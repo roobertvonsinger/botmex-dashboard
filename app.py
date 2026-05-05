@@ -14,6 +14,16 @@ from fastapi.staticfiles import StaticFiles
 ROOT = Path(__file__).parent
 STATIC = ROOT / "static"
 
+# Load .env (manual mini-parser, no extra deps)
+_env_file = ROOT / ".env"
+if _env_file.exists():
+    for _line in _env_file.read_text(encoding="utf-8").splitlines():
+        _s = _line.strip()
+        if not _s or _s.startswith("#") or "=" not in _s:
+            continue
+        _k, _v = _s.split("=", 1)
+        os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
+
 # La BD vive donde corre el bot. Local: usa ENV BETMEX_DB. VPS: /opt/betmexico/bot/betmexico_accounts.db
 DB_PATH = Path(os.environ.get("BETMEX_DB", str(ROOT.parent / "Telegram" / "betmexico_accounts.db")))
 
