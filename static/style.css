@@ -316,3 +316,52 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 .row-locked .locked-bar { background: var(--purple); box-shadow: 0 0 6px oklch(0.74 0.17 295 / 0.5); }
 
 .badge.hidden { display: none; }
+
+/* ─── Admin Panel — L invertida SuperAdmin ─── */
+.admin-panel {
+  padding: 10px 22px 8px;
+  border-bottom: 1px solid var(--hairline);
+}
+.ap-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.ap-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 10px 12px;
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+}
+.ap-card.ap-alert {
+  border-color: oklch(0.66 0.21 24 / 0.40);
+  background: linear-gradient(180deg, var(--danger-soft), var(--surface));
+}
+.ap-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  font-family: var(--font-mono);
+}
+.ap-value {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+.ap-alert .ap-value { color: var(--danger); }
+.ap-sub {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+}

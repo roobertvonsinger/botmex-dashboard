@@ -166,7 +166,56 @@ tickFrase();
 const fraseTimer = setInterval(tickFrase, 9000);
 reload();
 
+// ─── admin panel ───
+let adminRefreshing = false;
+async function refreshAdminPanel() {
+  if (adminRefreshing) return;
+  adminRefreshing = true;
+  try {
+    const [con, act, alt, pool] = await Promise.all([
+      fetch('/api/superadmin/conectados').then(r => r.json()).catch(() => null),
+      fetch('/api/superadmin/actividad').then(r => r.json()).catch(() => null),
+      fetch('/api/superadmin/alertas').then(r => r.json()).catch(() => null),
+      fetch('/api/superadmin/pool').then(r => r.json()).catch(() => null),
+    ]);
+
+    if (con) {
+      const conCount = con.reduce((s, o) => s + o.count, 0);
+      document.getElementById('apConVal').textContent = conCount;
+      document.getElementById('apConSub').textContent =
+        con.map(o => `${o.operator}(${o.count})`).join(', ') || 'nadie activo';
+    }
+    if (act) {
+      document.getElementById('apActVal').textContent = act.recentChecks.length;
+      const peak = act.byHour.reduce((p, h) => h.count > (p?.count ?? 0) ? h : p, null);
+      document.getElementById('apActSub').textContent =
+        peak ? `pico ${peak.hour}:00 (${peak.count} checks)` : 'sin actividad 24h';
+    }
+    if (alt) {
+      const altTotal = alt.recentDead.length + (alt.noRecentCheck > 0 ? 1 : 0);
+      document.getElementById('apAltVal').textContent = altTotal || '✓';
+      document.getElementById('apAltSub').textContent =
+        `${alt.recentDead.length} DEAD · ${alt.noRecentCheck} sin check 48h`;
+    }
+    if (pool && pool.capmonster) {
+      const cm = pool.capmonster;
+      document.getElementById('apPoolVal').textContent =
+        cm.balance != null ? `$${Number(cm.balance).toFixed(2)}` : '—';
+      document.getElementById('apPoolSub').textContent =
+        cm.error ? cm.error.slice(0, 30) : 'disponibles';
+    }
+  } catch (e) {
+    console.error('Admin panel error:', e);
+  } finally {
+    adminRefreshing = false;
+  }
+}
+
+refreshAdminPanel();
+const adminTimer = setInterval(refreshAdminPanel, 30_000);
+
 window.addEventListener('beforeunload', () => {
   clearInterval(greetingTimer);
   clearInterval(fraseTimer);
+  clearInterval(adminTimer);
 });
