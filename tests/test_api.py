@@ -107,3 +107,48 @@ def test_superadmin_pool_no_key(client, monkeypatch):
     assert "error" in data["capmonster"]
     assert data["capmonster"]["balance"] is None
     assert data["capmonster"]["error"] == "CAPMONSTER_KEY not set"
+
+
+def test_lock_account(client):
+    accounts = client.get("/api/accounts?status=LIVE").json()
+    acc_id = accounts[0]["id"]
+
+    r = client.post(
+        f"/api/accounts/{acc_id}/lock",
+        json={"operator": "RobertVS", "hours": 2},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["locked_by"] == "RobertVS"
+    assert data["locked_until"] is not None
+
+
+def test_unlock_account(client):
+    accounts = client.get("/api/accounts?status=LIVE").json()
+    acc_id = accounts[0]["id"]
+
+    client.post(f"/api/accounts/{acc_id}/lock", json={"operator": "RobertVS", "hours": 2})
+    r = client.post(f"/api/accounts/{acc_id}/unlock")
+    assert r.status_code == 200
+    assert r.json()["locked_by"] is None
+
+    # Verify DB state via re-query
+    rows = client.get("/api/accounts?status=all").json()
+    target = next(row for row in rows if row["id"] == acc_id)
+    assert target["locked_by"] is None
+    assert target["locked_at"] is None
+
+
+def test_lock_conflict(client):
+    accounts = client.get("/api/accounts?status=LIVE").json()
+    acc_id = accounts[0]["id"]
+
+    client.post(f"/api/accounts/{acc_id}/lock", json={"operator": "RobertVS", "hours": 2})
+    r = client.post(f"/api/accounts/{acc_id}/lock", json={"operator": "Lau", "hours": 2})
+    assert r.status_code == 409
+    assert "RobertVS" in r.json()["detail"]
+
+
+def test_lock_not_found(client):
+    r = client.post("/api/accounts/99999/lock", json={"operator": "RobertVS", "hours": 2})
+    assert r.status_code == 404

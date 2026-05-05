@@ -7,11 +7,13 @@ import sqlite3, os
 import json as _json
 import urllib.request
 from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 ROOT = Path(__file__).parent
 STATIC = ROOT / "static"
@@ -29,18 +31,39 @@ if _env_file.exists():
 # La BD vive donde corre el bot. Local: usa ENV BETMEX_DB. VPS: /opt/betmexico/bot/betmexico_accounts.db
 DB_PATH = Path(os.environ.get("BETMEX_DB", str(ROOT.parent / "Telegram" / "betmexico_accounts.db")))
 
-app = FastAPI(title="Botmexico v2")
-app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
-
 
 @contextmanager
-def db():
+def db(write: bool = False):
     conn = sqlite3.connect(str(DB_PATH), timeout=10)
     conn.row_factory = sqlite3.Row
+    if write:
+        conn.execute("PRAGMA journal_mode=WAL")
     try:
         yield conn
+        if write:
+            conn.commit()
+    except Exception:
+        if write:
+            conn.rollback()
+        raise
     finally:
         conn.close()
+
+
+def _migrate():
+    """Aditivo: agrega columna locked_until si no existe."""
+    try:
+        with db(write=True) as c:
+            c.execute("ALTER TABLE accounts ADD COLUMN locked_until TEXT")
+    except sqlite3.OperationalError as e:
+        if "duplicate column name" not in str(e):
+            raise
+
+
+_migrate()
+
+app = FastAPI(title="Botmexico v2")
+app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
 @app.get("/")
@@ -172,6 +195,50 @@ def superadmin_pool():
         "capmonster": _capmonster_balance(),
         "proxy": {"status": "pending", "note": "LitPort API — Sprint 5"},
     }
+
+
+class LockRequest(BaseModel):
+    operator: str
+    hours: int = 2
+
+
+@app.post("/api/accounts/{account_id}/lock")
+def lock_account(account_id: int, req: LockRequest):
+    now = datetime.now(timezone.utc)
+    locked_at = now.isoformat()
+    locked_until = (now + timedelta(hours=req.hours)).isoformat()
+    with db(write=True) as c:
+        cur = c.execute(
+            "UPDATE accounts SET locked_by=?, locked_at=?, locked_until=?"
+            " WHERE id=? AND locked_by IS NULL",
+            (req.operator, locked_at, locked_until, account_id),
+        )
+        if cur.rowcount == 0:
+            row = c.execute(
+                "SELECT id, locked_by FROM accounts WHERE id=?", (account_id,)
+            ).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Account not found")
+            raise HTTPException(
+                status_code=409,
+                detail=f"Already locked by {row['locked_by']}",
+            )
+    return {"id": account_id, "locked_by": req.operator, "locked_until": locked_until}
+
+
+@app.post("/api/accounts/{account_id}/unlock")
+def unlock_account(account_id: int):
+    with db(write=True) as c:
+        row = c.execute(
+            "SELECT id FROM accounts WHERE id=?", (account_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Account not found")
+        c.execute(
+            "UPDATE accounts SET locked_by=NULL, locked_at=NULL, locked_until=NULL WHERE id=?",
+            (account_id,),
+        )
+    return {"id": account_id, "locked_by": None, "locked_until": None}
 
 
 if __name__ == "__main__":
