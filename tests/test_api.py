@@ -152,3 +152,38 @@ def test_lock_conflict(client):
 def test_lock_not_found(client):
     r = client.post("/api/accounts/99999/lock", json={"operator": "RobertVS", "hours": 2})
     assert r.status_code == 404
+
+
+import asyncio
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_sse_immediate_heartbeat():
+    """El generator emite heartbeat inmediato al conectar."""
+    from app import _sse_generator
+    gen = _sse_generator()
+    try:
+        first = await gen.__anext__()
+        assert first == ": heartbeat\n\n"
+    finally:
+        await gen.aclose()
+
+
+@pytest.mark.asyncio
+async def test_sse_broadcast_delivery():
+    """Un evento _broadcast llega al cliente conectado."""
+    from app import _sse_generator, _broadcast, _sse_queues
+    gen = _sse_generator()
+    try:
+        await gen.__anext__()  # heartbeat inicial — registra el queue
+        assert len(_sse_queues) == 1
+        _broadcast({"type": "locked", "id": 42, "operator": "RobertVS"})
+        msg = await asyncio.wait_for(gen.__anext__(), timeout=2.0)
+        assert msg.startswith("data: ")
+        assert '"type": "locked"' in msg
+        assert '"id": 42' in msg
+    finally:
+        await gen.aclose()
+    # After aclose, queue should be removed
+    assert len(_sse_queues) == 0

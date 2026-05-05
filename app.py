@@ -4,14 +4,17 @@
 
 from __future__ import annotations
 import sqlite3, os
+import asyncio
 import json as _json
+import queue as _stdlib_queue
+import threading
 import urllib.request
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -61,6 +64,26 @@ def _migrate():
 
 
 _migrate()
+
+_sse_lock = threading.Lock()
+_sse_queues: list = []  # list[queue.SimpleQueue]
+
+
+def _broadcast(event: dict) -> None:
+    """Push event a todos los SSE clients. Thread-safe."""
+    msg = f"data: {_json.dumps(event)}\n\n"
+    with _sse_lock:
+        for q in _sse_queues:
+            q.put(msg)
+
+
+def _dequeue_blocking(q, timeout: float) -> str:
+    """Espera un mensaje, devuelve heartbeat si timeout."""
+    try:
+        return q.get(timeout=timeout)
+    except _stdlib_queue.Empty:
+        return ": heartbeat\n\n"
+
 
 app = FastAPI(title="Botmexico v2")
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
@@ -223,6 +246,7 @@ def lock_account(account_id: int, req: LockRequest):
                 status_code=409,
                 detail=f"Already locked by {row['locked_by']}",
             )
+    _broadcast({"type": "locked", "id": account_id, "operator": req.operator})
     return {"id": account_id, "locked_by": req.operator, "locked_until": locked_until}
 
 
@@ -238,7 +262,34 @@ def unlock_account(account_id: int):
             "UPDATE accounts SET locked_by=NULL, locked_at=NULL, locked_until=NULL WHERE id=?",
             (account_id,),
         )
+    _broadcast({"type": "unlocked", "id": account_id})
     return {"id": account_id, "locked_by": None, "locked_until": None}
+
+
+async def _sse_generator():
+    q = _stdlib_queue.SimpleQueue()
+    with _sse_lock:
+        _sse_queues.append(q)
+    try:
+        yield ": heartbeat\n\n"
+        while True:
+            msg = await asyncio.get_running_loop().run_in_executor(
+                None, _dequeue_blocking, q, 25.0
+            )
+            yield msg
+    finally:
+        with _sse_lock:
+            if q in _sse_queues:
+                _sse_queues.remove(q)
+
+
+@app.get("/api/events")
+async def events():
+    return StreamingResponse(
+        _sse_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 if __name__ == "__main__":

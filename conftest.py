@@ -19,7 +19,7 @@ def seed_db(tmp_path, monkeypatch):
                 status TEXT DEFAULT 'LIVE',
                 first_checked_at TEXT NOT NULL, last_checked_at TEXT NOT NULL, check_count INTEGER DEFAULT 1,
                 checked_by INTEGER DEFAULT 0,
-                locked_by INTEGER DEFAULT NULL, locked_at TEXT DEFAULT NULL,
+                locked_by INTEGER DEFAULT NULL, locked_at TEXT DEFAULT NULL, locked_until TEXT DEFAULT NULL,
                 grade TEXT DEFAULT '?'
             )
         """)
@@ -42,7 +42,6 @@ def seed_db(tmp_path, monkeypatch):
 @pytest.fixture
 def client(seed_db):
     """TestClient con BD seed apuntada."""
-    # Recargar app después de monkeypatch del env var
     import importlib, app as app_mod
     importlib.reload(app_mod)
     return TestClient(app_mod.app)
