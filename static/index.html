@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Botmexico v2 — Obsidian</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sb-brand"><img src="/static/assets/botmexico_logo.png" alt="Botmexico"></div>
+    <div class="tristrip"><i></i><i></i><i></i></div>
+    <div class="sb-greet">
+      <div>Hola, <b>RobertVS</b></div>
+      <div class="mono"><span id="sbDate"></span> · <span id="sbTime"></span></div>
+    </div>
+    <div class="sb-section">Principal</div>
+    <button class="nav on"><span class="i">▦</span>Cuentas<span class="b" id="navCount">…</span></button>
+    <button class="nav"><span class="i">$</span>Depósitos</button>
+    <button class="nav"><span class="i">▭</span>Tarjetas</button>
+    <div class="sb-section">Sistema</div>
+    <button class="nav"><span class="i">◔</span>Notificaciones<span class="b warn">·</span></button>
+    <button class="nav"><span class="i">▤</span>Logs</button>
+    <div class="grow"></div>
+    <div class="sb-status mono">
+      <div><span>xCAPTCHA</span><b class="ok" id="stCap">—</b></div>
+      <div><span>Proxy</span><b class="ok" id="stProxy">—</b></div>
+      <div><span>En uso</span><b class="warn" id="stInUse">—</b></div>
+    </div>
+    <div class="sb-user">
+      <div class="av">RV</div>
+      <div class="info"><div>RobertVS</div><div class="mono dim">admin</div></div>
+      <button class="ico-btn" title="Salir">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v9"/><path d="M5.5 8.5a8 8 0 1 0 13 0"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="search">
+        <span class="ico">⌕</span>
+        <input id="searchInput" placeholder="Buscar email, tarjeta, nombre, notas...">
+        <kbd>Ctrl K</kbd>
+      </div>
+      <div class="frase"><span class="emoji">💛</span><span id="fraseTxt">…</span></div>
+      <div class="topbar-right">
+        <button class="bell" title="Notificaciones">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+          <span class="badge">4</span>
+        </button>
+        <button class="power" title="Salir">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v9"/><path d="M5.5 8.5a8 8 0 1 0 13 0"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <section class="filterbar">
+      <h2>Cuentas <span class="dim mono" id="countLabel">— / —</span></h2>
+      <div class="grow"></div>
+      <div class="seg" data-seg="status">
+        <button data-v="LIVE" class="on">LIVE</button>
+        <button data-v="all">Todos</button>
+        <button data-v="DEAD">DEAD</button>
+      </div>
+      <div class="seg" data-seg="grade">
+        <button data-v="" class="on">Todos</button>
+        <button data-v="A">A</button>
+        <button data-v="B">B</button>
+        <button data-v="C">C</button>
+        <button data-v="?">?</button>
+      </div>
+      <div class="seg" data-seg="view">
+        <button data-v="simple" class="on">Simple</button>
+        <button data-v="detail">Detallada</button>
+      </div>
+    </section>
+
+    <section class="tablewrap">
+      <table id="accTable">
+        <thead></thead>
+        <tbody><tr><td class="loading" colspan="6">Cargando…</td></tr></tbody>
+      </table>
+    </section>
+  </main>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>
