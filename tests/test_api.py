@@ -60,3 +60,50 @@ def test_stats_returns_expected_aggregates(client):
         "withBalance": 2,        # ambas LIVE tienen saldo > 0
         "inUse": 0,              # ninguna locked
     }
+
+
+def test_superadmin_conectados(client):
+    r = client.get("/api/superadmin/conectados")
+    assert r.status_code == 200
+    data = r.json()
+    assert isinstance(data, list)
+    assert data == []
+
+
+def test_superadmin_actividad(client):
+    r = client.get("/api/superadmin/actividad")
+    assert r.status_code == 200
+    data = r.json()
+    assert "recentChecks" in data
+    assert "byHour" in data
+    assert isinstance(data["recentChecks"], list)
+    assert isinstance(data["byHour"], list)
+    # Seed has 3 accounts all with last_checked_at set
+    assert len(data["recentChecks"]) == 3
+    # All seeded checks share the same timestamp ("2026-05-05 11:00:00")
+    assert len(data["byHour"]) == 1
+
+
+def test_superadmin_alertas(client):
+    r = client.get("/api/superadmin/alertas")
+    assert r.status_code == 200
+    data = r.json()
+    assert "recentDead" in data
+    assert "noRecentCheck" in data
+    assert isinstance(data["recentDead"], list)
+    # Seed has exactly 1 DEAD account
+    assert len(data["recentDead"]) == 1
+    # Both LIVE accounts have fresh last_checked_at (within 48h of seed time)
+    assert data["noRecentCheck"] == 0
+
+
+def test_superadmin_pool_no_key(client, monkeypatch):
+    monkeypatch.delenv("CAPMONSTER_KEY", raising=False)
+    r = client.get("/api/superadmin/pool")
+    assert r.status_code == 200
+    data = r.json()
+    assert "capmonster" in data
+    assert "balance" in data["capmonster"]
+    assert "error" in data["capmonster"]
+    assert data["capmonster"]["balance"] is None
+    assert data["capmonster"]["error"] == "CAPMONSTER_KEY not set"

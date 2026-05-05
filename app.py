@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 import sqlite3, os
+import json as _json
+import urllib.request
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
@@ -90,6 +92,86 @@ def stats():
         with_balance = c.execute("SELECT COUNT(*) FROM accounts WHERE status='LIVE' AND balance_total > 0").fetchone()[0]
         in_use = c.execute("SELECT COUNT(*) FROM accounts WHERE locked_by IS NOT NULL").fetchone()[0]
     return {"live": live, "total": total, "totalBalance": balance, "withBalance": with_balance, "inUse": in_use}
+
+
+@app.get("/api/superadmin/conectados")
+def superadmin_conectados():
+    """Operadores con cuentas en uso agrupados por operador."""
+    with db() as c:
+        rows = c.execute(
+            "SELECT locked_by, COUNT(*) as count FROM accounts "
+            "WHERE locked_by IS NOT NULL GROUP BY locked_by"
+        ).fetchall()
+    return [{"operator": r["locked_by"], "count": r["count"]} for r in rows]
+
+
+@app.get("/api/superadmin/actividad")
+def superadmin_actividad():
+    """Checks recientes y actividad por hora últimas 24h."""
+    with db() as c:
+        recent = c.execute(
+            "SELECT id, email, grade, status, last_checked_at "
+            "FROM accounts WHERE last_checked_at IS NOT NULL "
+            "ORDER BY last_checked_at DESC LIMIT 20"
+        ).fetchall()
+        by_hour = c.execute(
+            "SELECT strftime('%H', last_checked_at) as hour, COUNT(*) as count "
+            "FROM accounts WHERE last_checked_at IS NOT NULL "
+            "AND last_checked_at >= datetime('now', '-24 hours') "
+            "GROUP BY hour ORDER BY hour"
+        ).fetchall()
+    return {
+        "recentChecks": [dict(r) for r in recent],
+        "byHour": [{"hour": r["hour"], "count": r["count"]} for r in by_hour],
+    }
+
+
+@app.get("/api/superadmin/alertas")
+def superadmin_alertas():
+    """Alertas: DEAD recientes (top 10) + LIVE sin check en 48h."""
+    with db() as c:
+        recent_dead = c.execute(
+            "SELECT id, email, grade, last_checked_at FROM accounts "
+            "WHERE status='DEAD' ORDER BY last_checked_at DESC LIMIT 10"
+        ).fetchall()
+        no_recent = c.execute(
+            "SELECT COUNT(*) FROM accounts WHERE status='LIVE' "
+            "AND (last_checked_at IS NULL "
+            "  OR last_checked_at < datetime('now', '-48 hours'))"
+        ).fetchone()[0]
+    return {
+        "recentDead": [dict(r) for r in recent_dead],
+        "noRecentCheck": no_recent,
+    }
+
+
+def _capmonster_balance() -> dict:
+    key = os.environ.get("CAPMONSTER_KEY", "")
+    if not key:
+        return {"balance": None, "error": "CAPMONSTER_KEY not set"}
+    try:
+        req = urllib.request.Request(
+            "https://api.capmonster.cloud/getBalance",
+            data=_json.dumps({"clientKey": key}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            body = _json.loads(resp.read())
+        if body.get("errorId") == 0:
+            return {"balance": body["balance"], "error": None}
+        return {"balance": None, "error": body.get("errorDescription", "API error")}
+    except Exception as e:
+        return {"balance": None, "error": str(e)}
+
+
+@app.get("/api/superadmin/pool")
+def superadmin_pool():
+    """Créditos CapMonster + estado proxy (LitPort pendiente Sprint 5)."""
+    return {
+        "capmonster": _capmonster_balance(),
+        "proxy": {"status": "pending", "note": "LitPort API — Sprint 5"},
+    }
 
 
 if __name__ == "__main__":
