@@ -72,7 +72,7 @@ async function fetchAccounts() {
   const url = new URL('/api/accounts', location.origin);
   url.searchParams.set('status', state.status);
   if (state.grade) url.searchParams.set('grade', state.grade);
-  url.searchParams.set('limit', '50');
+  url.searchParams.set('limit', '200');
   const r = await fetch(url);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
@@ -91,11 +91,10 @@ function renderTable() {
     t.querySelector('thead').innerHTML = `
       <tr>
         <th></th><th>Grade</th><th class="num">Saldo</th><th>Cuenta</th>
-        <th>Últ. depósito</th><th>Tarjetas</th>
+        <th>Últ. depósito</th>
       </tr>`;
     t.querySelector('tbody').innerHTML = state.rows.map(r => {
       const g = gradeClass(r.grade);
-      const has = (r.has_cards ?? false);
       const locked = r.locked_by ? 'row-locked' : '';
       return `<tr class="${locked}">
         <td><span class="locked-bar"></span></td>
@@ -103,9 +102,8 @@ function renderTable() {
         <td class="num"><span class="balance ${r.balance_total > 0 ? '' : 'zero'}">${fmtMoney(r.balance_total)}</span></td>
         <td class="combo"><b>${esc(r.email)}</b>:••••••••</td>
         <td class="dep">${r.last_deposit_amount ? `<b>${fmtMoney(r.last_deposit_amount)}</b><span class="ago">${fmtAgo(r.last_deposit_date)}</span>` : '<span class="dim">sin dep.</span>'}</td>
-        <td><span class="cards-icon ${has ? 'has' : 'none'}">▭</span></td>
       </tr>`;
-    }).join('') || `<tr><td colspan="6" class="loading">Sin cuentas</td></tr>`;
+    }).join('') || `<tr><td colspan="5" class="loading">Sin cuentas</td></tr>`;
   } else {
     t.querySelector('thead').innerHTML = `
       <tr>

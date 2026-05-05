@@ -314,3 +314,5 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
   background: var(--text-faint);
 }
 .row-locked .locked-bar { background: var(--purple); box-shadow: 0 0 6px oklch(0.74 0.17 295 / 0.5); }
+
+.badge.hidden { display: none; }
