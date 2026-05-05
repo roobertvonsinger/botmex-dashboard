@@ -13,6 +13,8 @@ const FRASES = [
   "El éxito sabe a tacos al pastor.",
 ];
 
+const esc = s => s == null ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
 const state = {
   status: 'LIVE',
   grade: '',
@@ -79,9 +81,9 @@ function renderTable() {
       const locked = r.locked_by ? 'row-locked' : '';
       return `<tr class="${locked}">
         <td><span class="locked-bar"></span></td>
-        <td><span class="grade ${g}">${r.grade || '?'}</span></td>
+        <td><span class="grade ${g}">${esc(r.grade) || '?'}</span></td>
         <td class="num"><span class="balance ${r.balance_total > 0 ? '' : 'zero'}">${fmtMoney(r.balance_total)}</span></td>
-        <td class="combo"><b>${r.email}</b>:••••••••</td>
+        <td class="combo"><b>${esc(r.email)}</b>:••••••••</td>
         <td class="dep">${r.last_deposit_amount ? `<b>${fmtMoney(r.last_deposit_amount)}</b><span class="ago">${fmtAgo(r.last_deposit_date)}</span>` : '<span class="dim">sin dep.</span>'}</td>
         <td><span class="cards-icon ${has ? 'has' : 'none'}">▭</span></td>
       </tr>`;
@@ -97,9 +99,9 @@ function renderTable() {
       const locked = r.locked_by ? 'row-locked' : '';
       return `<tr class="${locked}">
         <td><span class="locked-bar"></span></td>
-        <td><span class="grade ${g}">${r.grade || '?'}</span></td>
+        <td><span class="grade ${g}">${esc(r.grade) || '?'}</span></td>
         <td class="num"><span class="balance ${r.balance_total > 0 ? '' : 'zero'}">${fmtMoney(r.balance_total)}</span></td>
-        <td class="combo"><b>${r.email}</b></td>
+        <td class="combo"><b>${esc(r.email)}</b></td>
         <td class="dep">${r.last_deposit_amount ? `<b>${fmtMoney(r.last_deposit_amount)}</b><span class="ago">${fmtAgo(r.last_deposit_date)}</span>` : '<span class="dim">—</span>'}</td>
         <td>${r.status === 'LIVE' ? '<span style="color:var(--accent)">LIVE</span>' : '<span class="dim">DEAD</span>'}</td>
         <td class="dep dim">${fmtAgo(r.last_checked_at)}</td>
@@ -142,6 +144,13 @@ async function reload() {
 }
 
 // ─── init ───
-tickGreeting(); setInterval(tickGreeting, 30000);
-tickFrase(); setInterval(tickFrase, 9000);
+tickGreeting();
+const greetingTimer = setInterval(tickGreeting, 30000);
+tickFrase();
+const fraseTimer = setInterval(tickFrase, 9000);
 reload();
+
+window.addEventListener('beforeunload', () => {
+  clearInterval(greetingTimer);
+  clearInterval(fraseTimer);
+});

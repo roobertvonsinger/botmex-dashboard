@@ -13,6 +13,10 @@ python app.py
 
 Abre http://127.0.0.1:5001
 
+## Scope (Sprint 1)
+
+- Desktop-only viewport (≥1280px). Mobile/tablet responsive deferred until Sprint 2 panel work decides final layout. The shell is fixed at `100vh` with sidebar at `216px` on purpose to maximize information density.
+
 ## Stack
 
 - **Backend:** FastAPI + uvicorn + SQLite (read-only contra `betmexico_accounts.db`)

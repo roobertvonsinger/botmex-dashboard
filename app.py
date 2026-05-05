@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 import sqlite3, os
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
 from fastapi import FastAPI, Query
@@ -20,10 +21,14 @@ app = FastAPI(title="Botmexico v2")
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
+@contextmanager
 def db():
     conn = sqlite3.connect(str(DB_PATH), timeout=10)
     conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 @app.get("/")
@@ -53,7 +58,7 @@ def list_accounts(
     if grade:
         where.append("grade = ?"); params.append(grade)
     sql = (
-        "SELECT id, email, password, balance_total, balance_real, "
+        "SELECT id, email, balance_total, balance_real, "
         "last_deposit_amount, last_deposit_date, status, grade, "
         "locked_by, locked_at, last_checked_at, check_count "
         "FROM accounts"
