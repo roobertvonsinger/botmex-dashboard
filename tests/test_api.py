@@ -47,3 +47,16 @@ def test_accounts_ordering_by_balance_desc(client):
     rows = r.json()
     balances = [row["balance_total"] for row in rows]
     assert balances == sorted(balances, reverse=True)
+
+
+def test_stats_returns_expected_aggregates(client):
+    r = client.get("/api/stats")
+    assert r.status_code == 200
+    body = r.json()
+    assert body == {
+        "live": 2,
+        "total": 3,
+        "totalBalance": 150.5,  # 100 + 50.5
+        "withBalance": 2,        # ambas LIVE tienen saldo > 0
+        "inUse": 0,              # ninguna locked
+    }
