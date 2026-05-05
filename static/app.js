@@ -72,6 +72,7 @@ async function fetchAccounts() {
   const url = new URL('/api/accounts', location.origin);
   url.searchParams.set('status', state.status);
   if (state.grade) url.searchParams.set('grade', state.grade);
+  url.searchParams.set('limit', '50');
   const r = await fetch(url);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
