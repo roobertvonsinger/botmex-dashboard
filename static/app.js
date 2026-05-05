@@ -24,10 +24,27 @@ const state = {
 
 const $ = sel => document.querySelector(sel);
 const fmtMoney = v => `$${(v || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// Parsea formatos de la BD: ISO "YYYY-MM-DD HH:MM:SS" y MX "DD/MM/YYYY HH:MM".
+// Devuelve Date inválido (NaN-time) si no matchea.
+const parseTs = ts => {
+  if (!ts || ts === 'N/A') return new Date(NaN);
+  const mx = ts.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (mx) {
+    const [, dd, mm, yyyy, h, mi, ss] = mx;
+    return new Date(+yyyy, +mm - 1, +dd, +h, +mi, +(ss || 0));
+  }
+  const iso = ts.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
+  if (iso) {
+    const [, yyyy, mm, dd, h, mi, ss] = iso;
+    return new Date(+yyyy, +mm - 1, +dd, +h, +mi, +ss);
+  }
+  return new Date(ts);
+};
 const fmtAgo = ts => {
-  if (!ts) return '—';
-  const d = new Date(ts.replace(' ', 'T'));
+  const d = parseTs(ts);
+  if (isNaN(d.getTime())) return '—';
   const diff = (Date.now() - d.getTime()) / 1000;
+  if (diff < 0) return '—';
   if (diff < 60) return `${Math.floor(diff)}s`;
   if (diff < 3600) return `${Math.floor(diff/60)}m`;
   if (diff < 86400) return `${Math.floor(diff/3600)}h`;
