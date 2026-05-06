@@ -321,18 +321,28 @@
         <div class="dep-pool-count dim mono" id="depPoolCount">0 tarjetas</div>
       </div>
 
+      <!-- Cap status (24h window) -->
+      <div class="dep-cap" id="depCap" style="display:none">
+        <div class="dep-cap-bar"><div id="depCapFill" class="dep-cap-fill"></div></div>
+        <div class="dep-cap-text">
+          <span class="dep-cap-label">24h:</span>
+          <span><b id="depCapUsed">$0</b> / $1499</span>
+          <span class="dim" id="depCapExpires"></span>
+        </div>
+      </div>
+
       <!-- Monto -->
       <div class="dep-section">
-        <label class="dep-label">Monto <span class="dim" id="depAmountHint"></span></label>
+        <label class="dep-label">Monto <span class="dim" id="depAmountHint">— máx $499/intento</span></label>
         <div class="dep-amounts" id="depAmounts">
           <button class="dep-amt" data-v="10">$10</button>
           <button class="dep-amt on" data-v="50">$50</button>
           <button class="dep-amt" data-v="100">$100</button>
           <button class="dep-amt" data-v="200">$200</button>
-          <button class="dep-amt" data-v="500">$500</button>
+          <button class="dep-amt" data-v="400">$400</button>
           <button class="dep-amt" data-v="custom">Otro</button>
         </div>
-        <input type="number" id="depCustomAmount" class="dep-input hidden" placeholder="Monto…" step="0.01" min="1" max="5000">
+        <input type="number" id="depCustomAmount" class="dep-input hidden" placeholder="1 a 499…" step="1" min="1" max="499">
       </div>
 
       <!-- Repeticiones (modo schedule) -->
@@ -347,7 +357,35 @@
 
       <!-- Result / Feed -->
       <div id="depResult" class="dep-result hidden"></div>
-      <div id="depFeed" class="dep-feed hidden"></div>
+
+      <!-- Vista Matchmaker (modo multi durante run) -->
+      <div id="depMatchView" class="dep-match-view hidden">
+        <div class="dep-mm-header">
+          <span class="dep-mm-title">🎯 Matchmaker en curso</span>
+          <span class="dep-mm-stats mono">
+            <span id="mmStMatches">0</span> matches ·
+            <span id="mmStAttempts">0</span> intentos ·
+            $<span id="mmStAmount">50</span>/intento
+          </span>
+        </div>
+        <div class="dep-mm-grid">
+          <!-- Columna tarjetas -->
+          <div class="dep-mm-col">
+            <div class="dep-mm-col-h">TARJETAS</div>
+            <div id="mmCards" class="dep-mm-list"></div>
+          </div>
+          <!-- Feed central -->
+          <div class="dep-mm-col dep-mm-col-feed">
+            <div class="dep-mm-col-h">ACTIVIDAD</div>
+            <div id="depFeed" class="dep-mm-feed"></div>
+          </div>
+          <!-- Columna cuentas -->
+          <div class="dep-mm-col">
+            <div class="dep-mm-col-h">CUENTAS</div>
+            <div id="mmAccounts" class="dep-mm-list"></div>
+          </div>
+        </div>
+      </div>
 
       <div class="dep-exec-row">
         <button id="depExec" class="dep-exec">🚀 Ejecutar</button>

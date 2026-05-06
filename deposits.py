@@ -12,7 +12,7 @@ import logging
 import os
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -22,6 +22,71 @@ from auth import require_session
 
 logger = logging.getLogger("betmexico.dashboard.deposits")
 router = APIRouter(prefix="/api/deposits", tags=["deposits"])
+
+# Caps duros (anti 3DS, anti-baneo)
+DEP_MAX_PER_TXN = 499.0   # >$499 dispara 3DS prácticamente garantizado
+DEP_MAX_24H = 1499.0      # tope acumulado por cuenta en 24h vía dashboard
+
+
+def _window_status(email: str) -> dict:
+    """Estado de la ventana de 24h desde el PRIMER depósito aprobado.
+    - Si no hay deps aprobados en últimas 24h → window cerrada, disponible $1499
+    - Si hay → window abierta, expires_at = first_at + 24h, available = 1499 - used
+    """
+    from app import db
+    import sqlite3
+    out = {
+        "used": 0.0, "available": DEP_MAX_24H,
+        "first_at": None, "expires_at": None, "in_window": False,
+    }
+    try:
+        with db() as c:
+            rows = c.execute(
+                "SELECT created_at, amount FROM deposit_attempts "
+                "WHERE account_email=? AND status='approved' "
+                "AND created_at >= datetime('now','-24 hours') "
+                "ORDER BY created_at ASC",
+                (email,),
+            ).fetchall()
+    except sqlite3.OperationalError:
+        return out
+    if not rows:
+        return out
+    # Parse fechas (sqlite str → datetime UTC naive)
+    def _parse(s):
+        try:
+            return datetime.fromisoformat(s.replace(" ", "T").replace("Z", "+00:00"))
+        except Exception:
+            return None
+    first_at = _parse(rows[0]["created_at"])
+    if not first_at:
+        return out
+    if first_at.tzinfo is None:
+        first_at = first_at.replace(tzinfo=timezone.utc)
+    expires_at = first_at + timedelta(hours=24)
+    used = sum(float(r["amount"] or 0) for r in rows)
+    out.update({
+        "used": used, "available": max(0.0, DEP_MAX_24H - used),
+        "first_at": first_at.isoformat(), "expires_at": expires_at.isoformat(),
+        "in_window": True,
+    })
+    return out
+
+
+def _check_caps(email: str, amount: float, projected_extra: float = 0.0) -> Optional[str]:
+    """Devuelve string de error si viola cap, None si OK.
+    `projected_extra` = monto adicional ya proyectado (ej. schedule: amount * reps_extra)."""
+    if amount > DEP_MAX_PER_TXN:
+        return f"Máximo ${DEP_MAX_PER_TXN:.0f} por intento (>${DEP_MAX_PER_TXN:.0f} dispara 3DS)"
+    win = _window_status(email)
+    needed = amount + projected_extra
+    if needed > win["available"]:
+        if win["in_window"]:
+            return (f"Excede cap 24h. Ya depositados ${win['used']:.2f}, "
+                    f"disponible ${win['available']:.2f}. La window cierra a las "
+                    f"{win['expires_at'][:16].replace('T',' ')} UTC")
+        return f"Excede cap por txn ${DEP_MAX_PER_TXN:.0f} (intentas ${needed:.2f})"
+    return None
 
 
 def _load_deps():
@@ -120,8 +185,8 @@ async def deposit_execute(request: Request, user: dict = Depends(require_session
     if not account_id or not card_pipe or amount <= 0:
         raise HTTPException(400, "Faltan campos: account_id, card_pipe, amount")
 
-    if amount < 1 or amount > 5000:
-        raise HTTPException(400, "Monto fuera de rango (1-5000)")
+    if amount < 1 or amount > DEP_MAX_PER_TXN:
+        raise HTTPException(400, f"Monto fuera de rango (1-{DEP_MAX_PER_TXN:.0f})")
 
     try:
         cc_num, cc_exp, cc_cvv = _parse_pipe(card_pipe)
@@ -142,6 +207,11 @@ async def deposit_execute(request: Request, user: dict = Depends(require_session
     password = row["password"]
     operator_id = int(user.get("telegram_id") or 0)
     attempt_id = uuid.uuid4().hex
+
+    # Cap check
+    cap_err = _check_caps(email, amount)
+    if cap_err:
+        raise HTTPException(400, cap_err)
 
     # Pool de captcha — start_factory arranca workers (rápido, no bloquea).
     # NO awaiteamos prefetch: si get_jwt usa caché, ni token necesita; si no,
@@ -202,6 +272,22 @@ async def deposit_execute(request: Request, user: dict = Depends(require_session
     }
 
 
+@router.get("/cap-status/{account_id}")
+def cap_status(account_id: int, _user: dict = Depends(require_session)):
+    """Estado del cap de 24h para una cuenta — para mostrar en el modal."""
+    from app import db
+    with db() as c:
+        row = c.execute("SELECT email FROM accounts WHERE id=?", (account_id,)).fetchone()
+    if not row:
+        raise HTTPException(404, "Cuenta no encontrada")
+    win = _window_status(row["email"])
+    return {
+        "max_per_txn": DEP_MAX_PER_TXN,
+        "max_24h": DEP_MAX_24H,
+        **win,
+    }
+
+
 # ── Multicuenta (Matchmaker) ─────────────────────────────────────────────────
 # Pool de tarjetas vs N cuentas (max 5). Algoritmo:
 #  - 5s cooldown por tarjeta y por cuenta
@@ -233,8 +319,8 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
         raise HTTPException(400, "account_ids requerido")
     if not cards_raw:
         raise HTTPException(400, "cards requerido")
-    if amount <= 0:
-        raise HTTPException(400, "Monto inválido")
+    if amount <= 0 or amount > DEP_MAX_PER_TXN:
+        raise HTTPException(400, f"Monto debe ser entre $1 y ${DEP_MAX_PER_TXN:.0f}")
 
     # Parsea tarjetas
     cards: list[dict] = []
@@ -266,6 +352,15 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
 
     if not accounts:
         raise HTTPException(404, "Ninguna cuenta encontrada")
+
+    # Cap check por cuenta — si alguna está full, abortar antes de empezar
+    cap_errors = []
+    for a in accounts:
+        err = _check_caps(a["email"], amount)
+        if err:
+            cap_errors.append(f"{a['email']}: {err}")
+    if cap_errors:
+        raise HTTPException(400, "Caps violados:\n" + "\n".join(cap_errors))
 
     operator_id = int(user.get("telegram_id") or 0)
     user_ctx = {"telegram_id": operator_id, "username": user.get("username", "")}
@@ -469,6 +564,8 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
 
     if not account_id or not card_pipe:
         raise HTTPException(400, "account_id y card_pipe requeridos")
+    if amount <= 0 or amount > DEP_MAX_PER_TXN:
+        raise HTTPException(400, f"Monto debe ser entre $1 y ${DEP_MAX_PER_TXN:.0f}")
     try:
         cc_num, cc_exp, cc_cvv = _parse_pipe(card_pipe)
     except ValueError as e:

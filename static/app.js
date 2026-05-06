@@ -1374,6 +1374,9 @@ async function openDepositModal(accountId, opts = {}) {
     const acc = state.rows.find(r => r.id === _depAccountIds[0]);
     $('#depTargetEmail').textContent = acc?.email || '—';
     $('#depTargetBalance').textContent = acc ? fmtMoney(acc.balance_total) : '—';
+    refreshCapStatus(_depAccountIds[0]);
+  } else {
+    $('#depCap').style.display = 'none';
   }
 
   setTimeout(() => {
@@ -1435,7 +1438,39 @@ async function refreshSavedCards() {
 function closeDepositModal() {
   if (_depBusy) { toast('Detén la misión primero', 'error'); return; }
   $('#depModalOverlay').classList.add('hidden');
+  $('#depModal').classList.remove('dep-modal-wide');
+  $('#depMatchView').classList.add('hidden');
+  $('#depCap').style.display = 'none';
   _depAccountIds = [];
+}
+
+// Cap status — pinta la barra y devuelve disponible
+async function refreshCapStatus(accountId) {
+  const cap = $('#depCap');
+  if (!accountId) { cap.style.display = 'none'; return null; }
+  try {
+    const r = await fetch(`/api/deposits/cap-status/${accountId}`);
+    if (!r.ok) { cap.style.display = 'none'; return null; }
+    const s = await r.json();
+    const used = Number(s.used || 0);
+    const max = Number(s.max_24h || 1499);
+    const pct = Math.min(100, (used / max) * 100);
+    $('#depCapUsed').textContent = `$${used.toFixed(0)}`;
+    const fill = $('#depCapFill');
+    fill.style.width = `${pct}%`;
+    fill.className = 'dep-cap-fill ' + (pct >= 100 ? 'cap-full' : pct >= 75 ? 'cap-warn' : 'cap-ok');
+    if (s.in_window && s.expires_at) {
+      const exp = new Date(s.expires_at);
+      $('#depCapExpires').textContent = `· cierra ${exp.toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'})}`;
+    } else {
+      $('#depCapExpires').textContent = '';
+    }
+    cap.style.display = '';
+    return s;
+  } catch {
+    cap.style.display = 'none';
+    return null;
+  }
 }
 
 function validatePipe(s) {
@@ -1554,7 +1589,85 @@ async function executeScheduled(pipe, amount) {
   }
 }
 
-// ── MULTI: matchmaker SSE ──
+// ── MULTI: matchmaker SSE con vista 3-columnas reactiva ──
+const _mm = {
+  cards: new Map(),    // tail → {pipe, fails, status: idle|busy|retired|matched, matchedEmail}
+  accounts: new Map(), // email → {id, fails, status: idle|busy|done|dead|cooldown, matchedTail}
+  matches: 0,
+  attempts: 0,
+  amount: 0,
+};
+
+function _mmReset(accountIds, cardPipes, amount) {
+  _mm.cards.clear();
+  _mm.accounts.clear();
+  _mm.matches = 0;
+  _mm.attempts = 0;
+  _mm.amount = amount;
+  for (const pipe of cardPipes) {
+    const num = pipe.replace(/\s/g, '').split('|')[0];
+    const tail = num.slice(-4);
+    _mm.cards.set(tail, { pipe, num, fails: 0, status: 'idle' });
+  }
+  for (const id of accountIds) {
+    const acc = state.rows.find(r => r.id === id);
+    if (acc) _mm.accounts.set(acc.email, { id, fails: 0, status: 'idle' });
+  }
+}
+
+function _mmRender() {
+  // Tarjetas
+  const cardsHtml = [..._mm.cards.entries()].map(([tail, c]) => {
+    const cls = `mm-card mm-${c.status}`;
+    const fails = c.fails ? `<span class="mm-fails">${c.fails}/2</span>` : '';
+    const ic = c.status === 'matched' ? '🎯'
+             : c.status === 'busy'    ? '<span class="dep-spinner"></span>'
+             : c.status === 'retired' ? '💀'
+             : '';
+    return `<div class="${cls}">
+      <span class="mm-tail mono">···${tail}</span>
+      ${fails}
+      <span class="mm-ic">${ic}</span>
+    </div>`;
+  }).join('');
+  $('#mmCards').innerHTML = cardsHtml;
+
+  // Cuentas
+  const accsHtml = [..._mm.accounts.entries()].map(([email, a]) => {
+    const cls = `mm-acct mm-${a.status}`;
+    const fails = a.fails ? `<span class="mm-fails">${a.fails}/2</span>` : '';
+    const ic = a.status === 'done'     ? '✓'
+             : a.status === 'busy'     ? '<span class="dep-spinner"></span>'
+             : a.status === 'dead'     ? '💀'
+             : a.status === 'cooldown' ? '⏳'
+             : '';
+    const matched = a.matchedTail ? `<span class="mm-matched mono">···${a.matchedTail}</span>` : '';
+    return `<div class="${cls}">
+      <span class="mm-email">${esc(email)}</span>
+      ${matched}
+      ${fails}
+      <span class="mm-ic">${ic}</span>
+    </div>`;
+  }).join('');
+  $('#mmAccounts').innerHTML = accsHtml;
+
+  // Stats
+  $('#mmStMatches').textContent = _mm.matches;
+  $('#mmStAttempts').textContent = _mm.attempts;
+  $('#mmStAmount').textContent = _mm.amount;
+}
+
+function _mmFeedAdd(cls, html) {
+  const feed = $('#depFeed');
+  const div = document.createElement('div');
+  div.className = `mm-feed-row ${cls}`;
+  div.innerHTML = html;
+  feed.appendChild(div);
+  // Cap a 80 rows en pantalla
+  while (feed.children.length > 80) feed.removeChild(feed.firstChild);
+  feed.scrollTop = feed.scrollHeight;
+}
+
 async function executeMatchmaker() {
   if (_depBusy) return;
   if (_depAccountIds.length < 1) { toast('Selecciona al menos 1 cuenta', 'error'); return; }
@@ -1563,25 +1676,28 @@ async function executeMatchmaker() {
   const raw = $('#depMultiPool').value.trim();
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
   const cards = [];
-  const errors = [];
   for (const l of lines.slice(0, 10)) {
-    const err = validatePipe(l);
-    if (err) errors.push(`${l.slice(0, 30)}: ${err}`);
-    else cards.push(l);
+    if (!validatePipe(l)) cards.push(l);
   }
   if (!cards.length) { toast('Pega al menos 1 tarjeta válida', 'error'); return; }
 
   const amount = getAmount();
-  if (amount < 1 || amount > 5000) { toast('Monto fuera de rango', 'error'); return; }
+  if (amount < 1 || amount > 499) { toast('Monto debe ser entre $1 y $499', 'error'); return; }
 
   _depBusy = true;
   $('#depExec').disabled = true;
   $('#depCancel').classList.remove('hidden');
-  const feed = $('#depFeed');
-  feed.classList.remove('hidden');
-  feed.innerHTML = `<div class="dep-feed-info">🎯 Iniciando matchmaker — ${cards.length} tarjetas vs ${_depAccountIds.length} cuentas</div>`;
+  // Oculta inputs, abre la vista matchmaker
+  $('#depMultiCards').classList.add('hidden');
+  $('#depMultiAccts').classList.add('hidden');
+  $('#depResult').classList.add('hidden');
+  $('#depMatchView').classList.remove('hidden');
+  // El modal se ensancha
+  $('#depModal').classList.add('dep-modal-wide');
 
-  const matches = new Map();  // email → match info
+  _mmReset(_depAccountIds, cards, amount);
+  _mmRender();
+  $('#depFeed').innerHTML = '';
 
   try {
     const ctrl = new AbortController();
@@ -1595,7 +1711,6 @@ async function executeMatchmaker() {
       const err = await r.json().catch(() => ({}));
       throw new Error(err.detail || `HTTP ${r.status}`);
     }
-
     const reader = r.body.getReader();
     const decoder = new TextDecoder();
     let buf = '';
@@ -1609,75 +1724,110 @@ async function executeMatchmaker() {
         buf = buf.slice(idx + 2);
         const line = chunk.split('\n').find(l => l.startsWith('data: '));
         if (!line) continue;
-        try {
-          const ev = JSON.parse(line.slice(6));
-          handleMmEvent(ev, matches);
-        } catch {}
+        try { handleMmEvent(JSON.parse(line.slice(6))); } catch {}
       }
     }
   } catch (e) {
     if (e.name !== 'AbortError') {
-      $('#depFeed').insertAdjacentHTML('beforeend', `<div class="dep-feed-row dep-feed-err">✗ ${esc(e.message)}</div>`);
+      _mmFeedAdd('mm-err', `✗ ${esc(e.message)}`);
     }
   } finally {
     _depBusy = false;
     $('#depExec').disabled = false;
+    $('#depExec').textContent = '🔁 Otra ronda';
     $('#depCancel').classList.add('hidden');
     _depMmAbort = null;
     _depMmRunId = null;
-    if (matches.size > 0) reload();
+    if (_mm.matches > 0) reload();
   }
 }
 
-function handleMmEvent(ev, matches) {
-  const feed = $('#depFeed');
-  const row = (cls, html) => `<div class="dep-feed-row ${cls}">${html}</div>`;
+function handleMmEvent(ev) {
   switch (ev.type) {
     case 'start':
       _depMmRunId = ev.run_id;
-      feed.insertAdjacentHTML('beforeend', row('dep-feed-info',
-        `🚀 ${ev.cards} tarjetas vs ${ev.accounts} cuentas · $${ev.amount}/intento`));
+      _mmFeedAdd('mm-info', `🚀 Iniciado · ${ev.cards} cards × ${ev.accounts} cuentas`);
       break;
-    case 'trying':
-      feed.insertAdjacentHTML('beforeend', row('dep-feed-trying',
-        `<span class="dep-spinner"></span> ${esc(ev.tail)} → ${esc(ev.email)} <span class="dim mono">#${ev.attempt}</span>`));
+
+    case 'trying': {
+      _mm.attempts = ev.attempt;
+      const card = _mm.cards.get(ev.tail.replace('···', ''));
+      const acc = _mm.accounts.get(ev.email);
+      if (card) card.status = 'busy';
+      if (acc) acc.status = 'busy';
+      _mmRender();
+      _mmFeedAdd('mm-trying',
+        `<span class="dep-spinner"></span> <b class="mono">${esc(ev.tail)}</b> → <span>${esc(ev.email)}</span>`);
       break;
-    case 'match':
-      matches.set(ev.email, ev);
-      feed.insertAdjacentHTML('beforeend', row('dep-feed-match',
-        `✓ <b>${esc(ev.tail)}</b> → ${esc(ev.email)} · $${ev.amount.toFixed(2)} <span class="dim mono">${ev.duration_ms}ms</span>`));
+    }
+
+    case 'match': {
+      _mm.matches++;
+      const tail = ev.tail.replace('···', '');
+      const card = _mm.cards.get(tail);
+      const acc = _mm.accounts.get(ev.email);
+      if (card) { card.status = 'matched'; card.matchedEmail = ev.email; }
+      if (acc) { acc.status = 'done'; acc.matchedTail = tail; }
+      _mmRender();
+      _mmFeedAdd('mm-match',
+        `✓ <b class="mono">${esc(ev.tail)}</b> ↔ <b>${esc(ev.email)}</b> · $${ev.amount.toFixed(2)} <span class="dim mono">${ev.duration_ms}ms</span>`);
       pushNotif({ icon: '💳', msg: `Match: ${ev.tail} ↔ ${ev.email}` });
       break;
-    case 'rejected':
-      feed.insertAdjacentHTML('beforeend', row('dep-feed-rej',
-        `✗ ${esc(ev.tail)} → ${esc(ev.email)} <span class="dim mono">${esc(ev.code)}</span> ${ev.card_fails ? `· card ${ev.card_fails}/2` : ''}${ev.acct_fails ? ` · cuenta ${ev.acct_fails}/2` : ''}`));
+    }
+
+    case 'rejected': {
+      const tail = ev.tail.replace('···', '');
+      const card = _mm.cards.get(tail);
+      const acc = _mm.accounts.get(ev.email);
+      if (card) { card.fails = ev.card_fails ?? card.fails; card.status = 'idle'; }
+      if (acc)  {
+        acc.fails = ev.acct_fails ?? acc.fails;
+        acc.status = (ev.acct_fails >= 2) ? 'dead' : 'cooldown';
+      }
+      _mmRender();
+      _mmFeedAdd('mm-rej',
+        `✗ <span class="mono">${esc(ev.tail)}</span> → ${esc(ev.email)} <span class="dim mono">${esc(ev.code)}</span>`);
       break;
-    case 'card_retired':
-      feed.insertAdjacentHTML('beforeend', row('dep-feed-info',
-        `🔻 Tarjeta ${esc(ev.tail)} retirada (${ev.fails} fallos)`));
+    }
+
+    case 'card_retired': {
+      const tail = ev.tail.replace('···', '');
+      const card = _mm.cards.get(tail);
+      if (card) { card.status = 'retired'; card.fails = ev.fails; }
+      _mmRender();
+      _mmFeedAdd('mm-info', `🔻 <span class="mono">${esc(ev.tail)}</span> retirada`);
       break;
-    case 'account_dead':
-      feed.insertAdjacentHTML('beforeend', row('dep-feed-dead',
-        `💀 ${esc(ev.email)} fuera <span class="dim mono">${esc(ev.code)}</span>`));
+    }
+
+    case 'account_dead': {
+      const acc = _mm.accounts.get(ev.email);
+      if (acc) acc.status = 'dead';
+      _mmRender();
+      _mmFeedAdd('mm-dead', `💀 <b>${esc(ev.email)}</b> <span class="dim mono">${esc(ev.code)}</span>`);
       break;
+    }
+
     case 'cooldown':
-      feed.insertAdjacentHTML('beforeend', row('dep-feed-info dim',
-        `⏳ Cooldown ${ev.wait}s…`));
+      _mmFeedAdd('mm-cooldown', `⏳ Cooldown ${ev.wait}s…`);
       break;
+
     case 'error':
-      feed.insertAdjacentHTML('beforeend', row('dep-feed-err',
-        `✗ ${esc(ev.email || '')} ${esc(ev.message || '')}`));
+      _mmFeedAdd('mm-err', `✗ ${esc(ev.email || '')} ${esc(ev.message || '')}`);
       break;
+
     case 'cancelled':
-      feed.insertAdjacentHTML('beforeend', row('dep-feed-info',
-        `⏹ Cancelado por usuario`));
+      _mmFeedAdd('mm-info', `⏹ Cancelado`);
       break;
+
     case 'done':
-      feed.insertAdjacentHTML('beforeend', row('dep-feed-done',
-        `<b>Listo</b> — ${ev.matches} match${ev.matches !== 1 ? 'es' : ''}, ${ev.attempts} intentos${ev.pending ? `, ${ev.pending} sin emparejar` : ''}`));
+      _mmFeedAdd('mm-done',
+        `<b>Listo</b> · ${ev.matches} match${ev.matches !== 1 ? 'es' : ''} · ${ev.attempts} intentos${ev.pending ? ` · ${ev.pending} sin emparejar` : ''}`);
+      // Limpia estados busy → idle al final
+      for (const c of _mm.cards.values()) if (c.status === 'busy') c.status = 'idle';
+      for (const a of _mm.accounts.values()) if (a.status === 'busy' || a.status === 'cooldown') a.status = a.fails >= 2 ? 'dead' : 'idle';
+      _mmRender();
       break;
   }
-  feed.scrollTop = feed.scrollHeight;
 }
 
 async function cancelMatchmaker() {
