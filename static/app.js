@@ -876,7 +876,8 @@ async function refreshVisible(opts = {}) {
   const btn = $('#btnRefreshVisible');
   if (btn) {
     btn.classList.add('refreshing');
-    btn.innerHTML = force ? '⏹ Detener (forzado)' : '⏹ Detener';
+    btn.innerHTML = `⏹ Detener · 0/${ids.length}${force ? ' (forzado)' : ''}`;
+    btn.style.setProperty('--prog', '0%');
     btn.style.pointerEvents = 'auto';
   }
 
@@ -896,6 +897,16 @@ async function refreshVisible(opts = {}) {
   let watchdog = null;
   const ctrl = new AbortController();
   _refreshAbort = ctrl;
+  const total = ids.length;
+
+  // Helper: actualiza visual del botón con progreso
+  const updateProgress = () => {
+    if (!btn) return;
+    const done = updated + failed + skipped;
+    const pct = total > 0 ? (done / total) * 100 : 0;
+    btn.innerHTML = `⏹ Detener · ${done}/${total}`;
+    btn.style.setProperty('--prog', `${pct}%`);
+  };
 
   // Watchdog: si no llega ningún evento en 90s, aborta con error visible
   watchdog = setInterval(() => {
@@ -945,14 +956,17 @@ async function refreshVisible(opts = {}) {
             const i = state.rows.findIndex(x => x.id === ev.data.id);
             if (i >= 0) state.rows[i] = { ...state.rows[i], ...ev.data };
             _swapRowWithAnim(ev.data.id);
+            updateProgress();
           } else if (ev.type === 'fail') {
             failed++;
             _markRowFail(ev.id);
+            updateProgress();
           } else if (ev.type === 'skip') {
             skipped++;
             skipReasons[ev.reason] = (skipReasons[ev.reason] || 0) + 1;
             if (ev.can_force) forceableIds.push(ev.id);
             _markRowSkip(ev.id, ev.reason);
+            updateProgress();
           }
         } catch (parseErr) {}
       }

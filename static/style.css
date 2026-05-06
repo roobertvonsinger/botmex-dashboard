@@ -2008,13 +2008,29 @@ tbody tr.row-refresh-skip { animation: rowSkip 1500ms ease-out; opacity: 0.7; }
 
 /* ── Botón refresh con estado activo (stop) ── */
 .seg-btn.refreshing {
-  background: var(--danger-soft);
-  border-color: var(--danger);
-  color: var(--danger);
-  animation: refreshPulse 1.5s ease-in-out infinite;
+  background: linear-gradient(
+    to right,
+    var(--accent-soft) 0%,
+    var(--accent-soft) var(--prog, 0%),
+    var(--danger-soft) var(--prog, 0%),
+    var(--danger-soft) 100%
+  );
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 700;
+  position: relative;
+  overflow: hidden;
+  transition: background 240ms ease;
+  min-width: 180px;
 }
-@keyframes refreshPulse {
-  50% { box-shadow: 0 0 12px var(--danger); }
+.seg-btn.refreshing::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: var(--prog, 0%);
+  background: linear-gradient(90deg, transparent, var(--accent-glow));
+  pointer-events: none;
+  transition: width 240ms ease;
 }
 
 /* ── Admin panel ── */
