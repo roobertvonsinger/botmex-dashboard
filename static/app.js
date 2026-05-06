@@ -416,35 +416,6 @@ async function bulkTrastienda() {
   }
 }
 
-async function bulkPrewarm() {
-  if (selectedIds.size === 0) return;
-  const sel = state.rows.filter(r => selectedIds.has(r.id));
-  const emails = sel.map(r => r.email);
-  toast(`🔥 Prewarming ${emails.length}…`);
-  try {
-    const r = await fetch('/api/prewarm/select', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ account_emails: emails }),
-    });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
-    if (data.status === 'capmonster_low') {
-      toast(`⚠️ CapMonster bajo ($${data.capmonster_balance ?? '?'}) — prewarm cancelado`, 'error');
-      pushNotif({ icon: '⚠️', msg: `Prewarm bloqueado: CapMonster bajo` });
-      return;
-    }
-    const parts = [];
-    if (data.started) parts.push(`${data.started} iniciados`);
-    if (data.cached) parts.push(`${data.cached} cacheados`);
-    if (data.skipped) parts.push(`${data.skipped} skip`);
-    toast(`🔥 Prewarm: ${parts.join(' · ') || 'sin cambios'}`, 'success');
-    pushNotif({ icon: '🔥', msg: `Prewarm: ${parts.join(' · ')} (cap ${data.cap_used}/${data.cap_max})` });
-  } catch (e) {
-    toast(`Prewarm error: ${e.message}`, 'error');
-  }
-}
-
 function deselectAll() {
   selectedIds.clear();
   renderTable();
@@ -465,10 +436,7 @@ function actionLabel(kind) {
   if (kind === 'lock') return '🔒 Lock';
   if (kind === 'unlock') return '🔓 Unlock';
   if (kind === 'note') return '📝 Nota';
-  if (kind?.startsWith('prewarm_complete')) return '🔥 Prewarm OK';
-  if (kind?.startsWith('prewarm_error')) return '🔥 Prewarm err';
-  if (kind?.startsWith('prewarm_timeout')) return '🔥 Prewarm timeout';
-  if (kind?.startsWith('prewarm_')) return '🔥 ' + kind.replace('prewarm_', '');
+  if (kind?.startsWith('prewarm_')) return '· login bg';  // auditoría interna, sin ruido
   return kind;
 }
 function statusPill(e) {
@@ -645,9 +613,8 @@ function connectSSE() {
           if (isMine || isSA) {
             pushNotif({ icon: '📝', msg: `${ev.who} anotó en ${ev.target}: ${(ev.text || '').slice(0, 60)}` });
           }
-        } else if (ev.kind === 'prewarm_error' || ev.kind === 'prewarm_timeout') {
-          pushNotif({ icon: '🔥', msg: `Prewarm ${ev.kind.replace('prewarm_','')} en ${ev.target}` });
         }
+        // prewarm_*: silencioso — auditoría interna, sin notif ruidosa
       } else if (ev.type === 'health_warning') {
         pushNotif({ icon: '⚠️', msg: `Salud: ${(ev.issues || []).join(' · ')}` });
       }
@@ -1302,6 +1269,13 @@ async function openDepositModal(accountId) {
   if (!acc) { toast('Cuenta no encontrada', 'error'); return; }
   _depAccountId = accountId;
   _depAmount = 50;
+  // Auto-warm silencioso: dispara login + balance refresh en background mientras
+  // el operador pega la tarjeta. Para cuando dé clic en Ejecutar, el JWT está cacheado.
+  // Fire-and-forget: errores se ignoran (el flow normal de deposit hace login si falta).
+  fetch('/api/prewarm/select', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ account_emails: [acc.email] }),
+  }).catch(() => {});
   $('#depTargetEmail').textContent = acc.email;
   $('#depTargetBalance').textContent = fmtMoney(acc.balance_total);
   $('#depCardPipe').value = '';
@@ -1459,7 +1433,6 @@ $('#cmdDeposit').addEventListener('click', () => {
 });
 
 $('#cmdCopy')?.addEventListener('click', copySelectedCombos);
-$('#cmdPrewarm')?.addEventListener('click', bulkPrewarm);
 $('#cmdTrastienda')?.addEventListener('click', bulkTrastienda);
 $('#cmdLock').addEventListener('click', bulkLock);
 $('#cmdUnlock')?.addEventListener('click', bulkUnlock);
