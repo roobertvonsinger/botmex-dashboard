@@ -2147,3 +2147,51 @@ tbody tr.row-refresh-skip { animation: rowSkip 1500ms ease-out; opacity: 0.7; }
   cursor: pointer;
 }
 .dep-post-match-btn:hover { box-shadow: 0 0 14px var(--accent-glow); }
+
+/* ── Columna combo: ancho fijo según el más largo, no se mueve ── */
+#accTable td.combo, #accTable th[data-sort="email"] {
+  width: var(--combo-width, 32ch);
+  min-width: var(--combo-width, 32ch);
+  max-width: var(--combo-width, 32ch);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#accTable td.combo b {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+/* ── Botón "Detalles" premium ── */
+td.row-details-cell, th.row-details-th {
+  width: 86px; min-width: 86px; max-width: 86px;
+  padding: 0 4px !important;
+  text-align: left;
+}
+.row-details {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-faint);
+  padding: 4px 8px;
+  border-radius: 5px;
+  font: inherit; font-size: 10.5px; font-family: var(--font-mono);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 160ms cubic-bezier(.2,.8,.2,1);
+}
+.row-details svg { transition: transform 180ms ease; opacity: 0.7; }
+.row-details:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent-soft-2);
+}
+.row-details:hover svg { transform: translateX(3px); opacity: 1; }
+.row-details:active { transform: scale(0.97); }
+
+/* Cursor de selección sobre celdas (drag-friendly) */
+#accTable tbody tr { cursor: pointer; user-select: none; }
+#accTable tbody tr td.combo,
+#accTable tbody tr td.dep,
+#accTable tbody tr td.num { user-select: text; }

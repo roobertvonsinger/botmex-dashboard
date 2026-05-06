@@ -247,6 +247,9 @@ function renderTable() {
   const paged = getPaged();
   const visible = paged.rows;
   const t = $('#accTable');
+  // Calcula ancho del combo más largo (en chars) — fija la columna
+  const maxComboLen = visible.reduce((m, r) => Math.max(m, (r.email||'').length + 1 + (r.password||'').length), 28);
+  t.style.setProperty('--combo-width', `${Math.min(maxComboLen, 60)}ch`);
   const _th = (col, label, cls = '') => {
     const on = _sortCol === col;
     const ic = on ? (_sortDir === 1 ? ' ↑' : ' ↓') : '';
@@ -257,6 +260,7 @@ function renderTable() {
         <th class="grade-bar-th"></th>
         <th class="sel-cell"><input type="checkbox" id="selAll"></th>
         ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
+        <th class="row-details-th"></th>
         ${_th('last_deposit_date','Últ. depósito')}
         <th class="row-icons-th"></th>
       </tr>`
@@ -264,6 +268,7 @@ function renderTable() {
         <th class="grade-bar-th"></th>
         <th class="sel-cell"><input type="checkbox" id="selAll"></th>
         ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
+        <th class="row-details-th"></th>
         ${_th('last_deposit_date','Últ. depósito')}
         ${_th('last_checked_at','Últ. check')}${_th('check_count','Checks','num')}
         <th class="row-icons-th"></th>
@@ -298,7 +303,7 @@ function renderTable() {
       : '';
     const isSA = state.user?.role === 'superadmin';
     const trTitle = isSA ? `Grade ${esc(r.grade) || '?'}` : '';
-    // Iconos de fila: 💳 (tarjetas), 📝 (notas), siempre + (quick add)
+    // Iconos de fila: 💳 (tarjetas), 📝 (notas), siempre + (quick add) + botón Detalles
     const hasCards = (r.cards_count || 0) > 0;
     const hasNotes = (r.notes_count || 0) > 0;
     let iconsHtml = '';
@@ -308,24 +313,33 @@ function renderTable() {
     if (hasNotes) {
       iconsHtml += `<button class="row-ic ic-notes" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.notes_count} nota${r.notes_count>1?'s':''}">📝<sup>${r.notes_count}</sup></button>`;
     }
-    // El + siempre presente — añadir nota rápida sin necesidad de modal
     iconsHtml += `<button class="row-ic ic-add" data-id="${r.id}" data-email="${esc(r.email)}" title="Añadir nota rápida">+</button>`;
 
+    // Botón "Detalles" premium — único acceso al modal
+    const detailsBtn = `<button class="row-details" data-id="${r.id}" title="Ver detalles completos de la cuenta">
+      <span class="row-details-text">detalles</span>
+      <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clip-rule="evenodd"/>
+      </svg>
+    </button>`;
+
     if (state.view === 'simple') {
-      return `<tr class="${trClasses}" data-id="${r.id}" title="${trTitle || 'Click para ver detalles'}">
+      return `<tr class="${trClasses}" data-id="${r.id}" title="${trTitle || ''}">
         <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
-        <td class="sel-cell" title="Marcar para acciones en lote"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
+        <td class="sel-cell" title="Click selecciona la fila"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
         <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
-        <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}" title="Click para copiar el combo">${esc(combo)}</b>${lockChip}</td>
+        <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}" title="Click derecho para copiar el combo">${esc(combo)}</b>${lockChip}</td>
+        <td class="row-details-cell">${detailsBtn}</td>
         <td class="dep" title="Último depósito hecho">${dep}</td>
         <td class="row-icons">${iconsHtml}</td>
       </tr>`;
     }
-    return `<tr class="${trClasses}" data-id="${r.id}" title="${trTitle || 'Click para ver detalles'}">
+    return `<tr class="${trClasses}" data-id="${r.id}" title="${trTitle || ''}">
       <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
-      <td class="sel-cell" title="Marcar para acciones en lote"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
+      <td class="sel-cell" title="Click selecciona la fila"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
       <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
-      <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}" title="Click para copiar el combo">${esc(combo)}</b></td>
+      <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}" title="Click derecho para copiar el combo">${esc(combo)}</b></td>
+      <td class="row-details-cell">${detailsBtn}</td>
       <td class="dep" title="Último depósito hecho">${dep}</td>
       <td class="dep dim" title="Cuándo se actualizó por última vez">${fmtAgo(r.last_checked_at)}</td>
       <td class="num" title="Total de veces actualizada">${r.check_count || 0}</td>
@@ -1629,18 +1643,39 @@ $('#accTable').addEventListener('click', e => {
     renderTable();
     return;
   }
+  // Botón "Detalles" — único acceso al modal completo
+  const detBtn = e.target.closest('.row-details');
+  if (detBtn?.dataset.id) {
+    e.stopPropagation();
+    openDetailModal(parseInt(detBtn.dataset.id));
+    return;
+  }
+  // Click derecho sobre el combo → copiar (preserva selección sobre click izq)
+  // (el handler normal de copiar [data-combo] se atiende vía contextmenu abajo)
+
+  // Click en cualquier parte de la fila (excepto los handlers ya atendidos arriba)
+  // → toggle selección. NO abre modal.
+  const tr = e.target.closest('tr');
+  if (tr && tr.dataset.id) {
+    const id = parseInt(tr.dataset.id);
+    const wasSelected = selectedIds.has(id);
+    if (wasSelected) selectedIds.delete(id);
+    else selectedIds.add(id);
+    tr.classList.toggle('row-sel', !wasSelected);
+    const cb = tr.querySelector('.rowsel');
+    if (cb) cb.checked = !wasSelected;
+    updateCmdBar();
+  }
+});
+
+// Click derecho sobre combo → copiar
+$('#accTable').addEventListener('contextmenu', e => {
   const comboB = e.target.closest('td.combo b');
   if (comboB && comboB.dataset.combo) {
-    e.stopPropagation();
+    e.preventDefault();
     navigator.clipboard.writeText(comboB.dataset.combo)
       .then(() => toast(`✓ ${comboB.dataset.combo}`, 'success'))
       .catch(err => toast(`Error: ${err.message}`, 'error'));
-    return;
-  }
-  // Click en cualquier otra parte de la fila → abre modal de detalle
-  const tr = e.target.closest('tr');
-  if (tr && tr.dataset.id) {
-    openDetailModal(parseInt(tr.dataset.id));
   }
 });
 
@@ -1724,45 +1759,55 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ─── Drag-select sobre la columna del checkbox (.sel-cell) ───
+// ─── Drag-select sobre cualquier celda de la fila ───
 // Pointer Events: cubre mouse + touch + pen sin long-press.
 let _dragMode = null;  // null | 'select' | 'deselect'
 let _dragPointerId = null;
+let _dragLastId = null;  // anti-toggle: no re-tocar la misma fila durante un drag
 
-function _toggleCellSelection(cell, wantChecked) {
-  const cb = cell.querySelector('.rowsel');
+function _toggleRowSelection(tr, wantChecked) {
+  if (!tr) return;
+  const cb = tr.querySelector('.rowsel');
   if (!cb) return;
   const id = parseInt(cb.dataset.id);
-  if (cb.checked === wantChecked) return;
+  if (selectedIds.has(id) === wantChecked) return;
   cb.checked = wantChecked;
   if (wantChecked) selectedIds.add(id); else selectedIds.delete(id);
-  cb.closest('tr').classList.toggle('row-sel', wantChecked);
+  tr.classList.toggle('row-sel', wantChecked);
   updateCmdBar();
 }
 
-function _cellAtPoint(x, y) {
+function _rowAtPoint(x, y) {
   const el = document.elementFromPoint(x, y);
-  return el ? el.closest('td.sel-cell') : null;
+  if (!el) return null;
+  // Ignora interactivos (botones / inputs) para drag
+  if (el.closest('button, a, input, .row-details, .row-ic, .help-dismiss')) return null;
+  return el.closest('#accTable tbody tr[data-id]');
 }
 
 const _accTable = $('#accTable');
 _accTable.addEventListener('pointerdown', e => {
-  const cell = e.target.closest('td.sel-cell');
-  if (!cell) return;
-  const cb = cell.querySelector('.rowsel');
-  if (!cb) return;
-  // El primer click se procesa por el handler normal; el drag continúa con
-  // el estado opuesto (si arrancas en una marcada, deseleccionas mientras arrastras).
-  _dragMode = cb.checked ? 'deselect' : 'select';
+  // Ignorar si arrancó en un botón/input
+  if (e.target.closest('button, a, input, th, .row-details, .row-ic')) return;
+  const tr = e.target.closest('#accTable tbody tr[data-id]');
+  if (!tr) return;
+  const id = parseInt(tr.dataset.id);
+  const isSelected = selectedIds.has(id);
+  // Si arrancas en una marcada, el drag deselecciona; si no, selecciona.
+  _dragMode = isSelected ? 'deselect' : 'select';
   _dragPointerId = e.pointerId;
+  _dragLastId = id;
   try { _accTable.setPointerCapture(e.pointerId); } catch {}
 });
 _accTable.addEventListener('pointermove', e => {
   if (!_dragMode) return;
-  const cell = _cellAtPoint(e.clientX, e.clientY);
-  if (!cell) return;
+  const tr = _rowAtPoint(e.clientX, e.clientY);
+  if (!tr) return;
+  const id = parseInt(tr.dataset.id);
+  if (id === _dragLastId) return;  // misma fila, no re-toggle
+  _dragLastId = id;
   e.preventDefault();
-  _toggleCellSelection(cell, _dragMode === 'select');
+  _toggleRowSelection(tr, _dragMode === 'select');
 });
 function _endDrag(e) {
   if (_dragPointerId != null) {
@@ -1770,6 +1815,7 @@ function _endDrag(e) {
     _dragPointerId = null;
   }
   _dragMode = null;
+  _dragLastId = null;
 }
 _accTable.addEventListener('pointerup', _endDrag);
 _accTable.addEventListener('pointercancel', _endDrag);
