@@ -26,7 +26,7 @@ Abre http://127.0.0.1:5001
 ## Roadmap
 
 - [x] Sprint 1 — MVP tabla básica (vista usuario)
-- [ ] Sprint 2 — L invertida SuperAdmin (Conectados, Actividad LIVE, Alertas, Pool)
-- [ ] Sprint 3 — Sistema de uso + locks + notificaciones SSE
-- [ ] Sprint 4 — Depósitos (envuelve módulo blindado)
+- [x] Sprint 2 — L invertida SuperAdmin (Conectados, Actividad LIVE, Alertas, Pool)
+- [x] Sprint 3 — Sistema de uso + locks + notificaciones SSE + sidebar status
+- [x] Sprint 4 — Depósitos read-only (deposit_attempts, view + endpoints)
 - [ ] Sprint 5 — Pre-warm + deploy VPS + integración bot TG

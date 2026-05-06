@@ -35,9 +35,10 @@ def test_accounts_response_shape(client):
     r = client.get("/api/accounts")
     row = r.json()[0]
     expected_keys = {
-        "id", "email", "balance_total", "balance_real",
+        "id", "email", "password", "balance_total", "balance_real",
         "last_deposit_amount", "last_deposit_date", "status", "grade",
-        "locked_by", "locked_at", "last_checked_at", "check_count"
+        "locked_by", "locked_at", "last_checked_at", "check_count",
+        "cards_count",
     }
     assert set(row.keys()) == expected_keys
 
@@ -152,6 +153,24 @@ def test_lock_conflict(client):
 def test_lock_not_found(client):
     r = client.post("/api/accounts/99999/lock", json={"operator": "RobertVS", "hours": 2})
     assert r.status_code == 404
+
+
+def test_deposits_empty_returns_list(client):
+    r = client.get("/api/deposits")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+def test_deposits_stats_empty(client):
+    r = client.get("/api/deposits/stats")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total"] == 0
+    assert data["approved"] == 0
+    assert data["rejected"] == 0
+    assert data["pending"] == 0
+    assert data["success_rate"] == 0.0
+    assert data["total_amount_approved"] == 0.0
 
 
 import asyncio

@@ -8,6 +8,7 @@ def seed_db(tmp_path, monkeypatch):
     """BD SQLite temporal con 3 cuentas seed (1 LIVE A, 1 LIVE B, 1 DEAD C)."""
     db = tmp_path / "test.db"
     monkeypatch.setenv("BETMEX_DB", str(db))
+    monkeypatch.setenv("BMX_WEB_AUTH_MODE", "open")
     con = sqlite3.connect(db)
     try:
         con.execute("""
@@ -34,6 +35,37 @@ def seed_db(tmp_path, monkeypatch):
                 "VALUES (?,?,?,?,?,?,?,?,?)",
                 (email, pwd, bal, dep_date, status, grade, dep_amt, "2026-05-01 00:00:00", "2026-05-05 11:00:00")
             )
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS deposit_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                attempt_id TEXT, batch_id TEXT, mission_id TEXT,
+                account_email TEXT, card_id INTEGER, amount REAL,
+                source TEXT, operator_id INTEGER, status TEXT,
+                rejection_reason TEXT, gateway_response_raw TEXT,
+                gateway_txn_id TEXT, balance_before REAL, balance_after REAL,
+                duration_ms INTEGER, captcha_cost REAL, created_at TEXT
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS account_cards (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                card_number TEXT, card_expiry TEXT, card_cvv TEXT,
+                account_email TEXT, account_password TEXT,
+                registered_by INTEGER, registered_at TEXT,
+                last_used_at TEXT,
+                total_deposits INTEGER DEFAULT 0,
+                total_approved INTEGER DEFAULT 0,
+                total_rejected INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'ACTIVE'
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS account_assignments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT, user_id INTEGER, assigned_by INTEGER,
+                assigned_at TEXT, UNIQUE(email, user_id)
+            )
+        """)
         con.commit()
     finally:
         con.close()

@@ -3,7 +3,7 @@
 # Lee betmexico_accounts.db (la misma que el bot TG). Sin lógica de polling.
 
 from __future__ import annotations
-import sqlite3, os
+import sqlite3, os, sys
 import asyncio
 import json as _json
 import queue as _stdlib_queue
@@ -13,10 +13,22 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+
+# Permitir importar módulos del bot (betmexico_db, betmexico_login_service, etc.)
+# que viven en el directorio padre cuando el VPS los tiene desplegados.
+_HERE = Path(__file__).parent
+_BOT_DIR = _HERE.parent
+if (_BOT_DIR / "betmexico_db.py").exists() and str(_BOT_DIR) not in sys.path:
+    sys.path.insert(0, str(_BOT_DIR))
+from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+import auth as _auth
+from auth import require_session
+from prewarm import router as _prewarm_router
+from deposits import router as _deposits_router
 
 ROOT = Path(__file__).parent
 STATIC = ROOT / "static"
@@ -32,7 +44,7 @@ if _env_file.exists():
         os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
 
 # La BD vive donde corre el bot. Local: usa ENV BETMEX_DB. VPS: /opt/betmexico/bot/betmexico_accounts.db
-DB_PATH = Path(os.environ.get("BETMEX_DB", str(ROOT.parent / "Telegram" / "betmexico_accounts.db")))
+DB_PATH = Path(os.environ.get("BETMEX_DB", str(ROOT.parent / "betmexico_accounts.db")))
 
 
 @contextmanager
@@ -54,16 +66,48 @@ def db(write: bool = False):
 
 
 def _migrate():
-    """Aditivo: agrega columna locked_until si no existe."""
-    try:
-        with db(write=True) as c:
-            c.execute("ALTER TABLE accounts ADD COLUMN locked_until TEXT")
-    except sqlite3.OperationalError as e:
-        if "duplicate column name" not in str(e):
-            raise
+    """Aditivo: locked_until + published_to_pool (default 1 = pool)."""
+    for col, ddl in [
+        ("locked_until", "ALTER TABLE accounts ADD COLUMN locked_until TEXT"),
+        ("published_to_pool", "ALTER TABLE accounts ADD COLUMN published_to_pool INTEGER DEFAULT 1"),
+    ]:
+        try:
+            with db(write=True) as c:
+                c.execute(ddl)
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" not in str(e) and "no such table" not in str(e):
+                raise
 
 
 _migrate()
+
+
+def _resolve_operator(val):
+    """Convierte locked_by/operator_id (string nombre o int telegram_id)
+    al display name si lo encontramos en USERS. Si no, devuelve crudo."""
+    if val is None:
+        return None
+    if isinstance(val, str):
+        u = _auth.USERS.get(val.lower())
+        if u:
+            return u["display"]
+        try:
+            iv = int(val)
+            for v in _auth.USERS.values():
+                if v["telegram_id"] == iv:
+                    return v["display"]
+        except (TypeError, ValueError):
+            pass
+        return val
+    try:
+        iv = int(val)
+        for v in _auth.USERS.values():
+            if v["telegram_id"] == iv:
+                return v["display"]
+        return iv
+    except (TypeError, ValueError):
+        return val
+
 
 _sse_lock = threading.Lock()
 _sse_queues: list = []  # list[queue.SimpleQueue]
@@ -87,12 +131,107 @@ def _dequeue_blocking(q, timeout: float) -> str:
 
 app = FastAPI(title="Botmexico v2")
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
+app.include_router(_prewarm_router)
+app.include_router(_deposits_router)
+
+
+# ── Páginas ────────────────────────────────────────────────────────────────────
+
+@app.get("/favicon.ico")
+def favicon():
+    return FileResponse(STATIC / "assets" / "botmexico_logo.png", media_type="image/png")
+
+
+@app.get("/login")
+def login_page(bmx_session: str = Cookie(default=None)):
+    if bmx_session and _auth.get_session(bmx_session):
+        return RedirectResponse("/", status_code=302)
+    return FileResponse(STATIC / "login.html")
 
 
 @app.get("/")
-def index():
+def index(bmx_session: str = Cookie(default=None)):
+    if not bmx_session or not _auth.get_session(bmx_session):
+        return RedirectResponse("/login", status_code=302)
     return FileResponse(STATIC / "index.html")
 
+
+# ── Auth endpoints ─────────────────────────────────────────────────────────────
+
+from fastapi.responses import Response as _Response
+
+
+@app.post("/api/auth/login")
+async def auth_login(request: Request, response: _Response):
+    body = await request.json()
+    username = (body.get("username") or "").strip().lower()
+    password = body.get("password") or ""
+
+    if username not in _auth.USERS:
+        raise HTTPException(status_code=401, detail="Usuario no encontrado")
+
+    passwords = _auth.load_passwords()
+    stored = passwords.get(username)
+
+    if stored is None:
+        return JSONResponse({"first_time": True, "display": _auth.USERS[username]["display"]})
+
+    master = os.environ.get("BMX_MASTER", "")
+    if _auth.sha256(password) != stored and password != master:
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+
+    token = _auth.create_session(username)
+    response.set_cookie(
+        "bmx_session", token,
+        httponly=True, samesite="lax",
+        max_age=_auth.session_max_age(username),
+    )
+    u = _auth.USERS[username]
+    return {"username": u["display"], "role": u["role"]}
+
+
+@app.post("/api/auth/set-password")
+async def auth_set_password(request: Request, response: _Response):
+    body = await request.json()
+    username = (body.get("username") or "").strip().lower()
+    new_pwd = body.get("password") or ""
+
+    if username not in _auth.USERS:
+        raise HTTPException(status_code=401, detail="Usuario no válido")
+    if len(new_pwd) < 4:
+        raise HTTPException(status_code=400, detail="Contraseña muy corta (mínimo 4 caracteres)")
+
+    passwords = _auth.load_passwords()
+    if passwords.get(username) is not None:
+        raise HTTPException(status_code=400, detail="Ya tienes contraseña")
+
+    passwords[username] = _auth.sha256(new_pwd)
+    _auth.save_passwords(passwords)
+
+    token = _auth.create_session(username)
+    response.set_cookie(
+        "bmx_session", token,
+        httponly=True, samesite="lax",
+        max_age=_auth.session_max_age(username),
+    )
+    u = _auth.USERS[username]
+    return {"username": u["display"], "role": u["role"]}
+
+
+@app.post("/api/auth/logout")
+def auth_logout(response: _Response, bmx_session: str = Cookie(default=None)):
+    if bmx_session:
+        _auth.delete_session(bmx_session)
+    response.delete_cookie("bmx_session")
+    return {"ok": True}
+
+
+@app.get("/api/auth/me")
+def auth_me(user: dict = Depends(require_session)):
+    return {"username": user["display"], "role": user["role"]}
+
+
+# ── API — protegida con sesión ─────────────────────────────────────────────────
 
 @app.get("/api/health")
 def health():
@@ -108,29 +247,163 @@ def health():
 def list_accounts(
     status: str = Query("LIVE"),
     grade: Optional[str] = None,
-    limit: int = Query(200, le=1000),
+    q: Optional[str] = None,
+    limit: int = Query(500, le=2000),
+    user: dict = Depends(require_session),
 ):
     where, params = [], []
     if status != "all":
-        where.append("status = ?"); params.append(status)
+        where.append("a.status = ?"); params.append(status)
     if grade:
-        where.append("grade = ?"); params.append(grade)
-    sql = (
-        "SELECT id, email, balance_total, balance_real, "
-        "last_deposit_amount, last_deposit_date, status, grade, "
-        "locked_by, locked_at, last_checked_at, check_count "
-        "FROM accounts"
+        where.append("a.grade = ?"); params.append(grade)
+
+    # Búsqueda multi-campo: email + tarjeta (últimos 4 / fingerprint substr) + nota
+    if q:
+        like = f"%{q}%"
+        where.append(
+            "(a.email LIKE ? "
+            " OR EXISTS (SELECT 1 FROM account_cards ac WHERE ac.account_email=a.email AND ac.card_number LIKE ?) "
+            " OR EXISTS (SELECT 1 FROM account_notes an WHERE an.account_email=a.email AND an.note_text LIKE ?))"
+        )
+        params.extend([like, like, like])
+
+    role = user.get("role", "user")
+    user_tg = int(user.get("telegram_id") or 0)
+
+    # Trastienda: non-SA solo ve cuentas publicadas a la pool
+    if role != "superadmin":
+        where.append("COALESCE(a.published_to_pool, 1) = 1")
+
+    base_cols = (
+        "a.id, a.email, a.password, a.balance_total, a.balance_real, "
+        "a.last_deposit_amount, a.last_deposit_date, a.status, a.grade, "
+        "a.locked_by, a.locked_at, a.locked_until, a.last_checked_at, a.check_count, "
+        "COALESCE(a.published_to_pool, 1) AS published_to_pool, "
+        "(SELECT COUNT(*) FROM account_cards ac WHERE ac.account_email=a.email) AS cards_count"
     )
-    if where:
-        sql += " WHERE " + " AND ".join(where)
-    sql += " ORDER BY balance_total DESC, last_checked_at DESC LIMIT ?"
+    # Normal user: solo cuentas asignadas a su user_id
+    if role == "user" and user_tg:
+        sql = (
+            f"SELECT {base_cols} FROM accounts a "
+            "INNER JOIN account_assignments ass ON ass.email = a.email "
+            "WHERE ass.user_id = ?"
+        )
+        params.insert(0, user_tg)
+    else:
+        sql = f"SELECT {base_cols} FROM accounts a"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+            where = []  # ya consumidos
+
+    if where:  # caso user-filter con extras
+        sql += " AND " + " AND ".join(where)
+    sql += " ORDER BY a.balance_total DESC, a.last_checked_at DESC LIMIT ?"
     params.append(limit)
-    with db() as c:
-        return [dict(r) for r in c.execute(sql, params).fetchall()]
+    try:
+        with db() as c:
+            rows = [dict(r) for r in c.execute(sql, params).fetchall()]
+            for r in rows:
+                op = r.get("locked_by")
+                # Color del operador (para borde lateral en fila)
+                tg_id = None
+                if op is not None:
+                    try:
+                        tg_id = int(op)
+                    except (TypeError, ValueError):
+                        u = _auth.USERS.get(str(op).lower())
+                        tg_id = u["telegram_id"] if u else None
+                r["locked_by"] = _resolve_operator(op)
+                r["locked_color"] = _auth.USER_COLORS.get(tg_id) if tg_id else None
+            return rows
+    except sqlite3.OperationalError:
+        # Si no hay tabla account_assignments todavía
+        return []
+
+
+# ─── Asignaciones / Liberador ──────────────────────────────────────────────────
+
+@app.get("/api/users")
+def list_users(user: dict = Depends(require_session)):
+    """Lista los usuarios del sistema (para asignar cuentas).
+    Solo visible para superadmin/admin."""
+    if user.get("role") not in ("superadmin", "admin"):
+        raise HTTPException(403, "Solo superadmin/admin")
+    return [
+        {"username": k, "display": v["display"], "telegram_id": v["telegram_id"], "role": v["role"]}
+        for k, v in _auth.USERS.items()
+    ]
+
+
+@app.get("/api/assignments")
+def list_assignments(
+    user_id: Optional[int] = None,
+    user: dict = Depends(require_session),
+):
+    if user.get("role") not in ("superadmin", "admin"):
+        raise HTTPException(403, "Solo superadmin/admin")
+    try:
+        with db() as c:
+            if user_id is not None:
+                rows = c.execute(
+                    "SELECT email, user_id, assigned_by, assigned_at "
+                    "FROM account_assignments WHERE user_id=? ORDER BY assigned_at DESC",
+                    (user_id,),
+                ).fetchall()
+            else:
+                rows = c.execute(
+                    "SELECT email, user_id, assigned_by, assigned_at "
+                    "FROM account_assignments ORDER BY assigned_at DESC"
+                ).fetchall()
+            return [dict(r) for r in rows]
+    except sqlite3.OperationalError:
+        return []
+
+
+class AssignRequest(BaseModel):
+    emails: list[str]
+    user_id: int
+
+
+@app.post("/api/assignments/assign")
+def assign_accounts(req: AssignRequest, user: dict = Depends(require_session)):
+    if user.get("role") not in ("superadmin", "admin"):
+        raise HTTPException(403, "Solo superadmin/admin")
+    if not req.emails or not req.user_id:
+        raise HTTPException(400, "emails y user_id requeridos")
+    assigned_by = int(user.get("telegram_id") or 0)
+    now = datetime.now(timezone.utc).isoformat()
+    ok = 0
+    with db(write=True) as c:
+        for email in req.emails:
+            try:
+                c.execute(
+                    "INSERT OR IGNORE INTO account_assignments "
+                    "(email, user_id, assigned_by, assigned_at) VALUES (?,?,?,?)",
+                    (email, req.user_id, assigned_by, now),
+                )
+                ok += c.rowcount
+            except Exception as e:
+                print(f"[assign] error {email}: {e}")
+    return {"assigned": ok, "requested": len(req.emails)}
+
+
+@app.post("/api/assignments/unassign")
+def unassign_accounts(req: AssignRequest, user: dict = Depends(require_session)):
+    if user.get("role") not in ("superadmin", "admin"):
+        raise HTTPException(403, "Solo superadmin/admin")
+    removed = 0
+    with db(write=True) as c:
+        for email in req.emails:
+            cur = c.execute(
+                "DELETE FROM account_assignments WHERE email=? AND user_id=?",
+                (email, req.user_id),
+            )
+            removed += cur.rowcount
+    return {"removed": removed, "requested": len(req.emails)}
 
 
 @app.get("/api/stats")
-def stats():
+def stats(_user: dict = Depends(require_session)):
     with db() as c:
         live = c.execute("SELECT COUNT(*) FROM accounts WHERE status='LIVE'").fetchone()[0]
         total = c.execute("SELECT COUNT(*) FROM accounts").fetchone()[0]
@@ -140,59 +413,57 @@ def stats():
     return {"live": live, "total": total, "totalBalance": balance, "withBalance": with_balance, "inUse": in_use}
 
 
-@app.get("/api/superadmin/conectados")
-def superadmin_conectados():
-    """Operadores con cuentas en uso agrupados por operador."""
-    with db() as c:
-        rows = c.execute(
-            "SELECT locked_by, COUNT(*) as count FROM accounts "
-            "WHERE locked_by IS NOT NULL GROUP BY locked_by"
-        ).fetchall()
-    return [{"operator": r["locked_by"], "count": r["count"]} for r in rows]
+# ── LitPort proxy health (cache 60s) ───────────────────────────────────────────
+_proxy_cache: dict = {"ts": 0.0, "data": None}
+_PROXY_TTL = 60.0
 
 
-@app.get("/api/superadmin/actividad")
-def superadmin_actividad():
-    """Checks recientes y actividad por hora últimas 24h."""
-    with db() as c:
-        recent = c.execute(
-            "SELECT id, email, grade, status, last_checked_at "
-            "FROM accounts WHERE last_checked_at IS NOT NULL "
-            "ORDER BY last_checked_at DESC LIMIT 20"
-        ).fetchall()
-        by_hour = c.execute(
-            "SELECT strftime('%H', last_checked_at) as hour, COUNT(*) as count "
-            "FROM accounts WHERE last_checked_at IS NOT NULL "
-            "AND last_checked_at >= datetime('now', '-24 hours') "
-            "GROUP BY hour ORDER BY hour"
-        ).fetchall()
-    return {
-        "recentChecks": [dict(r) for r in recent],
-        "byHour": [{"hour": r["hour"], "count": r["count"]} for r in by_hour],
-    }
+def _proxy_health() -> dict:
+    """Verifica que el proxy LitPort responde haciendo GET a un endpoint de IP.
+    Devuelve {ok, ip, latency_ms, country, error}.
+    Vars de entorno: LITPORT_HOST, LITPORT_PORT, LITPORT_USER, LITPORT_PASS.
+    Cache 60s para no saturar."""
+    import time as _time
+    now = _time.time()
+    if _proxy_cache["data"] and (now - _proxy_cache["ts"]) < _PROXY_TTL:
+        return _proxy_cache["data"]
 
+    # Defaults desde betmexico_config.py (mismo proxy que usa el bot)
+    host = os.environ.get("LITPORT_HOST", "hub-us-7.litport.net")
+    port = os.environ.get("LITPORT_PORT", "1337")
+    user = os.environ.get("LITPORT_USER", "bmxutop")
+    pwd  = os.environ.get("LITPORT_PASS", "49O3mC6hl4")
 
-@app.get("/api/superadmin/alertas")
-def superadmin_alertas():
-    """Alertas: DEAD recientes (top 10) + LIVE sin check en 48h."""
-    with db() as c:
-        recent_dead = c.execute(
-            "SELECT id, email, grade, last_checked_at FROM accounts "
-            "WHERE status='DEAD' ORDER BY last_checked_at DESC LIMIT 10"
-        ).fetchall()
-        no_recent = c.execute(
-            "SELECT COUNT(*) FROM accounts WHERE status='LIVE' "
-            "AND (last_checked_at IS NULL "
-            "  OR last_checked_at < datetime('now', '-48 hours'))"
-        ).fetchone()[0]
-    return {
-        "recentDead": [dict(r) for r in recent_dead],
-        "noRecentCheck": no_recent,
-    }
+    proxy_url = f"http://{user}:{pwd}@{host}:{port}"
+    handler = urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
+    opener = urllib.request.build_opener(handler)
+
+    t0 = _time.time()
+    try:
+        with opener.open("http://ip-api.com/json/?fields=query,country,countryCode",
+                         timeout=8) as resp:
+            body = _json.loads(resp.read())
+        latency = int((_time.time() - t0) * 1000)
+        out = {
+            "ok": True,
+            "ip": body.get("query"),
+            "country": body.get("countryCode") or body.get("country"),
+            "latency_ms": latency,
+            "host": f"{host}:{port}",
+            "error": None,
+        }
+    except Exception as e:
+        out = {"ok": False, "error": str(e)[:80], "host": f"{host}:{port}"}
+
+    _proxy_cache.update({"ts": now, "data": out})
+    return out
 
 
 def _capmonster_balance() -> dict:
-    key = os.environ.get("CAPMONSTER_KEY", "")
+    # Misma key que usa el bot (api.py / betmexico_login_api.py)
+    key = (os.environ.get("CAPMONSTER_KEY")
+           or os.environ.get("BMX_CAPMONSTER_KEY")
+           or "a9040840fdb3828ecc6090a6010afcad")
     if not key:
         return {"balance": None, "error": "CAPMONSTER_KEY not set"}
     try:
@@ -211,13 +482,424 @@ def _capmonster_balance() -> dict:
         return {"balance": None, "error": str(e)}
 
 
-@app.get("/api/superadmin/pool")
-def superadmin_pool():
-    """Créditos CapMonster + estado proxy (LitPort pendiente Sprint 5)."""
-    return {
-        "capmonster": _capmonster_balance(),
-        "proxy": {"status": "pending", "note": "LitPort API — Sprint 5"},
+# ─── KPIs L invertida (spec chat2) ─────────────────────────────────────────────
+
+def _operator_color(tg_id):
+    return _auth.USER_COLORS.get(int(tg_id)) if tg_id else None
+
+
+@app.get("/api/superadmin/kpis")
+def superadmin_kpis(_user: dict = Depends(require_session)):
+    """L invertida del SuperAdmin (spec chat2):
+      1. Online: operadores con actividad < 5 min, lista con dot status
+      2. Activity feed (últimos 30 eventos: deposit/lock/prewarm)
+      3. Alertas: bulk masivo, prewarm errors, login fallidos, capmonster bajo
+      4. Pool stats: pool / en_uso / trastienda / rebotadas
+    """
+    now = datetime.now(timezone.utc)
+    out: dict = {}
+    with db() as c:
+        # ── 1. ONLINE NOW ──
+        # Operador "online" = tiene lock activo o evento < 5 min
+        online_ids: set = set()
+        try:
+            for r in c.execute(
+                "SELECT DISTINCT locked_by FROM accounts WHERE locked_by IS NOT NULL"
+            ).fetchall():
+                online_ids.add(str(r["locked_by"]))
+            for r in c.execute(
+                "SELECT DISTINCT operator_id FROM deposit_attempts "
+                "WHERE created_at >= datetime('now','-5 minutes')"
+            ).fetchall():
+                if r["operator_id"]:
+                    online_ids.add(str(r["operator_id"]))
+        except sqlite3.OperationalError:
+            pass
+
+        operators = []
+        for username, u in _auth.USERS.items():
+            tg = u["telegram_id"]
+            is_online = str(tg) in online_ids or username in online_ids
+            # idle si activo en últimos 30 min pero no ahora
+            try:
+                idle = c.execute(
+                    "SELECT 1 FROM deposit_attempts WHERE operator_id=? "
+                    "AND created_at >= datetime('now','-30 minutes') LIMIT 1",
+                    (tg,)
+                ).fetchone() is not None
+            except sqlite3.OperationalError:
+                idle = False
+            # cuántas cuentas tiene en uso ahora
+            try:
+                in_use = c.execute(
+                    "SELECT COUNT(*) FROM accounts WHERE locked_by IN (?, ?)",
+                    (str(tg), username)
+                ).fetchone()[0]
+            except sqlite3.OperationalError:
+                in_use = 0
+            operators.append({
+                "username": username,
+                "display": u["display"],
+                "role": u["role"],
+                "telegram_id": tg,
+                "color": _auth.USER_COLORS.get(tg),
+                "status": "online" if is_online else ("idle" if idle else "offline"),
+                "in_use": in_use,
+            })
+        out["online"] = {
+            "operators": operators,
+            "active": sum(1 for o in operators if o["status"] == "online"),
+            "total": len(operators),
+        }
+
+        # ── 2. ACTIVITY FEED (últimos 20 eventos mezclados) ──
+        feed = []
+        kpi_pw_cache: dict[str, str] = {}
+        def _kpi_combo(email: str) -> str:
+            if not email: return ""
+            if email not in kpi_pw_cache:
+                row = c.execute("SELECT password FROM accounts WHERE email=? LIMIT 1", (email,)).fetchone()
+                kpi_pw_cache[email] = row["password"] if row else ""
+            pw = kpi_pw_cache.get(email) or ""
+            return f"{email}:{pw}" if pw else email
+
+        try:
+            for r in c.execute(
+                "SELECT account_email, amount, status, operator_id, created_at "
+                "FROM deposit_attempts ORDER BY id DESC LIMIT 15"
+            ).fetchall():
+                feed.append({
+                    "kind": "deposit",
+                    "ts": r["created_at"],
+                    "who": _resolve_operator(r["operator_id"]),
+                    "who_color": _operator_color(r["operator_id"]),
+                    "target": _kpi_combo(r["account_email"]),
+                    "amount": r["amount"],
+                    "status": r["status"],
+                })
+        except sqlite3.OperationalError:
+            pass
+
+        for r in c.execute(
+            "SELECT email, locked_by, locked_at FROM accounts "
+            "WHERE locked_by IS NOT NULL ORDER BY locked_at DESC LIMIT 15"
+        ).fetchall():
+            tg = None
+            try: tg = int(r["locked_by"])
+            except (TypeError, ValueError):
+                u = _auth.USERS.get(str(r["locked_by"]).lower())
+                tg = u["telegram_id"] if u else None
+            feed.append({
+                "kind": "lock",
+                "ts": r["locked_at"],
+                "who": _resolve_operator(r["locked_by"]),
+                "who_color": _auth.USER_COLORS.get(tg) if tg else None,
+                "target": _kpi_combo(r["email"]),
+            })
+
+        feed.sort(key=lambda e: str(e.get("ts", "")), reverse=True)
+        out["feed"] = feed[:20]
+
+        # ── 3. ALERTAS REALES ──
+        alerts = []
+        # bulk: alguien tocó >20 cuentas en <1 min (locks)
+        try:
+            bulk = c.execute(
+                "SELECT locked_by, COUNT(*) as n, MIN(locked_at) as t0, MAX(locked_at) as t1 "
+                "FROM accounts WHERE locked_by IS NOT NULL "
+                "AND locked_at >= datetime('now','-5 minutes') "
+                "GROUP BY locked_by HAVING n >= 20"
+            ).fetchall()
+            for r in bulk:
+                alerts.append({
+                    "kind": "bulk", "severity": "warn",
+                    "msg": f"{_resolve_operator(r['locked_by'])} lockeó {r['n']} cuentas en <5 min",
+                    "ts": r["t1"],
+                })
+        except sqlite3.OperationalError:
+            pass
+        # prewarm errors recientes
+        try:
+            err = c.execute(
+                "SELECT COUNT(*) FROM process_log "
+                "WHERE process_type='prewarm' AND phase IN ('error','timeout') "
+                "AND created_at >= datetime('now','-30 minutes')"
+            ).fetchone()[0]
+            if err >= 3:
+                alerts.append({
+                    "kind": "prewarm_errors", "severity": "warn",
+                    "msg": f"{err} prewarms fallidos en 30 min",
+                    "ts": now.isoformat(),
+                })
+        except sqlite3.OperationalError:
+            pass
+        # capmonster bajo
+        cm = _capmonster_balance()
+        if cm.get("balance") is not None and cm["balance"] < 5:
+            alerts.append({
+                "kind": "capmonster_low", "severity": "danger",
+                "msg": f"CapMonster bajo: ${cm['balance']:.2f}",
+                "ts": now.isoformat(),
+            })
+        out["alerts"] = alerts
+
+        # ── 4. POOL STATS (Pool · En uso · Trastienda · Rebotadas) ──
+        live = c.execute("SELECT COUNT(*) FROM accounts WHERE status='LIVE'").fetchone()[0]
+        in_use = c.execute(
+            "SELECT COUNT(*) FROM accounts WHERE locked_by IS NOT NULL"
+        ).fetchone()[0]
+        # Trastienda = LIVE con published_to_pool=0 (las que tú aún no soltaste a la pool)
+        trastienda = c.execute(
+            "SELECT COUNT(*) FROM accounts "
+            "WHERE status='LIVE' AND COALESCE(published_to_pool, 1) = 0"
+        ).fetchone()[0]
+        # Pool = LIVE publicadas y libres
+        pool = c.execute(
+            "SELECT COUNT(*) FROM accounts "
+            "WHERE status='LIVE' AND COALESCE(published_to_pool, 1) = 1 "
+            "AND locked_by IS NULL"
+        ).fetchone()[0]
+        try:
+            # Rebotadas hoy: lock vencido sin depósito aprobado en últimas 24h
+            rebotadas = c.execute(
+                "SELECT COUNT(DISTINCT a.email) FROM accounts a "
+                "WHERE a.locked_until IS NOT NULL "
+                "AND a.locked_until <= datetime('now') "
+                "AND NOT EXISTS (SELECT 1 FROM deposit_attempts d "
+                "  WHERE d.account_email=a.email AND d.status='approved' "
+                "  AND d.created_at >= datetime('now','-24 hours'))"
+            ).fetchone()[0]
+        except sqlite3.OperationalError:
+            rebotadas = 0
+        out["pool"] = {
+            "pool": pool,
+            "in_use": in_use,
+            "trastienda": trastienda,
+            "rebotadas": rebotadas,
+        }
+
+        # ── Sistema (resumen rápido) ──
+        try:
+            dep24 = c.execute(
+                "SELECT COUNT(*) AS total, "
+                "SUM(CASE WHEN status='approved' THEN 1 ELSE 0 END) AS approved, "
+                "COALESCE(SUM(CASE WHEN status='approved' THEN amount ELSE 0 END),0) AS amount "
+                "FROM deposit_attempts WHERE created_at >= datetime('now','-24 hours')"
+            ).fetchone()
+            out["deposits_24h"] = {
+                "total": dep24[0] or 0,
+                "approved": dep24[1] or 0,
+                "amount": dep24[2] or 0.0,
+            }
+        except sqlite3.OperationalError:
+            out["deposits_24h"] = {"total": 0, "approved": 0, "amount": 0.0}
+
+        out["capmonster_balance"] = cm.get("balance")
+        out["capmonster_error"] = cm.get("error")
+
+        # ── Proxies (LitPort health check) ──
+        out["proxy"] = _proxy_health()
+
+    return out
+
+
+# ─── Refresh visible (re-lectura de DB) ────────────────────────────────────────
+
+class RefreshRequest(BaseModel):
+    ids: list[int]
+
+
+@app.post("/api/accounts/refresh")
+def accounts_refresh(req: RefreshRequest, _user: dict = Depends(require_session)):
+    """Re-lee del DB las cuentas indicadas. NOTA: el re-check live (login + balance)
+    contra BetMexico requiere las deps del bot — se hace via /api/prewarm/select.
+    Este endpoint solo refresca lo que el bot ya puso en BD."""
+    if not req.ids:
+        return {"rows": []}
+    placeholders = ",".join("?" * len(req.ids))
+    with db() as c:
+        rows = c.execute(
+            f"SELECT a.id, a.email, a.password, a.balance_total, a.balance_real, "
+            f"a.last_deposit_amount, a.last_deposit_date, a.status, a.grade, "
+            f"a.locked_by, a.locked_at, a.locked_until, a.last_checked_at, a.check_count, "
+            f"(SELECT COUNT(*) FROM account_cards ac WHERE ac.account_email=a.email) AS cards_count "
+            f"FROM accounts a WHERE a.id IN ({placeholders})",
+            req.ids,
+        ).fetchall()
+    out = [dict(r) for r in rows]
+    for r in out:
+        r["locked_by"] = _resolve_operator(r.get("locked_by"))
+    return {"rows": out}
+
+
+# ─── Logs en tiempo real ───────────────────────────────────────────────────────
+
+@app.get("/api/logs")
+def get_logs(limit: int = 200, since: Optional[str] = None,
+             user: dict = Depends(require_session)):
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Solo superadmin")
+    import subprocess
+    try:
+        cmd = ["journalctl", "-u", "betmexico-web", "-n", str(min(limit, 1000)),
+               "--no-pager", "--output=short-iso"]
+        if since:
+            cmd.extend(["--since", since])
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
+        lines = res.stdout.splitlines()
+    except FileNotFoundError:
+        lines = ["(journalctl no disponible en este entorno)"]
+    except Exception as e:
+        lines = [f"Error: {e}"]
+    return {"lines": lines}
+
+
+# ─── Health check ──────────────────────────────────────────────────────────────
+
+_health_state: dict = {"last_run": None, "ok": True, "issues": []}
+
+
+def _run_health_checks() -> dict:
+    issues: list[str] = []
+    # 1. DB accesible
+    try:
+        with db() as c:
+            c.execute("SELECT 1 FROM accounts LIMIT 1").fetchone()
+    except Exception as e:
+        issues.append(f"DB: {e}")
+    # 2. CapMonster balance
+    cm = _capmonster_balance()
+    if cm.get("error"):
+        issues.append(f"CapMonster: {cm['error']}")
+    elif cm.get("balance") is not None and cm["balance"] < 5:
+        issues.append(f"CapMonster bajo: ${cm['balance']:.2f}")
+    # 3. Cuentas DEAD masivas
+    try:
+        with db() as c:
+            recent_dead = c.execute(
+                "SELECT COUNT(*) FROM accounts WHERE status='DEAD' "
+                "AND last_checked_at >= datetime('now','-1 hours')"
+            ).fetchone()[0]
+        if recent_dead >= 10:
+            issues.append(f"{recent_dead} cuentas DEAD en última hora")
+    except Exception:
+        pass
+    # 4. Bot deps
+    try:
+        import betmexico_db  # noqa: F401
+    except Exception:
+        issues.append("Bot deps no cargan (betmexico_db)")
+
+    state = {
+        "last_run": datetime.now(timezone.utc).isoformat(),
+        "ok": len(issues) == 0,
+        "issues": issues,
     }
+    _health_state.update(state)
+    return state
+
+
+@app.get("/api/health/full")
+def health_full(_user: dict = Depends(require_session)):
+    return _run_health_checks()
+
+
+@app.get("/api/health/last")
+def health_last(_user: dict = Depends(require_session)):
+    return _health_state
+
+
+async def _health_loop():
+    """Cada 6 horas corre el check. Si falla, broadcast SSE."""
+    await asyncio.sleep(60)  # primer check al minuto del start
+    while True:
+        try:
+            res = await asyncio.to_thread(_run_health_checks)
+            if not res["ok"]:
+                _broadcast({"type": "health_warning", "issues": res["issues"]})
+        except Exception as e:
+            print(f"[health] error: {e}")
+        await asyncio.sleep(6 * 3600)
+
+
+def _run_lock_janitor() -> int:
+    """Auto-unlock (spec chat2):
+      - Lock vencido (locked_until < now) Y sin depósito aprobado en últimas 24h → liberar
+      - Si hay depósito/tarjeta nueva en últimas 24h → mantener 24h desde ese evento
+    Retorna cuántas se liberaron.
+    """
+    freed = 0
+    try:
+        with db(write=True) as c:
+            # Cuentas con lock vencido
+            rows = c.execute(
+                "SELECT id, email, locked_by, locked_at, locked_until "
+                "FROM accounts WHERE locked_by IS NOT NULL "
+                "AND locked_until IS NOT NULL "
+                "AND locked_until <= datetime('now')"
+            ).fetchall()
+            for r in rows:
+                # ¿Hubo depósito aprobado o tarjeta nueva en últimas 24h?
+                try:
+                    sticky = c.execute(
+                        "SELECT 1 FROM deposit_attempts "
+                        "WHERE account_email=? AND status='approved' "
+                        "AND created_at >= datetime('now','-24 hours') LIMIT 1",
+                        (r["email"],)
+                    ).fetchone()
+                    if not sticky:
+                        sticky = c.execute(
+                            "SELECT 1 FROM account_cards WHERE account_email=? "
+                            "AND registered_at >= datetime('now','-24 hours') LIMIT 1",
+                            (r["email"],)
+                        ).fetchone()
+                except sqlite3.OperationalError:
+                    sticky = None
+
+                if sticky:
+                    # Extender 24h desde ahora (sticky)
+                    new_until = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+                    c.execute(
+                        "UPDATE accounts SET locked_until=? WHERE id=?",
+                        (new_until, r["id"])
+                    )
+                else:
+                    # Vomitada — liberar y broadcast
+                    prev = r["locked_by"]
+                    c.execute(
+                        "UPDATE accounts SET locked_by=NULL, locked_at=NULL, locked_until=NULL "
+                        "WHERE id=?",
+                        (r["id"],)
+                    )
+                    freed += 1
+                    _broadcast({
+                        "type": "activity", "kind": "unlock_auto",
+                        "ts": datetime.now(timezone.utc).isoformat(),
+                        "who": "janitor", "target": r["email"],
+                        "id": r["id"], "prev_locked_by": prev,
+                    })
+    except Exception as e:
+        print(f"[janitor] error: {e}")
+    return freed
+
+
+async def _janitor_loop():
+    """Limpia locks vencidos cada 5 minutos."""
+    await asyncio.sleep(30)
+    while True:
+        try:
+            n = await asyncio.to_thread(_run_lock_janitor)
+            if n:
+                print(f"[janitor] auto-unlock {n} cuentas")
+        except Exception as e:
+            print(f"[janitor] error: {e}")
+        await asyncio.sleep(5 * 60)
+
+
+@app.on_event("startup")
+async def _start_bg_tasks():
+    asyncio.create_task(_health_loop())
+    asyncio.create_task(_janitor_loop())
 
 
 class LockRequest(BaseModel):
@@ -226,7 +908,7 @@ class LockRequest(BaseModel):
 
 
 @app.post("/api/accounts/{account_id}/lock")
-def lock_account(account_id: int, req: LockRequest):
+def lock_account(account_id: int, req: LockRequest, _user: dict = Depends(require_session)):
     now = datetime.now(timezone.utc)
     locked_at = now.isoformat()
     locked_until = (now + timedelta(hours=req.hours)).isoformat()
@@ -246,23 +928,60 @@ def lock_account(account_id: int, req: LockRequest):
                 status_code=409,
                 detail=f"Already locked by {row['locked_by']}",
             )
-    _broadcast({"type": "locked", "id": account_id, "operator": req.operator})
+        email = c.execute(
+            "SELECT email FROM accounts WHERE id=?", (account_id,)
+        ).fetchone()["email"]
+    _broadcast({
+        "type": "activity", "kind": "lock",
+        "ts": locked_at, "who": req.operator, "target": email,
+        "id": account_id, "locked_until": locked_until,
+    })
     return {"id": account_id, "locked_by": req.operator, "locked_until": locked_until}
 
 
+class PublishRequest(BaseModel):
+    ids: list[int]
+    publish: bool  # true = a la pool (visible), false = a trastienda (oculta)
+
+
+@app.post("/api/accounts/publish")
+def publish_accounts(req: PublishRequest, user: dict = Depends(require_session)):
+    """SA mueve cuentas entre Pool (visible para todos) y Trastienda (oculta).
+    El que pediste para 'dosificar' las 900 cuentas."""
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Solo superadmin")
+    if not req.ids:
+        return {"changed": 0}
+    placeholders = ",".join("?" * len(req.ids))
+    val = 1 if req.publish else 0
+    with db(write=True) as c:
+        cur = c.execute(
+            f"UPDATE accounts SET published_to_pool=? WHERE id IN ({placeholders})",
+            [val, *req.ids],
+        )
+        changed = cur.rowcount
+    return {"changed": changed, "publish": req.publish}
+
+
 @app.post("/api/accounts/{account_id}/unlock")
-def unlock_account(account_id: int):
+def unlock_account(account_id: int, user: dict = Depends(require_session)):
     with db(write=True) as c:
         row = c.execute(
-            "SELECT id FROM accounts WHERE id=?", (account_id,)
+            "SELECT id, email, locked_by FROM accounts WHERE id=?", (account_id,)
         ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Account not found")
+        prev_locked_by = row["locked_by"]
         c.execute(
             "UPDATE accounts SET locked_by=NULL, locked_at=NULL, locked_until=NULL WHERE id=?",
             (account_id,),
         )
-    _broadcast({"type": "unlocked", "id": account_id})
+    _broadcast({
+        "type": "activity", "kind": "unlock",
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "who": user.get("username"), "target": row["email"],
+        "id": account_id, "prev_locked_by": prev_locked_by,
+    })
     return {"id": account_id, "locked_by": None, "locked_until": None}
 
 
@@ -284,7 +1003,7 @@ async def _sse_generator():
 
 
 @app.get("/api/events")
-async def events():
+async def events(_user: dict = Depends(require_session)):
     return StreamingResponse(
         _sse_generator(),
         media_type="text/event-stream",
@@ -292,7 +1011,236 @@ async def events():
     )
 
 
+@app.get("/api/accounts/{account_id}/details")
+def account_details(account_id: int, _user: dict = Depends(require_session)):
+    with db() as c:
+        acc = c.execute(
+            "SELECT id, email, password, balance_total, balance_real, "
+            "last_deposit_amount, last_deposit_date, status, grade, "
+            "locked_by, locked_at, locked_until, last_checked_at, check_count, "
+            "first_checked_at "
+            "FROM accounts WHERE id=? LIMIT 1",
+            (account_id,),
+        ).fetchone()
+        if not acc:
+            raise HTTPException(404, "Cuenta no encontrada")
+        result = dict(acc)
+
+        # Tarjetas guardadas
+        try:
+            rows = c.execute(
+                "SELECT id, card_number, card_expiry, card_cvv, registered_at, "
+                "last_used_at, total_deposits, total_approved, total_rejected, status "
+                "FROM account_cards WHERE account_email=? "
+                "ORDER BY last_used_at DESC, registered_at DESC LIMIT 50",
+                (acc["email"],),
+            ).fetchall()
+            result["cards"] = [dict(r) for r in rows]
+        except sqlite3.OperationalError:
+            result["cards"] = []
+
+        # Transacciones recientes
+        try:
+            rows = c.execute(
+                "SELECT id, txn_date, amount, status, txn_type, gateway, fetched_at "
+                "FROM account_transactions WHERE account_email=? "
+                "ORDER BY txn_date DESC LIMIT 30",
+                (acc["email"],),
+            ).fetchall()
+            result["transactions"] = [dict(r) for r in rows]
+        except sqlite3.OperationalError:
+            result["transactions"] = []
+
+        # Notas
+        try:
+            rows = c.execute(
+                "SELECT id, note_text, created_at, created_by_name "
+                "FROM account_notes WHERE account_email=? "
+                "ORDER BY created_at DESC LIMIT 20",
+                (acc["email"],),
+            ).fetchall()
+            result["notes"] = [dict(r) for r in rows]
+        except sqlite3.OperationalError:
+            result["notes"] = []
+
+    return result
+
+
+class CombosRequest(BaseModel):
+    ids: list[int]
+
+
+@app.post("/api/accounts/combos")
+def accounts_combos(req: CombosRequest, _user: dict = Depends(require_session)):
+    if not req.ids:
+        return {"combos": []}
+    placeholders = ",".join("?" * len(req.ids))
+    with db() as c:
+        rows = c.execute(
+            f"SELECT id, email, password FROM accounts WHERE id IN ({placeholders})",
+            req.ids,
+        ).fetchall()
+    return {"combos": [{"id": r["id"], "email": r["email"], "password": r["password"]} for r in rows]}
+
+
+@app.get("/api/activity")
+def activity_feed(
+    limit: int = Query(150, le=500),
+    operator_id: Optional[int] = None,
+    user: dict = Depends(require_session),
+):
+    """Feed unificado: depósitos + locks activos + prewarms.
+    SA ve todo por defecto; user/admin ve solo lo suyo (su bitácora personal).
+    SA puede pasar operator_id para filtrar."""
+    events: list[dict] = []
+    role = user.get("role", "user")
+    if role == "superadmin":
+        op_filter = operator_id  # SA puede filtrar manualmente
+    else:
+        # Non-SA: forzado a sus propios eventos (no acepta operator_id ajeno)
+        op_filter = int(user.get("telegram_id") or 0)
+
+    with db() as c:
+        # Cache email → password para target=combo
+        pw_cache: dict[str, str] = {}
+        def _combo(email: str) -> str:
+            if not email: return ""
+            if email not in pw_cache:
+                row = c.execute(
+                    "SELECT password FROM accounts WHERE email=? LIMIT 1", (email,)
+                ).fetchone()
+                pw_cache[email] = row["password"] if row else ""
+            pw = pw_cache.get(email) or ""
+            return f"{email}:{pw}" if pw else email
+
+        # Depósitos
+        try:
+            sql = (
+                "SELECT account_email, amount, status, rejection_reason, "
+                "operator_id, duration_ms, created_at FROM deposit_attempts "
+            )
+            params: list = []
+            if op_filter is not None:
+                sql += "WHERE operator_id = ? "
+                params.append(op_filter)
+            sql += "ORDER BY id DESC LIMIT ?"
+            params.append(limit)
+            for r in c.execute(sql, params).fetchall():
+                events.append({
+                    "kind": "deposit", "ts": r["created_at"],
+                    "who": _resolve_operator(r["operator_id"]),
+                    "target": _combo(r["account_email"]),
+                    "amount": r["amount"], "status": r["status"],
+                    "reason": r["rejection_reason"], "duration_ms": r["duration_ms"],
+                })
+        except sqlite3.OperationalError:
+            pass
+
+        # Locks activos (ACCOUNTS — solo los actualmente bloqueados)
+        sql = "SELECT email, locked_by, locked_at FROM accounts WHERE locked_by IS NOT NULL "
+        params = []
+        if op_filter is not None:
+            sql += "AND locked_by = ? "
+            params.append(op_filter)
+        sql += "ORDER BY locked_at DESC LIMIT ?"
+        params.append(limit)
+        for r in c.execute(sql, params).fetchall():
+            events.append({
+                "kind": "lock", "ts": r["locked_at"],
+                "who": _resolve_operator(r["locked_by"]),
+                "target": _combo(r["email"]),
+            })
+
+        # Prewarms (process_log)
+        try:
+            sql = (
+                "SELECT phase, payload_json, created_at FROM process_log "
+                "WHERE process_type='prewarm' "
+            )
+            params = []
+            if op_filter is not None:
+                sql += "AND payload_json LIKE ? "
+                params.append(f'%"operator_id": {op_filter}%')
+            sql += "ORDER BY timestamp_ms DESC LIMIT ?"
+            params.append(limit)
+            for r in c.execute(sql, params).fetchall():
+                p = {}
+                try:
+                    p = _json.loads(r["payload_json"])
+                except Exception:
+                    pass
+                events.append({
+                    "kind": f"prewarm_{r['phase']}", "ts": r["created_at"],
+                    "who": _resolve_operator(p.get("operator_id")),
+                    "target": _combo(p.get("email", "")),
+                })
+        except sqlite3.OperationalError:
+            pass
+
+    events.sort(key=lambda e: str(e.get("ts", "")), reverse=True)
+    return events[:limit]
+
+
+@app.get("/api/deposits")
+def list_deposits(
+    status: Optional[str] = None,
+    operator_id: Optional[int] = None,
+    limit: int = Query(100, le=500),
+    _user: dict = Depends(require_session),
+):
+    where, params = [], []
+    if status:
+        where.append("status = ?"); params.append(status)
+    if operator_id is not None:
+        where.append("operator_id = ?"); params.append(operator_id)
+    sql = (
+        "SELECT id, attempt_id, account_email, card_id, amount, status, "
+        "rejection_reason, balance_before, balance_after, duration_ms, "
+        "captcha_cost, operator_id, created_at "
+        "FROM deposit_attempts"
+    )
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
+    try:
+        with db() as c:
+            return [dict(r) for r in c.execute(sql, params).fetchall()]
+    except sqlite3.OperationalError:
+        return []
+
+
+@app.get("/api/deposits/stats")
+def deposits_stats(_user: dict = Depends(require_session)):
+    try:
+        with db() as c:
+            total = c.execute("SELECT COUNT(*) FROM deposit_attempts").fetchone()[0]
+            approved = c.execute(
+                "SELECT COUNT(*) FROM deposit_attempts WHERE status='approved'"
+            ).fetchone()[0]
+            rejected = c.execute(
+                "SELECT COUNT(*) FROM deposit_attempts WHERE status='rejected'"
+            ).fetchone()[0]
+            amount = c.execute(
+                "SELECT COALESCE(SUM(amount),0) FROM deposit_attempts WHERE status='approved'"
+            ).fetchone()[0]
+        return {
+            "total": total,
+            "approved": approved,
+            "rejected": rejected,
+            "pending": total - approved - rejected,
+            "success_rate": round(approved / total * 100, 1) if total > 0 else 0.0,
+            "total_amount_approved": amount,
+        }
+    except sqlite3.OperationalError:
+        return {
+            "total": 0, "approved": 0, "rejected": 0, "pending": 0,
+            "success_rate": 0.0, "total_amount_approved": 0.0,
+        }
+
+
 if __name__ == "__main__":
     import uvicorn
+    port = int(os.environ.get("BMX_WEB_PORT", "5001"))
     print(f"BD: {DB_PATH} (existe: {DB_PATH.exists()})")
-    uvicorn.run(app, host="127.0.0.1", port=5001)
+    uvicorn.run(app, host="0.0.0.0", port=port)

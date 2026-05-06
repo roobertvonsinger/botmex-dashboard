@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Botmexico v2 — Acceso</title>
+<link rel="icon" type="image/png" href="/static/assets/botmexico_logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --hue: 169; --chr: 0.20;
+  --bg: #08090c;
+  --bg-accent: radial-gradient(ellipse 1100px 700px at 50% 30%, oklch(0.40 0.20 169 / 0.12), transparent 60%), #08090c;
+  --surface: rgba(18, 20, 24, 0.70);
+  --hairline: rgba(255,255,255,0.07);
+  --hairline-h: rgba(255,255,255,0.12);
+  --text: #eef0f3;
+  --text-dim: rgba(238,240,243,0.58);
+  --text-muted: rgba(238,240,243,0.34);
+  --accent: oklch(0.78 0.20 169);
+  --accent-mid: oklch(0.62 0.20 169);
+  --accent-soft: oklch(0.78 0.20 169 / 0.12);
+  --accent-glow: oklch(0.78 0.20 169 / 0.35);
+  --danger: oklch(0.66 0.21 24);
+  --danger-soft: oklch(0.66 0.21 24 / 0.10);
+  --warn: oklch(0.80 0.16 75);
+  --blur: 12px;
+  --font: 'Inter', system-ui, sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  background: var(--bg-accent);
+  color: var(--text);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh;
+}
+
+/* ── Card ── */
+.login-wrap { width: 340px; position: relative; }
+
+.login-card {
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur)); -webkit-backdrop-filter: blur(var(--blur));
+  border: 1px solid var(--hairline);
+  border-radius: 18px;
+  padding: 36px 32px 32px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.03) inset,
+              0 24px 64px rgba(0,0,0,0.55),
+              0 0 80px oklch(0.40 0.20 169 / 0.06);
+}
+
+/* Glow line at top */
+.login-card::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent 5%, var(--accent) 40%, rgba(255,255,255,0.6) 55%, var(--accent) 70%, transparent 95%);
+  opacity: 0.55;
+}
+
+/* Subtle inner glow */
+.login-card::after {
+  content: "";
+  position: absolute; inset: 0; border-radius: 18px; pointer-events: none;
+  background: radial-gradient(ellipse 280px 160px at 50% 0%, oklch(0.78 0.20 169 / 0.07), transparent 70%);
+}
+
+/* ── Brand ── */
+.login-brand {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  margin-bottom: 28px;
+}
+.login-brand img {
+  width: 140px; height: auto;
+  filter: drop-shadow(0 0 18px var(--accent-glow));
+}
+.login-tagline {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 1.8px; text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* ── Step title ── */
+.step-title {
+  font-family: var(--font-display); font-size: 15px; font-weight: 600;
+  color: var(--text); margin-bottom: 20px; text-align: center;
+  letter-spacing: -0.2px;
+}
+
+/* ── Form ── */
+.field { margin-bottom: 14px; }
+.field label {
+  display: block; font-size: 10.5px; font-weight: 600;
+  color: var(--text-muted); margin-bottom: 6px;
+  letter-spacing: 0.5px; text-transform: uppercase; font-family: var(--font-mono);
+}
+.field input {
+  width: 100%;
+  background: rgba(0,0,0,0.40);
+  border: 1px solid var(--hairline);
+  border-radius: 9px;
+  padding: 10px 14px;
+  color: var(--text);
+  font: inherit; font-size: 13px;
+  outline: none;
+  transition: border-color 150ms, box-shadow 150ms;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.35);
+}
+.field input:focus {
+  border-color: oklch(0.78 0.20 169 / 0.55);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.35), 0 0 0 3px oklch(0.78 0.20 169 / 0.10);
+}
+.field input::placeholder { color: var(--text-muted); }
+
+/* ── Submit btn ── */
+.btn-submit {
+  width: 100%; margin-top: 6px;
+  padding: 11px 20px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-mid));
+  border: none; border-radius: 9px;
+  color: #000; font: inherit; font-size: 13px; font-weight: 700;
+  cursor: pointer; letter-spacing: 0.3px;
+  transition: opacity 150ms, transform 80ms;
+  box-shadow: 0 0 20px oklch(0.78 0.20 169 / 0.30), inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.btn-submit:hover { opacity: 0.92; }
+.btn-submit:active { transform: scale(0.98); }
+.btn-submit:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+/* ── Error / Info ── */
+.msg {
+  margin-top: 14px; padding: 10px 13px;
+  border-radius: 8px; font-size: 12px; text-align: center;
+  display: none;
+}
+.msg.error {
+  background: var(--danger-soft);
+  border: 1px solid oklch(0.66 0.21 24 / 0.22);
+  color: var(--danger); display: block;
+}
+.msg.info {
+  background: var(--accent-soft);
+  border: 1px solid oklch(0.78 0.20 169 / 0.22);
+  color: var(--accent); display: block;
+}
+
+/* ── Steps ── */
+.step { display: none; }
+.step.active { display: block; }
+
+/* ── Spinner inline ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  display: inline-block; width: 14px; height: 14px;
+  border: 2px solid rgba(0,0,0,0.2); border-top-color: #000;
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+  vertical-align: middle; margin-right: 6px;
+}
+
+/* ── Footer ── */
+.login-footer {
+  margin-top: 20px; text-align: center;
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);
+  letter-spacing: 0.4px;
+}
+
+/* ── Subtle grid noise ── */
+body::before {
+  content: "";
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='1' height='1' fill='rgba(255,255,255,0.015)'/%3E%3C/svg%3E");
+  background-size: 4px 4px;
+}
+.login-wrap { z-index: 1; }
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-brand">
+      <img src="/static/assets/botmexico_logo.png" alt="Botmexico">
+      <span class="login-tagline">Panel de control</span>
+    </div>
+
+    <!-- Step 1: Login normal -->
+    <div id="stepLogin" class="step active">
+      <div class="step-title">Acceso al sistema</div>
+      <div class="field">
+        <label>Usuario</label>
+        <input id="inUser" type="text" placeholder="Tu nombre de usuario" autocomplete="username" autofocus>
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input id="inPass" type="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button id="btnLogin" class="btn-submit">Entrar</button>
+      <div id="msgLogin" class="msg"></div>
+    </div>
+
+    <!-- Step 2: Primera vez — elegir contraseña -->
+    <div id="stepFirstTime" class="step">
+      <div class="step-title">Elige tu contraseña</div>
+      <p style="text-align:center;color:var(--text-muted);font-size:12px;margin-bottom:18px">
+        Es tu primera vez entrando, <b id="ftDisplay" style="color:var(--text)"></b>.<br>
+        Elige una contraseña para tu cuenta.
+      </p>
+      <div class="field">
+        <label>Nueva contraseña</label>
+        <input id="ftPass" type="password" placeholder="Mínimo 4 caracteres" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label>Confirmar</label>
+        <input id="ftPassConfirm" type="password" placeholder="Repite la contraseña" autocomplete="new-password">
+      </div>
+      <button id="btnSetPass" class="btn-submit">Crear contraseña y entrar</button>
+      <div id="msgFt" class="msg"></div>
+    </div>
+  </div>
+  <div class="login-footer">Botmexico v2 · Acceso restringido</div>
+</div>
+
+<script>
+let _firstTimeUser = '';
+
+function showMsg(el, text, type) {
+  el.className = 'msg ' + type;
+  el.textContent = text;
+}
+
+function setLoading(btn, loading) {
+  if (loading) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Verificando…';
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = btn.dataset.label;
+  }
+}
+
+document.getElementById('btnLogin').dataset.label = 'Entrar';
+document.getElementById('btnSetPass').dataset.label = 'Crear contraseña y entrar';
+
+async function doLogin() {
+  const user = document.getElementById('inUser').value.trim();
+  const pass = document.getElementById('inPass').value;
+  const btn = document.getElementById('btnLogin');
+  const msg = document.getElementById('msgLogin');
+  msg.className = 'msg';
+
+  if (!user) { showMsg(msg, 'Ingresa tu usuario.', 'error'); return; }
+
+  setLoading(btn, true);
+  try {
+    const r = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username: user, password: pass}),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      showMsg(msg, data.detail || 'Error de acceso.', 'error');
+      return;
+    }
+    if (data.first_time) {
+      _firstTimeUser = user;
+      document.getElementById('ftDisplay').textContent = data.display;
+      document.getElementById('stepLogin').classList.remove('active');
+      document.getElementById('stepFirstTime').classList.add('active');
+      document.getElementById('ftPass').focus();
+      return;
+    }
+    showMsg(msg, 'Bienvenido, ' + data.username + ' ✓', 'info');
+    setTimeout(() => { window.location.href = '/'; }, 400);
+  } catch (e) {
+    showMsg(msg, 'Error de conexión.', 'error');
+  } finally {
+    setLoading(btn, false);
+  }
+}
+
+async function doSetPassword() {
+  const pass = document.getElementById('ftPass').value;
+  const confirm = document.getElementById('ftPassConfirm').value;
+  const btn = document.getElementById('btnSetPass');
+  const msg = document.getElementById('msgFt');
+  msg.className = 'msg';
+
+  if (pass.length < 4) { showMsg(msg, 'Mínimo 4 caracteres.', 'error'); return; }
+  if (pass !== confirm) { showMsg(msg, 'Las contraseñas no coinciden.', 'error'); return; }
+
+  setLoading(btn, true);
+  try {
+    const r = await fetch('/api/auth/set-password', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username: _firstTimeUser, password: pass}),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      showMsg(msg, data.detail || 'Error al guardar.', 'error');
+      return;
+    }
+    showMsg(msg, 'Contraseña guardada. Entrando…', 'info');
+    setTimeout(() => { window.location.href = '/'; }, 500);
+  } catch (e) {
+    showMsg(msg, 'Error de conexión.', 'error');
+  } finally {
+    setLoading(btn, false);
+  }
+}
+
+document.getElementById('btnLogin').addEventListener('click', doLogin);
+document.getElementById('btnSetPass').addEventListener('click', doSetPassword);
+
+// Enter key support
+document.getElementById('inPass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+document.getElementById('inUser').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('inPass').focus();
+});
+document.getElementById('ftPassConfirm').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSetPassword();
+});
+
+// Redirect if already logged in (401 check via /api/auth/me)
+fetch('/api/auth/me').then(r => {
+  if (r.ok) window.location.href = '/';
+}).catch(() => {});
+</script>
+</body>
+</html>

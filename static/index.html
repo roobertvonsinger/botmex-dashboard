@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Botmexico v2 — Obsidian</title>
+<link rel="icon" type="image/png" href="/static/assets/botmexico_logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -15,25 +16,25 @@
     <div class="sb-brand"><img src="/static/assets/botmexico_logo.png" alt="Botmexico"></div>
     <div class="tristrip"><i></i><i></i><i></i></div>
     <div class="sb-greet">
-      <div>Hola, <b>RobertVS</b></div>
-      <div class="mono"><span id="sbDate"></span> · <span id="sbTime"></span></div>
+      <div>Hola, <b id="sbGreetName">…</b> <span class="mono dim">· <span id="sbDate"></span> · <span id="sbTime"></span></span></div>
+      <div class="sb-frase"><span class="emoji">💛</span><span id="fraseTxt">…</span></div>
     </div>
     <div class="sb-section">Principal</div>
-    <button class="nav on"><span class="i">▦</span>Cuentas<span class="b" id="navCount">…</span></button>
-    <button class="nav"><span class="i">$</span>Depósitos</button>
-    <button class="nav"><span class="i">▭</span>Tarjetas</button>
+    <button class="nav on" data-section="accounts"><span class="i">▦</span>Cuentas<span class="b" id="navCount">…</span></button>
+    <button class="nav" data-section="activity"><span class="i">⚡</span>Actividad<span class="b" id="navActivityBadge"></span></button>
     <div class="sb-section">Sistema</div>
-    <button class="nav"><span class="i">◔</span>Notificaciones<span class="b warn">·</span></button>
-    <button class="nav"><span class="i">▤</span>Logs</button>
+    <button class="nav" data-section="notifications"><span class="i">◔</span>Notificaciones<span class="b warn hidden" id="navNotifBadge">·</span></button>
+    <button class="nav" data-section="logs" id="navLogs"><span class="i">▤</span>Logs<span class="b" id="navLogsBadge"></span></button>
+    <button class="nav" data-section="health" id="navHealth"><span class="i">◉</span>Salud<span class="b ok hidden" id="navHealthBadge">✓</span></button>
     <div class="grow"></div>
     <div class="sb-status mono">
-      <div><span>xCAPTCHA</span><b class="ok" id="stCap">—</b></div>
-      <div><span>Proxy</span><b class="ok" id="stProxy">—</b></div>
+      <div><span>xCAPTCHA</span><b class="ok" id="stCap" title="Saldo CapMonster">—</b></div>
+      <div><span>Proxies</span><b id="stProxy" title="Pool de proxies (LitPort)">—</b></div>
       <div><span>En uso</span><b class="warn" id="stInUse">—</b></div>
     </div>
     <div class="sb-user">
-      <div class="av">RV</div>
-      <div class="info"><div>RobertVS</div><div class="mono dim">admin</div></div>
+      <div class="av" id="sbUserAv">··</div>
+      <div class="info"><div id="sbUserName">…</div><div class="mono dim" id="sbUserRole">—</div></div>
       <button class="ico-btn" title="Salir">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v9"/><path d="M5.5 8.5a8 8 0 1 0 13 0"/></svg>
       </button>
@@ -42,14 +43,14 @@
 
   <main class="main">
     <header class="topbar">
+      <div class="grow"></div>
       <div class="search">
         <span class="ico">⌕</span>
-        <input id="searchInput" placeholder="Buscar email, tarjeta, nombre, notas...">
+        <input id="searchInput" placeholder="Buscar email, tarjeta, nombre, notas…">
         <kbd>Ctrl K</kbd>
       </div>
-      <div class="frase"><span class="emoji">💛</span><span id="fraseTxt">…</span></div>
       <div class="topbar-right">
-        <button class="bell" title="Notificaciones">
+        <button class="bell" id="bellBtn" title="Notificaciones">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
           <span id="bellBadge" class="badge hidden">0</span>
         </button>
@@ -59,60 +60,262 @@
       </div>
     </header>
 
-    <section class="admin-panel">
-      <div class="ap-grid">
-        <div class="ap-card">
-          <div class="ap-label">Conectados</div>
-          <div class="ap-value" id="apConVal">—</div>
-          <div class="ap-sub" id="apConSub">operadores activos</div>
+    <!-- Vista: Cuentas -->
+    <div id="accountsMain" style="display:flex;flex-direction:column;flex:1;min-height:0">
+      <section class="lpanel" id="adminPanel">
+        <!-- Bloque 1: Online ahora -->
+        <div class="lp-card lp-online">
+          <div class="lp-head">
+            <span class="lp-dot live"></span>
+            <span class="lp-label">Online</span>
+            <span class="lp-counter mono"><b id="lpOnlineActive">0</b>/<span id="lpOnlineTotal">0</span></span>
+          </div>
+          <div class="lp-ops" id="lpOps"></div>
         </div>
-        <div class="ap-card">
-          <div class="ap-label">Actividad LIVE</div>
-          <div class="ap-value" id="apActVal">—</div>
-          <div class="ap-sub" id="apActSub">últimos checks</div>
-        </div>
-        <div class="ap-card ap-alert">
-          <div class="ap-label">Alertas</div>
-          <div class="ap-value" id="apAltVal">—</div>
-          <div class="ap-sub" id="apAltSub">eventos</div>
-        </div>
-        <div class="ap-card">
-          <div class="ap-label">CapMonster</div>
-          <div class="ap-value" id="apPoolVal">—</div>
-          <div class="ap-sub" id="apPoolSub">créditos</div>
-        </div>
-      </div>
-    </section>
 
-    <section class="filterbar">
-      <h2>Cuentas <span class="dim mono" id="countLabel">— / —</span></h2>
-      <div class="grow"></div>
-      <div class="seg" data-seg="status">
-        <button data-v="LIVE" class="on">LIVE</button>
-        <button data-v="all">Todos</button>
-        <button data-v="DEAD">DEAD</button>
-      </div>
-      <div class="seg" data-seg="grade">
-        <button data-v="" class="on">Todos</button>
-        <button data-v="A">A</button>
-        <button data-v="B">B</button>
-        <button data-v="C">C</button>
-        <button data-v="?">?</button>
-      </div>
-      <div class="seg" data-seg="view">
-        <button data-v="simple" class="on">Simple</button>
-        <button data-v="detail">Detallada</button>
-      </div>
-    </section>
+        <!-- Bloque 2: Feed actividad LIVE -->
+        <div class="lp-card lp-feed">
+          <div class="lp-head">
+            <span class="lp-pulse"></span>
+            <span class="lp-label">Actividad LIVE</span>
+            <span class="lp-counter mono dim" id="lpFeedCount">—</span>
+          </div>
+          <div class="lp-feed-rows" id="lpFeed"></div>
+        </div>
 
-    <section class="tablewrap">
-      <table id="accTable">
-        <thead></thead>
-        <tbody><tr><td class="loading" colspan="6">Cargando…</td></tr></tbody>
-      </table>
-    </section>
+        <!-- Bloque 3: Alertas -->
+        <div class="lp-card lp-alerts">
+          <div class="lp-head">
+            <span class="lp-warn-ic">⚠</span>
+            <span class="lp-label">Alertas</span>
+            <span class="lp-counter mono" id="lpAlertCount">0</span>
+          </div>
+          <div class="lp-alert-rows" id="lpAlerts">
+            <div class="lp-empty dim mono">sin alertas</div>
+          </div>
+        </div>
+
+        <!-- Bloque 4: Pool stats 2×2 -->
+        <div class="lp-card lp-pool">
+          <div class="lp-head">
+            <span class="lp-label">Pool</span>
+            <span class="lp-counter mono dim" id="lpPoolSub">—</span>
+          </div>
+          <div class="lp-pool-grid">
+            <div class="lp-stat"><span class="lp-stat-label">Pool</span><b id="lpPool" class="lp-stat-val">—</b></div>
+            <div class="lp-stat"><span class="lp-stat-label">En uso</span><b id="lpInUse" class="lp-stat-val warn">—</b></div>
+            <div class="lp-stat"><span class="lp-stat-label">Trastienda</span><b id="lpTras" class="lp-stat-val dim">—</b></div>
+            <div class="lp-stat"><span class="lp-stat-label">Rebotadas</span><b id="lpReb" class="lp-stat-val danger">—</b></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="filterbar">
+        <h2>Cuentas <span class="dim mono" id="countLabel">— / —</span></h2>
+        <div class="grow"></div>
+        <div class="seg" data-seg="status">
+          <button data-v="LIVE" class="on">LIVE</button>
+          <button data-v="all">Todos</button>
+          <button data-v="DEAD">DEAD</button>
+        </div>
+        <div class="seg" data-seg="grade">
+          <button data-v="" class="on">Todos</button>
+          <button data-v="A">A</button>
+          <button data-v="B">B</button>
+          <button data-v="C">C</button>
+          <button data-v="?">?</button>
+        </div>
+        <div class="seg" data-seg="view">
+          <button data-v="simple" class="on">Simple</button>
+          <button data-v="detail">Detallada</button>
+        </div>
+      </section>
+
+      <section class="tablewrap">
+        <table id="accTable">
+          <thead></thead>
+          <tbody><tr><td class="loading" colspan="6">Cargando…</td></tr></tbody>
+        </table>
+      </section>
+
+      <div class="pagebar">
+        <div class="pb-left">
+          <button class="seg-btn" id="btnRefreshVisible">↻ Actualizar visibles</button>
+          <span class="dim mono" id="pbVisibleCount"></span>
+        </div>
+        <div class="pb-center" id="pbPages"></div>
+        <div class="pb-right">
+          <span class="dim mono">Por página</span>
+          <select id="pageSize" class="seg-btn">
+            <option value="20">20</option>
+            <option value="30">30</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+            <option value="200">200</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vista: Actividad (event log en vivo) -->
+    <div id="activityMain" style="display:none;flex-direction:column;flex:1;min-height:0">
+      <section class="filterbar">
+        <h2>Actividad <span class="dim mono" id="actCountLabel">—</span></h2>
+        <div class="grow"></div>
+        <div class="seg" data-seg="actkind">
+          <button data-v="" class="on">Todos</button>
+          <button data-v="deposit">💳 Depósitos</button>
+          <button data-v="lock">🔒 Locks</button>
+          <button data-v="unlock">🔓 Unlocks</button>
+          <button data-v="prewarm">🔥 Prewarms</button>
+        </div>
+        <button class="seg-btn" id="actClearFilter" style="display:none">× Filtro</button>
+        <span class="dim mono" id="actFilterInfo"></span>
+      </section>
+      <section class="tablewrap">
+        <table id="actTable">
+          <thead></thead>
+          <tbody><tr><td class="loading" colspan="6">Cargando…</td></tr></tbody>
+        </table>
+      </section>
+    </div>
+
+    <!-- Vista: Logs -->
+    <div id="logsMain" style="display:none;flex-direction:column;flex:1;min-height:0">
+      <section class="filterbar">
+        <h2>Logs <span class="dim mono" id="logsCount">—</span></h2>
+        <div class="grow"></div>
+        <button class="seg-btn" id="btnLogsClear">Limpiar</button>
+        <button class="seg-btn" id="btnLogsPause">⏸ Pausar</button>
+      </section>
+      <section class="tablewrap"><pre id="logsView" class="logs-view">Conectando…</pre></section>
+    </div>
+
+    <!-- Vista: Salud -->
+    <div id="healthMain" style="display:none;flex-direction:column;flex:1;min-height:0">
+      <section class="filterbar">
+        <h2>Salud del sistema <span class="dim mono" id="healthLast">—</span></h2>
+        <div class="grow"></div>
+        <button class="seg-btn" id="btnHealthRun">Correr ahora</button>
+      </section>
+      <section class="tablewrap">
+        <div id="healthView" class="health-view"><div class="loading">Cargando…</div></div>
+      </section>
+    </div>
+
+    <!-- Vista: Notificaciones -->
+    <div id="notificationsMain" style="display:none;flex-direction:column;flex:1;min-height:0">
+      <section class="filterbar">
+        <h2>Notificaciones <span class="dim mono" id="notifCountLabel">—</span></h2>
+        <div class="grow"></div>
+        <button class="seg-btn" id="btnClearNotif">Limpiar</button>
+      </section>
+      <section class="tablewrap">
+        <div id="notifList" class="notif-list">
+          <div class="loading">Sin notificaciones.</div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Command bar (siempre visible cuando hay selección) -->
+    <div id="cmdBar" class="cmdbar hidden">
+      <div class="cmd-left">
+        <span class="cmd-count"><b id="cmdSelCount">0</b> seleccionadas</span>
+      </div>
+      <div class="cmd-center">
+        <button class="cmd-btn primary" id="cmdDeposit">💳 Depositar</button>
+        <div class="cmd-lock-wrap">
+          <button class="cmd-btn" id="cmdLock">🔒 Lock <span class="cmd-lock-h" id="cmdLockHours">2h</span></button>
+          <div id="lockHoursPopup" class="lock-hours-popup hidden">
+            <button class="lh-btn" data-h="1">1h</button>
+            <button class="lh-btn on" data-h="2">2h</button>
+            <button class="lh-btn" data-h="4">4h</button>
+            <button class="lh-btn" data-h="8">8h</button>
+            <button class="lh-btn" data-h="24">24h</button>
+          </div>
+        </div>
+        <button class="cmd-btn" id="cmdTrastienda" title="Mover entre Pool (visible) y Trastienda (oculta)">📤 Trastienda</button>
+        <div class="cmd-release-wrap">
+          <button class="cmd-btn" id="cmdRelease">🎁 Liberar</button>
+          <div id="releasePopup" class="release-popup hidden"></div>
+        </div>
+        <button class="cmd-btn ghost" id="cmdDeselect">Deseleccionar</button>
+      </div>
+      <div class="cmd-right">
+        <span class="cmd-stats mono dim" id="cmdStats"></span>
+      </div>
+    </div>
   </main>
 </div>
+
+<!-- Modal Detalle de cuenta -->
+<div id="detModalOverlay" class="modal-overlay hidden">
+  <div class="modal modal-detail" id="detModal">
+    <header class="modal-head">
+      <div class="modal-title">
+        <span class="modal-icon">📋</span>
+        <span id="detModalTitle">Detalle de cuenta</span>
+      </div>
+      <button class="modal-close" id="detModalClose">×</button>
+    </header>
+    <div class="modal-body" id="detModalBody">
+      <div class="detail-loading"><span class="dep-spinner"></span> Cargando…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Depósito -->
+<div id="depModalOverlay" class="modal-overlay hidden">
+  <div class="modal" id="depModal">
+    <header class="modal-head">
+      <div class="modal-title">
+        <span class="modal-icon">💳</span>
+        <span>Depósito directo</span>
+      </div>
+      <button class="modal-close" id="depModalClose">×</button>
+    </header>
+    <div class="modal-body">
+      <div class="dep-target">
+        <div class="dep-target-row">
+          <span class="dep-target-label">Cuenta</span>
+          <b id="depTargetEmail">—</b>
+        </div>
+        <div class="dep-target-row">
+          <span class="dep-target-label">Saldo actual</span>
+          <span id="depTargetBalance" class="mono">—</span>
+        </div>
+      </div>
+
+      <div class="dep-section">
+        <label class="dep-label">Tarjeta <span class="dim">— pipe format</span></label>
+        <input type="text" id="depCardPipe" class="dep-input" placeholder="4242424242424242|1228|123" autocomplete="off" spellcheck="false">
+        <div id="depCardHint" class="dep-hint hidden">↑ última tarjeta usada · clic en el campo para reemplazar</div>
+        <div id="depCardErr" class="dep-err hidden"></div>
+      </div>
+
+      <div class="dep-section">
+        <label class="dep-label">Monto</label>
+        <div class="dep-amounts" id="depAmounts">
+          <button class="dep-amt" data-v="10">$10</button>
+          <button class="dep-amt on" data-v="50">$50</button>
+          <button class="dep-amt" data-v="100">$100</button>
+          <button class="dep-amt" data-v="200">$200</button>
+          <button class="dep-amt" data-v="500">$500</button>
+          <button class="dep-amt" data-v="custom">Otro</button>
+        </div>
+        <input type="number" id="depCustomAmount" class="dep-input hidden" placeholder="Monto…" step="0.01" min="1" max="5000">
+      </div>
+
+      <div id="depResult" class="dep-result hidden"></div>
+
+      <button id="depExec" class="dep-exec">🚀 Ejecutar depósito</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast hidden"></div>
+
 <script src="/static/app.js"></script>
 </body>
 </html>

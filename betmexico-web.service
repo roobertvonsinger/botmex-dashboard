@@ -1,0 +1,18 @@
+[Unit]
+Description=BetMexico Web Dashboard v2
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/betmexico/bot
+EnvironmentFile=-/opt/betmexico/bot/web/.env
+ExecStart=/opt/betmexico/venv/bin/python /opt/betmexico/bot/web/app.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
