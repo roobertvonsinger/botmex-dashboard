@@ -760,15 +760,12 @@ function connectSSE() {
           toast(`⏰ ${ev.email}: cierra en ${ev.mins_left}min`, 'warn');
         }
       } else if (ev.type === 'window_expired') {
-        // Window cerró — popup invitando a volver
+        // Window cerró — popup invitando a volver (con dismiss persistente opcional)
         const myTg = state.user?.telegram_id;
         if (!myTg || ev.operator_id === myTg || state.user?.role === 'superadmin') {
           pushNotif({ icon: '⏰', msg: `${ev.email}: window cerró ($${ev.used_24h.toFixed(0)} en 24h). Tienes 1h para volver o se libera.` });
-          // Popup grande
-          if (confirm(`⏰ La cuenta ${ev.email} acaba de cumplir 24h.\n\nDepositaste $${ev.used_24h.toFixed(2)} en este periodo.\nTienes 1h para volver a depositar o la cuenta se libera al pool para los demás.\n\n¿Abrir modal para depositar ahora?`)) {
-            // Buscar id por email y abrir modal
-            const acc = state.rows.find(r => r.email === ev.email);
-            if (acc) openDepositModal(acc.id);
+          if (!_isHelpDismissed('window_expired_popup')) {
+            _showWindowExpiredPopup(ev);
           }
         }
       } else if (ev.type === 'window_released') {
@@ -2042,8 +2039,93 @@ function renderDepHelpBanner(mode) {
               Te llegará una notif cuando se acerque el fin de las 24h para que
               vuelvas a depositar; si no, la cuenta se libera para los demás.`,
   };
-  banner.innerHTML = helps[mode] || '';
+  // Si el user dijo "no mostrar más" para este modo, ocultar
+  const dismissed = _isHelpDismissed(`dep_help_${mode}`);
+  if (dismissed || !helps[mode]) {
+    banner.innerHTML = '';
+    banner.classList.add('dim-help');
+    // Mini icono ? para volver a mostrar
+    if (helps[mode]) {
+      banner.innerHTML = `<button class="help-restore" data-mode="${mode}" title="Mostrar instrucciones">ℹ️</button>`;
+    }
+    return;
+  }
+  banner.classList.remove('dim-help');
+  banner.innerHTML = `
+    <div class="help-text">${helps[mode]}</div>
+    <button class="help-dismiss" data-key="dep_help_${mode}" title="No volver a mostrar">✕</button>
+  `;
 }
+
+// Popup custom para window_expired con opción "no volver a mostrar"
+function _showWindowExpiredPopup(ev) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal" style="width:440px">
+      <header class="modal-head">
+        <div class="modal-title"><span class="modal-icon">⏰</span><span>Window 24h cerró</span></div>
+        <button class="modal-close" data-act="close" title="Cerrar">×</button>
+      </header>
+      <div class="modal-body" style="padding:18px">
+        <p style="margin-bottom:12px">
+          La cuenta <b class="mono">${esc(ev.email)}</b> acaba de cumplir 24h.<br>
+          Depositaste <b>$${ev.used_24h.toFixed(2)}</b> en este periodo.
+        </p>
+        <p style="font-size:12px;color:var(--text-dim);margin-bottom:14px">
+          Tienes <b>1 hora</b> para volver a depositar. Si no, la cuenta se libera
+          al pool para los demás socios.
+        </p>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);margin-bottom:14px">
+          <input type="checkbox" id="winDismiss" style="accent-color:var(--accent)">
+          No volver a mostrar este popup
+        </label>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="seg-btn" data-act="close" title="Solo cierra el popup">Después</button>
+          <button class="seg-btn" data-act="open" title="Abrir modal de depósito ya" style="background:var(--accent-soft);color:var(--accent);border-color:var(--accent)">💳 Depositar ahora</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (!act && e.target !== overlay) return;
+    if ($('#winDismiss')?.checked) _dismissHelp('window_expired_popup');
+    if (act === 'open') {
+      const acc = state.rows.find(r => r.email === ev.email);
+      if (acc) openDepositModal(acc.id);
+    }
+    overlay.remove();
+  });
+}
+
+// LocalStorage helpers para "no mostrar más"
+function _isHelpDismissed(key) {
+  try { return localStorage.getItem(`dismiss:${key}`) === '1'; }
+  catch { return false; }
+}
+function _dismissHelp(key) {
+  try { localStorage.setItem(`dismiss:${key}`, '1'); } catch {}
+}
+function _undismissHelp(key) {
+  try { localStorage.removeItem(`dismiss:${key}`); } catch {}
+}
+
+// Handler global para ✕ y ℹ️ del banner
+document.addEventListener('click', e => {
+  const dismiss = e.target.closest('.help-dismiss');
+  if (dismiss?.dataset.key) {
+    _dismissHelp(dismiss.dataset.key);
+    renderDepHelpBanner(_depMode);
+    return;
+  }
+  const restore = e.target.closest('.help-restore');
+  if (restore?.dataset.mode) {
+    _undismissHelp(`dep_help_${restore.dataset.mode}`);
+    renderDepHelpBanner(restore.dataset.mode);
+    return;
+  }
+});
 
 async function openDepositModal(accountId, opts = {}) {
   // Determina cuentas iniciales:

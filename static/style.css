@@ -2098,9 +2098,35 @@ tbody tr.row-refresh-skip { animation: rowSkip 1500ms ease-out; opacity: 0.7; }
   border-radius: 6px;
   padding: 9px 12px;
   margin-bottom: 14px;
+  display: flex; align-items: flex-start; gap: 8px;
 }
+.dep-help-banner .help-text { flex: 1; }
 .dep-help-banner b { color: var(--accent); font-weight: 700; }
 .dep-help-banner:empty { display: none; }
+.dep-help-banner.dim-help {
+  background: transparent;
+  border-left: none;
+  padding: 0; margin-bottom: 6px;
+  justify-content: flex-end;
+}
+.help-dismiss, .help-restore {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+.help-dismiss:hover { color: var(--danger); border-color: var(--hairline-h); }
+.help-restore {
+  font-size: 13px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--hairline);
+}
+.help-restore:hover { color: var(--accent); border-color: var(--accent-soft-2); }
 
 /* Botón de "programar siguientes" tras match */
 .dep-post-match {
