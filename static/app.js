@@ -145,41 +145,107 @@ function _normalizeName(s) {
     .replace(/[^A-ZÑ\s]/g, ' ')
     .replace(/\s+/g, ' ').trim();
 }
-function _splitFullname(fullname) {
-  // Heurística: si tiene 4+ tokens, los últimos 2 son apellidos.
-  // Si tiene 3, último=primer apellido, segundo=nombre. Si tiene 2 → apellido+nombre.
-  // BetMexico suele guardar "Nombre(s) Apellido1 Apellido2"
-  const parts = _normalizeName(fullname).split(' ').filter(Boolean);
-  if (parts.length === 0) return null;
-  if (parts.length === 1) return { nombre: parts[0], ap1: '', ap2: '' };
-  if (parts.length === 2) return { nombre: parts[0], ap1: parts[1], ap2: '' };
-  // 3+ tokens: asume últimos 2 son apellidos
-  const ap2 = parts[parts.length - 1];
-  const ap1 = parts[parts.length - 2];
-  let nombre = parts.slice(0, parts.length - 2).join(' ');
-  // Si el nombre empieza con José/María y hay más, usar el siguiente
-  const nameTokens = nombre.split(' ');
-  if (nameTokens.length > 1 && _CURP_FIRST_NAME_SKIP.has(nameTokens[0])) {
-    nombre = nameTokens.slice(1).join(' ');
-  }
-  return { nombre: nombre.split(' ')[0], ap1, ap2 };  // solo primer nombre
+// Partículas que RENAPO ignora en apellidos (DA, DE, DEL, etc)
+const _CURP_PARTICLES = new Set(['DA','DAS','DE','DEL','DER','DI','DIE','DD','EL','LA','LAS','LE','LES','LO','LOS','MAC','MC','VAN','VON','Y']);
+
+function _stripParticles(tokens) {
+  // Elimina partículas iniciales del componente (apellido)
+  while (tokens.length > 1 && _CURP_PARTICLES.has(tokens[0])) tokens.shift();
+  return tokens.join(' ');
 }
+
+function _splitFullname(fullname) {
+  // BetMexico guarda "Nombre(s) Apellido1 Apellido2" — pero apellidos
+  // compuestos (DE LA CRUZ, DEL VALLE) requieren manejo especial.
+  const all = _normalizeName(fullname).split(' ').filter(Boolean);
+  if (all.length === 0) return null;
+  if (all.length === 1) return { nombre: all[0], ap1: '', ap2: '' };
+  if (all.length === 2) return { nombre: all[0], ap1: all[1], ap2: '' };
+
+  // Walk desde el final agarrando los últimos 2 grupos (apellidos)
+  // Un grupo termina cuando encuentra una palabra que NO es partícula.
+  // ej. "JUAN PEREZ DE LA CRUZ" → nombre=JUAN, ap1=PEREZ, ap2=DE LA CRUZ
+  // ej. "MARIA DEL CARMEN LOPEZ HERNANDEZ" → nombre=MARIA DEL CARMEN, ap1=LOPEZ, ap2=HERNANDEZ
+  // Heurística simple: tomar último token + cualquier partícula previa = ap2.
+  // Después siguiente token + partículas = ap1. El resto = nombre.
+  let i = all.length - 1;
+  // ap2: token + partículas hacia atrás
+  let ap2End = i;
+  while (i > 0 && _CURP_PARTICLES.has(all[i - 1])) i--;
+  const ap2Tokens = all.slice(i, ap2End + 1);
+  i--;
+  // ap1
+  let ap1End = i;
+  while (i > 0 && _CURP_PARTICLES.has(all[i - 1])) i--;
+  const ap1Tokens = i >= 0 ? all.slice(i, ap1End + 1) : [];
+  // nombre: lo que queda
+  let nombreTokens = i > 0 ? all.slice(0, i) : [];
+  // Si el primer nombre es José/María y hay más, usar el siguiente
+  if (nombreTokens.length > 1 && _CURP_FIRST_NAME_SKIP.has(nombreTokens[0])) {
+    nombreTokens = nombreTokens.slice(1);
+  }
+  // Saltar partículas tipo "DEL/DE LA" entre nombres (María DEL Carmen → Carmen)
+  while (nombreTokens.length > 1 && _CURP_PARTICLES.has(nombreTokens[0])) {
+    nombreTokens = nombreTokens.slice(1);
+  }
+  return {
+    nombre: (nombreTokens[0] || ''),  // solo PRIMER nombre real
+    ap1: _stripParticles(ap1Tokens),
+    ap2: _stripParticles(ap2Tokens),
+  };
+}
+
 function _firstInternalVowel(s) {
+  if (!s) return 'X';
   for (let i = 1; i < s.length; i++) if (_CURP_VOWELS.includes(s[i])) return s[i];
   return 'X';
 }
 function _firstInternalConsonant(s) {
+  if (!s) return 'X';
   for (let i = 1; i < s.length; i++) {
     const c = s[i];
-    if (_CURP_CONS.includes(c) || c === 'Ñ') return c === 'Ñ' ? 'X' : c;
+    // Ñ no cuenta como consonante para CURP — se busca otra
+    if (_CURP_CONS.includes(c)) return c;
   }
   return 'X';
 }
+// Códigos cortos de estados para detección por sigla (NL, JC, DF, etc.)
+const _CURP_STATE_CODES = ['AS','BC','BS','CC','CL','CM','CS','CH','DF','DG','GT','GR','HG','JC','MC','MN','MS','NT','NL','OC','PL','QT','QR','SP','SL','SR','TC','TS','TL','VZ','YN','ZS'];
+// Aliases comunes de siglas usadas en direcciones
+const _CURP_CODE_ALIASES = {
+  'NL': 'NL', 'JAL': 'JC', 'EDOMEX': 'MC', 'EDO MEX': 'MC',
+  'BCN': 'BC', 'BCS': 'BS', 'CDMX': 'DF', 'DF': 'DF',
+  'AGS': 'AS', 'CHIH': 'CH', 'CHIS': 'CS', 'COAH': 'CL',
+  'DGO': 'DG', 'GTO': 'GT', 'GRO': 'GR', 'HGO': 'HG',
+  'MICH': 'MN', 'MOR': 'MS', 'NAY': 'NT', 'OAX': 'OC',
+  'PUE': 'PL', 'QRO': 'QT', 'SLP': 'SP', 'SIN': 'SL',
+  'SON': 'SR', 'TAB': 'TC', 'TAMS': 'TS', 'TAMPS': 'TS',
+  'TLAX': 'TL', 'VER': 'VZ', 'YUC': 'YN', 'ZAC': 'ZS',
+  'CAMP': 'CC', 'COL': 'CM',
+  'QROO': 'QR', 'Q ROO': 'QR',
+};
+
 function _detectStateCode(address) {
-  if (!address) return 'NE';  // Nacido extranjero por default si no se sabe
-  const a = _normalizeName(address);
+  if (!address) return 'NE';
+  const norm = _normalizeName(address).replace(/\./g, '');
+  const aSpaced = ' ' + norm + ' ';
+  // 1. Match nombre completo del estado
   for (const [key, code] of Object.entries(_CURP_STATES)) {
-    if (a.includes(key)) return code;
+    const k = key.replace(/\./g, '');
+    if (aSpaced.includes(' ' + k + ' ') || aSpaced.endsWith(' ' + k)) return code;
+  }
+  // 2. Match aliases comunes (SLP, NL, EDOMEX, etc) — token-bounded
+  const tokens = norm.split(/\s+/);
+  for (const tok of tokens) {
+    if (_CURP_CODE_ALIASES[tok]) return _CURP_CODE_ALIASES[tok];
+  }
+  // 3. Match siglas tipo "S.L.P" → "S L P" → reconstrucción de iniciales
+  // Busca secuencias de 2-4 iniciales separadas por puntos/espacios
+  const initialsMatches = address.toUpperCase().match(/\b[A-Z](?:\.|\s+)[A-Z](?:\.|\s+)?[A-Z]?\.?/g) || [];
+  for (const m of initialsMatches) {
+    const compact = m.replace(/[^A-Z]/g, '');
+    if (_CURP_CODE_ALIASES[compact]) return _CURP_CODE_ALIASES[compact];
+    if (_CURP_STATE_CODES.includes(compact)) return compact;
   }
   return 'NE';
 }
@@ -205,31 +271,40 @@ function _curpVerifier(curp17) {
   const ver = (10 - (sum % 10)) % 10;
   return String(ver);
 }
-function computeCurp(fullname, birthdate, address) {
+function computeCurp(fullname, birthdate, address, sexOverride) {
   const split = _splitFullname(fullname);
-  if (!split || !split.ap1 || !birthdate) return null;
+  if (!split || !split.ap1 || !split.nombre || !birthdate) return null;
   // Fecha: acepta YYYY-MM-DD o YYYY-MM-DDT...
   const m = birthdate.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return null;
   const [, yyyy, mm, dd] = m;
   const yy = yyyy.slice(2);
 
-  let p1 = (split.ap1[0] || 'X');
+  // Pos 1: primera letra del primer apellido. Si es Ñ → X (regla RENAPO).
+  let p1 = split.ap1[0] || 'X';
+  if (p1 === 'Ñ') p1 = 'X';
+  // Pos 2: primera vocal interna del primer apellido
   let p2 = _firstInternalVowel(split.ap1);
-  let p3 = (split.ap2[0] || 'X');
-  let p4 = (split.nombre[0] || 'X');
-  // Si las primeras 4 forman palabra inconveniente, segunda letra → X
+  // Pos 3: primera letra del segundo apellido (X si no hay)
+  let p3 = split.ap2 ? (split.ap2[0] || 'X') : 'X';
+  if (p3 === 'Ñ') p3 = 'X';
+  // Pos 4: primera letra del nombre (de pila)
+  let p4 = split.nombre[0] || 'X';
+  if (p4 === 'Ñ') p4 = 'X';
+
+  // Si las primeras 4 forman palabra inconveniente, pos 2 → X
   let prefix = p1 + p2 + p3 + p4;
   if (_CURP_BAD_WORDS.has(prefix)) prefix = p1 + 'X' + p3 + p4;
 
-  const sex = _inferSex(split.nombre);
+  const sex = (sexOverride === 'H' || sexOverride === 'M')
+    ? sexOverride : _inferSex(split.nombre);
   const state = _detectStateCode(address);
   const c1 = _firstInternalConsonant(split.ap1);
-  const c2 = _firstInternalConsonant(split.ap2);
+  const c2 = split.ap2 ? _firstInternalConsonant(split.ap2) : 'X';
   const c3 = _firstInternalConsonant(split.nombre);
 
-  // Pos 17: '0' si nació <2000, 'A' si ≥2000 (default RENAPO; el contador
-  // sube por homonimia: 0,1,2... o A,B,C... pero la mayoría queda en 0/A).
+  // Pos 17: '0' si nació <2000, 'A' si ≥2000 (default RENAPO).
+  // El contador sube por homonimia (0,1,2... o A,B,C...) pero la mayoría queda en 0/A.
   const homo = parseInt(yyyy, 10) >= 2000 ? 'A' : '0';
   const curp17 = `${prefix}${yy}${mm}${dd}${sex}${state}${c1}${c2}${c3}${homo}`;
   const ver = _curpVerifier(curp17);
