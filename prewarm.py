@@ -322,8 +322,8 @@ async def prewarm_select(request: Request, user: dict = Depends(require_session)
         operator_id = abs(hash(user.get("username", "unknown"))) % 10_000_000
 
     bal = await _capmonster_balance()
-    if bal is not None and bal < CAPMONSTER_MIN_BALANCE:
-        return {"status": "capmonster_low", "started": 0, "capmonster_balance": bal}
+    # Solo avisa, no bloquea — el operador decide
+    cap_warning = (bal is not None and bal < CAPMONSTER_MIN_BALANCE)
 
     used = await asyncio.to_thread(_db_count_recent, operator_id, 10)
     remaining = max(0, CAP_PER_OPERATOR_10MIN - used)
@@ -373,6 +373,7 @@ async def prewarm_select(request: Request, user: dict = Depends(require_session)
         "skipped": skipped,
         "skipped_reasons": skipped_reasons,
         "capmonster_balance": bal,
+        "capmonster_warning": cap_warning,
         "cap_used": used + started,
         "cap_max": CAP_PER_OPERATOR_10MIN,
     }
@@ -440,17 +441,15 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
     logger.info(f"[refresh-stream] op={operator_id} ids={len(ids)} accs={len(accs)} valid")
 
     bal = await _capmonster_balance()
-    if bal is not None and bal < CAPMONSTER_MIN_BALANCE:
-        async def _err():
-            yield f"data: {json.dumps({'type':'capmonster_low','balance':bal})}\n\n"
-        return StreamingResponse(_err(), media_type="text/event-stream")
+    # Solo emite warning, NO aborta — el operador sabe que su saldo está bajo
+    cap_warning = (bal is not None and bal < CAPMONSTER_MIN_BALANCE)
 
     used = await asyncio.to_thread(_db_count_recent, operator_id, 10)
     remaining = max(0, CAP_PER_OPERATOR_10MIN - used)
-    logger.info(f"[refresh-stream] cap_used={used} remaining={remaining}")
+    logger.info(f"[refresh-stream] cap_used={used} remaining={remaining} cm=${bal}")
 
     async def gen():
-        yield f"data: {json.dumps({'type':'start','total':len(accs),'cap_remaining':remaining,'cap_used':used})}\n\n"
+        yield f"data: {json.dumps({'type':'start','total':len(accs),'cap_remaining':remaining,'cap_used':used,'capmonster_balance':bal,'capmonster_warning':cap_warning})}\n\n"
 
         q: asyncio.Queue = asyncio.Queue()
 

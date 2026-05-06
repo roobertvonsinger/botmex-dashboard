@@ -931,12 +931,11 @@ async function refreshVisible() {
         if (!line) continue;
         try {
           const ev = JSON.parse(line.slice(6));
-          if (ev.type === 'capmonster_low') {
-            toast(`⚠️ CapMonster bajo ($${ev.balance ?? '?'}) — refresh cancelado`, 'error');
-            return;
-          }
           if (ev.type === 'start') {
             started = true;
+            if (ev.capmonster_warning) {
+              toast(`⚠️ CapMonster bajo ($${ev.capmonster_balance?.toFixed(2)}) — sigue corriendo, recarga pronto`, 'error');
+            }
             if (ev.cap_remaining === 0) {
               toast(`⚠️ Cap 30/10min agotado (${ev.cap_used} usados) — espera 10min`, 'error');
             }
