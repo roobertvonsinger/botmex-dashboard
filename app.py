@@ -437,7 +437,7 @@ def _proxy_health() -> dict:
     # Defaults desde betmexico_config.py (mismo proxy que usa el bot)
     host = os.environ.get("LITPORT_HOST", "hub-us-7.litport.net")
     port = os.environ.get("LITPORT_PORT", "1337")
-    user = os.environ.get("LITPORT_USER", "bmxutop")
+    user = os.environ.get("LITPORT_USER", "bmxutop_country-mx")
     pwd  = os.environ.get("LITPORT_PASS", "49O3mC6hl4")
 
     proxy_url = f"http://{user}:{pwd}@{host}:{port}"
