@@ -47,6 +47,7 @@ _PREWARM_TASKS: Dict[str, asyncio.Task] = {}
 CAP_PER_OPERATOR_10MIN = 9999  # sin tope práctico — el operador decide
 ACCOUNT_FRESH_MINUTES = 30      # < 30min desde last check → skip con warning
 ACCOUNT_DAILY_LIMIT = 3          # >= 3 prewarms en el día → skip con warning
+REFRESH_PARALLEL = 4            # max logins concurrentes (anti rate-limit BetMexico)
 CAPMONSTER_MIN_BALANCE = 5.0
 BALANCE_FRESH_SEC = 5 * 60
 TASK_TIMEOUT_SEC = 25
@@ -264,7 +265,8 @@ async def _capmonster_balance() -> Optional[float]:
 
 # ── Pre-warm task ──────────────────────────────────────────────────────────────
 
-async def _run_prewarm(operator_id: int, email: str, password: str) -> None:
+async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
+    """Retorna {ok: bool, status: str, error: str?}."""
     process_id = uuid.uuid4().hex
     _db_log_phase(process_id, "init", {"email": email, "operator_id": operator_id})
     t0 = time.time()
@@ -281,13 +283,14 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> None:
             timeout=float(TASK_TIMEOUT_SEC),
         )
         if not jwt:
+            status = login_result.get("status") if isinstance(login_result, dict) else None
             _db_log_phase(
                 process_id, "no_jwt",
-                {"email": email, "operator_id": operator_id,
-                 "status": login_result.get("status") if isinstance(login_result, dict) else None},
+                {"email": email, "operator_id": operator_id, "status": status},
                 int((time.time() - t0) * 1000),
             )
-            return
+            return {"ok": False, "status": status or "no_jwt",
+                    "error": (login_result.get("error") if isinstance(login_result, dict) else None) or status or "Login falló"}
 
         async with BetmexicoApiChecker(proxy=None) as checker:
             details = await asyncio.wait_for(
@@ -306,6 +309,7 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> None:
              "grade": details.get("payment_score", {}).get("grade") if details else None},
             int((time.time() - t0) * 1000),
         )
+        return {"ok": True, "status": "complete"}
     except asyncio.CancelledError:
         _db_log_phase(
             process_id, "cancelled",
@@ -319,6 +323,7 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> None:
             {"email": email, "operator_id": operator_id},
             int((time.time() - t0) * 1000),
         )
+        return {"ok": False, "status": "timeout", "error": "Timeout 25s"}
     except Exception as e:
         logger.error(f"[Prewarm] {email}: {e}")
         _db_log_phase(
@@ -326,6 +331,7 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> None:
             {"email": email, "operator_id": operator_id, "error": str(e)[:300]},
             int((time.time() - t0) * 1000),
         )
+        return {"ok": False, "status": "error", "error": str(e)[:200]}
     finally:
         _PREWARM_TASKS.pop(f"{operator_id}:{email}", None)
         if pool is not None:
@@ -488,6 +494,7 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
         yield f"data: {json.dumps({'type':'start','total':len(accs),'cap_remaining':remaining,'cap_used':used,'capmonster_balance':bal,'capmonster_warning':cap_warning})}\n\n"
 
         q: asyncio.Queue = asyncio.Queue()
+        sem = asyncio.Semaphore(REFRESH_PARALLEL)  # anti rate-limit BetMexico
 
         async def _process(acc, slot_idx):
             email = acc["email"]
@@ -500,22 +507,26 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
                     return
                 # Reglas anti-spam (a menos que SA fuerce):
                 if not force:
-                    # 1. Cuenta actualizada hace < 30 min
                     mins = _account_minutes_since_check(acc)
                     if mins is not None and mins < ACCOUNT_FRESH_MINUTES:
                         await q.put({"type": "skip", "id": acc["id"], "email": email,
                                      "reason": "fresh", "minutes": round(mins, 1),
                                      "can_force": is_sa})
                         return
-                    # 2. Cuenta ya checada N veces hoy
                     today = await asyncio.to_thread(_db_account_prewarms_today, email)
                     if today >= ACCOUNT_DAILY_LIMIT:
                         await q.put({"type": "skip", "id": acc["id"], "email": email,
                                      "reason": "daily_limit", "today_count": today,
                                      "can_force": is_sa})
                         return
-                # Reusa _run_prewarm para login + fetch + recalc grade
-                await _run_prewarm(operator_id, email, acc["password"])
+                # Throttle: max N logins concurrentes para no triggear rate-limit
+                async with sem:
+                    result = await _run_prewarm(operator_id, email, acc["password"])
+                # Si el login falló, emitir fail con razón clara
+                if not result or not result.get("ok"):
+                    err = (result or {}).get("error") or (result or {}).get("status") or "login falló"
+                    await q.put({"type": "fail", "id": acc["id"], "email": email, "error": err})
+                    return
                 # Lee la fila ya actualizada
                 with _app_db() as cc:
                     r = cc.execute(

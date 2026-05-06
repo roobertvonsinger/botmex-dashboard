@@ -893,6 +893,7 @@ async function refreshVisible(opts = {}) {
   let started = false;
   let forceableIds = [];   // ids saltados por reglas anti-spam que SA puede forzar
   let skipReasons = {};
+  let failReasons = {};
   let lastEventAt = Date.now();
   let watchdog = null;
   const ctrl = new AbortController();
@@ -959,7 +960,8 @@ async function refreshVisible(opts = {}) {
             updateProgress();
           } else if (ev.type === 'fail') {
             failed++;
-            _markRowFail(ev.id);
+            failReasons[ev.error || 'error'] = (failReasons[ev.error || 'error'] || 0) + 1;
+            _markRowFail(ev.id, ev.error);
             updateProgress();
           } else if (ev.type === 'skip') {
             skipped++;
@@ -981,6 +983,10 @@ async function refreshVisible(opts = {}) {
       toast(`⚠️ 0 cuentas procesadas — bot deps no cargan en VPS?`, 'error');
     } else if (updated === 0 && skipped > 0) {
       toast(`⚠️ ${skipped} saltadas, 0 actualizadas`, 'error');
+    } else if (updated === 0 && failed > 0) {
+      // Todos fallaron — mostrar razón principal (BAN, rate limit, etc)
+      const topReason = Object.entries(failReasons).sort((a,b)=>b[1]-a[1])[0];
+      toast(`✗ ${failed} falló · ${topReason ? topReason[0].slice(0,60) : 'error'}`, 'error');
     } else {
       toast(`✓ ${parts.join(' · ')}`, failed ? 'error' : 'success');
     }
@@ -1085,12 +1091,13 @@ function _renderSingleRow(tr, r) {
   }
 }
 
-function _markRowFail(id) {
+function _markRowFail(id, reason) {
   const tr = document.querySelector(`#accTable tbody tr[data-id="${id}"]`);
   if (!tr) return;
   tr.classList.remove('row-refreshing');
   tr.classList.add('row-refresh-fail');
-  setTimeout(() => tr.classList.remove('row-refresh-fail'), 1500);
+  if (reason) tr.title = `Falló: ${reason}`;
+  setTimeout(() => tr.classList.remove('row-refresh-fail'), 2500);
 }
 function _markRowSkip(id, reason) {
   const tr = document.querySelector(`#accTable tbody tr[data-id="${id}"]`);
