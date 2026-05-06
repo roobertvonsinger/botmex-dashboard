@@ -188,8 +188,11 @@
 
     <!-- Vista: Actividad (event log en vivo) -->
     <div id="activityMain" style="display:none;flex-direction:column;flex:1;min-height:0">
-      <section class="filterbar">
-        <h2>Actividad <span class="dim mono" id="actCountLabel">—</span></h2>
+      <section class="filterbar act-filterbar">
+        <h2>Actividad
+          <span class="act-pulse" title="LIVE — eventos en vivo via SSE"></span>
+          <span class="dim mono" id="actCountLabel">—</span>
+        </h2>
         <div class="grow"></div>
         <div class="seg" data-seg="actkind" title="Filtra qué tipo de eventos ves">
           <button data-v="" class="on" title="Todo, sin filtrar">Todos</button>
@@ -198,8 +201,24 @@
           <button data-v="unlock" title="Cuándo se liberaron">🔓 Unlocks</button>
           <button data-v="note" title="Notas dejadas en cuentas">📝 Notas</button>
         </div>
-        <button class="seg-btn" id="actClearFilter" style="display:none" title="Quitar filtros del feed">× Filtro</button>
+        <div class="seg" data-seg="acttime" title="Ventana temporal de eventos">
+          <button data-v="all" class="on" title="Todo el feed (max 500)">Todo</button>
+          <button data-v="24h" title="Últimas 24 horas">24h</button>
+          <button data-v="1h" title="Última hora">1h</button>
+          <button data-v="30m" title="Últimos 30 min">30m</button>
+        </div>
+      </section>
+      <section class="filterbar act-filterbar-row2">
+        <div class="act-search-wrap" title="Filtra el feed actual por email, quién, monto…">
+          <span class="ico">⌕</span>
+          <input id="actSearch" placeholder="Buscar en este feed: email, operador, monto…">
+        </div>
+        <div class="act-ops-chips" id="actOpsChips" title="Filtra por operador — click para activar/desactivar">
+          <button class="act-op-chip on" data-who="" title="Todos los operadores">Todos</button>
+        </div>
         <span class="dim mono" id="actFilterInfo"></span>
+        <div class="grow"></div>
+        <button class="seg-btn" id="actClearFilter" style="display:none" title="Quitar todos los filtros">× Filtros</button>
       </section>
       <section class="tablewrap">
         <table id="actTable">
@@ -207,6 +226,23 @@
           <tbody><tr><td class="loading" colspan="6">Cargando…</td></tr></tbody>
         </table>
       </section>
+      <div class="pagebar">
+        <div class="pb-left">
+          <span class="dim mono" id="actVisibleCount"></span>
+        </div>
+        <div class="pb-center" id="actPbPages"></div>
+        <div class="pb-right">
+          <button class="seg-btn" id="actBtnReset" title="Volver al default: Todos · Todo · sin búsqueda">↺ Restaurar</button>
+          <button class="seg-btn" id="actBtnRefresh" title="Recargar el feed desde el servidor">↻ Refrescar</button>
+          <span class="dim mono">Por página</span>
+          <select id="actPageSize" class="seg-btn" title="Cuántos eventos ves por página">
+            <option value="25">25</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+            <option value="200">200</option>
+          </select>
+        </div>
+      </div>
     </div>
 
     <!-- Vista: Logs -->

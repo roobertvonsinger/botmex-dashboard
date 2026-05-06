@@ -32,7 +32,10 @@ const state = {
 const selectedIds = new Set();
 let searchQuery = '';
 let activityRows = [];
-let activityFilter = { kind: '', who: null };
+let activityFilter = { kind: '', who: null, time: 'all', q: '' };
+let activityPage = 1;
+let activityPageSize = 50;
+const _actNewIds = new Set();   // ids/keys de eventos llegados via SSE — para animar como nuevos
 let notifications = [];
 let _evtSrc = null;
 let _sortCol = null, _sortDir = -1;
@@ -727,15 +730,81 @@ function statusPill(e) {
   if (e.kind === 'note') return `<span class="dim mono" title="${esc(e.text || '')}">${esc((e.text || '').slice(0, 60))}</span>`;
   return '';
 }
+function _actEventKey(e) {
+  // Identifica un evento de manera estable para tracking de "nuevos"
+  return `${e.kind}|${e.ts}|${e.who}|${e.target}|${e.amount ?? ''}`;
+}
+function _actTimeCutoffMs() {
+  const t = activityFilter.time;
+  if (t === '24h') return 24 * 60 * 60 * 1000;
+  if (t === '1h')  return 60 * 60 * 1000;
+  if (t === '30m') return 30 * 60 * 1000;
+  return null;
+}
 function getFilteredActivity() {
+  const cutoff = _actTimeCutoffMs();
+  const now = Date.now();
+  const q = (activityFilter.q || '').trim().toLowerCase();
   return activityRows.filter(e => {
     if (activityFilter.kind) {
       if (activityFilter.kind === 'prewarm') return (e.kind || '').startsWith('prewarm_');
       if (e.kind !== activityFilter.kind) return false;
     }
     if (activityFilter.who != null && e.who != activityFilter.who) return false;
+    if (cutoff != null) {
+      const ts = Date.parse(e.ts || '');
+      if (isNaN(ts) || (now - ts) > cutoff) return false;
+    }
+    if (q) {
+      const hay = `${e.who ?? ''} ${e.target ?? ''} ${e.amount ?? ''} ${e.status ?? ''} ${e.text ?? ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
     return true;
   });
+}
+function _renderActPagination(total) {
+  const pages = Math.max(1, Math.ceil(total / activityPageSize));
+  if (activityPage > pages) activityPage = pages;
+  const wrap = $('#actPbPages');
+  if (!wrap) return;
+  if (pages <= 1) { wrap.innerHTML = ''; return; }
+  // Compact pagination: prev · 1 … (cur-1) cur (cur+1) … last · next
+  const btn = (label, page, opts = {}) => {
+    const cls = ['pb-btn'];
+    if (opts.active) cls.push('on');
+    if (opts.disabled) cls.push('disabled');
+    return `<button class="${cls.join(' ')}" data-page="${page}" ${opts.disabled ? 'disabled' : ''}>${label}</button>`;
+  };
+  let html = btn('‹', activityPage - 1, { disabled: activityPage <= 1 });
+  const seen = new Set();
+  const add = (p) => {
+    if (p < 1 || p > pages || seen.has(p)) return '';
+    seen.add(p);
+    return btn(String(p), p, { active: p === activityPage });
+  };
+  html += add(1);
+  if (activityPage > 3) html += `<span class="pb-gap">…</span>`;
+  for (let p = activityPage - 1; p <= activityPage + 1; p++) html += add(p);
+  if (activityPage < pages - 2) html += `<span class="pb-gap">…</span>`;
+  html += add(pages);
+  html += btn('›', activityPage + 1, { disabled: activityPage >= pages });
+  wrap.innerHTML = html;
+}
+function _renderActOpsChips() {
+  const wrap = $('#actOpsChips');
+  if (!wrap) return;
+  // Operadores únicos del feed actual con su color (best-effort)
+  const seen = new Map();   // who → color
+  for (const e of activityRows) {
+    if (e.who && !seen.has(e.who)) seen.set(e.who, e.who_color || null);
+  }
+  const all = `<button class="act-op-chip${activityFilter.who == null ? ' on' : ''}" data-who="" title="Todos los operadores">Todos</button>`;
+  const chips = Array.from(seen.entries()).map(([who, color]) => {
+    const active = activityFilter.who != null && String(activityFilter.who) === String(who);
+    const dot = color ? `<span class="act-op-chip-dot ${esc(color)}"></span>` : '';
+    return `<button class="act-op-chip${active ? ' on' : ''}" data-who="${esc(who)}" title="Solo eventos de ${esc(who)}">${dot}${esc(who)}</button>`;
+  }).join('');
+  wrap.innerHTML = all + chips;
 }
 function renderActivity() {
   const t = $('#actTable');
@@ -745,9 +814,18 @@ function renderActivity() {
       <th class="num">Monto</th><th>Estado</th>
     </tr>`;
   const filtered = getFilteredActivity();
-  $('#actCountLabel').textContent = `${filtered.length} eventos`;
-  t.querySelector('tbody').innerHTML = filtered.map(e => `
-    <tr class="act-${esc(e.kind)}">
+  const total = filtered.length;
+  const pages = Math.max(1, Math.ceil(total / activityPageSize));
+  if (activityPage > pages) activityPage = pages;
+  const start = (activityPage - 1) * activityPageSize;
+  const slice = filtered.slice(start, start + activityPageSize);
+
+  $('#actCountLabel').textContent = `${total} evento${total === 1 ? '' : 's'}`;
+
+  t.querySelector('tbody').innerHTML = slice.map(e => {
+    const key = _actEventKey(e);
+    const newCls = _actNewIds.has(key) ? ' act-row-new' : '';
+    return `<tr class="act-${esc(e.kind)}${newCls}" data-evkey="${esc(key)}">
       <td class="dim mono act-when" title="${esc(e.ts || '')}">
         <span class="act-abs">${fmtAbs(e.ts)}</span>
         <span class="act-rel dim">${fmtAgo(e.ts)}</span>
@@ -757,13 +835,27 @@ function renderActivity() {
       <td class="combo"><b class="act-target" data-email="${esc(e.target || '')}">${esc(e.target || '—')}</b></td>
       <td class="num">${e.amount != null ? fmtMoney(e.amount) : ''}</td>
       <td>${statusPill(e)}</td>
-    </tr>`).join('') || '<tr><td colspan="6" class="loading">Sin actividad reciente</td></tr>';
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" class="loading">Sin actividad que coincida con los filtros</td></tr>';
 
-  // Filtro info
+  // Limpieza: las claves que ya pintamos como "nuevas" se consumen
+  for (const ev of slice) _actNewIds.delete(_actEventKey(ev));
+
+  // Visible count + pagination
+  const from = total === 0 ? 0 : start + 1;
+  const to = Math.min(start + activityPageSize, total);
+  const vc = $('#actVisibleCount');
+  if (vc) vc.textContent = total === 0 ? 'sin eventos' : `${from}–${to} de ${total}`;
+  _renderActPagination(total);
+  _renderActOpsChips();
+
+  // Filtro info (chip)
   const parts = [];
   if (activityFilter.kind) parts.push(activityFilter.kind);
   if (activityFilter.who != null) parts.push(`op:${activityFilter.who}`);
-  $('#actFilterInfo').textContent = parts.length ? `(filtrado: ${parts.join(' · ')})` : '';
+  if (activityFilter.time !== 'all') parts.push(activityFilter.time);
+  if (activityFilter.q) parts.push(`"${activityFilter.q.slice(0, 20)}"`);
+  $('#actFilterInfo').textContent = parts.length ? parts.join(' · ') : '';
   $('#actClearFilter').style.display = parts.length ? '' : 'none';
 }
 async function reloadActivity() {
@@ -777,12 +869,15 @@ async function reloadActivity() {
 }
 function pushActivityEvent(ev) {
   // Insert at top, dedupe-ish, cap 500
-  activityRows.unshift({
-    kind: ev.kind, ts: ev.ts, who: ev.who, target: ev.target,
-    amount: ev.amount, status: ev.status, reason: ev.reason,
-    duration_ms: ev.duration_ms, id: ev.id, text: ev.text,
-  });
+  const row = {
+    kind: ev.kind, ts: ev.ts, who: ev.who, who_color: ev.who_color,
+    target: ev.target, amount: ev.amount, status: ev.status,
+    reason: ev.reason, duration_ms: ev.duration_ms, id: ev.id, text: ev.text,
+  };
+  activityRows.unshift(row);
   if (activityRows.length > 500) activityRows.length = 500;
+  // Marca como "nuevo" para animación highlight si la fila aparece en pantalla
+  _actNewIds.add(_actEventKey(row));
   if (state.section === 'activity') renderActivity();
 }
 
@@ -1761,6 +1856,12 @@ $$('.seg').forEach(seg => {
       btn.classList.add('on');
       if (key === 'actkind') {
         activityFilter.kind = btn.dataset.v;
+        activityPage = 1;
+        return renderActivity();
+      }
+      if (key === 'acttime') {
+        activityFilter.time = btn.dataset.v;
+        activityPage = 1;
         return renderActivity();
       }
       state[key] = btn.dataset.v;
@@ -1785,14 +1886,73 @@ $('#actTable').addEventListener('click', e => {
   const who = e.target.closest('.act-who');
   if (who && who.dataset.who) {
     activityFilter.who = isNaN(+who.dataset.who) ? who.dataset.who : +who.dataset.who;
-    reloadActivity();
+    activityPage = 1;
+    renderActivity();
     return;
   }
 });
 $('#actClearFilter')?.addEventListener('click', () => {
-  activityFilter = { kind: '', who: null };
+  _restoreActivityFilters();
+});
+
+function _restoreActivityFilters() {
+  activityFilter = { kind: '', who: null, time: 'all', q: '' };
+  activityPage = 1;
   document.querySelectorAll('.seg[data-seg="actkind"] button').forEach((b, i) => b.classList.toggle('on', i === 0));
+  document.querySelectorAll('.seg[data-seg="acttime"] button').forEach((b, i) => b.classList.toggle('on', i === 0));
+  const s = $('#actSearch'); if (s) s.value = '';
   reloadActivity();
+}
+
+// Búsqueda local en el feed (debounced)
+let _actSearchDeb = null;
+$('#actSearch')?.addEventListener('input', e => {
+  clearTimeout(_actSearchDeb);
+  _actSearchDeb = setTimeout(() => {
+    activityFilter.q = e.target.value;
+    activityPage = 1;
+    renderActivity();
+  }, 180);
+});
+
+// Chips de operadores
+$('#actOpsChips')?.addEventListener('click', e => {
+  const chip = e.target.closest('.act-op-chip');
+  if (!chip) return;
+  const who = chip.dataset.who;
+  activityFilter.who = (who === '' || who == null) ? null
+                     : (isNaN(+who) ? who : +who);
+  activityPage = 1;
+  renderActivity();
+});
+
+// Page size
+$('#actPageSize')?.addEventListener('change', e => {
+  activityPageSize = parseInt(e.target.value, 10) || 50;
+  activityPage = 1;
+  renderActivity();
+});
+
+// Restaurar
+$('#actBtnReset')?.addEventListener('click', _restoreActivityFilters);
+
+// Refrescar (recarga del backend)
+$('#actBtnRefresh')?.addEventListener('click', async () => {
+  const btn = $('#actBtnRefresh');
+  btn.classList.add('spinning');
+  await reloadActivity();
+  setTimeout(() => btn.classList.remove('spinning'), 700);
+});
+
+// Paginación
+$('#actPbPages')?.addEventListener('click', e => {
+  const b = e.target.closest('.pb-btn');
+  if (!b || b.disabled) return;
+  const p = parseInt(b.dataset.page, 10);
+  if (!isNaN(p) && p !== activityPage) {
+    activityPage = p;
+    renderActivity();
+  }
 });
 
 // ─── Tooltip hover para iconos 💳/📝 + click para nota rápida ───

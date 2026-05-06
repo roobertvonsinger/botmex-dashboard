@@ -2444,3 +2444,144 @@ td.row-details-cell, th.row-details-th {
   animation: hintTargetGlow 2.6s ease-in-out infinite;
   transition: outline 200ms;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Activity dashboard — controles premium con animaciones
+   ───────────────────────────────────────────────────────────────────────────── */
+.act-filterbar h2 { display: flex; align-items: center; gap: 10px; }
+@keyframes actLivePulse {
+  0%, 100% { opacity: 0.85; transform: scale(1); box-shadow: 0 0 0 0 rgba(96,250,178,0.55); }
+  50%      { opacity: 1;    transform: scale(1.15); box-shadow: 0 0 0 6px rgba(96,250,178,0); }
+}
+.act-pulse {
+  width: 8px; height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: actLivePulse 1.6s ease-in-out infinite;
+  display: inline-block;
+}
+
+.act-filterbar-row2 {
+  gap: 10px;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  border-bottom: 1px solid var(--hairline);
+}
+.act-search-wrap {
+  display: flex; align-items: center; gap: 8px;
+  min-width: 240px; max-width: 360px; flex: 1;
+  background: rgba(0,0,0,0.30);
+  border: 1px solid var(--hairline);
+  border-radius: 7px;
+  padding: 5px 10px;
+  transition: border-color 160ms, box-shadow 160ms;
+}
+.act-search-wrap:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(96,250,178,0.12);
+}
+.act-search-wrap .ico {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.act-search-wrap input {
+  flex: 1;
+  background: transparent;
+  border: 0; outline: 0;
+  color: var(--text);
+  font: inherit; font-size: 12px;
+}
+.act-search-wrap input::placeholder { color: var(--text-muted); }
+
+.act-ops-chips {
+  display: flex; align-items: center; gap: 6px;
+  flex-wrap: wrap;
+}
+.act-op-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--hairline);
+  color: var(--text-dim);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font: inherit; font-size: 11px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all 160ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.act-op-chip:hover {
+  border-color: var(--text-dim);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+.act-op-chip.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 2px 10px rgba(96,250,178,0.18);
+}
+.act-op-chip-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.act-op-chip-dot.warn   { background: var(--warn); }
+.act-op-chip-dot.purple { background: #b794f6; }
+.act-op-chip-dot.accent { background: var(--accent); }
+.act-op-chip-dot.azure  { background: #67c2ff; }
+
+/* Animación: filas nuevas via SSE — highlight pulsante verde */
+@keyframes actRowNew {
+  0%   { background: rgba(96,250,178,0.18); box-shadow: inset 3px 0 0 var(--accent); }
+  60%  { background: rgba(96,250,178,0.08); }
+  100% { background: transparent; box-shadow: inset 3px 0 0 transparent; }
+}
+#actTable tbody tr.act-row-new {
+  animation: actRowNew 2.4s ease-out;
+}
+
+/* Stagger fade-in de filas al renderizar/filtrar */
+@keyframes actRowIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+#actTable tbody tr {
+  animation: actRowIn 280ms ease-out backwards;
+}
+#actTable tbody tr:nth-child(1)  { animation-delay: 0ms; }
+#actTable tbody tr:nth-child(2)  { animation-delay: 18ms; }
+#actTable tbody tr:nth-child(3)  { animation-delay: 36ms; }
+#actTable tbody tr:nth-child(4)  { animation-delay: 54ms; }
+#actTable tbody tr:nth-child(5)  { animation-delay: 72ms; }
+#actTable tbody tr:nth-child(6)  { animation-delay: 90ms; }
+#actTable tbody tr:nth-child(7)  { animation-delay: 108ms; }
+#actTable tbody tr:nth-child(8)  { animation-delay: 126ms; }
+#actTable tbody tr:nth-child(9)  { animation-delay: 144ms; }
+#actTable tbody tr:nth-child(10) { animation-delay: 162ms; }
+#actTable tbody tr:nth-child(n+11) { animation-delay: 180ms; }
+
+/* Filterbar info pill cuando hay filtros activos */
+#actFilterInfo:not(:empty) {
+  background: var(--accent-soft);
+  border: 1px solid rgba(96,250,178,0.30);
+  color: var(--accent);
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.3px;
+}
+
+/* Botón refresh: spin al hacer click */
+@keyframes actRefreshSpin {
+  from { transform: rotate(0); }
+  to   { transform: rotate(360deg); }
+}
+#actBtnRefresh.spinning {
+  pointer-events: none;
+  opacity: 0.7;
+}
+#actBtnRefresh.spinning::before {
+  display: inline-block;
+  animation: actRefreshSpin 700ms linear;
+}
