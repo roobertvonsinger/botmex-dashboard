@@ -733,6 +733,10 @@ function connectSSE() {
         // prewarm_*: silencioso — auditoría interna, sin notif ruidosa
       } else if (ev.type === 'health_warning') {
         pushNotif({ icon: '⚠️', msg: `Salud: ${(ev.issues || []).join(' · ')}` });
+      } else if (ev.type === 'alert') {
+        // Alertas críticas (capmonster_low, proxy_down) — push notif + toast
+        pushNotif({ icon: ev.icon || '⚠️', msg: ev.msg });
+        toast(`${ev.icon || '⚠️'} ${ev.msg}`, ev.severity === 'danger' ? 'error' : 'warn');
       }
     } catch {}
   };

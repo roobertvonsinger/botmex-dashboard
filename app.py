@@ -423,6 +423,30 @@ def stats(_user: dict = Depends(require_session)):
 _proxy_cache: dict = {"ts": 0.0, "data": None}
 _PROXY_TTL = 60.0
 
+# Dedup de alertas push: kind → último timestamp broadcast (anti-spam)
+_alert_last_sent: dict = {}
+_ALERT_DEDUP_SEC = 5 * 60  # no repetir la misma alerta < 5 min
+
+
+def _maybe_alert_broadcast(alert: dict) -> None:
+    """Broadcast una alerta crítica como notif push, deduplicando por kind."""
+    import time as _t
+    kind = alert.get("kind", "alert")
+    now = _t.time()
+    last = _alert_last_sent.get(kind, 0)
+    if now - last < _ALERT_DEDUP_SEC:
+        return
+    _alert_last_sent[kind] = now
+    icon = {"capmonster_low": "💸", "proxy_down": "🔌", "prewarm_errors": "🔥"}.get(kind, "⚠️")
+    _broadcast({
+        "type": "alert",
+        "kind": kind,
+        "severity": alert.get("severity", "warn"),
+        "icon": icon,
+        "msg": alert.get("msg", ""),
+        "ts": alert.get("ts"),
+    })
+
 
 def _proxy_health() -> dict:
     """Verifica que el proxy LitPort responde haciendo GET a un endpoint de IP.
@@ -446,14 +470,18 @@ def _proxy_health() -> dict:
 
     t0 = _time.time()
     try:
-        with opener.open("http://ip-api.com/json/?fields=query,country,countryCode",
-                         timeout=8) as resp:
+        # ipinfo.io responde desde IPs MX (ip-api.com las bloquea por TOS)
+        req = urllib.request.Request(
+            "https://ipinfo.io/json",
+            headers={"User-Agent": "curl/8.0"},
+        )
+        with opener.open(req, timeout=8) as resp:
             body = _json.loads(resp.read())
         latency = int((_time.time() - t0) * 1000)
         out = {
             "ok": True,
-            "ip": body.get("query"),
-            "country": body.get("countryCode") or body.get("country"),
+            "ip": body.get("ip"),
+            "country": body.get("country"),
             "latency_ms": latency,
             "host": f"{host}:{port}",
             "error": None,
@@ -647,7 +675,20 @@ def superadmin_kpis(_user: dict = Depends(require_session)):
                 "msg": f"CapMonster bajo: ${cm['balance']:.2f}",
                 "ts": now.isoformat(),
             })
+        # proxy caído
+        ph = _proxy_health()
+        if ph and not ph.get("ok"):
+            alerts.append({
+                "kind": "proxy_down", "severity": "danger",
+                "msg": f"Proxy LitPort caído: {ph.get('error') or 'sin respuesta'}",
+                "ts": now.isoformat(),
+            })
         out["alerts"] = alerts
+
+        # Broadcast alertas críticas como notif push (deduplicado por kind+severity en 5min)
+        for a in alerts:
+            if a.get("severity") == "danger":
+                _maybe_alert_broadcast(a)
 
         # ── 4. POOL STATS (Pool · En uso · Trastienda · Rebotadas) ──
         live = c.execute("SELECT COUNT(*) FROM accounts WHERE status='LIVE'").fetchone()[0]
