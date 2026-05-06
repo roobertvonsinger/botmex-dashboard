@@ -1748,7 +1748,7 @@ tr.op-row-azure  .grade-bar-cell { box-shadow: inset 3px 0 0 var(--op-azure);  }
 
 /* ── Iconos de fila (💳 📝 ➕) — al final de la tabla ── */
 td.row-icons, th.row-icons-th {
-  width: 96px; min-width: 96px; padding: 4px 8px !important;
+  width: 1%; padding: 4px 10px 4px 4px !important;
   text-align: right;
   white-space: nowrap;
 }
@@ -1776,12 +1776,18 @@ td.row-icons, th.row-icons-th {
 .row-ic.ic-cards:hover { color: var(--accent); }
 .row-ic.ic-notes:hover { color: var(--warn); }
 .row-ic.ic-add {
-  font-size: 14px; font-weight: 700;
-  color: var(--text-faint);
-  border: 1px dashed var(--hairline);
+  font-size: 10.5px; font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  background: rgba(255,255,255,0.04);
+  border: 1px dashed var(--hairline-h);
+  padding: 3px 9px;
+  width: auto;
+  letter-spacing: 0.3px;
 }
 .row-ic.ic-add:hover {
   color: var(--accent);
+  background: var(--accent-soft);
   border-color: var(--accent-soft-2);
   border-style: solid;
 }
@@ -2163,10 +2169,16 @@ tbody tr.row-refresh-skip { animation: rowSkip 1500ms ease-out; opacity: 0.7; }
 }
 
 /* ── Botón "Detalles" premium ── */
+/* Detalles toma el espacio sobrante para empujar Últ. depósito + iconos a la derecha */
 td.row-details-cell, th.row-details-th {
-  width: 86px; min-width: 86px; max-width: 86px;
-  padding: 0 4px !important;
+  width: auto;
+  padding: 0 8px !important;
   text-align: left;
+}
+/* Últ. depósito y iconos: solo lo que necesitan, pegados a la derecha */
+#accTable td.dep, #accTable th[data-sort="last_deposit_date"] {
+  width: 1%; white-space: nowrap;
+  padding-right: 10px !important;
 }
 .row-details {
   display: inline-flex; align-items: center; gap: 4px;

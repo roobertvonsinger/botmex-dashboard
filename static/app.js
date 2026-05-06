@@ -313,7 +313,7 @@ function renderTable() {
     if (hasNotes) {
       iconsHtml += `<button class="row-ic ic-notes" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.notes_count} nota${r.notes_count>1?'s':''}">📝<sup>${r.notes_count}</sup></button>`;
     }
-    iconsHtml += `<button class="row-ic ic-add" data-id="${r.id}" data-email="${esc(r.email)}" title="Añadir nota rápida">+</button>`;
+    iconsHtml += `<button class="row-ic ic-add" data-id="${r.id}" data-email="${esc(r.email)}" title="Añadir nota rápida">+ Nota</button>`;
 
     // Botón "Detalles" premium — único acceso al modal
     const detailsBtn = `<button class="row-details" data-id="${r.id}" title="Ver detalles completos de la cuenta">
