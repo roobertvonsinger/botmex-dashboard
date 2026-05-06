@@ -822,6 +822,26 @@ async function refreshKpis() {
       stCap.title = k?.capmonster_error || 'CAPMONSTER_KEY no configurado';
     }
 
+    // WebScraping.ai status
+    const stWsai = $('#stWsai');
+    if (stWsai) {
+      const w = k?.wsai;
+      stWsai.classList.remove('ok', 'warn', 'danger', 'dim');
+      if (w && w.ok) {
+        stWsai.textContent = `${w.remaining.toLocaleString()}`;
+        const lvl = w.remaining < 100 ? 'danger' : w.remaining < 500 ? 'warn' : 'ok';
+        stWsai.classList.add(lvl);
+        stWsai.title = `WebScraping.ai · ${w.remaining} calls disponibles\nConcurrencia: ${w.concurrency}\nCuenta: ${w.email}`;
+      } else if (w) {
+        stWsai.textContent = 'err';
+        stWsai.classList.add('danger');
+        stWsai.title = w.error || 'sin respuesta';
+      } else {
+        stWsai.textContent = '—';
+        stWsai.classList.add('dim');
+      }
+    }
+
     const stProxy = $('#stProxy');
     if (stProxy) {
       const p = k?.proxy;

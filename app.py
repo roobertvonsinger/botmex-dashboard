@@ -461,6 +461,37 @@ _proxy_cache: dict = {"ts": 0.0, "data": None}
 _PROXY_TTL = 30.0       # cache si OK
 _PROXY_TTL_FAIL = 5.0   # cache corto si falló — re-intenta rápido
 
+_wsai_cache: dict = {"ts": 0.0, "data": None}
+_WSAI_TTL = 120.0       # 2 min — el balance no cambia tan seguido
+
+
+def _wsai_status() -> dict:
+    """Status de WebScraping.ai (cache 2min)."""
+    import time as _t
+    now = _t.time()
+    if _wsai_cache["data"] and (now - _wsai_cache["ts"]) < _WSAI_TTL:
+        return _wsai_cache["data"]
+    key = os.environ.get("WSAI_API_KEY", "9a79d4ae-dc34-4035-be65-7a76f062ead0")
+    try:
+        req = urllib.request.Request(
+            f"https://api.webscraping.ai/account?api_key={key}",
+            headers={"User-Agent": "curl/8.0"},
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            body = _json.loads(resp.read())
+        out = {
+            "ok": True,
+            "remaining": int(body.get("remaining_api_calls", 0)),
+            "concurrency": int(body.get("remaining_concurrency", 0)),
+            "email": body.get("email", "?"),
+            "resets_at": body.get("resets_at"),
+            "error": None,
+        }
+    except Exception as e:
+        out = {"ok": False, "error": str(e)[:80]}
+    _wsai_cache.update({"ts": now, "data": out})
+    return out
+
 # Dedup de alertas push: kind → último timestamp broadcast (anti-spam)
 _alert_last_sent: dict = {}
 _ALERT_DEDUP_SEC = 5 * 60  # no repetir la misma alerta < 5 min
@@ -792,6 +823,9 @@ def superadmin_kpis(_user: dict = Depends(require_session)):
 
         # ── Proxies (LitPort health check) ──
         out["proxy"] = _proxy_health()
+
+        # ── WebScraping.ai (saldo de API calls) ──
+        out["wsai"] = _wsai_status()
 
     return out
 
