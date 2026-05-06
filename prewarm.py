@@ -31,7 +31,7 @@ from auth import require_session
 try:
     from betmexico_login_service import get_jwt, make_pool
     from betmexico_login_api import BetmexicoApiChecker
-    from betmexico_payment_analyzer import score_payment_readiness
+    score_payment_readiness = None  # se setea desde app.BOT_SCORE_PAYMENT al usar
     _HAS_BOT_DEPS = True
 except ImportError:
     _HAS_BOT_DEPS = False
@@ -159,7 +159,11 @@ def _db_upsert_balance(email: str, details: dict) -> None:
 
 def _db_save_txns_and_recalc(email: str, details: dict, operator_id: int) -> None:
     """Guarda transacciones nuevas + recalcula grade. No-op si no llegaron txns."""
-    if score_payment_readiness is None:
+    try:
+        from app import BOT_SCORE_PAYMENT as _score
+    except Exception:
+        _score = None
+    if _score is None:
         return
     txn_data = (details or {}).get("transactions") or {}
     items = txn_data.get("items") or []
@@ -175,7 +179,7 @@ def _db_save_txns_and_recalc(email: str, details: dict, operator_id: int) -> Non
             logger.debug(f"[Prewarm] save_account_transactions: {e}")
     # Recalcula grade
     try:
-        scoring = score_payment_readiness(details)
+        scoring = _score(details)
     except Exception as e:
         logger.debug(f"[Prewarm] score_payment_readiness: {e}")
         scoring = None

@@ -90,14 +90,14 @@ def _check_caps(email: str, amount: float, projected_extra: float = 0.0) -> Opti
 
 
 def _load_deps():
-    """Lazy import — evita circular imports al startup."""
+    """Reusa deps ya cargadas eager en app.py (evita circular imports)."""
     try:
-        from web_routes_deposits import _run_deposit
-        from betmexico_login_service import make_pool
-        return _run_deposit, make_pool
+        from app import BOT_RUN_DEPOSIT, BOT_MAKE_POOL, BOT_DEPS_OK
+        if BOT_DEPS_OK and BOT_RUN_DEPOSIT and BOT_MAKE_POOL:
+            return BOT_RUN_DEPOSIT, BOT_MAKE_POOL
     except Exception as e:
         logger.warning(f"[Deposits] deps no disponibles: {e}")
-        return None, None
+    return None, None
 
 
 def _parse_pipe(pipe: str) -> tuple[str, str, str]:
