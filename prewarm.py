@@ -437,6 +437,7 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
             ids,
         ).fetchall()
     accs = [dict(r) for r in rows]
+    logger.info(f"[refresh-stream] op={operator_id} ids={len(ids)} accs={len(accs)} valid")
 
     bal = await _capmonster_balance()
     if bal is not None and bal < CAPMONSTER_MIN_BALANCE:
@@ -446,9 +447,10 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
 
     used = await asyncio.to_thread(_db_count_recent, operator_id, 10)
     remaining = max(0, CAP_PER_OPERATOR_10MIN - used)
+    logger.info(f"[refresh-stream] cap_used={used} remaining={remaining}")
 
     async def gen():
-        yield f"data: {json.dumps({'type':'start','total':len(accs),'cap_remaining':remaining})}\n\n"
+        yield f"data: {json.dumps({'type':'start','total':len(accs),'cap_remaining':remaining,'cap_used':used})}\n\n"
 
         q: asyncio.Queue = asyncio.Queue()
 

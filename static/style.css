@@ -2005,3 +2005,50 @@ tbody tr.row-refresh-fail { animation: rowFail 1500ms ease-out; }
   100% { background-color: transparent; }
 }
 tbody tr.row-refresh-skip { animation: rowSkip 1500ms ease-out; opacity: 0.7; }
+
+/* ── Botón refresh con estado activo (stop) ── */
+.seg-btn.refreshing {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+  animation: refreshPulse 1.5s ease-in-out infinite;
+}
+@keyframes refreshPulse {
+  50% { box-shadow: 0 0 12px var(--danger); }
+}
+
+/* ── Admin panel ── */
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  padding: 16px 18px;
+}
+.admin-card {
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.admin-card h4 { margin: 0; font-size: 12.5px; }
+.admin-card p { font-size: 11px; line-height: 1.4; margin: 0; }
+.admin-card .seg-btn { width: 100%; }
+.admin-card-danger {
+  border-color: oklch(0.66 0.21 24 / 0.30);
+  background: oklch(0.66 0.21 24 / 0.05);
+}
+.admin-out {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  display: flex; flex-direction: column; gap: 3px;
+  margin-top: 4px;
+  max-height: 180px; overflow-y: auto;
+}
+.adm-check {
+  display: flex; justify-content: space-between; gap: 8px;
+  padding: 4px 8px; border-radius: 5px;
+  background: rgba(255,255,255,0.03);
+}
+.adm-check.ok   { color: var(--accent); border-left: 2px solid var(--accent); }
+.adm-check.fail { color: var(--danger); border-left: 2px solid var(--danger); }

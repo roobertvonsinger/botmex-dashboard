@@ -27,6 +27,7 @@
     <button class="nav" data-section="notifications"><span class="i">◔</span>Notificaciones<span class="b warn hidden" id="navNotifBadge">·</span></button>
     <button class="nav" data-section="logs" id="navLogs"><span class="i">▤</span>Logs<span class="b" id="navLogsBadge"></span></button>
     <button class="nav" data-section="health" id="navHealth"><span class="i">◉</span>Salud<span class="b ok hidden" id="navHealthBadge">✓</span></button>
+    <button class="nav" data-section="admin" id="navAdmin"><span class="i">⚙</span>Controles</button>
     <div class="grow"></div>
     <div class="sb-status mono">
       <div><span>xCAPTCHA</span><b class="ok" id="stCap" title="Saldo CapMonster">—</b></div>
@@ -211,6 +212,8 @@
       <section class="filterbar">
         <h2>Logs <span class="dim mono" id="logsCount">—</span></h2>
         <div class="grow"></div>
+        <button class="seg-btn" id="btnLogsCopy" title="Copiar todo al portapapeles">📋 Copiar</button>
+        <button class="seg-btn" id="btnLogsScrollEnd" title="Ir al final + reanudar auto-scroll">⤓ Final</button>
         <button class="seg-btn" id="btnLogsClear">Limpiar</button>
         <button class="seg-btn" id="btnLogsPause">⏸ Pausar</button>
       </section>
@@ -228,6 +231,72 @@
       <section class="tablewrap">
         <div id="healthView" class="health-view"><div class="loading">Cargando…</div></div>
       </section>
+    </div>
+
+    <!-- Vista: Controles backend (SA only) -->
+    <div id="adminMain" style="display:none;flex-direction:column;flex:1;min-height:0;overflow-y:auto">
+      <section class="filterbar">
+        <h2>Controles del sistema <span class="dim mono">— solo SA</span></h2>
+        <div class="grow"></div>
+        <span class="dim mono" id="adminPauseStatus"></span>
+      </section>
+      <div class="admin-grid">
+
+        <div class="admin-card">
+          <h4>🩺 Diagnóstico</h4>
+          <p class="dim">Verifica BD, CapMonster, proxy, deps del bot.</p>
+          <button class="seg-btn" id="btnAdminDiag">Correr diagnóstico</button>
+          <div id="adminDiagOut" class="admin-out"></div>
+        </div>
+
+        <div class="admin-card">
+          <h4>📡 Ping</h4>
+          <p class="dim">Latencia a hosts críticos.</p>
+          <button class="seg-btn" id="btnAdminPing">Pingar hosts</button>
+          <div id="adminPingOut" class="admin-out"></div>
+        </div>
+
+        <div class="admin-card">
+          <h4>🔌 Proxy</h4>
+          <p class="dim">Refresca el chequeo de proxy ahora mismo.</p>
+          <button class="seg-btn" id="btnAdminProxyRefresh">Refrescar estado proxy</button>
+          <div id="adminProxyOut" class="admin-out"></div>
+        </div>
+
+        <div class="admin-card">
+          <h4>🔁 Hard refresh</h4>
+          <p class="dim">Reinicia el dashboard web (no afecta el bot).</p>
+          <button class="seg-btn" id="btnAdminRestartWeb">Reiniciar Web</button>
+          <button class="seg-btn" id="btnAdminRestartBot">Reiniciar Bot</button>
+          <button class="seg-btn" id="btnAdminRestartAll">Reiniciar Todo</button>
+        </div>
+
+        <div class="admin-card">
+          <h4>⏸ Pausa global</h4>
+          <p class="dim">Bloquea nuevos prewarms y depósitos para todos los users.</p>
+          <button class="seg-btn" id="btnAdminPause">Pausar sistema</button>
+          <button class="seg-btn" id="btnAdminResume">Reanudar</button>
+        </div>
+
+        <div class="admin-card admin-card-danger">
+          <h4>🛑 Paro de emergencia</h4>
+          <p class="dim">Cancela TODOS los prewarms y misiones programadas + pausa global.</p>
+          <button class="seg-btn danger" id="btnAdminEmergency">Paro de emergencia</button>
+        </div>
+
+        <div class="admin-card">
+          <h4>📥 Logs</h4>
+          <p class="dim">Descarga las últimas N líneas de bot + web.</p>
+          <button class="seg-btn" id="btnAdminExportLogs">Descargar logs</button>
+        </div>
+
+        <div class="admin-card admin-card-danger">
+          <h4>🔄 Reboot VPS</h4>
+          <p class="dim">Reinicia el VPS completo (en 1 min). Requiere confirmación doble.</p>
+          <button class="seg-btn danger" id="btnAdminRebootVps">Reboot VPS</button>
+        </div>
+
+      </div>
     </div>
 
     <!-- Vista: Notificaciones -->

@@ -198,6 +198,7 @@ async function loadMe() {
   // Pool solo superadmin
   if (!isSuper) {
     const np = $('#navPool'); if (np) np.style.display = 'none';
+    const na = $('#navAdmin'); if (na) na.style.display = 'none';
   }
   // Liberar (asignar a otros) solo superadmin — el "admin" NO debe verlo (vista secreta)
   if (!isSuper) {
@@ -614,12 +615,14 @@ function showSection(name) {
   $('#notificationsMain').style.display = name === 'notifications' ? 'flex' : 'none';
   const logsM = $('#logsMain'); if (logsM) logsM.style.display = name === 'logs' ? 'flex' : 'none';
   const healthM = $('#healthMain'); if (healthM) healthM.style.display = name === 'health' ? 'flex' : 'none';
+  const adminM = $('#adminMain'); if (adminM) adminM.style.display = name === 'admin' ? 'flex' : 'none';
   $$('.nav[data-section]').forEach(btn => btn.classList.toggle('on', btn.dataset.section === name));
   if (name === 'pool') reloadPool();
   if (name === 'activity') reloadActivity();
   if (name === 'notifications') renderNotifs();
   if (name === 'logs') startLogsPolling(); else stopLogsPolling();
   if (name === 'health') loadHealth(false);
+  if (name === 'admin') loadAdminState();
 }
 
 // ─── Pool view (SA only) ───
@@ -859,14 +862,21 @@ async function refreshKpis() {
 }
 
 // ─── Refresh visible ───
+let _refreshAbort = null;
 async function refreshVisible() {
+  if (_refreshAbort) {
+    _refreshAbort.abort();
+    return;
+  }
   const visible = getPaged().rows;
   const ids = visible.map(r => r.id);
   if (!ids.length) return;
   const btn = $('#btnRefreshVisible');
-  if (btn) btn.disabled = true;
+  if (btn) {
+    btn.classList.add('refreshing');
+    btn.innerHTML = '⏹ Detener actualización';
+  }
 
-  // Marca todas las filas visibles como "refreshing" — shimmer skeleton
   const idSet = new Set(ids);
   document.querySelectorAll('#accTable tbody tr[data-id]').forEach(tr => {
     if (idSet.has(parseInt(tr.dataset.id))) {
@@ -876,12 +886,30 @@ async function refreshVisible() {
   toast(`↻ Refrescando ${ids.length} en vivo…`);
 
   let updated = 0, failed = 0, skipped = 0;
+  let started = false;
+  let lastEventAt = Date.now();
+  let watchdog = null;
+  const ctrl = new AbortController();
+  _refreshAbort = ctrl;
+
+  // Watchdog: si no llega ningún evento en 90s, aborta con error visible
+  watchdog = setInterval(() => {
+    if (Date.now() - lastEventAt > 90_000) {
+      toast(`⚠️ Sin respuesta del servidor en 90s — aborté`, 'error');
+      ctrl.abort();
+    }
+  }, 5000);
+
   try {
     const r = await fetch('/api/prewarm/refresh-stream', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ account_ids: ids }),
+      signal: ctrl.signal,
     });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
 
     const reader = r.body.getReader();
     const decoder = new TextDecoder();
@@ -889,6 +917,7 @@ async function refreshVisible() {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
+      lastEventAt = Date.now();
       buf += decoder.decode(value, { stream: true });
       let idx;
       while ((idx = buf.indexOf('\n\n')) >= 0) {
@@ -899,15 +928,18 @@ async function refreshVisible() {
         try {
           const ev = JSON.parse(line.slice(6));
           if (ev.type === 'capmonster_low') {
-            toast(`⚠️ CapMonster bajo ($${ev.balance ?? '?'})`, 'error');
+            toast(`⚠️ CapMonster bajo ($${ev.balance ?? '?'}) — refresh cancelado`, 'error');
             return;
           }
-          if (ev.type === 'account' && ev.data) {
+          if (ev.type === 'start') {
+            started = true;
+            if (ev.cap_remaining === 0) {
+              toast(`⚠️ Cap 30/10min agotado (${ev.cap_used} usados) — espera 10min`, 'error');
+            }
+          } else if (ev.type === 'account' && ev.data) {
             updated++;
-            // Patch state.rows
             const i = state.rows.findIndex(x => x.id === ev.data.id);
             if (i >= 0) state.rows[i] = { ...state.rows[i], ...ev.data };
-            // Repintar SOLO la fila afectada con animación
             _swapRowWithAnim(ev.data.id);
           } else if (ev.type === 'fail') {
             failed++;
@@ -916,19 +948,33 @@ async function refreshVisible() {
             skipped++;
             _markRowSkip(ev.id);
           }
-        } catch {}
+        } catch (parseErr) {}
       }
     }
     const parts = [];
     if (updated) parts.push(`${updated} OK`);
     if (failed) parts.push(`${failed} falló`);
     if (skipped) parts.push(`${skipped} skip`);
-    toast(`✓ ${parts.join(' · ') || 'sin cambios'}`, failed ? 'error' : 'success');
+    if (!started) {
+      toast(`⚠️ Servidor no inició el stream — algo está mal`, 'error');
+    } else if (updated === 0 && failed === 0 && skipped === 0) {
+      toast(`⚠️ 0 cuentas procesadas — bot deps no cargan en VPS?`, 'error');
+    } else {
+      toast(`✓ ${parts.join(' · ')}`, failed ? 'error' : 'success');
+    }
   } catch (e) {
-    toast(`Error: ${e.message}`, 'error');
+    if (e.name === 'AbortError') {
+      toast(`⏹ Cancelado`, 'success');
+    } else {
+      toast(`Error: ${e.message}`, 'error');
+    }
   } finally {
-    if (btn) btn.disabled = false;
-    // Quita clase refreshing a las que no terminaron (timeout)
+    clearInterval(watchdog);
+    _refreshAbort = null;
+    if (btn) {
+      btn.classList.remove('refreshing');
+      btn.innerHTML = '↻ Actualizar visibles';
+    }
     setTimeout(() => {
       document.querySelectorAll('#accTable tbody tr.row-refreshing').forEach(tr => {
         tr.classList.remove('row-refreshing');
@@ -1020,6 +1066,7 @@ function _markRowSkip(id) {
 // ─── Logs view ───
 let _logsTimer = null;
 let _logsPaused = false;
+let _logsAutoScroll = true;
 async function reloadLogs() {
   const v = $('#logsView');
   if (!v) return;
@@ -1027,16 +1074,35 @@ async function reloadLogs() {
     const r = await fetch('/api/logs?limit=300');
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
-    $('#logsCount').textContent = `${data.lines.length} líneas`;
+    $('#logsCount').textContent = `${data.lines.length} líneas${_logsAutoScroll ? '' : ' · 🔒 scroll bloqueado'}`;
+    // Preserve selection — solo actualiza si nada está seleccionado
+    const sel = window.getSelection();
+    const hasSelection = sel && sel.toString().length > 0 && v.contains(sel.anchorNode);
+    if (hasSelection) return;
+    const wasAtBottom = (v.scrollHeight - v.scrollTop - v.clientHeight) < 50;
     v.textContent = data.lines.join('\n');
-    v.scrollTop = v.scrollHeight;
+    // Solo auto-scroll si el usuario no se ha movido manualmente
+    if (_logsAutoScroll && wasAtBottom) {
+      v.scrollTop = v.scrollHeight;
+    }
   } catch (e) {
     v.textContent = `Error: ${e.message}`;
   }
 }
+// Detecta si el user scrolleó manualmente → desactiva auto-scroll temporal
+function _attachLogsScrollDetect() {
+  const v = $('#logsView');
+  if (!v || v.dataset.scrollBound) return;
+  v.dataset.scrollBound = '1';
+  v.addEventListener('scroll', () => {
+    const atBottom = (v.scrollHeight - v.scrollTop - v.clientHeight) < 30;
+    _logsAutoScroll = atBottom;
+  });
+}
 function startLogsPolling() {
   stopLogsPolling();
   if (state.section === 'logs' && !_logsPaused) {
+    _attachLogsScrollDetect();
     reloadLogs();
     _logsTimer = setInterval(reloadLogs, 4000);
   }
@@ -1151,6 +1217,20 @@ $('#btnLogsPause')?.addEventListener('click', () => {
   if (_logsPaused) stopLogsPolling(); else startLogsPolling();
 });
 $('#btnLogsClear')?.addEventListener('click', () => { $('#logsView').textContent = ''; });
+$('#btnLogsCopy')?.addEventListener('click', async () => {
+  const txt = $('#logsView').textContent || '';
+  if (!txt) { toast('Sin logs para copiar', 'error'); return; }
+  try {
+    await navigator.clipboard.writeText(txt);
+    toast(`✓ ${txt.split('\n').length} líneas copiadas`, 'success');
+  } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+});
+$('#btnLogsScrollEnd')?.addEventListener('click', () => {
+  const v = $('#logsView');
+  if (!v) return;
+  _logsAutoScroll = true;
+  v.scrollTop = v.scrollHeight;
+});
 
 // Mobile drawer
 $('#btnMobileMenu')?.addEventListener('click', () => {
@@ -1175,6 +1255,116 @@ $('#poolTable')?.addEventListener('click', e => {
     e.stopPropagation();
     navigator.clipboard.writeText(combo.dataset.combo).then(() => toast(`✓ ${combo.dataset.combo}`, 'success'));
   }
+});
+
+// ─── Admin / Controles backend ───
+async function loadAdminState() {
+  try {
+    const r = await fetch('/api/admin/pause-state');
+    if (!r.ok) return;
+    const s = await r.json();
+    const lbl = $('#adminPauseStatus');
+    if (s.paused) {
+      lbl.textContent = `⏸ PAUSADO por ${s.by} (${s.reason})`;
+      lbl.style.color = 'var(--warn)';
+    } else {
+      lbl.textContent = '▶ Activo';
+      lbl.style.color = 'var(--accent)';
+    }
+  } catch {}
+}
+async function _adminPost(url, body = {}) {
+  const r = await fetch(url, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+  return data;
+}
+$('#btnAdminDiag')?.addEventListener('click', async () => {
+  const out = $('#adminDiagOut');
+  out.innerHTML = '<span class="dep-spinner"></span> corriendo…';
+  try {
+    const r = await fetch('/api/admin/diag');
+    const data = await r.json();
+    out.innerHTML = data.checks.map(c => `<div class="adm-check ${c.ok?'ok':'fail'}">
+      <span>${c.ok?'✓':'✗'} ${esc(c.name)}</span>
+      <span class="dim mono">${esc(c.info || c.error || '')}</span>
+    </div>`).join('');
+  } catch (e) { out.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; }
+});
+$('#btnAdminPing')?.addEventListener('click', async () => {
+  const out = $('#adminPingOut');
+  out.innerHTML = '<span class="dep-spinner"></span> pingeando…';
+  try {
+    const data = await _adminPost('/api/admin/ping');
+    out.innerHTML = data.results.map(r => `<div class="adm-check ${r.ok?'ok':'fail'}">
+      <span>${r.ok?'✓':'✗'} ${esc(r.host)}</span>
+      <span class="dim mono">${r.latency_ms != null ? r.latency_ms+'ms' : esc(r.error||'no responde')}</span>
+    </div>`).join('');
+  } catch (e) { out.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; }
+});
+$('#btnAdminProxyRefresh')?.addEventListener('click', async () => {
+  const out = $('#adminProxyOut');
+  out.innerHTML = '<span class="dep-spinner"></span>';
+  try {
+    const data = await _adminPost('/api/admin/refresh-proxy');
+    out.innerHTML = data.ok
+      ? `<div class="adm-check ok"><span>✓ ${esc(data.country||'?')}</span><span class="dim mono">${data.latency_ms||'?'}ms</span></div>`
+      : `<div class="adm-check fail"><span>✗ caído</span><span class="dim mono">${esc(data.error||'')}</span></div>`;
+    refreshKpis();
+  } catch (e) { out.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; }
+});
+async function _restartService(target) {
+  if (!confirm(`¿Reiniciar ${target}? Habrá downtime de unos segundos.`)) return;
+  try {
+    const data = await _adminPost(`/api/admin/services/restart?target=${target}`);
+    toast(`✓ ${target}: ${data.restarted.map(r=>r.service+(r.ok?' OK':' FAIL')).join(', ')}`, 'success');
+    if (target === 'web' || target === 'all') {
+      setTimeout(() => location.reload(), 5000);
+    }
+  } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+}
+$('#btnAdminRestartWeb')?.addEventListener('click', () => _restartService('web'));
+$('#btnAdminRestartBot')?.addEventListener('click', () => _restartService('bot'));
+$('#btnAdminRestartAll')?.addEventListener('click', () => _restartService('all'));
+$('#btnAdminPause')?.addEventListener('click', async () => {
+  const reason = prompt('Razón de la pausa (opcional):') ?? '';
+  try {
+    await _adminPost('/api/admin/pause', { reason });
+    toast('⏸ Sistema pausado', 'success');
+    loadAdminState();
+  } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+});
+$('#btnAdminResume')?.addEventListener('click', async () => {
+  try {
+    await _adminPost('/api/admin/resume');
+    toast('▶ Sistema reanudado', 'success');
+    loadAdminState();
+  } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+});
+$('#btnAdminEmergency')?.addEventListener('click', async () => {
+  if (!confirm('🛑 PARO DE EMERGENCIA\n\nEsto va a:\n• Pausar todos los nuevos prewarms y depósitos\n• Cancelar prewarms en curso\n• Cancelar misiones programadas\n• Cancelar matchmakers en vivo\n\n¿Continuar?')) return;
+  try {
+    const data = await _adminPost('/api/admin/emergency-stop');
+    toast(`🛑 Stop: ${data.cancelled_prewarms} prewarms, ${data.cancelled_schedules} misiones canceladas`, 'success');
+    loadAdminState();
+  } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+});
+$('#btnAdminExportLogs')?.addEventListener('click', () => {
+  window.open('/api/admin/export-logs?lines=2000', '_blank');
+});
+$('#btnAdminRebootVps')?.addEventListener('click', async () => {
+  if (!confirm('🔄 REBOOT VPS\n\nVa a reiniciar el servidor completo. Habrá ~2 minutos de downtime.\n\n¿Estás seguro?')) return;
+  if (prompt('Escribe "REBOOT" para confirmar:') !== 'REBOOT') {
+    toast('Confirmación incorrecta — cancelado', 'error');
+    return;
+  }
+  try {
+    const data = await _adminPost('/api/admin/vps-reboot?confirm=REBOOT');
+    toast(`🔄 VPS reboot programado en ${data.in}`, 'success');
+  } catch (e) { toast(`Error: ${e.message}`, 'error'); }
 });
 
 // Health

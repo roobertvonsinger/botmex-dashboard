@@ -877,6 +877,212 @@ def health_full(_user: dict = Depends(require_session)):
     return _run_health_checks()
 
 
+# ── Panel de controles backend (SA only) ─────────────────────────────────────
+
+import subprocess as _sp
+
+
+def _require_sa(user: dict):
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Solo superadmin")
+
+
+@app.get("/api/admin/diag")
+def admin_diag(user: dict = Depends(require_session)):
+    """Diagnóstico completo del sistema."""
+    _require_sa(user)
+    out = {"ts": datetime.now(timezone.utc).isoformat(), "checks": []}
+    # DB
+    try:
+        with db() as c:
+            n = c.execute("SELECT COUNT(*) FROM accounts").fetchone()[0]
+        out["checks"].append({"name": "BD SQLite", "ok": True, "info": f"{n} cuentas"})
+    except Exception as e:
+        out["checks"].append({"name": "BD SQLite", "ok": False, "error": str(e)[:120]})
+    # CapMonster
+    cm = _capmonster_balance()
+    if cm.get("balance") is not None:
+        out["checks"].append({"name": "CapMonster", "ok": cm["balance"] >= 5,
+                              "info": f"${cm['balance']:.2f}"})
+    else:
+        out["checks"].append({"name": "CapMonster", "ok": False, "error": cm.get("error", "?")})
+    # Proxy
+    p = _proxy_health()
+    out["checks"].append({"name": "Proxy LitPort", "ok": p.get("ok", False),
+                          "info": f"{p.get('country','?')} · {p.get('latency_ms','?')}ms" if p.get("ok") else None,
+                          "error": p.get("error") if not p.get("ok") else None})
+    # Bot deps
+    try:
+        from app import BOT_DEPS_OK
+        out["checks"].append({"name": "Bot deps", "ok": bool(BOT_DEPS_OK),
+                              "info": "loaded" if BOT_DEPS_OK else None,
+                              "error": "no cargan" if not BOT_DEPS_OK else None})
+    except Exception:
+        pass
+    return out
+
+
+@app.post("/api/admin/ping")
+def admin_ping(user: dict = Depends(require_session)):
+    """Ping a hosts críticos."""
+    _require_sa(user)
+    targets = ["betmexico.mx", "api.capmonster.cloud", "hub-us-7.litport.net"]
+    results = []
+    for host in targets:
+        try:
+            r = _sp.run(["ping", "-c", "1", "-W", "2", host],
+                        capture_output=True, text=True, timeout=5)
+            ok = r.returncode == 0
+            # Extrae tiempo
+            lat = None
+            for line in r.stdout.splitlines():
+                if "time=" in line:
+                    try:
+                        lat = float(line.split("time=")[1].split()[0])
+                    except Exception:
+                        pass
+            results.append({"host": host, "ok": ok, "latency_ms": lat})
+        except Exception as e:
+            results.append({"host": host, "ok": False, "error": str(e)[:100]})
+    return {"results": results}
+
+
+@app.post("/api/admin/refresh-proxy")
+def admin_refresh_proxy(user: dict = Depends(require_session)):
+    """Invalida cache de proxy_health para forzar re-check inmediato."""
+    _require_sa(user)
+    _proxy_cache["ts"] = 0.0
+    _proxy_cache["data"] = None
+    p = _proxy_health()
+    return {"ok": p.get("ok"), "country": p.get("country"), "latency_ms": p.get("latency_ms"),
+            "error": p.get("error")}
+
+
+@app.post("/api/admin/services/restart")
+def admin_services_restart(target: str, user: dict = Depends(require_session)):
+    """Reinicia bot, web, o ambos."""
+    _require_sa(user)
+    if target not in ("bot", "web", "all"):
+        raise HTTPException(400, "target debe ser bot|web|all")
+    services = {"bot": ["betmexico-bot"], "web": ["betmexico-web"],
+                "all": ["betmexico-bot", "betmexico-web"]}[target]
+    out = []
+    for s in services:
+        try:
+            r = _sp.run(["systemctl", "restart", s], capture_output=True, text=True, timeout=15)
+            out.append({"service": s, "ok": r.returncode == 0, "stderr": (r.stderr or "")[:200]})
+        except Exception as e:
+            out.append({"service": s, "ok": False, "error": str(e)[:100]})
+    return {"restarted": out}
+
+
+@app.get("/api/admin/export-logs")
+def admin_export_logs(lines: int = Query(500, le=5000),
+                      user: dict = Depends(require_session)):
+    """Descarga logs recientes (text/plain)."""
+    _require_sa(user)
+    try:
+        cmd = ["journalctl", "-u", "betmexico-web", "-u", "betmexico-bot",
+               "-n", str(lines), "--no-pager", "--output=short-iso"]
+        r = _sp.run(cmd, capture_output=True, text=True, timeout=15)
+        body = r.stdout or r.stderr
+    except Exception as e:
+        body = f"Error: {e}"
+    return Response(content=body, media_type="text/plain",
+                    headers={"Content-Disposition": "attachment; filename=betmexico-logs.txt"})
+
+
+# Estado de pausa global de procesos (SA puede pausar prewarms/deposits para todos)
+_GLOBAL_PAUSE = {"paused": False, "since": None, "by": None, "reason": None}
+
+
+@app.get("/api/admin/pause-state")
+def admin_pause_state(user: dict = Depends(require_session)):
+    _require_sa(user)
+    return _GLOBAL_PAUSE
+
+
+@app.post("/api/admin/pause")
+def admin_pause(user: dict = Depends(require_session), reason: str = ""):
+    """Pausa global: bloquea nuevos prewarms y depósitos para TODOS los users."""
+    _require_sa(user)
+    _GLOBAL_PAUSE.update({
+        "paused": True,
+        "since": datetime.now(timezone.utc).isoformat(),
+        "by": user.get("display"),
+        "reason": reason or "manual",
+    })
+    _broadcast({"type": "alert", "kind": "global_pause", "severity": "warn",
+                "icon": "⏸", "msg": f"Sistema pausado por {user.get('display')}",
+                "ts": datetime.now(timezone.utc).isoformat()})
+    return _GLOBAL_PAUSE
+
+
+@app.post("/api/admin/resume")
+def admin_resume(user: dict = Depends(require_session)):
+    _require_sa(user)
+    _GLOBAL_PAUSE.update({"paused": False, "since": None, "by": None, "reason": None})
+    _broadcast({"type": "alert", "kind": "global_resume", "severity": "info",
+                "icon": "▶", "msg": f"Sistema reanudado por {user.get('display')}",
+                "ts": datetime.now(timezone.utc).isoformat()})
+    return _GLOBAL_PAUSE
+
+
+@app.post("/api/admin/emergency-stop")
+def admin_emergency_stop(user: dict = Depends(require_session)):
+    """Paro de emergencia: pausa global + cancela todos los prewarms y schedules activos."""
+    _require_sa(user)
+    _GLOBAL_PAUSE.update({
+        "paused": True,
+        "since": datetime.now(timezone.utc).isoformat(),
+        "by": user.get("display"),
+        "reason": "EMERGENCY_STOP",
+    })
+    cancelled_pw = 0
+    cancelled_sched = 0
+    try:
+        from prewarm import _PREWARM_TASKS
+        for k, t in list(_PREWARM_TASKS.items()):
+            if not t.done():
+                t.cancel()
+                cancelled_pw += 1
+    except Exception:
+        pass
+    try:
+        from deposits import _active_schedules, _active_mm_runs
+        for sid, info in list(_active_schedules.items()):
+            try:
+                info["task"].cancel()
+                cancelled_sched += 1
+            except Exception:
+                pass
+        for run_id, ev in list(_active_mm_runs.items()):
+            ev.set()
+    except Exception:
+        pass
+    _broadcast({"type": "alert", "kind": "emergency_stop", "severity": "danger",
+                "icon": "🛑", "msg": f"PARO DE EMERGENCIA por {user.get('display')}",
+                "ts": datetime.now(timezone.utc).isoformat()})
+    return {"paused": True, "cancelled_prewarms": cancelled_pw,
+            "cancelled_schedules": cancelled_sched}
+
+
+@app.post("/api/admin/vps-reboot")
+def admin_vps_reboot(user: dict = Depends(require_session), confirm: str = ""):
+    """Reboot del VPS — requiere confirmación."""
+    _require_sa(user)
+    if confirm != "REBOOT":
+        raise HTTPException(400, "Pasa confirm=REBOOT para confirmar")
+    try:
+        _sp.Popen(["shutdown", "-r", "+1", "Reboot solicitado por SA"])
+        _broadcast({"type": "alert", "kind": "vps_reboot", "severity": "danger",
+                    "icon": "🔄", "msg": "VPS reboot programado en 1 min",
+                    "ts": datetime.now(timezone.utc).isoformat()})
+        return {"scheduled": True, "in": "1 minute"}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 @app.get("/api/health/last")
 def health_last(_user: dict = Depends(require_session)):
     return _health_state
