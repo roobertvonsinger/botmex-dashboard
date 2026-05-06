@@ -1019,9 +1019,11 @@ async function refreshVisible(opts = {}) {
   } finally {
     clearInterval(watchdog);
     _refreshAbort = null;
+    _refreshing = false;   // ← SIN ESTO el botón quedaba bloqueado para siempre
     if (btn) {
       btn.classList.remove('refreshing');
       btn.innerHTML = '↻ Actualizar visibles';
+      btn.style.removeProperty('--prog');
     }
     setTimeout(() => {
       document.querySelectorAll('#accTable tbody tr.row-refreshing').forEach(tr => {
