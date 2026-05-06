@@ -862,19 +862,23 @@ async function refreshKpis() {
 }
 
 // ─── Refresh visible ───
+let _refreshing = false;
 let _refreshAbort = null;
 async function refreshVisible() {
-  if (_refreshAbort) {
-    _refreshAbort.abort();
+  if (_refreshing) {
+    // Doble click / re-pico: cancelar el actual
+    if (_refreshAbort) _refreshAbort.abort();
     return;
   }
+  _refreshing = true;
   const visible = getPaged().rows;
   const ids = visible.map(r => r.id);
-  if (!ids.length) return;
+  if (!ids.length) { _refreshing = false; return; }
   const btn = $('#btnRefreshVisible');
   if (btn) {
     btn.classList.add('refreshing');
-    btn.innerHTML = '⏹ Detener actualización';
+    btn.innerHTML = '⏹ Detener';
+    btn.style.pointerEvents = 'auto';
   }
 
   const idSet = new Set(ids);
