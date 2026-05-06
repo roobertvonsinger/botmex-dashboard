@@ -228,7 +228,11 @@ def auth_logout(response: _Response, bmx_session: str = Cookie(default=None)):
 
 @app.get("/api/auth/me")
 def auth_me(user: dict = Depends(require_session)):
-    return {"username": user["display"], "role": user["role"]}
+    return {
+        "username": user["display"],
+        "role": user["role"],
+        "telegram_id": user.get("telegram_id"),
+    }
 
 
 # ── API — protegida con sesión ─────────────────────────────────────────────────
@@ -1051,19 +1055,85 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
         except sqlite3.OperationalError:
             result["transactions"] = []
 
-        # Notas
+        # Notas — non-SA solo ve las propias; SA ve todas
+        role = _user.get("role", "user")
+        my_tg = int(_user.get("telegram_id") or 0)
         try:
-            rows = c.execute(
-                "SELECT id, note_text, created_at, created_by_name "
-                "FROM account_notes WHERE account_email=? "
-                "ORDER BY created_at DESC LIMIT 20",
-                (acc["email"],),
-            ).fetchall()
+            if role == "superadmin":
+                rows = c.execute(
+                    "SELECT id, note_text, created_at, created_by, created_by_name "
+                    "FROM account_notes WHERE account_email=? AND COALESCE(note_text,'') != '' "
+                    "ORDER BY created_at DESC LIMIT 50",
+                    (acc["email"],),
+                ).fetchall()
+            else:
+                rows = c.execute(
+                    "SELECT id, note_text, created_at, created_by, created_by_name "
+                    "FROM account_notes WHERE account_email=? AND created_by=? "
+                    "AND COALESCE(note_text,'') != '' "
+                    "ORDER BY created_at DESC LIMIT 50",
+                    (acc["email"], my_tg),
+                ).fetchall()
             result["notes"] = [dict(r) for r in rows]
+            for n in result["notes"]:
+                n["mine"] = (n.get("created_by") == my_tg)
         except sqlite3.OperationalError:
             result["notes"] = []
 
     return result
+
+
+class NoteCreate(BaseModel):
+    text: str
+
+
+@app.post("/api/accounts/{account_id}/notes")
+def create_note(account_id: int, req: NoteCreate, user: dict = Depends(require_session)):
+    text = (req.text or "").strip()
+    if not text:
+        raise HTTPException(400, "Texto vacío")
+    if len(text) > 2000:
+        raise HTTPException(400, "Nota muy larga (máx 2000)")
+    tg = int(user.get("telegram_id") or 0)
+    name = user.get("display") or user.get("username") or "?"
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    with db(write=True) as c:
+        acc = c.execute(
+            "SELECT email, password FROM accounts WHERE id=?", (account_id,)
+        ).fetchone()
+        if not acc:
+            raise HTTPException(404, "Cuenta no encontrada")
+        cur = c.execute(
+            "INSERT INTO account_notes "
+            "(account_email, account_password, note_type, note_text, "
+            " created_by, created_by_name, created_at, updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (acc["email"], acc["password"] or "", "USER", text, tg, name, now, now),
+        )
+        note_id = cur.lastrowid
+    _broadcast({
+        "type": "activity", "kind": "note",
+        "ts": now, "who": name, "who_id": tg,
+        "target": acc["email"], "id": note_id,
+        "text": text[:120],
+    })
+    return {"id": note_id, "created_at": now}
+
+
+@app.delete("/api/accounts/{account_id}/notes/{note_id}")
+def delete_note(account_id: int, note_id: int, user: dict = Depends(require_session)):
+    tg = int(user.get("telegram_id") or 0)
+    role = user.get("role", "user")
+    with db(write=True) as c:
+        row = c.execute(
+            "SELECT id, created_by, account_email FROM account_notes WHERE id=?", (note_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Nota no encontrada")
+        if role != "superadmin" and row["created_by"] != tg:
+            raise HTTPException(403, "Solo puedes borrar tus propias notas")
+        c.execute("DELETE FROM account_notes WHERE id=?", (note_id,))
+    return {"deleted": note_id}
 
 
 class CombosRequest(BaseModel):
@@ -1150,6 +1220,29 @@ def activity_feed(
                 "who": _resolve_operator(r["locked_by"]),
                 "target": _combo(r["email"]),
             })
+
+        # Notas (de los usuarios — bitácora visible para uno mismo, SA ve todas)
+        try:
+            sql = (
+                "SELECT id, account_email, note_text, created_by, created_by_name, created_at "
+                "FROM account_notes WHERE COALESCE(note_text,'') != '' "
+            )
+            params = []
+            if op_filter is not None:
+                sql += "AND created_by = ? "
+                params.append(op_filter)
+            sql += "ORDER BY id DESC LIMIT ?"
+            params.append(limit)
+            for r in c.execute(sql, params).fetchall():
+                events.append({
+                    "kind": "note", "ts": r["created_at"],
+                    "who": r["created_by_name"] or _resolve_operator(r["created_by"]),
+                    "target": _combo(r["account_email"]),
+                    "text": (r["note_text"] or "")[:160],
+                    "id": r["id"],
+                })
+        except sqlite3.OperationalError:
+            pass
 
         # Prewarms (process_log)
         try:

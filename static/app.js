@@ -460,6 +460,7 @@ function actionLabel(kind) {
   if (kind === 'deposit') return '💳 Depósito';
   if (kind === 'lock') return '🔒 Lock';
   if (kind === 'unlock') return '🔓 Unlock';
+  if (kind === 'note') return '📝 Nota';
   if (kind?.startsWith('prewarm_complete')) return '🔥 Prewarm OK';
   if (kind?.startsWith('prewarm_error')) return '🔥 Prewarm err';
   if (kind?.startsWith('prewarm_timeout')) return '🔥 Prewarm timeout';
@@ -475,6 +476,7 @@ function statusPill(e) {
   }
   if (e.kind === 'lock') return `<span class="dim">activo</span>`;
   if (e.kind === 'unlock') return `<span class="dim">liberado</span>`;
+  if (e.kind === 'note') return `<span class="dim mono" title="${esc(e.text || '')}">${esc((e.text || '').slice(0, 60))}</span>`;
   return '';
 }
 function getFilteredActivity() {
@@ -530,7 +532,7 @@ function pushActivityEvent(ev) {
   activityRows.unshift({
     kind: ev.kind, ts: ev.ts, who: ev.who, target: ev.target,
     amount: ev.amount, status: ev.status, reason: ev.reason,
-    duration_ms: ev.duration_ms, id: ev.id,
+    duration_ms: ev.duration_ms, id: ev.id, text: ev.text,
   });
   if (activityRows.length > 500) activityRows.length = 500;
   if (state.section === 'activity') renderActivity();
@@ -628,6 +630,13 @@ function connectSSE() {
             msg: `${ev.who} depositó ${fmtMoney(ev.amount)} en ${ev.target} → ${ev.status}`,
           });
           if (ok) reload();
+        } else if (ev.kind === 'note') {
+          const myTg = state.user?.telegram_id;
+          const isMine = ev.who_id && myTg && ev.who_id === myTg;
+          const isSA = state.user?.role === 'superadmin';
+          if (isMine || isSA) {
+            pushNotif({ icon: '📝', msg: `${ev.who} anotó en ${ev.target}: ${(ev.text || '').slice(0, 60)}` });
+          }
         } else if (ev.kind === 'prewarm_error' || ev.kind === 'prewarm_timeout') {
           pushNotif({ icon: '🔥', msg: `Prewarm ${ev.kind.replace('prewarm_','')} en ${ev.target}` });
         }
@@ -1004,6 +1013,49 @@ $('#accTable').addEventListener('click', e => {
   }
 });
 
+// Modal de detalle: form de notas (submit + delete)
+$('#detModalBody').addEventListener('submit', async e => {
+  const form = e.target.closest('.d-note-form');
+  if (!form) return;
+  e.preventDefault();
+  const accId = parseInt(form.dataset.accId);
+  const inp = form.querySelector('.d-note-input');
+  const text = inp.value.trim();
+  if (!text) { inp.focus(); return; }
+  const btn = form.querySelector('.d-note-submit');
+  btn.disabled = true;
+  try {
+    await submitNote(accId, text);
+    inp.value = '';
+    toast('✓ Nota guardada', 'success');
+    // Re-render modal
+    openDetailModal(accId);
+  } catch (err) {
+    toast(`Error: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
+$('#detModalBody').addEventListener('click', async e => {
+  const del = e.target.closest('.d-note-del');
+  if (!del) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const noteId = parseInt(del.dataset.noteId);
+  const li = del.closest('li[data-note-id]');
+  const form = $('#detModalBody').querySelector('.d-note-form');
+  const accId = form ? parseInt(form.dataset.accId) : null;
+  if (!accId || !noteId) return;
+  if (!confirm('¿Borrar esta nota?')) return;
+  try {
+    await deleteNote(accId, noteId);
+    if (li) li.remove();
+    toast('✓ Nota borrada', 'success');
+  } catch (err) {
+    toast(`Error: ${err.message}`, 'error');
+  }
+});
+
 // Cerrar modal detalle: X, click fuera, Escape
 $('#detModalClose').addEventListener('click', closeDetailModal);
 $('#detModalOverlay').addEventListener('click', e => {
@@ -1162,16 +1214,48 @@ function renderDetail(d) {
       </div>`
     : `<div class="d-section"><h4>📊 Transacciones</h4><div class="d-empty">Sin transacciones registradas.</div></div>`;
 
-  const notes = (d.notes && d.notes.length > 0)
-    ? `<div class="d-section">
-        <h4>📝 Notas <span class="d-count">${d.notes.length}</span></h4>
-        <ul class="d-notes">
-          ${d.notes.map(n => `<li><span class="d-note-by">${esc(n.created_by_name || '—')}</span><span class="d-note-when dim mono" title="${esc(n.created_at || '')}">${fmtAbs(n.created_at)} · ${fmtAgo(n.created_at)}</span><div>${esc(n.note_text)}</div></li>`).join('')}
-        </ul>
-      </div>`
-    : '';
+  const notes = `<div class="d-section">
+      <h4>📝 Notas ${d.notes && d.notes.length > 0 ? `<span class="d-count">${d.notes.length}</span>` : ''}</h4>
+      <form class="d-note-form" data-acc-id="${d.id}">
+        <textarea class="d-note-input" placeholder="Nueva nota (visible solo para ti${state.user?.role === 'superadmin' ? '' : ' y SA'})…" maxlength="2000" rows="2"></textarea>
+        <button type="submit" class="d-note-submit">Guardar</button>
+      </form>
+      ${(d.notes && d.notes.length > 0)
+        ? `<ul class="d-notes">
+            ${d.notes.map(n => `<li data-note-id="${n.id}">
+              <div class="d-note-head">
+                <span class="d-note-by">${esc(n.created_by_name || '—')}</span>
+                <span class="d-note-when dim mono" title="${esc(n.created_at || '')}">${fmtAbs(n.created_at)} · ${fmtAgo(n.created_at)}</span>
+                ${n.mine || state.user?.role === 'superadmin' ? `<button class="d-note-del" data-note-id="${n.id}" title="Borrar">✕</button>` : ''}
+              </div>
+              <div class="d-note-body">${esc(n.note_text)}</div>
+            </li>`).join('')}
+          </ul>`
+        : '<div class="d-empty">Sin notas todavía.</div>'}
+    </div>`;
 
   return `<div class="d-grid">${personal}${cards}${txns}${notes}</div>`;
+}
+
+async function submitNote(accId, text) {
+  const r = await fetch(`/api/accounts/${accId}/notes`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ text }),
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
+async function deleteNote(accId, noteId) {
+  const r = await fetch(`/api/accounts/${accId}/notes/${noteId}`, { method: 'DELETE' });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${r.status}`);
+  }
+  return r.json();
 }
 
 // Click en .d-card / .d-copy / .d-card-copy → copia el pipe
