@@ -962,6 +962,8 @@ async function refreshVisible() {
       toast(`⚠️ Servidor no inició el stream — algo está mal`, 'error');
     } else if (updated === 0 && failed === 0 && skipped === 0) {
       toast(`⚠️ 0 cuentas procesadas — bot deps no cargan en VPS?`, 'error');
+    } else if (updated === 0 && skipped > 0) {
+      toast(`⚠️ ${skipped} saltadas, 0 actualizadas`, 'error');
     } else {
       toast(`✓ ${parts.join(' · ')}`, failed ? 'error' : 'success');
     }

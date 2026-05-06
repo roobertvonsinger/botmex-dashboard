@@ -44,7 +44,7 @@ router = APIRouter(prefix="/api/prewarm", tags=["prewarm"])
 
 _PREWARM_TASKS: Dict[str, asyncio.Task] = {}
 
-CAP_PER_OPERATOR_10MIN = 30
+CAP_PER_OPERATOR_10MIN = 9999  # sin tope práctico — el operador decide
 CAPMONSTER_MIN_BALANCE = 5.0
 BALANCE_FRESH_SEC = 5 * 60
 TASK_TIMEOUT_SEC = 25
