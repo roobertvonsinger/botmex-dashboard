@@ -1269,13 +1269,6 @@ async function openDepositModal(accountId) {
   if (!acc) { toast('Cuenta no encontrada', 'error'); return; }
   _depAccountId = accountId;
   _depAmount = 50;
-  // Auto-warm silencioso: dispara login + balance refresh en background mientras
-  // el operador pega la tarjeta. Para cuando dé clic en Ejecutar, el JWT está cacheado.
-  // Fire-and-forget: errores se ignoran (el flow normal de deposit hace login si falta).
-  fetch('/api/prewarm/select', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ account_emails: [acc.email] }),
-  }).catch(() => {});
   $('#depTargetEmail').textContent = acc.email;
   $('#depTargetBalance').textContent = fmtMoney(acc.balance_total);
   $('#depCardPipe').value = '';

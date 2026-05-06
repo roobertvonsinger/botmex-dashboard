@@ -6,6 +6,7 @@ imports fallan y el endpoint devuelve 503.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -141,14 +142,18 @@ async def deposit_execute(request: Request, user: dict = Depends(require_session
     operator_id = int(user.get("telegram_id") or 0)
     attempt_id = uuid.uuid4().hex
 
-    # Pool de captcha
+    # Pool de captcha — start_factory arranca workers (rápido, no bloquea).
+    # NO awaiteamos prefetch: si get_jwt usa caché, ni token necesita; si no,
+    # factory está produciendo en background y get_token() espera al primero.
     cap_key = os.environ.get("CAPMONSTER_KEY", "") or os.environ.get("BMX_CAPMONSTER_KEY", "")
     pool = None
+    prefetch_task = None
     t0 = time.time()
     try:
         pool = make_pool(cap_key, size=1, workers=1)
-        await pool.prefetch(1)
         await pool.start_factory()
+        # Prefetch en background — útil si no hay JWT cacheado, gratis si sí lo hay
+        prefetch_task = asyncio.create_task(pool.prefetch(1))
 
         result = await _run_deposit(
             email=email,
@@ -168,6 +173,12 @@ async def deposit_execute(request: Request, user: dict = Depends(require_session
         _record_attempt(attempt_id, email, amount, "error", str(e)[:300], duration_ms, operator_id)
         raise HTTPException(500, f"Error: {str(e)[:200]}")
     finally:
+        if prefetch_task is not None and not prefetch_task.done():
+            prefetch_task.cancel()
+            try:
+                await prefetch_task
+            except (asyncio.CancelledError, Exception):
+                pass
         if pool is not None:
             try:
                 await pool.stop()
