@@ -864,20 +864,19 @@ async function refreshKpis() {
 // ─── Refresh visible ───
 let _refreshing = false;
 let _refreshAbort = null;
-async function refreshVisible() {
+async function refreshVisible(opts = {}) {
   if (_refreshing) {
-    // Doble click / re-pico: cancelar el actual
     if (_refreshAbort) _refreshAbort.abort();
     return;
   }
   _refreshing = true;
-  const visible = getPaged().rows;
-  const ids = visible.map(r => r.id);
+  const force = !!opts.force;
+  const ids = opts.ids || getPaged().rows.map(r => r.id);
   if (!ids.length) { _refreshing = false; return; }
   const btn = $('#btnRefreshVisible');
   if (btn) {
     btn.classList.add('refreshing');
-    btn.innerHTML = '⏹ Detener';
+    btn.innerHTML = force ? '⏹ Detener (forzado)' : '⏹ Detener';
     btn.style.pointerEvents = 'auto';
   }
 
@@ -891,6 +890,8 @@ async function refreshVisible() {
 
   let updated = 0, failed = 0, skipped = 0;
   let started = false;
+  let forceableIds = [];   // ids saltados por reglas anti-spam que SA puede forzar
+  let skipReasons = {};
   let lastEventAt = Date.now();
   let watchdog = null;
   const ctrl = new AbortController();
@@ -907,7 +908,7 @@ async function refreshVisible() {
   try {
     const r = await fetch('/api/prewarm/refresh-stream', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ account_ids: ids }),
+      body: JSON.stringify({ account_ids: ids, force }),
       signal: ctrl.signal,
     });
     if (!r.ok) {
@@ -949,7 +950,9 @@ async function refreshVisible() {
             _markRowFail(ev.id);
           } else if (ev.type === 'skip') {
             skipped++;
-            _markRowSkip(ev.id);
+            skipReasons[ev.reason] = (skipReasons[ev.reason] || 0) + 1;
+            if (ev.can_force) forceableIds.push(ev.id);
+            _markRowSkip(ev.id, ev.reason);
           }
         } catch (parseErr) {}
       }
@@ -966,6 +969,21 @@ async function refreshVisible() {
       toast(`⚠️ ${skipped} saltadas, 0 actualizadas`, 'error');
     } else {
       toast(`✓ ${parts.join(' · ')}`, failed ? 'error' : 'success');
+    }
+    // Si hay skips force-ables (SA), preguntar si quiere forzar
+    if (forceableIds.length > 0 && !force) {
+      const fresh = skipReasons['fresh'] || 0;
+      const limit = skipReasons['daily_limit'] || 0;
+      const detail = [];
+      if (fresh) detail.push(`${fresh} actualizadas hace <30min`);
+      if (limit) detail.push(`${limit} ya checadas 3+ veces hoy`);
+      const msg = `${forceableIds.length} cuentas omitidas:\n• ${detail.join('\n• ')}\n\n¿Forzar refresh de ESAS cuentas?`;
+      // Defer fuera del finally para que el botón se rehabilite
+      setTimeout(() => {
+        if (confirm(msg)) {
+          refreshVisible({ ids: forceableIds, force: true });
+        }
+      }, 200);
     }
   } catch (e) {
     if (e.name === 'AbortError') {
@@ -1060,11 +1078,12 @@ function _markRowFail(id) {
   tr.classList.add('row-refresh-fail');
   setTimeout(() => tr.classList.remove('row-refresh-fail'), 1500);
 }
-function _markRowSkip(id) {
+function _markRowSkip(id, reason) {
   const tr = document.querySelector(`#accTable tbody tr[data-id="${id}"]`);
   if (!tr) return;
   tr.classList.remove('row-refreshing');
   tr.classList.add('row-refresh-skip');
+  if (reason) tr.title = `Saltada: ${reason}`;
   setTimeout(() => tr.classList.remove('row-refresh-skip'), 1500);
 }
 

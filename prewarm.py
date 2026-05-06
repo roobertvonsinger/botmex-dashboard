@@ -45,6 +45,8 @@ router = APIRouter(prefix="/api/prewarm", tags=["prewarm"])
 _PREWARM_TASKS: Dict[str, asyncio.Task] = {}
 
 CAP_PER_OPERATOR_10MIN = 9999  # sin tope práctico — el operador decide
+ACCOUNT_FRESH_MINUTES = 30      # < 30min desde last check → skip con warning
+ACCOUNT_DAILY_LIMIT = 3          # >= 3 prewarms en el día → skip con warning
 CAPMONSTER_MIN_BALANCE = 5.0
 BALANCE_FRESH_SEC = 5 * 60
 TASK_TIMEOUT_SEC = 25
@@ -119,6 +121,36 @@ def _db_count_recent(operator_id: int, minutes: int) -> int:
             return row[0] if row else 0
     except sqlite3.OperationalError:
         return 0
+
+
+def _db_account_prewarms_today(email: str) -> int:
+    """Cuenta cuántos prewarms 'complete' tuvo esta cuenta hoy (cualquier operador)."""
+    from app import db
+    import sqlite3
+    try:
+        with db() as c:
+            row = c.execute(
+                "SELECT COUNT(*) FROM process_log "
+                "WHERE process_type='prewarm' AND phase='complete' "
+                "AND payload_json LIKE ? "
+                "AND date(created_at) = date('now')",
+                (f'%"email": "{email}"%',),
+            ).fetchone()
+            return row[0] if row else 0
+    except sqlite3.OperationalError:
+        return 0
+
+
+def _account_minutes_since_check(acc: dict) -> Optional[float]:
+    """Minutos desde el último check de la cuenta. None si no se sabe."""
+    last = acc.get("last_checked_at")
+    if not last:
+        return None
+    try:
+        ts = datetime.fromisoformat(last.replace(" ", "T"))
+        return (time.time() - ts.timestamp()) / 60
+    except Exception:
+        return None
 
 
 def _db_get_recent_log(operator_id: int, minutes: int) -> list:
@@ -434,11 +466,15 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
     placeholders = ",".join("?" * len(ids))
     with _app_db() as c:
         rows = c.execute(
-            f"SELECT id, email, password FROM accounts WHERE id IN ({placeholders})",
+            f"SELECT id, email, password, last_checked_at FROM accounts WHERE id IN ({placeholders})",
             ids,
         ).fetchall()
     accs = [dict(r) for r in rows]
     logger.info(f"[refresh-stream] op={operator_id} ids={len(ids)} accs={len(accs)} valid")
+
+    # force=true: SA puede saltarse las reglas anti-spam (fresh < 30min, > 3 hoy)
+    force = bool(body.get("force"))
+    is_sa = (user.get("role") == "superadmin")
 
     bal = await _capmonster_balance()
     # Solo emite warning, NO aborta — el operador sabe que su saldo está bajo
@@ -446,7 +482,7 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
 
     used = await asyncio.to_thread(_db_count_recent, operator_id, 10)
     remaining = max(0, CAP_PER_OPERATOR_10MIN - used)
-    logger.info(f"[refresh-stream] cap_used={used} remaining={remaining} cm=${bal}")
+    logger.info(f"[refresh-stream] cap_used={used} remaining={remaining} cm=${bal} force={force} sa={is_sa}")
 
     async def gen():
         yield f"data: {json.dumps({'type':'start','total':len(accs),'cap_remaining':remaining,'cap_used':used,'capmonster_balance':bal,'capmonster_warning':cap_warning})}\n\n"
@@ -462,6 +498,22 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
                 if not acc.get("password"):
                     await q.put({"type": "skip", "id": acc["id"], "email": email, "reason": "no_password"})
                     return
+                # Reglas anti-spam (a menos que SA fuerce):
+                if not force:
+                    # 1. Cuenta actualizada hace < 30 min
+                    mins = _account_minutes_since_check(acc)
+                    if mins is not None and mins < ACCOUNT_FRESH_MINUTES:
+                        await q.put({"type": "skip", "id": acc["id"], "email": email,
+                                     "reason": "fresh", "minutes": round(mins, 1),
+                                     "can_force": is_sa})
+                        return
+                    # 2. Cuenta ya checada N veces hoy
+                    today = await asyncio.to_thread(_db_account_prewarms_today, email)
+                    if today >= ACCOUNT_DAILY_LIMIT:
+                        await q.put({"type": "skip", "id": acc["id"], "email": email,
+                                     "reason": "daily_limit", "today_count": today,
+                                     "can_force": is_sa})
+                        return
                 # Reusa _run_prewarm para login + fetch + recalc grade
                 await _run_prewarm(operator_id, email, acc["password"])
                 # Lee la fila ya actualizada
