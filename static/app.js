@@ -255,15 +255,17 @@ function renderTable() {
     ? `<tr>
         <th class="grade-bar-th"></th>
         <th class="sel-cell"><input type="checkbox" id="selAll"></th>
-        ${_th('balance_total','Saldo','num')}<th class="row-icons-th"></th>${_th('email','Cuenta')}
+        ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
         ${_th('last_deposit_date','Últ. depósito')}
+        <th class="row-icons-th"></th>
       </tr>`
     : `<tr>
         <th class="grade-bar-th"></th>
         <th class="sel-cell"><input type="checkbox" id="selAll"></th>
-        ${_th('balance_total','Saldo','num')}<th class="row-icons-th"></th>${_th('email','Cuenta')}
+        ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
         ${_th('last_deposit_date','Últ. depósito')}
         ${_th('last_checked_at','Últ. check')}${_th('check_count','Checks','num')}
+        <th class="row-icons-th"></th>
       </tr>`;
   const thead = t.querySelector('thead');
   thead.innerHTML = cols;
@@ -295,7 +297,7 @@ function renderTable() {
       : '';
     const isSA = state.user?.role === 'superadmin';
     const trTitle = isSA ? `Grade ${esc(r.grade) || '?'}` : '';
-    // Iconos de fila: 💳 (tarjetas), 📝 (notas), o ➕ (nada — quick add note)
+    // Iconos de fila: 💳 (tarjetas), 📝 (notas), siempre + (quick add)
     const hasCards = (r.cards_count || 0) > 0;
     const hasNotes = (r.notes_count || 0) > 0;
     let iconsHtml = '';
@@ -305,29 +307,28 @@ function renderTable() {
     if (hasNotes) {
       iconsHtml += `<button class="row-ic ic-notes" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.notes_count} nota${r.notes_count>1?'s':''}">📝<sup>${r.notes_count}</sup></button>`;
     }
-    if (!hasCards && !hasNotes) {
-      iconsHtml = `<button class="row-ic ic-add" data-id="${r.id}" data-email="${esc(r.email)}" title="Añadir nota rápida">+</button>`;
-    }
+    // El + siempre presente — añadir nota rápida sin necesidad de modal
+    iconsHtml += `<button class="row-ic ic-add" data-id="${r.id}" data-email="${esc(r.email)}" title="Añadir nota rápida">+</button>`;
 
     if (state.view === 'simple') {
       return `<tr class="${trClasses}" data-id="${r.id}" title="${trTitle}">
         <td class="grade-bar-cell"></td>
         <td class="sel-cell"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
         <td class="num"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
-        <td class="row-icons">${iconsHtml}</td>
         <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b>${lockChip}</td>
         <td class="dep">${dep}</td>
+        <td class="row-icons">${iconsHtml}</td>
       </tr>`;
     }
     return `<tr class="${trClasses}" data-id="${r.id}" title="${trTitle}">
       <td class="grade-bar-cell"></td>
       <td class="sel-cell"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
       <td class="num"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
-      <td class="row-icons">${iconsHtml}</td>
       <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b></td>
       <td class="dep">${dep}</td>
       <td class="dep dim">${fmtAgo(r.last_checked_at)}</td>
       <td class="num">${r.check_count || 0}</td>
+      <td class="row-icons">${iconsHtml}</td>
     </tr>`;
   }).join('');
 
@@ -1384,6 +1385,10 @@ async function openDetailModal(id) {
     const data = await r.json();
     title.textContent = `${data.email}:${data.password || ''}`;
     body.innerHTML = renderDetail(data);
+    // Aura del modal según grade
+    const modal = $('#detModal');
+    modal.classList.remove('grade-A', 'grade-B', 'grade-C', 'grade-D', 'grade-U');
+    modal.classList.add(`grade-${gradeClass(data.grade)}`);
   } catch (e) {
     body.innerHTML = `<div class="detail-error">Error: ${esc(e.message)}</div>`;
   }
