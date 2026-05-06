@@ -693,6 +693,26 @@ td.combo b:hover + .copyhint { color: var(--accent); }
 }
 .seg-btn:hover { color: var(--text); border-color: var(--accent-soft-2); }
 
+/* Select nativo (page size) — fuerza colores legibles en options */
+select.seg-btn {
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 24px;
+}
+select.seg-btn option {
+  background: var(--surface-solid);
+  color: var(--text);
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+}
+select.seg-btn option:hover,
+select.seg-btn option:checked {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 /* sb-user av dynamic */
 .sb-user .av {
   font-family: var(--font-display); font-weight: 700; font-size: 11px;

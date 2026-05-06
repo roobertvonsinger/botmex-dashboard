@@ -209,7 +209,7 @@ async function loadMe() {
     $('#cmdTrastienda').style.display = 'none';
   }
   // Page sizes según rol
-  const sizes = isSuper ? [100, 200, 500] : [20, 30, 50];
+  const sizes = isSuper ? [20, 50, 100, 200, 500] : [20, 30, 50];
   const sel = $('#pageSize');
   sel.innerHTML = sizes.map(n => `<option value="${n}">${n}</option>`).join('');
   state.pageSize = sizes[0];
