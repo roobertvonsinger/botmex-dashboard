@@ -1931,6 +1931,115 @@ $('#accTable').addEventListener('contextmenu', e => {
   }
 });
 
+// Modal de detalle: botón "Validar CURP en gob.mx"
+$('#detModalBody').addEventListener('click', async e => {
+  const vBtn = e.target.closest('.curp-validate-btn');
+  if (vBtn?.dataset.accId) {
+    e.preventDefault();
+    e.stopPropagation();
+    const accId = parseInt(vBtn.dataset.accId);
+    await openCurpValidator(accId);
+    return;
+  }
+});
+
+async function openCurpValidator(accId) {
+  // Re-fetch datos por si cambiaron
+  let d;
+  try {
+    d = await fetch(`/api/accounts/${accId}/details`).then(r => r.json());
+  } catch (e) { toast(`Error: ${e.message}`, 'error'); return; }
+  const bdate = d.birthdate ? String(d.birthdate).split('T')[0].split(' ')[0] : null;
+  if (!d.fullname || !bdate) { toast('Faltan nombre o fecha de nacimiento', 'error'); return; }
+  const split = _splitFullname(d.fullname);
+  if (!split) { toast('No se pudo separar nombre', 'error'); return; }
+  const m = bdate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const [_, yyyy, mm, dd] = m || [];
+  const sex = _inferSex(split.nombre);
+  const state = _detectStateCode(d.address);
+  // Texto pre-formateado para copiar al portapapeles
+  const fields = [
+    ['Nombre(s)', split.nombre],
+    ['Primer apellido', split.ap1],
+    ['Segundo apellido', split.ap2 || '—'],
+    ['Día', dd], ['Mes', mm], ['Año', yyyy],
+    ['Sexo', sex === 'M' ? 'Mujer' : 'Hombre'],
+    ['Estado (código)', state],
+  ];
+  const blob = fields.map(([k, v]) => `${k}\t${v}`).join('\n');
+
+  // Popup overlay con datos + botones
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal" style="width:480px">
+      <header class="modal-head">
+        <div class="modal-title"><span class="modal-icon">🔍</span><span>Validar CURP en gob.mx</span></div>
+        <button class="modal-close" data-act="close" title="Cerrar">×</button>
+      </header>
+      <div class="modal-body" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+        <p style="font-size:12px;color:var(--text-dim);margin:0">
+          gob.mx tiene Akamai anti-bot que bloquea automatización. Pero a mano es 10s:
+        </p>
+        <ol style="font-size:12px;line-height:1.6;padding-left:18px;color:var(--text-dim);margin:0">
+          <li>Picar <b>📋 Copiar datos</b> abajo</li>
+          <li>Picar <b>🔗 Abrir gob.mx</b> (nueva pestaña)</li>
+          <li>Pegar valores en cada campo del form (Tab+Ctrl+V)</li>
+          <li>Picar <b>Buscar</b>, copiar el CURP que sale</li>
+          <li>Volver acá y pegarlo abajo + Guardar</li>
+        </ol>
+        <table class="curp-fields-table">
+          ${fields.map(([k, v]) => `<tr><td class="dim mono">${esc(k)}</td><td><b class="mono">${esc(v)}</b></td></tr>`).join('')}
+        </table>
+        <div style="display:flex;gap:8px">
+          <button class="seg-btn" data-act="copy" title="Copia los 8 valores tab-separados">📋 Copiar datos</button>
+          <button class="seg-btn" data-act="open" title="Abre gob.mx en nueva pestaña" style="background:var(--accent-soft);color:var(--accent);border-color:var(--accent)">🔗 Abrir gob.mx</button>
+        </div>
+        <div style="border-top:1px solid var(--hairline);padding-top:12px;margin-top:4px">
+          <label style="font-size:10.5px;color:var(--text-muted);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.4px">CURP correcto</label>
+          <input type="text" id="curpFinalInput" maxlength="18" placeholder="Pegalo aquí (18 chars)"
+                 style="width:100%;margin-top:6px;background:rgba(0,0,0,0.30);border:1px solid var(--hairline);border-radius:6px;padding:8px 12px;color:var(--text);font:inherit;font-family:var(--font-mono);text-transform:uppercase">
+          <div style="display:flex;justify-content:flex-end;margin-top:8px">
+            <button class="seg-btn" data-act="save" style="background:var(--accent-soft);color:var(--accent);border-color:var(--accent)">💾 Guardar CURP</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', async ev => {
+    const act = ev.target.closest('[data-act]')?.dataset.act;
+    if (!act && ev.target !== overlay) return;
+    if (act === 'close' || ev.target === overlay) { overlay.remove(); return; }
+    if (act === 'copy') {
+      try {
+        await navigator.clipboard.writeText(blob);
+        toast('✓ Datos copiados', 'success');
+      } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+      return;
+    }
+    if (act === 'open') {
+      window.open('https://www.gob.mx/curp/#tab-02', '_blank');
+      return;
+    }
+    if (act === 'save') {
+      const v = $('#curpFinalInput').value.trim().toUpperCase();
+      if (v.length !== 18) { toast('CURP debe tener 18 caracteres', 'error'); return; }
+      try {
+        const r = await fetch(`/api/accounts/${accId}/curp`, {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ curp: v }),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+        toast(`✓ CURP guardado: ${v}`, 'success');
+        overlay.remove();
+        openDetailModal(accId);  // re-render
+      } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+    }
+  });
+}
+
 // Modal de detalle: botón "Depositar en esta cuenta"
 $('#detModalBody').addEventListener('click', e => {
   const btn = e.target.closest('.d-deposit-btn');
@@ -2139,11 +2248,17 @@ function renderDetail(d) {
   // CURP — usa el de BD si existe y es válido, si no calcula
   const curpStored = (d.curp && d.curp !== 'N/A') ? d.curp : null;
   const curpCalc = !curpStored ? computeCurp(d.fullname, bdate, d.address) : null;
+  const curpShown = curpStored || curpCalc || '';
+  // Botón validar gob.mx (solo si tenemos los datos mínimos)
+  const canValidate = !!(d.fullname && bdate);
+  const curpValidateBtn = canValidate
+    ? `<button class="curp-validate-btn" data-acc-id="${d.id}" title="Copia los datos al portapapeles y abre gob.mx para validar el CURP en humano (Akamai bloquea bots)">🔍 Validar</button>`
+    : '';
   const curpHtml = curpStored
-    ? `<b class="mono d-copy" data-copy="${esc(curpStored)}" title="Click para copiar">${esc(curpStored)}</b>`
+    ? `<div class="curp-cell"><b class="mono d-copy" data-copy="${esc(curpStored)}" title="Click para copiar">${esc(curpStored)}</b><span class="dim mono" style="font-size:9px">✓ guardado</span>${curpValidateBtn}</div>`
     : curpCalc
-      ? `<b class="mono d-copy" data-copy="${esc(curpCalc)}" title="Estimado — click para copiar">${esc(curpCalc)}<span class="dim" style="margin-left:4px;font-size:9px">est</span></b>`
-      : '<b><span class="dim">—</span></b>';
+      ? `<div class="curp-cell"><b class="mono d-copy" data-copy="${esc(curpCalc)}" title="Estimado — click para copiar">${esc(curpCalc)}</b><span class="dim mono" style="font-size:9px">est</span>${curpValidateBtn}</div>`
+      : `<div class="curp-cell"><b><span class="dim">—</span></b>${curpValidateBtn}</div>`;
 
   const personal = `
     <div class="d-section">

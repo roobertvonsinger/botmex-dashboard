@@ -2285,3 +2285,41 @@ td.row-details-cell, th.row-details-th {
   cursor: not-allowed;
   pointer-events: none;
 }
+
+/* CURP celda con botón validar inline */
+.curp-cell {
+  display: inline-flex; align-items: center; gap: 6px;
+  flex-wrap: wrap; justify-content: flex-end;
+}
+.curp-validate-btn {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--hairline-h);
+  color: var(--text-dim);
+  padding: 2px 7px; border-radius: 4px;
+  font: inherit; font-size: 9.5px; font-family: var(--font-mono);
+  letter-spacing: 0.4px; text-transform: uppercase;
+  cursor: pointer;
+  transition: all 140ms;
+}
+.curp-validate-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-soft-2);
+}
+
+/* Tabla compacta de campos en el validador */
+.curp-fields-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 11px; font-family: var(--font-mono);
+  background: rgba(0,0,0,0.30);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.curp-fields-table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--hairline);
+}
+.curp-fields-table tr:last-child td { border-bottom: 0; }
+.curp-fields-table td:first-child { width: 40%; color: var(--text-muted); }
+.curp-fields-table td:last-child b { color: var(--accent); }

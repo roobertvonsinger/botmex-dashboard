@@ -1647,6 +1647,25 @@ def create_note(account_id: int, req: NoteCreate, user: dict = Depends(require_s
     return {"id": note_id, "created_at": now}
 
 
+class CurpUpdate(BaseModel):
+    curp: str
+
+
+@app.post("/api/accounts/{account_id}/curp")
+def update_curp(account_id: int, req: CurpUpdate, _user: dict = Depends(require_session)):
+    """Guarda CURP validado manualmente por el operador."""
+    curp = (req.curp or "").strip().upper()
+    # Validación básica: 18 chars, formato general
+    import re
+    if not re.match(r"^[A-Z]{4}\d{6}[HM][A-Z]{5}[0-9A-Z]\d$", curp):
+        raise HTTPException(400, "CURP inválido (formato 18 chars)")
+    with db(write=True) as c:
+        cur = c.execute("UPDATE accounts SET curp=? WHERE id=?", (curp, account_id))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Cuenta no encontrada")
+    return {"id": account_id, "curp": curp}
+
+
 @app.delete("/api/accounts/{account_id}/notes/{note_id}")
 def delete_note(account_id: int, note_id: int, user: dict = Depends(require_session)):
     tg = int(user.get("telegram_id") or 0)
