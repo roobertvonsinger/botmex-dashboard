@@ -402,6 +402,13 @@ async function loadMe() {
   if (!isSuper) {
     $('#cmdTrastienda').style.display = 'none';
   }
+  // Vista premium del sidebar: admin solo ve xCAPTCHA + Proxies (oculta WSai y En uso)
+  if (!isSuper) {
+    const wsaiRow = $('#stWsai')?.closest('div');
+    if (wsaiRow) wsaiRow.style.display = 'none';
+    const inUseRow = $('#stInUse')?.closest('div');
+    if (inUseRow) inUseRow.style.display = 'none';
+  }
   // Page sizes según rol
   const sizes = isSuper ? [20, 50, 100, 200, 500] : [20, 30, 50];
   const sel = $('#pageSize');
@@ -998,10 +1005,12 @@ let kpiRefreshing = false;
 async function refreshKpis() {
   // Pulse del topbar lo refresca todo el mundo (no es exclusivo SA)
   const isSA = state.user?.role === 'superadmin';
+  const isAdmin = state.user?.role === 'admin' || isSA;
   if (kpiRefreshing) return;
   kpiRefreshing = true;
   try {
-    const k = isSA
+    // Admin recibe payload reducido (solo capmonster + proxy); SA recibe todo
+    const k = isAdmin
       ? await fetch('/api/superadmin/kpis').then(r => r.ok ? r.json() : null).catch(() => null)
       : null;
 
@@ -2184,6 +2193,156 @@ document.addEventListener('pointerup', _endDrag);
 
 // touch-action: none en sel-cell para no scrollear mientras arrastras (CSS lo aplica).
 
+// ─── Admin coachmarks (hints contextuales no invasivos solo para rol admin) ───
+const HINTS_KEY = 'admin_hints_v1';
+const ADMIN_HINTS = [
+  {
+    id: 'deposit',
+    selector: '.d-deposit-btn',
+    side: 'top',                   // prefiere arriba; flecha apunta abajo
+    icon: '💳',
+    title: 'Depositar en esta cuenta',
+    text: 'Click aquí para abrir el modal con 3 modos: ⚡ Una (single), 👥 Multi (matchmaker) o ⏰ Programado (goteo).',
+    delay: 0,
+  },
+  {
+    id: 'cards',
+    selector: '.d-cards .d-card, .d-section .d-empty',
+    selectorPick: 'cards-h4',      // si no hay tarjetas, usa el h4 de la sección
+    side: 'left',
+    icon: '🗂',
+    title: 'Tarjetas guardadas',
+    text: 'Click en cualquier tarjeta para copiar su pipe (numero|exp|cvv). Listo para pegar en el modal de depósito.',
+    delay: 380,
+  },
+  {
+    id: 'notes',
+    selector: '.d-note-input',
+    side: 'top',
+    icon: '📝',
+    title: 'Notas privadas',
+    text: 'Apunta aquí cualquier observación de la cuenta. Solo el equipo las ve. Útil para tracking y handoff.',
+    delay: 760,
+  },
+];
+
+function _getHintsDismissed() {
+  try { return JSON.parse(localStorage.getItem(HINTS_KEY) || '[]'); }
+  catch { return []; }
+}
+function _isHintDismissed(id) { return _getHintsDismissed().includes(id); }
+function _dismissHint(id) {
+  const d = _getHintsDismissed();
+  if (!d.includes(id)) {
+    d.push(id);
+    localStorage.setItem(HINTS_KEY, JSON.stringify(d));
+  }
+}
+function _resolveHintTarget(hint) {
+  // Caso especial: tarjetas — si no hay tarjetas guardadas, anclar al h4
+  if (hint.id === 'cards') {
+    const card = document.querySelector('.d-cards .d-card');
+    if (card) return card;
+    const headers = document.querySelectorAll('#detModalBody .d-section h4');
+    for (const h of headers) {
+      if (h.textContent.includes('Tarjetas')) return h;
+    }
+    return null;
+  }
+  return document.querySelector(hint.selector);
+}
+function _spawnCoachmark(hint) {
+  const target = _resolveHintTarget(hint);
+  if (!target) return;
+  const rect = target.getBoundingClientRect();
+  if (rect.width === 0 && rect.height === 0) return;
+
+  target.classList.add('hint-target-glow');
+
+  const cm = document.createElement('div');
+  cm.className = 'coachmark';
+  cm.dataset.hintId = hint.id;
+  cm.innerHTML = `
+    <div class="coachmark-tip">
+      <span class="cm-icon">${hint.icon}</span>
+      <span>${esc(hint.title)}</span>
+      <span class="cm-pill">tip</span>
+    </div>
+    <div class="coachmark-text">${esc(hint.text)}</div>
+    <div class="coachmark-actions">
+      <label class="coachmark-dismiss" title="No mostrar este tip nunca más">
+        <input type="checkbox"> No volver a mostrar
+      </label>
+      <button class="coachmark-ok" type="button">Entendido</button>
+    </div>`;
+  document.body.appendChild(cm);
+
+  // Posicionar después de que el navegador calcule dimensiones reales
+  requestAnimationFrame(() => {
+    const cmRect = cm.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const pad = 14;
+    let left, top, arrow = hint.side;
+
+    const place = (side) => {
+      if (side === 'right') return { l: rect.right + pad, t: rect.top + (rect.height/2) - (cmRect.height/2) };
+      if (side === 'left')  return { l: rect.left - cmRect.width - pad, t: rect.top + (rect.height/2) - (cmRect.height/2) };
+      if (side === 'top')   return { l: rect.left + (rect.width/2) - (cmRect.width/2), t: rect.top - cmRect.height - pad };
+      /* bottom */          return { l: rect.left + (rect.width/2) - (cmRect.width/2), t: rect.bottom + pad };
+    };
+    const fits = (side, p) => {
+      if (side === 'right')  return p.l + cmRect.width <= vw - 8;
+      if (side === 'left')   return p.l >= 8;
+      if (side === 'top')    return p.t >= 8;
+      return p.t + cmRect.height <= vh - 8;
+    };
+
+    // Intenta el lado preferido, si no entra prueba alternos
+    const order = [hint.side, 'top', 'right', 'bottom', 'left'];
+    let chosen = null;
+    for (const s of order) {
+      const p = place(s);
+      if (fits(s, p)) { chosen = { side: s, p }; break; }
+    }
+    if (!chosen) chosen = { side: hint.side, p: place(hint.side) };
+
+    left = Math.max(8, Math.min(chosen.p.l, vw - cmRect.width - 8));
+    top  = Math.max(8, Math.min(chosen.p.t, vh - cmRect.height - 8));
+    // Arrow apunta al elemento (lado opuesto al lado del coachmark)
+    const arrowMap = { right: 'left', left: 'right', top: 'bottom', bottom: 'top' };
+    arrow = arrowMap[chosen.side];
+
+    cm.style.left = `${left}px`;
+    cm.style.top = `${top}px`;
+    cm.classList.add(`cm-arrow-${arrow}`);
+  });
+
+  const close = (forever) => {
+    if (forever) _dismissHint(hint.id);
+    cm.classList.add('coachmark-exiting');
+    target.classList.remove('hint-target-glow');
+    setTimeout(() => cm.remove(), 240);
+  };
+  cm.querySelector('.coachmark-ok').addEventListener('click', () => {
+    const forever = cm.querySelector('input[type="checkbox"]').checked;
+    close(forever);
+  });
+}
+function showAdminHints() {
+  if (state.user?.role !== 'admin') return;  // SA y user no ven hints
+  // Espera a que el modal layout estabilice
+  setTimeout(() => {
+    for (const hint of ADMIN_HINTS) {
+      if (_isHintDismissed(hint.id)) continue;
+      setTimeout(() => _spawnCoachmark(hint), hint.delay);
+    }
+  }, 280);
+}
+function hideAdminHints() {
+  document.querySelectorAll('.coachmark').forEach(cm => cm.remove());
+  document.querySelectorAll('.hint-target-glow').forEach(el => el.classList.remove('hint-target-glow'));
+}
+
 // ─── Modal de detalle (fijo con scroll interno solo en secciones largas) ───
 async function openDetailModal(id) {
   const overlay = $('#detModalOverlay');
@@ -2200,6 +2359,8 @@ async function openDetailModal(id) {
     const combo = `${data.email}:${data.password || ''}`;
     title.innerHTML = `<span class="d-copy mono" data-copy="${esc(combo)}" title="Click para copiar combo">${esc(combo)}</span>`;
     body.innerHTML = renderDetail(data);
+    // Hints contextuales solo para admin (no invasivos, dismissables)
+    showAdminHints();
     // Aura del modal según grade
     const modal = $('#detModal');
     modal.classList.remove('grade-A', 'grade-B', 'grade-C', 'grade-D', 'grade-U');
@@ -2223,6 +2384,7 @@ async function openDetailModal(id) {
 }
 function closeDetailModal() {
   $('#detModalOverlay').classList.add('hidden');
+  hideAdminHints();
 }
 
 function renderDetail(d) {

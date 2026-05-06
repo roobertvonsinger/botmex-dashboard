@@ -369,8 +369,8 @@ def list_accounts(
 def list_users(user: dict = Depends(require_session)):
     """Lista los usuarios del sistema (para asignar cuentas).
     Solo visible para superadmin/admin."""
-    if user.get("role") not in ("superadmin", "admin"):
-        raise HTTPException(403, "Solo superadmin/admin")
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Solo superadmin")
     return [
         {"username": k, "display": v["display"], "telegram_id": v["telegram_id"], "role": v["role"]}
         for k, v in _auth.USERS.items()
@@ -382,8 +382,8 @@ def list_assignments(
     user_id: Optional[int] = None,
     user: dict = Depends(require_session),
 ):
-    if user.get("role") not in ("superadmin", "admin"):
-        raise HTTPException(403, "Solo superadmin/admin")
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Solo superadmin")
     try:
         with db() as c:
             if user_id is not None:
@@ -409,8 +409,8 @@ class AssignRequest(BaseModel):
 
 @app.post("/api/assignments/assign")
 def assign_accounts(req: AssignRequest, user: dict = Depends(require_session)):
-    if user.get("role") not in ("superadmin", "admin"):
-        raise HTTPException(403, "Solo superadmin/admin")
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Solo superadmin")
     if not req.emails or not req.user_id:
         raise HTTPException(400, "emails y user_id requeridos")
     assigned_by = int(user.get("telegram_id") or 0)
@@ -432,8 +432,8 @@ def assign_accounts(req: AssignRequest, user: dict = Depends(require_session)):
 
 @app.post("/api/assignments/unassign")
 def unassign_accounts(req: AssignRequest, user: dict = Depends(require_session)):
-    if user.get("role") not in ("superadmin", "admin"):
-        raise HTTPException(403, "Solo superadmin/admin")
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Solo superadmin")
     removed = 0
     with db(write=True) as c:
         for email in req.emails:
@@ -600,13 +600,29 @@ def _operator_color(tg_id):
 
 
 @app.get("/api/superadmin/kpis")
-def superadmin_kpis(_user: dict = Depends(require_session)):
+def superadmin_kpis(user: dict = Depends(require_session)):
     """L invertida del SuperAdmin (spec chat2):
       1. Online: operadores con actividad < 5 min, lista con dot status
       2. Activity feed (últimos 30 eventos: deposit/lock/prewarm)
       3. Alertas: bulk masivo, prewarm errors, login fallidos, capmonster bajo
       4. Pool stats: pool / en_uso / trastienda / rebotadas
+
+    Roles:
+      - superadmin: respuesta completa
+      - admin: solo capmonster_balance + proxy (vista premium del sidebar)
+      - user: 403
     """
+    role = user.get("role")
+    if role == "user":
+        raise HTTPException(403, "Solo superadmin/admin")
+    # Admin: respuesta mínima (solo lo que pinta el sidebar premium)
+    if role == "admin":
+        cm = _capmonster_balance()
+        return {
+            "capmonster_balance": cm.get("balance"),
+            "capmonster_error": cm.get("error"),
+            "proxy": _proxy_health(),
+        }
     now = datetime.now(timezone.utc)
     out: dict = {}
     with db() as c:
@@ -1444,6 +1460,13 @@ def unlock_account(account_id: int, user: dict = Depends(require_session)):
         if not row:
             raise HTTPException(status_code=404, detail="Account not found")
         prev_locked_by = row["locked_by"]
+        # Autorización: SA puede unlock cualquier cuenta; otros solo si son quien la bloqueó
+        if user.get("role") != "superadmin":
+            tg = str(user.get("telegram_id") or "")
+            uname = str(user.get("username") or "").lower()
+            owner = str(prev_locked_by or "").lower()
+            if not prev_locked_by or (owner != tg and owner != uname):
+                raise HTTPException(403, "Solo puedes desbloquear cuentas que tú bloqueaste")
         c.execute(
             "UPDATE accounts SET locked_by=NULL, locked_at=NULL, locked_until=NULL WHERE id=?",
             (account_id,),
