@@ -2088,3 +2088,36 @@ tbody tr.row-refresh-skip { animation: rowSkip 1500ms ease-out; opacity: 0.7; }
 }
 .adm-check.ok   { color: var(--accent); border-left: 2px solid var(--accent); }
 .adm-check.fail { color: var(--danger); border-left: 2px solid var(--danger); }
+
+/* Banner de instrucciones del depósito */
+.dep-help-banner {
+  font-size: 11.5px; line-height: 1.45;
+  color: var(--text-dim);
+  background: linear-gradient(135deg, var(--accent-soft) 0%, rgba(255,255,255,0.02) 100%);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 9px 12px;
+  margin-bottom: 14px;
+}
+.dep-help-banner b { color: var(--accent); font-weight: 700; }
+.dep-help-banner:empty { display: none; }
+
+/* Botón de "programar siguientes" tras match */
+.dep-post-match {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, var(--accent-soft), rgba(255,255,255,0.04));
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; gap: 10px;
+  animation: tipIn 320ms ease-out;
+}
+.dep-post-match-text { flex: 1; font-size: 11.5px; color: var(--text); }
+.dep-post-match-text b { color: var(--accent); font-family: var(--font-mono); }
+.dep-post-match-btn {
+  background: var(--accent); color: #000;
+  border: none; padding: 7px 14px; border-radius: 6px;
+  font: inherit; font-size: 11.5px; font-weight: 700;
+  cursor: pointer;
+}
+.dep-post-match-btn:hover { box-shadow: 0 0 14px var(--accent-glow); }

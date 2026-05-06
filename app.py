@@ -1201,10 +1201,106 @@ async def _janitor_loop():
         await asyncio.sleep(5 * 60)
 
 
+# ── Watcher de ventanas de depósito 24h ──────────────────────────────────
+# Emite notif al operador cuando su window 24h está por cerrar (~30 min antes)
+# Emite notif "ya cerró, vuelve" cuando expira
+# Auto-libera la cuenta a las 25h post primer-depósito si nadie hizo nada
+_window_notified: dict = {}  # email → set de fases ya notificadas
+
+def _run_window_watcher() -> dict:
+    """Revisa cuentas con depósitos aprobados últimas 25h y emite alertas."""
+    out = {"warned": 0, "expired": 0, "released": 0}
+    try:
+        with db() as c:
+            # Para cada cuenta con dep aprobado en últimas 25h, calcula window
+            rows = c.execute(
+                "SELECT account_email, MIN(created_at) AS first_at, "
+                "  MAX(operator_id) AS operator_id, COUNT(*) AS n, "
+                "  COALESCE(SUM(amount),0) AS total "
+                "FROM deposit_attempts "
+                "WHERE status='approved' "
+                "  AND created_at >= datetime('now','-25 hours') "
+                "GROUP BY account_email"
+            ).fetchall()
+        now = datetime.now(timezone.utc)
+        for r in rows:
+            email = r["account_email"]
+            try:
+                first_at = datetime.fromisoformat(r["first_at"].replace(" ", "T"))
+                if first_at.tzinfo is None:
+                    first_at = first_at.replace(tzinfo=timezone.utc)
+            except Exception:
+                continue
+            expires_at = first_at + timedelta(hours=24)
+            mins_left = (expires_at - now).total_seconds() / 60
+            operator_id = r["operator_id"]
+            phases = _window_notified.setdefault(email, set())
+
+            # Fase 1: 30 min antes
+            if 0 < mins_left <= 30 and "warning" not in phases:
+                phases.add("warning")
+                _broadcast({
+                    "type": "window_warning",
+                    "email": email, "operator_id": operator_id,
+                    "mins_left": int(mins_left), "used": float(r["total"]),
+                    "expires_at": expires_at.isoformat(),
+                })
+                out["warned"] += 1
+
+            # Fase 2: window cerró (acaba de pasar)
+            if -60 < mins_left <= 0 and "expired" not in phases:
+                phases.add("expired")
+                _broadcast({
+                    "type": "window_expired",
+                    "email": email, "operator_id": operator_id,
+                    "used_24h": float(r["total"]),
+                    "expires_at": expires_at.isoformat(),
+                    "deadline": (expires_at + timedelta(hours=1)).isoformat(),
+                })
+                out["expired"] += 1
+
+            # Fase 3: pasaron 25h sin acción → auto-libera (publish=1, unlock)
+            if mins_left <= -60 and "released" not in phases:
+                phases.add("released")
+                with db(write=True) as c:
+                    c.execute(
+                        "UPDATE accounts SET locked_by=NULL, locked_at=NULL, locked_until=NULL, "
+                        "published_to_pool=1 WHERE email=?",
+                        (email,),
+                    )
+                _broadcast({
+                    "type": "window_released",
+                    "email": email, "operator_id": operator_id,
+                    "msg": f"Cuenta {email} liberada al pool tras 25h sin actividad",
+                })
+                out["released"] += 1
+
+        # Limpia tracking de cuentas viejas (> 26h sin actividad)
+        for email in list(_window_notified.keys()):
+            if email not in [r["account_email"] for r in rows]:
+                _window_notified.pop(email, None)
+    except Exception as e:
+        print(f"[window_watcher] error: {e}")
+    return out
+
+
+async def _window_watcher_loop():
+    await asyncio.sleep(45)
+    while True:
+        try:
+            r = await asyncio.to_thread(_run_window_watcher)
+            if r["warned"] or r["expired"] or r["released"]:
+                print(f"[window_watcher] {r}")
+        except Exception as e:
+            print(f"[window_watcher] error: {e}")
+        await asyncio.sleep(2 * 60)  # cada 2 min
+
+
 @app.on_event("startup")
 async def _start_bg_tasks():
     asyncio.create_task(_health_loop())
     asyncio.create_task(_janitor_loop())
+    asyncio.create_task(_window_watcher_loop())
 
 
 class LockRequest(BaseModel):

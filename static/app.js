@@ -752,6 +752,31 @@ function connectSSE() {
         // Alertas críticas (capmonster_low, proxy_down) — push notif + toast
         pushNotif({ icon: ev.icon || '⚠️', msg: ev.msg });
         toast(`${ev.icon || '⚠️'} ${ev.msg}`, ev.severity === 'danger' ? 'error' : 'warn');
+      } else if (ev.type === 'window_warning') {
+        // Window 24h por cerrar (~30 min)
+        const myTg = state.user?.telegram_id;
+        if (!myTg || ev.operator_id === myTg || state.user?.role === 'superadmin') {
+          pushNotif({ icon: '⏰', msg: `${ev.email}: window 24h cierra en ${ev.mins_left}min — vuelve a depositar` });
+          toast(`⏰ ${ev.email}: cierra en ${ev.mins_left}min`, 'warn');
+        }
+      } else if (ev.type === 'window_expired') {
+        // Window cerró — popup invitando a volver
+        const myTg = state.user?.telegram_id;
+        if (!myTg || ev.operator_id === myTg || state.user?.role === 'superadmin') {
+          pushNotif({ icon: '⏰', msg: `${ev.email}: window cerró ($${ev.used_24h.toFixed(0)} en 24h). Tienes 1h para volver o se libera.` });
+          // Popup grande
+          if (confirm(`⏰ La cuenta ${ev.email} acaba de cumplir 24h.\n\nDepositaste $${ev.used_24h.toFixed(2)} en este periodo.\nTienes 1h para volver a depositar o la cuenta se libera al pool para los demás.\n\n¿Abrir modal para depositar ahora?`)) {
+            // Buscar id por email y abrir modal
+            const acc = state.rows.find(r => r.email === ev.email);
+            if (acc) openDepositModal(acc.id);
+          }
+        }
+      } else if (ev.type === 'window_released') {
+        const myTg = state.user?.telegram_id;
+        if (!myTg || ev.operator_id === myTg || state.user?.role === 'superadmin') {
+          pushNotif({ icon: '↩️', msg: ev.msg || `${ev.email} liberada al pool` });
+          reload();
+        }
       }
     } catch {}
   };
@@ -1967,16 +1992,57 @@ function setDepMode(mode) {
 
   // título
   $('#depModalTitle').textContent = isSingle ? 'Depositar' : isMulti ? 'Multicuenta (Matchmaker)' : 'Programado';
-  $('#depAmountHint').textContent = isMulti ? '— por intento' : isSched ? '— cada repetición' : '';
+  $('#depAmountHint').textContent = isMulti ? '— por intento (max $50)' : isSched ? '— cada repetición' : '';
 
   // botón principal
   $('#depExec').textContent = isSingle ? '🚀 Ejecutar depósito'
                             : isMulti ? '🎯 Lanzar Matchmaker'
                             : '⏰ Programar misión';
+
+  // Matchmaker: solo $10 / $50 (su único objetivo es buscar match con monto pequeño)
+  const amts = $$('#depAmounts .dep-amt');
+  amts.forEach(b => {
+    const v = b.dataset.v;
+    const allowedInMulti = (v === '10' || v === '50');
+    if (isMulti) {
+      b.style.display = allowedInMulti ? '' : 'none';
+      if (!allowedInMulti && b.classList.contains('on')) {
+        b.classList.remove('on');
+        amts.forEach(x => { if (x.dataset.v === '50') x.classList.add('on'); });
+        _depAmount = 50;
+      }
+    } else {
+      b.style.display = '';
+    }
+  });
+
+  // Banner de instrucciones según modo
+  renderDepHelpBanner(mode);
+
   // tarjetas guardadas solo aplica en single (1 cuenta) y schedule
   refreshSavedCards();
   // multi: refrescar el panel de cuentas
   if (isMulti) renderMultiAccounts();
+}
+
+function renderDepHelpBanner(mode) {
+  const banner = $('#depHelpBanner');
+  if (!banner) return;
+  const helps = {
+    single: `<b>⚡ Una</b> · 1 tarjeta a 1 cuenta. Si la pasarela ya está caliente,
+             pasa de un jalón. Sirve para reintentos rápidos o tarjetas casadas.`,
+    multi:  `<b>👥 Matchmaker</b> · busca qué tarjeta pasa con qué cuenta usando
+             montos chicos ($10/$50). Una vez que hay <b>match</b>, la tarjeta se
+             casa con esa cuenta — no se vuelve a probar en otras (anti baneo).
+             Después puedes <b>programar</b> los siguientes depósitos con esa
+             tarjeta ya emparejada.`,
+    schedule:`<b>⏰ Programado</b> · 1 tarjeta a 1 cuenta, N depósitos cada 1 min.
+              Topes: <b>máx $499 por intento</b> y <b>$1499 acumulado por cuenta
+              en 24h</b> desde el primer depósito aprobado. Si pasas, dispara 3DS.
+              Te llegará una notif cuando se acerque el fin de las 24h para que
+              vuelvas a depositar; si no, la cuenta se libera para los demás.`,
+  };
+  banner.innerHTML = helps[mode] || '';
 }
 
 async function openDepositModal(accountId, opts = {}) {
@@ -2422,11 +2488,22 @@ function handleMmEvent(ev) {
       const card = _mm.cards.get(tail);
       const acc = _mm.accounts.get(ev.email);
       if (card) { card.status = 'matched'; card.matchedEmail = ev.email; }
-      if (acc) { acc.status = 'done'; acc.matchedTail = tail; }
+      if (acc) { acc.status = 'done'; acc.matchedTail = tail; acc.matchedPipe = ev.pipe; }
       _mmRender();
       _mmFeedAdd('mm-match',
         `✓ <b class="mono">${esc(ev.tail)}</b> ↔ <b>${esc(ev.email)}</b> · $${ev.amount.toFixed(2)} <span class="dim mono">${ev.duration_ms}ms</span>`);
       pushNotif({ icon: '💳', msg: `Match: ${ev.tail} ↔ ${ev.email}` });
+      break;
+    }
+    case 'done': {
+      _mmFeedAdd('mm-done',
+        `<b>Listo</b> · ${ev.matches} match${ev.matches !== 1 ? 'es' : ''} · ${ev.attempts} intentos${ev.pending ? ` · ${ev.pending} sin emparejar` : ''}`);
+      // Limpia estados busy → idle al final
+      for (const c of _mm.cards.values()) if (c.status === 'busy') c.status = 'idle';
+      for (const a of _mm.accounts.values()) if (a.status === 'busy' || a.status === 'cooldown') a.status = a.fails >= 2 ? 'dead' : 'idle';
+      _mmRender();
+      // Si hubo matches, ofrecer programar los siguientes depósitos
+      if (_mm.matches > 0) _renderPostMatchOffer();
       break;
     }
 
@@ -2473,16 +2550,40 @@ function handleMmEvent(ev) {
     case 'cancelled':
       _mmFeedAdd('mm-info', `⏹ Cancelado`);
       break;
-
-    case 'done':
-      _mmFeedAdd('mm-done',
-        `<b>Listo</b> · ${ev.matches} match${ev.matches !== 1 ? 'es' : ''} · ${ev.attempts} intentos${ev.pending ? ` · ${ev.pending} sin emparejar` : ''}`);
-      // Limpia estados busy → idle al final
-      for (const c of _mm.cards.values()) if (c.status === 'busy') c.status = 'idle';
-      for (const a of _mm.accounts.values()) if (a.status === 'busy' || a.status === 'cooldown') a.status = a.fails >= 2 ? 'dead' : 'idle';
-      _mmRender();
-      break;
   }
+}
+
+// Tras matchmaker exitoso, ofrece programar los siguientes depósitos
+function _renderPostMatchOffer() {
+  const matched = [..._mm.accounts.entries()]
+    .filter(([_, a]) => a.status === 'done' && a.matchedTail);
+  if (!matched.length) return;
+  const view = $('#depMatchView');
+  if (!view) return;
+  const existing = $('#depPostMatch');
+  if (existing) existing.remove();
+  const div = document.createElement('div');
+  div.id = 'depPostMatch';
+  div.className = 'dep-post-match';
+  div.innerHTML = `
+    <span class="dep-post-match-text">
+      🎯 Tienes <b>${matched.length} match${matched.length>1?'es':''}</b>.
+      ¿Programar más depósitos con la(s) tarjeta(s) ya casada(s)?
+    </span>
+    <button class="dep-post-match-btn" id="btnPostMatchSchedule">⏰ Programar</button>
+  `;
+  view.appendChild(div);
+  $('#btnPostMatchSchedule').addEventListener('click', () => {
+    // Cambia a modo schedule con la primera cuenta+tarjeta
+    const [email, info] = matched[0];
+    const accId = info.id;
+    _depAccountIds = [accId];
+    setDepMode('schedule');
+    $('#depCardPipe').value = info.matchedPipe || '';
+    refreshCapStatus(accId);
+    div.remove();
+    toast(`⏰ Listo: ${matched.length>1?'usando primer match':'tarjeta cargada'}`, 'success');
+  });
 }
 
 async function cancelMatchmaker() {
