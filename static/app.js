@@ -1543,16 +1543,19 @@ async function deleteNote(accId, noteId) {
   return r.json();
 }
 
-// Click en .d-card / .d-copy / .d-card-copy → copia el pipe
-$('#accTable').addEventListener('click', e => {
-  const copyTarget = e.target.closest('[data-copy]');
-  if (copyTarget && copyTarget.dataset.copy) {
-    e.stopPropagation();
-    navigator.clipboard.writeText(copyTarget.dataset.copy)
-      .then(() => toast(`✓ ${copyTarget.dataset.copy.slice(0, 60)}`, 'success'))
-      .catch(err => toast(`Error: ${err.message}`, 'error'));
-  }
-}, true);  // capture para que ejecute antes del click handler de fila
+// Click global: copia [data-copy] o [data-combo] desde cualquier lado del DOM
+document.body.addEventListener('click', e => {
+  const t = e.target.closest('[data-copy], [data-combo]');
+  if (!t) return;
+  // No interceptar checkboxes / botones internos del row
+  if (e.target.closest('input, button:not(.d-copy)') && !t.classList.contains('d-copy')) return;
+  const txt = t.dataset.copy || t.dataset.combo;
+  if (!txt) return;
+  e.stopPropagation();
+  navigator.clipboard.writeText(txt)
+    .then(() => toast(`✓ ${txt.slice(0, 60)}`, 'success'))
+    .catch(err => toast(`Error: ${err.message}`, 'error'));
+}, true);
 
 // ─── Deposit modal (3 modos: single | multi | schedule) ───
 let _depMode = 'single';        // single | multi | schedule
@@ -1632,10 +1635,14 @@ async function openDepositModal(accountId, opts = {}) {
   // Mode default: single si 1 cuenta, multi si más
   setDepMode(_depAccountIds.length > 1 ? 'multi' : 'single');
 
-  // Display cuenta target (single/schedule)
+  // Display cuenta target (single/schedule) — combo clickeable para copiar
   if (_depAccountIds.length === 1) {
     const acc = state.rows.find(r => r.id === _depAccountIds[0]);
-    $('#depTargetEmail').textContent = acc?.email || '—';
+    const combo = acc ? `${acc.email}:${acc.password || ''}` : '—';
+    const tgt = $('#depTargetEmail');
+    tgt.textContent = combo;
+    tgt.dataset.combo = combo;
+    tgt.classList.add('d-copy');
     $('#depTargetBalance').textContent = acc ? fmtMoney(acc.balance_total) : '—';
     refreshCapStatus(_depAccountIds[0]);
   } else {
@@ -1658,8 +1665,9 @@ function renderMultiAccounts() {
   list.innerHTML = _depAccountIds.map(id => {
     const acc = state.rows.find(r => r.id === id);
     if (!acc) return '';
+    const combo = `${acc.email}:${acc.password || ''}`;
     return `<div class="dep-multi-row">
-      <span class="dep-multi-email">${esc(acc.email)}</span>
+      <span class="dep-multi-email d-copy" data-combo="${esc(combo)}" title="Click para copiar">${esc(combo)}</span>
       <span class="dep-multi-balance mono dim">${fmtMoney(acc.balance_total)}</span>
       <button class="dep-multi-rm" data-id="${id}" title="Quitar">×</button>
     </div>`;

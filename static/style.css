@@ -820,7 +820,11 @@ td.combo b:hover + .copyhint { color: var(--accent); }
   color: var(--text-muted); font-family: var(--font-mono); font-size: 10.5px;
   text-transform: uppercase; letter-spacing: 0.5px;
 }
-.dep-target b { color: var(--text); font-weight: 600; }
+.dep-target b { color: var(--text); font-weight: 600; font-family: var(--font-mono); }
+.dep-target b.d-copy { cursor: pointer; transition: color 120ms; }
+.dep-target b.d-copy:hover { color: var(--accent); }
+.dep-multi-email.d-copy { cursor: pointer; transition: color 120ms; font-family: var(--font-mono); }
+.dep-multi-email.d-copy:hover { color: var(--accent); }
 
 /* Sections */
 .dep-section { margin-bottom: 16px; }
