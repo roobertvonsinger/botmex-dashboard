@@ -750,10 +750,23 @@ async function refreshKpis() {
 
 // ─── Refresh visible ───
 async function refreshVisible() {
-  const ids = getPaged().rows.map(r => r.id);
+  const visible = getPaged().rows;
+  const ids = visible.map(r => r.id);
+  const emails = visible.map(r => r.email).filter(Boolean);
   if (!ids.length) return;
   toast(`↻ Actualizando ${ids.length}…`);
   try {
+    // 1. Dispara prewarm (login + balance live) — esto sí refresca datos en BD
+    if (emails.length) {
+      await fetch('/api/prewarm/select', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ account_emails: emails }),
+      }).catch(() => {});
+      // Espera un poco a que terminen los logins (max 6s)
+      await new Promise(r => setTimeout(r, 4500));
+    }
+    // 2. Re-lee de la BD ya con datos frescos
     const r = await fetch('/api/accounts/refresh', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -761,7 +774,6 @@ async function refreshVisible() {
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
-    // Patch state.rows
     const map = new Map(data.rows.map(r => [r.id, r]));
     state.rows = state.rows.map(r => map.get(r.id) || r);
     renderTable();
