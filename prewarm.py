@@ -25,6 +25,7 @@ from typing import Dict, List, Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
 from auth import require_session
 
@@ -408,3 +409,103 @@ async def prewarm_status(user: dict = Depends(require_session)):
         "capmonster_balance": bal,
         "recent_runs": recent,
     }
+
+
+# ── Refresh con stream — login live + emite cada cuenta cuando está lista ─────
+
+@router.post("/refresh-stream")
+async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_session)):
+    """SSE: corre prewarm en paralelo y emite cada cuenta cuando termina su fetch.
+    Permite al frontend repintar fila por fila con microanimación."""
+    if not _HAS_BOT_DEPS:
+        raise HTTPException(status_code=503, detail="Bot deps no disponibles")
+    body = await request.json()
+    ids = list(body.get("account_ids") or [])
+    if not ids:
+        raise HTTPException(status_code=400, detail="account_ids requerido")
+
+    operator_id = int(user.get("telegram_id") or 0)
+    if not operator_id:
+        operator_id = abs(hash(user.get("username", "unknown"))) % 10_000_000
+
+    # Lookup cuentas
+    from app import db as _app_db
+    placeholders = ",".join("?" * len(ids))
+    with _app_db() as c:
+        rows = c.execute(
+            f"SELECT id, email, password FROM accounts WHERE id IN ({placeholders})",
+            ids,
+        ).fetchall()
+    accs = [dict(r) for r in rows]
+
+    bal = await _capmonster_balance()
+    if bal is not None and bal < CAPMONSTER_MIN_BALANCE:
+        async def _err():
+            yield f"data: {json.dumps({'type':'capmonster_low','balance':bal})}\n\n"
+        return StreamingResponse(_err(), media_type="text/event-stream")
+
+    used = await asyncio.to_thread(_db_count_recent, operator_id, 10)
+    remaining = max(0, CAP_PER_OPERATOR_10MIN - used)
+
+    async def gen():
+        yield f"data: {json.dumps({'type':'start','total':len(accs),'cap_remaining':remaining})}\n\n"
+
+        q: asyncio.Queue = asyncio.Queue()
+
+        async def _process(acc, slot_idx):
+            email = acc["email"]
+            try:
+                if slot_idx >= remaining:
+                    await q.put({"type": "skip", "id": acc["id"], "email": email, "reason": "cap"})
+                    return
+                if not acc.get("password"):
+                    await q.put({"type": "skip", "id": acc["id"], "email": email, "reason": "no_password"})
+                    return
+                # Reusa _run_prewarm para login + fetch + recalc grade
+                await _run_prewarm(operator_id, email, acc["password"])
+                # Lee la fila ya actualizada
+                with _app_db() as cc:
+                    r = cc.execute(
+                        "SELECT a.id, a.email, a.password, a.balance_total, a.balance_real, "
+                        "a.last_deposit_amount, a.last_deposit_date, a.status, a.grade, "
+                        "a.locked_by, a.locked_at, a.locked_until, a.last_checked_at, a.check_count, "
+                        "COALESCE(a.published_to_pool,1) AS published_to_pool, "
+                        "(SELECT COUNT(*) FROM account_cards ac WHERE ac.account_email=a.email) AS cards_count, "
+                        "(SELECT COUNT(*) FROM account_notes an WHERE an.account_email=a.email "
+                        " AND COALESCE(an.note_text,'') != '') AS notes_count "
+                        "FROM accounts a WHERE a.id=?",
+                        (acc["id"],),
+                    ).fetchone()
+                if r:
+                    await q.put({"type": "account", "data": dict(r)})
+                else:
+                    await q.put({"type": "fail", "id": acc["id"], "email": email, "error": "row not found"})
+            except Exception as e:
+                logger.warning(f"[refresh-stream] {email}: {e}")
+                await q.put({"type": "fail", "id": acc["id"], "email": email, "error": str(e)[:120]})
+
+        # Lanza todo en paralelo (asyncio gather con producción a la queue)
+        tasks = [asyncio.create_task(_process(acc, i)) for i, acc in enumerate(accs)]
+
+        done_count = 0
+        last_keepalive = asyncio.get_event_loop().time()
+        while done_count < len(accs):
+            try:
+                ev = await asyncio.wait_for(q.get(), timeout=2.0)
+                yield f"data: {json.dumps(ev)}\n\n"
+                done_count += 1
+                last_keepalive = asyncio.get_event_loop().time()
+            except asyncio.TimeoutError:
+                # Heartbeat para mantener la conexión viva
+                yield f": ping\n\n"
+                # Si todas las tasks terminaron pero la queue se vació, salir
+                if all(t.done() for t in tasks) and q.empty():
+                    break
+
+        yield f"data: {json.dumps({'type':'done','total':len(accs),'completed':done_count})}\n\n"
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

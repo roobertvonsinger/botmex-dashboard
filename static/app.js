@@ -862,56 +862,159 @@ async function refreshKpis() {
 async function refreshVisible() {
   const visible = getPaged().rows;
   const ids = visible.map(r => r.id);
-  const emails = visible.map(r => r.email).filter(Boolean);
   if (!ids.length) return;
   const btn = $('#btnRefreshVisible');
   if (btn) btn.disabled = true;
-  toast(`↻ Login live a ${ids.length}…`);
-  try {
-    let pwInfo = null;
-    if (emails.length) {
-      // force=true: ignora cache, fuerza re-fetch contra BetMexico
-      const pr = await fetch('/api/prewarm/select', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ account_emails: emails, force: true }),
-      });
-      pwInfo = await pr.json().catch(() => null);
-      if (pwInfo?.status === 'capmonster_low') {
-        toast(`⚠️ CapMonster bajo ($${pwInfo.capmonster_balance ?? '?'}) — refresh cancelado`, 'error');
-        return;
-      }
-      const started = pwInfo?.started || 0;
-      const skipped = pwInfo?.skipped || 0;
-      // Si llegó al cap del operador, avisa
-      if (skipped > 0 && pwInfo?.skipped_reasons?.cap_session) {
-        toast(`⚠️ Cap 30/10min: ${started} en proceso, ${skipped} pendientes (espera)`, 'error');
-      }
-      // Espera proporcional al número de logins (4s base + 800ms por cuenta, max 25s)
-      const waitMs = Math.min(25000, 4000 + started * 800);
-      if (started > 0) {
-        toast(`↻ ${started} loggeando · ~${Math.round(waitMs/1000)}s`);
-        await new Promise(r => setTimeout(r, waitMs));
-      }
+
+  // Marca todas las filas visibles como "refreshing" — shimmer skeleton
+  const idSet = new Set(ids);
+  document.querySelectorAll('#accTable tbody tr[data-id]').forEach(tr => {
+    if (idSet.has(parseInt(tr.dataset.id))) {
+      tr.classList.add('row-refreshing');
     }
-    // Re-lee BD con datos frescos
-    const r = await fetch('/api/accounts/refresh', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ ids }),
+  });
+  toast(`↻ Refrescando ${ids.length} en vivo…`);
+
+  let updated = 0, failed = 0, skipped = 0;
+  try {
+    const r = await fetch('/api/prewarm/refresh-stream', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ account_ids: ids }),
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const data = await r.json();
-    const map = new Map(data.rows.map(r => [r.id, r]));
-    state.rows = state.rows.map(r => map.get(r.id) || r);
-    renderTable();
-    const tag = pwInfo ? `(${pwInfo.started || 0} live)` : '';
-    toast(`✓ ${data.rows.length} actualizadas ${tag}`, 'success');
+
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0) {
+        const chunk = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        const line = chunk.split('\n').find(l => l.startsWith('data: '));
+        if (!line) continue;
+        try {
+          const ev = JSON.parse(line.slice(6));
+          if (ev.type === 'capmonster_low') {
+            toast(`⚠️ CapMonster bajo ($${ev.balance ?? '?'})`, 'error');
+            return;
+          }
+          if (ev.type === 'account' && ev.data) {
+            updated++;
+            // Patch state.rows
+            const i = state.rows.findIndex(x => x.id === ev.data.id);
+            if (i >= 0) state.rows[i] = { ...state.rows[i], ...ev.data };
+            // Repintar SOLO la fila afectada con animación
+            _swapRowWithAnim(ev.data.id);
+          } else if (ev.type === 'fail') {
+            failed++;
+            _markRowFail(ev.id);
+          } else if (ev.type === 'skip') {
+            skipped++;
+            _markRowSkip(ev.id);
+          }
+        } catch {}
+      }
+    }
+    const parts = [];
+    if (updated) parts.push(`${updated} OK`);
+    if (failed) parts.push(`${failed} falló`);
+    if (skipped) parts.push(`${skipped} skip`);
+    toast(`✓ ${parts.join(' · ') || 'sin cambios'}`, failed ? 'error' : 'success');
   } catch (e) {
     toast(`Error: ${e.message}`, 'error');
   } finally {
     if (btn) btn.disabled = false;
+    // Quita clase refreshing a las que no terminaron (timeout)
+    setTimeout(() => {
+      document.querySelectorAll('#accTable tbody tr.row-refreshing').forEach(tr => {
+        tr.classList.remove('row-refreshing');
+      });
+    }, 800);
   }
+}
+
+// Repinta una fila con fade-out → fade-in + glow temporal
+function _swapRowWithAnim(id) {
+  const tr = document.querySelector(`#accTable tbody tr[data-id="${id}"]`);
+  if (!tr) return;
+  const r = state.rows.find(x => x.id === id);
+  if (!r) return;
+  // Generar el HTML nuevo de la fila con renderTable → reextraer la fila
+  // Atajo: re-render full y luego añadir clase refreshed a esa fila
+  // Más eficiente: regenerar solo el outerHTML
+  const idx = state.rows.findIndex(x => x.id === id);
+  if (idx < 0) return;
+  // Hack: trigger renderTable para una sola fila — pero podemos reutilizar el
+  // lock + grade + iconos manualmente. Por simplicidad: hacemos renderTable()
+  // ÚNICAMENTE para la fila actualizada, sin tocar las demás.
+  _renderSingleRow(tr, r);
+  tr.classList.remove('row-refreshing');
+  tr.classList.add('row-refreshed');
+  setTimeout(() => tr.classList.remove('row-refreshed'), 1200);
+}
+
+function _renderSingleRow(tr, r) {
+  // Replicamos la lógica mínima de renderTable para 1 fila
+  const g = gradeClass(r.grade);
+  const until = r.locked_by ? fmtUntil(r.locked_until) : null;
+  const lockedCls = r.locked_by ? (until?.expired ? 'row-locked row-lock-expired' : 'row-locked') : '';
+  const selCls = selectedIds.has(r.id) ? 'row-sel' : '';
+  const checked = selectedIds.has(r.id) ? 'checked' : '';
+  const dep = r.last_deposit_amount
+    ? `<b>${fmtMoney(r.last_deposit_amount)}</b><span class="ago">${fmtAgo(r.last_deposit_date)}</span>`
+    : '<span class="dim">sin dep.</span>';
+  const combo = `${r.email}:${r.password || ''}`;
+  const opCol = r.locked_color || 'accent';
+  const opClass = r.locked_by ? `op-row-${opCol}` : '';
+  const trasClass = r.published_to_pool === 0 ? 'row-trastienda' : '';
+  const hasCards = (r.cards_count || 0) > 0;
+  const hasNotes = (r.notes_count || 0) > 0;
+  let iconsHtml = '';
+  if (hasCards) iconsHtml += `<button class="row-ic ic-cards" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.cards_count} tarjeta${r.cards_count>1?'s':''}">💳<sup>${r.cards_count}</sup></button>`;
+  if (hasNotes) iconsHtml += `<button class="row-ic ic-notes" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.notes_count} nota${r.notes_count>1?'s':''}">📝<sup>${r.notes_count}</sup></button>`;
+  iconsHtml += `<button class="row-ic ic-add" data-id="${r.id}" data-email="${esc(r.email)}" title="Añadir nota rápida">+</button>`;
+  const lockChip = r.locked_by
+    ? `<span class="lock-chip op-${esc(opCol)} ${until?.expired ? 'expired' : ''}" title="Lockeada por ${esc(r.locked_by)}">🔒 ${esc(r.locked_by)}${until && !until.expired ? ` <span class="lock-chip-time dim">${until.text}</span>` : ''}</span>`
+    : '';
+  tr.className = `r-grade-${g} ${lockedCls} ${selCls} ${opClass} ${trasClass}`.trim();
+  if (state.view === 'simple') {
+    tr.innerHTML = `
+      <td class="grade-bar-cell"></td>
+      <td class="sel-cell"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
+      <td class="num"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
+      <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b>${lockChip}</td>
+      <td class="dep">${dep}</td>
+      <td class="row-icons">${iconsHtml}</td>`;
+  } else {
+    tr.innerHTML = `
+      <td class="grade-bar-cell"></td>
+      <td class="sel-cell"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
+      <td class="num"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
+      <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b></td>
+      <td class="dep">${dep}</td>
+      <td class="dep dim">${fmtAgo(r.last_checked_at)}</td>
+      <td class="num">${r.check_count || 0}</td>
+      <td class="row-icons">${iconsHtml}</td>`;
+  }
+}
+
+function _markRowFail(id) {
+  const tr = document.querySelector(`#accTable tbody tr[data-id="${id}"]`);
+  if (!tr) return;
+  tr.classList.remove('row-refreshing');
+  tr.classList.add('row-refresh-fail');
+  setTimeout(() => tr.classList.remove('row-refresh-fail'), 1500);
+}
+function _markRowSkip(id) {
+  const tr = document.querySelector(`#accTable tbody tr[data-id="${id}"]`);
+  if (!tr) return;
+  tr.classList.remove('row-refreshing');
+  tr.classList.add('row-refresh-skip');
+  setTimeout(() => tr.classList.remove('row-refresh-skip'), 1500);
 }
 
 // ─── Logs view ───

@@ -1936,3 +1936,72 @@ td.row-icons, th.row-icons-th {
   #accTable th:nth-child(7), #accTable td:nth-child(7),  /* checks count */
   #accTable th:nth-child(6), #accTable td:nth-child(6) { display: none; }
 }
+
+/* ── Refresh stream microanimations ── */
+
+/* Skeleton shimmer mientras se actualiza */
+@keyframes rowShimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+tbody tr.row-refreshing td {
+  position: relative;
+  overflow: hidden;
+}
+tbody tr.row-refreshing td::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.06) 40%,
+    rgba(255,255,255,0.10) 50%,
+    rgba(255,255,255,0.06) 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: rowShimmer 1.4s linear infinite;
+  pointer-events: none;
+}
+tbody tr.row-refreshing td > * {
+  opacity: 0.35;
+  transition: opacity 240ms;
+}
+
+/* Flash de éxito tras llegada de datos frescos */
+@keyframes rowRefreshed {
+  0%   { background-color: var(--accent-soft); transform: scale(1); }
+  20%  { transform: scale(1.005); }
+  100% { background-color: transparent; transform: scale(1); }
+}
+tbody tr.row-refreshed {
+  animation: rowRefreshed 1200ms cubic-bezier(.2,.8,.2,1);
+  position: relative;
+}
+tbody tr.row-refreshed::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+  animation: refreshFlash 1200ms ease-out;
+}
+@keyframes refreshFlash {
+  0%   { opacity: 1; transform: scaleY(1); }
+  100% { opacity: 0; transform: scaleY(0); }
+}
+
+/* Estados de error / skip */
+@keyframes rowFail {
+  0% { background-color: var(--danger-soft); }
+  100% { background-color: transparent; }
+}
+tbody tr.row-refresh-fail { animation: rowFail 1500ms ease-out; }
+
+@keyframes rowSkip {
+  0% { background-color: rgba(255,255,255,0.06); }
+  100% { background-color: transparent; }
+}
+tbody tr.row-refresh-skip { animation: rowSkip 1500ms ease-out; opacity: 0.7; }
