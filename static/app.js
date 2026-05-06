@@ -357,6 +357,7 @@ function renderTable() {
 
   renderPagination(paged);
   updateCmdBar();
+  _updateResetBtn();
 }
 
 function renderPagination(paged) {
@@ -398,12 +399,6 @@ function updateCmdBar() {
   const n = selectedIds.size;
   const bar = $('#cmdBar');
   $('#cmdSelCount').textContent = n;
-  // Botón Limpiar de la pagebar — disabled si no hay nada seleccionado
-  const btnDes = $('#btnDeselectAll');
-  if (btnDes) {
-    btnDes.disabled = (n === 0);
-    btnDes.title = n === 0 ? 'No hay nada seleccionado' : `Deseleccionar ${n} (Esc)`;
-  }
   if (n === 0) { bar.classList.add('hidden'); return; }
   bar.classList.remove('hidden');
 
@@ -1324,11 +1319,41 @@ $('#pbPages').addEventListener('click', e => {
   renderTable();
 });
 $('#btnRefreshVisible').addEventListener('click', refreshVisible);
-$('#btnDeselectAll')?.addEventListener('click', () => {
-  if (selectedIds.size === 0) { toast('Nada seleccionado', 'success'); return; }
-  const n = selectedIds.size;
-  deselectAll();
-  toast(`✕ ${n} deseleccionada${n>1?'s':''}`, 'success');
+function _isFiltersDefault() {
+  const isSuper = state.user?.role === 'superadmin';
+  const defaultView = isSuper ? state.view : 'simple';
+  return state.status === 'LIVE'
+      && state.grade === ''
+      && (state.view === defaultView)
+      && !searchQuery
+      && !state.filterInUse
+      && _sortCol === null;
+}
+function _updateResetBtn() {
+  const btn = $('#btnResetFilters');
+  if (!btn) return;
+  const isDefault = _isFiltersDefault();
+  btn.disabled = isDefault;
+  btn.title = isDefault
+    ? 'Ya estás en el default'
+    : 'Volver al default: LIVE, sin grade, sin búsqueda, sin orden';
+}
+$('#btnResetFilters')?.addEventListener('click', () => {
+  // Reset de filtros (no toca selección)
+  state.status = 'LIVE';
+  state.grade = '';
+  searchQuery = '';
+  state.filterInUse = false;
+  state.page = 1;
+  _sortCol = null;
+  _sortDir = -1;
+  // UI segments back to default
+  document.querySelectorAll('.seg[data-seg="status"] button').forEach(b => b.classList.toggle('on', b.dataset.v === 'LIVE'));
+  document.querySelectorAll('.seg[data-seg="grade"] button').forEach(b => b.classList.toggle('on', b.dataset.v === ''));
+  $('#searchInput').value = '';
+  const lpInUse = $('#lpInUse'); if (lpInUse) lpInUse.classList.remove('lp-stat-active');
+  reload();
+  toast('↺ Filtros restaurados', 'success');
 });
 
 // Logs handlers
@@ -2906,7 +2931,6 @@ $$('.ico-btn[title="Salir"], .power').forEach(btn => {
   tickFrase();
   setInterval(tickFrase, 9_000);
   await reload();
-  updateCmdBar();  // inicializa estado del btn Limpiar
   refreshKpis();
   setInterval(refreshKpis, 30_000);
   loadHealth(false);
