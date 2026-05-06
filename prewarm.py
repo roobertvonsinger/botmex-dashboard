@@ -34,9 +34,32 @@ try:
     from betmexico_login_api import BetmexicoApiChecker
     score_payment_readiness = None  # se setea desde app.BOT_SCORE_PAYMENT al usar
     _HAS_BOT_DEPS = True
+    try:
+        from betmexico_config import get_admin_proxy
+    except ImportError:
+        get_admin_proxy = None  # type: ignore
 except ImportError:
     _HAS_BOT_DEPS = False
     score_payment_readiness = None  # type: ignore
+    get_admin_proxy = None  # type: ignore
+
+
+def _build_proxy_url() -> Optional[str]:
+    """Construye URL de proxy admin para http.client."""
+    if not get_admin_proxy:
+        return None
+    try:
+        p = get_admin_proxy()
+        if not p:
+            return None
+        srv = p.get("server", "")
+        u = p.get("username", "")
+        pw = p.get("password", "")
+        if u and pw:
+            return f"http://{u}:{pw}@{srv}"
+        return f"http://{srv}"
+    except Exception:
+        return None
 
 logger = logging.getLogger("betmexico.dashboard.prewarm")
 
@@ -273,13 +296,14 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
     pool = None
     import os
     cap_key = os.environ.get("CAPMONSTER_KEY", "")
+    proxy_url = _build_proxy_url()  # ¡CRÍTICO! sale por proxy MX, no por IP del VPS
     try:
         pool = make_pool(cap_key, size=1, workers=1)
         await pool.prefetch(1)
         await pool.start_factory()
 
         jwt, login_result = await asyncio.wait_for(
-            get_jwt(email, password, pool, use_cache=True),
+            get_jwt(email, password, pool, proxy=proxy_url, use_cache=True),
             timeout=float(TASK_TIMEOUT_SEC),
         )
         if not jwt:
@@ -292,7 +316,7 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
             return {"ok": False, "status": status or "no_jwt",
                     "error": (login_result.get("error") if isinstance(login_result, dict) else None) or status or "Login falló"}
 
-        async with BetmexicoApiChecker(proxy=None) as checker:
+        async with BetmexicoApiChecker(proxy=proxy_url) as checker:
             details = await asyncio.wait_for(
                 checker.fetch_account_details_parallel(jwt, fetch_mode="full"),
                 timeout=18.0,
