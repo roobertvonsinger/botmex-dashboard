@@ -105,7 +105,7 @@ const fmtAbs = ts => {
     : { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false };
   return d.toLocaleString('es-MX', opts).replace('.', '');
 };
-const gradeClass = g => ({ A: 'A', B: 'B', C: 'C' })[g] || 'U';
+const gradeClass = g => ({ A: 'A', B: 'B', C: 'C', D: 'D' })[g] || 'U';
 // Glow tiers para el saldo:
 //   ≥ $10  → glow (verde brillante)
 //   $5-$10 → tenue/grisecito
@@ -184,6 +184,10 @@ async function loadMe() {
   if (!isSuper) {
     $('#navLogs').style.display = 'none';
     $('#navHealth').style.display = 'none';
+  }
+  // Pool solo superadmin
+  if (!isSuper) {
+    const np = $('#navPool'); if (np) np.style.display = 'none';
   }
   // Liberar (asignar a otros) solo superadmin — el "admin" NO debe verlo (vista secreta)
   if (!isSuper) {
@@ -573,15 +577,85 @@ function showSection(name) {
   }
   state.section = name;
   $('#accountsMain').style.display = name === 'accounts' ? 'flex' : 'none';
+  const poolM = $('#poolMain'); if (poolM) poolM.style.display = name === 'pool' ? 'flex' : 'none';
   $('#activityMain').style.display = name === 'activity' ? 'flex' : 'none';
   $('#notificationsMain').style.display = name === 'notifications' ? 'flex' : 'none';
   const logsM = $('#logsMain'); if (logsM) logsM.style.display = name === 'logs' ? 'flex' : 'none';
   const healthM = $('#healthMain'); if (healthM) healthM.style.display = name === 'health' ? 'flex' : 'none';
   $$('.nav[data-section]').forEach(btn => btn.classList.toggle('on', btn.dataset.section === name));
+  if (name === 'pool') reloadPool();
   if (name === 'activity') reloadActivity();
   if (name === 'notifications') renderNotifs();
   if (name === 'logs') startLogsPolling(); else stopLogsPolling();
   if (name === 'health') loadHealth(false);
+}
+
+// ─── Pool view (SA only) ───
+async function reloadPool() {
+  const t = $('#poolTable');
+  if (!t) return;
+  try {
+    const r = await fetch('/api/pool/accounts');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const rows = await r.json();
+    $('#poolCountLabel').textContent = `${rows.length} cuenta${rows.length !== 1 ? 's' : ''} visibles a operadores`;
+    $('#navPoolCount').textContent = rows.length;
+    t.querySelector('thead').innerHTML = `<tr>
+      <th class="grade-bar-th"></th>
+      <th class="num">Saldo</th>
+      <th>Cuenta</th>
+      <th>Asignada a</th>
+      <th>Lock</th>
+      <th class="num"></th>
+    </tr>`;
+    t.querySelector('tbody').innerHTML = rows.map(r => {
+      const g = gradeClass(r.grade);
+      const until = r.locked_by ? fmtUntil(r.locked_until) : null;
+      const lockChip = r.locked_by
+        ? `<span class="lock-chip op-accent">🔒 ${esc(r.locked_by)}${until && !until.expired ? ` <span class="dim mono">${until.text}</span>` : ''}</span>`
+        : '<span class="dim">libre</span>';
+      const assigned = r.assigned_to > 0 ? `<span class="dim mono">${r.assigned_to} usuario(s)</span>` : '<span class="dim">—</span>';
+      const combo = `${r.email}:${r.password || ''}`;
+      return `<tr class="r-grade-${g}" data-id="${r.id}">
+        <td class="grade-bar-cell"></td>
+        <td class="num"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
+        <td class="combo"><b data-combo="${esc(combo)}">${esc(combo)}</b></td>
+        <td>${assigned}</td>
+        <td>${lockChip}</td>
+        <td class="num"><button class="seg-btn pool-hide-btn" data-id="${r.id}" title="Quitar de la vista de operadores">×</button></td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="6" class="loading">Pool vacía — pica "Liberar" desde Cuentas para empezar a publicar</td></tr>';
+  } catch (e) {
+    t.querySelector('tbody').innerHTML = `<tr><td colspan="6" class="loading" style="color:var(--danger)">Error: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+async function hideAllPool() {
+  if (!confirm('¿Quitar TODAS las cuentas de la vista de los operadores?\n\nLos operadores dejarán de verlas hasta que las publiques de nuevo desde Cuentas → Liberar.')) return;
+  try {
+    const r = await fetch('/api/accounts/hide-all', { method: 'POST' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    toast(`📤 ${data.hidden} ocultas`, 'success');
+    reloadPool();
+    reload();
+  } catch (e) {
+    toast(`Error: ${e.message}`, 'error');
+  }
+}
+
+async function removeFromPool(id) {
+  try {
+    const r = await fetch('/api/accounts/publish', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ ids: [id], publish: false }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    toast('✓ Quitada de pool', 'success');
+    reloadPool();
+  } catch (e) {
+    toast(`Error: ${e.message}`, 'error');
+  }
 }
 
 // ─── reload ───
@@ -917,6 +991,19 @@ $('#btnLogsPause')?.addEventListener('click', () => {
   if (_logsPaused) stopLogsPolling(); else startLogsPolling();
 });
 $('#btnLogsClear')?.addEventListener('click', () => { $('#logsView').textContent = ''; });
+
+// Pool view handlers
+$('#btnPoolRefresh')?.addEventListener('click', reloadPool);
+$('#btnPoolHideAll')?.addEventListener('click', hideAllPool);
+$('#poolTable')?.addEventListener('click', e => {
+  const btn = e.target.closest('.pool-hide-btn');
+  if (btn) { e.stopPropagation(); removeFromPool(parseInt(btn.dataset.id)); return; }
+  const combo = e.target.closest('td.combo b');
+  if (combo?.dataset.combo) {
+    e.stopPropagation();
+    navigator.clipboard.writeText(combo.dataset.combo).then(() => toast(`✓ ${combo.dataset.combo}`, 'success'));
+  }
+});
 
 // Health
 $('#btnHealthRun')?.addEventListener('click', () => loadHealth(true));

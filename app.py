@@ -973,6 +973,43 @@ def publish_accounts(req: PublishRequest, user: dict = Depends(require_session))
     return {"changed": changed, "publish": req.publish}
 
 
+@app.post("/api/accounts/hide-all")
+def hide_all_accounts(user: dict = Depends(require_session)):
+    """SA oculta TODAS las cuentas LIVE de la pool (mueve todo a Trastienda).
+    Punto de partida para empezar a publicar selectivamente."""
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Solo superadmin")
+    with db(write=True) as c:
+        cur = c.execute(
+            "UPDATE accounts SET published_to_pool=0 "
+            "WHERE status='LIVE' AND COALESCE(published_to_pool,1)=1"
+        )
+        changed = cur.rowcount
+    return {"hidden": changed}
+
+
+@app.get("/api/pool/accounts")
+def pool_accounts(user: dict = Depends(require_session)):
+    """Cuentas actualmente publicadas a la pool (visibles para los operadores).
+    Solo SA — vista de control."""
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Solo superadmin")
+    with db() as c:
+        rows = c.execute(
+            "SELECT a.id, a.email, a.password, a.balance_total, a.balance_real, "
+            "a.last_deposit_amount, a.last_deposit_date, a.status, a.grade, a.grade_score, "
+            "a.locked_by, a.locked_at, a.locked_until, a.last_checked_at, "
+            "(SELECT COUNT(*) FROM account_assignments ass WHERE ass.email=a.email) AS assigned_to "
+            "FROM accounts a "
+            "WHERE a.status='LIVE' AND COALESCE(a.published_to_pool,1)=1 "
+            "ORDER BY a.balance_total DESC LIMIT 1000"
+        ).fetchall()
+        out = [dict(r) for r in rows]
+        for r in out:
+            r["locked_by"] = _resolve_operator(r.get("locked_by"))
+        return out
+
+
 @app.post("/api/accounts/{account_id}/unlock")
 def unlock_account(account_id: int, user: dict = Depends(require_session)):
     with db(write=True) as c:

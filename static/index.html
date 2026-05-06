@@ -21,6 +21,7 @@
     </div>
     <div class="sb-section">Principal</div>
     <button class="nav on" data-section="accounts"><span class="i">▦</span>Cuentas<span class="b" id="navCount">…</span></button>
+    <button class="nav" data-section="pool" id="navPool"><span class="i">◈</span>Pool<span class="b" id="navPoolCount">…</span></button>
     <button class="nav" data-section="activity"><span class="i">⚡</span>Actividad<span class="b" id="navActivityBadge"></span></button>
     <div class="sb-section">Sistema</div>
     <button class="nav" data-section="notifications"><span class="i">◔</span>Notificaciones<span class="b warn hidden" id="navNotifBadge">·</span></button>
@@ -123,6 +124,7 @@
           <button data-v="A">A</button>
           <button data-v="B">B</button>
           <button data-v="C">C</button>
+          <button data-v="D">D</button>
           <button data-v="?">?</button>
         </div>
         <div class="seg" data-seg="view">
@@ -153,6 +155,27 @@
             <option value="100">100</option>
             <option value="200">200</option>
           </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vista: Pool (cuentas visibles para operadores — solo SA) -->
+    <div id="poolMain" style="display:none;flex-direction:column;flex:1;min-height:0">
+      <section class="filterbar">
+        <h2>Pool <span class="dim mono" id="poolCountLabel">— cuentas en la vista de operadores</span></h2>
+        <div class="grow"></div>
+        <button class="seg-btn" id="btnPoolRefresh" title="Recargar">↻</button>
+        <button class="seg-btn danger" id="btnPoolHideAll" title="Quita TODAS las cuentas de la vista de operadores">📤 Ocultar todas</button>
+      </section>
+      <section class="tablewrap">
+        <table id="poolTable">
+          <thead></thead>
+          <tbody><tr><td class="loading" colspan="6">Cargando…</td></tr></tbody>
+        </table>
+      </section>
+      <div class="pagebar">
+        <div class="pb-left">
+          <span class="dim mono" id="poolHint">Solo Superadmin · vista de las cuentas que los operadores pueden ver y bloquear.</span>
         </div>
       </div>
     </div>

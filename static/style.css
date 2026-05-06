@@ -915,30 +915,42 @@ tr.row-trastienda td.combo b::before {
   position: relative;
 }
 
-/* Color sólido de la barrita por grade */
+/* Color sólido de la barrita por grade — V8 (A/B/C/D) */
 tr.r-grade-A .grade-bar-cell { background: var(--grade-a); box-shadow: 0 0 8px var(--grade-a); }
-tr.r-grade-B .grade-bar-cell { background: var(--warn);    box-shadow: 0 0 8px var(--warn); }
-tr.r-grade-C .grade-bar-cell { background: var(--danger);  box-shadow: 0 0 8px var(--danger); }
+tr.r-grade-B .grade-bar-cell { background: oklch(0.70 0.16 235); box-shadow: 0 0 8px oklch(0.70 0.16 235 / 0.5); }
+tr.r-grade-C .grade-bar-cell { background: var(--warn);    box-shadow: 0 0 8px var(--warn); }
+tr.r-grade-D .grade-bar-cell { background: var(--danger);  box-shadow: 0 0 8px var(--danger); }
 tr.r-grade-U .grade-bar-cell { background: rgba(255,255,255,0.10); }
 
 /* Glassy gradient: difumina del grade hacia la derecha, se desvanece ANTES de
-   llegar al saldo (≤8% del ancho). Solo abraza la barrita y el checkbox. */
+   llegar al saldo. */
 tbody tr.r-grade-A {
   background-image: linear-gradient(to right, oklch(0.78 0.20 169 / 0.18) 0%, oklch(0.78 0.20 169 / 0.04) 4%, transparent 9%);
 }
 tbody tr.r-grade-B {
-  background-image: linear-gradient(to right, oklch(0.86 0.16 75 / 0.16) 0%, oklch(0.86 0.16 75 / 0.04) 4%, transparent 9%);
+  background-image: linear-gradient(to right, oklch(0.70 0.16 235 / 0.16) 0%, oklch(0.70 0.16 235 / 0.04) 4%, transparent 9%);
 }
 tbody tr.r-grade-C {
+  background-image: linear-gradient(to right, oklch(0.86 0.16 75 / 0.16) 0%, oklch(0.86 0.16 75 / 0.04) 4%, transparent 9%);
+}
+tbody tr.r-grade-D {
   background-image: linear-gradient(to right, oklch(0.66 0.21 24 / 0.18) 0%, oklch(0.66 0.21 24 / 0.04) 4%, transparent 9%);
 }
 tbody tr.r-grade-U {
   background-image: linear-gradient(to right, rgba(255,255,255,0.04) 0%, transparent 8%);
 }
-/* Hover refuerza un toque, mismo desvanecido corto */
 tbody tr.r-grade-A:hover { background-image: linear-gradient(to right, oklch(0.78 0.20 169 / 0.26) 0%, oklch(0.78 0.20 169 / 0.06) 5%, rgba(255,255,255,0.03) 10%); }
-tbody tr.r-grade-B:hover { background-image: linear-gradient(to right, oklch(0.86 0.16 75 / 0.22) 0%, oklch(0.86 0.16 75 / 0.06) 5%, rgba(255,255,255,0.03) 10%); }
-tbody tr.r-grade-C:hover { background-image: linear-gradient(to right, oklch(0.66 0.21 24 / 0.26) 0%, oklch(0.66 0.21 24 / 0.06) 5%, rgba(255,255,255,0.03) 10%); }
+tbody tr.r-grade-B:hover { background-image: linear-gradient(to right, oklch(0.70 0.16 235 / 0.22) 0%, oklch(0.70 0.16 235 / 0.06) 5%, rgba(255,255,255,0.03) 10%); }
+tbody tr.r-grade-C:hover { background-image: linear-gradient(to right, oklch(0.86 0.16 75 / 0.22) 0%, oklch(0.86 0.16 75 / 0.06) 5%, rgba(255,255,255,0.03) 10%); }
+tbody tr.r-grade-D:hover { background-image: linear-gradient(to right, oklch(0.66 0.21 24 / 0.26) 0%, oklch(0.66 0.21 24 / 0.06) 5%, rgba(255,255,255,0.03) 10%); }
+
+/* Botón danger (Ocultar todas) */
+.seg-btn.danger {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.seg-btn.danger:hover { background: var(--danger); color: white; }
 
 /* Filas: glass tenue, color solo en la barra lateral. Sin wash. */
 tbody tr { background: transparent; }

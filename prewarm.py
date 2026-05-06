@@ -31,9 +31,11 @@ from auth import require_session
 try:
     from betmexico_login_service import get_jwt, make_pool
     from betmexico_login_api import BetmexicoApiChecker
+    from betmexico_payment_analyzer import score_payment_readiness
     _HAS_BOT_DEPS = True
 except ImportError:
     _HAS_BOT_DEPS = False
+    score_payment_readiness = None  # type: ignore
 
 logger = logging.getLogger("betmexico.dashboard.prewarm")
 
@@ -155,6 +157,42 @@ def _db_upsert_balance(email: str, details: dict) -> None:
         pass
 
 
+def _db_save_txns_and_recalc(email: str, details: dict, operator_id: int) -> None:
+    """Guarda transacciones nuevas + recalcula grade. No-op si no llegaron txns."""
+    if score_payment_readiness is None:
+        return
+    txn_data = (details or {}).get("transactions") or {}
+    items = txn_data.get("items") or []
+    # Persiste txns (reusa el helper del bot si está disponible)
+    if items:
+        try:
+            from betmexico_db import db as _bot_db
+            await_safe = getattr(_bot_db, "save_account_transactions", None)
+            if await_safe:
+                # save_account_transactions(email, items, checked_by) — sync en bot
+                _bot_db.save_account_transactions(email, items, checked_by=operator_id)
+        except Exception as e:
+            logger.debug(f"[Prewarm] save_account_transactions: {e}")
+    # Recalcula grade
+    try:
+        scoring = score_payment_readiness(details)
+    except Exception as e:
+        logger.debug(f"[Prewarm] score_payment_readiness: {e}")
+        scoring = None
+    if not scoring:
+        return
+    from app import db
+    import sqlite3
+    try:
+        with db(write=True) as c:
+            c.execute(
+                "UPDATE accounts SET grade=?, grade_score=? WHERE email=?",
+                (scoring.get("grade"), scoring.get("score"), email),
+            )
+    except sqlite3.OperationalError:
+        pass
+
+
 def _is_balance_fresh(acc: dict) -> bool:
     last = acc.get("last_checked_at")
     if not last:
@@ -216,16 +254,19 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> None:
 
         async with BetmexicoApiChecker(proxy=None) as checker:
             details = await asyncio.wait_for(
-                checker.fetch_account_details_parallel(jwt, fetch_mode="balance_only"),
-                timeout=15.0,
+                checker.fetch_account_details_parallel(jwt, fetch_mode="full"),
+                timeout=18.0,
             )
         if details:
             await asyncio.to_thread(_db_upsert_balance, email, details)
+            # Guarda txns frescas + recalcula grade (oportunidad gratuita)
+            await asyncio.to_thread(_db_save_txns_and_recalc, email, details, operator_id)
 
         _db_log_phase(
             process_id, "complete",
             {"email": email, "operator_id": operator_id,
-             "balance_real": details.get("balance_real") if details else None},
+             "balance_real": details.get("balance_real") if details else None,
+             "grade": details.get("payment_score", {}).get("grade") if details else None},
             int((time.time() - t0) * 1000),
         )
     except asyncio.CancelledError:
