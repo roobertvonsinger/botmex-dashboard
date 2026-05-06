@@ -245,14 +245,14 @@ function renderTable() {
     ? `<tr>
         <th class="grade-bar-th"></th>
         <th class="sel-cell"><input type="checkbox" id="selAll"></th>
-        ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
+        ${_th('balance_total','Saldo','num')}<th class="row-icons-th"></th>${_th('email','Cuenta')}
         ${_th('last_deposit_date','Últ. depósito')}
       </tr>`
     : `<tr>
         <th class="grade-bar-th"></th>
         <th class="sel-cell"><input type="checkbox" id="selAll"></th>
-        ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
-        ${_th('last_deposit_date','Últ. depósito')}${_th('status','Estado')}
+        ${_th('balance_total','Saldo','num')}<th class="row-icons-th"></th>${_th('email','Cuenta')}
+        ${_th('last_deposit_date','Últ. depósito')}
         ${_th('last_checked_at','Últ. check')}${_th('check_count','Checks','num')}
       </tr>`;
   const thead = t.querySelector('thead');
@@ -265,7 +265,7 @@ function renderTable() {
     });
   });
 
-  const colspan = state.view === 'simple' ? 5 : 8;
+  const colspan = state.view === 'simple' ? 6 : 8;
   const rowsHtml = visible.map(r => {
     const g = gradeClass(r.grade);
     const until = r.locked_by ? fmtUntil(r.locked_until) : null;
@@ -285,12 +285,27 @@ function renderTable() {
       : '';
     const isSA = state.user?.role === 'superadmin';
     const trTitle = isSA ? `Grade ${esc(r.grade) || '?'}` : '';
+    // Iconos de fila: 💳 (tarjetas), 📝 (notas), o ➕ (nada — quick add note)
+    const hasCards = (r.cards_count || 0) > 0;
+    const hasNotes = (r.notes_count || 0) > 0;
+    let iconsHtml = '';
+    if (hasCards) {
+      iconsHtml += `<button class="row-ic ic-cards" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.cards_count} tarjeta${r.cards_count>1?'s':''}">💳<sup>${r.cards_count}</sup></button>`;
+    }
+    if (hasNotes) {
+      iconsHtml += `<button class="row-ic ic-notes" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.notes_count} nota${r.notes_count>1?'s':''}">📝<sup>${r.notes_count}</sup></button>`;
+    }
+    if (!hasCards && !hasNotes) {
+      iconsHtml = `<button class="row-ic ic-add" data-id="${r.id}" data-email="${esc(r.email)}" title="Añadir nota rápida">+</button>`;
+    }
+
     if (state.view === 'simple') {
       return `<tr class="${trClasses}" data-id="${r.id}" title="${trTitle}">
         <td class="grade-bar-cell"></td>
         <td class="sel-cell"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
         <td class="num"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
-        <td class="combo">${r.cards_count > 0 ? `<span class="card-ind" title="${r.cards_count} tarjeta${r.cards_count > 1 ? 's' : ''} guardada${r.cards_count > 1 ? 's' : ''}">💳<sup>${r.cards_count}</sup></span>` : ''}<b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b>${lockChip}</td>
+        <td class="row-icons">${iconsHtml}</td>
+        <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b>${lockChip}</td>
         <td class="dep">${dep}</td>
       </tr>`;
     }
@@ -298,9 +313,9 @@ function renderTable() {
       <td class="grade-bar-cell"></td>
       <td class="sel-cell"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
       <td class="num"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
-      <td class="combo">${r.cards_count > 0 ? `<span class="card-ind" title="${r.cards_count} tarjeta${r.cards_count > 1 ? 's' : ''} guardada${r.cards_count > 1 ? 's' : ''}">💳<sup>${r.cards_count}</sup></span>` : ''}<b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b></td>
+      <td class="row-icons">${iconsHtml}</td>
+      <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b></td>
       <td class="dep">${dep}</td>
-      <td>${r.status === 'LIVE' ? '<span style="color:var(--accent)">LIVE</span>' : '<span class="dim">DEAD</span>'}</td>
       <td class="dep dim">${fmtAgo(r.last_checked_at)}</td>
       <td class="num">${r.check_count || 0}</td>
     </tr>`;
@@ -1084,8 +1099,97 @@ $('#actClearFilter')?.addEventListener('click', () => {
   reloadActivity();
 });
 
+// ─── Tooltip hover para iconos 💳/📝 + click para nota rápida ───
+let _rowTipEl = null;
+let _rowTipTimer = null;
+function _hideRowTip() {
+  if (_rowTipEl) { _rowTipEl.remove(); _rowTipEl = null; }
+  if (_rowTipTimer) { clearTimeout(_rowTipTimer); _rowTipTimer = null; }
+}
+async function _showRowTip(target, kind, accId) {
+  _hideRowTip();
+  const tip = document.createElement('div');
+  tip.className = 'row-tip';
+  tip.innerHTML = `<div class="row-tip-loading"><span class="dep-spinner"></span></div>`;
+  document.body.appendChild(tip);
+  _rowTipEl = tip;
+  // Posicionar
+  const r = target.getBoundingClientRect();
+  tip.style.left = (r.right + 8) + 'px';
+  tip.style.top = (r.top - 4) + 'px';
+  try {
+    if (kind === 'cards') {
+      const data = await fetch(`/api/accounts/${accId}/cards-pipe`).then(r => r.json());
+      tip.innerHTML = (data.cards || []).map(c =>
+        `<div class="row-tip-row"><span class="mono">${esc(c.pipe)}</span><span class="dim mono"> · ${c.approved}/${c.deposits} ok</span></div>`
+      ).join('') || '<div class="dim">Sin tarjetas</div>';
+    } else if (kind === 'notes') {
+      const data = await fetch(`/api/accounts/${accId}/notes-summary`).then(r => r.json());
+      tip.innerHTML = (data.notes || []).map(n =>
+        `<div class="row-tip-row"><b>${esc(n.created_by_name || '—')}</b> <span class="dim mono">${fmtAgo(n.created_at)}</span><div>${esc(n.note_text)}</div></div>`
+      ).join('') || '<div class="dim">Sin notas</div>';
+    }
+    // Re-position si el contenido se movió
+    const r2 = target.getBoundingClientRect();
+    const tipRect = tip.getBoundingClientRect();
+    if (r2.right + tipRect.width + 16 > window.innerWidth) {
+      tip.style.left = (r2.left - tipRect.width - 8) + 'px';
+    }
+  } catch (e) {
+    tip.innerHTML = `<div class="dim">Error: ${esc(e.message)}</div>`;
+  }
+}
+function _attachRowIconTooltip() {
+  const tbl = $('#accTable');
+  tbl.addEventListener('mouseover', e => {
+    const ic = e.target.closest('.row-ic.ic-cards, .row-ic.ic-notes');
+    if (!ic) return;
+    const accId = parseInt(ic.dataset.id);
+    const kind = ic.classList.contains('ic-cards') ? 'cards' : 'notes';
+    _rowTipTimer = setTimeout(() => _showRowTip(ic, kind, accId), 250);
+  });
+  tbl.addEventListener('mouseout', e => {
+    if (e.target.closest('.row-ic')) _hideRowTip();
+  });
+}
+_attachRowIconTooltip();
+
+// Quick note: ➕ icon
+async function _quickAddNote(accId, email) {
+  const text = prompt(`Nota rápida para ${email}:`);
+  if (!text || !text.trim()) return;
+  try {
+    const r = await fetch(`/api/accounts/${accId}/notes`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ text: text.trim() }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    toast('✓ Nota guardada', 'success');
+    reload();
+  } catch (e) {
+    toast(`Error: ${e.message}`, 'error');
+  }
+}
+
 // ─── Tabla: click en checkbox, click en combo (copia), click en fila (detalle) ───
 $('#accTable').addEventListener('click', e => {
+  // Iconos de fila — interceptan ANTES de que se abra el modal
+  const ic = e.target.closest('.row-ic');
+  if (ic) {
+    e.stopPropagation();
+    const accId = parseInt(ic.dataset.id);
+    const email = ic.dataset.email;
+    if (ic.classList.contains('ic-add')) {
+      _quickAddNote(accId, email);
+    } else {
+      // 💳 / 📝 → abre modal de detalle
+      openDetailModal(accId);
+    }
+    return;
+  }
   const th = e.target.closest('th.th-sort');
   if (th?.dataset.sort) { sortRows(th.dataset.sort); return; }
   const cb = e.target.closest('.rowsel');

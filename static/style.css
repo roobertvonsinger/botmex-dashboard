@@ -202,6 +202,10 @@ body {
 body.no-kpis .search { width: auto; flex: 1; max-width: none; }
 body.no-kpis .topbar > .grow { display: none; }
 body.no-kpis #adminPanel { display: none !important; }
+/* Controles premium (LIVE/DEAD, grade A/B/C/D, vista Simple/Detallada) — solo SA */
+body.no-kpis .seg[data-seg="status"],
+body.no-kpis .seg[data-seg="grade"],
+body.no-kpis .seg[data-seg="view"] { display: none !important; }
 .search .ico { color: var(--text-muted); font-size: 14px; }
 .search input { background: transparent; border: none; outline: none; color: var(--text); font-size: 12.5px; flex: 1; font-family: inherit; }
 .search input::placeholder { color: var(--text-muted); }
@@ -1677,3 +1681,65 @@ tr.op-row-azure  .grade-bar-cell { box-shadow: inset 3px 0 0 var(--op-azure);  }
 .mm-feed-row.mm-cooldown { color: var(--purple); font-style: italic; }
 .mm-feed-row.mm-err      { color: var(--danger); }
 .mm-feed-row.mm-done     { background: rgba(255,255,255,0.05); color: var(--text); padding: 6px 8px; margin-top: 4px; border-top: 1px solid var(--hairline); font-weight: 700; }
+
+/* ── Iconos de fila (💳 📝 ➕) ── */
+td.row-icons, th.row-icons-th {
+  width: 64px; min-width: 64px; padding: 0 4px !important;
+  text-align: center;
+}
+.row-ic {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid transparent;
+  color: var(--text-dim);
+  font-size: 12px;
+  width: 26px; height: 22px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin: 0 1px;
+  position: relative;
+  transition: all 120ms;
+}
+.row-ic:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: var(--hairline-h);
+  color: var(--text);
+}
+.row-ic sup {
+  font-size: 8px; font-family: var(--font-mono);
+  margin-left: 1px; color: var(--text-muted);
+}
+.row-ic.ic-cards:hover { color: var(--accent); }
+.row-ic.ic-notes:hover { color: var(--warn); }
+.row-ic.ic-add {
+  font-size: 14px; font-weight: 700;
+  color: var(--text-faint);
+  border: 1px dashed var(--hairline);
+}
+.row-ic.ic-add:hover {
+  color: var(--accent);
+  border-color: var(--accent-soft-2);
+  border-style: solid;
+}
+
+/* Tooltip ── */
+.row-tip {
+  position: fixed;
+  z-index: 9999;
+  background: var(--surface-elev);
+  backdrop-filter: blur(var(--blur));
+  border: 1px solid var(--hairline-h);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  max-width: 360px;
+  pointer-events: none;
+  animation: tipIn 140ms ease-out;
+}
+@keyframes tipIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
+.row-tip-row { padding: 3px 0; border-bottom: 1px solid var(--hairline); }
+.row-tip-row:last-child { border-bottom: none; }
+.row-tip-row .mono { color: var(--accent); }
+.row-tip-loading { padding: 8px; display: flex; gap: 6px; align-items: center; }

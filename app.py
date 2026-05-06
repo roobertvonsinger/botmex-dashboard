@@ -283,7 +283,9 @@ def list_accounts(
         "a.last_deposit_amount, a.last_deposit_date, a.status, a.grade, "
         "a.locked_by, a.locked_at, a.locked_until, a.last_checked_at, a.check_count, "
         "COALESCE(a.published_to_pool, 1) AS published_to_pool, "
-        "(SELECT COUNT(*) FROM account_cards ac WHERE ac.account_email=a.email) AS cards_count"
+        "(SELECT COUNT(*) FROM account_cards ac WHERE ac.account_email=a.email) AS cards_count, "
+        "(SELECT COUNT(*) FROM account_notes an WHERE an.account_email=a.email "
+        " AND COALESCE(an.note_text,'') != '') AS notes_count"
     )
     # Normal user: solo cuentas asignadas a su user_id
     if role == "user" and user_tg:
@@ -1056,6 +1058,64 @@ async def events(_user: dict = Depends(require_session)):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.get("/api/accounts/{account_id}/cards-pipe")
+def account_cards_pipe(account_id: int, _user: dict = Depends(require_session)):
+    """Devuelve solo las tarjetas en formato pipe (para tooltip rápido)."""
+    with db() as c:
+        acc = c.execute("SELECT email FROM accounts WHERE id=?", (account_id,)).fetchone()
+        if not acc:
+            raise HTTPException(404, "Cuenta no encontrada")
+        try:
+            rows = c.execute(
+                "SELECT card_number, card_expiry, card_cvv, total_approved, total_deposits "
+                "FROM account_cards WHERE account_email=? "
+                "ORDER BY last_used_at DESC, registered_at DESC LIMIT 20",
+                (acc["email"],),
+            ).fetchall()
+        except sqlite3.OperationalError:
+            return {"cards": []}
+    out = []
+    for r in rows:
+        if not (r["card_number"] and r["card_expiry"] and r["card_cvv"]):
+            continue
+        exp = str(r["card_expiry"]).replace("/", "")
+        out.append({
+            "pipe": f'{r["card_number"]}|{exp}|{r["card_cvv"]}',
+            "approved": r["total_approved"] or 0,
+            "deposits": r["total_deposits"] or 0,
+        })
+    return {"cards": out}
+
+
+@app.get("/api/accounts/{account_id}/notes-summary")
+def account_notes_summary(account_id: int, user: dict = Depends(require_session)):
+    """Notas resumidas para tooltip — filtradas por user/SA."""
+    role = user.get("role", "user")
+    my_tg = int(user.get("telegram_id") or 0)
+    with db() as c:
+        acc = c.execute("SELECT email FROM accounts WHERE id=?", (account_id,)).fetchone()
+        if not acc:
+            raise HTTPException(404, "Cuenta no encontrada")
+        try:
+            if role == "superadmin":
+                rows = c.execute(
+                    "SELECT note_text, created_by_name, created_at FROM account_notes "
+                    "WHERE account_email=? AND COALESCE(note_text,'') != '' "
+                    "ORDER BY created_at DESC LIMIT 10",
+                    (acc["email"],),
+                ).fetchall()
+            else:
+                rows = c.execute(
+                    "SELECT note_text, created_by_name, created_at FROM account_notes "
+                    "WHERE account_email=? AND created_by=? AND COALESCE(note_text,'') != '' "
+                    "ORDER BY created_at DESC LIMIT 10",
+                    (acc["email"], my_tg),
+                ).fetchall()
+        except sqlite3.OperationalError:
+            return {"notes": []}
+    return {"notes": [dict(r) for r in rows]}
 
 
 @app.get("/api/accounts/{account_id}/details")
