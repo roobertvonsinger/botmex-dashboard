@@ -47,7 +47,7 @@ _PREWARM_TASKS: Dict[str, asyncio.Task] = {}
 CAP_PER_OPERATOR_10MIN = 9999  # sin tope práctico — el operador decide
 ACCOUNT_FRESH_MINUTES = 30      # < 30min desde last check → skip con warning
 ACCOUNT_DAILY_LIMIT = 3          # >= 3 prewarms en el día → skip con warning
-REFRESH_PARALLEL = 4            # max logins concurrentes (anti rate-limit BetMexico)
+REFRESH_PARALLEL = 15           # max logins concurrentes (anti rate-limit BetMexico)
 CAPMONSTER_MIN_BALANCE = 5.0
 BALANCE_FRESH_SEC = 5 * 60
 TASK_TIMEOUT_SEC = 25
