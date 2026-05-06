@@ -228,8 +228,9 @@ function computeCurp(fullname, birthdate, address) {
   const c2 = _firstInternalConsonant(split.ap2);
   const c3 = _firstInternalConsonant(split.nombre);
 
-  // Homoclave (pos 17): A-Z para >= 2000, 0-9 para < 2000. Sin tabla → X.
-  const homo = parseInt(yyyy, 10) >= 2000 ? 'X' : '0';
+  // Pos 17: '0' si nació <2000, 'A' si ≥2000 (default RENAPO; el contador
+  // sube por homonimia: 0,1,2... o A,B,C... pero la mayoría queda en 0/A).
+  const homo = parseInt(yyyy, 10) >= 2000 ? 'A' : '0';
   const curp17 = `${prefix}${yy}${mm}${dd}${sex}${state}${c1}${c2}${c3}${homo}`;
   const ver = _curpVerifier(curp17);
   return curp17 + ver;
