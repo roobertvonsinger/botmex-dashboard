@@ -1743,3 +1743,20 @@ td.row-icons, th.row-icons-th {
 .row-tip-row:last-child { border-bottom: none; }
 .row-tip-row .mono { color: var(--accent); }
 .row-tip-loading { padding: 8px; display: flex; gap: 6px; align-items: center; }
+
+/* Tipo de transacción: monocromo, sin colores que distraigan */
+.d-txn-table .txn-type {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* Fila fallida: monto y método también en rojo */
+.d-txn-table tr.txn-row-fail .txn-type,
+.d-txn-table tr.txn-row-fail .txn-gw,
+.d-txn-table tr.txn-row-fail td.num {
+  color: var(--danger);
+  opacity: 0.85;
+}
+.d-txn-table tr.txn-row-fail { background: var(--danger-soft); }

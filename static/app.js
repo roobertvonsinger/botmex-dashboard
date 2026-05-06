@@ -105,6 +105,16 @@ const fmtAbs = ts => {
     : { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false };
   return d.toLocaleString('es-MX', opts).replace('.', '');
 };
+// Fecha con año (para historial de transacciones donde 673d necesitas saber 2023)
+const fmtAbsYear = ts => {
+  const d = parseTs(ts);
+  if (isNaN(d.getTime())) return '';
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  const opts = sameYear
+    ? { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }
+    : { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false };
+  return d.toLocaleString('es-MX', opts).replace(/\./g, '');
+};
 const gradeClass = g => ({ A: 'A', B: 'B', C: 'C', D: 'D' })[g] || 'U';
 // Glow tiers para el saldo:
 //   ≥ $10  → glow (verde brillante)
@@ -1247,11 +1257,25 @@ $('#detModalBody').addEventListener('submit', async e => {
   const btn = form.querySelector('.d-note-submit');
   btn.disabled = true;
   try {
-    await submitNote(accId, text);
+    const data = await submitNote(accId, text);
     inp.value = '';
     toast('✓ Nota guardada', 'success');
-    // Re-render modal
-    openDetailModal(accId);
+    // Append optimista — sin re-render del modal
+    const isSA = state.user?.role === 'superadmin';
+    const list = $('#dNotesList');
+    const empty = $('#dNotesEmpty');
+    if (empty) empty.remove();
+    const li = document.createElement('li');
+    li.dataset.noteId = data.id;
+    li.innerHTML = `<div class="d-note-head">
+      <span class="d-note-by">${esc(state.user?.username || 'tú')}</span>
+      <span class="d-note-when dim mono">ahora</span>
+      ${isSA ? `<button class="d-note-del" data-note-id="${data.id}" title="Borrar (SA)">✕</button>` : ''}
+    </div>
+    <div class="d-note-body">${esc(text)}</div>`;
+    list.insertBefore(li, list.firstChild);
+    const cnt = $('#dNotesCount');
+    if (cnt) cnt.textContent = list.children.length;
   } catch (err) {
     toast(`Error: ${err.message}`, 'error');
   } finally {
@@ -1365,6 +1389,23 @@ function closeDetailModal() {
 }
 
 function renderDetail(d) {
+  const isSA = state.user?.role === 'superadmin';
+  const naField = v => (!v || v === 'N/A') ? '<span class="dim">—</span>' : esc(v);
+  const lockHtml = d.locked_by
+    ? (() => {
+        const u = fmtUntil(d.locked_until);
+        return `por ${esc(d.locked_by)}${u ? ` <span class="${u.expired ? 'lock-expired' : (u.urgent ? 'lock-urgent' : 'dim')}">· ${u.text}</span>` : ''}`;
+      })()
+    : '<span class="dim">libre</span>';
+
+  // SA ve todo, users ven solo datos de la persona + saldo + lock + último depósito
+  const adminRows = isSA ? `
+        <li><span>Grade</span><b>${esc(d.grade) || '?'}${d.grade_score != null ? ` <span class="dim mono">(${d.grade_score})</span>` : ''}</b></li>
+        <li><span>Status</span><b>${esc(d.status)}</b></li>
+        <li><span>Últ. check</span><b>${fmtAgo(d.last_checked_at)}</b></li>
+        <li><span>Total checks</span><b>${d.check_count || 0}</b></li>
+  ` : '';
+
   const personal = `
     <div class="d-section">
       <div class="d-section-head">
@@ -1372,15 +1413,16 @@ function renderDetail(d) {
         <button class="d-deposit-btn" data-acc-id="${d.id}">💳 Depositar</button>
       </div>
       <ul class="d-list">
-        <li><span>Combo</span><b class="d-copy" data-copy="${esc(d.email + ':' + (d.password || ''))}">${esc(d.email)}:${esc(d.password || '')}</b></li>
-        <li><span>Saldo total</span><b>${fmtMoney(d.balance_total)}</b></li>
-        <li><span>Saldo real</span><b>${fmtMoney(d.balance_real)}</b></li>
-        <li><span>Grade</span><b>${esc(d.grade) || '?'}</b></li>
-        <li><span>Status</span><b>${esc(d.status)}</b></li>
-        <li><span>Lock</span><b>${d.locked_by ? `por ${esc(d.locked_by)}${(() => { const u = fmtUntil(d.locked_until); return u ? ` <span class="${u.expired ? 'lock-expired' : (u.urgent ? 'lock-urgent' : 'dim')}">· ${u.text}</span>` : ''; })()}` : '<span class="dim">libre</span>'}</b></li>
+        <li><span>Nombre</span><b>${naField(d.fullname)}</b></li>
+        <li><span>Fecha nac.</span><b>${naField(d.birthdate)}</b></li>
+        <li><span>Domicilio</span><b>${naField(d.address)}</b></li>
+        <li><span>Teléfono</span><b>${naField(d.phone)}</b></li>
+        <li><span>CURP</span><b class="mono">${naField(d.curp)}</b></li>
+        <li><span>KYC</span><b>${d.kyc_verified ? '<span style="color:var(--accent)">✓ verificado</span>' : '<span class="dim">no</span>'}</b></li>
+        <li><span>Saldo</span><b>${fmtMoney(d.balance_total)}${d.balance_real != null && d.balance_real !== d.balance_total ? ` <span class="dim mono">(real ${fmtMoney(d.balance_real)})</span>` : ''}</b></li>
+        <li><span>Lock</span><b>${lockHtml}</b></li>
         <li><span>Últ. dep.</span><b>${d.last_deposit_amount ? fmtMoney(d.last_deposit_amount) + ' · ' + fmtAgo(d.last_deposit_date) : '<span class="dim">—</span>'}</b></li>
-        <li><span>Últ. check</span><b>${fmtAgo(d.last_checked_at)}</b></li>
-        <li><span>Total checks</span><b>${d.check_count || 0}</b></li>
+        ${adminRows}
       </ul>
     </div>`;
 
@@ -1407,8 +1449,9 @@ function renderDetail(d) {
     : `<div class="d-section"><h4>💳 Tarjetas</h4><div class="d-empty">Sin tarjetas guardadas.</div></div>`;
 
   // BetMexico API: txn_type 1=depósito, 2=retiro. Gateway 1=tarjeta, 2=SPEI, 3=OXXO.
-  const _txnType = t => ({1: '⬇️ Depósito', 2: '⬆️ Retiro'})[t] ?? '🔄 Otro';
-  const _txnGateway = g => ({1: '💳 Tarjeta', 2: '🏦 SPEI', 3: '🏪 OXXO'})[g] || (g ? `gw${g}` : '—');
+  // Iconos sutiles (monocromos) — el color va por estado, no por tipo
+  const _txnType = t => ({1: '↓ Depósito', 2: '↑ Retiro'})[t] ?? '· Otro';
+  const _txnGateway = g => ({1: 'Tarjeta', 2: 'SPEI', 3: 'OXXO'})[g] || (g ? `gw${g}` : '—');
   const _txnStatus = s => {
     const m = {6: 'Exitoso', 0: 'Pendiente', '-4': 'Fallido', 5: 'Error'};
     return m[s] ?? m[String(s)] ?? `cod ${s}`;
@@ -1423,14 +1466,19 @@ function renderDetail(d) {
             <thead><tr><th>Cuándo</th><th>Tipo</th><th>Método</th><th class="num">Monto</th><th>Estado</th></tr></thead>
             <tbody>
               ${d.transactions.map(t => {
+                const stCls = _txnStatusCls(t.status);
+                const isFail = stCls === 'fail';
                 const isCard = t.txn_type === 1 && t.gateway === 1;
-                const rowCls = isCard ? '' : 'txn-row-other';
+                // Si fail: toda la fila en rojo (monto + método incluidos)
+                // Si ok/pendiente: tarjeta acentuada (verde), SPEI/OXXO tenue
+                const rowCls = isFail ? 'txn-row-fail' : (isCard ? '' : 'txn-row-other');
+                const gwCls = isFail ? '' : (isCard ? 'txn-gw-card' : 'dim');
                 return `<tr class="${rowCls}">
-                  <td class="dim mono" title="${esc(t.txn_date || '')}">${fmtAbs(t.txn_date)}</td>
-                  <td>${_txnType(t.txn_type)}</td>
-                  <td class="txn-gw${isCard ? ' txn-gw-card' : ' dim'}">${esc(_txnGateway(t.gateway))}</td>
+                  <td class="dim mono" title="${esc(t.txn_date || '')}">${fmtAbsYear(t.txn_date)}</td>
+                  <td class="txn-type">${_txnType(t.txn_type)}</td>
+                  <td class="txn-gw ${gwCls}">${esc(_txnGateway(t.gateway))}</td>
                   <td class="num">${fmtMoney(t.amount)}</td>
-                  <td><span class="txn-st txn-st-${_txnStatusCls(t.status)}">${esc(_txnStatus(t.status))}</span></td>
+                  <td><span class="txn-st txn-st-${stCls}">${esc(_txnStatus(t.status))}</span></td>
                 </tr>`;
               }).join('')}
             </tbody>
@@ -1439,24 +1487,27 @@ function renderDetail(d) {
       </div>`
     : `<div class="d-section"><h4>📊 Transacciones</h4><div class="d-empty">Sin transacciones registradas.</div></div>`;
 
+  // Solo SA puede borrar notas (otros usuarios no, son immutables una vez enviadas)
+  const renderNoteLi = n => `<li data-note-id="${n.id}">
+    <div class="d-note-head">
+      <span class="d-note-by">${esc(n.created_by_name || '—')}</span>
+      <span class="d-note-when dim mono" title="${esc(n.created_at || '')}">${fmtAbs(n.created_at)} · ${fmtAgo(n.created_at)}</span>
+      ${isSA ? `<button class="d-note-del" data-note-id="${n.id}" title="Borrar (SA)">✕</button>` : ''}
+    </div>
+    <div class="d-note-body">${esc(n.note_text)}</div>
+  </li>`;
+
+  const notesList = (d.notes && d.notes.length > 0)
+    ? `<ul class="d-notes" id="dNotesList">${d.notes.map(renderNoteLi).join('')}</ul>`
+    : '<ul class="d-notes" id="dNotesList"></ul><div class="d-empty" id="dNotesEmpty">Sin notas todavía.</div>';
+
   const notes = `<div class="d-section">
-      <h4>📝 Notas ${d.notes && d.notes.length > 0 ? `<span class="d-count">${d.notes.length}</span>` : ''}</h4>
+      <h4>📝 Notas <span class="d-count" id="dNotesCount">${(d.notes || []).length}</span></h4>
       <form class="d-note-form" data-acc-id="${d.id}">
-        <textarea class="d-note-input" placeholder="Nueva nota (visible solo para ti${state.user?.role === 'superadmin' ? '' : ' y SA'})…" maxlength="2000" rows="2"></textarea>
+        <textarea class="d-note-input" placeholder="Nueva nota (visible solo para ti${isSA ? '' : ' y SA'})…" maxlength="2000" rows="2"></textarea>
         <button type="submit" class="d-note-submit">Guardar</button>
       </form>
-      ${(d.notes && d.notes.length > 0)
-        ? `<ul class="d-notes">
-            ${d.notes.map(n => `<li data-note-id="${n.id}">
-              <div class="d-note-head">
-                <span class="d-note-by">${esc(n.created_by_name || '—')}</span>
-                <span class="d-note-when dim mono" title="${esc(n.created_at || '')}">${fmtAbs(n.created_at)} · ${fmtAgo(n.created_at)}</span>
-                ${n.mine || state.user?.role === 'superadmin' ? `<button class="d-note-del" data-note-id="${n.id}" title="Borrar">✕</button>` : ''}
-              </div>
-              <div class="d-note-body">${esc(n.note_text)}</div>
-            </li>`).join('')}
-          </ul>`
-        : '<div class="d-empty">Sin notas todavía.</div>'}
+      ${notesList}
     </div>`;
 
   return `<div class="d-grid">${personal}${cards}${txns}${notes}</div>`;

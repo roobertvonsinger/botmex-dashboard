@@ -1123,9 +1123,10 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
     with db() as c:
         acc = c.execute(
             "SELECT id, email, password, balance_total, balance_real, "
-            "last_deposit_amount, last_deposit_date, status, grade, "
+            "last_deposit_amount, last_deposit_date, status, grade, grade_score, "
             "locked_by, locked_at, locked_until, last_checked_at, check_count, "
-            "first_checked_at "
+            "first_checked_at, "
+            "fullname, birthdate, address, phone, curp, kyc_verified "
             "FROM accounts WHERE id=? LIMIT 1",
             (account_id,),
         ).fetchone()
