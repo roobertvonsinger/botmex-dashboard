@@ -34,6 +34,20 @@ let activityRows = [];
 let activityFilter = { kind: '', who: null };
 let notifications = [];
 let _evtSrc = null;
+let _sortCol = null, _sortDir = -1;
+
+function sortRows(col) {
+  if (_sortCol === col) _sortDir = -_sortDir;
+  else { _sortCol = col; _sortDir = -1; }
+  const numeric = ['balance_total', 'balance_real', 'last_deposit_amount', 'check_count'];
+  state.rows.sort((a, b) => {
+    const av = numeric.includes(col) ? (a[col] || 0) : (parseTs(a[col] || '').getTime() || 0);
+    const bv = numeric.includes(col) ? (b[col] || 0) : (parseTs(b[col] || '').getTime() || 0);
+    return (av - bv) * _sortDir;
+  });
+  state.page = 1;
+  renderTable();
+}
 
 const $ = sel => document.querySelector(sel);
 const $$ = sel => document.querySelectorAll(sel);
@@ -208,15 +222,21 @@ function renderTable() {
   const paged = getPaged();
   const visible = paged.rows;
   const t = $('#accTable');
+  const _th = (col, label, cls = '') => {
+    const on = _sortCol === col;
+    const ic = on ? (_sortDir === 1 ? ' ↑' : ' ↓') : '';
+    return `<th class="th-sort${on ? ' sort-on' : ''} ${cls}" data-sort="${col}">${label}${ic}</th>`;
+  };
   const cols = state.view === 'simple'
     ? `<tr>
-        <th class="grade-bar-th"></th><th class="num">Saldo</th><th>Cuenta</th>
-        <th>Últ. depósito</th>
+        <th class="grade-bar-th"></th>${_th('balance_total','Saldo','num')}<th>Cuenta</th>
+        ${_th('last_deposit_date','Últ. depósito')}
         <th class="sel-cell"><input type="checkbox" id="selAll"></th>
       </tr>`
     : `<tr>
-        <th class="grade-bar-th"></th><th class="num">Saldo</th><th>Cuenta</th>
-        <th>Últ. depósito</th><th>Estado</th><th>Últ. check</th><th class="num">Checks</th>
+        <th class="grade-bar-th"></th>${_th('balance_total','Saldo','num')}<th>Cuenta</th>
+        ${_th('last_deposit_date','Últ. depósito')}<th>Estado</th>
+        ${_th('last_checked_at','Últ. check')}${_th('check_count','Checks','num')}
         <th class="sel-cell"><input type="checkbox" id="selAll"></th>
       </tr>`;
   t.querySelector('thead').innerHTML = cols;
@@ -951,6 +971,8 @@ $('#actClearFilter')?.addEventListener('click', () => {
 
 // ─── Tabla: click en checkbox, click en combo (copia), click en fila (detalle) ───
 $('#accTable').addEventListener('click', e => {
+  const th = e.target.closest('th.th-sort');
+  if (th?.dataset.sort) { sortRows(th.dataset.sort); return; }
   const cb = e.target.closest('.rowsel');
   if (cb) {
     const id = parseInt(cb.dataset.id);
@@ -1107,30 +1129,36 @@ function renderDetail(d) {
       </div>`
     : `<div class="d-section"><h4>💳 Tarjetas</h4><div class="d-empty">Sin tarjetas guardadas.</div></div>`;
 
-  // Mappings del bot (betmexico_utils.py / search.py): txn_type 0=dep, 1=retiro.
-  // Otros valores los ve el bot pero no los etiqueta (apuestas, bonos, etc) → fallback genérico.
-  const _txnType = t => ({0: '⬇️ Depósito', 1: '⬆️ Retiro'})[t] || '🔄 Otro';
+  // BetMexico API: txn_type 1=depósito, 2=retiro. Gateway 1=tarjeta, 2=SPEI, 3=OXXO.
+  const _txnType = t => ({1: '⬇️ Depósito', 2: '⬆️ Retiro'})[t] ?? '🔄 Otro';
+  const _txnGateway = g => ({1: '💳 Tarjeta', 2: '🏦 SPEI', 3: '🏪 OXXO'})[g] || (g ? `gw${g}` : '—');
   const _txnStatus = s => {
-    const m = {6: 'exitosa', 0: 'pendiente', '-4': 'fallida'};
+    const m = {6: 'Exitoso', 0: 'Pendiente', '-4': 'Fallido', 5: 'Error'};
     return m[s] ?? m[String(s)] ?? `cod ${s}`;
   };
-  const _txnStatusCls = s => ({6: 'ok', 0: 'pending', '-4': 'fail'})[s] ?? ({6: 'ok', 0: 'pending', '-4': 'fail'})[String(s)] ?? '';
+  const _txnStatusCls = s => ({6: 'ok', 0: 'pending', '-4': 'fail', 5: 'fail'})[s]
+    ?? ({6: 'ok', 0: 'pending', '-4': 'fail', 5: 'fail'})[String(s)] ?? '';
   const txns = (d.transactions && d.transactions.length > 0)
     ? `<div class="d-section">
         <h4>📊 Transacciones <span class="d-count">${d.transactions.length}</span></h4>
-        <table class="d-txn-table">
-          <thead><tr><th>Cuándo</th><th>Tipo</th><th>Gateway</th><th class="num">Monto</th><th>Estado</th></tr></thead>
-          <tbody>
-            ${d.transactions.map(t => `
-              <tr>
-                <td class="dim mono" title="${esc(t.txn_date || '')}">${fmtAbs(t.txn_date)}</td>
-                <td>${_txnType(t.txn_type)}</td>
-                <td class="dim mono">${esc(t.gateway || '—')}</td>
-                <td class="num">${fmtMoney(t.amount)}</td>
-                <td><span class="txn-st txn-st-${_txnStatusCls(t.status)}">${esc(_txnStatus(t.status))}</span></td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
+        <div class="d-txn-scroll">
+          <table class="d-txn-table">
+            <thead><tr><th>Cuándo</th><th>Tipo</th><th>Método</th><th class="num">Monto</th><th>Estado</th></tr></thead>
+            <tbody>
+              ${d.transactions.map(t => {
+                const isCard = t.txn_type === 1 && t.gateway === 1;
+                const rowCls = isCard ? '' : 'txn-row-other';
+                return `<tr class="${rowCls}">
+                  <td class="dim mono" title="${esc(t.txn_date || '')}">${fmtAbs(t.txn_date)}</td>
+                  <td>${_txnType(t.txn_type)}</td>
+                  <td class="txn-gw${isCard ? ' txn-gw-card' : ' dim'}">${esc(_txnGateway(t.gateway))}</td>
+                  <td class="num">${fmtMoney(t.amount)}</td>
+                  <td><span class="txn-st txn-st-${_txnStatusCls(t.status)}">${esc(_txnStatus(t.status))}</span></td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
       </div>`
     : `<div class="d-section"><h4>📊 Transacciones</h4><div class="d-empty">Sin transacciones registradas.</div></div>`;
 

@@ -989,16 +989,28 @@ tr.row-sel { background: var(--accent-soft) !important; }
 .d-card-copy:hover { color: var(--accent); border-color: var(--accent); }
 
 /* Tabla de transacciones */
+.d-txn-scroll {
+  max-height: 420px; overflow-y: auto;
+  border: 1px solid var(--hairline); border-radius: 6px;
+}
+.d-txn-scroll::-webkit-scrollbar { width: 4px; }
+.d-txn-scroll::-webkit-scrollbar-track { background: transparent; }
+.d-txn-scroll::-webkit-scrollbar-thumb { background: var(--hairline-h); border-radius: 2px; }
 .d-txn-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
 .d-txn-table th, .d-txn-table td {
   padding: 6px 10px; border-bottom: 1px solid var(--hairline);
   text-align: left;
 }
 .d-txn-table th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--surface-solid);
   font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase;
   letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600;
 }
 .d-txn-table td.num, .d-txn-table th.num { text-align: right; font-family: var(--font-mono); }
+.txn-row-other td { color: var(--text-dim); }
+.txn-gw { font-size: 11px; white-space: nowrap; }
+.txn-gw-card { color: var(--accent); font-weight: 600; }
 
 /* Notas */
 .d-notes { list-style: none; display: flex; flex-direction: column; gap: 8px; }
@@ -1010,6 +1022,14 @@ tr.row-sel { background: var(--accent-soft) !important; }
 }
 .d-note-by { font-weight: 600; margin-right: 8px; }
 .d-note-when { font-size: 10px; }
+
+/* Sortable column headers */
+th.th-sort {
+  cursor: pointer; user-select: none;
+  white-space: nowrap;
+}
+th.th-sort:hover { color: var(--text); }
+th.th-sort.sort-on { color: var(--accent); }
 
 /* sel-cell — drag-select touch + mouse */
 td.sel-cell, th.sel-cell {
