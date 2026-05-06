@@ -271,31 +271,59 @@
     <header class="modal-head">
       <div class="modal-title">
         <span class="modal-icon">💳</span>
-        <span>Depósito directo</span>
+        <span id="depModalTitle">Depositar</span>
       </div>
       <button class="modal-close" id="depModalClose">×</button>
     </header>
     <div class="modal-body">
-      <div class="dep-target">
+      <!-- Modo (segmented) -->
+      <div class="dep-mode-seg" id="depModeSeg">
+        <button class="dep-mode-btn on" data-mode="single">⚡ Una</button>
+        <button class="dep-mode-btn" data-mode="multi">👥 Multi (Matchmaker)</button>
+        <button class="dep-mode-btn" data-mode="schedule">⏰ Programado</button>
+      </div>
+
+      <!-- Cuentas (target) -->
+      <div class="dep-target" id="depTargetBlock">
         <div class="dep-target-row">
-          <span class="dep-target-label">Cuenta</span>
+          <span class="dep-target-label" id="depTargetLabel">Cuenta</span>
           <b id="depTargetEmail">—</b>
         </div>
-        <div class="dep-target-row">
+        <div class="dep-target-row" id="depTargetBalanceRow">
           <span class="dep-target-label">Saldo actual</span>
           <span id="depTargetBalance" class="mono">—</span>
         </div>
       </div>
 
-      <div class="dep-section">
+      <!-- Lista de cuentas (modo multi) -->
+      <div class="dep-section hidden" id="depMultiAccts">
+        <label class="dep-label">Cuentas seleccionadas <span class="dim" id="depMultiAcctsCount">0/5</span></label>
+        <div class="dep-multi-list" id="depMultiList"></div>
+      </div>
+
+      <!-- Tarjetas guardadas (chips) -->
+      <div class="dep-section hidden" id="depSavedCards">
+        <label class="dep-label">💳 Tarjetas guardadas <span class="dim">— click para usar</span></label>
+        <div class="dep-chips" id="depCardChips"></div>
+      </div>
+
+      <!-- Input tarjeta (modo single + schedule) -->
+      <div class="dep-section" id="depCardSection">
         <label class="dep-label">Tarjeta <span class="dim">— pipe format</span></label>
         <input type="text" id="depCardPipe" class="dep-input" placeholder="4242424242424242|1228|123" autocomplete="off" spellcheck="false">
-        <div id="depCardHint" class="dep-hint hidden">↑ última tarjeta usada · clic en el campo para reemplazar</div>
         <div id="depCardErr" class="dep-err hidden"></div>
       </div>
 
+      <!-- Pool tarjetas (modo multi) -->
+      <div class="dep-section hidden" id="depMultiCards">
+        <label class="dep-label">Pool de tarjetas <span class="dim">— una por línea (max 10)</span></label>
+        <textarea id="depMultiPool" class="dep-textarea" rows="4" placeholder="4242424242424242|1228|123&#10;5555555555554444|0627|456" spellcheck="false"></textarea>
+        <div class="dep-pool-count dim mono" id="depPoolCount">0 tarjetas</div>
+      </div>
+
+      <!-- Monto -->
       <div class="dep-section">
-        <label class="dep-label">Monto</label>
+        <label class="dep-label">Monto <span class="dim" id="depAmountHint"></span></label>
         <div class="dep-amounts" id="depAmounts">
           <button class="dep-amt" data-v="10">$10</button>
           <button class="dep-amt on" data-v="50">$50</button>
@@ -307,9 +335,24 @@
         <input type="number" id="depCustomAmount" class="dep-input hidden" placeholder="Monto…" step="0.01" min="1" max="5000">
       </div>
 
-      <div id="depResult" class="dep-result hidden"></div>
+      <!-- Repeticiones (modo schedule) -->
+      <div class="dep-section hidden" id="depScheduleBlock">
+        <label class="dep-label">Repeticiones <span class="dim">— cada 1 min, máx 20</span></label>
+        <div class="dep-stepper">
+          <button class="dep-step-btn" data-d="-1">−</button>
+          <span class="dep-step-val mono" id="depRepsVal">5</span>
+          <button class="dep-step-btn" data-d="1">+</button>
+        </div>
+      </div>
 
-      <button id="depExec" class="dep-exec">🚀 Ejecutar depósito</button>
+      <!-- Result / Feed -->
+      <div id="depResult" class="dep-result hidden"></div>
+      <div id="depFeed" class="dep-feed hidden"></div>
+
+      <div class="dep-exec-row">
+        <button id="depExec" class="dep-exec">🚀 Ejecutar</button>
+        <button id="depCancel" class="dep-exec dep-exec-cancel hidden">⏹ Detener</button>
+      </div>
     </div>
   </div>
 </div>

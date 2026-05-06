@@ -355,8 +355,9 @@ function updateCmdBar() {
   const totalBal = selRows.reduce((s, r) => s + (r.balance_total || 0), 0);
   $('#cmdStats').textContent = `Σ ${fmtMoney(totalBal)}`;
 
-  // Depositar solo con 1 seleccionada
-  $('#cmdDeposit').style.display = n === 1 ? '' : 'none';
+  // Depositar visible 1-5 cuentas (>5 → tope del matchmaker)
+  $('#cmdDeposit').style.display = (n >= 1 && n <= 5) ? '' : 'none';
+  $('#cmdDeposit').textContent = n === 1 ? '💳 Depositar' : `💳 Depositar (${n})`;
 
   // Label dinámico de Trastienda según estado de la selección
   const tBtn = $('#cmdTrastienda');
@@ -1019,6 +1020,18 @@ $('#accTable').addEventListener('click', e => {
   }
 });
 
+// Modal de detalle: botón "Depositar en esta cuenta"
+$('#detModalBody').addEventListener('click', e => {
+  const btn = e.target.closest('.d-deposit-btn');
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const accId = parseInt(btn.dataset.accId);
+  if (!accId) return;
+  closeDetailModal();
+  setTimeout(() => openDepositModal(accId), 80);
+});
+
 // Modal de detalle: form de notas (submit + delete)
 $('#detModalBody').addEventListener('submit', async e => {
   const form = e.target.closest('.d-note-form');
@@ -1151,7 +1164,10 @@ function closeDetailModal() {
 function renderDetail(d) {
   const personal = `
     <div class="d-section">
-      <h4>📋 Datos personales</h4>
+      <div class="d-section-head">
+        <h4>📋 Datos personales</h4>
+        <button class="d-deposit-btn" data-acc-id="${d.id}">💳 Depositar</button>
+      </div>
       <ul class="d-list">
         <li><span>Combo</span><b class="d-copy" data-copy="${esc(d.email + ':' + (d.password || ''))}">${esc(d.email)}:${esc(d.password || '')}</b></li>
         <li><span>Saldo total</span><b>${fmtMoney(d.balance_total)}</b></li>
@@ -1275,53 +1291,151 @@ $('#accTable').addEventListener('click', e => {
   }
 }, true);  // capture para que ejecute antes del click handler de fila
 
-// ─── Deposit modal ───
-let _depAccountId = null;
+// ─── Deposit modal (3 modos: single | multi | schedule) ───
+let _depMode = 'single';        // single | multi | schedule
+let _depAccountIds = [];        // 1 ó N cuentas
 let _depAmount = 50;
+let _depReps = 5;
 let _depBusy = false;
+let _depMmRunId = null;         // run_id del matchmaker (para cancel)
+let _depMmAbort = null;         // AbortController del SSE fetch
 
-async function openDepositModal(accountId) {
-  const acc = state.rows.find(r => r.id === accountId);
-  if (!acc) { toast('Cuenta no encontrada', 'error'); return; }
-  _depAccountId = accountId;
+function setDepMode(mode) {
+  _depMode = mode;
+  $$('#depModeSeg .dep-mode-btn').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+
+  const isSingle = mode === 'single';
+  const isMulti  = mode === 'multi';
+  const isSched  = mode === 'schedule';
+
+  // visibilidades
+  $('#depTargetBlock').classList.toggle('hidden', isMulti);
+  $('#depMultiAccts').classList.toggle('hidden', !isMulti);
+  $('#depCardSection').classList.toggle('hidden', isMulti);
+  $('#depMultiCards').classList.toggle('hidden', !isMulti);
+  $('#depScheduleBlock').classList.toggle('hidden', !isSched);
+
+  // título
+  $('#depModalTitle').textContent = isSingle ? 'Depositar' : isMulti ? 'Multicuenta (Matchmaker)' : 'Programado';
+  $('#depAmountHint').textContent = isMulti ? '— por intento' : isSched ? '— cada repetición' : '';
+
+  // botón principal
+  $('#depExec').textContent = isSingle ? '🚀 Ejecutar depósito'
+                            : isMulti ? '🎯 Lanzar Matchmaker'
+                            : '⏰ Programar misión';
+  // tarjetas guardadas solo aplica en single (1 cuenta) y schedule
+  refreshSavedCards();
+  // multi: refrescar el panel de cuentas
+  if (isMulti) renderMultiAccounts();
+}
+
+async function openDepositModal(accountId, opts = {}) {
+  // Determina cuentas iniciales:
+  // - openDepositModal(id) → single, esa cuenta
+  // - openDepositModal(null, {ids: [...]}) → multi por default si >1
+  if (opts.ids && opts.ids.length > 0) {
+    _depAccountIds = [...opts.ids].slice(0, 5);
+  } else if (accountId) {
+    _depAccountIds = [accountId];
+  } else if (selectedIds.size > 0) {
+    _depAccountIds = [...selectedIds].slice(0, 5);
+  } else {
+    toast('Sin cuenta seleccionada', 'error');
+    return;
+  }
+
   _depAmount = 50;
-  $('#depTargetEmail').textContent = acc.email;
-  $('#depTargetBalance').textContent = fmtMoney(acc.balance_total);
+  _depReps = 5;
+  _depMmRunId = null;
   $('#depCardPipe').value = '';
+  $('#depMultiPool').value = '';
+  $('#depPoolCount').textContent = '0 tarjetas';
   $('#depCardErr').classList.add('hidden');
   $('#depResult').classList.add('hidden');
+  $('#depFeed').classList.add('hidden');
+  $('#depFeed').innerHTML = '';
   $('#depCustomAmount').value = '';
   $('#depCustomAmount').classList.add('hidden');
   $$('#depAmounts .dep-amt').forEach(b => b.classList.toggle('on', b.dataset.v === '50'));
+  $('#depRepsVal').textContent = '5';
   $('#depExec').disabled = false;
-  $('#depExec').textContent = '🚀 Ejecutar depósito';
+  $('#depCancel').classList.add('hidden');
   $('#depModalOverlay').classList.remove('hidden');
 
-  // Auto-rellenar última tarjeta usada de esta cuenta (proceso completo en un paso)
-  if (acc.cards_count > 0) {
-    try {
-      const data = await fetch(`/api/accounts/${accountId}/details`).then(r => r.ok ? r.json() : null);
-      const lastCard = (data?.cards || [])[0];  // ya viene ordenada DESC last_used_at
-      if (lastCard?.card_number && lastCard?.card_expiry && lastCard?.card_cvv) {
-        const exp = String(lastCard.card_expiry).replace('/', '');
-        const pipe = `${lastCard.card_number}|${exp}|${lastCard.card_cvv}`;
-        $('#depCardPipe').value = pipe;
-        $('#depCardPipe').classList.add('dep-prefilled');
-        $('#depCardHint')?.classList.remove('hidden');
-      }
-    } catch {}
+  // Mostrar/ocultar botones de modo según contexto
+  const multiBtn = document.querySelector('#depModeSeg [data-mode="multi"]');
+  if (multiBtn) multiBtn.style.display = (_depAccountIds.length >= 2) ? '' : 'none';
+
+  // Mode default: single si 1 cuenta, multi si más
+  setDepMode(_depAccountIds.length > 1 ? 'multi' : 'single');
+
+  // Display cuenta target (single/schedule)
+  if (_depAccountIds.length === 1) {
+    const acc = state.rows.find(r => r.id === _depAccountIds[0]);
+    $('#depTargetEmail').textContent = acc?.email || '—';
+    $('#depTargetBalance').textContent = acc ? fmtMoney(acc.balance_total) : '—';
   }
+
   setTimeout(() => {
-    const inp = $('#depCardPipe');
-    inp.focus();
-    if (inp.value) inp.select();  // ya rellenada → seleccionada para reemplazar fácil
-  }, 50);
+    if (_depMode === 'multi') $('#depMultiPool').focus();
+    else {
+      const inp = $('#depCardPipe');
+      inp.focus();
+      if (inp.value) inp.select();
+    }
+  }, 60);
+}
+
+function renderMultiAccounts() {
+  const list = $('#depMultiList');
+  $('#depMultiAcctsCount').textContent = `${_depAccountIds.length}/5`;
+  list.innerHTML = _depAccountIds.map(id => {
+    const acc = state.rows.find(r => r.id === id);
+    if (!acc) return '';
+    return `<div class="dep-multi-row">
+      <span class="dep-multi-email">${esc(acc.email)}</span>
+      <span class="dep-multi-balance mono dim">${fmtMoney(acc.balance_total)}</span>
+      <button class="dep-multi-rm" data-id="${id}" title="Quitar">×</button>
+    </div>`;
+  }).join('');
+}
+
+async function refreshSavedCards() {
+  const cont = $('#depSavedCards');
+  const chips = $('#depCardChips');
+  if (_depMode === 'multi' || _depAccountIds.length !== 1) {
+    cont.classList.add('hidden');
+    return;
+  }
+  const accId = _depAccountIds[0];
+  const acc = state.rows.find(r => r.id === accId);
+  if (!acc || !acc.cards_count) { cont.classList.add('hidden'); return; }
+
+  try {
+    const data = await fetch(`/api/accounts/${accId}/details`).then(r => r.ok ? r.json() : null);
+    const cards = (data?.cards || []).filter(c => c.card_number && c.card_expiry && c.card_cvv);
+    if (!cards.length) { cont.classList.add('hidden'); return; }
+
+    chips.innerHTML = cards.slice(0, 8).map((c, i) => {
+      const exp = String(c.card_expiry).replace('/', '');
+      const pipe = `${c.card_number}|${exp}|${c.card_cvv}`;
+      const tail = c.card_number.slice(-4);
+      const ok = (c.total_approved || 0) > 0;
+      return `<button class="dep-chip${i === 0 ? ' dep-chip-fresh' : ''}${ok ? ' dep-chip-ok' : ''}" data-pipe="${esc(pipe)}" title="${ok ? `${c.total_approved}/${c.total_deposits} aprobados` : 'sin depósitos exitosos'}">
+        <span class="dep-chip-tail mono">···${tail}</span>
+        ${ok ? '<span class="dep-chip-badge">✓</span>' : ''}
+      </button>`;
+    }).join('');
+    cont.classList.remove('hidden');
+  } catch {
+    cont.classList.add('hidden');
+  }
 }
 
 function closeDepositModal() {
-  if (_depBusy) { toast('Espera a que termine el depósito', 'error'); return; }
+  if (_depBusy) { toast('Detén la misión primero', 'error'); return; }
   $('#depModalOverlay').classList.add('hidden');
-  _depAccountId = null;
+  _depAccountIds = [];
 }
 
 function validatePipe(s) {
@@ -1330,7 +1444,6 @@ function validatePipe(s) {
   if (parts.length === 3) {
     const [num, exp, cvv] = parts;
     if (!/^\d{13,19}$/.test(num)) return 'Número de tarjeta inválido';
-    // Acepta MMYY (4 dígitos), MM/YY o MMYYYY
     if (!/^(0[1-9]|1[0-2])\/?(\d{2}|\d{4})$/.test(exp)) return 'Vencimiento inválido (MMYY)';
     if (!/^\d{3,4}$/.test(cvv)) return 'CVV inválido';
     return null;
@@ -1343,13 +1456,21 @@ function validatePipe(s) {
     if (!/^\d{3,4}$/.test(cvv)) return 'CVV inválido';
     return null;
   }
-  return 'Formato: numero|MMYY|CVV o numero|MM|YY|CVV';
+  return 'Formato: numero|MMYY|CVV';
 }
 
+function getAmount() {
+  let a = _depAmount;
+  if (a === 'custom') a = parseFloat($('#depCustomAmount').value) || 0;
+  return a;
+}
+
+// ── SINGLE / SCHEDULE: 1 tarjeta, 1 cuenta ──
 async function executeDeposit() {
   if (_depBusy) return;
-  if (!_depAccountId) { toast('Sin cuenta seleccionada', 'error'); return; }
+  if (_depMode === 'multi') return executeMatchmaker();
 
+  if (_depAccountIds.length !== 1) { toast('Selecciona 1 cuenta', 'error'); return; }
   const pipe = $('#depCardPipe').value.trim();
   const err = validatePipe(pipe);
   if (err) {
@@ -1358,38 +1479,30 @@ async function executeDeposit() {
     $('#depCardPipe').focus();
     return;
   }
-  $('#depCardErr').classList.add('hidden');
+  const amount = getAmount();
+  if (amount < 1 || amount > 5000) { toast('Monto fuera de rango (1-5000)', 'error'); return; }
 
-  let amount = _depAmount;
-  if (amount === 'custom') {
-    amount = parseFloat($('#depCustomAmount').value) || 0;
-    if (amount < 1 || amount > 5000) { toast('Monto fuera de rango (1-5000)', 'error'); return; }
-  }
+  if (_depMode === 'schedule') return executeScheduled(pipe, amount);
 
+  // SINGLE
   _depBusy = true;
   $('#depExec').disabled = true;
   $('#depExec').textContent = 'Procesando…';
   const res = $('#depResult');
   res.className = 'dep-result loading';
+  res.classList.remove('hidden');
   res.innerHTML = `<span class="dep-spinner"></span> Login → BeginDeposit → makePayment…`;
 
   try {
     const r = await fetch('/api/deposits/execute', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ account_id: _depAccountId, card_pipe: pipe, amount }),
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ account_id: _depAccountIds[0], card_pipe: pipe, amount }),
     });
     const data = await r.json();
-
     if (!r.ok) {
       res.className = 'dep-result error';
       res.innerHTML = `<b>✗ ${esc(data.detail || 'Error')}</b>`;
-      $('#depExec').disabled = false;
-      $('#depExec').textContent = '🚀 Ejecutar depósito';
-      return;
-    }
-
-    if (data.success) {
+    } else if (data.success) {
       res.className = 'dep-result success';
       res.innerHTML = `<b>✓ Depósito aprobado</b> — $${amount.toFixed(2)} <span class="dim mono"> · ${data.duration_ms}ms</span>`;
       pushNotif({ icon: '💳', msg: `Depósito $${amount.toFixed(2)} aprobado` });
@@ -1399,20 +1512,198 @@ async function executeDeposit() {
       res.innerHTML = `<b>✗ Rechazado</b><br><span class="mono">${esc(data.error || data.result_code || 'Sin detalle')}</span>`;
       pushNotif({ icon: '⚠️', msg: `Depósito rechazado: ${data.error || data.result_code}` });
     }
-    $('#depExec').disabled = false;
     $('#depExec').textContent = '🔁 Otro intento';
   } catch (e) {
     res.className = 'dep-result error';
     res.innerHTML = `<b>✗ Error de red</b><br><span class="mono">${esc(e.message)}</span>`;
-    $('#depExec').disabled = false;
     $('#depExec').textContent = '🔁 Reintentar';
   } finally {
     _depBusy = false;
+    $('#depExec').disabled = false;
   }
 }
 
+// ── SCHEDULE: 1 tarjeta, 1 cuenta, N reps cada 1 min ──
+async function executeScheduled(pipe, amount) {
+  _depBusy = true;
+  $('#depExec').disabled = true;
+  $('#depExec').textContent = 'Programando…';
+  try {
+    const r = await fetch('/api/deposits/scheduled/create', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        account_id: _depAccountIds[0], card_pipe: pipe,
+        amount, repetitions: _depReps,
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+    const res = $('#depResult');
+    res.className = 'dep-result success';
+    res.classList.remove('hidden');
+    res.innerHTML = `<b>⏰ Misión programada</b> — ${_depReps} repeticiones cada 1min<br><span class="dim mono">id: ${esc(data.sched_id)}</span>`;
+    pushNotif({ icon: '⏰', msg: `Misión ${data.sched_id}: ${_depReps} reps en ${data.email}` });
+    $('#depExec').textContent = '✓ Programada · cerrar';
+    setTimeout(() => closeDepositModal(), 1500);
+  } catch (e) {
+    toast(`Error: ${e.message}`, 'error');
+    $('#depExec').textContent = '⏰ Programar misión';
+  } finally {
+    _depBusy = false;
+    $('#depExec').disabled = false;
+  }
+}
+
+// ── MULTI: matchmaker SSE ──
+async function executeMatchmaker() {
+  if (_depBusy) return;
+  if (_depAccountIds.length < 1) { toast('Selecciona al menos 1 cuenta', 'error'); return; }
+  if (_depAccountIds.length > 5) { toast('Máximo 5 cuentas', 'error'); return; }
+
+  const raw = $('#depMultiPool').value.trim();
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  const cards = [];
+  const errors = [];
+  for (const l of lines.slice(0, 10)) {
+    const err = validatePipe(l);
+    if (err) errors.push(`${l.slice(0, 30)}: ${err}`);
+    else cards.push(l);
+  }
+  if (!cards.length) { toast('Pega al menos 1 tarjeta válida', 'error'); return; }
+
+  const amount = getAmount();
+  if (amount < 1 || amount > 5000) { toast('Monto fuera de rango', 'error'); return; }
+
+  _depBusy = true;
+  $('#depExec').disabled = true;
+  $('#depCancel').classList.remove('hidden');
+  const feed = $('#depFeed');
+  feed.classList.remove('hidden');
+  feed.innerHTML = `<div class="dep-feed-info">🎯 Iniciando matchmaker — ${cards.length} tarjetas vs ${_depAccountIds.length} cuentas</div>`;
+
+  const matches = new Map();  // email → match info
+
+  try {
+    const ctrl = new AbortController();
+    _depMmAbort = ctrl;
+    const r = await fetch('/api/deposits/multi/stream', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ account_ids: _depAccountIds, cards, amount }),
+      signal: ctrl.signal,
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0) {
+        const chunk = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        const line = chunk.split('\n').find(l => l.startsWith('data: '));
+        if (!line) continue;
+        try {
+          const ev = JSON.parse(line.slice(6));
+          handleMmEvent(ev, matches);
+        } catch {}
+      }
+    }
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      $('#depFeed').insertAdjacentHTML('beforeend', `<div class="dep-feed-row dep-feed-err">✗ ${esc(e.message)}</div>`);
+    }
+  } finally {
+    _depBusy = false;
+    $('#depExec').disabled = false;
+    $('#depCancel').classList.add('hidden');
+    _depMmAbort = null;
+    _depMmRunId = null;
+    if (matches.size > 0) reload();
+  }
+}
+
+function handleMmEvent(ev, matches) {
+  const feed = $('#depFeed');
+  const row = (cls, html) => `<div class="dep-feed-row ${cls}">${html}</div>`;
+  switch (ev.type) {
+    case 'start':
+      _depMmRunId = ev.run_id;
+      feed.insertAdjacentHTML('beforeend', row('dep-feed-info',
+        `🚀 ${ev.cards} tarjetas vs ${ev.accounts} cuentas · $${ev.amount}/intento`));
+      break;
+    case 'trying':
+      feed.insertAdjacentHTML('beforeend', row('dep-feed-trying',
+        `<span class="dep-spinner"></span> ${esc(ev.tail)} → ${esc(ev.email)} <span class="dim mono">#${ev.attempt}</span>`));
+      break;
+    case 'match':
+      matches.set(ev.email, ev);
+      feed.insertAdjacentHTML('beforeend', row('dep-feed-match',
+        `✓ <b>${esc(ev.tail)}</b> → ${esc(ev.email)} · $${ev.amount.toFixed(2)} <span class="dim mono">${ev.duration_ms}ms</span>`));
+      pushNotif({ icon: '💳', msg: `Match: ${ev.tail} ↔ ${ev.email}` });
+      break;
+    case 'rejected':
+      feed.insertAdjacentHTML('beforeend', row('dep-feed-rej',
+        `✗ ${esc(ev.tail)} → ${esc(ev.email)} <span class="dim mono">${esc(ev.code)}</span> ${ev.card_fails ? `· card ${ev.card_fails}/2` : ''}${ev.acct_fails ? ` · cuenta ${ev.acct_fails}/2` : ''}`));
+      break;
+    case 'card_retired':
+      feed.insertAdjacentHTML('beforeend', row('dep-feed-info',
+        `🔻 Tarjeta ${esc(ev.tail)} retirada (${ev.fails} fallos)`));
+      break;
+    case 'account_dead':
+      feed.insertAdjacentHTML('beforeend', row('dep-feed-dead',
+        `💀 ${esc(ev.email)} fuera <span class="dim mono">${esc(ev.code)}</span>`));
+      break;
+    case 'cooldown':
+      feed.insertAdjacentHTML('beforeend', row('dep-feed-info dim',
+        `⏳ Cooldown ${ev.wait}s…`));
+      break;
+    case 'error':
+      feed.insertAdjacentHTML('beforeend', row('dep-feed-err',
+        `✗ ${esc(ev.email || '')} ${esc(ev.message || '')}`));
+      break;
+    case 'cancelled':
+      feed.insertAdjacentHTML('beforeend', row('dep-feed-info',
+        `⏹ Cancelado por usuario`));
+      break;
+    case 'done':
+      feed.insertAdjacentHTML('beforeend', row('dep-feed-done',
+        `<b>Listo</b> — ${ev.matches} match${ev.matches !== 1 ? 'es' : ''}, ${ev.attempts} intentos${ev.pending ? `, ${ev.pending} sin emparejar` : ''}`));
+      break;
+  }
+  feed.scrollTop = feed.scrollHeight;
+}
+
+async function cancelMatchmaker() {
+  if (!_depMmRunId) {
+    if (_depMmAbort) _depMmAbort.abort();
+    return;
+  }
+  try {
+    await fetch(`/api/deposits/multi/${_depMmRunId}/cancel`, { method: 'POST' });
+    toast('⏹ Cancelando…', 'success');
+  } catch (e) {
+    toast(`Error: ${e.message}`, 'error');
+  }
+}
+
+// ── Wire-up ──
 $('#depModalClose').addEventListener('click', closeDepositModal);
-$('#depModalOverlay').addEventListener('click', e => { if (e.target.id === 'depModalOverlay') closeDepositModal(); });
+$('#depModalOverlay').addEventListener('click', e => {
+  if (e.target.id === 'depModalOverlay') closeDepositModal();
+});
+$('#depModeSeg').addEventListener('click', e => {
+  const btn = e.target.closest('.dep-mode-btn');
+  if (!btn) return;
+  if (_depBusy) { toast('Espera a que termine', 'error'); return; }
+  setDepMode(btn.dataset.mode);
+});
 $('#depAmounts').addEventListener('click', e => {
   const btn = e.target.closest('.dep-amt');
   if (!btn) return;
@@ -1424,10 +1715,37 @@ $('#depAmounts').addEventListener('click', e => {
   else cust.classList.add('hidden');
 });
 $('#depExec').addEventListener('click', executeDeposit);
+$('#depCancel').addEventListener('click', cancelMatchmaker);
 $('#depCardPipe').addEventListener('input', () => {
   $('#depCardErr').classList.add('hidden');
-  $('#depCardPipe').classList.remove('dep-prefilled');
-  $('#depCardHint')?.classList.add('hidden');
+});
+$('#depCardChips').addEventListener('click', e => {
+  const chip = e.target.closest('.dep-chip');
+  if (!chip) return;
+  $('#depCardPipe').value = chip.dataset.pipe;
+  $('#depCardPipe').focus();
+});
+$('#depMultiPool').addEventListener('input', () => {
+  const lines = $('#depMultiPool').value.split('\n').map(l => l.trim()).filter(Boolean);
+  $('#depPoolCount').textContent = `${lines.length} tarjeta${lines.length !== 1 ? 's' : ''}`;
+});
+$('#depMultiList').addEventListener('click', e => {
+  const rm = e.target.closest('.dep-multi-rm');
+  if (!rm) return;
+  const id = parseInt(rm.dataset.id);
+  _depAccountIds = _depAccountIds.filter(x => x !== id);
+  if (_depAccountIds.length < 2) {
+    setDepMode('single');
+  } else {
+    renderMultiAccounts();
+  }
+});
+document.querySelector('#depScheduleBlock')?.addEventListener('click', e => {
+  const btn = e.target.closest('.dep-step-btn');
+  if (!btn) return;
+  const d = parseInt(btn.dataset.d);
+  _depReps = Math.max(1, Math.min(20, _depReps + d));
+  $('#depRepsVal').textContent = String(_depReps);
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('#depModalOverlay').classList.contains('hidden')) closeDepositModal();
@@ -1436,9 +1754,11 @@ document.addEventListener('keydown', e => {
   }
 });
 
+// Botón cmdBar — abre el modal con TODAS las seleccionadas
 $('#cmdDeposit').addEventListener('click', () => {
-  if (selectedIds.size !== 1) { toast('Selecciona exactamente 1 cuenta', 'error'); return; }
-  openDepositModal([...selectedIds][0]);
+  if (selectedIds.size === 0) { toast('Selecciona al menos 1 cuenta', 'error'); return; }
+  if (selectedIds.size > 5) { toast('Máximo 5 cuentas para multi', 'error'); return; }
+  openDepositModal(null, { ids: [...selectedIds] });
 });
 
 $('#cmdCopy')?.addEventListener('click', copySelectedCombos);
