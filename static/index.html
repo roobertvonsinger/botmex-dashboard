@@ -20,24 +20,24 @@
       <div class="sb-frase"><span class="emoji">💛</span><span id="fraseTxt">…</span></div>
     </div>
     <div class="sb-section">Principal</div>
-    <button class="nav on" data-section="accounts"><span class="i">▦</span>Cuentas<span class="b" id="navCount">…</span></button>
-    <button class="nav" data-section="pool" id="navPool"><span class="i">◈</span>Pool<span class="b" id="navPoolCount">…</span></button>
-    <button class="nav" data-section="activity"><span class="i">⚡</span>Actividad<span class="b" id="navActivityBadge"></span></button>
+    <button class="nav on" data-section="accounts" title="Tu chamba diaria — todas las cuentas vivas"><span class="i">▦</span>Cuentas<span class="b" id="navCount">…</span></button>
+    <button class="nav" data-section="pool" id="navPool" title="Las que ven los operadores ahorita"><span class="i">◈</span>Pool<span class="b" id="navPoolCount">…</span></button>
+    <button class="nav" data-section="activity" title="Quién hizo qué y cuándo — la chismografía"><span class="i">⚡</span>Actividad<span class="b" id="navActivityBadge"></span></button>
     <div class="sb-section">Sistema</div>
-    <button class="nav" data-section="notifications"><span class="i">◔</span>Notificaciones<span class="b warn hidden" id="navNotifBadge">·</span></button>
-    <button class="nav" data-section="logs" id="navLogs"><span class="i">▤</span>Logs<span class="b" id="navLogsBadge"></span></button>
-    <button class="nav" data-section="health" id="navHealth"><span class="i">◉</span>Salud<span class="b ok hidden" id="navHealthBadge">✓</span></button>
-    <button class="nav" data-section="admin" id="navAdmin"><span class="i">⚙</span>Controles</button>
+    <button class="nav" data-section="notifications" title="Lo que pasó mientras no veías"><span class="i">◔</span>Notificaciones<span class="b warn hidden" id="navNotifBadge">·</span></button>
+    <button class="nav" data-section="logs" id="navLogs" title="Tripas en vivo del servidor"><span class="i">▤</span>Logs<span class="b" id="navLogsBadge"></span></button>
+    <button class="nav" data-section="health" id="navHealth" title="¿Está vivo todo? Aquí lo dice"><span class="i">◉</span>Salud<span class="b ok hidden" id="navHealthBadge">✓</span></button>
+    <button class="nav" data-section="admin" id="navAdmin" title="Botones rojos peligrosos — usa con criterio"><span class="i">⚙</span>Controles</button>
     <div class="grow"></div>
     <div class="sb-status mono">
-      <div><span>xCAPTCHA</span><b class="ok" id="stCap" title="Saldo CapMonster">—</b></div>
-      <div><span>Proxies</span><b id="stProxy" title="Pool de proxies (LitPort)">—</b></div>
-      <div><span>En uso</span><b class="warn" id="stInUse">—</b></div>
+      <div><span>xCAPTCHA</span><b class="ok" id="stCap" title="Saldo CapMonster — cuando esté en rojo, recarga">—</b></div>
+      <div><span>Proxies</span><b id="stProxy" title="Estado del proxy MX — verde es bueno, rojo es ojo">—</b></div>
+      <div><span>En uso</span><b class="warn" id="stInUse" title="Cuántas cuentas están bloqueadas ahora — click para filtrar">—</b></div>
     </div>
     <div class="sb-user">
-      <div class="av" id="sbUserAv">··</div>
+      <div class="av" id="sbUserAv" title="Eres tú">··</div>
       <div class="info"><div id="sbUserName">…</div><div class="mono dim" id="sbUserRole">—</div></div>
-      <button class="ico-btn" title="Salir">
+      <button class="ico-btn" title="Cerrar sesión y salir">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v9"/><path d="M5.5 8.5a8 8 0 1 0 13 0"/></svg>
       </button>
     </div>
@@ -45,22 +45,22 @@
 
   <main class="main">
     <header class="topbar">
-      <button class="topbar-hamburger" id="btnMobileMenu" title="Menú" aria-label="Abrir menú">
+      <button class="topbar-hamburger" id="btnMobileMenu" title="Abrir menú" aria-label="Abrir menú">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
       </button>
       <div class="grow"></div>
-      <div class="search">
+      <div class="search" title="Busca lo que sea: email, tarjeta, nombre, nota… (Ctrl+K)">
         <span class="ico">⌕</span>
         <input id="searchInput" placeholder="Buscar email, tarjeta, nombre, notas…">
         <kbd>Ctrl K</kbd>
       </div>
       <div class="grow"></div>
       <div class="topbar-right">
-        <button class="bell" id="bellBtn" title="Notificaciones">
+        <button class="bell" id="bellBtn" title="Notificaciones — clic 2 veces para regresar">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
           <span id="bellBadge" class="badge hidden">0</span>
         </button>
-        <button class="power" title="Salir">
+        <button class="power" title="Cerrar sesión">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v9"/><path d="M5.5 8.5a8 8 0 1 0 13 0"/></svg>
         </button>
       </div>
@@ -119,21 +119,21 @@
       <section class="filterbar">
         <h2>Cuentas <span class="dim mono" id="countLabel">— / —</span></h2>
         <div class="grow"></div>
-        <div class="seg" data-seg="status">
-          <button data-v="LIVE" class="on">LIVE</button>
-          <button data-v="all">Todos</button>
-          <button data-v="DEAD">DEAD</button>
+        <div class="seg" data-seg="status" title="Vivas, todas, o muertitas">
+          <button data-v="LIVE" class="on" title="Solo cuentas que jalan">LIVE</button>
+          <button data-v="all" title="Todas, sin filtrar">Todos</button>
+          <button data-v="DEAD" title="Las que ya descansan en paz">DEAD</button>
         </div>
-        <div class="seg" data-seg="grade">
-          <button data-v="" class="on">Todos</button>
-          <button data-v="A">A</button>
-          <button data-v="B">B</button>
-          <button data-v="C">C</button>
-          <button data-v="D">D</button>
+        <div class="seg" data-seg="grade" title="Filtra por salud de la pasarela">
+          <button data-v="" class="on" title="Sin filtrar grado">Todos</button>
+          <button data-v="A" title="🟢 Pasarela sana — dale con confianza">A</button>
+          <button data-v="B" title="🔵 Buena — alta prob. de éxito">B</button>
+          <button data-v="C" title="🟡 Cuidado — señales raras">C</button>
+          <button data-v="D" title="🔴 Pasarela quemada, no pierdas tiempo">D</button>
         </div>
-        <div class="seg" data-seg="view">
-          <button data-v="simple" class="on">Simple</button>
-          <button data-v="detail">Detallada</button>
+        <div class="seg" data-seg="view" title="Cambia cuántas columnas ves">
+          <button data-v="simple" class="on" title="Lo esencial — saldo, cuenta, depósito">Simple</button>
+          <button data-v="detail" title="Todo, incluso métricas raras">Detallada</button>
         </div>
       </section>
 
@@ -151,14 +151,14 @@
         <div class="pb-center" id="pbPages"></div>
         <div class="pb-right">
           <span class="dim mono">Por página</span>
-          <select id="pageSize" class="seg-btn">
+          <select id="pageSize" class="seg-btn" title="Cuántas cuentas ves de un jalón">
             <option value="20">20</option>
             <option value="30">30</option>
             <option value="50" selected>50</option>
             <option value="100">100</option>
             <option value="200">200</option>
           </select>
-          <button class="seg-btn" id="btnRefreshVisible">↻ Actualizar visibles</button>
+          <button class="seg-btn" id="btnRefreshVisible" title="Login en vivo de las cuentas visibles — verás el progreso">↻ Actualizar visibles</button>
         </div>
       </div>
     </div>
@@ -168,8 +168,8 @@
       <section class="filterbar">
         <h2>Pool <span class="dim mono" id="poolCountLabel">— cuentas en la vista de operadores</span></h2>
         <div class="grow"></div>
-        <button class="seg-btn" id="btnPoolRefresh" title="Recargar">↻</button>
-        <button class="seg-btn danger" id="btnPoolHideAll" title="Quita TODAS las cuentas de la vista de operadores">📤 Ocultar todas</button>
+        <button class="seg-btn" id="btnPoolRefresh" title="Recargar la lista de pool">↻</button>
+        <button class="seg-btn danger" id="btnPoolHideAll" title="Esconde TODAS de los operadores — el botón rojo del pánico">📤 Ocultar todas</button>
       </section>
       <section class="tablewrap">
         <table id="poolTable">
@@ -189,14 +189,14 @@
       <section class="filterbar">
         <h2>Actividad <span class="dim mono" id="actCountLabel">—</span></h2>
         <div class="grow"></div>
-        <div class="seg" data-seg="actkind">
-          <button data-v="" class="on">Todos</button>
-          <button data-v="deposit">💳 Depósitos</button>
-          <button data-v="lock">🔒 Locks</button>
-          <button data-v="unlock">🔓 Unlocks</button>
-          <button data-v="note">📝 Notas</button>
+        <div class="seg" data-seg="actkind" title="Filtra qué tipo de eventos ves">
+          <button data-v="" class="on" title="Todo, sin filtrar">Todos</button>
+          <button data-v="deposit" title="Solo depósitos (éxitos y fracasos)">💳 Depósitos</button>
+          <button data-v="lock" title="Cuándo alguien apartó cuentas">🔒 Locks</button>
+          <button data-v="unlock" title="Cuándo se liberaron">🔓 Unlocks</button>
+          <button data-v="note" title="Notas dejadas en cuentas">📝 Notas</button>
         </div>
-        <button class="seg-btn" id="actClearFilter" style="display:none">× Filtro</button>
+        <button class="seg-btn" id="actClearFilter" style="display:none" title="Quitar filtros del feed">× Filtro</button>
         <span class="dim mono" id="actFilterInfo"></span>
       </section>
       <section class="tablewrap">
@@ -214,8 +214,8 @@
         <div class="grow"></div>
         <button class="seg-btn" id="btnLogsCopy" title="Copiar todo al portapapeles">📋 Copiar</button>
         <button class="seg-btn" id="btnLogsScrollEnd" title="Ir al final + reanudar auto-scroll">⤓ Final</button>
-        <button class="seg-btn" id="btnLogsClear">Limpiar</button>
-        <button class="seg-btn" id="btnLogsPause">⏸ Pausar</button>
+        <button class="seg-btn" id="btnLogsClear" title="Borra el contenido visible (no afecta servidor)">Limpiar</button>
+        <button class="seg-btn" id="btnLogsPause" title="Detener / reanudar el polling automático">⏸ Pausar</button>
       </section>
       <section class="tablewrap"><pre id="logsView" class="logs-view">Conectando…</pre></section>
     </div>
@@ -225,8 +225,8 @@
       <section class="filterbar">
         <h2>Salud del sistema <span class="dim mono" id="healthLast">—</span></h2>
         <div class="grow"></div>
-        <button class="seg-btn" id="btnHealthRun">Correr ahora</button>
-        <button class="seg-btn" id="btnHealthDismiss" title="Re-corre el check; si ya no hay issue, se limpia">Descartar</button>
+        <button class="seg-btn" id="btnHealthRun" title="Forza un check completo ahorita">Correr ahora</button>
+        <button class="seg-btn" id="btnHealthDismiss" title="Re-checa; si ya no hay issue, se limpia el badge">Descartar</button>
       </section>
       <section class="tablewrap">
         <div id="healthView" class="health-view"><div class="loading">Cargando…</div></div>
@@ -242,58 +242,58 @@
       </section>
       <div class="admin-grid">
 
-        <div class="admin-card">
+        <div class="admin-card" title="Te dice rapidito si algo está roto">
           <h4>🩺 Diagnóstico</h4>
           <p class="dim">Verifica BD, CapMonster, proxy, deps del bot.</p>
-          <button class="seg-btn" id="btnAdminDiag">Correr diagnóstico</button>
+          <button class="seg-btn" id="btnAdminDiag" title="Corre todos los checks ahora">Correr diagnóstico</button>
           <div id="adminDiagOut" class="admin-out"></div>
         </div>
 
-        <div class="admin-card">
+        <div class="admin-card" title="Mide la latencia hacia los servicios externos">
           <h4>📡 Ping</h4>
           <p class="dim">Latencia a hosts críticos.</p>
-          <button class="seg-btn" id="btnAdminPing">Pingar hosts</button>
+          <button class="seg-btn" id="btnAdminPing" title="Pinga BetMexico, CapMonster y LitPort">Pingar hosts</button>
           <div id="adminPingOut" class="admin-out"></div>
         </div>
 
-        <div class="admin-card">
+        <div class="admin-card" title="Vuelve a checar el proxy MX">
           <h4>🔌 Proxy</h4>
           <p class="dim">Refresca el chequeo de proxy ahora mismo.</p>
-          <button class="seg-btn" id="btnAdminProxyRefresh">Refrescar estado proxy</button>
+          <button class="seg-btn" id="btnAdminProxyRefresh" title="Ignora cache, pega al proxy ya">Refrescar estado proxy</button>
           <div id="adminProxyOut" class="admin-out"></div>
         </div>
 
-        <div class="admin-card">
+        <div class="admin-card" title="Reinicia los servicios para limpiar estado raro">
           <h4>🔁 Hard refresh</h4>
           <p class="dim">Reinicia el dashboard web (no afecta el bot).</p>
-          <button class="seg-btn" id="btnAdminRestartWeb">Reiniciar Web</button>
-          <button class="seg-btn" id="btnAdminRestartBot">Reiniciar Bot</button>
-          <button class="seg-btn" id="btnAdminRestartAll">Reiniciar Todo</button>
+          <button class="seg-btn" id="btnAdminRestartWeb" title="Reinicia solo el dashboard — la página se recarga sola">Reiniciar Web</button>
+          <button class="seg-btn" id="btnAdminRestartBot" title="Reinicia el bot de Telegram (sin afectar el dashboard)">Reiniciar Bot</button>
+          <button class="seg-btn" id="btnAdminRestartAll" title="Reinicia los dos — usa con criterio">Reiniciar Todo</button>
         </div>
 
-        <div class="admin-card">
+        <div class="admin-card" title="Detén nuevos procesos sin matar los actuales">
           <h4>⏸ Pausa global</h4>
           <p class="dim">Bloquea nuevos prewarms y depósitos para todos los users.</p>
-          <button class="seg-btn" id="btnAdminPause">Pausar sistema</button>
-          <button class="seg-btn" id="btnAdminResume">Reanudar</button>
+          <button class="seg-btn" id="btnAdminPause" title="Bloquea nuevos prewarms/depósitos para todos">Pausar sistema</button>
+          <button class="seg-btn" id="btnAdminResume" title="Quita la pausa global">Reanudar</button>
         </div>
 
-        <div class="admin-card admin-card-danger">
+        <div class="admin-card admin-card-danger" title="El botón rojo del pánico — cancela TODO">
           <h4>🛑 Paro de emergencia</h4>
           <p class="dim">Cancela TODOS los prewarms y misiones programadas + pausa global.</p>
-          <button class="seg-btn danger" id="btnAdminEmergency">Paro de emergencia</button>
+          <button class="seg-btn danger" id="btnAdminEmergency" title="Cancela todo en curso + pausa — usa solo si algo se descontroló">Paro de emergencia</button>
         </div>
 
-        <div class="admin-card">
+        <div class="admin-card" title="Bájate los logs para revisar offline">
           <h4>📥 Logs</h4>
           <p class="dim">Descarga las últimas N líneas de bot + web.</p>
-          <button class="seg-btn" id="btnAdminExportLogs">Descargar logs</button>
+          <button class="seg-btn" id="btnAdminExportLogs" title="Descarga 2000 líneas como .txt">Descargar logs</button>
         </div>
 
-        <div class="admin-card admin-card-danger">
+        <div class="admin-card admin-card-danger" title="Reinicia el VPS — solo si está realmente atorado">
           <h4>🔄 Reboot VPS</h4>
           <p class="dim">Reinicia el VPS completo (en 1 min). Requiere confirmación doble.</p>
-          <button class="seg-btn danger" id="btnAdminRebootVps">Reboot VPS</button>
+          <button class="seg-btn danger" id="btnAdminRebootVps" title="2-3 min de downtime — pide confirmación doble">Reboot VPS</button>
         </div>
 
       </div>
@@ -319,23 +319,23 @@
         <span class="cmd-count"><b id="cmdSelCount">0</b> seleccionadas</span>
       </div>
       <div class="cmd-center">
-        <button class="cmd-btn primary" id="cmdDeposit">💳 Depositar</button>
+        <button class="cmd-btn primary" id="cmdDeposit" title="Abre el modal de depósito — 1 cuenta o multi (max 5)">💳 Depositar</button>
         <div class="cmd-lock-wrap">
-          <button class="cmd-btn" id="cmdLock">🔒 Lock <span class="cmd-lock-h" id="cmdLockHours">2h</span></button>
+          <button class="cmd-btn" id="cmdLock" title="Aparta las cuentas para ti — nadie más las toca">🔒 Lock <span class="cmd-lock-h" id="cmdLockHours" title="Click para cambiar duración">2h</span></button>
           <div id="lockHoursPopup" class="lock-hours-popup hidden">
-            <button class="lh-btn" data-h="1">1h</button>
-            <button class="lh-btn on" data-h="2">2h</button>
-            <button class="lh-btn" data-h="4">4h</button>
-            <button class="lh-btn" data-h="8">8h</button>
-            <button class="lh-btn" data-h="24">24h</button>
+            <button class="lh-btn" data-h="1" title="1 hora">1h</button>
+            <button class="lh-btn on" data-h="2" title="2 horas (recomendado)">2h</button>
+            <button class="lh-btn" data-h="4" title="4 horas">4h</button>
+            <button class="lh-btn" data-h="8" title="Toda tu jornada">8h</button>
+            <button class="lh-btn" data-h="24" title="Día entero">24h</button>
           </div>
         </div>
-        <button class="cmd-btn" id="cmdTrastienda" title="Mover entre Pool (visible) y Trastienda (oculta)">📤 Trastienda</button>
+        <button class="cmd-btn" id="cmdTrastienda" title="Toggle: visibles a operadores ↔ ocultas">📤 Trastienda</button>
         <div class="cmd-release-wrap">
-          <button class="cmd-btn" id="cmdRelease">🎁 Liberar</button>
+          <button class="cmd-btn" id="cmdRelease" title="Asignar las seleccionadas a un operador específico">🎁 Liberar</button>
           <div id="releasePopup" class="release-popup hidden"></div>
         </div>
-        <button class="cmd-btn ghost" id="cmdDeselect">Deseleccionar</button>
+        <button class="cmd-btn ghost" id="cmdDeselect" title="Quitar selección de todas (Esc)">Deseleccionar</button>
       </div>
       <div class="cmd-right">
         <span class="cmd-stats mono dim" id="cmdStats"></span>
@@ -352,7 +352,7 @@
         <span class="modal-icon">📋</span>
         <span id="detModalTitle">Detalle de cuenta</span>
       </div>
-      <button class="modal-close" id="detModalClose">×</button>
+      <button class="modal-close" id="detModalClose" title="Cerrar (Esc)">×</button>
     </header>
     <div class="modal-body" id="detModalBody">
       <div class="detail-loading"><span class="dep-spinner"></span> Cargando…</div>
@@ -368,14 +368,14 @@
         <span class="modal-icon">💳</span>
         <span id="depModalTitle">Depositar</span>
       </div>
-      <button class="modal-close" id="depModalClose">×</button>
+      <button class="modal-close" id="depModalClose" title="Cerrar (Esc)">×</button>
     </header>
     <div class="modal-body">
       <!-- Modo (segmented) -->
       <div class="dep-mode-seg" id="depModeSeg">
-        <button class="dep-mode-btn on" data-mode="single">⚡ Una</button>
-        <button class="dep-mode-btn" data-mode="multi">👥 Multi (Matchmaker)</button>
-        <button class="dep-mode-btn" data-mode="schedule">⏰ Programado</button>
+        <button class="dep-mode-btn on" data-mode="single" title="Una tarjeta a una cuenta — rápido y al punto">⚡ Una</button>
+        <button class="dep-mode-btn" data-mode="multi" title="Pool de tarjetas vs varias cuentas — empareja la que pase">👥 Multi (Matchmaker)</button>
+        <button class="dep-mode-btn" data-mode="schedule" title="Goteo automático: N intentos cada 1 min">⏰ Programado</button>
       </div>
 
       <!-- Cuentas (target) -->
@@ -417,7 +417,7 @@
       </div>
 
       <!-- Cap status (24h window) -->
-      <div class="dep-cap" id="depCap" style="display:none">
+      <div class="dep-cap" id="depCap" style="display:none" title="Tope de $1499 cada 24h por cuenta — pasarlo dispara 3DS">
         <div class="dep-cap-bar"><div id="depCapFill" class="dep-cap-fill"></div></div>
         <div class="dep-cap-text">
           <span class="dep-cap-label">24h:</span>
@@ -430,23 +430,23 @@
       <div class="dep-section">
         <label class="dep-label">Monto <span class="dim" id="depAmountHint">— máx $499/intento</span></label>
         <div class="dep-amounts" id="depAmounts">
-          <button class="dep-amt" data-v="10">$10</button>
-          <button class="dep-amt on" data-v="50">$50</button>
-          <button class="dep-amt" data-v="100">$100</button>
-          <button class="dep-amt" data-v="200">$200</button>
-          <button class="dep-amt" data-v="400">$400</button>
-          <button class="dep-amt" data-v="custom">Otro</button>
+          <button class="dep-amt" data-v="10" title="Tantito — para probar la pasarela">$10</button>
+          <button class="dep-amt on" data-v="50" title="Default seguro">$50</button>
+          <button class="dep-amt" data-v="100" title="Ya vas en serio">$100</button>
+          <button class="dep-amt" data-v="200" title="El ambicioso">$200</button>
+          <button class="dep-amt" data-v="400" title="High roller — al límite del cap">$400</button>
+          <button class="dep-amt" data-v="custom" title="Tu monto, tus reglas (max $499)">Otro</button>
         </div>
-        <input type="number" id="depCustomAmount" class="dep-input hidden" placeholder="1 a 499…" step="1" min="1" max="499">
+        <input type="number" id="depCustomAmount" class="dep-input hidden" placeholder="1 a 499…" step="1" min="1" max="499" title="Max $499 — más dispara 3DS">
       </div>
 
       <!-- Repeticiones (modo schedule) -->
       <div class="dep-section hidden" id="depScheduleBlock">
         <label class="dep-label">Repeticiones <span class="dim">— cada 1 min, máx 20</span></label>
-        <div class="dep-stepper">
-          <button class="dep-step-btn" data-d="-1">−</button>
+        <div class="dep-stepper" title="Cuántas veces se repite el depósito automático">
+          <button class="dep-step-btn" data-d="-1" title="−1">−</button>
           <span class="dep-step-val mono" id="depRepsVal">5</span>
-          <button class="dep-step-btn" data-d="1">+</button>
+          <button class="dep-step-btn" data-d="1" title="+1">+</button>
         </div>
       </div>
 
@@ -483,8 +483,8 @@
       </div>
 
       <div class="dep-exec-row">
-        <button id="depExec" class="dep-exec">🚀 Ejecutar</button>
-        <button id="depCancel" class="dep-exec dep-exec-cancel hidden">⏹ Detener</button>
+        <button id="depExec" class="dep-exec" title="Lanza el depósito o misión">🚀 Ejecutar</button>
+        <button id="depCancel" class="dep-exec dep-exec-cancel hidden" title="Cancela el matchmaker en curso">⏹ Detener</button>
       </div>
     </div>
   </div>

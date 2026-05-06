@@ -312,23 +312,23 @@ function renderTable() {
     iconsHtml += `<button class="row-ic ic-add" data-id="${r.id}" data-email="${esc(r.email)}" title="Añadir nota rápida">+</button>`;
 
     if (state.view === 'simple') {
-      return `<tr class="${trClasses}" data-id="${r.id}" title="${trTitle}">
-        <td class="grade-bar-cell"></td>
-        <td class="sel-cell"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
-        <td class="num"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
-        <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b>${lockChip}</td>
-        <td class="dep">${dep}</td>
+      return `<tr class="${trClasses}" data-id="${r.id}" title="${trTitle || 'Click para ver detalles'}">
+        <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
+        <td class="sel-cell" title="Marcar para acciones en lote"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
+        <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
+        <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}" title="Click para copiar el combo">${esc(combo)}</b>${lockChip}</td>
+        <td class="dep" title="Último depósito hecho">${dep}</td>
         <td class="row-icons">${iconsHtml}</td>
       </tr>`;
     }
-    return `<tr class="${trClasses}" data-id="${r.id}" title="${trTitle}">
-      <td class="grade-bar-cell"></td>
-      <td class="sel-cell"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
-      <td class="num"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
-      <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b></td>
-      <td class="dep">${dep}</td>
-      <td class="dep dim">${fmtAgo(r.last_checked_at)}</td>
-      <td class="num">${r.check_count || 0}</td>
+    return `<tr class="${trClasses}" data-id="${r.id}" title="${trTitle || 'Click para ver detalles'}">
+      <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
+      <td class="sel-cell" title="Marcar para acciones en lote"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
+      <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
+      <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}" title="Click para copiar el combo">${esc(combo)}</b></td>
+      <td class="dep" title="Último depósito hecho">${dep}</td>
+      <td class="dep dim" title="Cuándo se actualizó por última vez">${fmtAgo(r.last_checked_at)}</td>
+      <td class="num" title="Total de veces actualizada">${r.check_count || 0}</td>
       <td class="row-icons">${iconsHtml}</td>
     </tr>`;
   }).join('');
@@ -1803,7 +1803,7 @@ function renderDetail(d) {
     <div class="d-section">
       <div class="d-section-head">
         <h4>📋 Datos personales</h4>
-        <button class="d-deposit-btn" data-acc-id="${d.id}">💳 Depositar</button>
+        <button class="d-deposit-btn" data-acc-id="${d.id}" title="Depositar en esta cuenta sin cerrar el detalle">💳 Depositar</button>
       </div>
       <ul class="d-list">
         <li><span>Nombre</span><b>${naField(d.fullname)}</b></li>
