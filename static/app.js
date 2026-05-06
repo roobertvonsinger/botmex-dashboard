@@ -1297,6 +1297,12 @@ $('#pbPages').addEventListener('click', e => {
   renderTable();
 });
 $('#btnRefreshVisible').addEventListener('click', refreshVisible);
+$('#btnDeselectAll')?.addEventListener('click', () => {
+  if (selectedIds.size === 0) { toast('Nada seleccionado', 'success'); return; }
+  const n = selectedIds.size;
+  deselectAll();
+  toast(`✕ ${n} deseleccionada${n>1?'s':''}`, 'success');
+});
 
 // Logs handlers
 $('#btnLogsPause')?.addEventListener('click', () => {
