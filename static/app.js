@@ -40,8 +40,14 @@ let _sortCol = null, _sortDir = -1;
 function sortRows(col) {
   if (_sortCol === col) _sortDir = -_sortDir;
   else { _sortCol = col; _sortDir = -1; }
-  const numeric = ['balance_total', 'balance_real', 'last_deposit_amount', 'check_count'];
+  const numeric = ['balance_total', 'balance_real', 'last_deposit_amount', 'check_count', 'cards_count'];
+  const text    = ['email', 'status', 'grade', 'locked_by'];
   state.rows.sort((a, b) => {
+    if (text.includes(col)) {
+      const av = String(a[col] || '').toLowerCase();
+      const bv = String(b[col] || '').toLowerCase();
+      return av.localeCompare(bv) * _sortDir;
+    }
     const av = numeric.includes(col) ? (a[col] || 0) : (parseTs(a[col] || '').getTime() || 0);
     const bv = numeric.includes(col) ? (b[col] || 0) : (parseTs(b[col] || '').getTime() || 0);
     return (av - bv) * _sortDir;
@@ -235,17 +241,25 @@ function renderTable() {
     ? `<tr>
         <th class="grade-bar-th"></th>
         <th class="sel-cell"><input type="checkbox" id="selAll"></th>
-        ${_th('balance_total','Saldo','num')}<th>Cuenta</th>
+        ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
         ${_th('last_deposit_date','Últ. depósito')}
       </tr>`
     : `<tr>
         <th class="grade-bar-th"></th>
         <th class="sel-cell"><input type="checkbox" id="selAll"></th>
-        ${_th('balance_total','Saldo','num')}<th>Cuenta</th>
-        ${_th('last_deposit_date','Últ. depósito')}<th>Estado</th>
+        ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
+        ${_th('last_deposit_date','Últ. depósito')}${_th('status','Estado')}
         ${_th('last_checked_at','Últ. check')}${_th('check_count','Checks','num')}
       </tr>`;
-  t.querySelector('thead').innerHTML = cols;
+  const thead = t.querySelector('thead');
+  thead.innerHTML = cols;
+  // Listeners directos en cada th-sort (evita problemas de delegation)
+  thead.querySelectorAll('th.th-sort').forEach(th => {
+    th.addEventListener('click', ev => {
+      ev.stopPropagation();
+      sortRows(th.dataset.sort);
+    });
+  });
 
   const colspan = state.view === 'simple' ? 5 : 8;
   const rowsHtml = visible.map(r => {

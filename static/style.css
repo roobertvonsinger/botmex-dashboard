@@ -530,12 +530,38 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
   padding: 0 !important;
   text-align: center;
 }
+/* Oculta el checkbox nativo y lo reemplaza por un dot personalizado */
 .sel-cell input[type="checkbox"] {
-  width: 13px; height: 13px;
-  accent-color: var(--accent);
+  appearance: none; -webkit-appearance: none;
+  width: 12px; height: 12px;
+  margin: 0; padding: 0;
+  border: 1.4px solid var(--text-faint);
+  border-radius: 50%;
+  background: transparent;
   cursor: pointer;
   vertical-align: middle;
-  margin: 0;
+  position: relative;
+  transition: border-color 140ms, background 140ms, transform 100ms;
+}
+.sel-cell input[type="checkbox"]:hover {
+  border-color: var(--text-dim);
+  transform: scale(1.12);
+}
+.sel-cell input[type="checkbox"]:checked {
+  border-color: var(--accent);
+  background: radial-gradient(circle at center, var(--accent) 0 45%, transparent 55%);
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+.sel-cell input[type="checkbox"]:checked:hover {
+  background: radial-gradient(circle at center, var(--accent) 0 50%, transparent 60%);
+}
+/* selAll del header — un poco más grande para diferenciar */
+th.sel-cell input[type="checkbox"] {
+  width: 11px; height: 11px;
+  border-radius: 3px;  /* cuadradito redondeado para el "todos" */
+}
+th.sel-cell input[type="checkbox"]:checked {
+  background: var(--accent);
 }
 tr.row-sel { background: var(--accent-soft) !important; }
 tr.row-sel td { border-color: var(--accent-soft-2) !important; }
@@ -895,23 +921,24 @@ tr.r-grade-B .grade-bar-cell { background: var(--warn);    box-shadow: 0 0 8px v
 tr.r-grade-C .grade-bar-cell { background: var(--danger);  box-shadow: 0 0 8px var(--danger); }
 tr.r-grade-U .grade-bar-cell { background: rgba(255,255,255,0.10); }
 
-/* Glassy gradient extendido del grade hacia la columna del saldo (sutil) */
+/* Glassy gradient: difumina del grade hacia la derecha, se desvanece ANTES de
+   llegar al saldo (≤8% del ancho). Solo abraza la barrita y el checkbox. */
 tbody tr.r-grade-A {
-  background-image: linear-gradient(to right, oklch(0.78 0.20 169 / 0.16) 0%, oklch(0.78 0.20 169 / 0.06) 12%, transparent 24%);
+  background-image: linear-gradient(to right, oklch(0.78 0.20 169 / 0.18) 0%, oklch(0.78 0.20 169 / 0.04) 4%, transparent 9%);
 }
 tbody tr.r-grade-B {
-  background-image: linear-gradient(to right, oklch(0.86 0.16 75 / 0.14) 0%, oklch(0.86 0.16 75 / 0.05) 12%, transparent 24%);
+  background-image: linear-gradient(to right, oklch(0.86 0.16 75 / 0.16) 0%, oklch(0.86 0.16 75 / 0.04) 4%, transparent 9%);
 }
 tbody tr.r-grade-C {
-  background-image: linear-gradient(to right, oklch(0.66 0.21 24 / 0.16) 0%, oklch(0.66 0.21 24 / 0.06) 12%, transparent 24%);
+  background-image: linear-gradient(to right, oklch(0.66 0.21 24 / 0.18) 0%, oklch(0.66 0.21 24 / 0.04) 4%, transparent 9%);
 }
 tbody tr.r-grade-U {
-  background-image: linear-gradient(to right, rgba(255,255,255,0.05) 0%, transparent 20%);
+  background-image: linear-gradient(to right, rgba(255,255,255,0.04) 0%, transparent 8%);
 }
-/* Hover refuerza el wash sin perder la firma del grade */
-tbody tr.r-grade-A:hover { background-image: linear-gradient(to right, oklch(0.78 0.20 169 / 0.22) 0%, oklch(0.78 0.20 169 / 0.08) 14%, rgba(255,255,255,0.025) 28%); }
-tbody tr.r-grade-B:hover { background-image: linear-gradient(to right, oklch(0.86 0.16 75 / 0.20) 0%, oklch(0.86 0.16 75 / 0.07) 14%, rgba(255,255,255,0.025) 28%); }
-tbody tr.r-grade-C:hover { background-image: linear-gradient(to right, oklch(0.66 0.21 24 / 0.22) 0%, oklch(0.66 0.21 24 / 0.08) 14%, rgba(255,255,255,0.025) 28%); }
+/* Hover refuerza un toque, mismo desvanecido corto */
+tbody tr.r-grade-A:hover { background-image: linear-gradient(to right, oklch(0.78 0.20 169 / 0.26) 0%, oklch(0.78 0.20 169 / 0.06) 5%, rgba(255,255,255,0.03) 10%); }
+tbody tr.r-grade-B:hover { background-image: linear-gradient(to right, oklch(0.86 0.16 75 / 0.22) 0%, oklch(0.86 0.16 75 / 0.06) 5%, rgba(255,255,255,0.03) 10%); }
+tbody tr.r-grade-C:hover { background-image: linear-gradient(to right, oklch(0.66 0.21 24 / 0.26) 0%, oklch(0.66 0.21 24 / 0.06) 5%, rgba(255,255,255,0.03) 10%); }
 
 /* Filas: glass tenue, color solo en la barra lateral. Sin wash. */
 tbody tr { background: transparent; }
