@@ -311,6 +311,7 @@ async def prewarm_select(request: Request, user: dict = Depends(require_session)
 
     body = await request.json()
     emails: List[str] = list(body.get("account_emails") or [])
+    force = bool(body.get("force"))  # True = ignora cache, fuerza re-fetch live
     if not emails:
         raise HTTPException(status_code=400, detail="account_emails requerido")
 
@@ -348,7 +349,9 @@ async def prewarm_select(request: Request, user: dict = Depends(require_session)
             continue
 
         jwt_cache = await asyncio.to_thread(_db_get_jwt_cache, email)
-        if jwt_cache and _is_balance_fresh(acc):
+        # En modo force ignoramos el cache de balance fresh — el operador pidió
+        # explícitamente actualizar live (ej. picó 'Actualizar visibles').
+        if not force and jwt_cache and _is_balance_fresh(acc):
             cached += 1
             continue
 

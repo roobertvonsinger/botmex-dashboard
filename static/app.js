@@ -864,19 +864,37 @@ async function refreshVisible() {
   const ids = visible.map(r => r.id);
   const emails = visible.map(r => r.email).filter(Boolean);
   if (!ids.length) return;
-  toast(`↻ Actualizando ${ids.length}…`);
+  const btn = $('#btnRefreshVisible');
+  if (btn) btn.disabled = true;
+  toast(`↻ Login live a ${ids.length}…`);
   try {
-    // 1. Dispara prewarm (login + balance live) — esto sí refresca datos en BD
+    let pwInfo = null;
     if (emails.length) {
-      await fetch('/api/prewarm/select', {
+      // force=true: ignora cache, fuerza re-fetch contra BetMexico
+      const pr = await fetch('/api/prewarm/select', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ account_emails: emails }),
-      }).catch(() => {});
-      // Espera un poco a que terminen los logins (max 6s)
-      await new Promise(r => setTimeout(r, 4500));
+        body: JSON.stringify({ account_emails: emails, force: true }),
+      });
+      pwInfo = await pr.json().catch(() => null);
+      if (pwInfo?.status === 'capmonster_low') {
+        toast(`⚠️ CapMonster bajo ($${pwInfo.capmonster_balance ?? '?'}) — refresh cancelado`, 'error');
+        return;
+      }
+      const started = pwInfo?.started || 0;
+      const skipped = pwInfo?.skipped || 0;
+      // Si llegó al cap del operador, avisa
+      if (skipped > 0 && pwInfo?.skipped_reasons?.cap_session) {
+        toast(`⚠️ Cap 30/10min: ${started} en proceso, ${skipped} pendientes (espera)`, 'error');
+      }
+      // Espera proporcional al número de logins (4s base + 800ms por cuenta, max 25s)
+      const waitMs = Math.min(25000, 4000 + started * 800);
+      if (started > 0) {
+        toast(`↻ ${started} loggeando · ~${Math.round(waitMs/1000)}s`);
+        await new Promise(r => setTimeout(r, waitMs));
+      }
     }
-    // 2. Re-lee de la BD ya con datos frescos
+    // Re-lee BD con datos frescos
     const r = await fetch('/api/accounts/refresh', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -887,9 +905,12 @@ async function refreshVisible() {
     const map = new Map(data.rows.map(r => [r.id, r]));
     state.rows = state.rows.map(r => map.get(r.id) || r);
     renderTable();
-    toast(`✓ ${data.rows.length} actualizadas`, 'success');
+    const tag = pwInfo ? `(${pwInfo.started || 0} live)` : '';
+    toast(`✓ ${data.rows.length} actualizadas ${tag}`, 'success');
   } catch (e) {
     toast(`Error: ${e.message}`, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
