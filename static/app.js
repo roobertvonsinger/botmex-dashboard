@@ -389,15 +389,21 @@ function updateCmdBar() {
   $('#cmdDeposit').style.display = (n >= 1 && n <= 5) ? '' : 'none';
   $('#cmdDeposit').textContent = n === 1 ? '💳 Depositar' : `💳 Depositar (${n})`;
 
-  // Label dinámico de Trastienda según estado de la selección
+  // Label dinámico: claro qué hace según estado
   const tBtn = $('#cmdTrastienda');
   if (tBtn && tBtn.style.display !== 'none') {
     const selRowsArr = state.rows.filter(r => selectedIds.has(r.id));
     const allPub = selRowsArr.every(r => r.published_to_pool !== 0);
-    tBtn.innerHTML = allPub ? '📤 Trastienda' : '📥 A pool';
-    tBtn.title = allPub
-      ? 'Ocultar de la pool (solo tú las verás)'
-      : 'Publicar a la pool (todos las verán)';
+    const someHidden = selRowsArr.some(r => r.published_to_pool === 0);
+    if (someHidden) {
+      tBtn.innerHTML = '🎁 Publicar a Pool';
+      tBtn.title = 'Hacer visibles a los operadores';
+      tBtn.classList.add('cmd-btn-hl');
+    } else {
+      tBtn.innerHTML = '📤 Quitar de Pool';
+      tBtn.title = 'Ocultar de la vista de operadores';
+      tBtn.classList.remove('cmd-btn-hl');
+    }
   }
 }
 
@@ -1021,6 +1027,18 @@ $('#btnLogsPause')?.addEventListener('click', () => {
   if (_logsPaused) stopLogsPolling(); else startLogsPolling();
 });
 $('#btnLogsClear')?.addEventListener('click', () => { $('#logsView').textContent = ''; });
+
+// Mobile drawer
+$('#btnMobileMenu')?.addEventListener('click', () => {
+  document.body.classList.toggle('mobile-drawer-open');
+});
+// Cerrar drawer al picar nav o fuera
+document.addEventListener('click', e => {
+  if (!document.body.classList.contains('mobile-drawer-open')) return;
+  if (e.target.closest('.sidebar .nav, .sidebar .ico-btn')) {
+    document.body.classList.remove('mobile-drawer-open');
+  }
+});
 
 // Pool view handlers
 $('#btnPoolRefresh')?.addEventListener('click', reloadPool);

@@ -1805,3 +1805,134 @@ td.row-icons, th.row-icons-th {
   opacity: 0.85;
 }
 .d-txn-table tr.txn-row-fail { background: var(--danger-soft); }
+
+/* ── Hamburger (oculto en desktop) ── */
+.topbar-hamburger {
+  display: none;
+  background: transparent; border: 1px solid var(--hairline);
+  border-radius: 8px;
+  width: 36px; height: 36px;
+  align-items: center; justify-content: center;
+  color: var(--text-dim);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.topbar-hamburger:hover { color: var(--text); border-color: var(--hairline-h); }
+
+/* Highlight para CTAs primarios del cmdBar */
+.cmd-btn.cmd-btn-hl {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-soft-2), 0 0 14px var(--accent-glow);
+}
+.cmd-btn.cmd-btn-hl:hover { background: var(--accent-soft-2); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RESPONSIVE / MOBILE
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Tablet horizontal (≤ 1100px): KPI panel se compacta */
+@media (max-width: 1100px) {
+  .lpanel { gap: 8px; padding: 8px; }
+  .lpanel { grid-template-columns: 1fr 1.4fr 1fr 1fr; }
+  .search { width: 360px; }
+}
+
+/* Mobile / tablet vertical (≤ 768px) */
+@media (max-width: 768px) {
+  /* Sidebar como drawer */
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0;
+    width: 260px;
+    transform: translateX(-100%);
+    transition: transform 240ms cubic-bezier(.2,.8,.2,1);
+    z-index: 100;
+    box-shadow: 0 0 40px rgba(0,0,0,0.6);
+  }
+  body.mobile-drawer-open .sidebar { transform: translateX(0); }
+  body.mobile-drawer-open::before {
+    content: ''; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55); z-index: 99;
+    backdrop-filter: blur(2px);
+  }
+
+  /* Hamburger visible */
+  .topbar-hamburger { display: inline-flex; }
+  .topbar { padding: 0 12px; gap: 10px; }
+  .topbar > .grow { display: none; }  /* sin grow para que la search ocupe */
+  .search { width: auto; flex: 1; max-width: none; }
+  .topbar-right { gap: 6px; }
+  .topbar-right .power { display: none; }  /* salir solo desde el sidebar */
+
+  /* KPI panel (L invertida) — oculto en mobile */
+  #adminPanel { display: none !important; }
+
+  /* Filterbar: scroll horizontal en lugar de wrap */
+  .filterbar {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .filterbar::-webkit-scrollbar { height: 0; }
+  .filterbar h2 { font-size: 14px; flex-shrink: 0; }
+  .filterbar .seg { flex-shrink: 0; }
+
+  /* Tabla con scroll horizontal */
+  .tablewrap { overflow-x: auto; }
+  #accTable, #poolTable, #actTable { min-width: 640px; }
+  /* Ocultar columnas menos importantes en mobile */
+  #accTable th:nth-child(1), #accTable td:nth-child(1) { display: none; }  /* grade-bar */
+
+  /* Combos en mono más chico */
+  td.combo b { font-size: 11px; word-break: break-all; }
+
+  /* Modal full-screen */
+  .modal {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    height: 100vh;
+    border-radius: 0;
+    border: none;
+  }
+  .modal-detail .d-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+  .modal.dep-modal-wide { width: 100vw !important; }
+  .dep-mm-grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px;
+  }
+  .dep-mm-col { min-height: 120px; max-height: 180px; }
+  .dep-mm-col-feed { max-height: 220px; }
+
+  /* Pagebar compacta */
+  .pagebar { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+  .pb-left, .pb-right { flex: 1 0 100%; justify-content: space-between; }
+
+  /* Command bar sticky bottom (en mobile) */
+  #cmdBar {
+    position: sticky; bottom: 0;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+  #cmdBar .cmd-center { flex-wrap: wrap; gap: 6px; }
+  #cmdBar .cmd-btn { font-size: 12px; padding: 7px 10px; }
+
+  /* Topbar bell sin texto */
+  .bell { padding: 0; width: 36px; height: 36px; }
+}
+
+/* Pantalla muy pequeña (≤ 480px) */
+@media (max-width: 480px) {
+  .topbar { height: auto; padding: 8px; flex-wrap: wrap; }
+  .search { order: 99; flex: 1 0 100%; padding: 6px 12px; }
+  .search kbd { display: none; }
+  .filterbar h2 { font-size: 13px; }
+  #accTable th:nth-child(7), #accTable td:nth-child(7),  /* checks count */
+  #accTable th:nth-child(6), #accTable td:nth-child(6) { display: none; }
+}
