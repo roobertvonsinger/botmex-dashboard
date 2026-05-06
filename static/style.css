@@ -740,25 +740,43 @@ select.seg-btn option:checked {
 .modal-detail .d-grid {
   display: grid;
   grid-template-columns: 280px 1fr;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto 1fr auto;   /* row 3 para notas, antes faltaba */
   gap: 18px;
   min-height: 0;
   flex: 1;
   overflow: hidden;
 }
 .modal-detail .d-grid > .d-section:nth-child(1) {
-  grid-row: 1 / span 2;  /* Datos personales — columna 1, alto completo */
+  /* Datos personales — col 1, rows 1+2 */
+  grid-column: 1;
+  grid-row: 1 / span 2;
   overflow-y: auto;
+  min-height: 0;
 }
 .modal-detail .d-grid > .d-section:nth-child(2) {
-  /* Tarjetas — fila 1, columna 2 */
+  /* Tarjetas — col 2, row 1 */
+  grid-column: 2;
+  grid-row: 1;
   overflow-y: auto;
   max-height: 220px;
 }
 .modal-detail .d-grid > .d-section:nth-child(3) {
-  /* Transacciones — fila 2, columna 2, scroll interno */
-  overflow-y: auto;
+  /* Transacciones — col 2, row 2, scroll interno (override del genérico que ponía 1/-1) */
+  grid-column: 2;
+  grid-row: 2;
+  overflow: hidden;
   min-height: 0;
+  display: flex; flex-direction: column;
+}
+.modal-detail .d-grid > .d-section.d-section-notes {
+  /* Notas — toda la fila inferior, alto auto */
+  grid-column: 1 / -1;
+  grid-row: 3;
+}
+.modal-detail .d-txn-scroll {
+  max-height: none;       /* el contenedor de la sección ya scrollea */
+  flex: 1; min-height: 0;
+  overflow-y: auto;
 }
 .modal-detail .d-section h4 {
   position: sticky; top: 0; z-index: 2;
