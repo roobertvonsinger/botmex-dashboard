@@ -116,6 +116,124 @@ const fmtAbsYear = ts => {
   return d.toLocaleString('es-MX', opts).replace(/\./g, '');
 };
 const gradeClass = g => ({ A: 'A', B: 'B', C: 'C', D: 'D' })[g] || 'U';
+
+// ─── CURP calculator (estimado, no oficial — homoclave queda como X+verif) ───
+const _CURP_STATES = {
+  // claves CURP oficiales (2 letras) — busca substring case-insensitive en address
+  'AGUASCALIENTES': 'AS', 'BAJA CALIFORNIA SUR': 'BS', 'BAJA CALIFORNIA': 'BC',
+  'CAMPECHE': 'CC', 'CHIAPAS': 'CS', 'CHIHUAHUA': 'CH',
+  'CIUDAD DE MEXICO': 'DF', 'DISTRITO FEDERAL': 'DF', 'CDMX': 'DF', 'D.F.': 'DF',
+  'COAHUILA': 'CL', 'COLIMA': 'CM', 'DURANGO': 'DG', 'GUANAJUATO': 'GT',
+  'GUERRERO': 'GR', 'HIDALGO': 'HG', 'JALISCO': 'JC', 'ESTADO DE MEXICO': 'MC',
+  'EDOMEX': 'MC', 'EDO. DE MEXICO': 'MC', 'EDO. MEX': 'MC',
+  'MICHOACAN': 'MN', 'MORELOS': 'MS', 'NAYARIT': 'NT', 'NUEVO LEON': 'NL',
+  'OAXACA': 'OC', 'PUEBLA': 'PL', 'QUERETARO': 'QT', 'QUINTANA ROO': 'QR',
+  'SAN LUIS POTOSI': 'SP', 'S.L.P': 'SP', 'SLP': 'SP',
+  'SINALOA': 'SL', 'SONORA': 'SR', 'TABASCO': 'TC', 'TAMAULIPAS': 'TS',
+  'TLAXCALA': 'TL', 'VERACRUZ': 'VZ', 'YUCATAN': 'YN', 'ZACATECAS': 'ZS',
+};
+const _CURP_VOWELS = 'AEIOU';
+const _CURP_CONS = 'BCDFGHJKLMNÑPQRSTVWXYZ';
+const _CURP_BAD_WORDS = new Set(['BACA','BAKA','BUEI','BUEY','CACA','CACO','CAGA','CAGO','CAKA','CAKO','COGE','COGI','COJA','COJE','COJI','COJO','COLA','CULO','FALO','FETO','GETA','GUEI','GUEY','JETA','JOTO','KACA','KACO','KAGA','KAGO','KAKA','KAKO','KOGE','KOGI','KOJA','KOJE','KOJI','KOJO','KOLA','KULO','LILO','LOCA','LOCO','LOKA','LOKO','MAME','MAMO','MEAR','MEAS','MEON','MIAR','MION','MOCO','MOKO','MULA','MULO','NACA','NACO','PEDA','PEDO','PENE','PIPI','PITO','POPO','PUTA','PUTO','QULO','RATA','ROBA','ROBE','ROBO','RUIN','SENO','TETA','VACA','VAGA','VAGO','VAKA','VUEI','VUEY','WUEI','WUEY']);
+const _CURP_FIRST_NAME_SKIP = new Set(['JOSE', 'MARIA', 'MA.', 'MA', 'J.', 'J']);
+
+function _normalizeName(s) {
+  if (!s) return '';
+  // Quita acentos, ñ→Ñ se queda
+  return s.toUpperCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-ZÑ\s]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+function _splitFullname(fullname) {
+  // Heurística: si tiene 4+ tokens, los últimos 2 son apellidos.
+  // Si tiene 3, último=primer apellido, segundo=nombre. Si tiene 2 → apellido+nombre.
+  // BetMexico suele guardar "Nombre(s) Apellido1 Apellido2"
+  const parts = _normalizeName(fullname).split(' ').filter(Boolean);
+  if (parts.length === 0) return null;
+  if (parts.length === 1) return { nombre: parts[0], ap1: '', ap2: '' };
+  if (parts.length === 2) return { nombre: parts[0], ap1: parts[1], ap2: '' };
+  // 3+ tokens: asume últimos 2 son apellidos
+  const ap2 = parts[parts.length - 1];
+  const ap1 = parts[parts.length - 2];
+  let nombre = parts.slice(0, parts.length - 2).join(' ');
+  // Si el nombre empieza con José/María y hay más, usar el siguiente
+  const nameTokens = nombre.split(' ');
+  if (nameTokens.length > 1 && _CURP_FIRST_NAME_SKIP.has(nameTokens[0])) {
+    nombre = nameTokens.slice(1).join(' ');
+  }
+  return { nombre: nombre.split(' ')[0], ap1, ap2 };  // solo primer nombre
+}
+function _firstInternalVowel(s) {
+  for (let i = 1; i < s.length; i++) if (_CURP_VOWELS.includes(s[i])) return s[i];
+  return 'X';
+}
+function _firstInternalConsonant(s) {
+  for (let i = 1; i < s.length; i++) {
+    const c = s[i];
+    if (_CURP_CONS.includes(c) || c === 'Ñ') return c === 'Ñ' ? 'X' : c;
+  }
+  return 'X';
+}
+function _detectStateCode(address) {
+  if (!address) return 'NE';  // Nacido extranjero por default si no se sabe
+  const a = _normalizeName(address);
+  for (const [key, code] of Object.entries(_CURP_STATES)) {
+    if (a.includes(key)) return code;
+  }
+  return 'NE';
+}
+function _inferSex(nombre) {
+  // Heurística: nombres femeninos comunes; si termina en 'A' es femenino mayoría;
+  // por default H si no se decide
+  const FEM = new Set(['ANA','MARIA','MARIANA','SOFIA','LUCIA','ELENA','LAURA','SARA','ADRIANA','ANDREA','ANGELA','ANGELES','BEATRIZ','CARMEN','CECILIA','CLAUDIA','CRISTINA','DANIELA','DIANA','DOLORES','DULCE','ELIZABETH','ESPERANZA','FATIMA','FRANCISCA','GABRIELA','GLORIA','GUADALUPE','HORTENSIA','INES','IRENE','IRMA','ISABEL','JAZMIN','JESSICA','JIMENA','JOSEFINA','JUANA','JULIANA','JULIA','KARLA','LETICIA','LIDIA','LILIANA','LILY','LIZ','LUPITA','MAGDALENA','MARGARITA','MARTHA','MARIBEL','MELISSA','MERCEDES','MICHELLE','MIRIAM','MONICA','NANCY','NATALIA','NORMA','OLIVIA','PALOMA','PAOLA','PATRICIA','PAULA','PILAR','PRISCILA','RAQUEL','REBECA','ROCIO','ROSA','ROSARIO','SANDRA','SILVIA','SUSANA','TANIA','TERESA','VALERIA','VANESSA','VERONICA','VICTORIA','VIRGINIA','XIMENA','YESENIA','YOLANDA','ZULEMA']);
+  if (!nombre) return 'X';
+  if (FEM.has(nombre)) return 'M';
+  // Termina en A pero no es nombre conocido → asumir M
+  if (nombre.endsWith('A')) return 'M';
+  return 'H';
+}
+function _curpVerifier(curp17) {
+  // Algoritmo oficial: cada char tiene un valor (0-9 / A-Z), suma ponderada, resta 10.
+  const map = '0123456789ABCDEFGHIJKLMNÑOPQRSTUVWXYZ';
+  let sum = 0;
+  for (let i = 0; i < 17; i++) {
+    const v = map.indexOf(curp17[i]);
+    if (v < 0) return '0';
+    sum += v * (18 - i);
+  }
+  const ver = (10 - (sum % 10)) % 10;
+  return String(ver);
+}
+function computeCurp(fullname, birthdate, address) {
+  const split = _splitFullname(fullname);
+  if (!split || !split.ap1 || !birthdate) return null;
+  // Fecha: acepta YYYY-MM-DD o YYYY-MM-DDT...
+  const m = birthdate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const [, yyyy, mm, dd] = m;
+  const yy = yyyy.slice(2);
+
+  let p1 = (split.ap1[0] || 'X');
+  let p2 = _firstInternalVowel(split.ap1);
+  let p3 = (split.ap2[0] || 'X');
+  let p4 = (split.nombre[0] || 'X');
+  // Si las primeras 4 forman palabra inconveniente, segunda letra → X
+  let prefix = p1 + p2 + p3 + p4;
+  if (_CURP_BAD_WORDS.has(prefix)) prefix = p1 + 'X' + p3 + p4;
+
+  const sex = _inferSex(split.nombre);
+  const state = _detectStateCode(address);
+  const c1 = _firstInternalConsonant(split.ap1);
+  const c2 = _firstInternalConsonant(split.ap2);
+  const c3 = _firstInternalConsonant(split.nombre);
+
+  // Homoclave (pos 17): A-Z para >= 2000, 0-9 para < 2000. Sin tabla → X.
+  const homo = parseInt(yyyy, 10) >= 2000 ? 'X' : '0';
+  const curp17 = `${prefix}${yy}${mm}${dd}${sex}${state}${c1}${c2}${c3}${homo}`;
+  const ver = _curpVerifier(curp17);
+  return curp17 + ver;
+}
 // Glow tiers para el saldo:
 //   ≥ $10  → glow (verde brillante)
 //   $5-$10 → tenue/grisecito
@@ -320,7 +438,7 @@ function renderTable() {
     const detailsBtn = `<button class="row-details" data-id="${r.id}" title="Ver detalles completos de la cuenta">
       <span class="row-details-text">detalles</span>
       <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-        <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clip-rule="evenodd"/>
+        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/>
       </svg>
     </button>`;
 
@@ -1893,12 +2011,27 @@ async function openDetailModal(id) {
     const r = await fetch(`/api/accounts/${id}/details`);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
-    title.textContent = `${data.email}:${data.password || ''}`;
+    // Combo en el title — clickable para copiar
+    const combo = `${data.email}:${data.password || ''}`;
+    title.innerHTML = `<span class="d-copy mono" data-copy="${esc(combo)}" title="Click para copiar combo">${esc(combo)}</span>`;
     body.innerHTML = renderDetail(data);
     // Aura del modal según grade
     const modal = $('#detModal');
     modal.classList.remove('grade-A', 'grade-B', 'grade-C', 'grade-D', 'grade-U');
-    modal.classList.add(`grade-${gradeClass(data.grade)}`);
+    const gc = gradeClass(data.grade);
+    modal.classList.add(`grade-${gc}`);
+    // Letra grande del grade en el header (premium feel)
+    const isSA = state.user?.role === 'superadmin';
+    const headerExtra = $('#detModalGradeBadge');
+    if (headerExtra) {
+      if (isSA && data.grade) {
+        headerExtra.textContent = data.grade;
+        headerExtra.className = `det-grade-badge grade-${gc}`;
+        headerExtra.style.display = '';
+      } else {
+        headerExtra.style.display = 'none';
+      }
+    }
   } catch (e) {
     body.innerHTML = `<div class="detail-error">Error: ${esc(e.message)}</div>`;
   }
@@ -1925,18 +2058,26 @@ function renderDetail(d) {
         <li><span>Total checks</span><b>${d.check_count || 0}</b></li>
   ` : '';
 
+  // Birthdate sin hora
+  const bdate = d.birthdate ? String(d.birthdate).split('T')[0].split(' ')[0] : null;
+  // CURP — usa el de BD si existe y es válido, si no calcula
+  const curpStored = (d.curp && d.curp !== 'N/A') ? d.curp : null;
+  const curpCalc = !curpStored ? computeCurp(d.fullname, bdate, d.address) : null;
+  const curpHtml = curpStored
+    ? `<b class="mono d-copy" data-copy="${esc(curpStored)}" title="Click para copiar">${esc(curpStored)}</b>`
+    : curpCalc
+      ? `<b class="mono d-copy" data-copy="${esc(curpCalc)}" title="Estimado — click para copiar">${esc(curpCalc)}<span class="dim" style="margin-left:4px;font-size:9px">est</span></b>`
+      : '<b><span class="dim">—</span></b>';
+
   const personal = `
     <div class="d-section">
-      <div class="d-section-head">
-        <h4>📋 Datos personales</h4>
-        <button class="d-deposit-btn" data-acc-id="${d.id}" title="Depositar en esta cuenta sin cerrar el detalle">💳 Depositar</button>
-      </div>
+      <h4>📋 Datos personales</h4>
       <ul class="d-list">
         <li><span>Nombre</span><b>${naField(d.fullname)}</b></li>
-        <li><span>Fecha nac.</span><b>${naField(d.birthdate)}</b></li>
-        <li><span>Domicilio</span><b>${naField(d.address)}</b></li>
+        <li><span>Fecha nac.</span><b>${bdate ? esc(bdate) : '<span class="dim">—</span>'}</b></li>
+        <li class="d-list-multiline"><span>Domicilio</span><b>${naField(d.address)}</b></li>
         <li><span>Teléfono</span><b>${naField(d.phone)}</b></li>
-        <li><span>CURP</span><b class="mono">${naField(d.curp)}</b></li>
+        <li><span>CURP</span>${curpHtml}</li>
         <li><span>KYC</span><b>${d.kyc_verified ? '<span style="color:var(--accent)">✓ verificado</span>' : '<span class="dim">no</span>'}</b></li>
         <li><span>Saldo</span><b>${fmtMoney(d.balance_total)}${d.balance_real != null && d.balance_real !== d.balance_total ? ` <span class="dim mono">(real ${fmtMoney(d.balance_real)})</span>` : ''}</b></li>
         <li><span>Lock</span><b>${lockHtml}</b></li>
@@ -2020,7 +2161,7 @@ function renderDetail(d) {
     ? `<ul class="d-notes" id="dNotesList">${d.notes.map(renderNoteLi).join('')}</ul>`
     : '<ul class="d-notes" id="dNotesList"></ul><div class="d-empty" id="dNotesEmpty">Sin notas todavía.</div>';
 
-  const notes = `<div class="d-section">
+  const notes = `<div class="d-section d-section-notes">
       <h4>📝 Notas <span class="d-count" id="dNotesCount">${(d.notes || []).length}</span></h4>
       <form class="d-note-form" data-acc-id="${d.id}">
         <textarea class="d-note-input" placeholder="Nueva nota (visible solo para ti${isSA ? '' : ' y SA'})…" maxlength="2000" rows="2"></textarea>
@@ -2029,7 +2170,12 @@ function renderDetail(d) {
       ${notesList}
     </div>`;
 
-  return `<div class="d-grid">${personal}${cards}${txns}${notes}</div>`;
+  // Botón Depositar al fondo, alineado a la derecha (ya no en el header de personal)
+  const depositFooter = `<div class="d-deposit-footer">
+    <button class="d-deposit-btn" data-acc-id="${d.id}" title="Abrir modal de depósito en esta cuenta">💳 Depositar</button>
+  </div>`;
+
+  return `<div class="d-grid">${personal}${cards}${txns}${notes}</div>${depositFooter}`;
 }
 
 async function submitNote(accId, text) {
