@@ -349,11 +349,16 @@ function renderPagination(paged) {
   const c = $('#pbPages');
   if (paged.totalPages <= 1) { c.innerHTML = ''; return; }
   const cur = state.page, last = paged.totalPages;
-  const range = [];
-  range.push(1);
-  for (let i = cur - 1; i <= cur + 1; i++) if (i > 1 && i < last) range.push(i);
-  if (last > 1) range.push(last);
-  const uniq = [...new Set(range)].sort((a, b) => a - b);
+  // Mostrar al menos 10 números visibles + 1 y last + ellipsis
+  const WINDOW = 10;
+  const range = new Set([1, last]);
+  // Ventana centrada en cur
+  let start = Math.max(2, cur - Math.floor(WINDOW / 2));
+  let end = Math.min(last - 1, start + WINDOW - 1);
+  // Si chocamos con el final, expandir hacia atrás
+  start = Math.max(2, end - WINDOW + 1);
+  for (let i = start; i <= end; i++) range.add(i);
+  const uniq = [...range].sort((a, b) => a - b);
   let html = `<button class="pg-btn" data-pg="prev" ${cur === 1 ? 'disabled' : ''}>‹</button>`;
   let prev = 0;
   for (const p of uniq) {
