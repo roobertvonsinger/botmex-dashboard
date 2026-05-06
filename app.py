@@ -458,7 +458,8 @@ def stats(_user: dict = Depends(require_session)):
 
 # ── LitPort proxy health (cache 60s) ───────────────────────────────────────────
 _proxy_cache: dict = {"ts": 0.0, "data": None}
-_PROXY_TTL = 60.0
+_PROXY_TTL = 30.0       # cache si OK
+_PROXY_TTL_FAIL = 5.0   # cache corto si falló — re-intenta rápido
 
 # Dedup de alertas push: kind → último timestamp broadcast (anti-spam)
 _alert_last_sent: dict = {}
@@ -492,8 +493,10 @@ def _proxy_health() -> dict:
     Cache 60s para no saturar."""
     import time as _time
     now = _time.time()
-    if _proxy_cache["data"] and (now - _proxy_cache["ts"]) < _PROXY_TTL:
-        return _proxy_cache["data"]
+    if _proxy_cache["data"]:
+        ttl = _PROXY_TTL if _proxy_cache["data"].get("ok") else _PROXY_TTL_FAIL
+        if (now - _proxy_cache["ts"]) < ttl:
+            return _proxy_cache["data"]
 
     # Defaults desde betmexico_config.py (mismo proxy que usa el bot)
     host = os.environ.get("LITPORT_HOST", "hub-us-7.litport.net")
@@ -505,26 +508,32 @@ def _proxy_health() -> dict:
     handler = urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
     opener = urllib.request.build_opener(handler)
 
-    t0 = _time.time()
-    try:
-        # ipinfo.io responde desde IPs MX (ip-api.com las bloquea por TOS)
-        req = urllib.request.Request(
-            "https://ipinfo.io/json",
-            headers={"User-Agent": "curl/8.0"},
-        )
-        with opener.open(req, timeout=8) as resp:
-            body = _json.loads(resp.read())
-        latency = int((_time.time() - t0) * 1000)
-        out = {
-            "ok": True,
-            "ip": body.get("ip"),
-            "country": body.get("country"),
-            "latency_ms": latency,
-            "host": f"{host}:{port}",
-            "error": None,
-        }
-    except Exception as e:
-        out = {"ok": False, "error": str(e)[:80], "host": f"{host}:{port}"}
+    # Intenta ipinfo.io primero, ipify como fallback
+    out = None
+    for endpoint, parse in [
+        ("https://ipinfo.io/json", lambda b: (b.get("ip"), b.get("country"))),
+        ("https://api.ipify.org?format=json", lambda b: (b.get("ip"), None)),
+    ]:
+        t0 = _time.time()
+        try:
+            req = urllib.request.Request(endpoint, headers={"User-Agent": "curl/8.0"})
+            with opener.open(req, timeout=12) as resp:
+                body = _json.loads(resp.read())
+            ip, country = parse(body)
+            latency = int((_time.time() - t0) * 1000)
+            out = {
+                "ok": True, "ip": ip, "country": country or "MX",
+                "latency_ms": latency,
+                "host": f"{host}:{port}",
+                "error": None, "endpoint": endpoint,
+            }
+            break
+        except Exception as e:
+            last_err = str(e)[:100]
+            print(f"[proxy_health] {endpoint} fail: {last_err}")
+            continue
+    if out is None:
+        out = {"ok": False, "error": last_err, "host": f"{host}:{port}"}
 
     _proxy_cache.update({"ts": now, "data": out})
     return out
