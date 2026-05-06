@@ -2207,3 +2207,10 @@ td.row-details-cell, th.row-details-th {
 #accTable tbody tr td.combo,
 #accTable tbody tr td.dep,
 #accTable tbody tr td.num { user-select: text; }
+
+/* seg-btn deshabilitado (Limpiar sin selección, etc) */
+.seg-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}

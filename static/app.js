@@ -249,7 +249,8 @@ function renderTable() {
   const t = $('#accTable');
   // Calcula ancho del combo más largo (en chars) — fija la columna
   const maxComboLen = visible.reduce((m, r) => Math.max(m, (r.email||'').length + 1 + (r.password||'').length), 28);
-  t.style.setProperty('--combo-width', `${Math.min(maxComboLen, 60)}ch`);
+  // +15ch de margen a la derecha — más cómodo visualmente
+  t.style.setProperty('--combo-width', `${Math.min(maxComboLen + 15, 75)}ch`);
   const _th = (col, label, cls = '') => {
     const on = _sortCol === col;
     const ic = on ? (_sortDir === 1 ? ' ↑' : ' ↓') : '';
@@ -397,6 +398,12 @@ function updateCmdBar() {
   const n = selectedIds.size;
   const bar = $('#cmdBar');
   $('#cmdSelCount').textContent = n;
+  // Botón Limpiar de la pagebar — disabled si no hay nada seleccionado
+  const btnDes = $('#btnDeselectAll');
+  if (btnDes) {
+    btnDes.disabled = (n === 0);
+    btnDes.title = n === 0 ? 'No hay nada seleccionado' : `Deseleccionar ${n} (Esc)`;
+  }
   if (n === 0) { bar.classList.add('hidden'); return; }
   bar.classList.remove('hidden');
 
@@ -2899,6 +2906,7 @@ $$('.ico-btn[title="Salir"], .power').forEach(btn => {
   tickFrase();
   setInterval(tickFrase, 9_000);
   await reload();
+  updateCmdBar();  // inicializa estado del btn Limpiar
   refreshKpis();
   setInterval(refreshKpis, 30_000);
   loadHealth(false);
