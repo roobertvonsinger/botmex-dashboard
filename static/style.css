@@ -524,13 +524,18 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
   text-shadow: 0 0 6px var(--accent-glow);
 }
 
-/* ─── Selection checkbox ─── */
-.sel-cell { width: 28px; padding: 0 4px !important; text-align: center; }
+/* ─── Selection checkbox (entre grade-bar y saldo, comprimido) ─── */
+.sel-cell {
+  width: 22px !important; min-width: 22px !important; max-width: 22px !important;
+  padding: 0 !important;
+  text-align: center;
+}
 .sel-cell input[type="checkbox"] {
-  width: 14px; height: 14px;
+  width: 13px; height: 13px;
   accent-color: var(--accent);
   cursor: pointer;
   vertical-align: middle;
+  margin: 0;
 }
 tr.row-sel { background: var(--accent-soft) !important; }
 tr.row-sel td { border-color: var(--accent-soft-2) !important; }

@@ -233,15 +233,17 @@ function renderTable() {
   };
   const cols = state.view === 'simple'
     ? `<tr>
-        <th class="grade-bar-th"></th>${_th('balance_total','Saldo','num')}<th>Cuenta</th>
-        ${_th('last_deposit_date','Últ. depósito')}
+        <th class="grade-bar-th"></th>
         <th class="sel-cell"><input type="checkbox" id="selAll"></th>
+        ${_th('balance_total','Saldo','num')}<th>Cuenta</th>
+        ${_th('last_deposit_date','Últ. depósito')}
       </tr>`
     : `<tr>
-        <th class="grade-bar-th"></th>${_th('balance_total','Saldo','num')}<th>Cuenta</th>
+        <th class="grade-bar-th"></th>
+        <th class="sel-cell"><input type="checkbox" id="selAll"></th>
+        ${_th('balance_total','Saldo','num')}<th>Cuenta</th>
         ${_th('last_deposit_date','Últ. depósito')}<th>Estado</th>
         ${_th('last_checked_at','Últ. check')}${_th('check_count','Checks','num')}
-        <th class="sel-cell"><input type="checkbox" id="selAll"></th>
       </tr>`;
   t.querySelector('thead').innerHTML = cols;
 
@@ -268,21 +270,21 @@ function renderTable() {
     if (state.view === 'simple') {
       return `<tr class="${trClasses}" data-id="${r.id}" title="${trTitle}">
         <td class="grade-bar-cell"></td>
+        <td class="sel-cell"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
         <td class="num"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
         <td class="combo">${r.cards_count > 0 ? `<span class="card-ind" title="${r.cards_count} tarjeta${r.cards_count > 1 ? 's' : ''} guardada${r.cards_count > 1 ? 's' : ''}">💳<sup>${r.cards_count}</sup></span>` : ''}<b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b>${lockChip}</td>
         <td class="dep">${dep}</td>
-        <td class="sel-cell"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
       </tr>`;
     }
     return `<tr class="${trClasses}" data-id="${r.id}" title="${trTitle}">
       <td class="grade-bar-cell"></td>
+      <td class="sel-cell"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
       <td class="num"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
       <td class="combo">${r.cards_count > 0 ? `<span class="card-ind" title="${r.cards_count} tarjeta${r.cards_count > 1 ? 's' : ''} guardada${r.cards_count > 1 ? 's' : ''}">💳<sup>${r.cards_count}</sup></span>` : ''}<b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b></td>
       <td class="dep">${dep}</td>
       <td>${r.status === 'LIVE' ? '<span style="color:var(--accent)">LIVE</span>' : '<span class="dim">DEAD</span>'}</td>
       <td class="dep dim">${fmtAgo(r.last_checked_at)}</td>
       <td class="num">${r.check_count || 0}</td>
-      <td class="sel-cell"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
     </tr>`;
   }).join('');
 
