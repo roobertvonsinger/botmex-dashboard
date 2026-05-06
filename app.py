@@ -48,7 +48,7 @@ except Exception as _e:
     _tb.print_exc()
 
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -180,7 +180,17 @@ def login_page(bmx_session: str = Cookie(default=None)):
 def index(bmx_session: str = Cookie(default=None)):
     if not bmx_session or not _auth.get_session(bmx_session):
         return RedirectResponse("/login", status_code=302)
-    return FileResponse(STATIC / "index.html")
+    # Cache-bust: añadir mtime de los assets al src para forzar re-fetch tras deploy
+    try:
+        html = (STATIC / "index.html").read_text(encoding="utf-8")
+        v_js = int((STATIC / "app.js").stat().st_mtime)
+        v_css = int((STATIC / "style.css").stat().st_mtime)
+        html = html.replace('src="/static/app.js"', f'src="/static/app.js?v={v_js}"')
+        html = html.replace('href="/static/style.css"', f'href="/static/style.css?v={v_css}"')
+        return Response(content=html, media_type="text/html",
+                        headers={"Cache-Control": "no-cache, must-revalidate"})
+    except Exception:
+        return FileResponse(STATIC / "index.html")
 
 
 # ── Auth endpoints ─────────────────────────────────────────────────────────────
