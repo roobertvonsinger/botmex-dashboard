@@ -25,6 +25,7 @@ const state = {
   page: 1,
   pageSize: 50,
   lockHours: 2,
+  filterInUse: false,
 };
 
 
@@ -110,7 +111,9 @@ const balanceCls = v => {
   if (v > 5) return 'dim-amount';
   return '';
 };
-const getVisible = () => state.rows;
+const getVisible = () => state.filterInUse
+  ? state.rows.filter(r => r.locked_by)
+  : state.rows;
 
 function getPaged() {
   const v = getVisible();
@@ -163,6 +166,7 @@ async function loadMe() {
   // L invertida (control multiusuario) SOLO superadmin — admin no debe ver indicios de SA
   if (!isSuper) {
     $('#adminPanel').style.display = 'none';
+    document.body.classList.add('no-kpis');
   }
   // Vista Detallada solo superadmin (admin/user usan Simple)
   if (!isSuper) {
@@ -577,7 +581,11 @@ function renderNotifs() {
 }
 
 // ─── navigation ───
+let _lastNonNotifSection = 'accounts';
 function showSection(name) {
+  if (state.section !== 'notifications' && name !== state.section) {
+    _lastNonNotifSection = state.section;
+  }
   state.section = name;
   $('#accountsMain').style.display = name === 'accounts' ? 'flex' : 'none';
   $('#activityMain').style.display = name === 'activity' ? 'flex' : 'none';
@@ -716,10 +724,13 @@ async function refreshKpis() {
     $('#lpFeed').innerHTML = feed.length === 0
       ? '<div class="lp-empty dim mono">esperando actividad…</div>'
       : feed.map(e => {
-          const ic = e.kind === 'deposit' ? (e.status === 'approved' ? '💰' : '✗')
-                   : e.kind === 'lock' ? '🎣' : '·';
+          const isDepOk   = e.kind === 'deposit' && e.status === 'approved';
+          const isDepFail = e.kind === 'deposit' && e.status !== 'approved';
+          const ic = e.kind === 'deposit' ? (isDepOk ? '💰' : '✗')
+                   : e.kind === 'lock' ? '🔒' : '·';
           const col = e.who_color || 'accent';
-          return `<div class="lp-feed-row">
+          const rowCls = isDepOk ? 'lp-feed-ok' : isDepFail ? 'lp-feed-fail' : 'lp-feed-neutral';
+          return `<div class="lp-feed-row ${rowCls}">
             <span class="lp-feed-ic">${ic}</span>
             <span class="lp-feed-who lp-color-${esc(col)}">${esc(e.who || '—')}</span>
             <span class="lp-feed-target dim mono">${esc(e.target || '')}</span>
@@ -913,6 +924,18 @@ $('#btnLogsClear')?.addEventListener('click', () => { $('#logsView').textContent
 
 // Health
 $('#btnHealthRun')?.addEventListener('click', () => loadHealth(true));
+$('#btnHealthDismiss')?.addEventListener('click', async () => {
+  try {
+    const r = await fetch('/api/health/dismiss', { method: 'POST' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const h = await r.json();
+    if (h.ok) toast('✓ Salud OK — alertas limpias', 'success');
+    else toast(`Issues persisten: ${h.issues.length}`, 'error');
+    await loadHealth(false);
+  } catch (e) {
+    toast(`Error: ${e.message}`, 'error');
+  }
+});
 
 // Liberar
 $('#cmdRelease')?.addEventListener('click', openReleasePopup);
@@ -1460,7 +1483,33 @@ document.addEventListener('click', e => {
   if (!e.target.closest('.cmd-lock-wrap')) $('#lockHoursPopup')?.classList.add('hidden');
 });
 
-$('#bellBtn').addEventListener('click', () => showSection('notifications'));
+$('#bellBtn').addEventListener('click', () => {
+  if (state.section === 'notifications') {
+    showSection(_lastNonNotifSection || 'accounts');
+  } else {
+    showSection('notifications');
+  }
+});
+
+// Click en "En uso" del Pool → filtra accounts por las que tienen lock activo
+$('#lpInUse')?.addEventListener('click', () => {
+  state.filterInUse = !state.filterInUse;
+  state.page = 1;
+  $('#lpInUse').classList.toggle('lp-stat-active', state.filterInUse);
+  showSection('accounts');
+  renderTable();
+  toast(state.filterInUse ? '🎣 Filtro: solo en uso' : '↺ Filtro removido', 'success');
+});
+// Click en "Pool" → quita filtros, muestra todas
+$('#lpPool')?.addEventListener('click', () => {
+  if (state.filterInUse) {
+    state.filterInUse = false;
+    $('#lpInUse').classList.remove('lp-stat-active');
+    state.page = 1;
+    showSection('accounts');
+    renderTable();
+  }
+});
 
 // Click en avatar de la L invertida → filtra activity por ese operador
 $('#lpOps')?.addEventListener('click', e => {

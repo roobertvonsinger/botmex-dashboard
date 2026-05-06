@@ -196,7 +196,12 @@ body {
   background: rgba(0,0,0,0.35); border: 1px solid var(--hairline);
   border-radius: 9px;
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.4);
+  transition: width 200ms ease;
 }
+/* Usuarios sin KPIs: search ocupa casi toda la topbar (la tabla gana altura) */
+body.no-kpis .search { width: auto; flex: 1; max-width: none; }
+body.no-kpis .topbar > .grow { display: none; }
+body.no-kpis #adminPanel { display: none !important; }
 .search .ico { color: var(--text-muted); font-size: 14px; }
 .search input { background: transparent; border: none; outline: none; color: var(--text); font-size: 12.5px; flex: 1; font-family: inherit; }
 .search input::placeholder { color: var(--text-muted); }
@@ -447,8 +452,14 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 .lp-feed-ic { font-size: 11px; flex-shrink: 0; }
 .lp-feed-who { font-weight: 600; flex-shrink: 0; }
 .lp-feed-target { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lp-feed-amt { color: var(--accent); font-weight: 600; }
+.lp-feed-amt { font-weight: 600; }
 .lp-feed-time { font-size: 9.5px; flex-shrink: 0; }
+/* Color del monto / icono según resultado: verde solo si fue éxito */
+.lp-feed-row.lp-feed-ok .lp-feed-amt   { color: var(--accent); }
+.lp-feed-row.lp-feed-fail .lp-feed-amt { color: var(--text-muted); text-decoration: line-through; }
+.lp-feed-row.lp-feed-fail .lp-feed-ic  { color: var(--danger); opacity: 0.7; }
+.lp-feed-row.lp-feed-fail              { opacity: 0.72; }
+.lp-feed-row.lp-feed-neutral .lp-feed-amt { color: var(--text-dim); }
 
 /* Tokens de color por operador (chip + feed-who) */
 .lp-color-warn   { color: var(--warn); }
@@ -505,6 +516,13 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 .lp-stat-val.warn { color: var(--warn); }
 .lp-stat-val.danger { color: var(--danger); }
 .lp-stat-val.dim { color: var(--text-muted); }
+/* lp-stat clickable (En uso, Pool) */
+#lpInUse, #lpPool { cursor: pointer; transition: color 140ms; }
+#lpInUse:hover, #lpPool:hover { filter: brightness(1.3); }
+#lpInUse.lp-stat-active {
+  color: var(--accent);
+  text-shadow: 0 0 6px var(--accent-glow);
+}
 
 /* ─── Selection checkbox ─── */
 .sel-cell { width: 28px; padding: 0 4px !important; text-align: center; }
@@ -871,6 +889,24 @@ tr.r-grade-A .grade-bar-cell { background: var(--grade-a); box-shadow: 0 0 8px v
 tr.r-grade-B .grade-bar-cell { background: var(--warn);    box-shadow: 0 0 8px var(--warn); }
 tr.r-grade-C .grade-bar-cell { background: var(--danger);  box-shadow: 0 0 8px var(--danger); }
 tr.r-grade-U .grade-bar-cell { background: rgba(255,255,255,0.10); }
+
+/* Glassy gradient extendido del grade hacia la columna del saldo (sutil) */
+tbody tr.r-grade-A {
+  background-image: linear-gradient(to right, oklch(0.78 0.20 169 / 0.16) 0%, oklch(0.78 0.20 169 / 0.06) 12%, transparent 24%);
+}
+tbody tr.r-grade-B {
+  background-image: linear-gradient(to right, oklch(0.86 0.16 75 / 0.14) 0%, oklch(0.86 0.16 75 / 0.05) 12%, transparent 24%);
+}
+tbody tr.r-grade-C {
+  background-image: linear-gradient(to right, oklch(0.66 0.21 24 / 0.16) 0%, oklch(0.66 0.21 24 / 0.06) 12%, transparent 24%);
+}
+tbody tr.r-grade-U {
+  background-image: linear-gradient(to right, rgba(255,255,255,0.05) 0%, transparent 20%);
+}
+/* Hover refuerza el wash sin perder la firma del grade */
+tbody tr.r-grade-A:hover { background-image: linear-gradient(to right, oklch(0.78 0.20 169 / 0.22) 0%, oklch(0.78 0.20 169 / 0.08) 14%, rgba(255,255,255,0.025) 28%); }
+tbody tr.r-grade-B:hover { background-image: linear-gradient(to right, oklch(0.86 0.16 75 / 0.20) 0%, oklch(0.86 0.16 75 / 0.07) 14%, rgba(255,255,255,0.025) 28%); }
+tbody tr.r-grade-C:hover { background-image: linear-gradient(to right, oklch(0.66 0.21 24 / 0.22) 0%, oklch(0.66 0.21 24 / 0.08) 14%, rgba(255,255,255,0.025) 28%); }
 
 /* Filas: glass tenue, color solo en la barra lateral. Sin wash. */
 tbody tr { background: transparent; }

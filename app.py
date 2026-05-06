@@ -788,11 +788,10 @@ def _run_health_checks() -> dict:
             issues.append(f"{recent_dead} cuentas DEAD en última hora")
     except Exception:
         pass
-    # 4. Bot deps
-    try:
-        import betmexico_db  # noqa: F401
-    except Exception:
-        issues.append("Bot deps no cargan (betmexico_db)")
+    # 4. Bot deps — solo informativo, NO genera issue (en dev local los deps
+    #    no están y eso es esperado; el VPS los tiene siempre).
+    # try: import betmexico_db
+    # → eliminado del check; la ausencia no rompe el dashboard, solo /api/deposits/execute.
 
     state = {
         "last_run": datetime.now(timezone.utc).isoformat(),
@@ -811,6 +810,13 @@ def health_full(_user: dict = Depends(require_session)):
 @app.get("/api/health/last")
 def health_last(_user: dict = Depends(require_session)):
     return _health_state
+
+
+@app.post("/api/health/dismiss")
+def health_dismiss(_user: dict = Depends(require_session)):
+    """Limpia el estado de salud — re-corre el check ahora.
+    Si los issues siguen presentes, vuelven a aparecer; si se resolvieron, quedan limpios."""
+    return _run_health_checks()
 
 
 async def _health_loop():
