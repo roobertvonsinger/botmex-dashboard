@@ -496,12 +496,24 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                         matches.append({"email": acc["email"], "tail": card["tail"], "pipe": card["pipe"]})
                         yield f"data: {json.dumps({'type':'match','email':acc['email'],'tail':card['tail'],'pipe':card['pipe'],'amount':amount,'duration_ms':duration,'attempt':n})}\n\n"
                     elif code in ("LOGIN_FAILED", "AUTOEXCLUSION", "KYC_PENDING", "3DS_UNDETECTED", "SHADOW_BAN?"):
-                        acc["fail_count"] = MM_MAX_FAILS  # cuenta fuera
-                        yield f"data: {json.dumps({'type':'account_dead','email':acc['email'],'code':code,'tail':card['tail'],'attempt':n})}\n\n"
-                    elif code == "3DS_REQUIRED":
-                        # solo strike a tarjeta
+                        # Cuenta fuera del run + persistir DEAD en BD para no volver a intentarla
+                        acc["fail_count"] = MM_MAX_FAILS
+                        try:
+                            from app import db as _appdb
+                            with _appdb(write=True) as cdb:
+                                cdb.execute(
+                                    "UPDATE accounts SET status='DEAD', dead_reason=?, dead_at=? "
+                                    "WHERE email=? AND status != 'DEAD'",
+                                    (code, datetime.now(timezone.utc).isoformat(), acc["email"])
+                                )
+                        except Exception as ex:
+                            logger.error(f"[Matchmaker] no pude marcar DEAD {acc['email']}: {ex}")
+                        yield f"data: {json.dumps({'type':'account_dead','email':acc['email'],'code':code,'tail':card['tail'],'attempt':n,'persisted':True})}\n\n"
+                    elif code in ("3DS_REQUIRED", "BANK_REJECTED"):
+                        # Solo strike a tarjeta — la cuenta está fina (BANK_REJECTED viene del banco
+                        # emisor de la tarjeta, no de BetMexico)
                         card["fail_count"] += 1
-                        yield f"data: {json.dumps({'type':'rejected','email':acc['email'],'tail':card['tail'],'code':code,'card_fails':card['fail_count'],'attempt':n})}\n\n"
+                        yield f"data: {json.dumps({'type':'rejected','email':acc['email'],'tail':card['tail'],'code':code,'card_fails':card['fail_count'],'attempt':n,'card_only':True})}\n\n"
                     else:
                         card["fail_count"] += 1
                         acc["fail_count"] += 1

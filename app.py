@@ -97,6 +97,8 @@ def _migrate():
     for col, ddl in [
         ("locked_until", "ALTER TABLE accounts ADD COLUMN locked_until TEXT"),
         ("published_to_pool", "ALTER TABLE accounts ADD COLUMN published_to_pool INTEGER DEFAULT 1"),
+        ("dead_reason", "ALTER TABLE accounts ADD COLUMN dead_reason TEXT"),
+        ("dead_at", "ALTER TABLE accounts ADD COLUMN dead_at TEXT"),
     ]:
         try:
             with db(write=True) as c:
