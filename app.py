@@ -473,7 +473,7 @@ def _wsai_status() -> dict:
     now = _t.time()
     if _wsai_cache["data"] and (now - _wsai_cache["ts"]) < _WSAI_TTL:
         return _wsai_cache["data"]
-    key = os.environ.get("WSAI_API_KEY", "9a79d4ae-dc34-4035-be65-7a76f062ead0")
+    key = os.environ.get("WSAI_API_KEY", "e338d7e4-3c48-4b65-937c-8508c405ba6f")
     try:
         req = urllib.request.Request(
             f"https://api.webscraping.ai/account?api_key={key}",
