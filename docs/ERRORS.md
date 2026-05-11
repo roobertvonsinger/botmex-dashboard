@@ -144,6 +144,23 @@ Ver "Las tarjetas no se persisten" arriba (mismo bug raíz).
 
 ---
 
+### Cuentas no quedan reservadas al depositar (otros operadores las siguen viendo)
+
+**Síntoma**: dos operadores trabajan la misma cuenta sin saberlo → conflict en BetMexico (sesiones simultáneas → bans).
+
+**Causa**: el flujo de depósito (single/multi/scheduled) no aplicaba `locked_by` automáticamente. El lock era solo manual vía botón "Lock" del cmdBar.
+
+**Fix aplicado 2026-05-11**:
+- `deposits._auto_lock_for_deposit(account_id, operator_id, user, hours)` ejecuta UPDATE en `accounts.locked_by/locked_at/locked_until` al inicio de cada deposit
+- Llamado desde `/api/deposits/execute` (2h), `/api/deposits/multi/stream` (2h por cuenta), `/api/deposits/scheduled/create` (4h)
+- Rechaza con 409 si está lockeada por otro operador (SA puede override)
+- Filtro en `/api/accounts`: non-SA solo ve cuentas con `locked_by IS NULL` o `locked_by = <my_tg_id>`
+- Broadcast SSE `kind:lock` con `auto:true` para distinguir lock manual vs automático
+
+**Histórico**: commit `<TBD>` 2026-05-11.
+
+---
+
 ### Feed de Actividad muestra 2 entradas idénticas por cada depósito
 
 **Síntoma**: el feed muestra 2 rows con mismo email/monto/timestamp/estado.

@@ -318,6 +318,12 @@ def list_accounts(
     # Trastienda: non-SA solo ve cuentas publicadas a la pool
     if role != "superadmin":
         where.append("COALESCE(a.published_to_pool, 1) = 1")
+        # Lock-aware: non-SA solo ve cuentas libres O lockeadas por ellos mismos.
+        # Si otro operador la tiene, NO la ve. SA ve todo.
+        # `locked_by` se guarda como string del telegram_id (ver lock_account).
+        where.append("(a.locked_by IS NULL OR a.locked_by = ? OR a.locked_by = ?)")
+        params.append(str(user_tg))
+        params.append(user.get("username", "__none__"))
 
     base_cols = (
         "a.id, a.email, a.password, a.balance_total, a.balance_real, "

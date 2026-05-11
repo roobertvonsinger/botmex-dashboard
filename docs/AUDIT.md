@@ -29,6 +29,9 @@
 | Notas crear/leer/borrar | ✅ user crea sus notas, SA borra | ✅ | ✅ |
 | CURP estimado + validable | ✅ cálculo + botón "Validar gob.mx" | ✅ | ✅ |
 | Bulk lock / unlock / trastienda | ✅ | ✅ | ✅ |
+| **Auto-lock al iniciar depósito** | ✅ cuenta queda lockeada para operador (single 2h, multi 2h, scheduled 4h) | ✅ desde 2026-05-11 | ✅ |
+| **Filtro lock-aware en `/api/accounts`** | ✅ non-SA solo ve libres O propias; SA ve todo | ✅ desde 2026-05-11 | ✅ |
+| **Conflict 409 si cuenta lockeada por otro** | ✅ rechaza depósito; SA puede override | ✅ desde 2026-05-11 | ✅ |
 
 ## Depósitos
 

@@ -27,6 +27,62 @@ router = APIRouter(prefix="/api/deposits", tags=["deposits"])
 DEP_MAX_PER_TXN = 499.0   # >$499 dispara 3DS prácticamente garantizado
 DEP_MAX_24H = 1499.0      # tope acumulado por cuenta en 24h vía dashboard
 
+# Auto-lock al iniciar depósito (horas)
+AUTOLOCK_HOURS_SINGLE = 2
+AUTOLOCK_HOURS_MULTI = 2
+AUTOLOCK_HOURS_SCHEDULED = 4  # más amplio porque corre N reps cada 1 min
+
+
+def _auto_lock_for_deposit(
+    account_id: int,
+    operator_id: int,
+    user: dict,
+    hours: int = AUTOLOCK_HOURS_SINGLE,
+) -> None:
+    """Lockea la cuenta para el operador que arranca el depósito.
+
+    - Si ya está lockeada por el mismo operador → refresh (idempotente)
+    - Si está lockeada por OTRO operador:
+        * SA puede override
+        * non-SA → 409 Conflict
+    - Si no está lockeada → toma el lock
+    Broadcasta evento `kind:lock` con flag `auto:True` para distinguir del manual.
+    """
+    from app import db, _broadcast
+    now = datetime.now(timezone.utc)
+    locked_at = now.isoformat()
+    locked_until = (now + timedelta(hours=hours)).isoformat()
+    is_sa = user.get("role") == "superadmin"
+
+    with db(write=True) as c:
+        row = c.execute(
+            "SELECT locked_by, email FROM accounts WHERE id=?", (account_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Cuenta no encontrada")
+        cur_lock = row["locked_by"]
+        # Normalizar cur_lock para comparar contra operator_id (int)
+        try:
+            cur_lock_int = int(cur_lock) if cur_lock else None
+        except (TypeError, ValueError):
+            cur_lock_int = None
+        if cur_lock and cur_lock_int != operator_id and not is_sa:
+            raise HTTPException(409, f"Cuenta lockeada por otro operador ({cur_lock}). Espera o pide al SA que libere.")
+        c.execute(
+            "UPDATE accounts SET locked_by=?, locked_at=?, locked_until=? WHERE id=?",
+            (str(operator_id), locked_at, locked_until, account_id),
+        )
+        email = row["email"]
+    try:
+        _broadcast({
+            "type": "activity", "kind": "lock",
+            "ts": locked_at, "who": operator_id, "target": email,
+            "id": account_id, "locked_until": locked_until,
+            "auto": True,
+        })
+    except Exception:
+        pass
+
 
 def _window_status(email: str) -> dict:
     """Estado de la ventana de 24h desde el PRIMER depósito aprobado.
@@ -204,6 +260,11 @@ async def deposit_execute(request: Request, user: dict = Depends(require_session
     if cap_err:
         raise HTTPException(400, cap_err)
 
+    # Auto-lock: la cuenta queda lockeada para el operador. Otros operadores
+    # NO la verán hasta que se libere (manual o expiración). Falla 409 si está
+    # lockeada por otro y el caller no es superadmin.
+    _auto_lock_for_deposit(account_id, operator_id, user, hours=AUTOLOCK_HOURS_SINGLE)
+
     # Pool de captcha — start_factory arranca workers (rápido, no bloquea).
     # NO awaiteamos prefetch: si get_jwt usa caché, ni token necesita; si no,
     # factory está produciendo en background y get_token() espera al primero.
@@ -355,6 +416,11 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
 
     operator_id = int(user.get("telegram_id") or 0)
     user_ctx = {"telegram_id": operator_id, "username": user.get("username", "")}
+
+    # Auto-lock TODAS las cuentas del batch para este operador. Si alguna está
+    # lockeada por otro y el caller no es SA → 409. Si SA, override.
+    for a in accounts:
+        _auto_lock_for_deposit(a["id"], operator_id, user, hours=AUTOLOCK_HOURS_MULTI)
     cap_key = os.environ.get("CAPMONSTER_KEY", "") or os.environ.get("BMX_CAPMONSTER_KEY", "")
 
     run_id = uuid.uuid4().hex[:10]
@@ -588,6 +654,10 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
     email = row["email"]
     password = row["password"]
     cap_key = os.environ.get("CAPMONSTER_KEY", "") or os.environ.get("BMX_CAPMONSTER_KEY", "")
+
+    # Auto-lock: durante todo el schedule (N reps × 1min + buffer) la cuenta es
+    # del operador. Si está lockeada por otro y NO soy SA, 409.
+    _auto_lock_for_deposit(account_id, operator_id, user, hours=AUTOLOCK_HOURS_SCHEDULED)
 
     async def loop():
         pool = make_pool(cap_key, size=1, workers=1)
