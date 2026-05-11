@@ -680,6 +680,20 @@ td.combo b:hover + .copyhint { color: var(--accent); }
 .notif-item .ni-time { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
 .notif-item.new { border-color: var(--accent-soft-2); background: var(--accent-soft); }
 
+/* Acciones inline en notif (botones Depositar / Liberar) */
+.notif-item .ni-actions { display: flex; gap: 6px; }
+.notif-item .ni-act {
+  padding: 4px 10px; border-radius: 6px; cursor: pointer;
+  font: inherit; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--border, #2a3a4a); background: transparent; color: var(--fg);
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+.notif-item .ni-act:hover { background: rgba(255,255,255,0.05); }
+.notif-item .ni-act-deposit { border-color: var(--accent); color: var(--accent); }
+.notif-item .ni-act-deposit:hover { background: var(--accent-soft); }
+.notif-item .ni-act-release { border-color: var(--danger, #c33); color: var(--danger, #c33); }
+.notif-item .ni-act-release:hover { background: rgba(195, 51, 51, 0.08); }
+
 /* hidden helper */
 .hidden { display: none !important; }
 

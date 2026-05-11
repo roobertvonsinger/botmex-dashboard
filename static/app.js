@@ -885,6 +885,14 @@ function pushActivityEvent(ev) {
 
 // ─── notifications ───
 function pushNotif(n) {
+  // Filter por destinatario: si la notif tiene target_user, solo el operador
+  // dueño la ve. SA siempre ve todas (visibilidad operativa total).
+  if (n.target_user != null) {
+    const myTg = state.user?.telegram_id;
+    const isSA = state.user?.role === 'superadmin';
+    const isOwner = String(myTg) === String(n.target_user);
+    if (!isSA && !isOwner) return; // no es para mí
+  }
   notifications.unshift({ ...n, ts: Date.now(), id: Date.now() + Math.random(), unread: true });
   if (notifications.length > 50) notifications.length = 50;
   renderNotifBadge();
@@ -910,16 +918,61 @@ function renderNotifs() {
     list.innerHTML = '<div class="loading">Sin notificaciones.</div>';
     return;
   }
-  list.innerHTML = notifications.map(n => `
-    <div class="notif-item ${n.unread ? 'new' : ''}">
+  list.innerHTML = notifications.map(n => {
+    const actions = (n.actions || []).map(a => {
+      if (a === 'deposit') {
+        return `<button class="ni-act ni-act-deposit" data-act="deposit" data-acc-id="${n.account_id ?? ''}" title="Abrir modal de depósito">💳 Depositar</button>`;
+      }
+      if (a === 'release') {
+        return `<button class="ni-act ni-act-release" data-act="release" data-acc-id="${n.account_id ?? ''}" title="Liberar la cuenta para otros operadores">🔓 Liberar</button>`;
+      }
+      return '';
+    }).join('');
+    return `
+    <div class="notif-item ${n.unread ? 'new' : ''}" data-notif-id="${n.id}">
       <span class="ni-icon">${n.icon || '🔔'}</span>
       <span class="ni-msg">${esc(n.msg)}</span>
+      ${actions ? `<span class="ni-actions">${actions}</span>` : ''}
       <span class="ni-time">${fmtAgo(new Date(n.ts).toISOString())}</span>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   // marcar como leídas
   notifications.forEach(n => n.unread = false);
   renderNotifBadge();
 }
+
+// Handler de acciones en notifs (botones Depositar / Liberar)
+document.body.addEventListener('click', async e => {
+  const btn = e.target.closest('.ni-act');
+  if (!btn) return;
+  e.stopPropagation();
+  const act = btn.dataset.act;
+  const accId = parseInt(btn.dataset.accId);
+  if (!accId) return;
+  if (act === 'deposit') {
+    if (typeof openDepositModal === 'function') openDepositModal(accId);
+    return;
+  }
+  if (act === 'release') {
+    try {
+      const r = await fetch(`/api/accounts/${accId}/unlock`, { method: 'POST' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      toast('🔓 Cuenta liberada', 'success');
+      // Remover esa notif del feed (sus acciones quedaron sin sentido)
+      const item = btn.closest('.notif-item');
+      const nid = item?.dataset.notifId;
+      if (nid) {
+        const idx = notifications.findIndex(n => String(n.id) === String(nid));
+        if (idx >= 0) notifications.splice(idx, 1);
+      }
+      if (state.section === 'notifications') renderNotifs();
+      renderNotifBadge();
+    } catch (err) {
+      toast(`Error: ${err.message}`, 'error');
+    }
+    return;
+  }
+});
 
 // ─── navigation ───
 let _lastNonNotifSection = 'accounts';

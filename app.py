@@ -101,6 +101,10 @@ def _migrate():
         ("dead_at", "ALTER TABLE accounts ADD COLUMN dead_at TEXT"),
         # Trazabilidad: tarjeta usada en cada intento (apruebado o no). Sin enmascarar.
         ("card_pipe", "ALTER TABLE deposit_attempts ADD COLUMN card_pipe TEXT"),
+        # Watchdog auto-release: tracking de notifs enviadas (no spam).
+        ("notif_pre24h_sent_at", "ALTER TABLE accounts ADD COLUMN notif_pre24h_sent_at TEXT"),
+        ("notif_at24h_sent_at", "ALTER TABLE accounts ADD COLUMN notif_at24h_sent_at TEXT"),
+        ("notif_at24h10_sent_at", "ALTER TABLE accounts ADD COLUMN notif_at24h10_sent_at TEXT"),
     ]:
         try:
             with db(write=True) as c:
@@ -1372,11 +1376,142 @@ async def _window_watcher_loop():
         await asyncio.sleep(2 * 60)  # cada 2 min
 
 
+def _release_watchdog_tick():
+    """Watchdog post-depósito: notif progresivas y auto-release a las 27h.
+
+    Timeline desde `last_deposit_date`:
+    - T+23h55m → notif "disponible en 5 min" (info)
+    - T+24h    → notif "ya puedes volver a depositar" (warn) + acciones [deposit, release]
+    - T+24h10m → notif "segundo aviso" (warn) + acciones [deposit, release]
+    - T+27h    → auto-release silencioso
+
+    Las notifs son por-usuario (target_user = locked_by). El frontend filtra para
+    mostrar solo al operador dueño del lock. SA siempre las ve.
+    """
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    # last_deposit_date está en hora MX (UTC-6) sin tzinfo. Asumir MX.
+    mx_tz = timezone(timedelta(hours=-6))
+
+    try:
+        with db(write=True) as c:
+            rows = c.execute(
+                "SELECT id, email, locked_by, last_deposit_date, "
+                "notif_pre24h_sent_at, notif_at24h_sent_at, notif_at24h10_sent_at "
+                "FROM accounts "
+                "WHERE locked_by IS NOT NULL "
+                "AND last_deposit_date IS NOT NULL "
+                "AND last_deposit_date != 'N/A' "
+                "AND TRIM(last_deposit_date) != ''"
+            ).fetchall()
+    except sqlite3.OperationalError as e:
+        print(f"[release_watchdog] db error: {e}")
+        return
+
+    for r in rows:
+        try:
+            dt = datetime.strptime(r["last_deposit_date"], "%d/%m/%Y %H:%M")
+            dt_mx = dt.replace(tzinfo=mx_tz)
+        except ValueError:
+            continue
+
+        delta = now - dt_mx
+        hours = delta.total_seconds() / 3600.0
+        if hours < 0:
+            continue  # depósito en futuro? skip
+
+        acc_id = r["id"]
+        email = r["email"]
+        owner = r["locked_by"]
+        now_iso = now.isoformat()
+
+        # Caso 1: ≥27h → auto-release
+        if hours >= 27:
+            with db(write=True) as c:
+                c.execute(
+                    "UPDATE accounts SET locked_by=NULL, locked_at=NULL, locked_until=NULL, "
+                    "notif_pre24h_sent_at=NULL, notif_at24h_sent_at=NULL, notif_at24h10_sent_at=NULL "
+                    "WHERE id=?",
+                    (acc_id,),
+                )
+            _broadcast({
+                "type": "activity", "kind": "unlock_auto",
+                "ts": now_iso, "target": email, "id": acc_id,
+                "reason": "27h post-deposit, sin acción del operador",
+            })
+            _broadcast({
+                "type": "notification", "kind": "release_auto",
+                "severity": "info", "icon": "🕒",
+                "msg": f"{email} liberada automáticamente (27h sin actividad)",
+                "target_user": owner, "account_id": acc_id,
+            })
+            continue
+
+        # Caso 2: 24h+10m → segundo aviso con acciones
+        if hours >= 24.166 and not r["notif_at24h10_sent_at"]:
+            with db(write=True) as c:
+                c.execute(
+                    "UPDATE accounts SET notif_at24h10_sent_at=? WHERE id=?",
+                    (now_iso, acc_id),
+                )
+            _broadcast({
+                "type": "notification", "kind": "release_available_again",
+                "severity": "warn", "icon": "⏰",
+                "msg": f"{email}: 2do aviso — deposita o libera. Auto-release a las 27h.",
+                "target_user": owner, "account_id": acc_id,
+                "actions": ["deposit", "release"],
+            })
+            continue
+
+        # Caso 3: 24h cumplidas → primer aviso con acciones
+        if hours >= 24 and not r["notif_at24h_sent_at"]:
+            with db(write=True) as c:
+                c.execute(
+                    "UPDATE accounts SET notif_at24h_sent_at=? WHERE id=?",
+                    (now_iso, acc_id),
+                )
+            _broadcast({
+                "type": "notification", "kind": "release_available",
+                "severity": "warn", "icon": "🟢",
+                "msg": f"{email}: ya puedes depositar de nuevo (24h cumplidas)",
+                "target_user": owner, "account_id": acc_id,
+                "actions": ["deposit", "release"],
+            })
+            continue
+
+        # Caso 4: 5 min antes de 24h → pre-aviso (info)
+        if 23.917 <= hours < 24 and not r["notif_pre24h_sent_at"]:
+            with db(write=True) as c:
+                c.execute(
+                    "UPDATE accounts SET notif_pre24h_sent_at=? WHERE id=?",
+                    (now_iso, acc_id),
+                )
+            mins_left = max(0, int((24 - hours) * 60))
+            _broadcast({
+                "type": "notification", "kind": "release_warning_5min",
+                "severity": "info", "icon": "⏳",
+                "msg": f"{email}: disponible en ~{mins_left} min para volver a depositar",
+                "target_user": owner, "account_id": acc_id,
+            })
+
+
+async def _release_watchdog_loop():
+    """Loop infinito del watchdog. Tick cada 60s."""
+    await asyncio.sleep(15)  # esperar a que app arranque
+    while True:
+        try:
+            _release_watchdog_tick()
+        except Exception as e:
+            print(f"[release_watchdog] tick error: {e}")
+        await asyncio.sleep(60)
+
+
 @app.on_event("startup")
 async def _start_bg_tasks():
     asyncio.create_task(_health_loop())
     asyncio.create_task(_janitor_loop())
     asyncio.create_task(_window_watcher_loop())
+    asyncio.create_task(_release_watchdog_loop())
 
 
 class LockRequest(BaseModel):
@@ -1494,7 +1629,9 @@ def unlock_account(account_id: int, user: dict = Depends(require_session)):
             if not prev_locked_by or (owner != tg and owner != uname):
                 raise HTTPException(403, "Solo puedes desbloquear cuentas que tú bloqueaste")
         c.execute(
-            "UPDATE accounts SET locked_by=NULL, locked_at=NULL, locked_until=NULL WHERE id=?",
+            "UPDATE accounts SET locked_by=NULL, locked_at=NULL, locked_until=NULL, "
+            "notif_pre24h_sent_at=NULL, notif_at24h_sent_at=NULL, notif_at24h10_sent_at=NULL "
+            "WHERE id=?",
             (account_id,),
         )
     _broadcast({

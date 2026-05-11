@@ -23,6 +23,11 @@
 | `notification` | `global_resume` | `resume` endpoint | `{ts, who}` | `pushNotif()` |
 | `notification` | `emergency_stop` | `emergency-stop` endpoint | `{ts, who, cancelled_prewarms, cancelled_schedules}` | `pushNotif()` |
 | `notification` | `vps_reboot` | `vps-reboot` endpoint | `{ts, who, in}` | `pushNotif()` |
+| `notification` | `release_warning_5min` | `_release_watchdog_tick` (5 min antes de 24h post-deposit) | `{msg, target_user, account_id, icon:⏳, severity:info}` | `pushNotif()` filtra por `target_user` |
+| `notification` | `release_available` | `_release_watchdog_tick` (24h cumplidas) | `{msg, target_user, account_id, icon:🟢, severity:warn, actions:[deposit,release]}` | `pushNotif()` con botones |
+| `notification` | `release_available_again` | `_release_watchdog_tick` (24h+10min, 2do aviso) | `{msg, target_user, account_id, icon:⏰, severity:warn, actions:[deposit,release]}` | `pushNotif()` con botones |
+| `notification` | `release_auto` | `_release_watchdog_tick` (27h auto-release) | `{msg, target_user, account_id, icon:🕒, severity:info}` | `pushNotif()` |
+| `activity` | `unlock_auto` | `_release_watchdog_tick` (al auto-release a las 27h) | `{ts, target, id, reason}` | `pushActivityEvent()` |
 
 ## Tipos de eventos del matchmaker (multi/stream)
 
