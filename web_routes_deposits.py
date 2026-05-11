@@ -93,6 +93,7 @@ async def _run_deposit(
                 duration_ms=duration_ms,
                 rejection_reason=result.get("result_code"),
                 mission_id=mission_id,
+                card_pipe=f"{cc_num}|{cc_exp}|{cc_cvv}",
             )
         except Exception as e:
             logger.error(f"[Deposit] Error persisting attempt: {e}")

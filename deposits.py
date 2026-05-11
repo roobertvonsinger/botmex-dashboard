@@ -134,25 +134,14 @@ def _record_attempt(
     operator_id: int,
     card_pipe: Optional[str] = None,
 ) -> None:
-    from app import db, _broadcast
-    import sqlite3
-    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    try:
-        with db(write=True) as c:
-            c.execute(
-                "INSERT INTO deposit_attempts "
-                "(attempt_id, account_email, amount, source, operator_id, status, "
-                " rejection_reason, duration_ms, created_at, card_pipe) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?)",
-                (
-                    attempt_id, email, amount, "dashboard_v2", operator_id, status,
-                    rejection_reason, duration_ms, now_str, card_pipe,
-                ),
-            )
-    except sqlite3.OperationalError as e:
-        logger.warning(f"[Deposits] no se pudo grabar attempt: {e}")
+    """Broadcast SSE para el feed de Actividad.
 
-    # Broadcast SSE para feed de Actividad
+    NO escribe en BD. El INSERT en deposit_attempts lo hace
+    `web_routes_deposits._persist_final` via `db.log_attempt(...)` con info
+    completa (card_id, card_pipe, gateway_response_raw, txn_id, etc.).
+    Tener 2 INSERT en paralelo causaba duplicación en el feed (2026-05-11)."""
+    from app import _broadcast
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     try:
         _broadcast({
             "type": "activity",
