@@ -1,0 +1,187 @@
+# Frontend — mapa operativo
+
+> Vanilla JS (sin framework), 1 archivo grande: `static/app.js` (~3,500 líneas, ~109 funciones).
+> Mantener este mapa vivo cuando se agreguen/quiten secciones o handlers.
+
+## Layout general
+
+```
++------------------------------------------------------------+
+| topbar: greeting + servicios (xCAPTCHA, Proxies, WSai) + 🔔|
++----+--------------------------------------------------------+
+| s  |  main section (cambia según nav):                      |
+| i  |   - accounts                                           |
+| d  |   - activity                                           |
+| e  |   - pool                                               |
+| b  |   - notifications                                      |
+| a  |   - logs (SA)                                          |
+| r  |   - admin panel (SA)                                   |
++----+--------------------------------------------------------+
+| cmdBar (visible cuando hay selección): Depositar · Lock ... |
++------------------------------------------------------------+
+```
+
+## Secciones (vías `showSection(name)` — app.js:926)
+
+| Sección | Container HTML | Render | Endpoint inicial |
+|---|---|---|---|
+| `accounts` | `#accountsMain` | `renderTable()` (app.js:450) | `GET /api/accounts` |
+| `activity` | `#activityMain` | `renderActivity()` (app.js:809) | `GET /api/activity` |
+| `pool` | `#poolMain` | `reloadPool()` (app.js:948) | `GET /api/pool/accounts` |
+| `notifications` | `#notificationsMain` | `renderNotifs()` (app.js:906) | (estado in-memory `notifications[]`) |
+
+## Topbar — status pills
+
+| Pill | ID | Endpoint | Actualizado en | Significado |
+|---|---|---|---|---|
+| xCAPTCHA | `#stCap` | `/api/health/full` (cada N min) | `loadHealthFull()` | Saldo CapMonsterCloud (USD) |
+| Proxies | `#stProxy` | `/api/health/full` | `loadHealthFull()` | Estado proxy MX |
+| WSai | `#stWsai` | `/api/superadmin/kpis` | dentro de KPIs | Calls disponibles WebScraping.ai |
+| 🔔 (bell) | `#notifBell` | n/a | `renderNotifBadge()` (app.js:893) | Notificaciones no leídas |
+
+## Modal Detalle (`#detModalOverlay`)
+
+| Elemento | Función |
+|---|---|
+| `#detModalTitle` | Combo `email:password` clickeable para copiar |
+| `#detModalGradeBadge` | Letra grande A/B/C/D para SA |
+| `#detModalBody` | Renderizado por `renderDetail(data)` (app.js:2552+) |
+| Footer botones | `.d-select-btn` (toggle multi sin cerrar modal) + `.d-deposit-btn` (abre modal depósito) |
+
+**Apertura**: `openDetailModal(id)` (app.js:2509)
+**Endpoint**: `GET /api/accounts/{id}/details` → devuelve `{...persona, cards, transactions, deposit_attempts, notes}`
+
+**Secciones renderizadas** (`renderDetail`):
+1. 📋 Datos personales (nombre, fecha nac, domicilio, tel, CURP estimado/guardado, KYC, saldo, lock, último dep, grade, status, checks)
+2. 💳 Tarjetas guardadas (de `account_cards` table) — pipe completo clickeable
+3. 📊 Transacciones (de `account_transactions` table — historial BetMexico)
+4. 🎯 Intentos del dashboard (de `deposit_attempts` table — incluye `card_pipe` desde 2026-05-11)
+5. 📝 Notas (con form para crear; SA puede borrar)
+
+## Modal Depósito (`#depModalOverlay`)
+
+3 modos seleccionables con seg-buttons `#depModeSeg`:
+
+| Modo | Estado interno | Endpoint | Handler |
+|---|---|---|---|
+| `single` | `_depMode = 'single'` | `POST /api/deposits/execute` | `executeSingleAccount(pipe, amount)` (app.js:3069) |
+| `multi` | `_depMode = 'multi'` | `POST /api/deposits/multi/stream` (SSE) | `executeMulti(...)` (app.js:~3280) |
+| `schedule` | `_depMode = 'schedule'` | `POST /api/deposits/scheduled/create` | `executeScheduled(pipe, amount)` (app.js:3128) |
+
+**Inputs principales**:
+- `#depCardPipe` — single/schedule (1 tarjeta `num|MM/YY|CVV`)
+- `#depMultiPool` — multi (textarea con N tarjetas, 1 por línea)
+- `#depCustomAmount` — monto custom (`#depAmounts` tiene presets)
+- `#depScheduleBlock` — solo schedule, número de repeticiones
+
+**Output / Match view**:
+- `#depResult` — resultado del single/schedule
+- `#depMatchView` + `#depFeed` — feed live del matchmaker SSE
+
+## Command Bar (`#cmdBar`)
+
+Visible cuando `selectedIds.size > 0`. Actualizado por `updateCmdBar()` (app.js:602).
+
+| Botón | ID | Acción |
+|---|---|---|
+| 💳 Depositar | `#cmdDeposit` | Abre modal depósito (single si 1, multi si 2-5) |
+| 🔒 Lock Nh | `#cmdLock` + `#cmdLockHours` | Lock por N horas (default 2h, click cambia) |
+| 📤 Trastienda | `#cmdTrastienda` | Toggle visibilidad pool |
+| 🎁 Liberar | `#cmdRelease` | Asignar a operador (SA) |
+| Deseleccionar | `#cmdDeselect` | Limpia `selectedIds` |
+| (count) | `#cmdSelCount` | número de cuentas seleccionadas |
+| (stats) | `#cmdStats` | suma total potencial / status mixto |
+
+## Tabla principal (`#accTable`)
+
+**Render**: `renderTable()` (app.js:450).
+**Source**: `state.rows[]` (todas) o `getVisible()` (filtradas).
+
+**Handler global** (app.js:2034 — `#accTable.click`):
+| Target | Acción |
+|---|---|
+| `.row-ic` (iconitos 💳/📝/+) | Abre detalle o quick-add note |
+| `th.th-sort` | Ordena por columna |
+| `.rowsel` | Toggle individual de selección |
+| `#selAll` | Select all visible |
+| `.row-details` | Abre modal de detalles |
+| `td.combo b` | **Click izquierdo copia combo `email:password`** (desde 2026-05-11) |
+| Resto de la fila | Toggle selección (sin abrir modal) |
+
+**Handler context (click derecho)** (app.js:2092 — `#accTable.contextmenu`): mantiene comportamiento de copia para usuarios habituados.
+
+## Feed de Actividad (`#actTable`)
+
+**Render**: `renderActivity()` (app.js:809).
+**Source**: `activityRows[]` (cache local + push via SSE).
+**Filtros**: `activityFilter = {kind, who, time, q}` — filtros aplicados en `getFilteredActivity()`.
+
+**Columnas**: `Cuándo | Quién | Acción | Cuenta | Tarjeta | Monto | Estado` (7 cols desde 2026-05-11).
+
+**Inputs**:
+- `#actSearch` — búsqueda en email/operador/monto
+- `#actOpsChips` — chips operadores activos
+- `#actBtnReset`, `#actBtnRefresh`
+- `#actPageSize` — paginación
+
+## Conexión SSE (`connectSSE()` — app.js:1032)
+
+EventSource a `/api/events`. Cada mensaje:
+```js
+const ev = JSON.parse(e.data);
+if (ev.type === 'activity') pushActivityEvent(ev);
+else if (ev.type === 'notification') pushNotif(...);
+else if (ev.kind === 'capmonster_low') ...
+```
+
+Ver `docs/SSE_EVENTS.md` para tabla maestra de `kind` y su handler.
+
+## State global
+
+| Variable | Tipo | Función |
+|---|---|---|
+| `state` | object | `{user, rows, filter, sort, section, ...}` |
+| `selectedIds` | `Set<int>` | IDs de cuentas seleccionadas |
+| `activityRows` | array | Feed de actividad cacheado |
+| `_actNewIds` | `Set` | Keys de eventos recién llegados (animación) |
+| `notifications` | array | Notificaciones in-memory |
+| `_evtSrc` | EventSource | Conexión SSE activa |
+| `_depMode` | string | `'single' | 'multi' | 'schedule'` |
+| `_depAccountIds` | array | IDs en el modal de depósito |
+| `_depBusy` | bool | Lock para evitar doble-submit |
+| `_depMmRunId` | string | run_id del matchmaker activo (para cancelar) |
+| `_depReps` | int | Repeticiones del schedule |
+
+## Helpers principales
+
+| Función | Propósito | File:line |
+|---|---|---|
+| `$(sel)` | querySelector wrapper | (top del file) |
+| `esc(s)` | Escapa HTML | (top) |
+| `toast(msg, kind)` | Notificación temporal abajo-derecha | app.js:341 |
+| `fmtMoney(n)` | `$1,234.56` | (helper) |
+| `fmtAbs(ts)` | Hora absoluta `HH:MM` | (helper) |
+| `fmtAgo(ts)` | Relativa `5min` `2h` | (helper) |
+| `pushNotif({icon,msg})` | Agrega al bell | app.js:887 |
+| `pushActivityEvent(ev)` | Inserta en feed con animación | app.js:872 |
+| `computeCurp(name, bdate, addr)` | Calcula CURP estimado (4 letras + fecha + sex + estado + verifier) | app.js:277 |
+| `_splitFullname(s)` | Separa nombre/apellidos para CURP | app.js:160 |
+
+## Convenciones
+
+- **`data-copy`** en cualquier elemento → click izquierdo copia el valor. Handler global en app.js:2715.
+- **`data-combo`** en `<b>` dentro de `td.combo` → click izquierdo copia. Handler en row click handler (app.js:2034).
+- **`.d-copy`** clase utilitaria para elementos copiables (estilo + handler).
+- **Cache-bust** en `index.html` con `?v=<timestamp>` para forzar refresh tras deploy (no requiere Ctrl+F5 normalmente).
+
+## Pendientes / WIP conocidos
+
+(de `AVANCES_SESION.md`)
+- Tabla compacta 24px de fila (hoy 36px)
+- Multi-selección drag por columna de checkboxes
+- Detail panel inline `grid-template-rows: 1fr ↔ 0fr` smooth
+- Drawer depósitos lateral 480px (hoy modal centrado)
+- Mini-widget PiP para procesos en curso
+- Auditoría de glow verde residual en `style.css`
+
+Ver `AUDIT.md` para gap-analysis spec vs actual.

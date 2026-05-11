@@ -1,0 +1,41 @@
+graph LR
+    subgraph Producers["Producers (backend)"]
+        DA[_record_attempt<br/>deposits.py]
+        SC[scheduled loop<br/>deposits.py]
+        MM[matchmaker<br/>deposits.py]
+        LCK[lock/unlock<br/>app.py]
+        NOT[note create<br/>app.py]
+        ADM[admin actions<br/>app.py]
+        HCK[health monitor<br/>app.py]
+    end
+
+    BR((_broadcast<br/>payload))
+
+    subgraph Bus["SSE Bus"]
+        EV[/GET /api/events<br/>text/event-stream/]
+        SUB[(set _event_subscribers)]
+    end
+
+    subgraph Consumers["Consumers (frontend)"]
+        SSE[connectSSE<br/>EventSource]
+        AE[pushActivityEvent<br/>renderActivity]
+        NF[pushNotif<br/>renderNotifBadge]
+    end
+
+    DA --> BR
+    SC --> BR
+    MM --> BR
+    LCK --> BR
+    NOT --> BR
+    ADM --> BR
+    HCK --> BR
+
+    BR --> SUB
+    SUB --> EV
+    EV --> SSE
+    SSE --> AE
+    SSE --> NF
+
+    style Bus fill:#1a3a4a,color:#fff
+    style Producers fill:#2a3a4a,color:#fff
+    style Consumers fill:#2a3a4a,color:#fff

@@ -1,0 +1,40 @@
+{
+  "nodes": [
+    {"id":"user","type":"text","text":"# 👤 Usuario\n- Browser → dashboard\n- Telegram → bot","x":-700,"y":-200,"width":260,"height":140,"color":"5"},
+    {"id":"dns","type":"text","text":"# 🌐 DNS\nbotmexico.com.mx\nwww.botmexico.com.mx\n→ 2.24.211.109","x":-700,"y":40,"width":260,"height":140,"color":"5"},
+    {"id":"traefik","type":"text","text":"# 🔐 Traefik\n:80 → :443 redirect\n:443 HTTPS + Let's Encrypt\n(network: host)","x":-350,"y":-100,"width":260,"height":140,"color":"4"},
+    {"id":"web","type":"text","text":"# 🌐 betmexico-web\nFastAPI :8080\napp.py + routers\nHot-mount ./code:/app","x":0,"y":-280,"width":260,"height":160,"color":"3"},
+    {"id":"bot","type":"text","text":"# 🤖 betmexico-bot\nPolling Telegram\nbetmexico_bot.py\nShared modules","x":0,"y":-80,"width":260,"height":140,"color":"3"},
+    {"id":"db","type":"text","text":"# 💾 BD SQLite\n/data/betmexico_accounts.db\n- accounts (~902)\n- account_cards\n- deposit_attempts (con card_pipe)\n- payment_tests\n- account_notes\n- account_transactions","x":0,"y":120,"width":320,"height":220,"color":"1"},
+    {"id":"bmxapi","type":"text","text":"# 🏦 BetMexico API\nLogin + KYC\nTxns + Deposit","x":400,"y":-280,"width":220,"height":120,"color":"6"},
+    {"id":"pp","type":"text","text":"# 💳 ProcessorPay\nGateway de banco\nmakePayment","x":400,"y":-120,"width":220,"height":120,"color":"6"},
+    {"id":"cap","type":"text","text":"# 🧩 CapMonsterCloud\nReCAPTCHA solver\nUSD balance","x":400,"y":40,"width":220,"height":120,"color":"6"},
+    {"id":"wsai","type":"text","text":"# 🕸 WebScraping.ai\nFallback scrape\nAPI calls","x":400,"y":180,"width":220,"height":120,"color":"6"},
+    {"id":"tg","type":"text","text":"# 📨 Telegram API\nBot token\nPolling","x":400,"y":320,"width":220,"height":120,"color":"6"},
+
+    {"id":"single","type":"text","text":"# 🎯 Single\n/api/deposits/execute","x":-350,"y":160,"width":260,"height":80,"color":"2"},
+    {"id":"multi","type":"text","text":"# 🎰 Matchmaker\n/api/deposits/multi/stream (SSE)","x":-350,"y":260,"width":260,"height":80,"color":"2"},
+    {"id":"sched","type":"text","text":"# ⏰ Scheduled\n/api/deposits/scheduled/create","x":-350,"y":360,"width":260,"height":80,"color":"2"},
+    {"id":"prewarm","type":"text","text":"# 🔥 Prewarm\n/api/prewarm/* (SSE)","x":-350,"y":460,"width":260,"height":80,"color":"2"},
+
+    {"id":"sse","type":"text","text":"# 📡 SSE bus\n/api/events\nactivity + notifications","x":-350,"y":620,"width":260,"height":120,"color":"4"},
+    {"id":"forgejo","type":"text","text":"# 📦 Forgejo\nGit repos privados\nKVM4","x":400,"y":620,"width":220,"height":120,"color":"6"}
+  ],
+  "edges": [
+    {"id":"e1","fromNode":"user","fromSide":"right","toNode":"dns","toSide":"left"},
+    {"id":"e2","fromNode":"dns","fromSide":"right","toNode":"traefik","toSide":"left"},
+    {"id":"e3","fromNode":"traefik","fromSide":"right","toNode":"web","toSide":"left"},
+    {"id":"e4","fromNode":"web","fromSide":"right","toNode":"bmxapi","toSide":"left"},
+    {"id":"e5","fromNode":"web","fromSide":"right","toNode":"pp","toSide":"left"},
+    {"id":"e6","fromNode":"web","fromSide":"right","toNode":"cap","toSide":"left"},
+    {"id":"e7","fromNode":"web","fromSide":"right","toNode":"wsai","toSide":"left"},
+    {"id":"e8","fromNode":"bot","fromSide":"right","toNode":"tg","toSide":"left"},
+    {"id":"e9","fromNode":"web","fromSide":"bottom","toNode":"db","toSide":"top"},
+    {"id":"e10","fromNode":"bot","fromSide":"bottom","toNode":"db","toSide":"top"},
+    {"id":"e11","fromNode":"single","fromSide":"right","toNode":"web","toSide":"bottom"},
+    {"id":"e12","fromNode":"multi","fromSide":"right","toNode":"web","toSide":"bottom"},
+    {"id":"e13","fromNode":"sched","fromSide":"right","toNode":"web","toSide":"bottom"},
+    {"id":"e14","fromNode":"prewarm","fromSide":"right","toNode":"web","toSide":"bottom"},
+    {"id":"e15","fromNode":"sse","fromSide":"right","toNode":"web","toSide":"bottom"}
+  ]
+}

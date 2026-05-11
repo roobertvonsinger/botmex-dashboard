@@ -23,4 +23,12 @@ data/
 .vscode/
 .DS_Store
 Thumbs.db
-.claude/
+# Ignorar Claude session/cache local, pero commit las skills del repo (parte de la bitácora)
+.claude/projects/
+.claude/cache/
+.claude/sessions/
+.claude/local/
+.claude/*.log
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
+.claude/settings.json

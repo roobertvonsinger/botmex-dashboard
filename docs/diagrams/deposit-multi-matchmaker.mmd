@@ -1,0 +1,39 @@
+sequenceDiagram
+    autonumber
+    participant U as Usuario (Browser)
+    participant W as betmexico-web
+    participant D as deposits.py<br/>multi_stream
+    participant POOL as Captcha pool<br/>(CapMonster)
+    participant R as _run_deposit
+    participant P as ProcessorPay
+    participant DB as BD
+
+    U->>W: POST /api/deposits/multi/stream<br/>{account_ids[1..5], cards[1..10], amount}
+    W->>D: multi_stream()
+    D->>D: cap_check x cuenta
+    D->>POOL: make_pool + start_factory
+    POOL-->>D: prefetch N tokens
+    D-->>U: SSE event {type:start, run_id, ...}
+
+    loop pairing greedy
+        D->>D: build batch (1 card + 1 acc, no cooldown, no tried)
+        par para cada par
+            D->>R: _run_deposit(acc, card, save_card=True)
+            R->>P: login + makePayment
+            P-->>R: result
+            R-->>D: {success, code}
+            D->>DB: _record_attempt(card_pipe)
+            D->>W: _broadcast{kind:deposit, card_pipe, ...}
+            W-->>U: SSE event
+        end
+        D->>D: card.fail_count++ si fail<br/>retire si >= MM_MAX_FAILS
+        D->>D: cooldown MM_COOLDOWN entre uses
+    end
+
+    D-->>U: SSE event {type:done, matches, attempts}
+
+    opt cancel
+        U->>W: POST /multi/{run_id}/cancel
+        W->>D: cancel_event.set()
+        D-->>U: SSE event {type:cancelled}
+    end

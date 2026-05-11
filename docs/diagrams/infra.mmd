@@ -1,0 +1,60 @@
+graph TB
+    subgraph User["Usuario"]
+        BR[Browser]
+        TG[Telegram client]
+    end
+
+    subgraph DNS["DNS"]
+        DOM["botmexico.com.mx<br/>www.botmexico.com.mx<br/>→ 2.24.211.109"]
+    end
+
+    subgraph KVM4["VPS KVM4 (Tailscale 100.77.154.31)"]
+        subgraph Traefik["Traefik container<br/>(network: host)"]
+            T80[":80<br/>HTTP redirect"]
+            T443[":443 HTTPS<br/>Let's Encrypt"]
+        end
+
+        subgraph BMX["/docker/betmexico/"]
+            WEB[betmexico-web container<br/>uvicorn :8080]
+            BOT[betmexico-bot container<br/>polling Telegram]
+            DATA[(./data/<br/>betmexico_accounts.db)]
+            CODE[./code/<br/>shared hot-mount]
+        end
+
+        subgraph Forgejo["/docker/forgejo-2oqx/"]
+            FJ[Forgejo<br/>git repo host]
+        end
+    end
+
+    subgraph External["Externos"]
+        BMXAPI[BetMexico API<br/>via proxy MX]
+        PP[ProcessorPay<br/>payment gateway]
+        CAP[CapMonsterCloud<br/>captcha solver]
+        WSAI[WebScraping.ai]
+        TGAPI[Telegram API]
+    end
+
+    BR --> DOM
+    DOM --> T443
+    T80 -.redirect.-> T443
+    T443 --> WEB
+
+    TG --> TGAPI
+    TGAPI --> BOT
+
+    WEB --> DATA
+    BOT --> DATA
+    WEB --> CODE
+    BOT --> CODE
+
+    WEB --> BMXAPI
+    WEB --> PP
+    WEB --> CAP
+    WEB --> WSAI
+    BOT --> BMXAPI
+    BOT --> CAP
+
+    style KVM4 fill:#1a3a4a,color:#fff
+    style Traefik fill:#2a4a5a,color:#fff
+    style BMX fill:#2a4a3a,color:#fff
+    style External fill:#3a2a4a,color:#fff

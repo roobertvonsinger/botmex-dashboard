@@ -1,0 +1,38 @@
+sequenceDiagram
+    autonumber
+    participant U as Usuario
+    participant W as betmexico-web
+    participant D as deposits.py<br/>scheduled_create
+    participant T as asyncio task<br/>loop()
+    participant R as _run_deposit
+    participant DB as BD
+
+    U->>W: POST /api/deposits/scheduled/create<br/>{account_id, card_pipe, amount, repetitions}
+    W->>D: scheduled_create()
+    D->>D: _parse_pipe + validar caps
+    D->>T: asyncio.create_task(loop())
+    D-->>U: {sched_id, email, repetitions}
+
+    loop i in range(repetitions)
+        T->>R: _run_deposit(...) save_card=True
+        R-->>T: {success, code}
+        T->>DB: _record_attempt(card_pipe, status)
+        T->>W: _broadcast {kind:scheduled, iter, success}
+        W-->>U: SSE event
+
+        alt success == False
+            T->>W: _broadcast {kind:scheduled_aborted}
+            W-->>U: SSE event "abortado"
+            Note over T: break loop
+        else success
+            T->>T: await sleep(60s)
+        end
+    end
+
+    T->>T: finally: pool.stop() + remove from _active_schedules
+
+    opt cancel manual
+        U->>W: POST /scheduled/{id}/cancel
+        W->>T: task.cancel()
+        T->>W: _broadcast {kind:scheduled_cancelled}
+    end
