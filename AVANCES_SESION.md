@@ -11,6 +11,7 @@
 - **API keys actualizadas**:
   - CapMonsterCloud: `1f249a94...` (revertido desde Gemini→CapMonster)
   - WebScraping.ai: `e338d7e4...`
+- **Dominio público con HTTPS**: **https://botmexico.com.mx** (Traefik + Let's Encrypt auto-renueva)
 - **Protocolo de deploy declarado** → ver [`DEPLOY.md`](DEPLOY.md)
 
 ## ⚠️ Avisos críticos

@@ -21,14 +21,20 @@ services:
       - ./data:/data
       - ./code:/app
     working_dir: /app
-    ports:
-      - '8080:8080'
+    expose:
+      - '8080'
     command: python web/app.py
     restart: unless-stopped
     depends_on:
       - bot
     networks:
       - bmx
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.betmexico.rule=Host(`botmexico.com.mx`) || Host(`www.botmexico.com.mx`)'
+      - 'traefik.http.routers.betmexico.entrypoints=websecure'
+      - 'traefik.http.routers.betmexico.tls.certresolver=letsencrypt'
+      - 'traefik.http.services.betmexico.loadbalancer.server.port=8080'
 
 networks:
   bmx:

@@ -52,8 +52,25 @@ Ambos comparten:
 
 ### Acceso
 
-- **Dashboard**: `http://2.24.211.109:8080` (público) · `http://100.77.154.31:8080` (Tailscale)
-- **Bot Telegram**: `@BetMexicoBot` (token en `.env`)
+- **Dashboard (público)**: **`https://botmexico.com.mx`** y `https://www.botmexico.com.mx` (TLS automático vía Traefik + Let's Encrypt)
+- **Dashboard (Tailscale, debug)**: containers NO exponen 8080 al host. Para debug interno: `docker exec betmexico-web curl http://localhost:8080/api/health` o `docker network inspect betmexico_bmx` y curl al IP interno.
+- **Bot Telegram**: `@betmx_bot` (token en `.env`)
+
+### Reverse proxy (Traefik en KVM4)
+
+Traefik corre como service vecino en `/docker/traefik/` (network `host`, entrypoints `:80`/`:443`, certresolver `letsencrypt` con HTTP-01 challenge). Auto-redirect HTTP→HTTPS configurado globalmente.
+
+Labels en `docker-compose.yml` del servicio `web`:
+```yaml
+labels:
+  - 'traefik.enable=true'
+  - 'traefik.http.routers.betmexico.rule=Host(`botmexico.com.mx`) || Host(`www.botmexico.com.mx`)'
+  - 'traefik.http.routers.betmexico.entrypoints=websecure'
+  - 'traefik.http.routers.betmexico.tls.certresolver=letsencrypt'
+  - 'traefik.http.services.betmexico.loadbalancer.server.port=8080'
+```
+
+Para agregar un nuevo dominio: ampliar la regla `Host(...)` y propagar DNS A → `2.24.211.109`. Traefik emite cert en background.
 
 ---
 
@@ -178,5 +195,6 @@ docker compose ps
 
 | Fecha | Cambio |
 |---|---|
+| 2026-05-11 | **Dominio `botmexico.com.mx` activado** con HTTPS + Let's Encrypt vía Traefik |
 | 2026-05-11 | **Migración KVM4** — dockerizado, salimos de VPS Hostinger `187.77.207.90` (caído) |
 | 2026-04-11 | Último deploy en VPS viejo (sesión 80) |
