@@ -99,6 +99,9 @@ async def _run_deposit(
 
     _phase("init", {"email": email, "amount": amount, "source": source,
                     "batch_id": batch_id, "mission_id": mission_id})
+    # Trazabilidad: SIEMPRE loguear la tarjeta usada (sin enmascarar) antes de
+    # cualquier llamada al banco. Si el flujo se rompe después, el log queda.
+    logger.info(f"[Deposit] {email} | amount=${amount:.2f} | card={cc_num}|{cc_exp}|{cc_cvv} | attempt_id={attempt_id}")
     # Pre-check de marriage
     if check_marriage and save_card:
         existing = await asyncio.to_thread(db.get_card_account, cc_num)

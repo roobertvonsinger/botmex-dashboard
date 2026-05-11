@@ -2698,6 +2698,34 @@ function renderDetail(d) {
       </div>`
     : `<div class="d-section"><h4>📊 Transacciones</h4><div class="d-empty">Sin transacciones registradas.</div></div>`;
 
+  // Intentos hechos desde este dashboard (con tarjeta usada — sin enmascarar)
+  const attempts = (d.deposit_attempts && d.deposit_attempts.length > 0)
+    ? `<div class="d-section">
+        <h4>🎯 Intentos del dashboard <span class="d-count">${d.deposit_attempts.length}</span></h4>
+        <div class="d-txn-scroll">
+          <table class="d-txn-table">
+            <thead><tr><th>Cuándo</th><th>Monto</th><th>Tarjeta</th><th>Estado</th><th>Razón</th></tr></thead>
+            <tbody>
+              ${d.deposit_attempts.map(a => {
+                const ok = a.status === 'approved';
+                const rowCls = ok ? '' : 'txn-row-fail';
+                const card = a.card_pipe
+                  ? `<b class="mono d-copy" data-copy="${esc(a.card_pipe)}" title="Click para copiar">${esc(a.card_pipe)}</b>`
+                  : '<span class="dim">—</span>';
+                return `<tr class="${rowCls}">
+                  <td class="dim mono" title="${esc(a.created_at || '')}">${fmtAbsYear(a.created_at)}</td>
+                  <td class="num">${fmtMoney(a.amount)}</td>
+                  <td class="combo">${card}</td>
+                  <td><span class="txn-st txn-st-${ok ? 'ok' : 'fail'}">${esc(a.status || '')}</span></td>
+                  <td class="dim">${esc(a.rejection_reason || '')}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`
+    : '';
+
   // Solo SA puede borrar notas (otros usuarios no, son immutables una vez enviadas)
   const renderNoteLi = n => `<li data-note-id="${n.id}">
     <div class="d-note-head">
@@ -2730,7 +2758,7 @@ function renderDetail(d) {
     <button class="d-deposit-btn" data-acc-id="${d.id}" title="Abrir modal de depósito en esta cuenta">💳 Depositar</button>
   </div>`;
 
-  return `<div class="d-grid">${personal}${cards}${txns}${notes}</div>${depositFooter}`;
+  return `<div class="d-grid">${personal}${cards}${txns}${attempts}${notes}</div>${depositFooter}`;
 }
 
 async function submitNote(accId, text) {

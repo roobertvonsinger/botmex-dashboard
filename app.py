@@ -99,6 +99,8 @@ def _migrate():
         ("published_to_pool", "ALTER TABLE accounts ADD COLUMN published_to_pool INTEGER DEFAULT 1"),
         ("dead_reason", "ALTER TABLE accounts ADD COLUMN dead_reason TEXT"),
         ("dead_at", "ALTER TABLE accounts ADD COLUMN dead_at TEXT"),
+        # Trazabilidad: tarjeta usada en cada intento (apruebado o no). Sin enmascarar.
+        ("card_pipe", "ALTER TABLE deposit_attempts ADD COLUMN card_pipe TEXT"),
     ]:
         try:
             with db(write=True) as c:
@@ -1606,6 +1608,19 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
             result["transactions"] = [dict(r) for r in rows]
         except sqlite3.OperationalError:
             result["transactions"] = []
+
+        # Intentos de depósito hechos desde el dashboard (con tarjeta usada)
+        try:
+            rows = c.execute(
+                "SELECT attempt_id, amount, status, rejection_reason, card_pipe, "
+                "       duration_ms, operator_id, created_at "
+                "FROM deposit_attempts WHERE account_email=? "
+                "ORDER BY id DESC LIMIT 30",
+                (acc["email"],),
+            ).fetchall()
+            result["deposit_attempts"] = [dict(r) for r in rows]
+        except sqlite3.OperationalError:
+            result["deposit_attempts"] = []
 
         # Notas — non-SA solo ve las propias; SA ve todas
         role = _user.get("role", "user")

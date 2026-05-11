@@ -142,11 +142,11 @@ def _record_attempt(
             c.execute(
                 "INSERT INTO deposit_attempts "
                 "(attempt_id, account_email, amount, source, operator_id, status, "
-                " rejection_reason, duration_ms, created_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?)",
+                " rejection_reason, duration_ms, created_at, card_pipe) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (
                     attempt_id, email, amount, "dashboard_v2", operator_id, status,
-                    rejection_reason, duration_ms, now_str,
+                    rejection_reason, duration_ms, now_str, card_pipe,
                 ),
             )
     except sqlite3.OperationalError as e:
