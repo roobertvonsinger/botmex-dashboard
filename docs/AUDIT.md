@@ -63,8 +63,9 @@
 | Feed actividad LIVE | ✅ SSE push + scrollable feed | ✅ | ✅ |
 | Columna "Tarjeta" en actividad | ✅ pipe completo clickeable | ✅ (desde 2026-05-11) | ✅ |
 | Histórico paginado de actividad | ✅ GET `/api/activity` con filtros | ✅ | ✅ |
-| `payment_tests` legacy escribiendo | ⚠️ era legacy del bot. Hoy `web_routes_deposits` escribe ahí + en `deposit_attempts` | ⚠️ duplicación | 🔵 |
-| Persistir `gateway_response_raw` con info útil | ✅ JSON serializable con resultCode, orderId, etc. | ⚠️ `_record_attempt` lo deja NULL | 🔵 |
+| `payment_tests` legacy escribiendo | ⚠️ era legacy del bot. Hoy `web_routes_deposits` escribe ahí + en `deposit_attempts` | ⚠️ duplicación entre tablas (no rows) | 🔵 |
+| Persistir `gateway_response_raw` con info útil | ✅ JSON serializable con resultCode, orderId, etc. | ✅ `_persist_final` lo guarda | ✅ |
+| 1 sola row en `deposit_attempts` por intento (sin duplicación) | ✅ | ✅ desde 2026-05-11 (consolidado en `_persist_final`) | ✅ |
 | Histórico de tarjetas por cuenta (último uso, fails, status) | ✅ tabla `account_cards` con total_deposits/approved/rejected | ✅ | ✅ |
 
 ## Admin / Controles SA

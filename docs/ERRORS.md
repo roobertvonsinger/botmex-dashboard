@@ -144,6 +144,25 @@ Ver "Las tarjetas no se persisten" arriba (mismo bug raíz).
 
 ---
 
+### Feed de Actividad muestra 2 entradas idénticas por cada depósito
+
+**Síntoma**: el feed muestra 2 rows con mismo email/monto/timestamp/estado.
+
+**Causa**: 2 funciones escribían a `deposit_attempts` en paralelo:
+1. `web_routes_deposits._persist_final` → `db.log_attempt` (info completa)
+2. `deposits._record_attempt` → INSERT directo (sólo con `card_pipe`)
+
+Cada deposit creaba 2 rows → 2 events SSE → 2 filas en el feed.
+
+**Fix aplicado 2026-05-11**:
+- `_record_attempt` ya NO escribe — solo broadcastea SSE (1 sola vez)
+- `_persist_final` ahora recibe y guarda `card_pipe` en la columna
+- BD: limpiados duplicados existentes con query agrupada por `(email, amount, status, minute)`
+
+**Histórico**: introducido con la migración inicial (2 paths heredados). Resuelto en commit `4ce207b`.
+
+---
+
 ## Deploy / Infra
 
 ### Builds Docker paralelos pelean por buildkit
