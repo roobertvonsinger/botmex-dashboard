@@ -162,6 +162,22 @@ def _dequeue_blocking(q, timeout: float) -> str:
 
 app = FastAPI(title="Botmexico v2")
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
+
+
+@app.middleware("http")
+async def _no_cache_static_assets(request, call_next):
+    """Fuerza no-cache en .js/.css/.html servidos por StaticFiles.
+
+    Sin esto, navegadores cachean agresivamente y los devs/operadores ven
+    versiones viejas tras un deploy aunque el index ya use ?v=mtime cache-bust.
+    """
+    response = await call_next(request)
+    path = request.url.path
+    if path.endswith((".js", ".css", ".html")) or path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 app.include_router(_prewarm_router)
 app.include_router(_deposits_router)
 
