@@ -533,7 +533,7 @@ function renderTable() {
         <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
         <td class="sel-cell" title="Click selecciona la fila"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
         <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
-        <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}" title="Click derecho para copiar el combo">${esc(combo)}</b>${lockChip}</td>
+        <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}" title="Click para copiar combo">${esc(combo)}</b>${lockChip}</td>
         <td class="row-details-cell">${detailsBtn}</td>
         <td class="dep" title="Último depósito hecho">${dep}</td>
         <td class="row-icons">${iconsHtml}</td>
@@ -543,7 +543,7 @@ function renderTable() {
       <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
       <td class="sel-cell" title="Click selecciona la fila"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
       <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
-      <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}" title="Click derecho para copiar el combo">${esc(combo)}</b></td>
+      <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}" title="Click para copiar combo">${esc(combo)}</b></td>
       <td class="row-details-cell">${detailsBtn}</td>
       <td class="dep" title="Último depósito hecho">${dep}</td>
       <td class="dep dim" title="Cuándo se actualizó por última vez">${fmtAgo(r.last_checked_at)}</td>
@@ -811,6 +811,7 @@ function renderActivity() {
   t.querySelector('thead').innerHTML = `
     <tr>
       <th>Cuándo</th><th>Quién</th><th>Acción</th><th>Cuenta</th>
+      <th>Tarjeta</th>
       <th class="num">Monto</th><th>Estado</th>
     </tr>`;
   const filtered = getFilteredActivity();
@@ -833,10 +834,11 @@ function renderActivity() {
       <td><span class="act-who" data-who="${esc(e.who ?? '')}">${esc(e.who ?? '—')}</span></td>
       <td>${actionLabel(e.kind)}</td>
       <td class="combo"><b class="act-target" data-email="${esc(e.target || '')}">${esc(e.target || '—')}</b></td>
+      <td class="combo">${e.card_pipe ? `<b class="d-copy mono" data-copy="${esc(e.card_pipe)}" title="Click para copiar tarjeta">${esc(e.card_pipe)}</b>` : '<span class="dim">—</span>'}</td>
       <td class="num">${e.amount != null ? fmtMoney(e.amount) : ''}</td>
       <td>${statusPill(e)}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="6" class="loading">Sin actividad que coincida con los filtros</td></tr>';
+  }).join('') || '<tr><td colspan="7" class="loading">Sin actividad que coincida con los filtros</td></tr>';
 
   // Limpieza: las claves que ya pintamos como "nuevas" se consumen
   for (const ev of slice) _actNewIds.delete(_actEventKey(ev));
@@ -864,7 +866,7 @@ async function reloadActivity() {
     renderActivity();
   } catch (e) {
     $('#actTable').querySelector('tbody').innerHTML =
-      `<tr><td colspan="6" class="loading" style="color:var(--danger)">Error: ${esc(e.message)}</td></tr>`;
+      `<tr><td colspan="7" class="loading" style="color:var(--danger)">Error: ${esc(e.message)}</td></tr>`;
   }
 }
 function pushActivityEvent(ev) {
@@ -2057,6 +2059,16 @@ $('#accTable').addEventListener('click', e => {
     updateCmdBar();
     return;
   }
+  // Click izquierdo sobre el combo (email:password) en la tabla principal → copiar
+  // Va ANTES del row-toggle para no marcar la cuenta cuando solo querés copiar.
+  const comboB = e.target.closest('td.combo b');
+  if (comboB && comboB.dataset.combo) {
+    e.stopPropagation();
+    navigator.clipboard.writeText(comboB.dataset.combo)
+      .then(() => toast(`✓ ${comboB.dataset.combo}`, 'success'))
+      .catch(err => toast(`Error: ${err.message}`, 'error'));
+    return;
+  }
   if (e.target.id === 'selAll') {
     const visible = getVisible();
     if (e.target.checked) visible.forEach(r => selectedIds.add(r.id));
@@ -2219,6 +2231,32 @@ $('#detModalBody').addEventListener('click', e => {
   if (!accId) return;
   closeDetailModal();
   setTimeout(() => openDepositModal(accId), 80);
+});
+
+// Modal de detalle: botón "Seleccionar" — toggle multi-selección sin cerrar el panel
+$('#detModalBody').addEventListener('click', e => {
+  const btn = e.target.closest('.d-select-btn');
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const accId = parseInt(btn.dataset.accId);
+  if (!accId) return;
+  const willSelect = !selectedIds.has(accId);
+  if (willSelect) selectedIds.add(accId);
+  else selectedIds.delete(accId);
+  // Re-render del propio botón
+  btn.classList.toggle('is-selected', willSelect);
+  btn.textContent = willSelect ? '✓ Seleccionada · click para quitar' : '+ Seleccionar (multi)';
+  // Refrescar fila visible en la tabla principal (checkbox + clase row-sel)
+  const tr = document.querySelector(`#accTable tr[data-id="${accId}"]`);
+  if (tr) {
+    tr.classList.toggle('row-sel', willSelect);
+    const cb = tr.querySelector('.rowsel');
+    if (cb) cb.checked = willSelect;
+  }
+  // Refrescar la barra de comandos (cuenta seleccionada, botones Depositar/Copiar combos)
+  if (typeof updateCmdBar === 'function') updateCmdBar();
+  toast(willSelect ? '✓ Sumada a la selección' : '— Removida de selección', willSelect ? 'success' : '');
 });
 
 // Modal de detalle: form de notas (submit + delete)
@@ -2683,8 +2721,12 @@ function renderDetail(d) {
       ${notesList}
     </div>`;
 
-  // Botón Depositar al fondo, alineado a la derecha (ya no en el header de personal)
+  // Botones al footer: Seleccionar (toggle multi-selección, no cierra modal) + Depositar
+  const isSelected = selectedIds.has(d.id);
+  const selBtnLabel = isSelected ? '✓ Seleccionada · click para quitar' : '+ Seleccionar (multi)';
+  const selBtnClass = isSelected ? 'd-select-btn is-selected' : 'd-select-btn';
   const depositFooter = `<div class="d-deposit-footer">
+    <button class="${selBtnClass}" data-acc-id="${d.id}" title="Marca/desmarca esta cuenta para depósito multi (Matchmaker). NO cierra este panel.">${selBtnLabel}</button>
     <button class="d-deposit-btn" data-acc-id="${d.id}" title="Abrir modal de depósito en esta cuenta">💳 Depositar</button>
   </div>`;
 
@@ -3142,10 +3184,9 @@ async function executeScheduled(pipe, amount) {
     const res = $('#depResult');
     res.className = 'dep-result success';
     res.classList.remove('hidden');
-    res.innerHTML = `<b>⏰ Misión programada</b> — ${_depReps} repeticiones cada 1min<br><span class="dim mono">id: ${esc(data.sched_id)}</span>`;
+    res.innerHTML = `<b>⏰ Misión programada</b> — ${_depReps} repeticiones cada 1min<br><span class="dim mono">id: ${esc(data.sched_id)}</span><br><span class="dim">Sigue el progreso en el feed de Actividad. Si una rep falla, la misión se aborta automáticamente.</span>`;
     pushNotif({ icon: '⏰', msg: `Misión ${data.sched_id}: ${_depReps} reps en ${data.email}` });
-    $('#depExec').textContent = '✓ Programada · cerrar';
-    setTimeout(() => closeDepositModal(), 1500);
+    $('#depExec').textContent = '✓ Programada — ciérralo cuando quieras';
   } catch (e) {
     toast(`Error: ${e.message}`, 'error');
     $('#depExec').textContent = '⏰ Programar misión';
@@ -3157,8 +3198,8 @@ async function executeScheduled(pipe, amount) {
 
 // ── MULTI: matchmaker SSE con vista 3-columnas reactiva ──
 const _mm = {
-  cards: new Map(),    // tail → {pipe, fails, status: idle|busy|retired|matched, matchedEmail}
-  accounts: new Map(), // email → {id, fails, status: idle|busy|done|dead|cooldown, matchedTail}
+  cards: new Map(),    // tail → {pipe, fails, status: idle|busy|retired|matched, matchedEmail, lastCode}
+  accounts: new Map(), // email → {id, fails, status: idle|busy|done|dead|cooldown, matchedTail, deadCode, lastCode}
   matches: 0,
   attempts: 0,
   amount: 0,
@@ -3181,6 +3222,19 @@ function _mmReset(accountIds, cardPipes, amount) {
   }
 }
 
+const _MM_CODE_LABEL = {
+  LOGIN_FAILED:    'Login falló',
+  AUTOEXCLUSION:   'Autoexcluida',
+  KYC_PENDING:     'KYC revocado',
+  '3DS_UNDETECTED':'3DS no detectado',
+  'SHADOW_BAN?':   'Shadow ban',
+  '3DS_REQUIRED':  '3DS bloqueó',
+  BANK_REJECTED:   'Banco rechazó',
+  ERROR:           'Error',
+  UNKNOWN:         'Desconocido',
+};
+const _mmLabel = code => _MM_CODE_LABEL[code] || code || '';
+
 function _mmRender() {
   // Tarjetas
   const cardsHtml = [..._mm.cards.entries()].map(([tail, c]) => {
@@ -3190,9 +3244,12 @@ function _mmRender() {
              : c.status === 'busy'    ? '<span class="dep-spinner"></span>'
              : c.status === 'retired' ? '💀'
              : '';
+    const reason = (c.status === 'retired' && c.lastCode)
+      ? `<span class="mm-reason">${esc(_mmLabel(c.lastCode))}</span>` : '';
     return `<div class="${cls}">
       <span class="mm-tail mono">···${tail}</span>
       ${fails}
+      ${reason}
       <span class="mm-ic">${ic}</span>
     </div>`;
   }).join('');
@@ -3208,10 +3265,14 @@ function _mmRender() {
              : a.status === 'cooldown' ? '⏳'
              : '';
     const matched = a.matchedTail ? `<span class="mm-matched mono">···${a.matchedTail}</span>` : '';
+    const reason = (a.status === 'dead' && a.deadCode)
+      ? `<span class="mm-reason mm-reason-dead" title="${esc(a.deadCode)}">${esc(_mmLabel(a.deadCode))}</span>`
+      : '';
     return `<div class="${cls}">
       <span class="mm-email">${esc(email)}</span>
       ${matched}
       ${fails}
+      ${reason}
       <span class="mm-ic">${ic}</span>
     </div>`;
   }).join('');
@@ -3356,10 +3417,12 @@ function handleMmEvent(ev) {
       const tail = ev.tail.replace('···', '');
       const card = _mm.cards.get(tail);
       const acc = _mm.accounts.get(ev.email);
-      if (card) { card.fails = ev.card_fails ?? card.fails; card.status = 'idle'; }
+      if (card) { card.fails = ev.card_fails ?? card.fails; card.status = 'idle'; card.lastCode = ev.code; }
       if (acc)  {
         acc.fails = ev.acct_fails ?? acc.fails;
-        acc.status = (ev.acct_fails >= 2) ? 'dead' : 'cooldown';
+        acc.lastCode = ev.code;
+        if (ev.acct_fails >= 2) { acc.status = 'dead'; acc.deadCode = ev.code; }
+        else { acc.status = 'cooldown'; }
       }
       _mmRender();
       _mmFeedAdd('mm-rej',
@@ -3372,15 +3435,18 @@ function handleMmEvent(ev) {
       const card = _mm.cards.get(tail);
       if (card) { card.status = 'retired'; card.fails = ev.fails; }
       _mmRender();
-      _mmFeedAdd('mm-info', `🔻 <span class="mono">${esc(ev.tail)}</span> retirada`);
+      const why = card?.lastCode ? ` · ${esc(_mmLabel(card.lastCode))}` : '';
+      _mmFeedAdd('mm-info', `🔻 <span class="mono">${esc(ev.tail)}</span> retirada${why}`);
       break;
     }
 
     case 'account_dead': {
       const acc = _mm.accounts.get(ev.email);
-      if (acc) acc.status = 'dead';
+      if (acc) { acc.status = 'dead'; acc.deadCode = ev.code; acc.lastCode = ev.code; }
       _mmRender();
-      _mmFeedAdd('mm-dead', `💀 <b>${esc(ev.email)}</b> <span class="dim mono">${esc(ev.code)}</span>`);
+      const persisted = ev.persisted ? ' <span class="mm-persisted">guardada</span>' : '';
+      _mmFeedAdd('mm-dead',
+        `💀 <b>${esc(ev.email)}</b> · <b>${esc(_mmLabel(ev.code))}</b> <span class="dim mono">${esc(ev.code)}</span>${persisted}`);
       break;
     }
 

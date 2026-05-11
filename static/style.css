@@ -1558,6 +1558,25 @@ tr.op-row-azure  .grade-bar-cell { box-shadow: inset 3px 0 0 var(--op-azure);  }
 }
 .d-deposit-btn:hover { background: var(--accent-soft-2); }
 
+/* Botón Seleccionar en panel de detalles — toggle multi-selección */
+.d-select-btn {
+  background: transparent;
+  border: 1px solid var(--border, #2a3a4a);
+  color: var(--fg, #d8e2ec);
+  padding: 5px 11px;
+  border-radius: 6px;
+  font: inherit; font-size: 11.5px; font-weight: 600;
+  cursor: pointer;
+  margin-right: 8px;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+.d-select-btn:hover { background: rgba(255,255,255,0.04); }
+.d-select-btn.is-selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* Tarjetas guardadas como chips */
 .dep-chips {
   display: flex; flex-wrap: wrap; gap: 6px;
@@ -1767,6 +1786,23 @@ tr.op-row-azure  .grade-bar-cell { box-shadow: inset 3px 0 0 var(--op-azure);  }
   background: var(--warn-soft); color: var(--warn);
 }
 .mm-ic { font-size: 12px; min-width: 14px; text-align: right; }
+.mm-reason {
+  font-size: 10px; font-weight: 600;
+  padding: 1px 6px; border-radius: 3px;
+  background: rgba(255,255,255,0.04);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.mm-reason-dead {
+  background: rgba(220, 38, 38, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(220, 38, 38, 0.25);
+}
+.mm-persisted {
+  font-size: 9px; padding: 1px 4px; border-radius: 2px;
+  background: rgba(34,197,94,0.12); color: #22c55e;
+  margin-left: 4px;
+}
 .mm-matched {
   font-size: 9.5px; color: var(--accent);
   padding: 1px 4px; background: var(--accent-soft);

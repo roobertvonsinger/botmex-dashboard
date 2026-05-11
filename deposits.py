@@ -132,6 +132,7 @@ def _record_attempt(
     rejection_reason: Optional[str],
     duration_ms: int,
     operator_id: int,
+    card_pipe: Optional[str] = None,
 ) -> None:
     from app import db, _broadcast
     import sqlite3
@@ -163,6 +164,7 @@ def _record_attempt(
             "status": status,
             "reason": rejection_reason,
             "duration_ms": duration_ms,
+            "card_pipe": card_pipe,
         })
     except Exception:
         pass
@@ -235,13 +237,13 @@ async def deposit_execute(request: Request, user: dict = Depends(require_session
             amount=amount,
             user={"telegram_id": operator_id, "username": user.get("username", "")},
             pool=pool,
-            save_card=False,
+            save_card=True,
             check_marriage=False,
         )
     except Exception as e:
         logger.error(f"[Deposits] {email} ${amount}: {e}")
         duration_ms = int((time.time() - t0) * 1000)
-        _record_attempt(attempt_id, email, amount, "error", str(e)[:300], duration_ms, operator_id)
+        _record_attempt(attempt_id, email, amount, "error", str(e)[:300], duration_ms, operator_id, card_pipe=card_pipe)
         raise HTTPException(500, f"Error: {str(e)[:200]}")
     finally:
         if prefetch_task is not None and not prefetch_task.done():
@@ -261,7 +263,7 @@ async def deposit_execute(request: Request, user: dict = Depends(require_session
     status = "approved" if success else "rejected"
     reason = result.get("error") or result.get("result_code")
 
-    _record_attempt(attempt_id, email, amount, status, reason, duration_ms, operator_id)
+    _record_attempt(attempt_id, email, amount, status, reason, duration_ms, operator_id, card_pipe=card_pipe)
 
     return {
         "success": success,
@@ -402,6 +404,7 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                 "approved" if ok else "rejected",
                 r.get("error") or r.get("result_code"),
                 duration, operator_id,
+                card_pipe=card.get("pipe"),
             )
             return r, duration
 
@@ -610,7 +613,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                         cc_num=cc_num, cc_exp=cc_exp, cc_cvv=cc_cvv,
                         amount=amount,
                         user={"telegram_id": operator_id, "username": user.get("username", "")},
-                        pool=pool, save_card=False, check_marriage=False,
+                        pool=pool, save_card=True, check_marriage=False,
                     )
                 except Exception as e:
                     logger.error(f"[Scheduled {sched_id}] {email}: {e}")
@@ -622,6 +625,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                     uuid.uuid4().hex, email, amount,
                     "approved" if ok else "rejected",
                     r.get("error") or code, duration, operator_id,
+                    card_pipe=card_pipe,
                 )
                 _broadcast({
                     "type": "activity", "kind": "scheduled",
@@ -631,11 +635,13 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                     "ts": datetime.now(timezone.utc).isoformat(),
                     "who": operator_id,
                 })
-                # Aborta auto en errores fatales
-                if not ok and code in ("LOGIN_FAILED", "AUTOEXCLUSION", "KYC_PENDING", "3DS_UNDETECTED"):
+                # Cualquier falla aborta el loop completo: no tiene sentido
+                # reintentar el mismo monto que ya rechazó (quema cuentas).
+                if not ok:
                     _broadcast({
                         "type": "activity", "kind": "scheduled_aborted",
                         "sched_id": sched_id, "email": email, "code": code,
+                        "iter": i + 1, "total": repetitions,
                         "ts": datetime.now(timezone.utc).isoformat(),
                     })
                     break
