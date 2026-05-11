@@ -1,3 +1,25 @@
+# Sesión 2026-05-11 — Migración a KVM4
+
+## Highlights
+- **VPS viejo `187.77.207.90` caído** (sin SSH, sin red, sin Tailscale) — migración forzada
+- **Migrado todo BetMexico a KVM4** (`100.77.154.31` / pública `2.24.211.109`)
+- **Dockerizado** en `/docker/betmexico/`:
+  - `betmexico-bot` (Telegram, polling)
+  - `betmexico-web` (FastAPI dashboard, puerto 8080)
+  - Imagen base: `mcr.microsoft.com/playwright/python:v1.49.0-jammy` + `tzdata`
+- **BD migrada**: la más fresca local (2026-05-04) → `/docker/betmexico/data/betmexico_accounts.db`
+- **API keys actualizadas**:
+  - CapMonsterCloud: `1f249a94...` (revertido desde Gemini→CapMonster)
+  - WebScraping.ai: `e338d7e4...`
+- **Protocolo de deploy declarado** → ver [`DEPLOY.md`](DEPLOY.md)
+
+## ⚠️ Avisos críticos
+- Token Telegram único: si VPS viejo revive, NO arrancar bot allí (conflicto polling)
+- BD canónica vive en KVM4 — VPS viejo queda obsoleto
+- NO editar código en monorepo (`Proyectos/BetMexico/Telegram/` o `Web/`)
+
+---
+
 # Sesión 2026-05-06 — Resumen de avances
 
 ## Highlights

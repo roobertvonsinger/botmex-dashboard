@@ -1,0 +1,35 @@
+services:
+  bot:
+    build: .
+    image: betmexico:latest
+    container_name: betmexico-bot
+    env_file: .env
+    volumes:
+      - ./data:/data
+      - ./code:/app
+    working_dir: /app
+    command: python betmexico_bot.py
+    restart: unless-stopped
+    networks:
+      - bmx
+
+  web:
+    image: betmexico:latest
+    container_name: betmexico-web
+    env_file: .env
+    volumes:
+      - ./data:/data
+      - ./code:/app
+    working_dir: /app
+    ports:
+      - '8080:8080'
+    command: python web/app.py
+    restart: unless-stopped
+    depends_on:
+      - bot
+    networks:
+      - bmx
+
+networks:
+  bmx:
+    driver: bridge

@@ -2,6 +2,8 @@
 
 Dashboard web v2 de BetMexico. Frontend nuevo (Obsidian Refined) sobre la BD existente que ya gestiona el bot Telegram.
 
+> 🚨 **DEPLOY EN PROD**: ver [`DEPLOY.md`](DEPLOY.md). VPS actual = **KVM4** (Docker Compose en `/docker/betmexico/`). VPS viejo `187.77.207.90` murió 2026-05-11 — migración forzada.
+
 ## Quickstart
 
 ```bash
