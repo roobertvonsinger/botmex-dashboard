@@ -123,6 +123,12 @@
 | GET | `/api/deposits/scheduled/list` | Listar schedules activos | require_session | — | `{schedules}` | `deposits.py:674` |
 | POST | `/api/deposits/scheduled/{sched_id}/cancel` | Cancelar un schedule | require_session | — | `{ok}` | `deposits.py:693` |
 
+## Tarjetas
+
+| Método | Path | Función | Auth | Body / Query | Respuesta | File:line |
+|---|---|---|---|---|---|---|
+| GET | `/api/cards/all` | Lista unificada de tarjetas (account_cards + account_notes con card, dedupe por (num, email)). Pipe completo sin enmascarar. | require_session | — | `{rows: [{source, card_pipe, card_number, card_expiry, card_cvv, account_email, account_password, registered_by, registered_at, last_used_at, total_deposits, total_approved, total_rejected, status}], total}` | `app.py` |
+
 ## Histórico de depósitos
 
 | Método | Path | Función | Auth | Body / Query | Respuesta | File:line |

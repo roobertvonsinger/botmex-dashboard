@@ -26,6 +26,7 @@ const state = {
   pageSize: 50,
   lockHours: 2,
   filterInUse: false,
+  cardsOnly: false,  // filter: solo cuentas con al menos 1 tarjeta
 };
 
 
@@ -426,6 +427,7 @@ async function fetchAccounts() {
   url.searchParams.set('status', state.status);
   if (state.grade) url.searchParams.set('grade', state.grade);
   if (searchQuery) url.searchParams.set('q', searchQuery);
+  if (state.cardsOnly) url.searchParams.set('cards_only', 'true');
   url.searchParams.set('limit', '500');
   const r = await fetch(url);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -1723,6 +1725,7 @@ $('#btnResetFilters')?.addEventListener('click', () => {
   state.grade = '';
   searchQuery = '';
   state.filterInUse = false;
+  state.cardsOnly = false;
   state.page = 1;
   _sortCol = null;
   _sortDir = -1;
@@ -1731,8 +1734,18 @@ $('#btnResetFilters')?.addEventListener('click', () => {
   document.querySelectorAll('.seg[data-seg="grade"] button').forEach(b => b.classList.toggle('on', b.dataset.v === ''));
   $('#searchInput').value = '';
   const lpInUse = $('#lpInUse'); if (lpInUse) lpInUse.classList.remove('lp-stat-active');
+  $('#btnCardsOnly')?.classList.remove('on');
   reload();
   toast('↺ Filtros restaurados', 'success');
+});
+
+// Filtro: solo cuentas con tarjeta
+$('#btnCardsOnly')?.addEventListener('click', () => {
+  state.cardsOnly = !state.cardsOnly;
+  state.page = 1;
+  $('#btnCardsOnly').classList.toggle('on', state.cardsOnly);
+  reload();
+  toast(state.cardsOnly ? '💳 Filtro: solo cuentas con tarjeta' : '↺ Filtro tarjetas removido', 'success');
 });
 
 // Logs handlers

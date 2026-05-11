@@ -313,6 +313,7 @@ def list_accounts(
     status: str = Query("LIVE"),
     grade: Optional[str] = None,
     q: Optional[str] = None,
+    cards_only: bool = Query(False),
     limit: int = Query(500, le=2000),
     user: dict = Depends(require_session),
 ):
@@ -321,6 +322,13 @@ def list_accounts(
         where.append("a.status = ?"); params.append(status)
     if grade:
         where.append("a.grade = ?"); params.append(grade)
+    # Filtro: solo cuentas con al menos 1 tarjeta (en account_cards o account_notes con card)
+    if cards_only:
+        where.append(
+            "(EXISTS (SELECT 1 FROM account_cards ac WHERE ac.account_email=a.email) "
+            " OR EXISTS (SELECT 1 FROM account_notes an WHERE an.account_email=a.email "
+            "            AND an.card_number IS NOT NULL AND TRIM(an.card_number) != ''))"
+        )
 
     # Búsqueda multi-campo: email + tarjeta (últimos 4 / fingerprint substr) + nota
     if q:
@@ -1896,6 +1904,80 @@ def accounts_combos(req: CombosRequest, _user: dict = Depends(require_session)):
             req.ids,
         ).fetchall()
     return {"combos": [{"id": r["id"], "email": r["email"], "password": r["password"]} for r in rows]}
+
+
+@app.get("/api/cards/all")
+def list_all_cards(user: dict = Depends(require_session)):
+    """Lista unificada de tarjetas (account_cards + account_notes con card).
+
+    Devuelve pipe completo sin enmascarar. Dedupe por (card_number, account_email).
+    `source` indica origen ('card' = formalmente registrada, 'note' = solo en nota).
+    """
+    out = []
+    seen = set()
+    with db() as c:
+        # 1) account_cards (registradas formalmente)
+        try:
+            rows = c.execute(
+                "SELECT card_number, card_expiry, card_cvv, account_email, account_password, "
+                "registered_by, registered_by_name, registered_at, last_used_at, "
+                "total_deposits, total_approved, total_rejected, status "
+                "FROM account_cards ORDER BY registered_at DESC"
+            ).fetchall()
+            for r in rows:
+                key = (r["card_number"], r["account_email"])
+                seen.add(key)
+                out.append({
+                    "source": "card",
+                    "card_pipe": f"{r['card_number']}|{r['card_expiry'] or ''}|{r['card_cvv'] or ''}",
+                    "card_number": r["card_number"],
+                    "card_expiry": r["card_expiry"],
+                    "card_cvv": r["card_cvv"],
+                    "account_email": r["account_email"],
+                    "account_password": r["account_password"],
+                    "registered_by": r["registered_by_name"] or r["registered_by"],
+                    "registered_at": r["registered_at"],
+                    "last_used_at": r["last_used_at"],
+                    "total_deposits": r["total_deposits"] or 0,
+                    "total_approved": r["total_approved"] or 0,
+                    "total_rejected": r["total_rejected"] or 0,
+                    "status": r["status"] or "ACTIVE",
+                })
+        except sqlite3.OperationalError:
+            pass
+        # 2) account_notes con card (no duplicados ya en account_cards)
+        try:
+            rows = c.execute(
+                "SELECT card_number, card_expiry, card_cvv, account_email, account_password, "
+                "created_by, created_by_name, created_at, note_type, note_text "
+                "FROM account_notes "
+                "WHERE card_number IS NOT NULL AND TRIM(card_number) != '' "
+                "ORDER BY created_at DESC"
+            ).fetchall()
+            for r in rows:
+                key = (r["card_number"], r["account_email"])
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append({
+                    "source": "note",
+                    "card_pipe": f"{r['card_number']}|{r['card_expiry'] or ''}|{r['card_cvv'] or ''}",
+                    "card_number": r["card_number"],
+                    "card_expiry": r["card_expiry"],
+                    "card_cvv": r["card_cvv"],
+                    "account_email": r["account_email"],
+                    "account_password": r["account_password"],
+                    "registered_by": r["created_by_name"] or r["created_by"],
+                    "registered_at": r["created_at"],
+                    "last_used_at": None,
+                    "total_deposits": 0,
+                    "total_approved": 0,
+                    "total_rejected": 0,
+                    "status": r["note_type"] or "note",
+                })
+        except sqlite3.OperationalError:
+            pass
+    return {"rows": out, "total": len(out)}
 
 
 @app.get("/api/activity")
