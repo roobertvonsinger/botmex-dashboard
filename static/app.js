@@ -806,6 +806,14 @@ function _renderActOpsChips() {
   }).join('');
   wrap.innerHTML = all + chips;
 }
+// Helper: resuelve email -> "email:password" combo desde state.rows (cache).
+// Si la cuenta no está en cache (filtrada/no cargada), devuelve solo el email.
+function _resolveComboFromEmail(email) {
+  if (!email) return '';
+  const row = (state.rows || []).find(r => r.email === email);
+  return row ? `${row.email}:${row.password || ''}` : email;
+}
+
 function renderActivity() {
   const t = $('#actTable');
   t.querySelector('thead').innerHTML = `
@@ -833,7 +841,7 @@ function renderActivity() {
       </td>
       <td><span class="act-who" data-who="${esc(e.who ?? '')}">${esc(e.who ?? '—')}</span></td>
       <td>${actionLabel(e.kind)}</td>
-      <td class="combo"><b class="act-target" data-email="${esc(e.target || '')}">${esc(e.target || '—')}</b></td>
+      <td class="combo"><b class="act-target d-copy" data-email="${esc(e.target || '')}" data-copy="${esc(_resolveComboFromEmail(e.target))}" title="Click para copiar combo">${esc(e.target || '—')}</b></td>
       <td class="combo">${e.card_pipe ? `<b class="d-copy mono" data-copy="${esc(e.card_pipe)}" title="Click para copiar tarjeta">${esc(e.card_pipe)}</b>` : '<span class="dim">—</span>'}</td>
       <td class="num">${e.amount != null ? fmtMoney(e.amount) : ''}</td>
       <td>${statusPill(e)}</td>
@@ -940,6 +948,20 @@ function renderNotifs() {
   notifications.forEach(n => n.unread = false);
   renderNotifBadge();
 }
+
+// Navegación rápida: click en cualquier elemento con [data-nav="<section>"]
+// lleva a esa sección. Compatible con feed live, header live, alertas, etc.
+document.body.addEventListener('click', e => {
+  const nav = e.target.closest('[data-nav]');
+  if (!nav) return;
+  // Si el click cayó en un sub-elemento con data-copy/data-combo, no navegar
+  // (el handler global de copia ya hizo stopPropagation, pero por defensa extra).
+  if (e.target.closest('[data-copy], [data-combo], button, input, a')) return;
+  const target = nav.dataset.nav;
+  if (target && typeof showSection === 'function') {
+    showSection(target);
+  }
+});
 
 // Handler de acciones en notifs (botones Depositar / Liberar)
 document.body.addEventListener('click', async e => {
@@ -1243,10 +1265,14 @@ async function refreshKpis() {
                    : e.kind === 'lock' ? '🔒' : '·';
           const col = e.who_color || 'accent';
           const rowCls = isDepOk ? 'lp-feed-ok' : isDepFail ? 'lp-feed-fail' : 'lp-feed-neutral';
-          return `<div class="lp-feed-row ${rowCls}">
+          const combo = _resolveComboFromEmail(e.target || '');
+          // Toda la fila navega al panel de Actividad. El combo (target) tiene data-copy
+          // para 1-click izquierdo copiar (el handler global stopPropagation evita
+          // que dispare también la navegación).
+          return `<div class="lp-feed-row ${rowCls} lp-feed-clickable" data-nav="activity" title="Click para ir al panel de Actividad">
             <span class="lp-feed-ic">${ic}</span>
             <span class="lp-feed-who lp-color-${esc(col)}">${esc(e.who || '—')}</span>
-            <span class="lp-feed-target dim mono">${esc(e.target || '')}</span>
+            <span class="lp-feed-target dim mono d-copy" data-copy="${esc(combo)}" title="Click para copiar combo">${esc(e.target || '')}</span>
             ${e.amount != null ? `<span class="lp-feed-amt mono">${fmtMoney(e.amount)}</span>` : ''}
             <span class="lp-feed-time mono dim">${fmtAgo(e.ts)}</span>
           </div>`;

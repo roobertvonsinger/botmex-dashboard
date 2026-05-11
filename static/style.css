@@ -694,6 +694,17 @@ td.combo b:hover + .copyhint { color: var(--accent); }
 .notif-item .ni-act-release { border-color: var(--danger, #c33); color: var(--danger, #c33); }
 .notif-item .ni-act-release:hover { background: rgba(195, 51, 51, 0.08); }
 
+/* Feed live (sidebar): cursor pointer en filas y header clickeables */
+.lp-head-clickable, .lp-feed-clickable {
+  cursor: pointer;
+  transition: background 100ms;
+}
+.lp-head-clickable:hover, .lp-feed-clickable:hover {
+  background: rgba(255,255,255,0.04);
+}
+.lp-feed-target.d-copy { cursor: pointer; }
+.lp-feed-target.d-copy:hover { text-decoration: underline; text-decoration-style: dotted; }
+
 /* hidden helper */
 .hidden { display: none !important; }
 
