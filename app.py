@@ -1906,6 +1906,14 @@ def accounts_combos(req: CombosRequest, _user: dict = Depends(require_session)):
     return {"combos": [{"id": r["id"], "email": r["email"], "password": r["password"]} for r in rows]}
 
 
+@app.get("/api/accounts/pass-map")
+def accounts_pass_map(_user: dict = Depends(require_session)):
+    """Mapa email→password para todas las cuentas. Uso: resolver combos en activity/live feed."""
+    with db() as c:
+        rows = c.execute("SELECT email, password FROM accounts WHERE password IS NOT NULL").fetchall()
+    return {r["email"]: r["password"] for r in rows}
+
+
 @app.get("/api/cards/all")
 def list_all_cards(user: dict = Depends(require_session)):
     """Lista unificada de tarjetas (account_cards + account_notes con card).
