@@ -48,6 +48,31 @@ Si ves 2 archivos → la fantasma está creándose y desviando escrituras.
 
 ---
 
+### Cuentas muestran balance/depósito/check desactualizados después del prewarm
+
+**Síntoma**: pulsar "Actualizar visibles" consume Capsolver pero el dashboard sigue mostrando balance viejo, sin fecha de último depósito y `last_checked_at` que no avanza.
+
+**Causa (3 bugs combinados)**:
+
+1. **`_db_upsert_balance` incompleto** (bug en versión desplegada): sólo actualizaba `balance_real` y `balance_total` (que podía llegar NULL si la API no lo calcula). Nunca escribía `balance_bonos`, `last_deposit_amount`, ni `last_deposit_date`.
+
+2. **Capsolver gastado en vano**: `pool.prefetch(1)` resolvía un captcha ANTES de chequear si el JWT seguía en cache. Si el JWT era válido, el captcha prefetchado se descartaba.
+
+3. **`ok=True` falso cuando `details=None`**: si el fetch fallaba (timeout 18s, API sin datos, JWT rechazado), `_run_prewarm` igual retornaba `{"ok": True}` → frontend leía el row viejo como "actualizado". `last_checked_at` nunca se escribía → anti-spam (30min) no detectaba el intento → retry inmediato.
+
+**Fix aplicado** (`prewarm.py`, 2026-05-13):
+- `_db_upsert_balance`: calcula `balance_total = bal_real + bal_bonos`, escribe `balance_bonos`, escribe `last_deposit_*` cuando la API los trae válidos.
+- `_run_prewarm`: chequea `_db_get_jwt_cache` ANTES de `make_pool/prefetch`. JWT vigente → fetch directo, 0 Capsolver. JWT de cache rechazado por BetMexico → invalida el cache (`jwt_token=NULL`) para forzar login real la próxima vez.
+- `_run_prewarm`: retorna `ok=False` cuando `details is None`. Siempre escribe `last_checked_at` (incluso en timeout) para activar el anti-spam.
+
+**Diagnóstico rápido**:
+```bash
+docker exec betmexico-web sqlite3 /data/betmexico_accounts.db \
+  "SELECT phase, COUNT(*) FROM process_log WHERE process_type='prewarm' GROUP BY phase"
+```
+
+---
+
 ### `tzdata` falta / `apt-get install tzdata` bloquea el build
 
 **Síntoma**: `ZoneInfoNotFoundError: 'No time zone found with key America/Mexico_City'` al cargar `betmexico_login_api.py`. O `docker build` se queda colgado en `Configuring tzdata` esperando input.

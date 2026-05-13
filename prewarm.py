@@ -196,20 +196,48 @@ def _db_get_recent_log(operator_id: int, minutes: int) -> list:
 
 
 def _db_upsert_balance(email: str, details: dict) -> None:
+    """Persiste balance + último depósito.
+    - balance_total = balance_real + balance_bonos (el dict de details NO trae
+      balance_total — había que calcularlo; antes se escribía NULL).
+    - Si la API regresó balance_real=0 pero la BD ya tenía saldo >0, conserva
+      el saldo (BetMéxico es intermitente, mismo guard que usa el bot).
+    - last_deposit_* solo se sobreescribe si el fetch trajo datos válidos —
+      no pisa con 0/N/A si el fetch vino vacío (ej. fetch_mode='balance_only')."""
     from app import db
     import sqlite3
+    bal_real = float(details.get("balance_real", 0.0) or 0.0)
+    bal_bonos = float(details.get("balance_bonos", 0.0) or 0.0)
+    bal_total = bal_real + bal_bonos
+    new_amt = details.get("last_deposit_amount")
+    new_date = details.get("last_deposit_date")
+    has_dep = (new_amt is not None and float(new_amt or 0) > 0
+               and new_date and str(new_date).strip() not in ("", "N/A"))
+    now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     try:
         with db(write=True) as c:
-            c.execute(
-                "UPDATE accounts SET balance_real=?, balance_total=?, "
-                "last_checked_at=? WHERE email=?",
-                (
-                    details.get("balance_real"),
-                    details.get("balance_total"),
-                    datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
-                    email,
-                ),
-            )
+            if bal_real == 0.0:
+                row = c.execute(
+                    "SELECT balance_real, balance_bonos, balance_total "
+                    "FROM accounts WHERE email=?", (email,),
+                ).fetchone()
+                if row and (row["balance_real"] or 0) > 0:
+                    bal_real = float(row["balance_real"] or 0.0)
+                    bal_bonos = float(row["balance_bonos"] or 0.0)
+                    bal_total = float(row["balance_total"] or (bal_real + bal_bonos))
+            if has_dep:
+                c.execute(
+                    "UPDATE accounts SET balance_real=?, balance_bonos=?, "
+                    "balance_total=?, last_deposit_amount=?, last_deposit_date=?, "
+                    "last_checked_at=? WHERE email=?",
+                    (bal_real, bal_bonos, bal_total,
+                     float(new_amt), str(new_date), now_utc, email),
+                )
+            else:
+                c.execute(
+                    "UPDATE accounts SET balance_real=?, balance_bonos=?, "
+                    "balance_total=?, last_checked_at=? WHERE email=?",
+                    (bal_real, bal_bonos, bal_total, now_utc, email),
+                )
     except sqlite3.OperationalError:
         pass
 
@@ -249,6 +277,35 @@ def _db_save_txns_and_recalc(email: str, details: dict, operator_id: int) -> Non
             c.execute(
                 "UPDATE accounts SET grade=?, grade_score=? WHERE email=?",
                 (scoring.get("grade"), scoring.get("score"), email),
+            )
+    except sqlite3.OperationalError:
+        pass
+
+
+def _db_update_last_checked(email: str) -> None:
+    """Solo actualiza last_checked_at — cuando el fetch falló pero el login fue OK."""
+    from app import db
+    import sqlite3
+    try:
+        now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        with db(write=True) as c:
+            c.execute(
+                "UPDATE accounts SET last_checked_at=? WHERE email=?",
+                (now_utc, email),
+            )
+    except sqlite3.OperationalError:
+        pass
+
+
+def _db_invalidate_jwt(email: str) -> None:
+    """Borra JWT de cache — cuando el JWT de cache fue rechazado por BetMexico."""
+    from app import db
+    import sqlite3
+    try:
+        with db(write=True) as c:
+            c.execute(
+                "UPDATE accounts SET jwt_token=NULL, jwt_expires_at=NULL WHERE email=?",
+                (email,),
             )
     except sqlite3.OperationalError:
         pass
@@ -298,23 +355,30 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
     cap_key = os.environ.get("CAPMONSTER_KEY", "")
     proxy_url = _build_proxy_url()  # ¡CRÍTICO! sale por proxy MX, no por IP del VPS
     try:
-        pool = make_pool(cap_key, size=1, workers=1)
-        await pool.prefetch(1)
-        await pool.start_factory()
+        # Verificar JWT cache ANTES de crear pool — evita gastar Capsolver en vano.
+        # Si el JWT sigue vigente, ir directo al fetch sin login ni captcha.
+        jwt = await asyncio.to_thread(_db_get_jwt_cache, email)
+        jwt_from_cache = jwt is not None
 
-        jwt, login_result = await asyncio.wait_for(
-            get_jwt(email, password, pool, proxy=proxy_url, use_cache=True),
-            timeout=float(TASK_TIMEOUT_SEC),
-        )
         if not jwt:
-            status = login_result.get("status") if isinstance(login_result, dict) else None
-            _db_log_phase(
-                process_id, "no_jwt",
-                {"email": email, "operator_id": operator_id, "status": status},
-                int((time.time() - t0) * 1000),
+            # JWT vencido o ausente — necesita login real (consume 1 captcha)
+            pool = make_pool(cap_key, size=1, workers=1)
+            await pool.prefetch(1)
+            await pool.start_factory()
+
+            jwt, login_result = await asyncio.wait_for(
+                get_jwt(email, password, pool, proxy=proxy_url, use_cache=True),
+                timeout=float(TASK_TIMEOUT_SEC),
             )
-            return {"ok": False, "status": status or "no_jwt",
-                    "error": (login_result.get("error") if isinstance(login_result, dict) else None) or status or "Login falló"}
+            if not jwt:
+                status = login_result.get("status") if isinstance(login_result, dict) else None
+                _db_log_phase(
+                    process_id, "no_jwt",
+                    {"email": email, "operator_id": operator_id, "status": status},
+                    int((time.time() - t0) * 1000),
+                )
+                return {"ok": False, "status": status or "no_jwt",
+                        "error": (login_result.get("error") if isinstance(login_result, dict) else None) or status or "Login falló"}
 
         async with BetmexicoApiChecker(proxy=proxy_url) as checker:
             details = await asyncio.wait_for(
@@ -325,15 +389,24 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
             await asyncio.to_thread(_db_upsert_balance, email, details)
             # Guarda txns frescas + recalcula grade (oportunidad gratuita)
             await asyncio.to_thread(_db_save_txns_and_recalc, email, details, operator_id)
+        else:
+            # Login/fetch OK pero sin datos — actualizar timestamp para evitar retry inmediato
+            await asyncio.to_thread(_db_update_last_checked, email)
+            if jwt_from_cache:
+                # JWT de cache rechazado — invalidar para que el próximo refresh haga login real
+                await asyncio.to_thread(_db_invalidate_jwt, email)
 
+        phase = "complete" if details else "no_details"
         _db_log_phase(
-            process_id, "complete",
+            process_id, phase,
             {"email": email, "operator_id": operator_id,
              "balance_real": details.get("balance_real") if details else None,
-             "grade": details.get("payment_score", {}).get("grade") if details else None},
+             "grade": details.get("payment_score", {}).get("grade") if details else None,
+             "jwt_from_cache": jwt_from_cache},
             int((time.time() - t0) * 1000),
         )
-        return {"ok": True, "status": "complete"}
+        return {"ok": bool(details), "status": phase,
+                "error": None if details else "fetch sin datos"}
     except asyncio.CancelledError:
         _db_log_phase(
             process_id, "cancelled",
@@ -347,6 +420,8 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
             {"email": email, "operator_id": operator_id},
             int((time.time() - t0) * 1000),
         )
+        # Actualizar last_checked_at para que el anti-spam detecte el intento fallido
+        await asyncio.to_thread(_db_update_last_checked, email)
         return {"ok": False, "status": "timeout", "error": "Timeout 25s"}
     except Exception as e:
         logger.error(f"[Prewarm] {email}: {e}")
