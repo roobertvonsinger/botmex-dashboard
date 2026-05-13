@@ -637,7 +637,18 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
                         (acc["id"],),
                     ).fetchone()
                 if r:
-                    await q.put({"type": "account", "data": dict(r)})
+                    row = dict(r)
+                    # Resolver locked_by a display name (igual que list_accounts)
+                    if row.get("locked_by"):
+                        from app import _resolve_operator
+                        from auth import USER_COLORS
+                        raw = row["locked_by"]
+                        row["locked_by"] = _resolve_operator(raw)
+                        try:
+                            row["locked_color"] = USER_COLORS.get(int(raw))
+                        except (ValueError, TypeError):
+                            row["locked_color"] = None
+                    await q.put({"type": "account", "data": row})
                 else:
                     await q.put({"type": "fail", "id": acc["id"], "email": email, "error": "row not found"})
             except Exception as e:
