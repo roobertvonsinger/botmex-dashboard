@@ -355,30 +355,27 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
     cap_key = os.environ.get("CAPMONSTER_KEY", "")
     proxy_url = _build_proxy_url()  # ¡CRÍTICO! sale por proxy MX, no por IP del VPS
     try:
-        # Verificar JWT cache ANTES de crear pool — evita gastar Capsolver en vano.
-        # Si el JWT sigue vigente, ir directo al fetch sin login ni captcha.
-        jwt = await asyncio.to_thread(_db_get_jwt_cache, email)
-        jwt_from_cache = jwt is not None
+        # Siempre login fresco (use_cache=False) — el JWT de BetMexico puede ser
+        # invalidado server-side antes de su exp local (nueva sesión desde otro IP).
+        # Reusar JWT muerto → 401 silencioso → balance_real=0 → no se actualiza nada.
+        jwt_from_cache = False
+        pool = make_pool(cap_key, size=1, workers=1)
+        await pool.prefetch(1)
+        await pool.start_factory()
 
+        jwt, login_result = await asyncio.wait_for(
+            get_jwt(email, password, pool, proxy=proxy_url, use_cache=False),
+            timeout=float(TASK_TIMEOUT_SEC),
+        )
         if not jwt:
-            # JWT vencido o ausente — necesita login real (consume 1 captcha)
-            pool = make_pool(cap_key, size=1, workers=1)
-            await pool.prefetch(1)
-            await pool.start_factory()
-
-            jwt, login_result = await asyncio.wait_for(
-                get_jwt(email, password, pool, proxy=proxy_url, use_cache=True),
-                timeout=float(TASK_TIMEOUT_SEC),
+            status = login_result.get("status") if isinstance(login_result, dict) else None
+            _db_log_phase(
+                process_id, "no_jwt",
+                {"email": email, "operator_id": operator_id, "status": status},
+                int((time.time() - t0) * 1000),
             )
-            if not jwt:
-                status = login_result.get("status") if isinstance(login_result, dict) else None
-                _db_log_phase(
-                    process_id, "no_jwt",
-                    {"email": email, "operator_id": operator_id, "status": status},
-                    int((time.time() - t0) * 1000),
-                )
-                return {"ok": False, "status": status or "no_jwt",
-                        "error": (login_result.get("error") if isinstance(login_result, dict) else None) or status or "Login falló"}
+            return {"ok": False, "status": status or "no_jwt",
+                    "error": (login_result.get("error") if isinstance(login_result, dict) else None) or status or "Login falló"}
 
         async with BetmexicoApiChecker(proxy=proxy_url) as checker:
             details = await asyncio.wait_for(
