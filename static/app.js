@@ -2788,55 +2788,63 @@ async function deleteNote(accId, noteId) {
   return r.json();
 }
 
-// Fallback clipboard si navigator.clipboard falla (HTTP, contextos sin focus, etc)
-function _legacyCopy(txt) {
+// Copia text al portapapeles. Estrategia: primero execCommand (sincrónico,
+// funciona dentro del user gesture sin necesitar permisos especiales).
+// Si falla, fallback a navigator.clipboard (async).
+function _copyText(txt) {
+  if (!txt) return false;
+  const short = txt.length > 60 ? txt.slice(0, 60) + '…' : txt;
+  // Método 1: execCommand sobre textarea oculto — SINCRÓNICO, más confiable
+  let ok = false;
   try {
     const ta = document.createElement('textarea');
     ta.value = txt;
+    ta.setAttribute('readonly', '');
     ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.left = '0';
     ta.style.opacity = '0';
-    ta.style.left = '-9999px';
+    ta.style.pointerEvents = 'none';
     document.body.appendChild(ta);
-    ta.focus(); ta.select();
-    const ok = document.execCommand('copy');
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, txt.length);
+    ok = document.execCommand('copy');
     document.body.removeChild(ta);
-    return ok;
-  } catch (_) { return false; }
-}
-function _copyText(txt) {
-  if (!txt) return;
-  const short = txt.length > 60 ? txt.slice(0, 60) + '…' : txt;
-  const onOk = () => toast(`✓ copiado: ${short}`, 'success');
+  } catch (_) { ok = false; }
+  if (ok) {
+    toast(`✓ copiado: ${short}`, 'success');
+    return true;
+  }
+  // Método 2: navigator.clipboard (async) — fallback
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(txt)
-      .then(onOk)
-      .catch(() => { if (_legacyCopy(txt)) onOk(); else toast('Error al copiar', 'error'); });
-  } else {
-    if (_legacyCopy(txt)) onOk(); else toast('Error al copiar', 'error');
+      .then(() => toast(`✓ copiado: ${short}`, 'success'))
+      .catch(err => toast(`Error al copiar: ${err.message || err}`, 'error'));
+    return true;
   }
+  toast('Error al copiar (no hay API disponible)', 'error');
+  return false;
 }
 
-// Click global: copia [data-copy] o [data-combo] desde cualquier lado del DOM
-// Resuelve combo via data-email al momento del click (no al render — evita race
-// con _emailPassMap loading).
+// Click global: copia [data-copy] o [data-combo] desde cualquier lado del DOM.
+// Capture phase (true) para correr ANTES que handlers locales (#accTable, etc).
+// Resuelve combo via data-email al momento del click (no al render).
 document.body.addEventListener('click', e => {
   const t = e.target.closest('[data-copy], [data-combo]');
   if (!t) return;
-  // No interceptar inputs ni botones que NO son d-copy (los d-copy SÍ pueden ser botones)
+  // No interceptar inputs ni botones que NO son d-copy
   if (e.target.closest('input, button:not(.d-copy)') && !t.classList.contains('d-copy')) return;
-  // Resolver texto a copiar
+  // Resolver texto
   let txt = t.dataset.copy || t.dataset.combo || '';
   if (t.dataset.email) {
     const resolved = _resolveComboFromEmail(t.dataset.email);
-    // Solo usar el resolved si trae el combo completo (con ':'). Si solo trae
-    // el email (passmap aún no cargado), preferir data-copy/data-combo que tal
-    // vez tenga el combo ya completo.
     if (resolved && resolved.includes(':')) txt = resolved;
     else if (!txt) txt = resolved;
   }
   if (!txt) return;
+  // stopPropagation suprime el handler de fila/sort de #accTable
   e.stopPropagation();
-  e.preventDefault();
   _copyText(txt);
 }, true);
 
