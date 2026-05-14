@@ -536,7 +536,7 @@ function renderTable() {
         <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
         <td class="sel-cell" title="Click selecciona la fila"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
         <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
-        <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}" title="Click para copiar combo">${esc(combo)}</b>${lockChip}</td>
+        <td class="combo d-copy" data-combo="${esc(combo)}" title="Click para copiar combo"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b>${lockChip}</td>
         <td class="row-details-cell">${detailsBtn}</td>
         <td class="dep" title="Último depósito hecho">${dep}</td>
         <td class="row-icons">${iconsHtml}</td>
@@ -546,7 +546,7 @@ function renderTable() {
       <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
       <td class="sel-cell" title="Click selecciona la fila"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
       <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
-      <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}" title="Click para copiar combo">${esc(combo)}</b></td>
+      <td class="combo d-copy" data-combo="${esc(combo)}" title="Click para copiar combo"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b></td>
       <td class="row-details-cell">${detailsBtn}</td>
       <td class="dep" title="Último depósito hecho">${dep}</td>
       <td class="dep dim" title="Cuándo se actualizó por última vez">${fmtAgo(r.last_checked_at)}</td>
@@ -2788,26 +2788,56 @@ async function deleteNote(accId, noteId) {
   return r.json();
 }
 
+// Fallback clipboard si navigator.clipboard falla (HTTP, contextos sin focus, etc)
+function _legacyCopy(txt) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = txt;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch (_) { return false; }
+}
+function _copyText(txt) {
+  if (!txt) return;
+  const short = txt.length > 60 ? txt.slice(0, 60) + '…' : txt;
+  const onOk = () => toast(`✓ copiado: ${short}`, 'success');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt)
+      .then(onOk)
+      .catch(() => { if (_legacyCopy(txt)) onOk(); else toast('Error al copiar', 'error'); });
+  } else {
+    if (_legacyCopy(txt)) onOk(); else toast('Error al copiar', 'error');
+  }
+}
+
 // Click global: copia [data-copy] o [data-combo] desde cualquier lado del DOM
+// Resuelve combo via data-email al momento del click (no al render — evita race
+// con _emailPassMap loading).
 document.body.addEventListener('click', e => {
   const t = e.target.closest('[data-copy], [data-combo]');
   if (!t) return;
-  // No interceptar checkboxes / botones internos del row
+  // No interceptar inputs ni botones que NO son d-copy (los d-copy SÍ pueden ser botones)
   if (e.target.closest('input, button:not(.d-copy)') && !t.classList.contains('d-copy')) return;
-  // Lazy resolution: si el elemento tiene data-email, resolver combo al momento del
-  // click (no al render) — evita que data-copy quede baked con solo el email cuando
-  // el passmap aún no había cargado.
-  let txt;
+  // Resolver texto a copiar
+  let txt = t.dataset.copy || t.dataset.combo || '';
   if (t.dataset.email) {
-    txt = _resolveComboFromEmail(t.dataset.email) || t.dataset.copy || t.dataset.combo;
-  } else {
-    txt = t.dataset.copy || t.dataset.combo;
+    const resolved = _resolveComboFromEmail(t.dataset.email);
+    // Solo usar el resolved si trae el combo completo (con ':'). Si solo trae
+    // el email (passmap aún no cargado), preferir data-copy/data-combo que tal
+    // vez tenga el combo ya completo.
+    if (resolved && resolved.includes(':')) txt = resolved;
+    else if (!txt) txt = resolved;
   }
   if (!txt) return;
   e.stopPropagation();
-  navigator.clipboard.writeText(txt)
-    .then(() => toast(`✓ ${txt.slice(0, 60)}`, 'success'))
-    .catch(err => toast(`Error: ${err.message}`, 'error'));
+  e.preventDefault();
+  _copyText(txt);
 }, true);
 
 // ─── Deposit modal (3 modos: single | multi | schedule) ───

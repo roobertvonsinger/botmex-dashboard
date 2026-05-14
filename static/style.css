@@ -2152,6 +2152,21 @@ tbody tr.row-refresh-fail { animation: rowFail 1500ms ease-out; }
 }
 tbody tr.row-refresh-skip { animation: rowSkip 1500ms ease-out; opacity: 0.7; }
 
+/* ── Copyable universal: feedback visual ── */
+/* Cualquier elemento con data-copy o data-combo es clickable */
+[data-copy], [data-combo] {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+[data-copy]:hover, [data-combo]:hover {
+  background-color: rgba(112, 196, 167, 0.10);
+  color: var(--accent, #70c4a7);
+}
+[data-copy]:active, [data-combo]:active {
+  background-color: rgba(112, 196, 167, 0.20);
+}
+
 /* Botón Actualizar Visibles — amber/dorado en idle */
 #btnRefreshVisible {
   border-color: #c89b2a;
