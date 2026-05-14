@@ -199,10 +199,11 @@ def _db_upsert_balance(email: str, details: dict) -> None:
     """Persiste balance + último depósito.
     - balance_total = balance_real + balance_bonos (el dict de details NO trae
       balance_total — había que calcularlo; antes se escribía NULL).
-    - Si la API regresó balance_real=0 pero la BD ya tenía saldo >0, conserva
-      el saldo (BetMéxico es intermitente, mismo guard que usa el bot).
-    - last_deposit_* solo se sobreescribe si el fetch trajo datos válidos —
-      no pisa con 0/N/A si el fetch vino vacío (ej. fetch_mode='balance_only')."""
+    - Guard "preserve old balance" SOLO si el fetch fue claramente vacío
+      (sin last_deposit, sin fullname, sin txns) — eso indica JWT muerto/401
+      silencioso. Si el fetch trae cualquier señal de éxito, confiamos en
+      balance_real aunque sea 0 (usuario realmente puede tener $0).
+    - last_deposit_* solo se sobreescribe si el fetch trajo datos válidos."""
     from app import db
     import sqlite3
     bal_real = float(details.get("balance_real", 0.0) or 0.0)
@@ -212,10 +213,18 @@ def _db_upsert_balance(email: str, details: dict) -> None:
     new_date = details.get("last_deposit_date")
     has_dep = (new_amt is not None and float(new_amt or 0) > 0
                and new_date and str(new_date).strip() not in ("", "N/A"))
+    # Señales de que la API respondió de verdad (no es 401 silencioso):
+    api_succeeded = (
+        has_dep
+        or bool(details.get("fullname"))
+        or bool((details.get("transactions") or {}).get("items"))
+        or bal_bonos > 0
+    )
     now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     try:
         with db(write=True) as c:
-            if bal_real == 0.0:
+            # Solo preservar saldo viejo si la API respondió VACÍO (= falla)
+            if bal_real == 0.0 and not api_succeeded:
                 row = c.execute(
                     "SELECT balance_real, balance_bonos, balance_total "
                     "FROM accounts WHERE email=?", (email,),
