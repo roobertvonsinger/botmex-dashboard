@@ -79,51 +79,63 @@ Para agregar un nuevo dominio: ampliar la regla `Host(...)` y propagar DNS A →
 ### 1. Cambios en código del dashboard (este repo)
 
 ```bash
-# Local — editar lo que toque, commitear
-git add . && git commit -m "fix: bla"
-git push origin main
+KEY="C:\Users\rober\Dropbox\TESTING DEV\SSH KEYS\kvm4_hostinger"
+HOST="root@100.77.154.31"
 
-# KVM4 — pull + restart container (sin rebuild porque code es volumen)
-plink -ssh -pw "Kashau2022##" root@100.77.154.31 \
-  "cd /docker/betmexico && \
-   # opción A: pull del repo si ya existe clone
-   # opción B (actual): pscp de archivos desde local
-   docker compose restart web"
+# Subir archivo(s) modificado(s) — dashboard vive en code/web/
+scp -P 22 -o StrictHostKeyChecking=no -i "$KEY" \
+  prewarm.py "$HOST:/docker/betmexico/code/web/prewarm.py"
+
+scp -P 22 -o StrictHostKeyChecking=no -i "$KEY" \
+  static/app.js "$HOST:/docker/betmexico/code/web/static/app.js"
+
+scp -P 22 -o StrictHostKeyChecking=no -i "$KEY" \
+  static/style.css "$HOST:/docker/betmexico/code/web/static/style.css"
+
+# Restart (no rebuild — código montado como volumen)
+ssh -o StrictHostKeyChecking=no -i "$KEY" $HOST \
+  "docker compose -f /docker/betmexico/docker-compose.yml restart web"
 ```
+
+> **Nota**: usar Tailscale IP `100.77.154.31` con la key `kvm4_hostinger`.
+> `pscp`/`plink` se cuelgan en bash (prompt interactivo sin TTY). Usar `scp`/`ssh` nativo.
 
 ### 2. Cambios en bot Telegram (monorepo, `Proyectos/BetMexico/Telegram/`)
 
 > **NOTA**: el bot vive en el monorepo por ahora. Cuando migre a su propio repo, se actualizará este flujo.
 
 ```bash
-# Subir archivos modificados
-pscp -pw "Kashau2022##" betmexico_X.py \
-  root@100.77.154.31:/docker/betmexico/code/
+KEY="C:\Users\rober\Dropbox\TESTING DEV\SSH KEYS\kvm4_hostinger"
+HOST="root@100.77.154.31"
+
+# Subir archivo(s) — bot vive en code/ raíz
+scp -P 22 -o StrictHostKeyChecking=no -i "$KEY" \
+  betmexico_X.py "$HOST:/docker/betmexico/code/betmexico_X.py"
 
 # Restart container bot
-plink -ssh -pw "Kashau2022##" root@100.77.154.31 \
-  "cd /docker/betmexico && docker compose restart bot"
+ssh -o StrictHostKeyChecking=no -i "$KEY" $HOST \
+  "docker compose -f /docker/betmexico/docker-compose.yml restart bot"
 ```
 
 ### 3. Cambios en dependencias (requirements / Dockerfile)
 
 ```bash
-plink -ssh -pw "Kashau2022##" root@100.77.154.31 \
-  "cd /docker/betmexico && \
-   docker compose build && \
-   docker compose up -d"
+KEY="C:\Users\rober\Dropbox\TESTING DEV\SSH KEYS\kvm4_hostinger"
+HOST="root@100.77.154.31"
+
+ssh -o StrictHostKeyChecking=no -i "$KEY" $HOST \
+  "cd /docker/betmexico && docker compose build && docker compose up -d"
 ```
 
 ### 4. Update de API keys (.env)
 
 ```bash
-# Editar .env en KVM4
-plink -ssh -pw "Kashau2022##" root@100.77.154.31 \
-  "sed -i 's/OLD_KEY/NEW_KEY/g' /docker/betmexico/.env"
+KEY="C:\Users\rober\Dropbox\TESTING DEV\SSH KEYS\kvm4_hostinger"
+HOST="root@100.77.154.31"
 
-# Restart para que tome la nueva
-plink -ssh -pw "Kashau2022##" root@100.77.154.31 \
-  "cd /docker/betmexico && docker compose restart"
+ssh -o StrictHostKeyChecking=no -i "$KEY" $HOST \
+  "sed -i 's/OLD_KEY/NEW_KEY/g' /docker/betmexico/.env && \
+   docker compose -f /docker/betmexico/docker-compose.yml restart"
 ```
 
 ---
