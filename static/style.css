@@ -2115,36 +2115,6 @@ td.row-icons, th.row-icons-th {
 
 /* ── Refresh stream microanimations ── */
 
-/* Skeleton shimmer mientras se actualiza */
-@keyframes rowShimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-tbody tr.row-refreshing td {
-  position: relative;
-  overflow: hidden;
-}
-tbody tr.row-refreshing td::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255,255,255,0.06) 40%,
-    rgba(255,255,255,0.10) 50%,
-    rgba(255,255,255,0.06) 60%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  animation: rowShimmer 1.4s linear infinite;
-  pointer-events: none;
-}
-tbody tr.row-refreshing td > * {
-  opacity: 0.35;
-  transition: opacity 240ms;
-}
-
 /* Flash de éxito tras llegada de datos frescos */
 @keyframes rowRefreshed {
   0%   { background-color: var(--accent-soft); transform: scale(1); }
@@ -2181,6 +2151,17 @@ tbody tr.row-refresh-fail { animation: rowFail 1500ms ease-out; }
   100% { background-color: transparent; }
 }
 tbody tr.row-refresh-skip { animation: rowSkip 1500ms ease-out; opacity: 0.7; }
+
+/* Botón Actualizar Visibles — amber/dorado en idle */
+#btnRefreshVisible {
+  border-color: #c89b2a;
+  color: #d4aa40;
+}
+#btnRefreshVisible:hover {
+  background: rgba(212, 170, 64, 0.12);
+  border-color: #f0c840;
+  color: #f0c840;
+}
 
 /* ── Botón refresh con estado activo (stop) ── */
 .seg-btn.refreshing {

@@ -325,9 +325,10 @@ const balanceCls = v => {
   if (v > 5) return 'dim-amount';
   return '';
 };
-const getVisible = () => state.filterInUse
-  ? state.rows.filter(r => r.locked_by)
-  : state.rows;
+function getVisible() {
+  if (state.refreshMode) return state.refreshMode.updatedRows;
+  return state.filterInUse ? state.rows.filter(r => r.locked_by) : state.rows;
+}
 
 function getPaged() {
   const v = getVisible();
@@ -1285,7 +1286,7 @@ async function refreshKpis() {
           return `<div class="lp-feed-row ${rowCls} lp-feed-clickable" data-nav="activity" title="Click para ir al panel de Actividad">
             <span class="lp-feed-ic">${ic}</span>
             <span class="lp-feed-who lp-color-${esc(col)}">${esc(e.who || '—')}</span>
-            <span class="lp-feed-target dim mono d-copy" data-copy="${esc(combo)}" title="Click para copiar combo">${esc(combo || e.target || '')}</span>
+            <span class="lp-feed-target dim mono d-copy" data-email="${esc(e.target || '')}" data-copy="${esc(combo)}" title="Click para copiar combo">${esc(combo || e.target || '')}</span>
             ${e.amount != null ? `<span class="lp-feed-amt mono">${fmtMoney(e.amount)}</span>` : ''}
             <span class="lp-feed-time mono dim">${fmtAgo(e.ts)}</span>
           </div>`;
@@ -1326,28 +1327,25 @@ async function refreshVisible(opts = {}) {
   }
   _refreshing = true;
   const force = !!opts.force;
+  // Capturar IDs ANTES de activar refreshMode (getPaged usa state normal)
   const ids = opts.ids || getPaged().rows.map(r => r.id);
   if (!ids.length) { _refreshing = false; return; }
   const btn = $('#btnRefreshVisible');
+
+  // Refresh mode: tabla vacía que se llena cuenta por cuenta conforme llegan datos frescos.
+  // Evita el cagadero de animaciones shimmer + filtros locos del approach anterior.
+  state.refreshMode = { updatedRows: [] };
+  renderTable();
+
   if (btn) {
     btn.classList.add('refreshing');
-    btn.innerHTML = `⏹ Detener · 0/${ids.length}${force ? ' (forzado)' : ''}`;
+    btn.innerHTML = `⏹ Detener · 0/${ids.length}`;
     btn.style.setProperty('--prog', '0%');
-    btn.style.pointerEvents = 'auto';
   }
-
-  const idSet = new Set(ids);
-  document.querySelectorAll('#accTable tbody tr[data-id]').forEach(tr => {
-    if (idSet.has(parseInt(tr.dataset.id))) {
-      tr.classList.add('row-refreshing');
-    }
-  });
   toast(`↻ Refrescando ${ids.length} en vivo…`);
 
   let updated = 0, failed = 0, skipped = 0;
   let started = false;
-  let forceableIds = [];   // ids saltados por reglas anti-spam que SA puede forzar
-  let skipReasons = {};
   let failReasons = {};
   let lastEventAt = Date.now();
   let watchdog = null;
@@ -1355,7 +1353,6 @@ async function refreshVisible(opts = {}) {
   _refreshAbort = ctrl;
   const total = ids.length;
 
-  // Helper: actualiza visual del botón con progreso
   const updateProgress = () => {
     if (!btn) return;
     const done = updated + failed + skipped;
@@ -1364,7 +1361,6 @@ async function refreshVisible(opts = {}) {
     btn.style.setProperty('--prog', `${pct}%`);
   };
 
-  // Watchdog: si no llega ningún evento en 90s, aborta con error visible
   watchdog = setInterval(() => {
     if (Date.now() - lastEventAt > 90_000) {
       toast(`⚠️ Sin respuesta del servidor en 90s — aborté`, 'error');
@@ -1402,27 +1398,36 @@ async function refreshVisible(opts = {}) {
           if (ev.type === 'start') {
             started = true;
             if (ev.capmonster_warning) {
-              toast(`⚠️ CapMonster bajo ($${ev.capmonster_balance?.toFixed(2)}) — sigue corriendo, recarga pronto`, 'error');
-            }
-            if (ev.cap_remaining === 0) {
-              toast(`⚠️ Cap 30/10min agotado (${ev.cap_used} usados) — espera 10min`, 'error');
+              toast(`⚠️ CapMonster bajo ($${ev.capmonster_balance?.toFixed(2)}) — recarga pronto`, 'error');
             }
           } else if (ev.type === 'account' && ev.data) {
             updated++;
+            // Actualizar en state.rows (fuente de verdad global)
             const i = state.rows.findIndex(x => x.id === ev.data.id);
             if (i >= 0) state.rows[i] = { ...state.rows[i], ...ev.data };
-            _swapRowWithAnim(ev.data.id);
+            // Añadir a refreshMode y re-render tabla (solo muestra las ya actualizadas)
+            if (state.refreshMode) {
+              const rowData = i >= 0 ? state.rows[i] : ev.data;
+              const ri = state.refreshMode.updatedRows.findIndex(x => x.id === ev.data.id);
+              if (ri >= 0) state.refreshMode.updatedRows[ri] = rowData;
+              else state.refreshMode.updatedRows.push(rowData);
+              renderTable();
+              // Flash verde suave en la fila recién llegada
+              requestAnimationFrame(() => {
+                const tr = document.querySelector(`#accTable tbody tr[data-id="${ev.data.id}"]`);
+                if (tr) {
+                  tr.classList.add('row-refreshed');
+                  setTimeout(() => tr.classList.remove('row-refreshed'), 1200);
+                }
+              });
+            }
             updateProgress();
           } else if (ev.type === 'fail') {
             failed++;
             failReasons[ev.error || 'error'] = (failReasons[ev.error || 'error'] || 0) + 1;
-            _markRowFail(ev.id, ev.error);
             updateProgress();
           } else if (ev.type === 'skip') {
             skipped++;
-            skipReasons[ev.reason] = (skipReasons[ev.reason] || 0) + 1;
-            if (ev.can_force) forceableIds.push(ev.id);
-            _markRowSkip(ev.id, ev.reason);
             updateProgress();
           }
         } catch (parseErr) {}
@@ -1435,30 +1440,12 @@ async function refreshVisible(opts = {}) {
     if (!started) {
       toast(`⚠️ Servidor no inició el stream — algo está mal`, 'error');
     } else if (updated === 0 && failed === 0 && skipped === 0) {
-      toast(`⚠️ 0 cuentas procesadas — bot deps no cargan en VPS?`, 'error');
-    } else if (updated === 0 && skipped > 0) {
-      toast(`⚠️ ${skipped} saltadas, 0 actualizadas`, 'error');
+      toast(`⚠️ 0 cuentas procesadas — bot deps no cargan?`, 'error');
     } else if (updated === 0 && failed > 0) {
-      // Todos fallaron — mostrar razón principal (BAN, rate limit, etc)
       const topReason = Object.entries(failReasons).sort((a,b)=>b[1]-a[1])[0];
       toast(`✗ ${failed} falló · ${topReason ? topReason[0].slice(0,60) : 'error'}`, 'error');
     } else {
       toast(`✓ ${parts.join(' · ')}`, failed ? 'error' : 'success');
-    }
-    // Si hay skips force-ables (SA), preguntar si quiere forzar
-    if (forceableIds.length > 0 && !force) {
-      const fresh = skipReasons['fresh'] || 0;
-      const limit = skipReasons['daily_limit'] || 0;
-      const detail = [];
-      if (fresh) detail.push(`${fresh} actualizadas hace <30min`);
-      if (limit) detail.push(`${limit} ya checadas 3+ veces hoy`);
-      const msg = `${forceableIds.length} cuentas omitidas:\n• ${detail.join('\n• ')}\n\n¿Forzar refresh de ESAS cuentas?`;
-      // Defer fuera del finally para que el botón se rehabilite
-      setTimeout(() => {
-        if (confirm(msg)) {
-          refreshVisible({ ids: forceableIds, force: true });
-        }
-      }, 200);
     }
   } catch (e) {
     if (e.name === 'AbortError') {
@@ -1469,100 +1456,16 @@ async function refreshVisible(opts = {}) {
   } finally {
     clearInterval(watchdog);
     _refreshAbort = null;
-    _refreshing = false;   // ← SIN ESTO el botón quedaba bloqueado para siempre
+    _refreshing = false;
+    // Salir de refresh mode — mostrar tabla completa con datos frescos
+    state.refreshMode = null;
+    renderTable();
     if (btn) {
       btn.classList.remove('refreshing');
       btn.innerHTML = '↻ Actualizar visibles';
       btn.style.removeProperty('--prog');
     }
-    setTimeout(() => {
-      document.querySelectorAll('#accTable tbody tr.row-refreshing').forEach(tr => {
-        tr.classList.remove('row-refreshing');
-      });
-    }, 800);
   }
-}
-
-// Repinta una fila con fade-out → fade-in + glow temporal
-function _swapRowWithAnim(id) {
-  const tr = document.querySelector(`#accTable tbody tr[data-id="${id}"]`);
-  if (!tr) return;
-  const r = state.rows.find(x => x.id === id);
-  if (!r) return;
-  // Generar el HTML nuevo de la fila con renderTable → reextraer la fila
-  // Atajo: re-render full y luego añadir clase refreshed a esa fila
-  // Más eficiente: regenerar solo el outerHTML
-  const idx = state.rows.findIndex(x => x.id === id);
-  if (idx < 0) return;
-  // Hack: trigger renderTable para una sola fila — pero podemos reutilizar el
-  // lock + grade + iconos manualmente. Por simplicidad: hacemos renderTable()
-  // ÚNICAMENTE para la fila actualizada, sin tocar las demás.
-  _renderSingleRow(tr, r);
-  tr.classList.remove('row-refreshing');
-  tr.classList.add('row-refreshed');
-  setTimeout(() => tr.classList.remove('row-refreshed'), 1200);
-}
-
-function _renderSingleRow(tr, r) {
-  // Replicamos la lógica mínima de renderTable para 1 fila
-  const g = gradeClass(r.grade);
-  const until = r.locked_by ? fmtUntil(r.locked_until) : null;
-  const lockedCls = r.locked_by ? (until?.expired ? 'row-locked row-lock-expired' : 'row-locked') : '';
-  const selCls = selectedIds.has(r.id) ? 'row-sel' : '';
-  const checked = selectedIds.has(r.id) ? 'checked' : '';
-  const dep = r.last_deposit_amount
-    ? `<b>${fmtMoney(r.last_deposit_amount)}</b><span class="ago">${fmtAgo(r.last_deposit_date)}</span>`
-    : '<span class="dim">sin dep.</span>';
-  const combo = `${r.email}:${r.password || ''}`;
-  const opCol = r.locked_color || 'accent';
-  const opClass = r.locked_by ? `op-row-${opCol}` : '';
-  const trasClass = r.published_to_pool === 0 ? 'row-trastienda' : '';
-  const hasCards = (r.cards_count || 0) > 0;
-  const hasNotes = (r.notes_count || 0) > 0;
-  let iconsHtml = '';
-  if (hasCards) iconsHtml += `<button class="row-ic ic-cards" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.cards_count} tarjeta${r.cards_count>1?'s':''}">💳<sup>${r.cards_count}</sup></button>`;
-  if (hasNotes) iconsHtml += `<button class="row-ic ic-notes" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.notes_count} nota${r.notes_count>1?'s':''}">📝<sup>${r.notes_count}</sup></button>`;
-  iconsHtml += `<button class="row-ic ic-add" data-id="${r.id}" data-email="${esc(r.email)}" title="Añadir nota rápida">+</button>`;
-  const lockChip = r.locked_by
-    ? `<span class="lock-chip op-${esc(opCol)} ${until?.expired ? 'expired' : ''}" title="Lockeada por ${esc(r.locked_by)}">🔒 ${esc(r.locked_by)}${until && !until.expired ? ` <span class="lock-chip-time dim">${until.text}</span>` : ''}</span>`
-    : '';
-  tr.className = `r-grade-${g} ${lockedCls} ${selCls} ${opClass} ${trasClass}`.trim();
-  if (state.view === 'simple') {
-    tr.innerHTML = `
-      <td class="grade-bar-cell"></td>
-      <td class="sel-cell"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
-      <td class="num"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
-      <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b>${lockChip}</td>
-      <td class="dep">${dep}</td>
-      <td class="row-icons">${iconsHtml}</td>`;
-  } else {
-    tr.innerHTML = `
-      <td class="grade-bar-cell"></td>
-      <td class="sel-cell"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
-      <td class="num"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
-      <td class="combo"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b></td>
-      <td class="dep">${dep}</td>
-      <td class="dep dim">${fmtAgo(r.last_checked_at)}</td>
-      <td class="num">${r.check_count || 0}</td>
-      <td class="row-icons">${iconsHtml}</td>`;
-  }
-}
-
-function _markRowFail(id, reason) {
-  const tr = document.querySelector(`#accTable tbody tr[data-id="${id}"]`);
-  if (!tr) return;
-  tr.classList.remove('row-refreshing');
-  tr.classList.add('row-refresh-fail');
-  if (reason) tr.title = `Falló: ${reason}`;
-  setTimeout(() => tr.classList.remove('row-refresh-fail'), 2500);
-}
-function _markRowSkip(id, reason) {
-  const tr = document.querySelector(`#accTable tbody tr[data-id="${id}"]`);
-  if (!tr) return;
-  tr.classList.remove('row-refreshing');
-  tr.classList.add('row-refresh-skip');
-  if (reason) tr.title = `Saltada: ${reason}`;
-  setTimeout(() => tr.classList.remove('row-refresh-skip'), 1500);
 }
 
 // ─── Logs view ───
@@ -2891,7 +2794,15 @@ document.body.addEventListener('click', e => {
   if (!t) return;
   // No interceptar checkboxes / botones internos del row
   if (e.target.closest('input, button:not(.d-copy)') && !t.classList.contains('d-copy')) return;
-  const txt = t.dataset.copy || t.dataset.combo;
+  // Lazy resolution: si el elemento tiene data-email, resolver combo al momento del
+  // click (no al render) — evita que data-copy quede baked con solo el email cuando
+  // el passmap aún no había cargado.
+  let txt;
+  if (t.dataset.email) {
+    txt = _resolveComboFromEmail(t.dataset.email) || t.dataset.copy || t.dataset.combo;
+  } else {
+    txt = t.dataset.copy || t.dataset.combo;
+  }
   if (!txt) return;
   e.stopPropagation();
   navigator.clipboard.writeText(txt)

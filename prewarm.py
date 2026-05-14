@@ -601,20 +601,6 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
                 if not acc.get("password"):
                     await q.put({"type": "skip", "id": acc["id"], "email": email, "reason": "no_password"})
                     return
-                # Reglas anti-spam (a menos que SA fuerce):
-                if not force:
-                    mins = _account_minutes_since_check(acc)
-                    if mins is not None and mins < ACCOUNT_FRESH_MINUTES:
-                        await q.put({"type": "skip", "id": acc["id"], "email": email,
-                                     "reason": "fresh", "minutes": round(mins, 1),
-                                     "can_force": is_sa})
-                        return
-                    today = await asyncio.to_thread(_db_account_prewarms_today, email)
-                    if today >= ACCOUNT_DAILY_LIMIT:
-                        await q.put({"type": "skip", "id": acc["id"], "email": email,
-                                     "reason": "daily_limit", "today_count": today,
-                                     "can_force": is_sa})
-                        return
                 # Throttle: max N logins concurrentes para no triggear rate-limit
                 async with sem:
                     result = await _run_prewarm(operator_id, email, acc["password"])
