@@ -1090,7 +1090,10 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                         ev = await asyncio.wait_for(phase_queue.get(), timeout=0.5)
                         yield f"data: {json.dumps(ev)}\n\n"
                     except asyncio.TimeoutError:
-                        pass
+                        # SSE comment heartbeat — keeps proxy connections alive
+                        # durante captcha solves largos (30s+). nginx/traefik
+                        # cierran conexiones sin tráfico ~60s.
+                        yield ": ping\n\n"
 
                 # Drena el remanente que pudo entrar entre la última lectura y
                 # gather_task.done() (events de la fase 'done' final, etc.)

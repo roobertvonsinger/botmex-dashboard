@@ -205,6 +205,38 @@ Cada deposit creaba 2 rows → 2 events SSE → 2 filas en el feed.
 
 ---
 
+## Matchmaker live-progress (Task 4)
+
+### `velocity_skip` deja rows en spinner permanente
+
+**Síntoma**: en el panel matchmaker (multi), tras un `VELOCITY_SKIP` la tarjeta y la cuenta involucradas quedan con spinner girando hasta que un evento futuro las toque.
+
+**Causa**: `handleMmEvent` no tenía `case 'velocity_skip'`. El `trying` previo ya dejó `card.status='busy'` y `acc.status='busy'`, y nadie las regresaba a `idle`.
+
+**Fix** (2026-05-15, commit post-`f4c68e8`): agregado handler en `static/app.js` que pone ambos en `idle`, limpia `busyEmail/busyTail` + `currentPhase`, y agrega línea al feed con el `wait_sec`.
+
+---
+
+### Sub-indicador de fase desaparece cuando otro par dispara `_mmRender`
+
+**Síntoma**: en matchmaker con 2+ pares concurrentes, el texto en `.mm-pair-phase` ("🔑 Login…", "💳 Tarjeta…") aparece y desaparece intermitentemente.
+
+**Causa**: `_mmRender` hace `innerHTML = cardsHtml` — destruye el DOM y lo re-crea desde el modelo (`_mm.cards` / `_mm.accounts`). El texto inyectado por `_mmSetPairPhase` solo vivía en el DOM, no en el modelo, así que cualquier evento que dispare `_mmRender` (otro par, otro `trying`, etc.) lo borraba.
+
+**Fix** (2026-05-15): `_mmSetPairPhase` ahora persiste el texto como `card.currentPhase` y `acc.currentPhase`. `_mmRender` inyecta este valor en el HTML inicial de filas `busy`. Eventos terminales (`match`, `rejected`, `account_dead`, `velocity_skip`, `done`) limpian `currentPhase = ''` para no mostrar texto stale en una segunda ronda.
+
+---
+
+### SSE drain loop sin heartbeat — proxies cierran conexión en captchas largos
+
+**Síntoma**: en captchas que tardan 30s+, el cliente recibe `net::ERR_INCOMPLETE_CHUNKED_ENCODING` o el stream queda colgado. nginx/traefik cierran por timeout sin tráfico.
+
+**Causa**: en `deposits.py` `multi_stream`, el drain loop del `gather_task` hacía `except asyncio.TimeoutError: pass` — 0 bytes enviados por SSE mientras los attempts corrían en paralelo.
+
+**Fix** (2026-05-15): el `except asyncio.TimeoutError` ahora emite `yield ": ping\n\n"` (SSE comment heartbeat — no es un event, no afecta al cliente JS, pero mantiene la conexión activa contra proxies).
+
+---
+
 ## Deploy / Infra
 
 ### Builds Docker paralelos pelean por buildkit

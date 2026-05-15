@@ -3529,11 +3529,14 @@ function _mmRender() {
       ? `<span class="mm-reason">${esc(_mmLabel(c.lastCode))}</span>` : '';
     const pairKey = (c.status === 'busy' && c.busyEmail)
       ? ` data-pair-key="${esc(c.busyEmail)}|···${tail}"` : '';
+    // currentPhase se persiste en el modelo para sobrevivir re-renders
+    // disparados por otros pares (ver _mmSetPairPhase).
+    const phaseTxt = (c.status === 'busy' && c.currentPhase) ? esc(c.currentPhase) : '';
     return `<div class="${cls}"${pairKey}>
       <span class="mm-tail mono">···${tail}</span>
       ${fails}
       ${reason}
-      <span class="mm-pair-phase"></span>
+      <span class="mm-pair-phase">${phaseTxt}</span>
       <span class="mm-ic">${ic}</span>
     </div>`;
   }).join('');
@@ -3554,12 +3557,13 @@ function _mmRender() {
       : '';
     const pairKey = (a.status === 'busy' && a.busyTail)
       ? ` data-pair-key="${esc(email)}|···${a.busyTail}"` : '';
+    const phaseTxt = (a.status === 'busy' && a.currentPhase) ? esc(a.currentPhase) : '';
     return `<div class="${cls}"${pairKey}>
       <span class="mm-email">${esc(email)}</span>
       ${matched}
       ${fails}
       ${reason}
-      <span class="mm-pair-phase"></span>
+      <span class="mm-pair-phase">${phaseTxt}</span>
       <span class="mm-ic">${ic}</span>
     </div>`;
   }).join('');
@@ -3574,10 +3578,11 @@ function _mmRender() {
 // Actualiza el sub-indicador de fase dentro del row del par (email, tail).
 // Llama el handler de 'phase' en cada evento; si no hay row (el par ya terminó
 // y el render lo movió a otro estado), es un no-op silencioso.
+// IMPORTANTE: persiste el texto en el modelo (_mm.cards / _mm.accounts) para
+// sobrevivir un _mmRender disparado por otro par. Sin esto, el indicador se
+// borra cada vez que otro evento causa re-render.
 function _mmSetPairPhase(key, name, data) {
-  // El key viene como "email|···tail" — buscamos en ambos paneles
-  const rows = document.querySelectorAll(`[data-pair-key="${key}"]`);
-  if (!rows.length) return;
+  data = data || {};
   const labels = {
     login_start:          '🔑 Login…',
     login_done:           data.ok ? '🔑 ✓' : '🔑 ✗',
@@ -3590,6 +3595,18 @@ function _mmSetPairPhase(key, name, data) {
     done:                 data.success ? '✓ Aprobado' : '✗ Rechazado',
   };
   const text = labels[name] || name;
+  // El key viene como "email|···tail" — parseamos para persistir en modelo
+  const sepIdx = key.indexOf('|');
+  if (sepIdx > 0) {
+    const email = key.slice(0, sepIdx);
+    const tail = key.slice(sepIdx + 1).replace('···', '');
+    const card = _mm.cards.get(tail);
+    const acc = _mm.accounts.get(email);
+    if (card) card.currentPhase = text;
+    if (acc) acc.currentPhase = text;
+  }
+  // DOM update directo (sin forzar _mmRender) — más rápido y suave
+  const rows = document.querySelectorAll(`[data-pair-key="${key}"]`);
   rows.forEach(row => {
     const phaseEl = row.querySelector('.mm-pair-phase');
     if (phaseEl) phaseEl.textContent = text;
@@ -3715,8 +3732,8 @@ function handleMmEvent(ev) {
       const tail = ev.tail.replace('···', '');
       const card = _mm.cards.get(tail);
       const acc = _mm.accounts.get(ev.email);
-      if (card) { card.status = 'matched'; card.matchedEmail = ev.email; card.busyEmail = null; }
-      if (acc) { acc.status = 'done'; acc.matchedTail = tail; acc.matchedPipe = ev.pipe; acc.busyTail = null; }
+      if (card) { card.status = 'matched'; card.matchedEmail = ev.email; card.busyEmail = null; card.currentPhase = ''; }
+      if (acc) { acc.status = 'done'; acc.matchedTail = tail; acc.matchedPipe = ev.pipe; acc.busyTail = null; acc.currentPhase = ''; }
       _mmRender();
       _mmFeedAdd('mm-match',
         `✓ <b class="mono">${esc(ev.tail)}</b> ↔ <b>${esc(ev.email)}</b> · $${ev.amount.toFixed(2)} <span class="dim mono">${ev.duration_ms}ms</span>`);
@@ -3726,9 +3743,16 @@ function handleMmEvent(ev) {
     case 'done': {
       _mmFeedAdd('mm-done',
         `<b>Listo</b> · ${ev.matches} match${ev.matches !== 1 ? 'es' : ''} · ${ev.attempts} intentos${ev.pending ? ` · ${ev.pending} sin emparejar` : ''}`);
-      // Limpia estados busy → idle al final
-      for (const c of _mm.cards.values()) if (c.status === 'busy') c.status = 'idle';
-      for (const a of _mm.accounts.values()) if (a.status === 'busy' || a.status === 'cooldown') a.status = a.fails >= 2 ? 'dead' : 'idle';
+      // Limpia estados busy → idle al final + limpia currentPhase para no
+      // mostrar texto stale si se re-usa el panel para otra ronda
+      for (const c of _mm.cards.values()) {
+        if (c.status === 'busy') c.status = 'idle';
+        c.currentPhase = '';
+      }
+      for (const a of _mm.accounts.values()) {
+        if (a.status === 'busy' || a.status === 'cooldown') a.status = a.fails >= 2 ? 'dead' : 'idle';
+        a.currentPhase = '';
+      }
       _mmRender();
       // Si hubo matches, ofrecer programar los siguientes depósitos
       if (_mm.matches > 0) _renderPostMatchOffer();
@@ -3739,11 +3763,12 @@ function handleMmEvent(ev) {
       const tail = ev.tail.replace('···', '');
       const card = _mm.cards.get(tail);
       const acc = _mm.accounts.get(ev.email);
-      if (card) { card.fails = ev.card_fails ?? card.fails; card.status = 'idle'; card.lastCode = ev.code; card.busyEmail = null; }
+      if (card) { card.fails = ev.card_fails ?? card.fails; card.status = 'idle'; card.lastCode = ev.code; card.busyEmail = null; card.currentPhase = ''; }
       if (acc)  {
         acc.fails = ev.acct_fails ?? acc.fails;
         acc.lastCode = ev.code;
         acc.busyTail = null;
+        acc.currentPhase = '';
         if (ev.acct_fails >= 2) { acc.status = 'dead'; acc.deadCode = ev.code; }
         else { acc.status = 'cooldown'; }
       }
@@ -3765,17 +3790,32 @@ function handleMmEvent(ev) {
 
     case 'account_dead': {
       const acc = _mm.accounts.get(ev.email);
-      if (acc) { acc.status = 'dead'; acc.deadCode = ev.code; acc.lastCode = ev.code; acc.busyTail = null; }
+      if (acc) { acc.status = 'dead'; acc.deadCode = ev.code; acc.lastCode = ev.code; acc.busyTail = null; acc.currentPhase = ''; }
       // Tarjeta queda 'idle' (la cuenta murió, no la tarjeta) — limpia su busyEmail
       if (ev.tail) {
         const tail = ev.tail.replace('···', '');
         const card = _mm.cards.get(tail);
-        if (card && card.status === 'busy') { card.status = 'idle'; card.busyEmail = null; }
+        if (card && card.status === 'busy') { card.status = 'idle'; card.busyEmail = null; card.currentPhase = ''; }
       }
       _mmRender();
       const persisted = ev.persisted ? ' <span class="mm-persisted">guardada</span>' : '';
       _mmFeedAdd('mm-dead',
         `💀 <b>${esc(ev.email)}</b> · <b>${esc(_mmLabel(ev.code))}</b> <span class="dim mono">${esc(ev.code)}</span>${persisted}`);
+      break;
+    }
+
+    case 'velocity_skip': {
+      // Backend marcó VELOCITY_SKIP — la tarjeta no se consumió pero el par
+      // (email, tail) ya pasó por el 'trying' que dejó ambos en busy. Sin
+      // este handler, ambos rows quedan con spinner permanente.
+      const tail = (ev.tail || '').replace('···', '');
+      const card = _mm.cards.get(tail);
+      const acc = _mm.accounts.get(ev.email);
+      if (card) { card.status = 'idle'; card.busyEmail = null; card.currentPhase = ''; }
+      if (acc)  { acc.status = 'idle'; acc.busyTail = null; acc.currentPhase = ''; }
+      _mmRender();
+      _mmFeedAdd('mm-cooldown',
+        `⏳ <span class="mono">${esc(ev.tail || '')}</span> → ${esc(ev.email || '')} velocity skip · ${ev.wait_sec || 0}s`);
       break;
     }
 
