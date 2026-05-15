@@ -656,7 +656,7 @@ async def deposit_execute_stream(request: Request, user: dict = Depends(require_
       - `{type:'start', attempt_id, email, amount}`
       - `{type:'phase', name, data}` — uno por fase (ver _run_deposit_with_phases)
       - `{type:'done', attempt_id, success, result_code, error, duration_ms}`
-      - `{type:'fatal', error}` — solo si el generator explota
+      - `{type:'fatal', attempt_id, error}` — solo si el generator explota
     """
     _run_deposit, make_pool = _load_deps()
     if _run_deposit is None or make_pool is None:
@@ -772,16 +772,10 @@ async def deposit_execute_stream(request: Request, user: dict = Depends(require_
 
             duration_ms = int((time.time() - t_start) * 1000)
             success = bool(result.get("success"))
-            status = "approved" if success else "rejected"
-            reason = result.get("error") or result.get("result_code")
-
-            # Persistir en feed/BD igual que /execute (broadcast SSE al bus global)
-            _record_attempt(
-                attempt_id, email, amount, status, reason,
-                duration_ms, operator_id, card_pipe=card_pipe,
-            )
 
             # Evento final del stream (cierre lógico para el cliente SSE)
+            # _record_attempt vive en finally para garantizar persistencia incluso si el cliente
+            # se desconecta antes de recibir el 'done' (FastAPI cierra el async gen mid-stream).
             yield "data: " + json.dumps({
                 "type": "done",
                 "attempt_id": attempt_id,
@@ -793,18 +787,45 @@ async def deposit_execute_stream(request: Request, user: dict = Depends(require_
 
         except Exception as e:
             logger.error(f"[execute-stream] generator error: {e}")
-            yield f"data: {json.dumps({'type':'fatal','error':str(e)[:300]})}\n\n"
+            yield f"data: {json.dumps({'type':'fatal','attempt_id':attempt_id,'error':str(e)[:300]})}\n\n"
         finally:
+            # Cancelar deposit_task primero si sigue corriendo — log de warning para
+            # rastrear casos donde submit_card pudo haber aprobado pero perdimos visibilidad.
+            if deposit_task is not None and not deposit_task.done():
+                logger.warning(
+                    f"[execute-stream] {email} deposit_task cancelled mid-flight — outcome may be unknown"
+                )
+                deposit_task.cancel()
+                try:
+                    await deposit_task
+                except (asyncio.CancelledError, Exception):
+                    pass
+            # Si no capturamos result en el try (early disconnect antes del await), intenta
+            # rescatarlo de la task ya terminada para no perder la entrada del activity feed.
+            if not result and deposit_task is not None and deposit_task.done():
+                try:
+                    result = deposit_task.result() or {}
+                except Exception:
+                    result = {}
+            # Persistir en feed/BD (broadcast SSE al bus global). Se ejecuta SIEMPRE que tengamos
+            # data — incluso si el cliente se desconectó antes del 'done'. Envuelto en try/except
+            # para que un fallo de broadcast no rompa la limpieza del pool.
+            if result:
+                try:
+                    duration_ms_final = int((time.time() - t_start) * 1000)
+                    success_final = bool(result.get("success"))
+                    status_final = "approved" if success_final else "rejected"
+                    reason_final = result.get("error") or result.get("result_code")
+                    _record_attempt(
+                        attempt_id, email, amount, status_final, reason_final,
+                        duration_ms_final, operator_id, card_pipe=card_pipe,
+                    )
+                except Exception as e:
+                    logger.error(f"[execute-stream] _record_attempt error: {e}")
             if prefetch_task is not None and not prefetch_task.done():
                 prefetch_task.cancel()
                 try:
                     await prefetch_task
-                except (asyncio.CancelledError, Exception):
-                    pass
-            if deposit_task is not None and not deposit_task.done():
-                deposit_task.cancel()
-                try:
-                    await deposit_task
                 except (asyncio.CancelledError, Exception):
                     pass
             if pool is not None:
