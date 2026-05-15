@@ -720,8 +720,35 @@ function actionLabel(kind) {
   if (kind === 'lock') return '🔒 Lock';
   if (kind === 'unlock') return '🔓 Unlock';
   if (kind === 'note') return '📝 Nota';
+  if (kind === 'scheduled') return '⏱️ Scheduled';
+  if (kind === 'scheduled_phase') return '⏳ Fase';
+  if (kind === 'scheduled_aborted') return '⏱️ Abortado';
+  if (kind === 'scheduled_cancelled') return '⏱️ Cancelado';
   if (kind?.startsWith('prewarm_')) return '· login bg';  // auditoría interna, sin ruido
   return kind;
+}
+
+// Labels y formato para fases del scheduled (Task 5 deposit-live-progress).
+// Compactos, monoespaciados, con emoji de la fase y check/cross del resultado.
+function _schedPhaseLabel(name, data) {
+  data = data || {};
+  const ms = data.duration_ms ? ` <span class="dim">(${data.duration_ms}ms)</span>` : '';
+  switch (name) {
+    case 'login_start':         return '🔑 Login…';
+    case 'login_done':          return (data.ok ? '🔑 ✓' : '🔑 ✗') + ms + (data.from_cache ? ' <span class="dim">cache</span>' : '');
+    case 'gateway_begin':       return '📝 Orden…';
+    case 'gateway_begin_done':  return (data.ok ? '📝 ✓' : '📝 ✗') + ms + (data.order_id ? ` <span class="dim mono">${esc(String(data.order_id).slice(0, 12))}</span>` : '');
+    case 'gateway_submit':      return '💳 Tarjeta…';
+    case 'gateway_submit_done': {
+      const code = data.result_code || '';
+      const tag = data.is_3ds ? '💳 3DS' : (code === 'BANK_APPROVED' ? '💳 ✓' : '💳 ✗');
+      return tag + ms + (code ? ` <span class="dim mono">${esc(code)}</span>` : '');
+    }
+    case 'gateway_check':       return '✓ Verificando…';
+    case 'gateway_check_done':  return (data.check_error ? '✓ ✗' : '✓ ✓') + ms;
+    case 'done':                return data.success ? '✓ Aprobado' : '✗ Rechazado';
+    default:                    return esc(name);
+  }
 }
 function statusPill(e) {
   if (e.kind === 'deposit') {
@@ -733,6 +760,22 @@ function statusPill(e) {
   if (e.kind === 'lock') return `<span class="dim">activo</span>`;
   if (e.kind === 'unlock') return `<span class="dim">liberado</span>`;
   if (e.kind === 'note') return `<span class="dim mono" title="${esc(e.text || '')}">${esc((e.text || '').slice(0, 60))}</span>`;
+  if (e.kind === 'scheduled') {
+    const ok = !!e.success;
+    const col = ok ? 'var(--accent)' : 'var(--danger)';
+    const iter = (e.iter != null && e.total != null) ? `<span class="dim mono">${e.iter}/${e.total}</span> ` : '';
+    return `${iter}<span style="color:${col}">${ok ? 'aprobado' : 'rechazado'}</span>${e.code ? `<span class="dim mono"> · ${esc(e.code)}</span>` : ''}`;
+  }
+  if (e.kind === 'scheduled_phase') {
+    const iter = (e.iter != null && e.total != null) ? `<span class="dim mono">${e.iter}/${e.total}</span> ` : '';
+    const sid = e.sched_id ? `<span class="dim mono"> · ${esc(String(e.sched_id).slice(0, 6))}</span>` : '';
+    return `${iter}${_schedPhaseLabel(e.name, e.data)}${sid}`;
+  }
+  if (e.kind === 'scheduled_aborted') {
+    const iter = (e.iter != null && e.total != null) ? `<span class="dim mono">${e.iter}/${e.total}</span> ` : '';
+    return `${iter}<span style="color:var(--danger)">abortado</span>${e.code ? `<span class="dim mono"> · ${esc(e.code)}</span>` : ''}`;
+  }
+  if (e.kind === 'scheduled_cancelled') return `<span class="dim">cancelado</span>`;
   return '';
 }
 function _actEventKey(e) {
@@ -899,7 +942,14 @@ function pushActivityEvent(ev) {
     kind: ev.kind, ts: ev.ts, who: ev.who, who_color: ev.who_color,
     target: ev.target, amount: ev.amount, status: ev.status,
     reason: ev.reason, duration_ms: ev.duration_ms, id: ev.id, text: ev.text,
+    // Campos para scheduled / scheduled_phase / scheduled_aborted / scheduled_cancelled
+    sched_id: ev.sched_id, iter: ev.iter, total: ev.total,
+    code: ev.code, success: ev.success,
+    name: ev.name, data: ev.data, email: ev.email,
   };
+  // Si el evento trae 'email' (scheduled*) pero no 'target', usar email como target
+  // para que la columna "Cuenta" del feed muestre el combo y filtros por target funcionen.
+  if (!row.target && row.email) row.target = row.email;
   activityRows.unshift(row);
   if (activityRows.length > 500) activityRows.length = 500;
   // Marca como "nuevo" para animación highlight si la fila aparece en pantalla

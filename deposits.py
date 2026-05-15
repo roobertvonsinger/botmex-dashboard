@@ -1253,14 +1253,33 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
         asyncio.create_task(pool.prefetch(1))
         try:
             for i in range(repetitions):
+                iter_num = i + 1
+
+                # phase_cb por iter: emite scheduled_phase a SSE para visibilidad
+                # live. _it captura iter_num por default-arg para evitar late-bind.
+                async def phase_cb(name, payload, _it=iter_num):
+                    try:
+                        _broadcast({
+                            "type": "activity", "kind": "scheduled_phase",
+                            "sched_id": sched_id,
+                            "iter": _it, "total": repetitions,
+                            "name": name, "data": payload or {},
+                            "email": email,
+                            "ts": datetime.now(timezone.utc).isoformat(),
+                            "who": operator_id,
+                        })
+                    except Exception as e:
+                        logger.warning(f"[Scheduled {sched_id}] phase broadcast failed: {e}")
+
                 t0 = time.time()
                 try:
-                    r = await _run_deposit(
+                    r = await _run_deposit_with_phases(
                         email=email, password=password,
                         cc_num=cc_num, cc_exp=cc_exp, cc_cvv=cc_cvv,
                         amount=amount,
                         user={"telegram_id": operator_id, "username": user.get("username", "")},
-                        pool=pool, save_card=True, check_marriage=False,
+                        pool=pool,
+                        phase_cb=phase_cb,
                     )
                 except Exception as e:
                     logger.error(f"[Scheduled {sched_id}] {email}: {e}")

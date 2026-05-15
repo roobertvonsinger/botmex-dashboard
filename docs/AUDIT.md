@@ -50,6 +50,7 @@
 | Multi/matchmaker SSE | ✅ N cuentas × M tarjetas, pairing greedy, cooldown | ✅ | ✅ |
 | Cancelar matchmaker run | ✅ POST `/multi/{id}/cancel` | ✅ | ✅ |
 | Scheduled N reps cada 1 min | ✅ aborta al primer fail | ✅ | ✅ |
+| **Scheduled con fases en vivo** | ✅ `scheduled_create.loop()` usa `_run_deposit_with_phases` con `phase_cb` que emite `kind:scheduled_phase` por sub-fase (login/begin/submit/check/done). Feed renderiza con `_schedPhaseLabel()`. Eventos summary `scheduled`/`scheduled_aborted`/`scheduled_cancelled` siguen igual | ✅ 2026-05-15 — Task 5 deposit-live-progress | ✅ |
 | Modal scheduled NO se cierra solo | ✅ usuario decide cuándo cerrar | ✅ (desde 2026-05-11) | ✅ |
 | Listar schedules activos | ✅ GET `/scheduled/list` | ✅ | ✅ |
 | Cancelar schedule | ✅ POST `/scheduled/{id}/cancel` | ✅ | ✅ |

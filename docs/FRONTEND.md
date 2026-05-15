@@ -163,7 +163,8 @@ Ver `docs/SSE_EVENTS.md` para tabla maestra de `kind` y su handler.
 | `fmtAbs(ts)` | Hora absoluta `HH:MM` | (helper) |
 | `fmtAgo(ts)` | Relativa `5min` `2h` | (helper) |
 | `pushNotif({icon,msg})` | Agrega al bell | app.js:887 |
-| `pushActivityEvent(ev)` | Inserta en feed con animación | app.js:872 |
+| `pushActivityEvent(ev)` | Inserta en feed con animación. Soporta scheduled/scheduled_phase/scheduled_aborted/scheduled_cancelled (mapea email→target) | app.js |
+| `_schedPhaseLabel(name, data)` | Formatea fase del scheduled (login/begin/submit/check/done) con emoji + ✓/✗ + duración_ms | app.js |
 | `computeCurp(name, bdate, addr)` | Calcula CURP estimado (4 letras + fecha + sex + estado + verifier) | app.js:277 |
 | `_splitFullname(s)` | Separa nombre/apellidos para CURP | app.js:160 |
 

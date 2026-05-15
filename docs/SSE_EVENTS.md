@@ -8,7 +8,8 @@
 | `type` | `kind` | Disparado por | Payload | Handler frontend |
 |---|---|---|---|---|
 | `activity` | `deposit` | `_record_attempt()` en `deposits.py` | `{ts, who, target, amount, status, reason, duration_ms, card_pipe}` | `pushActivityEvent()` → `renderActivity()` |
-| `activity` | `scheduled` | `scheduled_create.loop()` en `deposits.py:626` | `{sched_id, iter, total, email, amount, success, code, ts, who}` | `pushActivityEvent()` |
+| `activity` | `scheduled` | `scheduled_create.loop()` en `deposits.py` (summary por iter) | `{sched_id, iter, total, email, amount, success, code, ts, who}` | `pushActivityEvent()` |
+| `activity` | `scheduled_phase` | `scheduled_create.loop()` via `phase_cb` → `_run_deposit_with_phases` (1 por sub-fase) | `{sched_id, iter, total, name, data, email, ts, who}`. `name` ∈ {login_start, login_done, gateway_begin, gateway_begin_done, gateway_submit, gateway_submit_done, gateway_check, gateway_check_done, done}. `data` igual al de execute-stream. | `pushActivityEvent()` (`_schedPhaseLabel()` formatea) |
 | `activity` | `scheduled_aborted` | `scheduled_create.loop()` (al primer fail) | `{sched_id, email, code, iter, total, ts}` | `pushActivityEvent()` (chip "abortado") |
 | `activity` | `scheduled_cancelled` | Cancel manual | `{sched_id, email, ts}` | `pushActivityEvent()` |
 | `activity` | `lock` | `lock_account()` en `app.py` | `{ts, who, target, until}` | `pushActivityEvent()` |
