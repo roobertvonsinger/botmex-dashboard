@@ -180,6 +180,73 @@ def _parse_pipe(pipe: str) -> tuple[str, str, str]:
     raise ValueError("Formato pipe inválido. Usa: numero|MMYY|CVV")
 
 
+# ── Velocity check: misma tarjeta en cuentas distintas → bloqueo de pasarela ──
+# Regla operativa (Robert 2026-05-15):
+#   - Las primeras 2 cuentas distintas con la misma tarjeta APROBADAS NO tienen
+#     cooldown (el matchmaker hace pares rápidos a propósito).
+#   - A partir del 3er APROBADO, cooldown mínimo de 1 minuto desde el último
+#     APROBADO en cuenta distinta. Esto evita el patrón "1 tarjeta en muchas
+#     cuentas en segundos" que la pasarela detecta como fraude.
+#   - SOLO cuentan los aprobados (status='approved'). Los rechazos no
+#     ensucian la tarjeta para la pasarela en cuanto a velocity; ya están
+#     cubiertos por otras señales del propio gateway.
+#   - La ventana de "memoria" es de 30 min — pasado ese tiempo, la tarjeta
+#     vuelve a ser "fresca" y se reinicia el contador.
+CARD_VELOCITY_MEMORY_MIN = 30      # ventana donde contamos aprobados distintos
+CARD_VELOCITY_FREE_PAIR = 2        # primeros N aprobados en cuentas distintas sin cooldown
+CARD_VELOCITY_COOLDOWN_SEC = 60    # cooldown a partir del N+1 aprobado
+
+
+def _check_card_velocity(card_pipe: str, account_email: str) -> Optional[dict]:
+    """None = OK proceder. dict = bloquear.
+    Cuenta APROBADOS con esta card_pipe en cuentas distintas en últimos 30min.
+    Si ya hay 2+ aprobados distintos y el último fue hace <60s → bloquea."""
+    if not card_pipe or not account_email:
+        return None
+    from app import db
+    try:
+        with db() as c:
+            rows = c.execute(
+                "SELECT account_email, created_at, "
+                "(strftime('%s','now') - strftime('%s', created_at)) AS age_sec "
+                "FROM deposit_attempts "
+                "WHERE card_pipe=? AND account_email != ? "
+                "AND status='approved' "
+                "AND created_at > datetime('now', ?) "
+                "ORDER BY created_at DESC LIMIT 20",
+                (card_pipe, account_email, f"-{CARD_VELOCITY_MEMORY_MIN} minutes"),
+            ).fetchall()
+    except Exception:
+        return None
+    if not rows:
+        return None
+    others = sorted({r["account_email"] for r in rows})
+    distinct_count = len(others)
+    last_age_sec = int(rows[0]["age_sec"] or 0)
+    # Primeras N cuentas libres (esta cuenta sería la #distinct_count+1)
+    if distinct_count < CARD_VELOCITY_FREE_PAIR:
+        return None
+    # Ya hay 2+ cuentas distintas → exigir cooldown
+    if last_age_sec >= CARD_VELOCITY_COOLDOWN_SEC:
+        return None
+    wait_sec = CARD_VELOCITY_COOLDOWN_SEC - last_age_sec
+    return {
+        "blocked": True,
+        "reason": "CARD_VELOCITY",
+        "message": (f"Tarjeta ya usada en {distinct_count} cuenta(s) distinta(s). "
+                    f"Espera {wait_sec}s para enfriar antes de probar otra "
+                    f"(política: primeras {CARD_VELOCITY_FREE_PAIR} libres, después "
+                    f"{CARD_VELOCITY_COOLDOWN_SEC}s entre cuentas)."),
+        "other_accounts": others,
+        "distinct_count": distinct_count,
+        "last_seen": rows[0]["created_at"],
+        "last_age_sec": last_age_sec,
+        "wait_sec": wait_sec,
+        "free_pair": CARD_VELOCITY_FREE_PAIR,
+        "cooldown_sec": CARD_VELOCITY_COOLDOWN_SEC,
+    }
+
+
 def _record_attempt(
     attempt_id: str,
     email: str,
@@ -213,6 +280,238 @@ def _record_attempt(
         })
     except Exception:
         pass
+
+
+# ── Wrapper con visibilidad de fases ─────────────────────────────────────────
+# Orquesta el depósito llamando funciones bajas del bot (get_jwt, begin_deposit,
+# submit_card, check_transaction) directamente y emite eventos entre cada paso.
+# NO escribe en BD, NO quema tarjetas — eso lo hace _run_deposit del bot. Este
+# wrapper es solo para visibilidad live (stepper UI). El caller persiste el
+# resultado vía _record_attempt + db.log_attempt.
+
+async def _safe_phase(cb, name: str, payload: dict) -> None:
+    """Llama phase_cb tragándose excepciones. Si cb es None, no-op."""
+    if cb is None:
+        return
+    try:
+        await cb(name, payload)
+    except Exception as e:
+        logger.warning(f"[Deposits] phase_cb error en '{name}': {e}")
+
+
+def _build_admin_proxy_url() -> Optional[str]:
+    """Construye URL de proxy admin (http://user:pass@server) para httpx.
+    Mirror de _build_proxy_url en prewarm.py."""
+    try:
+        from betmexico_config import get_admin_proxy
+    except Exception:
+        return None
+    try:
+        p = get_admin_proxy()
+        if not p:
+            return None
+        srv = p.get("server", "")
+        u = p.get("username", "")
+        pw = p.get("password", "")
+        if u and pw:
+            return f"http://{u}:{pw}@{srv}"
+        return f"http://{srv}"
+    except Exception:
+        return None
+
+
+async def _run_deposit_with_phases(
+    email: str,
+    password: str,
+    cc_num: str,
+    cc_exp: str,
+    cc_cvv: str,
+    amount: float,
+    user: dict,
+    pool,
+    phase_cb,  # Callable[[str, dict], Awaitable[None]] | None
+    proxy: Optional[str] = None,
+) -> dict:
+    """Orquesta deposit emitiendo fases. Mismo shape que _run_deposit.
+
+    NO escribe en BD. NO quema tarjetas. NO maneja marriage.
+    Solo visibilidad — caller persiste resultado.
+
+    Returns:
+      {"success": bool, "result_code": str, "error": str|None, "duration_ms": int}
+    """
+    import httpx
+    try:
+        from betmexico_login_service import get_jwt as _get_jwt
+        from betmexico_deposit import (
+            begin_deposit as _begin_deposit,
+            submit_card as _submit_card,
+            check_transaction as _check_transaction,
+        )
+    except ImportError as e:
+        # Bot deps no cargados — devolver error sin crashear
+        await _safe_phase(phase_cb, "done", {
+            "success": False, "result_code": "DEPS_MISSING", "error": str(e)
+        })
+        return {"success": False, "result_code": "DEPS_MISSING",
+                "error": f"Bot deps no disponibles: {e}", "duration_ms": 0}
+
+    t_total = time.time()
+    proxy_url = proxy or _build_admin_proxy_url()
+
+    # ── PASO 1: Login ─────────────────────────────────────────────────────
+    await _safe_phase(phase_cb, "login_start", {})
+    t0 = time.time()
+    jwt = None
+    login_result: dict = {}
+    try:
+        jwt, login_result = await _get_jwt(
+            email, password, pool, proxy=proxy_url, use_cache=False
+        )
+    except Exception as e:
+        logger.error(f"[Deposits/phases] get_jwt {email}: {e}")
+        login_result = {"status": "ERROR", "error": str(e)}
+    login_ms = int((time.time() - t0) * 1000)
+    from_cache = bool(
+        isinstance(login_result, dict) and login_result.get("from_cache")
+    )
+
+    if not jwt:
+        await _safe_phase(phase_cb, "login_done", {
+            "ok": False, "duration_ms": login_ms, "from_cache": from_cache,
+        })
+        err = None
+        if isinstance(login_result, dict):
+            err = login_result.get("error") or login_result.get("status")
+        err = err or "Login falló"
+        await _safe_phase(phase_cb, "done", {
+            "success": False, "result_code": "LOGIN_FAILED", "error": err,
+        })
+        return {
+            "success": False, "result_code": "LOGIN_FAILED",
+            "error": err, "duration_ms": int((time.time() - t_total) * 1000),
+        }
+
+    await _safe_phase(phase_cb, "login_done", {
+        "ok": True, "duration_ms": login_ms, "from_cache": from_cache,
+    })
+
+    # ── HTTPX client compartido para pasos 2/3/4 ──────────────────────────
+    client_kwargs = {"timeout": 30.0, "verify": False}
+    if proxy_url:
+        client_kwargs["proxy"] = proxy_url
+
+    async with httpx.AsyncClient(**client_kwargs) as client:
+        # ── PASO 2: begin_deposit ────────────────────────────────────────
+        await _safe_phase(phase_cb, "gateway_begin", {})
+        t0 = time.time()
+        try:
+            step1 = await _begin_deposit(client, jwt, amount)
+        except Exception as e:
+            logger.error(f"[Deposits/phases] begin_deposit {email}: {e}")
+            step1 = {"error": str(e)}
+        begin_ms = int((time.time() - t0) * 1000)
+
+        if "error" in step1:
+            await _safe_phase(phase_cb, "gateway_begin_done", {
+                "order_id": None, "ok": False, "duration_ms": begin_ms,
+            })
+            err = step1.get("error") or "begin_deposit falló"
+            await _safe_phase(phase_cb, "done", {
+                "success": False, "result_code": "BEGIN_ERROR", "error": err,
+            })
+            return {
+                "success": False, "result_code": "BEGIN_ERROR",
+                "error": err, "duration_ms": int((time.time() - t_total) * 1000),
+            }
+
+        order_id = step1.get("orderId", "")
+        txn_id = step1.get("transactionId", "")
+        await _safe_phase(phase_cb, "gateway_begin_done", {
+            "order_id": order_id, "ok": True, "duration_ms": begin_ms,
+        })
+
+        # ── PASO 3: submit_card ──────────────────────────────────────────
+        await _safe_phase(phase_cb, "gateway_submit", {"order_id": order_id})
+        t0 = time.time()
+        try:
+            step2 = await _submit_card(client, cc_num, cc_exp, cc_cvv, order_id)
+        except Exception as e:
+            logger.error(f"[Deposits/phases] submit_card {email}: {e}")
+            step2 = {"error": str(e)}
+        submit_ms = int((time.time() - t0) * 1000)
+
+        if "error" in step2:
+            await _safe_phase(phase_cb, "gateway_submit_done", {
+                "result_code": "ERROR", "is_3ds": False, "duration_ms": submit_ms,
+            })
+            err = step2.get("error") or "submit_card falló"
+            await _safe_phase(phase_cb, "done", {
+                "success": False, "result_code": "SUBMIT_ERROR", "error": err,
+            })
+            return {
+                "success": False, "result_code": "SUBMIT_ERROR",
+                "error": err, "duration_ms": int((time.time() - t_total) * 1000),
+            }
+
+        result_code = step2.get("resultCode", "UNKNOWN")
+        payload = step2.get("payload", {}) or {}
+        is_3ds = bool(payload.get("threeDs", False))
+
+        await _safe_phase(phase_cb, "gateway_submit_done", {
+            "result_code": result_code, "is_3ds": is_3ds,
+            "duration_ms": submit_ms,
+        })
+
+        # ── 3DS detectado: NO llamar check_transaction ───────────────────
+        if is_3ds:
+            await _safe_phase(phase_cb, "done", {
+                "success": False, "result_code": "3DS_REQUIRED",
+                "error": "3DS_REQUIRED — Tarjeta requiere autenticación",
+            })
+            return {
+                "success": False, "result_code": "3DS_REQUIRED",
+                "error": "3DS_REQUIRED — Tarjeta requiere autenticación",
+                "duration_ms": int((time.time() - t_total) * 1000),
+            }
+
+        # ── PASO 4: check_transaction ────────────────────────────────────
+        await _safe_phase(phase_cb, "gateway_check", {})
+        t0 = time.time()
+        try:
+            step3 = await _check_transaction(client, jwt, txn_id)
+        except Exception as e:
+            logger.error(f"[Deposits/phases] check_transaction {email}: {e}")
+            step3 = {"error": str(e)}
+        check_ms = int((time.time() - t0) * 1000)
+        txn_status = (step3.get("transactionStatus", 0)
+                      if "error" not in step3 else 0)
+
+        await _safe_phase(phase_cb, "gateway_check_done", {
+            "txn_status": txn_status, "duration_ms": check_ms,
+        })
+
+    # ── Resultado final ──────────────────────────────────────────────────
+    approved = (result_code == "BANK_APPROVED")
+    error_msg = None
+    if not approved:
+        decline = (payload.get("message")
+                   or payload.get("statusDescription")
+                   or "decline genérico")
+        error_msg = f"{result_code} — {decline}"
+
+    await _safe_phase(phase_cb, "done", {
+        "success": approved, "result_code": result_code, "error": error_msg,
+    })
+
+    return {
+        "success": approved,
+        "result_code": result_code,
+        "error": error_msg,
+        "duration_ms": int((time.time() - t_total) * 1000),
+        "txn_id": txn_id,
+        "order_id": order_id,
+    }
 
 
 @router.post("/execute")
@@ -259,6 +558,14 @@ async def deposit_execute(request: Request, user: dict = Depends(require_session
     cap_err = _check_caps(email, amount)
     if cap_err:
         raise HTTPException(400, cap_err)
+
+    # Velocity check (saltarse con force=true, solo SA)
+    force = bool(body.get("force"))
+    is_sa = (user.get("role") == "superadmin")
+    if not (force and is_sa):
+        vel = _check_card_velocity(card_pipe, email)
+        if vel:
+            raise HTTPException(409, {"detail": vel["message"], "velocity": vel})
 
     # Auto-lock: la cuenta queda lockeada para el operador. Otros operadores
     # NO la verán hasta que se libere (manual o expiración). Falla 409 si está
@@ -442,6 +749,14 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
             nonlocal attempts
             email = acc["email"]
             t0 = time.time()
+            # Velocity check pre-gateway — primeras 2 cuentas libres, después
+            # cooldown 60s. NO penaliza fail_count: solo skip y sigue.
+            vel = _check_card_velocity(card.get("pipe"), email)
+            if vel:
+                logger.info(f"[Matchmaker] velocity skip {email}/{card['tail']}: "
+                            f"wait {vel['wait_sec']}s ({vel['distinct_count']} cuentas previas)")
+                return {"success": False, "result_code": "VELOCITY_SKIP",
+                        "skip": True, "velocity": vel}, int((time.time() - t0) * 1000)
             try:
                 r = await _run_deposit(
                     email=email, password=acc["password"],
@@ -536,16 +851,24 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                 results = await asyncio.gather(*tasks, return_exceptions=True)
 
                 for (acc, card, n), res in zip(batch, results):
-                    tried.add((card["num"], acc["id"]))
-                    now2 = asyncio.get_event_loop().time()
-                    card["last_used"] = now2
-                    acc["last_used"] = now2
-
                     if isinstance(res, Exception):
                         yield f"data: {json.dumps({'type':'error','email':acc['email'],'tail':card['tail'],'message':str(res)[:200]})}\n\n"
                         continue
                     r, duration = res
                     code = r.get("result_code", "UNKNOWN")
+                    # Velocity skip — NO marca tried, NO incrementa fail_count,
+                    # NO actualiza last_used (la tarjeta no se "consumió"). El
+                    # siguiente loop la considera con cooldown 60s aplicado por
+                    # _check_card_velocity automáticamente.
+                    if code == "VELOCITY_SKIP":
+                        vel = r.get("velocity", {})
+                        yield f"data: {json.dumps({'type':'velocity_skip','email':acc['email'],'tail':card['tail'],'wait_sec':vel.get('wait_sec'),'distinct_count':vel.get('distinct_count'),'message':vel.get('message','')})}\n\n"
+                        continue
+                    # Sí se hizo intento real → marca tried + last_used
+                    tried.add((card["num"], acc["id"]))
+                    now2 = asyncio.get_event_loop().time()
+                    card["last_used"] = now2
+                    acc["last_used"] = now2
                     ok = bool(r.get("success"))
 
                     if ok:
@@ -654,6 +977,15 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
     email = row["email"]
     password = row["password"]
     cap_key = os.environ.get("CAPMONSTER_KEY", "") or os.environ.get("BMX_CAPMONSTER_KEY", "")
+
+    # Velocity check al crear el schedule (no en cada iter — misma cuenta+tarjeta
+    # no dispara velocity, solo si la tarjeta se usó en OTRA cuenta hace <60s).
+    force = bool(body.get("force"))
+    is_sa = (user.get("role") == "superadmin")
+    if not (force and is_sa):
+        vel = _check_card_velocity(card_pipe, email)
+        if vel:
+            raise HTTPException(409, {"detail": vel["message"], "velocity": vel})
 
     # Auto-lock: durante todo el schedule (N reps × 1min + buffer) la cuenta es
     # del operador. Si está lockeada por otro y NO soy SA, 409.
