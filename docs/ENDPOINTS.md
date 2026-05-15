@@ -115,13 +115,14 @@
 
 | Método | Path | Función | Auth | Body / Query | Respuesta | File:line |
 |---|---|---|---|---|---|---|
-| POST | `/api/deposits/execute` | Single deposit (1 cuenta, 1 tarjeta) | require_session | `{account_id, card_pipe, amount}` | `{success, result_code, error, duration_ms}` | `deposits.py:173` |
-| GET | `/api/deposits/cap-status/{account_id}` | Cap status de una cuenta (window 24h, sesión 10min) | require_session | — | `{caps}` | `deposits.py:277` |
-| POST | `/api/deposits/multi/stream` | Matchmaker N cuentas × M tarjetas (SSE) | require_session | `{account_ids, cards, amount}` | `text/event-stream` | `deposits.py:309` |
-| POST | `/api/deposits/multi/{run_id}/cancel` | Cancelar matchmaker run | require_session | — | `{ok}` | `deposits.py:551` |
-| POST | `/api/deposits/scheduled/create` | Programar N reps a 1 min de intervalo (aborta al primer fail) | require_session | `{account_id, card_pipe, amount, repetitions}` | `{sched_id, email, repetitions}` | `deposits.py:567` |
-| GET | `/api/deposits/scheduled/list` | Listar schedules activos | require_session | — | `{schedules}` | `deposits.py:674` |
-| POST | `/api/deposits/scheduled/{sched_id}/cancel` | Cancelar un schedule | require_session | — | `{ok}` | `deposits.py:693` |
+| POST | `/api/deposits/execute` | Single deposit (1 cuenta, 1 tarjeta) | require_session | `{account_id, card_pipe, amount, force?}` | `{success, result_code, error, duration_ms, attempt_id}` | `deposits.py:531` |
+| POST | `/api/deposits/execute-stream` | Single deposit SSE (live phases: login/begin/submit/check) | require_session | `{account_id, card_pipe, amount, force?}` | `text/event-stream` (`start`/`phase`/`done`/`fatal`) | `deposits.py:648` |
+| GET | `/api/deposits/cap-status/{account_id}` | Cap status de una cuenta (window 24h, sesión 10min) | require_session | — | `{caps}` | `deposits.py:823` |
+| POST | `/api/deposits/multi/stream` | Matchmaker N cuentas × M tarjetas (SSE) | require_session | `{account_ids, cards, amount}` | `text/event-stream` | `deposits.py:855` |
+| POST | `/api/deposits/multi/{run_id}/cancel` | Cancelar matchmaker run | require_session | — | `{ok}` | `deposits.py:1118` |
+| POST | `/api/deposits/scheduled/create` | Programar N reps a 1 min de intervalo (aborta al primer fail) | require_session | `{account_id, card_pipe, amount, repetitions}` | `{sched_id, email, repetitions}` | `deposits.py:1134` |
+| GET | `/api/deposits/scheduled/list` | Listar schedules activos | require_session | — | `{schedules}` | `deposits.py:1254` |
+| POST | `/api/deposits/scheduled/{sched_id}/cancel` | Cancelar un schedule | require_session | — | `{ok}` | `deposits.py:1273` |
 
 ## Tarjetas
 

@@ -42,6 +42,34 @@ Endpoint `/api/deposits/multi/stream` devuelve eventos SSE específicos del run 
 | `cancelled` | `{run_id}` | Cancelado por usuario |
 | `done` | `{matches, attempts, summary}` | Run terminado |
 
+## Tipos de eventos de execute-stream (single deposit live)
+
+Endpoint `/api/deposits/execute-stream` devuelve eventos SSE específicos del intento. NO van por `/api/events` bus (la persistencia final sí se broadcast por ese bus vía `_record_attempt` al cierre).
+
+| `type` | Payload | Significado |
+|---|---|---|
+| `start` | `{attempt_id, email, amount}` | Stream iniciado. `attempt_id` para correlación. |
+| `phase` | `{name, data}` | Fase del depósito. `name` ∈ `login_start, login_done, gateway_begin, gateway_begin_done, gateway_submit, gateway_submit_done, gateway_check, gateway_check_done, done`. |
+| `done` | `{attempt_id, success, result_code, error, duration_ms}` | Cierre lógico — la conexión termina justo después. |
+| `fatal` | `{error}` | Error fatal en el generator (no debería ocurrir; los errores de fases vienen como `phase`/`done`). |
+| `:ping` | (comentario SSE, sin payload) | Heartbeat cada 2s si no hay eventos — mantiene la conexión viva pasando proxies/buffers. |
+
+### Payloads de `phase` (data por fase)
+
+Coinciden 1:1 con lo que emite `_run_deposit_with_phases`:
+
+| `name` | `data` |
+|---|---|
+| `login_start` | `{}` |
+| `login_done` | `{ok: bool, duration_ms: int, from_cache: bool}` |
+| `gateway_begin` | `{}` |
+| `gateway_begin_done` | `{order_id: str|None, ok: bool, duration_ms: int}` |
+| `gateway_submit` | `{order_id: str}` |
+| `gateway_submit_done` | `{result_code: str, is_3ds: bool, duration_ms: int}` |
+| `gateway_check` | `{}` (solo si NO es 3DS) |
+| `gateway_check_done` | `{txn_status: int, duration_ms: int, check_error?: str}` |
+| `done` | `{success: bool, result_code: str, error: str|None}` (también emitido por el wrapper antes del `type:done` del generator) |
+
 ## Tipos de eventos del prewarm
 
 Endpoint `/api/prewarm/select` (SSE):

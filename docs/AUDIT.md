@@ -43,6 +43,7 @@
 | Función | Esperado | Actual | Estado |
 |---|---|---|---|
 | Single deposit (`/execute`) | ✅ 1 cuenta, 1 tarjeta, $1-$499 | ✅ | ✅ |
+| **Single deposit con fases en vivo (`/execute-stream`)** | ✅ SSE emite `start`/`phase`/`done` para stepper UI; mismas validaciones que `/execute` (cap, velocity, auto-lock) | ✅ desde 2026-05-15 — backend listo, frontend pendiente (Task 3) | ⚠️ |
 | Persistir tarjeta al APPROVE | ✅ INSERT en `account_cards` | ✅ (desde fix BETMEX_DB 2026-05-11) | ✅ |
 | Persistir cada intento en `deposit_attempts` | ✅ con `card_pipe`, `status`, `rejection_reason` | ✅ (desde fix 2026-05-11) | ✅ |
 | Loguear card al inicio del deposit | ✅ logger.info | ✅ (desde fix 2026-05-11) | ✅ |

@@ -645,6 +645,181 @@ async def deposit_execute(request: Request, user: dict = Depends(require_session
     }
 
 
+@router.post("/execute-stream")
+async def deposit_execute_stream(request: Request, user: dict = Depends(require_session)):
+    """SSE variant de /execute — emite fases en vivo (login/begin/submit/check).
+
+    Mismas validaciones que /execute (parse, cap, velocity, auto-lock).
+    Body idéntico: `{account_id, card_pipe, amount, force?}`.
+
+    Eventos SSE emitidos:
+      - `{type:'start', attempt_id, email, amount}`
+      - `{type:'phase', name, data}` — uno por fase (ver _run_deposit_with_phases)
+      - `{type:'done', attempt_id, success, result_code, error, duration_ms}`
+      - `{type:'fatal', error}` — solo si el generator explota
+    """
+    _run_deposit, make_pool = _load_deps()
+    if _run_deposit is None or make_pool is None:
+        raise HTTPException(503, "Módulo de depósitos no disponible en este entorno")
+
+    body = await request.json()
+    try:
+        account_id = int(body.get("account_id") or 0)
+        amount = float(body.get("amount") or 0)
+        card_pipe = (body.get("card_pipe") or "").strip()
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Campos inválidos")
+
+    if not account_id or not card_pipe or amount <= 0:
+        raise HTTPException(400, "Faltan campos: account_id, card_pipe, amount")
+
+    if amount < 1 or amount > DEP_MAX_PER_TXN:
+        raise HTTPException(400, f"Monto fuera de rango (1-{DEP_MAX_PER_TXN:.0f})")
+
+    try:
+        cc_num, cc_exp, cc_cvv = _parse_pipe(card_pipe)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    # Lookup cuenta
+    from app import db
+    with db() as c:
+        row = c.execute(
+            "SELECT id, email, password FROM accounts WHERE id=? LIMIT 1",
+            (account_id,),
+        ).fetchone()
+    if not row:
+        raise HTTPException(404, "Cuenta no encontrada")
+
+    email = row["email"]
+    password = row["password"]
+    operator_id = int(user.get("telegram_id") or 0)
+
+    # Cap check
+    cap_err = _check_caps(email, amount)
+    if cap_err:
+        raise HTTPException(400, cap_err)
+
+    # Velocity check (saltarse con force=true, solo SA) — mismo orden que /execute
+    force = bool(body.get("force"))
+    is_sa = (user.get("role") == "superadmin")
+    if not (force and is_sa):
+        vel = _check_card_velocity(card_pipe, email)
+        if vel:
+            raise HTTPException(409, {"detail": vel["message"], "velocity": vel})
+
+    # Auto-lock antes de empezar a streamear
+    _auto_lock_for_deposit(account_id, operator_id, user, hours=AUTOLOCK_HOURS_SINGLE)
+
+    cap_key = os.environ.get("CAPMONSTER_KEY", "") or os.environ.get("BMX_CAPMONSTER_KEY", "")
+    attempt_id = uuid.uuid4().hex
+
+    async def gen():
+        queue: asyncio.Queue = asyncio.Queue()
+
+        async def phase_cb(name: str, payload: dict) -> None:
+            await queue.put({"type": "phase", "name": name, "data": payload})
+
+        pool = None
+        prefetch_task = None
+        deposit_task = None
+        t_start = time.time()
+        result: dict = {}
+
+        try:
+            # Start event con attempt_id para que el frontend correlacione
+            yield f"data: {json.dumps({'type':'start','attempt_id':attempt_id,'email':email,'amount':amount})}\n\n"
+
+            # Arranca pool (mismo patrón que /execute)
+            pool = make_pool(cap_key, size=1, workers=1)
+            await pool.start_factory()
+            prefetch_task = asyncio.create_task(pool.prefetch(1))
+
+            # Lanza deposit en background — emite fases vía phase_cb → queue
+            deposit_task = asyncio.create_task(
+                _run_deposit_with_phases(
+                    email=email, password=password,
+                    cc_num=cc_num, cc_exp=cc_exp, cc_cvv=cc_cvv,
+                    amount=amount,
+                    user={"telegram_id": operator_id, "username": user.get("username", "")},
+                    pool=pool,
+                    phase_cb=phase_cb,
+                )
+            )
+
+            # Drena la queue mientras el deposit corre. Heartbeat cada 2s si idle.
+            while True:
+                ev = None
+                try:
+                    ev = await asyncio.wait_for(queue.get(), timeout=2.0)
+                    yield f"data: {json.dumps(ev)}\n\n"
+                except asyncio.TimeoutError:
+                    # Heartbeat — mantiene la conexión viva tras proxies/buffering
+                    yield f": ping\n\n"
+                    # Si la task terminó Y no hay más eventos pendientes → salir
+                    if deposit_task.done() and queue.empty():
+                        break
+                # Si recibimos 'done' phase, también salimos (la task ya emitió todo)
+                if ev is not None and ev.get("name") == "done":
+                    break
+
+            # Espera el resultado real (el wrapper ya terminó si vimos 'done')
+            try:
+                result = await deposit_task
+            except Exception as e:
+                logger.error(f"[execute-stream] deposit task error: {e}")
+                result = {"success": False, "result_code": "ERROR", "error": str(e)[:300]}
+
+            duration_ms = int((time.time() - t_start) * 1000)
+            success = bool(result.get("success"))
+            status = "approved" if success else "rejected"
+            reason = result.get("error") or result.get("result_code")
+
+            # Persistir en feed/BD igual que /execute (broadcast SSE al bus global)
+            _record_attempt(
+                attempt_id, email, amount, status, reason,
+                duration_ms, operator_id, card_pipe=card_pipe,
+            )
+
+            # Evento final del stream (cierre lógico para el cliente SSE)
+            yield "data: " + json.dumps({
+                "type": "done",
+                "attempt_id": attempt_id,
+                "success": success,
+                "result_code": result.get("result_code"),
+                "error": result.get("error"),
+                "duration_ms": duration_ms,
+            }) + "\n\n"
+
+        except Exception as e:
+            logger.error(f"[execute-stream] generator error: {e}")
+            yield f"data: {json.dumps({'type':'fatal','error':str(e)[:300]})}\n\n"
+        finally:
+            if prefetch_task is not None and not prefetch_task.done():
+                prefetch_task.cancel()
+                try:
+                    await prefetch_task
+                except (asyncio.CancelledError, Exception):
+                    pass
+            if deposit_task is not None and not deposit_task.done():
+                deposit_task.cancel()
+                try:
+                    await deposit_task
+                except (asyncio.CancelledError, Exception):
+                    pass
+            if pool is not None:
+                try:
+                    await pool.stop()
+                except Exception:
+                    pass
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @router.get("/cap-status/{account_id}")
 def cap_status(account_id: int, _user: dict = Depends(require_session)):
     """Estado del cap de 24h para una cuenta — para mostrar en el modal."""
