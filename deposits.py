@@ -802,10 +802,13 @@ async def deposit_execute_stream(request: Request, user: dict = Depends(require_
                     pass
             # Si no capturamos result en el try (early disconnect antes del await), intenta
             # rescatarlo de la task ya terminada para no perder la entrada del activity feed.
+            # NOTA: asyncio.CancelledError es BaseException (no Exception) en Python 3.8+,
+            # por eso capturamos BaseException aquí — un except Exception dejaría escapar
+            # CancelledError y se perdería _record_attempt en disconnects.
             if not result and deposit_task is not None and deposit_task.done():
                 try:
                     result = deposit_task.result() or {}
-                except Exception:
+                except BaseException:
                     result = {}
             # Persistir en feed/BD (broadcast SSE al bus global). Se ejecuta SIEMPRE que tengamos
             # data — incluso si el cliente se desconectó antes del 'done'. Envuelto en try/except
@@ -1167,6 +1170,17 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                         })
                     except Exception:
                         pass
+
+            # done MUST emit aquí dentro del try — si quedaba fuera del try/finally,
+            # una excepción en el while haría que finally limpie pero el frontend
+            # nunca recibe 'done' y las pair rows quedan stuck en busy.
+            yield f"data: {json.dumps({'type':'done','matches':len(matches),'attempts':attempts,'pending':sum(1 for a in accounts if not a['done'] and a['fail_count']<MM_MAX_FAILS)})}\n\n"
+        except Exception as e:
+            logger.error(f"[Matchmaker {run_id}] generator error: {e}")
+            try:
+                yield f"data: {json.dumps({'type':'fatal','run_id':run_id,'error':str(e)[:300]})}\n\n"
+            except Exception:
+                pass
         finally:
             if not prefetch.done():
                 prefetch.cancel()
@@ -1175,8 +1189,6 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
             except Exception:
                 pass
             _active_mm_runs.pop(run_id, None)
-
-        yield f"data: {json.dumps({'type':'done','matches':len(matches),'attempts':attempts,'pending':sum(1 for a in accounts if not a['done'] and a['fail_count']<MM_MAX_FAILS)})}\n\n"
 
     return StreamingResponse(gen(), media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

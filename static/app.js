@@ -3468,8 +3468,10 @@ function _handleExecStreamEvent(ev, amount) {
       }
       case 'gateway_check':       _setStepState('check',  'active'); break;
       case 'gateway_check_done': {
-        const ok = !d.check_error && (d.txn_status === 1 || d.txn_status === 2);
-        _setStepState('check', ok ? 'ok' : 'fail', d.duration_ms);
+        // OK unless the check itself raised an error.
+        // txn_status es informativo; la aprobación real viene de result_code en submit_done.
+        // El reconcile final en type='done' fuerza ok si el backend confirmó success.
+        _setStepState('check', d.check_error ? 'fail' : 'ok', d.duration_ms);
         break;
       }
       case 'done':
@@ -3486,6 +3488,12 @@ function _handleExecStreamEvent(ev, amount) {
       res.className = 'dep-result success';
       res.innerHTML = `<b>✓ Depósito aprobado</b> — $${(amount || 0).toFixed(2)} <span class="dim mono"> · ${ev.duration_ms || 0}ms</span>`;
       pushNotif({ icon: '💳', msg: `Depósito $${(amount || 0).toFixed(2)} aprobado` });
+      // Reconcile: backend confirmó aprobado. Si el step 'check' quedó marcado fail por
+      // un edge case (txn_status=0 mientras el banco ya aprobó), corregirlo a ok aquí.
+      const checkEl = document.querySelector('.dep-phase[data-step="check"]');
+      if (checkEl && !checkEl.classList.contains('na') && !checkEl.classList.contains('ok')) {
+        _setStepState('check', 'ok');
+      }
       reload();
     } else {
       res.className = 'dep-result error';
@@ -3705,6 +3713,9 @@ async function executeMatchmaker() {
   _mmRender();
   $('#depFeed').innerHTML = '';
 
+  // Fallback: si el stream cierra sin 'done' (excepción en generator, conexión cortada,
+  // etc.) las pair rows quedan stuck en busy. _mmGotDone marca recepción explícita.
+  let _mmGotDone = false;
   try {
     const ctrl = new AbortController();
     _depMmAbort = ctrl;
@@ -3730,7 +3741,13 @@ async function executeMatchmaker() {
         buf = buf.slice(idx + 2);
         const line = chunk.split('\n').find(l => l.startsWith('data: '));
         if (!line) continue;
-        try { handleMmEvent(JSON.parse(line.slice(6))); } catch {}
+        try {
+          const parsed = JSON.parse(line.slice(6));
+          if (parsed && (parsed.type === 'done' || parsed.type === 'fatal' || parsed.type === 'cancelled')) {
+            _mmGotDone = true;
+          }
+          handleMmEvent(parsed);
+        } catch {}
       }
     }
   } catch (e) {
@@ -3744,6 +3761,19 @@ async function executeMatchmaker() {
     $('#depCancel').classList.add('hidden');
     _depMmAbort = null;
     _depMmRunId = null;
+    // Stream cerró sin done explícito → reset preventivo del estado busy para que
+    // las pair rows no queden con spinner hasta recargar la página.
+    if (!_mmGotDone) {
+      console.warn('[MM] stream closed without done — clearing busy state');
+      for (const c of _mm.cards.values()) {
+        if (c.status === 'busy') { c.status = 'idle'; c.busyEmail = null; c.currentPhase = ''; }
+      }
+      for (const a of _mm.accounts.values()) {
+        if (a.status === 'busy') { a.status = 'idle'; a.busyTail = null; a.currentPhase = ''; }
+      }
+      _mmRender();
+      toast('Conexión interrumpida — selección reseteada', 'error');
+    }
     if (_mm.matches > 0) reload();
   }
 }

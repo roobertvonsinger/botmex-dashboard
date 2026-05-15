@@ -47,7 +47,8 @@ Endpoint `/api/deposits/multi/stream` devuelve eventos SSE específicos del run 
 | `cooldown` | `{wait}` | Esperando cooldown mínimo entre intentos |
 | `error` | `{email, tail, message}` | Excepción en `attempt()` |
 | `cancelled` | `{run_id}` | Cancelado por usuario |
-| `done` | `{matches, attempts, pending}` | Run terminado |
+| `done` | `{matches, attempts, pending}` | Run terminado (emitido DENTRO del try; si el generator lanza excepción, se emite `fatal` en su lugar) |
+| `fatal` | `{run_id, error}` | Excepción en el generator del matchmaker. Frontend debe limpiar busy state (mismo fallback que stream-close-sin-done). Agregado 2026-05-15 (v20260515f). |
 
 ## Tipos de eventos de execute-stream (single deposit live)
 

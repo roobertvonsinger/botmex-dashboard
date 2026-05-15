@@ -237,6 +237,45 @@ Cada deposit creaba 2 rows → 2 events SSE → 2 filas en el feed.
 
 ---
 
+### `CancelledError` perdido en finally del execute-stream → activity feed loses entries
+
+**Síntoma**: en escenarios de client-disconnect (browser cerrado mid-depósito), el feed de actividad pierde la entrada aunque el depósito haya completado en backend.
+
+**Causa**: en `deposits.py` `/execute-stream`, el bloque de rescate de result hacía:
+```python
+try:
+    result = deposit_task.result() or {}
+except Exception:
+    result = {}
+```
+`asyncio.CancelledError` es `BaseException`, no `Exception` (Python 3.8+). El except no lo atrapa, el resto del finally no corre, `_record_attempt` nunca se llama.
+
+**Fix** (2026-05-15, v20260515f): cambiar a `except BaseException:` solo en ese rescate. El resto del código sigue con `except Exception` (intencional para no tragar CancelledError donde sí debe propagar).
+
+---
+
+### `gateway_check_done` rojo aunque depósito aprobado
+
+**Síntoma**: el step `check` del stepper queda rojo mientras el banner final dice "Aprobado". Visualmente contradictorio.
+
+**Causa**: `check_transaction` puede devolver `txn_status=0` (procesando) en depósitos ya aprobados. La condición frontend `txn_status === 1 || === 2` marcaba fail. La aprobación real viene de `result_code == "BANK_APPROVED"` en `gateway_submit_done`.
+
+**Fix** (2026-05-15, v20260515f): `_handleExecStreamEvent` ahora solo marca fail si `d.check_error` está presente; `txn_status` es informativo. Adicionalmente, en el evento `type='done'` con `success: true`, se fuerza el step `check` a ok como reconcile final.
+
+---
+
+### Multi `done` event nunca emitido si el generator explota
+
+**Síntoma**: en multi (matchmaker), si el generator lanza excepción, el finally limpia el pool pero el cliente nunca recibe `done`. Las pair rows (cards/accounts) quedan stuck con spinner hasta recargar la página.
+
+**Causa**: el `yield {'type':'done'}` estaba FUERA del `try/finally` en `multi_stream`. Cualquier excepción dentro del try saltaba directo al finally sin pasar por el yield.
+
+**Fix** (2026-05-15, v20260515f):
+1. Backend: mover el `yield done` DENTRO del try. Agregar `except Exception` que emite `{'type':'fatal','run_id','error'}` antes del finally.
+2. Frontend (`app.js`): agregar flag `_mmGotDone` en el SSE consumer. Si el stream cierra sin `done|fatal|cancelled`, limpiar busy → idle preventivo en cards/accounts y mostrar toast "Conexión interrumpida — selección reseteada".
+
+---
+
 ## Deploy / Infra
 
 ### Builds Docker paralelos pelean por buildkit
