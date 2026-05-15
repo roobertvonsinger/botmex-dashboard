@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20260514d">
+<link rel="stylesheet" href="/static/style.css?v=20260515a">
 </head>
 <body>
 <div class="shell">
@@ -493,6 +493,30 @@
         </div>
       </div>
 
+      <!-- Phase stepper (single mode, live SSE) -->
+      <div id="depStepper" class="dep-phase-stepper hidden">
+        <div class="dep-phase" data-step="login">
+          <span class="dep-phase-icon">🔑</span>
+          <span class="dep-phase-name">Login</span>
+          <span class="dep-phase-time"></span>
+        </div>
+        <div class="dep-phase" data-step="begin">
+          <span class="dep-phase-icon">📝</span>
+          <span class="dep-phase-name">Orden</span>
+          <span class="dep-phase-time"></span>
+        </div>
+        <div class="dep-phase" data-step="submit">
+          <span class="dep-phase-icon">💳</span>
+          <span class="dep-phase-name">Tarjeta</span>
+          <span class="dep-phase-time"></span>
+        </div>
+        <div class="dep-phase" data-step="check">
+          <span class="dep-phase-icon">✓</span>
+          <span class="dep-phase-name">Verificar</span>
+          <span class="dep-phase-time"></span>
+        </div>
+      </div>
+
       <!-- Result / Feed -->
       <div id="depResult" class="dep-result hidden"></div>
 
@@ -536,6 +560,6 @@
 <!-- Toast -->
 <div id="toast" class="toast hidden"></div>
 
-<script src="/static/app.js?v=20260514d"></script>
+<script src="/static/app.js?v=20260515a"></script>
 </body>
 </html>

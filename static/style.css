@@ -2152,6 +2152,39 @@ tbody tr.row-refresh-fail { animation: rowFail 1500ms ease-out; }
 }
 tbody tr.row-refresh-skip { animation: rowSkip 1500ms ease-out; opacity: 0.7; }
 
+/* ── Botón ↻ por fila — refresh individual ── */
+.row-refresh-one {
+  background: transparent;
+  border: 1px solid var(--hairline-h, rgba(255,255,255,0.10));
+  color: var(--text-dim, #999);
+  font-size: 11px;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: 6px;
+  padding: 0;
+  vertical-align: middle;
+  transition: all 120ms ease;
+  font-family: var(--font-mono);
+}
+.row-refresh-one:hover {
+  background: rgba(212, 170, 64, 0.15);
+  border-color: #d4aa40;
+  color: #f0c840;
+}
+.row-refresh-one:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.row-refresh-one.spinning {
+  animation: rowRefreshSpin 800ms linear infinite;
+}
+@keyframes rowRefreshSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* ── Copyable universal: feedback visual ── */
 /* Cualquier elemento con data-copy o data-combo es clickable */
 [data-copy], [data-combo] {
@@ -2659,4 +2692,62 @@ td.row-details-cell, th.row-details-th {
 #actBtnRefresh.spinning::before {
   display: inline-block;
   animation: actRefreshSpin 700ms linear;
+}
+
+/* ── Phase stepper (single deposit SSE live progress) ── */
+.dep-phase-stepper {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+.dep-phase-stepper.hidden { display: none; }
+.dep-phase {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  opacity: 0.5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  transition: all 200ms ease;
+  min-width: 0;
+}
+.dep-phase-icon {
+  font-size: 14px;
+  display: inline-block;
+}
+.dep-phase-name {
+  font-weight: 500;
+}
+.dep-phase-time {
+  color: var(--text-dim);
+  font-size: 10px;
+}
+.dep-phase.active {
+  opacity: 1;
+  border-color: #d4aa40;
+  box-shadow: 0 0 8px rgba(212,170,64,0.25);
+}
+.dep-phase.active .dep-phase-icon {
+  animation: depPhasePulse 1s ease-in-out infinite;
+}
+.dep-phase.ok {
+  opacity: 1;
+  border-color: var(--accent);
+}
+.dep-phase.fail {
+  opacity: 1;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.dep-phase.na {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+@keyframes depPhasePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
 }

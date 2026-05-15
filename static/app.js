@@ -531,11 +531,13 @@ function renderTable() {
       </svg>
     </button>`;
 
+    // Botón ↻ por fila — actualiza SOLO esta cuenta al instante
+    const refreshOneBtn = `<button class="row-refresh-one" data-id="${r.id}" title="Actualizar SOLO esta cuenta (login fresh + fetch live)">↻</button>`;
     if (state.view === 'simple') {
       return `<tr class="${trClasses}" data-id="${r.id}" title="${trTitle || ''}">
         <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
         <td class="sel-cell" title="Click selecciona la fila"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
-        <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
+        <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
         <td class="combo d-copy" data-combo="${esc(combo)}" title="Click para copiar combo"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b>${lockChip}</td>
         <td class="row-details-cell">${detailsBtn}</td>
         <td class="dep" title="Último depósito hecho">${dep}</td>
@@ -545,7 +547,7 @@ function renderTable() {
     return `<tr class="${trClasses}" data-id="${r.id}" title="${trTitle || ''}">
       <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
       <td class="sel-cell" title="Click selecciona la fila"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
-      <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
+      <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
       <td class="combo d-copy" data-combo="${esc(combo)}" title="Click para copiar combo"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b></td>
       <td class="row-details-cell">${detailsBtn}</td>
       <td class="dep" title="Último depósito hecho">${dep}</td>
@@ -1317,6 +1319,84 @@ async function refreshKpis() {
   }
 }
 
+// ─── Refresh SOLO una cuenta (botón ↻ por fila) ───
+// No toca paginación, no vacía la tabla. Update in-place.
+async function refreshSingleRow(accId, btnEl) {
+  if (!accId) return;
+  const originalText = btnEl?.innerHTML || '↻';
+  if (btnEl) {
+    btnEl.disabled = true;
+    btnEl.innerHTML = '⟳';
+    btnEl.classList.add('spinning');
+  }
+  const tr = document.querySelector(`#accTable tbody tr[data-id="${accId}"]`);
+  try {
+    const r = await fetch('/api/prewarm/refresh-stream', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ account_ids: [accId], force: true }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let gotAccount = false;
+    let failMsg = null;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0) {
+        const chunk = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        const line = chunk.split('\n').find(l => l.startsWith('data: '));
+        if (!line) continue;
+        try {
+          const ev = JSON.parse(line.slice(6));
+          if (ev.type === 'account' && ev.data) {
+            gotAccount = true;
+            const i = state.rows.findIndex(x => x.id === ev.data.id);
+            if (i >= 0) state.rows[i] = { ...state.rows[i], ...ev.data };
+            renderTable();
+            // Flash en la fila actualizada
+            requestAnimationFrame(() => {
+              const tr2 = document.querySelector(`#accTable tbody tr[data-id="${accId}"]`);
+              if (tr2) {
+                tr2.classList.add('row-refreshed');
+                setTimeout(() => tr2.classList.remove('row-refreshed'), 1200);
+              }
+            });
+          } else if (ev.type === 'fail') {
+            failMsg = ev.error || 'fetch falló';
+          } else if (ev.type === 'skip') {
+            failMsg = `skip: ${ev.reason}`;
+          }
+        } catch {}
+      }
+    }
+    if (gotAccount) {
+      toast(`✓ Cuenta actualizada`, 'success');
+    } else if (failMsg) {
+      toast(`✗ ${failMsg}`, 'error');
+    } else {
+      toast(`⚠ Sin respuesta del servidor`, 'error');
+    }
+  } catch (e) {
+    toast(`Error: ${e.message}`, 'error');
+  } finally {
+    // Re-localizar el botón (renderTable lo reemplazó)
+    const newBtn = document.querySelector(`#accTable tbody tr[data-id="${accId}"] .row-refresh-one`);
+    if (newBtn) {
+      newBtn.disabled = false;
+      newBtn.classList.remove('spinning');
+      newBtn.innerHTML = '↻';
+    }
+  }
+}
+
 // ─── Refresh visible ───
 let _refreshing = false;
 let _refreshAbort = null;
@@ -1325,9 +1405,12 @@ async function refreshVisible(opts = {}) {
     if (_refreshAbort) _refreshAbort.abort();
     return;
   }
+  // CRÍTICO: limpiar refreshMode antes de leer getPaged(). Si quedó pegado
+  // de un refresh anterior que abortó, getVisible() regresaría updatedRows
+  // (lista vacía) y nunca dispararíamos nada.
+  state.refreshMode = null;
   _refreshing = true;
   const force = !!opts.force;
-  // Capturar IDs ANTES de activar refreshMode (getPaged usa state normal)
   const ids = opts.ids || getPaged().rows.map(r => r.id);
   if (!ids.length) { _refreshing = false; return; }
   const btn = $('#btnRefreshVisible');
@@ -2040,6 +2123,13 @@ async function _quickAddNote(accId, email) {
 
 // ─── Tabla: click en checkbox, click en combo (copia), click en fila (detalle) ───
 $('#accTable').addEventListener('click', e => {
+  // Botón ↻ por fila — refresh SOLO esa cuenta, no toca paginación ni filtros
+  const refOne = e.target.closest('.row-refresh-one');
+  if (refOne?.dataset.id) {
+    e.stopPropagation();
+    refreshSingleRow(parseInt(refOne.dataset.id), refOne);
+    return;
+  }
   // Iconos de fila — interceptan ANTES de que se abra el modal
   const ic = e.target.closest('.row-ic');
   if (ic) {
@@ -2871,6 +2961,8 @@ function setDepMode(mode) {
   $('#depCardSection').classList.toggle('hidden', isMulti);
   $('#depMultiCards').classList.toggle('hidden', !isMulti);
   $('#depScheduleBlock').classList.toggle('hidden', !isSched);
+  // Phase stepper solo aplica a single — ocultar al cambiar de modo
+  const _ps = $('#depStepper'); if (_ps) _ps.classList.add('hidden');
 
   // título
   $('#depModalTitle').textContent = isSingle ? 'Depositar' : isMulti ? 'Multicuenta (Matchmaker)' : 'Programado';
@@ -3207,42 +3299,144 @@ async function executeDeposit() {
 
   if (_depMode === 'schedule') return executeScheduled(pipe, amount);
 
-  // SINGLE
+  // SINGLE — SSE live stepper
   _depBusy = true;
   $('#depExec').disabled = true;
   $('#depExec').textContent = 'Procesando…';
   const res = $('#depResult');
-  res.className = 'dep-result loading';
-  res.classList.remove('hidden');
-  res.innerHTML = `<span class="dep-spinner"></span> Login → BeginDeposit → makePayment…`;
+  res.classList.add('hidden');
+  res.className = 'dep-result hidden';
+  res.innerHTML = '';
+  _stepperReset();
+  $('#depStepper').classList.remove('hidden');
 
+  let _gotDone = false;
   try {
-    const r = await fetch('/api/deposits/execute', {
+    const r = await fetch('/api/deposits/execute-stream', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ account_id: _depAccountIds[0], card_pipe: pipe, amount }),
     });
-    const data = await r.json();
     if (!r.ok) {
-      res.className = 'dep-result error';
-      res.innerHTML = `<b>✗ ${esc(data.detail || 'Error')}</b>`;
-    } else if (data.success) {
-      res.className = 'dep-result success';
-      res.innerHTML = `<b>✓ Depósito aprobado</b> — $${amount.toFixed(2)} <span class="dim mono"> · ${data.duration_ms}ms</span>`;
-      pushNotif({ icon: '💳', msg: `Depósito $${amount.toFixed(2)} aprobado` });
-      reload();
-    } else {
-      res.className = 'dep-result error';
-      res.innerHTML = `<b>✗ Rechazado</b><br><span class="mono">${esc(data.error || data.result_code || 'Sin detalle')}</span>`;
-      pushNotif({ icon: '⚠️', msg: `Depósito rechazado: ${data.error || data.result_code}` });
+      const err = await r.json().catch(() => ({}));
+      const msg = (err.detail && err.detail.message) || err.detail || `HTTP ${r.status}`;
+      throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    }
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0) {
+        const chunk = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        // SSE comments (heartbeat ":ping") start with ":" — skip
+        const dataLine = chunk.split('\n').find(l => l.startsWith('data: '));
+        if (!dataLine) continue;
+        try {
+          const ev = JSON.parse(dataLine.slice(6));
+          if (ev && ev.type === 'done') _gotDone = true;
+          _handleExecStreamEvent(ev, amount);
+        } catch { /* ignore malformed */ }
+      }
+    }
+    if (!_gotDone) {
+      // Stream cerró sin done — marcar fatal
+      _showStepperFatal('Conexión cerrada sin resultado');
     }
     $('#depExec').textContent = '🔁 Otro intento';
   } catch (e) {
-    res.className = 'dep-result error';
-    res.innerHTML = `<b>✗ Error de red</b><br><span class="mono">${esc(e.message)}</span>`;
+    _showStepperFatal(e.message);
     $('#depExec').textContent = '🔁 Reintentar';
   } finally {
     _depBusy = false;
     $('#depExec').disabled = false;
+  }
+}
+
+// ── Phase stepper helpers (single deposit SSE) ──
+function _stepperReset() {
+  document.querySelectorAll('#depStepper .dep-phase').forEach(el => {
+    el.classList.remove('active', 'ok', 'fail', 'na');
+    const t = el.querySelector('.dep-phase-time');
+    if (t) t.textContent = '';
+  });
+}
+function _setStepState(stepName, state, durationMs) {
+  const el = document.querySelector(`#depStepper .dep-phase[data-step="${stepName}"]`);
+  if (!el) return;
+  el.classList.remove('active', 'ok', 'fail', 'na');
+  if (state) el.classList.add(state);
+  const t = el.querySelector('.dep-phase-time');
+  if (t) {
+    if (typeof durationMs === 'number' && isFinite(durationMs)) t.textContent = `${durationMs}ms`;
+    else if (durationMs === '3DS') t.textContent = '3DS';
+    else if (typeof durationMs === 'string') t.textContent = durationMs;
+  }
+}
+function _showStepperFatal(msg) {
+  // Cualquier paso "active" pasa a "fail"; los pending quedan tal cual
+  document.querySelectorAll('#depStepper .dep-phase.active').forEach(el => {
+    el.classList.remove('active');
+    el.classList.add('fail');
+  });
+  const res = $('#depResult');
+  res.className = 'dep-result error';
+  res.classList.remove('hidden');
+  res.innerHTML = `<b>✗ Error</b><br><span class="mono">${esc(msg || 'Sin detalle')}</span>`;
+}
+function _handleExecStreamEvent(ev, amount) {
+  if (!ev || !ev.type) return;
+  if (ev.type === 'start') {
+    return;
+  }
+  if (ev.type === 'fatal') {
+    _showStepperFatal(ev.error || 'Error fatal en stream');
+    return;
+  }
+  if (ev.type === 'phase') {
+    const d = ev.data || {};
+    switch (ev.name) {
+      case 'login_start':         _setStepState('login',  'active'); break;
+      case 'login_done':          _setStepState('login',  d.ok ? 'ok' : 'fail', d.duration_ms); break;
+      case 'gateway_begin':       _setStepState('begin',  'active'); break;
+      case 'gateway_begin_done':  _setStepState('begin',  d.ok ? 'ok' : 'fail', d.duration_ms); break;
+      case 'gateway_submit':      _setStepState('submit', 'active'); break;
+      case 'gateway_submit_done': {
+        const approved = d.result_code === 'BANK_APPROVED';
+        _setStepState('submit', approved ? 'ok' : 'fail', d.duration_ms);
+        if (d.is_3ds) _setStepState('check', 'na', '3DS');
+        break;
+      }
+      case 'gateway_check':       _setStepState('check',  'active'); break;
+      case 'gateway_check_done': {
+        const ok = !d.check_error && (d.txn_status === 1 || d.txn_status === 2);
+        _setStepState('check', ok ? 'ok' : 'fail', d.duration_ms);
+        break;
+      }
+      case 'done':
+        // El backend también emite phase=done justo antes del type=done final.
+        // Lo dejamos pasar — el type=done hace el render del result panel.
+        break;
+    }
+    return;
+  }
+  if (ev.type === 'done') {
+    const res = $('#depResult');
+    res.classList.remove('hidden');
+    if (ev.success) {
+      res.className = 'dep-result success';
+      res.innerHTML = `<b>✓ Depósito aprobado</b> — $${(amount || 0).toFixed(2)} <span class="dim mono"> · ${ev.duration_ms || 0}ms</span>`;
+      pushNotif({ icon: '💳', msg: `Depósito $${(amount || 0).toFixed(2)} aprobado` });
+      reload();
+    } else {
+      res.className = 'dep-result error';
+      const detail = ev.error || ev.result_code || 'Sin detalle';
+      res.innerHTML = `<b>✗ Rechazado</b><br><span class="mono">${esc(detail)}</span>`;
+      pushNotif({ icon: '⚠️', msg: `Depósito rechazado: ${detail}` });
+    }
   }
 }
 

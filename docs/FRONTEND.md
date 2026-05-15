@@ -64,7 +64,7 @@
 
 | Modo | Estado interno | Endpoint | Handler |
 |---|---|---|---|
-| `single` | `_depMode = 'single'` | `POST /api/deposits/execute` | `executeSingleAccount(pipe, amount)` (app.js:3069) |
+| `single` | `_depMode = 'single'` | `POST /api/deposits/execute-stream` (SSE) | `executeDeposit()` SINGLE branch + `_handleExecStreamEvent()` (app.js:~3300) — live phase stepper `#depStepper` (4 pasos: login/begin/submit/check) |
 | `multi` | `_depMode = 'multi'` | `POST /api/deposits/multi/stream` (SSE) | `executeMulti(...)` (app.js:~3280) |
 | `schedule` | `_depMode = 'schedule'` | `POST /api/deposits/scheduled/create` | `executeScheduled(pipe, amount)` (app.js:3128) |
 
