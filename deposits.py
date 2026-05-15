@@ -15,6 +15,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
@@ -340,7 +341,6 @@ async def _run_deposit_with_phases(
     Returns:
       {"success": bool, "result_code": str, "error": str|None, "duration_ms": int}
     """
-    import httpx
     try:
         from betmexico_login_service import get_jwt as _get_jwt
         from betmexico_deposit import (
@@ -365,6 +365,10 @@ async def _run_deposit_with_phases(
     jwt = None
     login_result: dict = {}
     try:
+        # use_cache=False: mirrors prewarm.py — un JWT cacheado puede devolver 401
+        # silencioso y balance=0 falso. Para depósitos eso es inaceptable.
+        # Trade-off: en loops repetidos (matchmaker, scheduled), esto implica un
+        # captcha solve por iteración — caller debe estar consciente del costo.
         jwt, login_result = await _get_jwt(
             email, password, pool, proxy=proxy_url, use_cache=False
         )
@@ -478,18 +482,28 @@ async def _run_deposit_with_phases(
         # ── PASO 4: check_transaction ────────────────────────────────────
         await _safe_phase(phase_cb, "gateway_check", {})
         t0 = time.time()
+        check_exc: Optional[str] = None
         try:
             step3 = await _check_transaction(client, jwt, txn_id)
         except Exception as e:
             logger.error(f"[Deposits/phases] check_transaction {email}: {e}")
             step3 = {"error": str(e)}
+            check_exc = str(e)[:200]
         check_ms = int((time.time() - t0) * 1000)
         txn_status = (step3.get("transactionStatus", 0)
                       if "error" not in step3 else 0)
 
-        await _safe_phase(phase_cb, "gateway_check_done", {
+        check_done_payload: dict = {
             "txn_status": txn_status, "duration_ms": check_ms,
-        })
+        }
+        # Surface el error si check_transaction explotó — submit_card pudo haber
+        # devuelto BANK_APPROVED pero el check falló (network, timeout, etc.).
+        # El caller decide si tratar esto como ambiguo (success=True pero sin
+        # confirmación del banco).
+        if check_exc is not None:
+            check_done_payload["check_error"] = check_exc
+
+        await _safe_phase(phase_cb, "gateway_check_done", check_done_payload)
 
     # ── Resultado final ──────────────────────────────────────────────────
     approved = (result_code == "BANK_APPROVED")
