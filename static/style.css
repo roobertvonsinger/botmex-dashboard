@@ -1834,6 +1834,21 @@ tr.op-row-azure  .grade-bar-cell { box-shadow: inset 3px 0 0 var(--op-azure);  }
   border-radius: 3px; font-weight: 700;
 }
 
+/* Sub-indicador de fase para el par (email, tail) activo en matchmaker.
+   Vacío por default — se llena via JS cuando llega un evento 'phase'. */
+.mm-pair-phase {
+  display: inline-block;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.04);
+}
+.mm-pair-phase:empty {
+  display: none;
+}
+
 /* Estados — animaciones */
 .mm-card.mm-busy, .mm-acct.mm-busy {
   background: var(--warn-soft);

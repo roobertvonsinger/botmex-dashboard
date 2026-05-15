@@ -3516,7 +3516,8 @@ const _MM_CODE_LABEL = {
 const _mmLabel = code => _MM_CODE_LABEL[code] || code || '';
 
 function _mmRender() {
-  // Tarjetas
+  // Tarjetas — incluye data-pair-key cuando hay pair activo (email del busy)
+  // para que el handler de 'phase' pueda inyectar el sub-indicador.
   const cardsHtml = [..._mm.cards.entries()].map(([tail, c]) => {
     const cls = `mm-card mm-${c.status}`;
     const fails = c.fails ? `<span class="mm-fails">${c.fails}/2</span>` : '';
@@ -3526,16 +3527,19 @@ function _mmRender() {
              : '';
     const reason = (c.status === 'retired' && c.lastCode)
       ? `<span class="mm-reason">${esc(_mmLabel(c.lastCode))}</span>` : '';
-    return `<div class="${cls}">
+    const pairKey = (c.status === 'busy' && c.busyEmail)
+      ? ` data-pair-key="${esc(c.busyEmail)}|···${tail}"` : '';
+    return `<div class="${cls}"${pairKey}>
       <span class="mm-tail mono">···${tail}</span>
       ${fails}
       ${reason}
+      <span class="mm-pair-phase"></span>
       <span class="mm-ic">${ic}</span>
     </div>`;
   }).join('');
   $('#mmCards').innerHTML = cardsHtml;
 
-  // Cuentas
+  // Cuentas — mismo patrón: data-pair-key cuando está busy
   const accsHtml = [..._mm.accounts.entries()].map(([email, a]) => {
     const cls = `mm-acct mm-${a.status}`;
     const fails = a.fails ? `<span class="mm-fails">${a.fails}/2</span>` : '';
@@ -3548,11 +3552,14 @@ function _mmRender() {
     const reason = (a.status === 'dead' && a.deadCode)
       ? `<span class="mm-reason mm-reason-dead" title="${esc(a.deadCode)}">${esc(_mmLabel(a.deadCode))}</span>`
       : '';
-    return `<div class="${cls}">
+    const pairKey = (a.status === 'busy' && a.busyTail)
+      ? ` data-pair-key="${esc(email)}|···${a.busyTail}"` : '';
+    return `<div class="${cls}"${pairKey}>
       <span class="mm-email">${esc(email)}</span>
       ${matched}
       ${fails}
       ${reason}
+      <span class="mm-pair-phase"></span>
       <span class="mm-ic">${ic}</span>
     </div>`;
   }).join('');
@@ -3562,6 +3569,31 @@ function _mmRender() {
   $('#mmStMatches').textContent = _mm.matches;
   $('#mmStAttempts').textContent = _mm.attempts;
   $('#mmStAmount').textContent = _mm.amount;
+}
+
+// Actualiza el sub-indicador de fase dentro del row del par (email, tail).
+// Llama el handler de 'phase' en cada evento; si no hay row (el par ya terminó
+// y el render lo movió a otro estado), es un no-op silencioso.
+function _mmSetPairPhase(key, name, data) {
+  // El key viene como "email|···tail" — buscamos en ambos paneles
+  const rows = document.querySelectorAll(`[data-pair-key="${key}"]`);
+  if (!rows.length) return;
+  const labels = {
+    login_start:          '🔑 Login…',
+    login_done:           data.ok ? '🔑 ✓' : '🔑 ✗',
+    gateway_begin:        '📝 Orden…',
+    gateway_begin_done:   data.ok ? '📝 ✓' : '📝 ✗',
+    gateway_submit:       '💳 Tarjeta…',
+    gateway_submit_done:  data.is_3ds ? '💳 3DS' : (data.result_code === 'BANK_APPROVED' ? '💳 ✓' : '💳 ✗'),
+    gateway_check:        '✓ Verificando…',
+    gateway_check_done:   data.check_error ? '✓ ✗' : '✓ ✓',
+    done:                 data.success ? '✓ Aprobado' : '✗ Rechazado',
+  };
+  const text = labels[name] || name;
+  rows.forEach(row => {
+    const phaseEl = row.querySelector('.mm-pair-phase');
+    if (phaseEl) phaseEl.textContent = text;
+  });
 }
 
 function _mmFeedAdd(cls, html) {
@@ -3658,13 +3690,23 @@ function handleMmEvent(ev) {
 
     case 'trying': {
       _mm.attempts = ev.attempt;
-      const card = _mm.cards.get(ev.tail.replace('···', ''));
+      const tail = ev.tail.replace('···', '');
+      const card = _mm.cards.get(tail);
       const acc = _mm.accounts.get(ev.email);
-      if (card) card.status = 'busy';
-      if (acc) acc.status = 'busy';
+      if (card) { card.status = 'busy'; card.busyEmail = ev.email; }
+      if (acc)  { acc.status = 'busy'; acc.busyTail = tail; }
       _mmRender();
       _mmFeedAdd('mm-trying',
         `<span class="dep-spinner"></span> <b class="mono">${esc(ev.tail)}</b> → <span>${esc(ev.email)}</span>`);
+      break;
+    }
+
+    case 'phase': {
+      // Sub-indicador en vivo dentro del par (email, tail) que está corriendo.
+      // Llega ANTES que match/rejected/account_dead — cuando termina, esos
+      // eventos cambian el status a matched/dead/idle y el data-pair-key se quita.
+      const key = `${ev.email}|${ev.tail}`;
+      _mmSetPairPhase(key, ev.name, ev.data || {});
       break;
     }
 
@@ -3673,8 +3715,8 @@ function handleMmEvent(ev) {
       const tail = ev.tail.replace('···', '');
       const card = _mm.cards.get(tail);
       const acc = _mm.accounts.get(ev.email);
-      if (card) { card.status = 'matched'; card.matchedEmail = ev.email; }
-      if (acc) { acc.status = 'done'; acc.matchedTail = tail; acc.matchedPipe = ev.pipe; }
+      if (card) { card.status = 'matched'; card.matchedEmail = ev.email; card.busyEmail = null; }
+      if (acc) { acc.status = 'done'; acc.matchedTail = tail; acc.matchedPipe = ev.pipe; acc.busyTail = null; }
       _mmRender();
       _mmFeedAdd('mm-match',
         `✓ <b class="mono">${esc(ev.tail)}</b> ↔ <b>${esc(ev.email)}</b> · $${ev.amount.toFixed(2)} <span class="dim mono">${ev.duration_ms}ms</span>`);
@@ -3697,10 +3739,11 @@ function handleMmEvent(ev) {
       const tail = ev.tail.replace('···', '');
       const card = _mm.cards.get(tail);
       const acc = _mm.accounts.get(ev.email);
-      if (card) { card.fails = ev.card_fails ?? card.fails; card.status = 'idle'; card.lastCode = ev.code; }
+      if (card) { card.fails = ev.card_fails ?? card.fails; card.status = 'idle'; card.lastCode = ev.code; card.busyEmail = null; }
       if (acc)  {
         acc.fails = ev.acct_fails ?? acc.fails;
         acc.lastCode = ev.code;
+        acc.busyTail = null;
         if (ev.acct_fails >= 2) { acc.status = 'dead'; acc.deadCode = ev.code; }
         else { acc.status = 'cooldown'; }
       }
@@ -3722,7 +3765,13 @@ function handleMmEvent(ev) {
 
     case 'account_dead': {
       const acc = _mm.accounts.get(ev.email);
-      if (acc) { acc.status = 'dead'; acc.deadCode = ev.code; acc.lastCode = ev.code; }
+      if (acc) { acc.status = 'dead'; acc.deadCode = ev.code; acc.lastCode = ev.code; acc.busyTail = null; }
+      // Tarjeta queda 'idle' (la cuenta murió, no la tarjeta) — limpia su busyEmail
+      if (ev.tail) {
+        const tail = ev.tail.replace('···', '');
+        const card = _mm.cards.get(tail);
+        if (card && card.status === 'busy') { card.status = 'idle'; card.busyEmail = null; }
+      }
       _mmRender();
       const persisted = ev.persisted ? ' <span class="mm-persisted">guardada</span>' : '';
       _mmFeedAdd('mm-dead',

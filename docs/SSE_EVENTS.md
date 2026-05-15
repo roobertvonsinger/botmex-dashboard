@@ -36,11 +36,17 @@ Endpoint `/api/deposits/multi/stream` devuelve eventos SSE específicos del run 
 | `type` | Payload | Significado |
 |---|---|---|
 | `start` | `{run_id, accounts, cards, amount}` | Match iniciado |
-| `attempt_start` | `{email, tail, n}` | Iniciando intento |
-| `attempt_result` | `{email, tail, success, code, duration_ms}` | Resultado del intento |
+| `trying` | `{email, tail, attempt}` | Lanzando intento (par activo) |
+| `phase` | `{email, tail, name, data}` | Sub-fase del intento activo. `name`/`data` idénticos a execute-stream (login_start, login_done, gateway_begin, etc.). Permite mostrar progreso vivo por par. |
+| `match` | `{email, tail, pipe, amount, duration_ms, attempt}` | Aprobado — par casado |
+| `rejected` | `{email, tail, code, card_fails, acct_fails?, attempt, card_only?}` | Rechazado por gateway. `card_only:true` cuando el strike es solo a la tarjeta (3DS/BANK_REJECTED). |
+| `account_dead` | `{email, code, tail, attempt, persisted}` | Cuenta DEAD por LOGIN_FAILED/AUTOEXCLUSION/KYC_PENDING/3DS_UNDETECTED/SHADOW_BAN? |
+| `velocity_skip` | `{email, tail, wait_sec, distinct_count, message}` | Tarjeta ya usada en N cuentas recientes — skip sin penalizar |
 | `card_retired` | `{tail, fails}` | Tarjeta retirada por max fails |
+| `cooldown` | `{wait}` | Esperando cooldown mínimo entre intentos |
+| `error` | `{email, tail, message}` | Excepción en `attempt()` |
 | `cancelled` | `{run_id}` | Cancelado por usuario |
-| `done` | `{matches, attempts, summary}` | Run terminado |
+| `done` | `{matches, attempts, pending}` | Run terminado |
 
 ## Tipos de eventos de execute-stream (single deposit live)
 

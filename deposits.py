@@ -953,6 +953,22 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
         matches: list[dict] = []
         attempts = 0
 
+        # Queue compartida para emisión live de fases desde attempt() → outer gen().
+        # Cada attempt() escribe eventos {type:"phase", email, tail, name, data}
+        # mientras corre; el outer loop los drena concurrentemente con el gather.
+        phase_queue: asyncio.Queue = asyncio.Queue()
+
+        def make_attempt_phase_cb(email_p: str, tail_p: str):
+            async def cb(name: str, payload: dict) -> None:
+                await phase_queue.put({
+                    "type": "phase",
+                    "email": email_p,
+                    "tail": tail_p,
+                    "name": name,
+                    "data": payload,
+                })
+            return cb
+
         yield f"data: {json.dumps({'type':'start','run_id':run_id,'accounts':len(accounts),'cards':len(cards),'amount':amount})}\n\n"
 
         async def attempt(acc, card, n):
@@ -967,12 +983,17 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                             f"wait {vel['wait_sec']}s ({vel['distinct_count']} cuentas previas)")
                 return {"success": False, "result_code": "VELOCITY_SKIP",
                         "skip": True, "velocity": vel}, int((time.time() - t0) * 1000)
+            # Wrapper con fases — empuja eventos a phase_queue mientras corre,
+            # mismo shape de retorno que _run_deposit. NO escribe en BD, NO
+            # marca DEAD, NO maneja marriage — eso lo hace el caller (este
+            # bloque) con _record_attempt + la lógica de estado del matchmaker.
+            phase_cb = make_attempt_phase_cb(email, card["tail"])
             try:
-                r = await _run_deposit(
+                r = await _run_deposit_with_phases(
                     email=email, password=acc["password"],
                     cc_num=card["num"], cc_exp=card["exp"], cc_cvv=card["cvv"],
                     amount=amount, user=user_ctx, pool=pool,
-                    save_card=True, check_marriage=False,
+                    phase_cb=phase_cb,
                 )
             except Exception as e:
                 logger.error(f"[Matchmaker] {email}/{card['tail']}: {e}")
@@ -1057,8 +1078,30 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                 for acc, card, n in batch:
                     yield f"data: {json.dumps({'type':'trying','email':acc['email'],'tail':card['tail'],'attempt':n})}\n\n"
 
+                # Lanza tasks en paralelo y drena phase_queue mientras corren —
+                # los eventos `phase` salen en tiempo real, no acumulados al final.
                 tasks = [asyncio.create_task(attempt(acc, card, n)) for acc, card, n in batch]
-                results = await asyncio.gather(*tasks, return_exceptions=True)
+                gather_task = asyncio.create_task(
+                    asyncio.gather(*tasks, return_exceptions=True)
+                )
+
+                while not gather_task.done():
+                    try:
+                        ev = await asyncio.wait_for(phase_queue.get(), timeout=0.5)
+                        yield f"data: {json.dumps(ev)}\n\n"
+                    except asyncio.TimeoutError:
+                        pass
+
+                # Drena el remanente que pudo entrar entre la última lectura y
+                # gather_task.done() (events de la fase 'done' final, etc.)
+                while not phase_queue.empty():
+                    try:
+                        ev = phase_queue.get_nowait()
+                        yield f"data: {json.dumps(ev)}\n\n"
+                    except asyncio.QueueEmpty:
+                        break
+
+                results = await gather_task
 
                 for (acc, card, n), res in zip(batch, results):
                     if isinstance(res, Exception):
