@@ -3311,6 +3311,7 @@ async function executeDeposit() {
   $('#depStepper').classList.remove('hidden');
 
   let _gotDone = false;
+  let reader = null;
   try {
     const r = await fetch('/api/deposits/execute-stream', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -3321,7 +3322,7 @@ async function executeDeposit() {
       const msg = (err.detail && err.detail.message) || err.detail || `HTTP ${r.status}`;
       throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
     }
-    const reader = r.body.getReader();
+    reader = r.body.getReader();
     const decoder = new TextDecoder();
     let buf = '';
     while (true) {
@@ -3351,6 +3352,11 @@ async function executeDeposit() {
     _showStepperFatal(e.message);
     $('#depExec').textContent = '🔁 Reintentar';
   } finally {
+    // Cancel SSE reader if still open (network drop, modal closed, etc.)
+    // cancel() may throw if stream already closed — we don't care.
+    if (reader) {
+      try { await reader.cancel(); } catch {}
+    }
     _depBusy = false;
     $('#depExec').disabled = false;
   }
