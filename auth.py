@@ -10,7 +10,7 @@ USERS: dict[str, dict] = {
     "robertvs": {"display": "RobertVS", "telegram_id": 1341812706, "role": "superadmin"},
     "lau":      {"display": "Lau",      "telegram_id": 7599631505, "role": "admin"},
     "luisito":  {"display": "Luisito",  "telegram_id": 7847239854, "role": "admin"},
-    "magdiel":  {"display": "Magdiel",  "telegram_id": 1059367082, "role": "user"},
+    "magdiel":  {"display": "Magdiel",  "telegram_id": 1059367082, "role": "admin"},
 }
 
 # Color por operador (token name del CSS). Consistente lock-chip y borde fila.

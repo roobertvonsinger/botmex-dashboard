@@ -14,6 +14,17 @@
 | Logout limpia cookie | ✅ | ✅ | ✅ |
 | Cookie expiration / refresh | ❓ comportamiento de expiración no documentado | ❓ | 🔵 |
 
+### Roster de usuarios (auth.py + web_auth.py)
+
+| Username | telegram_id | Role | Notas |
+|---|---|---|---|
+| RobertVS | 1341812706 | superadmin | sesión persistente (10y) |
+| Lau | 7599631505 | admin | |
+| Luisito | 7847239854 | admin | |
+| Magdiel | 1059367082 | admin | **promovido de `user` → `admin` 2026-05-22** (antes solo veía cuentas asignadas vía `account_assignments`; ahora ve todas las publicadas a la pool excepto las lockeadas por otros) |
+
+> **Efecto colateral**: el popup "Liberar cuentas a..." (frontend `app.js:1688`) filtra por `role === 'user'`. Ya no hay usuarios con role `user` activos → la lista queda vacía. Si en el futuro hace falta un destino "user" para liberar, agregar uno o cambiar el filtro.
+
 ## Cuentas
 
 | Función | Esperado | Actual | Estado |
@@ -33,6 +44,8 @@
 | **Lista unificada de tarjetas** | ✅ `GET /api/cards/all` (account_cards + account_notes con card, deduplicado) | ✅ desde 2026-05-11 | ✅ |
 | **Auto-lock al iniciar depósito** | ✅ cuenta queda lockeada para operador (single 2h, multi 2h, scheduled 4h) | ✅ desde 2026-05-11 | ✅ |
 | **Filtro lock-aware en `/api/accounts`** | ✅ non-SA solo ve libres O propias; SA ve todo | ✅ desde 2026-05-11 | ✅ |
+| **Filtro published_to_pool en `/api/accounts`** | ✅ non-SA solo ve `published_to_pool=1`; SA ve todo (trastienda + pool) | ✅ (`app.py:347-348`) | ✅ |
+| **Bulk unpublish 2026-05-22** | n/a — operación manual: 45 cuentas publicadas (todas `status=DEAD`) → `published_to_pool=0` para ocultarlas a admins. Total pool ahora 0 visibles a non-SA. | ✅ ejecutado en KVM4 prod | ✅ |
 | **Conflict 409 si cuenta lockeada por otro** | ✅ rechaza depósito; SA puede override | ✅ desde 2026-05-11 | ✅ |
 | **Watchdog auto-release 27h post-deposit** | ✅ 3 notifs progresivas (T-5min, T+0, T+10min) + auto-release a T+27h | ✅ desde 2026-05-11 | ✅ |
 | **Notifs filtradas por dueño del lock** | ✅ solo el operador (o SA) ve la notif | ✅ vía `target_user` en payload + filtro frontend | ✅ |

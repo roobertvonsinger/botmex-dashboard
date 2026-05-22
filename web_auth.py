@@ -20,7 +20,7 @@ WEB_USERS_RAW = {
     "RobertVS": {"telegram_id": 1341812706, "role": "superadmin"},
     "Lau":      {"telegram_id": 7599631505, "role": "admin"},
     "Luisito":  {"telegram_id": 7847239854, "role": "admin"},
-    "Magdiel":  {"telegram_id": 1059367082, "role": "user"},
+    "Magdiel":  {"telegram_id": 1059367082, "role": "admin"},
 }
 WEB_USERS = {k.lower(): v for k, v in WEB_USERS_RAW.items()}
 
