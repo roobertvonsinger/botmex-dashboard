@@ -3,17 +3,29 @@
 > Diagramas Mermaid en [`diagrams/`](diagrams/).
 > Quick links: [single deposit](diagrams/deposit-single.mmd) · [matchmaker](diagrams/deposit-multi-matchmaker.mmd) · [scheduled](diagrams/deposit-scheduled.mmd) · [SSE bus](diagrams/sse-bus.mmd) · [infra](diagrams/infra.mmd)
 
-## Proxies (admin pool)
+## Proxies (admin pool + failover)
 
 El dashboard NO depende exclusivamente de `betmexico_config.ADMIN_PROXIES` del bot (monorepo). Tiene su propio pool en [`proxy_pool.py`](../proxy_pool.py) que combina:
 - Lista del bot (`betmexico_config.ADMIN_PROXIES`) — si está disponible al import
 - `EXTRA_ADMIN_PROXIES` definidos localmente en `proxy_pool.py` (ej. NodeMaven)
 
-`get_admin_proxy()` hace `random.choice` sobre la lista combinada → cualquier flujo del dashboard (prewarm, deposits single/multi/scheduled) alterna entre todos los proxies activos. Agregar/quitar proxies en el dashboard NO requiere tocar el monorepo del bot.
+### Failover real (no solo rotación)
+
+`call_with_proxy_failover(fn, *args, **kwargs)` es el camino canónico para hacer `login + fetch` desde el dashboard. Funcionamiento:
+
+1. Toma el pool combinado, mezcla en orden aleatorio.
+2. Intenta `fn(*args, proxy=URL_1, **kwargs)`. Si lanza excepción **proxy-related** (`ConnectTimeout`, `ReadTimeout`, `ConnectError`, `ProxyError`, etc. de httpx/httpcore) → loguea WARNING y prueba el siguiente.
+3. Si todos los proxies del pool fallan → re-lanza la última excepción.
+4. Retorna `(resultado, proxy_url_usado)` para que el caller mantenga **afinidad de proxy**: el ApiChecker / httpx client post-login usa el MISMO proxy que validó el login (no rota a uno que podría estar caído a mitad del flujo).
+
+Solo se reintenta en errores de conexión. Errores HTTP del servidor (401, 403, 500) NO disparan failover — esos significan que el proxy funcionó, el problema es la cuenta.
 
 Call sites:
-- [prewarm.py](../prewarm.py) — `from proxy_pool import build_admin_proxy_url as _build_proxy_url`
-- [deposits.py](../deposits.py) — `_build_admin_proxy_url()` delega en `proxy_pool.build_admin_proxy_url`
+- [`prewarm.py:_run_prewarm`](../prewarm.py) — `get_jwt` via failover, `ApiChecker` con `used_proxy`
+- [`deposits.py:_run_deposit_with_phases`](../deposits.py) — `get_jwt` via failover (matchmaker + scheduled + single con phases)
+- [`web_routes_deposits.py:_run_deposit`](../web_routes_deposits.py) — `/execute` y `/execute-stream`. Si exhausted → emite `PROXY_FAILOVER_EXHAUSTED` y persiste row.
+
+Agregar/quitar proxies en el dashboard NO requiere tocar el monorepo del bot — editar `EXTRA_ADMIN_PROXIES` en `proxy_pool.py`.
 
 
 ## Stack

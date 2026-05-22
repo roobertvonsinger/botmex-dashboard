@@ -342,7 +342,9 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
     pool = None
     import os
     cap_key = os.environ.get("CAPMONSTER_KEY", "")
-    proxy_url = _build_proxy_url()  # ¡CRÍTICO! sale por proxy MX, no por IP del VPS
+    # proxy_url se decide adentro del failover. used_proxy se conserva para reusar
+    # el mismo proxy en el ApiChecker post-login (afinidad de proxy validado).
+    used_proxy: Optional[str] = None
     try:
         # Siempre login fresco (use_cache=False) — el JWT de BetMexico puede ser
         # invalidado server-side antes de su exp local (nueva sesión desde otro IP).
@@ -352,8 +354,13 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
         await pool.prefetch(1)
         await pool.start_factory()
 
-        jwt, login_result = await asyncio.wait_for(
-            get_jwt(email, password, pool, proxy=proxy_url, use_cache=False),
+        # Failover real: si el primer proxy timeout/conn-error, rota al siguiente
+        # del pool en vez de fallar el intento entero.
+        from proxy_pool import call_with_proxy_failover
+        (jwt, login_result), used_proxy = await asyncio.wait_for(
+            call_with_proxy_failover(
+                get_jwt, email, password, pool, use_cache=False,
+            ),
             timeout=float(TASK_TIMEOUT_SEC),
         )
         if not jwt:
@@ -366,7 +373,8 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
             return {"ok": False, "status": status or "no_jwt",
                     "error": (login_result.get("error") if isinstance(login_result, dict) else None) or status or "Login falló"}
 
-        async with BetmexicoApiChecker(proxy=proxy_url) as checker:
+        # Mantener afinidad: ApiChecker usa el mismo proxy que validó el login.
+        async with BetmexicoApiChecker(proxy=used_proxy) as checker:
             details = await asyncio.wait_for(
                 checker.fetch_account_details_parallel(jwt, fetch_mode="full"),
                 timeout=18.0,

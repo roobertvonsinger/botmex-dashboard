@@ -113,16 +113,29 @@ async def _run_deposit(
             return r
 
     if step_cb: step_cb("login", "start")
-    admin_proxy_url = None if NO_PROXY else _build_proxy_url(db.get_admin_proxy() if hasattr(db, "get_admin_proxy") else None)
-    
-    # Fallback si db no tiene get_admin_proxy (api.py lo tiene vía import)
-    if not admin_proxy_url and not NO_PROXY:
-         from betmexico_config import get_admin_proxy
-         admin_proxy_url = _build_proxy_url(get_admin_proxy())
 
     _phase("login_start", {"email": email})
     t_login = time.time()
-    jwt, login_result = await get_jwt(email, password, pool, proxy=admin_proxy_url)
+    # Failover real: rota entre los proxies del pool (LitPort + NodeMaven + ...)
+    # si el primero da timeout/connection error. `used_proxy` se reusa en los
+    # httpx clients de los pasos siguientes para mantener afinidad de proxy
+    # validado (no reintentar con otro a mitad del flujo).
+    if NO_PROXY:
+        jwt, login_result = await get_jwt(email, password, pool, proxy=None)
+        admin_proxy_url = None
+    else:
+        from proxy_pool import call_with_proxy_failover
+        try:
+            (jwt, login_result), admin_proxy_url = await call_with_proxy_failover(
+                get_jwt, email, password, pool,
+            )
+        except Exception as e:
+            logger.error(f"[Deposit] proxy failover exhausted para {email}: {e}")
+            _phase("error", {"reason": "PROXY_FAILOVER_EXHAUSTED", "msg": str(e)[:160]}, t_login)
+            r = {"success": False, "result_code": "PROXY_FAILOVER_EXHAUSTED",
+                 "error": f"Todos los proxies del pool fallaron: {type(e).__name__}"}
+            _persist_final(r)
+            return r
     if not jwt:
         _phase("error", {"reason": "LOGIN_FAILED"}, t_login)
         r = {"success": False, "result_code": "LOGIN_FAILED", "error": _friendly_error("LOGIN_FAILED")}

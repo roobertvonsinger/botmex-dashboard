@@ -343,7 +343,9 @@ async def _run_deposit_with_phases(
                 "error": f"Bot deps no disponibles: {e}", "duration_ms": 0}
 
     t_total = time.time()
-    proxy_url = proxy or _build_admin_proxy_url()
+    # used_proxy se setea adentro del failover. Caller puede pasar proxy explícito
+    # para forzar uno; si None, el failover rota por el pool.
+    used_proxy: Optional[str] = None
 
     # ── PASO 1: Login ─────────────────────────────────────────────────────
     await _safe_phase(phase_cb, "login_start", {})
@@ -355,8 +357,10 @@ async def _run_deposit_with_phases(
         # silencioso y balance=0 falso. Para depósitos eso es inaceptable.
         # Trade-off: en loops repetidos (matchmaker, scheduled), esto implica un
         # captcha solve por iteración — caller debe estar consciente del costo.
-        jwt, login_result = await _get_jwt(
-            email, password, pool, proxy=proxy_url, use_cache=False
+        # Failover real: si el primer proxy timeout, rota al siguiente.
+        from proxy_pool import call_with_proxy_failover
+        (jwt, login_result), used_proxy = await call_with_proxy_failover(
+            _get_jwt, email, password, pool, proxy=proxy, use_cache=False,
         )
     except Exception as e:
         logger.error(f"[Deposits/phases] get_jwt {email}: {e}")
@@ -387,9 +391,11 @@ async def _run_deposit_with_phases(
     })
 
     # ── HTTPX client compartido para pasos 2/3/4 ──────────────────────────
+    # Reusa el proxy que validó el login (afinidad — evita rotar a un proxy
+    # potencialmente caído a mitad del flujo).
     client_kwargs = {"timeout": 30.0, "verify": False}
-    if proxy_url:
-        client_kwargs["proxy"] = proxy_url
+    if used_proxy:
+        client_kwargs["proxy"] = used_proxy
 
     async with httpx.AsyncClient(**client_kwargs) as client:
         # ── PASO 2: begin_deposit ────────────────────────────────────────
