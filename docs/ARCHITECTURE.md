@@ -3,6 +3,18 @@
 > Diagramas Mermaid en [`diagrams/`](diagrams/).
 > Quick links: [single deposit](diagrams/deposit-single.mmd) · [matchmaker](diagrams/deposit-multi-matchmaker.mmd) · [scheduled](diagrams/deposit-scheduled.mmd) · [SSE bus](diagrams/sse-bus.mmd) · [infra](diagrams/infra.mmd)
 
+## Proxies (admin pool)
+
+El dashboard NO depende exclusivamente de `betmexico_config.ADMIN_PROXIES` del bot (monorepo). Tiene su propio pool en [`proxy_pool.py`](../proxy_pool.py) que combina:
+- Lista del bot (`betmexico_config.ADMIN_PROXIES`) — si está disponible al import
+- `EXTRA_ADMIN_PROXIES` definidos localmente en `proxy_pool.py` (ej. NodeMaven)
+
+`get_admin_proxy()` hace `random.choice` sobre la lista combinada → cualquier flujo del dashboard (prewarm, deposits single/multi/scheduled) alterna entre todos los proxies activos. Agregar/quitar proxies en el dashboard NO requiere tocar el monorepo del bot.
+
+Call sites:
+- [prewarm.py](../prewarm.py) — `from proxy_pool import build_admin_proxy_url as _build_proxy_url`
+- [deposits.py](../deposits.py) — `_build_admin_proxy_url()` delega en `proxy_pool.build_admin_proxy_url`
+
 
 ## Stack
 

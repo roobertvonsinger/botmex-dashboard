@@ -34,32 +34,12 @@ try:
     from betmexico_login_api import BetmexicoApiChecker
     score_payment_readiness = None  # se setea desde app.BOT_SCORE_PAYMENT al usar
     _HAS_BOT_DEPS = True
-    try:
-        from betmexico_config import get_admin_proxy
-    except ImportError:
-        get_admin_proxy = None  # type: ignore
 except ImportError:
     _HAS_BOT_DEPS = False
     score_payment_readiness = None  # type: ignore
-    get_admin_proxy = None  # type: ignore
 
-
-def _build_proxy_url() -> Optional[str]:
-    """Construye URL de proxy admin para http.client."""
-    if not get_admin_proxy:
-        return None
-    try:
-        p = get_admin_proxy()
-        if not p:
-            return None
-        srv = p.get("server", "")
-        u = p.get("username", "")
-        pw = p.get("password", "")
-        if u and pw:
-            return f"http://{u}:{pw}@{srv}"
-        return f"http://{srv}"
-    except Exception:
-        return None
+# Pool de proxies local del dashboard — combina bot + extras (NodeMaven, etc.)
+from proxy_pool import build_admin_proxy_url as _build_proxy_url
 
 logger = logging.getLogger("betmexico.dashboard.prewarm")
 

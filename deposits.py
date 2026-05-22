@@ -302,23 +302,9 @@ async def _safe_phase(cb, name: str, payload: dict) -> None:
 
 def _build_admin_proxy_url() -> Optional[str]:
     """Construye URL de proxy admin (http://user:pass@server) para httpx.
-    Mirror de _build_proxy_url en prewarm.py."""
-    try:
-        from betmexico_config import get_admin_proxy
-    except Exception:
-        return None
-    try:
-        p = get_admin_proxy()
-        if not p:
-            return None
-        srv = p.get("server", "")
-        u = p.get("username", "")
-        pw = p.get("password", "")
-        if u and pw:
-            return f"http://{u}:{pw}@{srv}"
-        return f"http://{srv}"
-    except Exception:
-        return None
+    Wrapper sobre proxy_pool (combina bot + extras locales del dashboard)."""
+    from proxy_pool import build_admin_proxy_url
+    return build_admin_proxy_url()
 
 
 async def _run_deposit_with_phases(
