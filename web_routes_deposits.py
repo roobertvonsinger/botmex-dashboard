@@ -15,6 +15,7 @@ import uuid
 from typing import Optional
 from betmexico_db import db
 from betmexico_payment_analyzer import score_payment_readiness
+from web_grading import recalc_grade_from_db
 from betmexico_login_api import (
     BetmexicoApiChecker, BETMEXICO_URLS,
     RECAPTCHA_V2_SITE_KEY
@@ -64,7 +65,8 @@ async def _run_deposit(
             pass
 
     def _persist_final(result: dict, balance_before: Optional[float] = None):
-        """Persiste el intento en deposit_attempts. SIEMPRE invocado al final."""
+        """Persiste el intento en deposit_attempts. SIEMPRE invocado al final.
+        Además recalcula el grade desde BD (incorpora cualquier txn nueva)."""
         try:
             if result.get("success"):
                 status = "approved"
@@ -95,6 +97,12 @@ async def _run_deposit(
                 mission_id=mission_id,
                 card_pipe=f"{cc_num}|{cc_exp}|{cc_cvv}",
             )
+            # BD viva: cada operación que tocó BetMexico recalcula grade desde
+            # account_transactions (capturando lo que ya guardamos en pre-login)
+            try:
+                recalc_grade_from_db(email)
+            except Exception as ge:
+                logger.debug(f"[Deposit] recalc_grade no-op: {ge}")
         except Exception as e:
             logger.error(f"[Deposit] Error persisting attempt: {e}")
 
@@ -161,6 +169,8 @@ async def _run_deposit(
             txn_items = txns_data.get("items", [])
             if txn_items:
                 await asyncio.to_thread(db.save_account_transactions, email, txn_items, user.get("telegram_id", 0))
+            # Recalcular grade desde BD (V10) — toda conexión a BetMexico actualiza grade
+            await asyncio.to_thread(recalc_grade_from_db, email)
         except Exception as e:
             logger.warning(f"[Deposit] Error actualizando BD con datos de login: {e}")
 

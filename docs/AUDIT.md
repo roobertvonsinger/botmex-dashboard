@@ -46,6 +46,20 @@
 | **Filtro lock-aware en `/api/accounts`** | ✅ non-SA solo ve libres O propias; SA ve todo | ✅ desde 2026-05-11 | ✅ |
 | **Filtro published_to_pool en `/api/accounts`** | ✅ non-SA solo ve `published_to_pool=1`; SA ve todo (trastienda + pool) | ✅ (`app.py:347-348`) | ✅ |
 | **Bulk unpublish 2026-05-22** | n/a — operación manual: 45 cuentas publicadas (todas `status=DEAD`) → `published_to_pool=0` para ocultarlas a admins. Total pool ahora 0 visibles a non-SA. | ✅ ejecutado en KVM4 prod | ✅ |
+
+## Grading / Payment Analyzer
+
+> Canónico: `repos/botmex-dashboard/shared/betmexico_payment_analyzer.py` (V10 desde 2026-05-22). Deploy a KVM4 reemplaza `/docker/betmexico/code/betmexico_payment_analyzer.py` directamente. NO se toca el monorepo.
+
+| Función | Esperado | Actual | Estado |
+|---|---|---|---|
+| Algoritmo V10 (matriz por reglas) | A = sana (sin fail ≥60d, max 2 fails juntos, total ≤3); B = reparándose; C = masacrada hace ≥90d; D = fail <14d O ≥3 sesiones machine-gun | ✅ desde 2026-05-22 | ✅ |
+| Bug parser microsegundos | `_parse_txn_date` tolera microsegundos de cualquier longitud (BD tiene `.94907` con 5 dígitos que rompía `fromisoformat` en Python <3.11) | ✅ fix V10 | ✅ |
+| Backfill on-demand | `scripts/recalc_grades.py` recorre `accounts`, recalcula desde `account_transactions`, persiste grade+score | ✅ ejecutado 2026-05-22: 810/902 cambiaron | ✅ |
+| Distribución post-V10 | A:145, B:300, C:142, D:307 (era A:605, B:209, C:78, D:1) | ✅ refleja realidad de pasarelas | ✅ |
+| **BD viva: deposit hooks** | Login pre-deposit guarda txns + recalc grade; `_persist_final` post-intento recalc grade | ✅ `web_routes_deposits.py:160-165, 67-101` | ✅ |
+| **BD viva: prewarm hooks** | `_db_save_txns_and_recalc` guarda txns + recalc grade vía BOT_SCORE_PAYMENT (V10 después del deploy 2026-05-22) | ✅ `prewarm.py:234` | ✅ |
+| BD viva: watchdog | Solo actualiza balance (`fetch_mode=balance_only`). NO trae txns nuevas → grade no se recalcula desde watchdog | ⚠️ por diseño (performance) | ⚠️ |
 | **Conflict 409 si cuenta lockeada por otro** | ✅ rechaza depósito; SA puede override | ✅ desde 2026-05-11 | ✅ |
 | **Watchdog auto-release 27h post-deposit** | ✅ 3 notifs progresivas (T-5min, T+0, T+10min) + auto-release a T+27h | ✅ desde 2026-05-11 | ✅ |
 | **Notifs filtradas por dueño del lock** | ✅ solo el operador (o SA) ve la notif | ✅ vía `target_user` en payload + filtro frontend | ✅ |
