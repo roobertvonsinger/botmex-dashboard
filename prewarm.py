@@ -398,9 +398,8 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
         else:
             # Login/fetch OK pero sin datos — actualizar timestamp para evitar retry inmediato
             await asyncio.to_thread(_db_update_last_checked, email)
-            if jwt_from_cache:
-                # JWT de cache rechazado — invalidar para que el próximo refresh haga login real
-                await asyncio.to_thread(_db_invalidate_jwt, email)
+            # JWT silenció datos (401 silencioso) — invalidar siempre para forzar login real la próxima vez
+            await asyncio.to_thread(_db_invalidate_jwt, email)
 
         phase = "complete" if details else "no_details"
         _db_log_phase(
@@ -656,6 +655,12 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
         done_count = 0
         last_keepalive = asyncio.get_event_loop().time()
         while done_count < len(accs):
+            if await request.is_disconnected():
+                # Cliente cerró la conexión — cancelar tasks en vuelo para no quemar captchas
+                for t in tasks:
+                    if not t.done():
+                        t.cancel()
+                break
             try:
                 ev = await asyncio.wait_for(q.get(), timeout=2.0)
                 yield f"data: {json.dumps(ev)}\n\n"

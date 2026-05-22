@@ -593,6 +593,8 @@ async def deposit_execute(request: Request, user: dict = Depends(require_session
     pool = None
     prefetch_task = None
     t0 = time.time()
+    result = None
+    _exc = None
     try:
         pool = make_pool(cap_key, size=1, workers=1)
         await pool.start_factory()
@@ -611,11 +613,13 @@ async def deposit_execute(request: Request, user: dict = Depends(require_session
             save_card=True,
             check_marriage=False,
         )
-    except Exception as e:
-        logger.error(f"[Deposits] {email} ${amount}: {e}")
-        duration_ms = int((time.time() - t0) * 1000)
-        _record_attempt(attempt_id, email, amount, "error", str(e)[:300], duration_ms, operator_id, card_pipe=card_pipe)
-        raise HTTPException(500, f"Error: {str(e)[:200]}")
+    except BaseException as e:
+        # BaseException = atrapa CancelledError también (Py 3.8+). Sin esto, el
+        # client-disconnect mid-deposit dejaba `_record_attempt` sin correr → BD
+        # sin row → tarjeta "quemada invisible".
+        _exc = e
+        logger.error(f"[Deposits] {email} ${amount}: {type(e).__name__}: {e}")
+        # Re-raise abajo en el finally para que el _record_attempt corra primero
     finally:
         if prefetch_task is not None and not prefetch_task.done():
             prefetch_task.cancel()
@@ -628,13 +632,34 @@ async def deposit_execute(request: Request, user: dict = Depends(require_session
                 await pool.stop()
             except Exception:
                 pass
+        # _record_attempt SIEMPRE — el finally garantiza row en BD aunque
+        # CancelledError propague (cliente desconectó mid-deposit).
+        duration_ms = int((time.time() - t0) * 1000)
+        if _exc is not None:
+            _record_attempt(
+                attempt_id, email, amount, "error",
+                f"{type(_exc).__name__}: {str(_exc)[:280]}",
+                duration_ms, operator_id, card_pipe=card_pipe,
+            )
+        elif result is not None:
+            success = bool(result.get("success"))
+            _record_attempt(
+                attempt_id, email, amount,
+                "approved" if success else "rejected",
+                result.get("error") or result.get("result_code"),
+                duration_ms, operator_id, card_pipe=card_pipe,
+            )
+
+    if _exc is not None:
+        # CancelledError → propagar bare (no la envolvemos en HTTPException;
+        # debe seguir como cancelación). Exception normal → HTTPException 500
+        # para que el frontend reciba mensaje útil en el toast.
+        if isinstance(_exc, Exception):
+            raise HTTPException(500, f"Error: {str(_exc)[:200]}")
+        raise _exc
 
     duration_ms = int((time.time() - t0) * 1000)
     success = bool(result.get("success"))
-    status = "approved" if success else "rejected"
-    reason = result.get("error") or result.get("result_code")
-
-    _record_attempt(attempt_id, email, amount, status, reason, duration_ms, operator_id, card_pipe=card_pipe)
 
     return {
         "success": success,
@@ -948,9 +973,8 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
     _active_mm_runs[run_id] = cancel_event
 
     async def gen():
-        pool = make_pool(cap_key, size=max(2, len(cards)), workers=1)
-        await pool.start_factory()
-        prefetch = asyncio.create_task(pool.prefetch(min(len(accounts), len(cards))))
+        pool = None
+        prefetch = None
 
         tried: set[tuple[str, int]] = set()  # (card_num, account_id)
         matches: list[dict] = []
@@ -984,6 +1008,8 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
             if vel:
                 logger.info(f"[Matchmaker] velocity skip {email}/{card['tail']}: "
                             f"wait {vel['wait_sec']}s ({vel['distinct_count']} cuentas previas)")
+                # Throttle velocity-blocked pairs so matchmaker doesn't tight-loop
+                await asyncio.sleep(min(vel.get("wait_sec") or 60, 30))
                 return {"success": False, "result_code": "VELOCITY_SKIP",
                         "skip": True, "velocity": vel}, int((time.time() - t0) * 1000)
             # Wrapper con fases — empuja eventos a phase_queue mientras corre,
@@ -1013,6 +1039,11 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
             return r, duration
 
         try:
+            # Init pool INSIDE try so auto_lock is released in finally if start_factory fails
+            pool = make_pool(cap_key, size=max(2, len(cards)), workers=1)
+            await pool.start_factory()
+            prefetch = asyncio.create_task(pool.prefetch(min(len(accounts), len(cards))))
+
             while True:
                 if cancel_event.is_set():
                     yield f"data: {json.dumps({'type':'cancelled','run_id':run_id})}\n\n"
@@ -1182,12 +1213,13 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
             except Exception:
                 pass
         finally:
-            if not prefetch.done():
+            if prefetch is not None and not prefetch.done():
                 prefetch.cancel()
-            try:
-                await pool.stop()
-            except Exception:
-                pass
+            if pool is not None:
+                try:
+                    await pool.stop()
+                except Exception:
+                    pass
             _active_mm_runs.pop(run_id, None)
 
     return StreamingResponse(gen(), media_type="text/event-stream",
@@ -1260,10 +1292,13 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
     _auto_lock_for_deposit(account_id, operator_id, user, hours=AUTOLOCK_HOURS_SCHEDULED)
 
     async def loop():
-        pool = make_pool(cap_key, size=1, workers=1)
-        await pool.start_factory()
-        asyncio.create_task(pool.prefetch(1))
+        pool = None
         try:
+            # Init pool INSIDE try so _active_schedules cleanup runs in finally
+            # even if start_factory fails (prevents orphaned scheduled entry).
+            pool = make_pool(cap_key, size=1, workers=1)
+            await pool.start_factory()
+            asyncio.create_task(pool.prefetch(1))
             for i in range(repetitions):
                 iter_num = i + 1
 
@@ -1284,6 +1319,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                         logger.warning(f"[Scheduled {sched_id}] phase broadcast failed: {e}")
 
                 t0 = time.time()
+                r = None
                 try:
                     r = await _run_deposit_with_phases(
                         email=email, password=password,
@@ -1293,7 +1329,21 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                         pool=pool,
                         phase_cb=phase_cb,
                     )
+                except asyncio.CancelledError:
+                    # Cancel mid-iter: registrar el intento antes de propagar para
+                    # que la tarjeta no quede "quemada invisible" en BD. El outer
+                    # except hace broadcast scheduled_cancelled.
+                    duration = int((time.time() - t0) * 1000)
+                    _record_attempt(
+                        uuid.uuid4().hex, email, amount, "error",
+                        "CancelledError", duration, operator_id,
+                        card_pipe=card_pipe,
+                    )
+                    raise
                 except Exception as e:
+                    # Excepción real: armar dict de error para que el flujo normal
+                    # de abajo broadcastee scheduled + scheduled_aborted y rompa
+                    # el loop. NO re-raise: el frontend debe ver el aborted.
                     logger.error(f"[Scheduled {sched_id}] {email}: {e}")
                     r = {"success": False, "result_code": "ERROR", "error": str(e)[:200]}
                 duration = int((time.time() - t0) * 1000)
@@ -1333,10 +1383,11 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
             })
             raise
         finally:
-            try:
-                await pool.stop()
-            except Exception:
-                pass
+            if pool is not None:
+                try:
+                    await pool.stop()
+                except Exception:
+                    pass
             _active_schedules.pop(sched_id, None)
 
     task = asyncio.create_task(loop())

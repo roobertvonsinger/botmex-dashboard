@@ -42,12 +42,12 @@
 
 | Función | Esperado | Actual | Estado |
 |---|---|---|---|
-| Single deposit (`/execute`) | ✅ 1 cuenta, 1 tarjeta, $1-$499 | ✅ | ✅ |
+| Single deposit (`/execute`) | ✅ 1 cuenta, 1 tarjeta, $1-$499. `_record_attempt` corre siempre (incluso si client disconnect mid-deposit) | ✅ desde 2026-05-21 | ✅ |
 | **Single deposit con fases en vivo (`/execute-stream`)** | ✅ SSE emite `start`/`phase`/`done` para stepper UI; mismas validaciones que `/execute` (cap, velocity, auto-lock); frontend consume stream y pinta `#depStepper` con 4 fases (login/begin/submit/check) — `na` para `check` cuando `is_3ds=true` | ✅ 2026-05-15 — backend (Task 1+2) + frontend (Task 3) listos. `/execute` queda como endpoint legacy no consumido por single mode (multi/scheduled siguen usando sus endpoints) | ✅ |
 | Persistir tarjeta al APPROVE | ✅ INSERT en `account_cards` | ✅ (desde fix BETMEX_DB 2026-05-11) | ✅ |
 | Persistir cada intento en `deposit_attempts` | ✅ con `card_pipe`, `status`, `rejection_reason` | ✅ (desde fix 2026-05-11) | ✅ |
 | Loguear card al inicio del deposit | ✅ logger.info | ✅ (desde fix 2026-05-11) | ✅ |
-| Multi/matchmaker SSE | ✅ N cuentas × M tarjetas, pairing greedy, cooldown | ✅ | ✅ |
+| Multi/matchmaker SSE | ✅ N cuentas × M tarjetas, pairing greedy, cooldown 5s, velocity-skip throttle 30s, pool init dentro de try (lock release garantizado si CapMonster down) | ✅ desde 2026-05-21 | ✅ |
 | Cancelar matchmaker run | ✅ POST `/multi/{id}/cancel` | ✅ | ✅ |
 | Scheduled N reps cada 1 min | ✅ aborta al primer fail | ✅ | ✅ |
 | **Scheduled con fases en vivo** | ✅ `scheduled_create.loop()` usa `_run_deposit_with_phases` con `phase_cb` que emite `kind:scheduled_phase` por sub-fase (login/begin/submit/check/done). Feed renderiza con `_schedPhaseLabel()`. Eventos summary `scheduled`/`scheduled_aborted`/`scheduled_cancelled` siguen igual | ✅ 2026-05-15 — Task 5 deposit-live-progress | ✅ |
@@ -60,7 +60,7 @@
 
 | Función | Esperado | Actual | Estado |
 |---|---|---|---|
-| Pre-cargar JWT + balance para N cuentas | ✅ SSE stream | ✅ | ✅ |
+| Pre-cargar JWT + balance para N cuentas | ✅ SSE stream. JWT cache se invalida siempre que `details` venga vacío (silent 401). Cliente disconnect cancela tasks pendientes (no quema captchas) | ✅ desde 2026-05-21 | ✅ |
 | Pause-on-deselect | ✅ cancela si el operador desmarca | ✅ | ✅ |
 | Auto-stop si CapMonster < $5 | ✅ saldo warning | ✅ | ✅ |
 | Force-refresh para SA | ✅ pasa cap-check | ✅ | ✅ |

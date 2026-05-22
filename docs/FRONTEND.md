@@ -110,6 +110,10 @@ Visible cuando `selectedIds.size > 0`. Actualizado por `updateCmdBar()` (app.js:
 
 **Handler context (click derecho)** (app.js:2092 — `#accTable.contextmenu`): mantiene comportamiento de copia para usuarios habituados.
 
+**Columna Saldo (`td.num` / `th.num`)** — `style.css:1075`:
+- `width: 128px; min-width: 128px; white-space: nowrap;`
+- El ancho cabe `$X,XXX.XX` + botón ↻ (22px + 6px margen) sin wrap. Antes era 92px y con montos 4+ dígitos el botón saltaba a la línea siguiente, ensanchando la fila. Cualquier ajuste futuro debe verificar que `$99,999.99 ↻` cabe.
+
 ## Feed de Actividad (`#actTable`)
 
 **Render**: `renderActivity()` (app.js:809).

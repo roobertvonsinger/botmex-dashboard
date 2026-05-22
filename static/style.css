@@ -1070,8 +1070,10 @@ tbody tr:hover { background: rgba(255,255,255,0.025); }
 /* Selección sobreescribe pero mantiene la barra */
 tr.row-sel { background: var(--accent-soft) !important; }
 
-/* Saldo: ancho fijo, font mono para que cuadre */
-#accTable th.num, #accTable td.num { width: 92px; min-width: 92px; }
+/* Saldo: ancho fijo, font mono para que cuadre.
+   Debe caber `$X,XXX.XX` + botón ↻ (22px + 6px margen) sin wrap.
+   nowrap evita que el botón salte de línea cuando el monto crece. */
+#accTable th.num, #accTable td.num { width: 128px; min-width: 128px; white-space: nowrap; }
 
 /* Pill clase .grade ya no se usa en filas — se conserva por si se reusa */
 

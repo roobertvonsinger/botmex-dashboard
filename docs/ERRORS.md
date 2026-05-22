@@ -276,6 +276,79 @@ except Exception:
 
 ---
 
+### Botón ↻ de fila salta debajo del saldo cuando el monto tiene 4+ dígitos
+
+**Síntoma**: en la tabla principal, cuando una cuenta tiene saldo `$1,234.56` o más, el botón ↻ (refresh individual) se mueve a la línea siguiente, ensanchando la fila y rompiendo la alineación con el resto de filas.
+
+**Causa**: `#accTable td.num` tenía `width: 92px`. El monto en mono `$X,XXX.XX` + botón (22px + 6px margen) excede 92px → flex wrap natural del navegador empuja el botón abajo.
+
+**Fix** (2026-05-21, `static/style.css:1075`):
+```css
+#accTable th.num, #accTable td.num { width: 128px; min-width: 128px; white-space: nowrap; }
+```
+- Sube el ancho a 128px (cabe `$99,999.99` + botón ↻).
+- `white-space: nowrap` es la red de seguridad: aunque el contenido crezca, el botón nunca salta de línea (el cell se desborda en horizontal en su lugar, lo cual es muy preferible al wrap vertical).
+
+**Histórico**: detectado 2026-05-21 por Robert tras ver saldos altos en la operación diaria.
+
+---
+
+### JWT cache rancio NUNCA se invalida — captcha desperdiciado en cada refresh
+
+**Síntoma**: una cuenta con JWT cacheado que BetMexico ya rechazó silenciosamente sigue intentando login con ese mismo JWT cada refresh. La API devuelve `details` vacío, el balance no se actualiza, pero `last_checked_at` sí — el operador no nota nada salvo que el balance está stale.
+
+**Causa**: en `prewarm.py:_run_prewarm` la variable `jwt_from_cache` se inicializa en `False` y nunca se asigna `True`. El bloque `if jwt_from_cache: _db_invalidate_jwt(email)` era código muerto desde el commit inicial.
+
+**Fix** (2026-05-21, [prewarm.py:398](prewarm.py#L398)): quitar el guard `if jwt_from_cache`. Ahora cuando `details` viene vacío, el JWT cacheado se invalida incondicionalmente y el próximo refresh hace login real.
+
+**Histórico**: detectado por code review 2026-05-21 (Batch 1 holistic).
+
+---
+
+### `/api/prewarm/refresh-stream` no cancela tasks si el cliente desconecta
+
+**Síntoma**: el operador cierra el browser mid-refresh masivo → hasta 15 tasks `_run_prewarm` siguen corriendo en background, gastando captchas de CapMonster cuyo resultado nadie lee.
+
+**Causa**: el async generator no llamaba `await request.is_disconnected()` durante el loop principal.
+
+**Fix** (2026-05-21, [prewarm.py:655](prewarm.py#L655)): chequeo al inicio de cada iteración del `while done_count < len(accs)`. Si disconnected → cancelar todas las tasks pending → break.
+
+---
+
+### `_record_attempt` NO se llamaba si el cliente desconectaba mid-deposit (single)
+
+**Síntoma**: depósito iniciado vía `/api/deposits/execute`, el operador cierra la pestaña o falla la red mid-deposit. Si BetMexico ya aprobó el cargo, la tarjeta se "quema" sin que la BD tenga row en `deposit_attempts` → invisibilidad total.
+
+**Causa**: el handler tenía `except Exception as e:` alrededor de `_run_deposit`. `asyncio.CancelledError` deriva de `BaseException` (Py 3.8+), no de `Exception`, así que no entraba al except y el `_record_attempt` que vivía dentro de él nunca corría.
+
+**Fix** (2026-05-21, [deposits.py:616](deposits.py#L616)):
+- `except BaseException as e:` captura ambos.
+- `_record_attempt` movido al `finally` (siempre corre).
+- Re-raise post-finally: `Exception` → `HTTPException(500, ...)` (preserva contrato con frontend), `CancelledError` → propagación bare.
+- Mismo patrón aplicado a iteración de scheduled ([deposits.py:1324](deposits.py#L1324)).
+
+---
+
+### Matchmaker tight-loop sobre tarjetas velocity-blocked
+
+**Síntoma**: en el feed se ven decenas de `velocity_skip` consecutivos para la misma tarjeta en segundos. El matchmaker no quema (el velocity check funciona) pero satura el SSE y consume ciclos.
+
+**Causa**: el `VELOCITY_SKIP` retornaba inmediato. El cooldown del matchmaker (`MM_COOLDOWN=5s`) es menor que el `wait_sec` del velocity (60s), así que la misma combinación card+account se volvía a intentar 12 veces en el minuto.
+
+**Fix** (2026-05-21, [deposits.py:1001](deposits.py#L1001)): `await asyncio.sleep(min(vel["wait_sec"] or 60, 30))` antes de retornar. Cap a 30s para no bloquear otros pares en el batch.
+
+---
+
+### `pool.start_factory()` failure dejaba cuentas lockeadas + state inconsistente
+
+**Síntoma raro**: si CapMonster está caído al lanzar un multi/scheduled, las cuentas del batch quedaban auto-lockeadas 2-4h sin posibilidad de release manual (excepto SA override).
+
+**Causa**: en `multi_stream.gen()` y `scheduled_create.loop()`, las llamadas `pool = make_pool(...)` y `await pool.start_factory()` estaban FUERA del `try:` que tenía el `finally` con `pool.stop()` + `_active_mm_runs.pop()` + `_active_schedules.pop()`. Si start_factory raise → finally nunca corre → state inconsistente.
+
+**Fix** (2026-05-21, [deposits.py:1033](deposits.py#L1033) y [deposits.py:1287](deposits.py#L1287)): pool init movido DENTRO del try. Init `pool = None, prefetch = None` antes. Finally guardea con `if ... is not None:`.
+
+---
+
 ## Deploy / Infra
 
 ### Builds Docker paralelos pelean por buildkit
