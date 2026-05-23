@@ -34,6 +34,76 @@ AUTOLOCK_HOURS_MULTI = 2
 AUTOLOCK_HOURS_SCHEDULED = 4  # más amplio porque corre N reps cada 1 min
 
 
+# ── Helpers de captcha pool (scheduled / multi) ─────────────────────────────
+# Bug observado 2026-05-23: en /scheduled, después del sleep(60) el token del
+# pool estaba expirado (TOKEN_MAX_AGE=55s) y get_token tenía que esperar al
+# factory loop a producir uno nuevo — a veces tomaba 70s+. Solución:
+# `_drain_stale_tokens` saca los tokens viejos del pool y dispara prefetch
+# fresh. Llamarse ~10s antes del próximo intento (en el sleep dinámico) y como
+# red de seguridad al iniciar cada iter.
+
+def _drain_stale_tokens(pool, max_age: float = 30.0) -> int:
+    """Saca del pool todos los tokens con edad > max_age. Devuelve cuántos drenó.
+    Los tokens válidos los reinserta. No-throws."""
+    if pool is None or not hasattr(pool, "pool"):
+        return 0
+    fresh: list = []
+    drained = 0
+    try:
+        while True:
+            try:
+                item = pool.pool.get_nowait()
+            except Exception:
+                break
+            try:
+                _tok, _tid, ts = item
+                age = time.time() - ts
+                if age <= max_age:
+                    fresh.append(item)
+                else:
+                    drained += 1
+            except Exception:
+                # Estructura inesperada → descartar
+                drained += 1
+        for item in fresh:
+            try:
+                pool.pool.put_nowait(item)
+            except Exception:
+                pass
+        if drained > 0:
+            logger.info(f"[Captcha] drained {drained} stale token(s) (edad >{max_age}s)")
+    except Exception as e:
+        logger.warning(f"[Captcha] _drain_stale_tokens err: {e}")
+    return drained
+
+
+async def _ensure_fresh_captcha(pool, wait_for_solve: float = 8.0) -> None:
+    """Garantiza que el pool tenga al menos 1 token <30s de edad.
+    Si después del drain queda 0, dispara prefetch y espera hasta `wait_for_solve`
+    segundos. No bloquea más de eso — `get_token` después manejará el caso."""
+    if pool is None:
+        return
+    _drain_stale_tokens(pool, max_age=30.0)
+    try:
+        qsize = pool.pool.qsize() if hasattr(pool, "pool") else 0
+    except Exception:
+        qsize = 0
+    if qsize == 0:
+        try:
+            asyncio.create_task(pool.prefetch(1))
+        except Exception:
+            pass
+        # Espera corta para dar tiempo al solve (~4-7s típico)
+        deadline = time.time() + wait_for_solve
+        while time.time() < deadline:
+            try:
+                if pool.pool.qsize() > 0:
+                    return
+            except Exception:
+                pass
+            await asyncio.sleep(0.5)
+
+
 # ── Tracking de BINes que lanzan 3DS ────────────────────────────────────────
 # Cada vez que detectamos 3DS en un intento → incrementamos total_3ds del BIN
 # correspondiente. Endpoint `/api/deposits/bin-check` permite al frontend
@@ -499,6 +569,31 @@ async def _run_deposit_with_phases(
     await _safe_phase(phase_cb, "login_done", {
         "ok": True, "duration_ms": login_ms, "from_cache": from_cache,
     })
+
+    # ── Persistir detalles del login en BD ───────────────────────────────
+    # Bug visto 2026-05-23: scheduled depositaba 4 veces pero last_checked_at
+    # de la cuenta seguía en marzo. El flow _run_deposit (legacy) hacía
+    # `db.upsert_account` después del login; _run_deposit_with_phases NO. Como
+    # resultado, balance/txns/last_checked nunca se refrescaban y el modal de
+    # detalles mostraba data stale.
+    try:
+        from betmexico_db import db as _bot_db
+        from web_grading import recalc_grade_from_db
+        if login_result and not from_cache:
+            # login_result incluye account_details (balance, txns, kyc, etc.)
+            await asyncio.to_thread(
+                _bot_db.upsert_account, login_result, user.get("telegram_id", 0)
+            )
+            txns_data = (login_result.get("account_details") or {}).get("transactions", {}) or {}
+            txn_items = txns_data.get("items") or []
+            if txn_items:
+                await asyncio.to_thread(
+                    _bot_db.save_account_transactions,
+                    email, txn_items, user.get("telegram_id", 0),
+                )
+            await asyncio.to_thread(recalc_grade_from_db, email)
+    except Exception as e:
+        logger.warning(f"[Deposits/phases] persist login details failed: {e}")
 
     # ── HTTPX client compartido para pasos 2/3/4 ──────────────────────────
     # Reusa el proxy que validó el login (afinidad — evita rotar a un proxy
@@ -1539,6 +1634,15 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                     except Exception as e:
                         logger.warning(f"[Scheduled {sched_id}] phase broadcast failed: {e}")
 
+                # Garantía de token captcha fresco para este intento.
+                # Bug visto 2026-05-23: tras el sleep de 60s, el token del pool
+                # ya tenía >55s de edad y se descartaba en get_token, obligando
+                # a esperar al factory loop (a veces 70s+ extra). El refresh
+                # debe haberse hecho ~10s antes vía _refresh_captcha_pool, pero
+                # como segunda red de seguridad lo dejamos aquí también.
+                if i > 0:
+                    await _ensure_fresh_captcha(pool)
+
                 t0 = time.time()
                 r = None
                 try:
@@ -1595,7 +1699,24 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                     })
                     break
                 if i < repetitions - 1:
-                    await asyncio.sleep(interval)
+                    # Sleep dinámico: cadencia fija de `interval` segundos desde
+                    # el INICIO del intento actual (no desde el fin). Si el
+                    # intento tomó 18s, dormimos 42s — no 60s. Así sale un
+                    # depósito cada minuto exacto.
+                    elapsed = time.time() - t0
+                    sleep_total = max(0.0, interval - elapsed)
+                    # Refresh del token captcha ~10s antes del próximo intento:
+                    # drena tokens viejos del pool y dispara un prefetch nuevo,
+                    # que típicamente termina en 4-7s. Al empezar el siguiente
+                    # iter, el token estará fresco (edad ~3-6s).
+                    pre_refresh = min(10.0, sleep_total)
+                    sleep_before = max(0.0, sleep_total - pre_refresh)
+                    if sleep_before > 0:
+                        await asyncio.sleep(sleep_before)
+                    _drain_stale_tokens(pool, max_age=30)
+                    asyncio.create_task(pool.prefetch(1))
+                    if pre_refresh > 0:
+                        await asyncio.sleep(pre_refresh)
         except asyncio.CancelledError:
             _broadcast({
                 "type": "activity", "kind": "scheduled_cancelled",
