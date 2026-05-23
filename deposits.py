@@ -257,15 +257,55 @@ def _record_attempt(
     duration_ms: int,
     operator_id: int,
     card_pipe: Optional[str] = None,
+    result_raw: Optional[dict] = None,
+    balance_before: Optional[float] = None,
+    balance_after: Optional[float] = None,
 ) -> None:
-    """Broadcast SSE para el feed de Actividad.
+    """Persiste el intento en deposit_attempts + recalc grade + broadcast SSE.
 
-    NO escribe en BD. El INSERT en deposit_attempts lo hace
-    `web_routes_deposits._persist_final` via `db.log_attempt(...)` con info
-    completa (card_id, card_pipe, gateway_response_raw, txn_id, etc.).
-    Tener 2 INSERT en paralelo causaba duplicación en el feed (2026-05-11)."""
+    Histórico (2026-05-11 → 2026-05-22): este helper SOLO hacía broadcast
+    porque `_run_deposit._persist_final` ya escribía en BD. Pero el endpoint
+    `/execute-stream` usa `_run_deposit_with_phases` que NO escribe — y este
+    helper era el único llamado, dejando los attempts sin persistir.
+    Fix 2026-05-23: re-habilitada escritura. Idempotente por attempt_id
+    (INSERT OR IGNORE) para evitar duplicación si `_persist_final` ya escribió.
+    """
     from app import _broadcast
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    # ── 1. Persistir en BD ──────────────────────────────────────
+    try:
+        from betmexico_db import db as _bot_db
+        # log_attempt internamente hace INSERT OR IGNORE por attempt_id
+        _bot_db.log_attempt(
+            attempt_id=attempt_id,
+            batch_id=None,
+            account_email=email,
+            card_id=None,  # /execute-stream no resuelve card_id (no es crítico)
+            amount=float(amount or 0.0),
+            source="manual_single",
+            operator_id=int(operator_id) if operator_id else None,
+            status=status,
+            gateway_response_raw=(json.dumps(result_raw, ensure_ascii=False, default=str)[:4000]
+                                   if result_raw else None),
+            gateway_txn_id=(result_raw or {}).get("txn_id"),
+            balance_before=balance_before,
+            balance_after=balance_after,
+            duration_ms=int(duration_ms) if duration_ms is not None else None,
+            rejection_reason=rejection_reason,
+            mission_id=None,
+            card_pipe=card_pipe,
+        )
+    except Exception as e:
+        logger.error(f"[Deposits] _record_attempt log_attempt error: {e}")
+
+    # ── 2. Recalcular grade (BD viva) ──────────────────────────
+    try:
+        from web_grading import recalc_grade_from_db
+        recalc_grade_from_db(email)
+    except Exception as e:
+        logger.debug(f"[Deposits] _record_attempt recalc_grade: {e}")
+
+    # ── 3. Broadcast SSE para feed de actividad ────────────────
     try:
         _broadcast({
             "type": "activity",
@@ -834,11 +874,25 @@ async def deposit_execute_stream(request: Request, user: dict = Depends(require_
                 try:
                     duration_ms_final = int((time.time() - t_start) * 1000)
                     success_final = bool(result.get("success"))
-                    status_final = "approved" if success_final else "rejected"
-                    reason_final = result.get("error") or result.get("result_code")
+                    # Mapping de status alineado con _persist_final
+                    rc = result.get("result_code") or ""
+                    if success_final:
+                        status_final = "approved"
+                    elif rc in ("LOGIN_FAILED", "CAPTCHA_POOL_EMPTY"):
+                        status_final = "login_lost"
+                    elif rc in ("BEGIN_ERROR", "PAYMENT_ERROR"):
+                        status_final = "gateway_error"
+                    elif rc == "TIMEOUT":
+                        status_final = "timeout"
+                    else:
+                        status_final = "rejected"
+                    reason_final = result.get("error") or rc or None
                     _record_attempt(
                         attempt_id, email, amount, status_final, reason_final,
-                        duration_ms_final, operator_id, card_pipe=card_pipe,
+                        duration_ms_final, operator_id,
+                        card_pipe=card_pipe,
+                        result_raw=result,
+                        balance_after=result.get("balance_real"),
                     )
                 except Exception as e:
                     logger.error(f"[execute-stream] _record_attempt error: {e}")

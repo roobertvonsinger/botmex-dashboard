@@ -163,9 +163,20 @@ async def call_with_proxy_failover(
 
     retry_excs = _retry_exceptions()
     last_err: Optional[BaseException] = None
+    last_result: Any = None
     for i, url in enumerate(urls):
         try:
             result = await fn(*args, **{proxy_kwarg: url, **kwargs})
+            # Algunas funciones (get_jwt) atrapan ProxyError adentro y devuelven
+            # un tuple `(None, {"status": "ERROR", "error": "...ProxyError..."})`
+            # en vez de propagar. Detectarlo y reintentar con el siguiente proxy.
+            if _looks_like_proxy_failure_result(result):
+                logger.warning(
+                    f"[proxy_pool] {_proxy_host(url)} returned proxy-failure result "
+                    f"— try {i+1}/{len(urls)}"
+                )
+                last_result = result
+                continue
             if i > 0:
                 logger.info(
                     f"[proxy_pool] failover ok via {_proxy_host(url)} "
@@ -179,6 +190,36 @@ async def call_with_proxy_failover(
             )
             last_err = e
             continue
-    # Todos fallaron
-    assert last_err is not None
-    raise last_err
+    # Todos fallaron: si hubo result-style failure, devolvemos el último resultado
+    # (mantiene compatibilidad con callers que esperan tuple); si fue excepción, raise.
+    if last_err is not None:
+        raise last_err
+    return last_result, urls[-1] if urls else None
+
+
+_PROXY_FAILURE_TOKENS = (
+    "ProxyError", "504 Gateway Timeout", "502 Bad Gateway",
+    "ConnectError", "ReadTimeout", "ConnectTimeout", "RemoteProtocolError",
+)
+
+
+def _looks_like_proxy_failure_result(result: Any) -> bool:
+    """Detecta resultados que indican fallo de proxy aunque NO se haya lanzado
+    excepción (porque la función interna los atrapó). Heurística:
+    - Es un tuple (a, b) con `a is None` y `b` es dict con status ERROR
+      y `error` contiene tokens típicos de proxy/timeout.
+    """
+    try:
+        if not isinstance(result, tuple) or len(result) < 2:
+            return False
+        primary, meta = result[0], result[1]
+        if primary is not None:
+            return False
+        if not isinstance(meta, dict):
+            return False
+        if meta.get("status") not in ("ERROR", "PROXY_ERROR", "TIMEOUT"):
+            return False
+        err_str = str(meta.get("error", ""))
+        return any(tok in err_str for tok in _PROXY_FAILURE_TOKENS)
+    except Exception:
+        return False
