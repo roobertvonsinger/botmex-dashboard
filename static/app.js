@@ -2702,7 +2702,17 @@ async function openDetailModal(id) {
     // Combo en el title — clickable para copiar
     const combo = `${data.email}:${data.password || ''}`;
     title.innerHTML = `<span class="d-copy mono" data-copy="${esc(combo)}" title="Click para copiar combo">${esc(combo)}</span>`;
-    body.innerHTML = renderDetail(data);
+    // try/catch defensivo: si renderDetail tira excepción a mitad del template,
+    // el `body.innerHTML` quedaba con secciones incompletas y faltaba todo el
+    // panel derecho. Aislamos para que un error parcial muestre fallback en
+    // lugar de un modal a medias. Robert (2026-05-23): "se perdió la info de
+    // detalles" — el render fallaba silenciosamente sin que apareciera error.
+    try {
+      body.innerHTML = renderDetail(data);
+    } catch (renderErr) {
+      console.error('[Detail] renderDetail failed:', renderErr, 'data keys:', Object.keys(data));
+      body.innerHTML = `<div class="detail-error">⚠️ Error renderizando los detalles: ${esc(renderErr.message)}<br><small>Abrí DevTools Console para el stack completo. Datos llegaron del servidor (${Object.keys(data).length} campos).</small></div>`;
+    }
     // Hints contextuales solo para admin (no invasivos, dismissables)
     showAdminHints();
     // Aura del modal según grade

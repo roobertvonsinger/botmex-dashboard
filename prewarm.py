@@ -232,43 +232,28 @@ def _db_upsert_balance(email: str, details: dict) -> None:
 
 
 def _db_save_txns_and_recalc(email: str, details: dict, operator_id: int) -> None:
-    """Guarda transacciones nuevas + recalcula grade. No-op si no llegaron txns."""
-    try:
-        from app import BOT_SCORE_PAYMENT as _score
-    except Exception:
-        _score = None
-    if _score is None:
-        return
+    """Guarda transacciones nuevas + recalcula grade desde BD completa.
+    Cambio 2026-05-23: el recalc ahora usa `web_grading.recalc_grade_from_db`
+    que lee TODAS las txns persistidas en BD, no solo las 10 del fetch actual.
+    Eso da grade correcto incluso cuando fetch_mode='balance_only' trae solo
+    una página."""
     txn_data = (details or {}).get("transactions") or {}
     items = txn_data.get("items") or []
-    # Persiste txns (reusa el helper del bot si está disponible)
+    # Persiste txns nuevas (reusa el helper del bot)
     if items:
         try:
             from betmexico_db import db as _bot_db
-            await_safe = getattr(_bot_db, "save_account_transactions", None)
-            if await_safe:
-                # save_account_transactions(email, items, checked_by) — sync en bot
+            saver = getattr(_bot_db, "save_account_transactions", None)
+            if saver:
                 _bot_db.save_account_transactions(email, items, checked_by=operator_id)
         except Exception as e:
             logger.debug(f"[Prewarm] save_account_transactions: {e}")
-    # Recalcula grade
+    # Recalc grade usando TODAS las txns en BD (no solo las del fetch).
     try:
-        scoring = _score(details)
+        from web_grading import recalc_grade_from_db
+        recalc_grade_from_db(email)
     except Exception as e:
-        logger.debug(f"[Prewarm] score_payment_readiness: {e}")
-        scoring = None
-    if not scoring:
-        return
-    from app import db
-    import sqlite3
-    try:
-        with db(write=True) as c:
-            c.execute(
-                "UPDATE accounts SET grade=?, grade_score=? WHERE email=?",
-                (scoring.get("grade"), scoring.get("score"), email),
-            )
-    except sqlite3.OperationalError:
-        pass
+        logger.debug(f"[Prewarm] recalc_grade_from_db: {e}")
 
 
 def _db_update_last_checked(email: str) -> None:
@@ -356,10 +341,15 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
 
         # Failover real: si el primer proxy timeout/conn-error, rota al siguiente
         # del pool en vez de fallar el intento entero.
+        #
+        # use_cache=True (cambio 2026-05-23): aprovecha JWT cacheado si está
+        # vigente. Ahorra ~5-10s vs forzar captcha+login fresh. El guard
+        # `api_succeeded` en _db_upsert_balance evita madrear balance si el
+        # JWT cacheado devuelve 401 silencioso.
         from proxy_pool import call_with_proxy_failover
         (jwt, login_result), used_proxy = await asyncio.wait_for(
             call_with_proxy_failover(
-                get_jwt, email, password, pool, use_cache=False,
+                get_jwt, email, password, pool, use_cache=True,
             ),
             timeout=float(TASK_TIMEOUT_SEC),
         )
@@ -374,10 +364,15 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
                     "error": (login_result.get("error") if isinstance(login_result, dict) else None) or status or "Login falló"}
 
         # Mantener afinidad: ApiChecker usa el mismo proxy que validó el login.
+        # fetch_mode="balance_only" (cambio 2026-05-23): trae balance +
+        # last_deposit + KYC. NO trae txns (~3-5s ahorro). Robert: "el balance
+        # y fechas de depósito y cantidades sí actualizar, pero los datos
+        # estáticos repararse desde BD". Las txns nuevas las trae el watchdog
+        # o el flujo de depósito (que sí usa "full").
         async with BetmexicoApiChecker(proxy=used_proxy) as checker:
             details = await asyncio.wait_for(
-                checker.fetch_account_details_parallel(jwt, fetch_mode="full"),
-                timeout=18.0,
+                checker.fetch_account_details_parallel(jwt, fetch_mode="balance_only"),
+                timeout=12.0,
             )
         if details:
             await asyncio.to_thread(_db_upsert_balance, email, details)
