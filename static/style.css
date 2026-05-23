@@ -2768,3 +2768,203 @@ td.row-details-cell, th.row-details-th {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.15); }
 }
+
+/* ─── Programado: vista live (SSE-driven) — premium ADHD-friendly ─────── */
+.dep-sched-run {
+  margin: 14px 0;
+  padding: 16px 18px 14px;
+  background:
+    radial-gradient(circle at 100% 0%, var(--accent-soft-2), transparent 60%),
+    linear-gradient(180deg, var(--accent-soft) 0%, transparent 100%);
+  border: 1px solid var(--accent-soft-2);
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+  animation: depSchedAppear 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dep-sched-run.hidden { display: none; }
+.dep-sched-run::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-mid));
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+@keyframes depSchedAppear {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dep-sched-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px;
+}
+.dep-sched-title {
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent);
+  text-shadow: 0 0 8px var(--accent-glow);
+}
+.dep-sched-id { font-size: 10px; }
+
+.dep-sched-counter {
+  display: flex; align-items: baseline; gap: 8px;
+  margin-bottom: 10px;
+}
+.dep-sched-num {
+  font-size: 32px; font-weight: 700;
+  letter-spacing: -0.02em;
+  font-family: var(--font-mono);
+  color: var(--text);
+  line-height: 1;
+  text-shadow: 0 0 14px var(--accent-glow);
+}
+.dep-sched-num .dim { font-size: 22px; }
+.dep-sched-counter-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dep-sched-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+  margin-bottom: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+.dep-sched-bar-fill {
+  height: 100%; width: 0;
+  background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+  border-radius: 3px;
+  box-shadow: 0 0 10px var(--accent-glow);
+  transition: width 520ms cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+.dep-sched-bar-fill::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  animation: depSchedShimmer 1.8s linear infinite;
+}
+@keyframes depSchedShimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.dep-sched-now {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 12px;
+  color: var(--text);
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  margin-bottom: 10px;
+  min-height: 32px;
+}
+.dep-sched-now-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+  animation: depSchedPulse 1.4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes depSchedPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.5); opacity: 0.55; }
+}
+.dep-sched-now-text {
+  flex: 1;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  transition: opacity 200ms ease;
+}
+.dep-sched-countdown {
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  font-feature-settings: 'tnum' 1;
+}
+.dep-sched-countdown.hidden { display: none; }
+
+.dep-sched-timeline {
+  display: flex; flex-direction: column;
+  gap: 4px;
+  max-height: 140px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent-soft-2) transparent;
+}
+.dep-sched-timeline::-webkit-scrollbar { width: 4px; }
+.dep-sched-timeline::-webkit-scrollbar-thumb { background: var(--accent-soft-2); border-radius: 2px; }
+.dep-sched-tl-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  animation: depSchedSlideIn 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dep-sched-tl-item.ok {
+  background: var(--accent-soft);
+  border-color: var(--accent-soft-2);
+  color: var(--accent);
+}
+.dep-sched-tl-item.fail {
+  background: oklch(0.55 0.22 18 / 0.10);
+  border-color: oklch(0.55 0.22 18 / 0.25);
+  color: var(--danger);
+}
+.dep-sched-tl-iter { font-weight: 700; min-width: 30px; }
+.dep-sched-tl-icon { font-size: 12px; }
+.dep-sched-tl-code { flex: 1; opacity: 0.85; }
+.dep-sched-tl-dur { opacity: 0.65; font-size: 10px; }
+@keyframes depSchedSlideIn {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Estados terminales — claros y diferenciados */
+.dep-sched-run.done {
+  border-color: var(--accent);
+  background:
+    radial-gradient(circle at 100% 0%, var(--accent-soft-2), transparent 50%),
+    linear-gradient(180deg, var(--accent-soft-2) 0%, transparent 100%);
+}
+.dep-sched-run.done .dep-sched-now-dot {
+  animation: none;
+  background: var(--accent);
+  transform: scale(1.4);
+}
+.dep-sched-run.aborted {
+  border-color: oklch(0.55 0.22 18 / 0.5);
+  background:
+    radial-gradient(circle at 100% 0%, oklch(0.55 0.22 18 / 0.15), transparent 50%),
+    linear-gradient(180deg, oklch(0.55 0.22 18 / 0.06) 0%, transparent 100%);
+}
+.dep-sched-run.aborted::before {
+  background: linear-gradient(180deg, var(--danger), oklch(0.42 0.20 18));
+}
+.dep-sched-run.aborted .dep-sched-title,
+.dep-sched-run.aborted .dep-sched-num { color: var(--danger); text-shadow: 0 0 10px oklch(0.55 0.22 18 / 0.35); }
+.dep-sched-run.aborted .dep-sched-now-dot {
+  animation: none;
+  background: var(--danger);
+  box-shadow: 0 0 8px oklch(0.55 0.22 18 / 0.5);
+}
+.dep-sched-run.aborted .dep-sched-bar-fill {
+  background: linear-gradient(90deg, oklch(0.42 0.20 18), var(--danger));
+  box-shadow: 0 0 8px oklch(0.55 0.22 18 / 0.4);
+}
+.dep-sched-run.aborted .dep-sched-bar-fill::after { animation: none; }
+.dep-sched-run.done .dep-sched-bar-fill::after { animation: none; }

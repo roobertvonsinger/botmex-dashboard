@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20260515f">
+<link rel="stylesheet" href="/static/style.css?v=20260523a">
 </head>
 <body>
 <div class="shell">
@@ -517,6 +517,27 @@
         </div>
       </div>
 
+      <!-- Vista live para Programado (SSE-driven, premium feedback) -->
+      <div id="depScheduledRun" class="dep-sched-run hidden">
+        <div class="dep-sched-head">
+          <span class="dep-sched-title">⏰ Misión en curso</span>
+          <span id="depSchedId" class="dep-sched-id mono dim"></span>
+        </div>
+        <div class="dep-sched-counter">
+          <span class="dep-sched-num">
+            <span id="depSchedIterNow">0</span><span class="dim">/</span><span id="depSchedIterTot">0</span>
+          </span>
+          <span class="dep-sched-counter-label">intentos completados</span>
+        </div>
+        <div class="dep-sched-bar"><div id="depSchedBarFill" class="dep-sched-bar-fill"></div></div>
+        <div id="depSchedNow" class="dep-sched-now">
+          <span class="dep-sched-now-dot"></span>
+          <span id="depSchedNowText" class="dep-sched-now-text">Iniciando…</span>
+          <span id="depSchedCountdown" class="dep-sched-countdown mono hidden">⏱ 0s</span>
+        </div>
+        <div id="depSchedTimeline" class="dep-sched-timeline"></div>
+      </div>
+
       <!-- Result / Feed -->
       <div id="depResult" class="dep-result hidden"></div>
 
@@ -560,6 +581,6 @@
 <!-- Toast -->
 <div id="toast" class="toast hidden"></div>
 
-<script src="/static/app.js?v=20260515f"></script>
+<script src="/static/app.js?v=20260523a"></script>
 </body>
 </html>

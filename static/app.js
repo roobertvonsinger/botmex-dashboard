@@ -1192,6 +1192,14 @@ function connectSSE() {
             msg: `${ev.who} depositó ${fmtMoney(ev.amount)} en ${ev.target} → ${ev.status}`,
           });
           if (ok) reload();
+        } else if (ev.kind === 'scheduled_phase') {
+          _schedOnPhase(ev);
+        } else if (ev.kind === 'scheduled') {
+          _schedOnIterDone(ev);
+        } else if (ev.kind === 'scheduled_aborted') {
+          _schedOnAborted(ev);
+        } else if (ev.kind === 'scheduled_cancelled') {
+          _schedOnCancelled(ev);
         } else if (ev.kind === 'note') {
           const myTg = state.user?.telegram_id;
           const isMine = ev.who_id && myTg && ev.who_id === myTg;
@@ -3023,6 +3031,8 @@ function setDepMode(mode) {
   $('#depScheduleBlock').classList.toggle('hidden', !isSched);
   // Phase stepper solo aplica a single — ocultar al cambiar de modo
   const _ps = $('#depStepper'); if (_ps) _ps.classList.add('hidden');
+  // Vista live de schedule solo aplica a programado — ocultar y limpiar
+  if (!isSched) { try { _schedReset(); } catch {} }
 
   // título
   $('#depModalTitle').textContent = isSingle ? 'Depositar' : isMulti ? 'Multicuenta (Matchmaker)' : 'Programado';
@@ -3281,6 +3291,8 @@ function closeDepositModal() {
   $('#depModal').classList.remove('dep-modal-wide');
   $('#depMatchView').classList.add('hidden');
   $('#depCap').style.display = 'none';
+  // Limpiar la vista live del schedule (si quedó algún render previo)
+  try { _schedReset(); } catch {}
   _depAccountIds = [];
 }
 
@@ -3515,10 +3527,171 @@ function _handleExecStreamEvent(ev, amount) {
 }
 
 // ── SCHEDULE: 1 tarjeta, 1 cuenta, N reps cada 1 min ──
+// Vista live driven por SSE: barra de progreso, fase actual, timeline.
+// No usa el feed de Actividad — todo el feedback vive en el modal.
+const _PHASE_TEXTS = {
+  login_start: '🔑 Iniciando sesión…',
+  login_done: '✓ Sesión OK',
+  gateway_begin: '📝 Generando orden…',
+  gateway_begin_done: '✓ Orden creada',
+  gateway_submit: '💳 Procesando tarjeta…',
+  gateway_submit_done: '✓ Banco respondió',
+  gateway_check: '🔎 Verificando con BetMexico…',
+  gateway_check_done: '✓ Verificado',
+  implicit_3ds_detected: '⚠️ 3DS detectado (no acreditado)',
+  done: '✓ Intento completado',
+};
+
+// Estado del schedule activo (un solo schedule a la vez por user)
+let _schedActive = null;          // { sched_id, total, currentIter, lastIterStart, results: [] }
+let _schedCountdownTimer = null;
+
+function _schedReset() {
+  if (_schedCountdownTimer) { clearInterval(_schedCountdownTimer); _schedCountdownTimer = null; }
+  _schedActive = null;
+  const el = $('#depScheduledRun');
+  if (!el) return;
+  el.classList.add('hidden');
+  el.classList.remove('done', 'aborted');
+  const tl = $('#depSchedTimeline'); if (tl) tl.innerHTML = '';
+  const bar = $('#depSchedBarFill'); if (bar) bar.style.width = '0%';
+  const cd = $('#depSchedCountdown'); if (cd) cd.classList.add('hidden');
+  const txt = $('#depSchedNowText'); if (txt) txt.textContent = 'Iniciando…';
+}
+
+function _schedShow(sched_id, total) {
+  _schedActive = { sched_id, total, currentIter: 0, lastIterStart: 0, results: [] };
+  const el = $('#depScheduledRun');
+  if (!el) return;
+  el.classList.remove('hidden', 'done', 'aborted');
+  $('#depSchedId').textContent = `id: ${sched_id}`;
+  $('#depSchedIterNow').textContent = '0';
+  $('#depSchedIterTot').textContent = String(total);
+  $('#depSchedBarFill').style.width = '0%';
+  $('#depSchedTimeline').innerHTML = '';
+  $('#depSchedNowText').textContent = `⚡ Preparando intento 1 de ${total}…`;
+  $('#depSchedCountdown').classList.add('hidden');
+}
+
+function _schedUpdateProgress() {
+  if (!_schedActive) return;
+  const pct = Math.max(0, Math.min(100, Math.round((_schedActive.currentIter / _schedActive.total) * 100)));
+  $('#depSchedBarFill').style.width = pct + '%';
+  $('#depSchedIterNow').textContent = String(_schedActive.currentIter);
+}
+
+function _schedOnPhase(ev) {
+  if (!_schedActive || ev.sched_id !== _schedActive.sched_id) return;
+  const iter = ev.iter || 1;
+  // Marca inicio de un nuevo intento (primer phase)
+  if (iter > _schedActive.currentIter || (iter === 1 && !_schedActive.lastIterStart)) {
+    _schedActive.lastIterStart = Date.now();
+  }
+  const txt = _PHASE_TEXTS[ev.name] || `· ${ev.name}`;
+  $('#depSchedNowText').textContent = `Intento ${iter}/${_schedActive.total} — ${txt}`;
+  $('#depSchedCountdown').classList.add('hidden');
+  if (_schedCountdownTimer) { clearInterval(_schedCountdownTimer); _schedCountdownTimer = null; }
+}
+
+function _schedOnIterDone(ev) {
+  if (!_schedActive || ev.sched_id !== _schedActive.sched_id) return;
+  const iter = ev.iter || 1;
+  const ok = !!ev.success;
+  const code = ev.code || (ok ? 'APPROVED' : 'REJECTED');
+  const durMs = _schedActive.lastIterStart ? (Date.now() - _schedActive.lastIterStart) : 0;
+  const dur = durMs > 0 ? (durMs / 1000).toFixed(1) + 's' : '';
+  _schedActive.results.push({ iter, ok, code, dur });
+  _schedActive.currentIter = iter;
+  _schedUpdateProgress();
+
+  // Append a timeline (más reciente arriba)
+  const tl = $('#depSchedTimeline');
+  if (tl) {
+    const item = document.createElement('div');
+    item.className = `dep-sched-tl-item ${ok ? 'ok' : 'fail'}`;
+    item.innerHTML = `
+      <span class="dep-sched-tl-iter">#${iter}</span>
+      <span class="dep-sched-tl-icon">${ok ? '✓' : '✗'}</span>
+      <span class="dep-sched-tl-code">${esc(code)}</span>
+      <span class="dep-sched-tl-dur">${esc(dur)}</span>
+    `;
+    tl.insertBefore(item, tl.firstChild);
+  }
+
+  // Check terminal
+  if (iter >= _schedActive.total) {
+    _schedFinish(ok);
+    return;
+  }
+  if (!ok) {
+    // El backend va a emitir scheduled_aborted, dejamos que ese handler termine
+    return;
+  }
+  // Próximo intento — countdown
+  _schedStartCountdown(60);
+}
+
+function _schedStartCountdown(seconds) {
+  const el = $('#depSchedCountdown');
+  const txtEl = $('#depSchedNowText');
+  if (!el || !txtEl) return;
+  el.classList.remove('hidden');
+  let remaining = seconds;
+  el.textContent = `⏱ ${remaining}s`;
+  txtEl.textContent = `Esperando próximo intento…`;
+  if (_schedCountdownTimer) clearInterval(_schedCountdownTimer);
+  _schedCountdownTimer = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(_schedCountdownTimer);
+      _schedCountdownTimer = null;
+      el.classList.add('hidden');
+    } else {
+      el.textContent = `⏱ ${remaining}s`;
+    }
+  }, 1000);
+}
+
+function _schedFinish(allOk) {
+  if (!_schedActive) return;
+  if (_schedCountdownTimer) { clearInterval(_schedCountdownTimer); _schedCountdownTimer = null; }
+  const el = $('#depScheduledRun');
+  if (el) el.classList.add(allOk ? 'done' : 'aborted');
+  const total = _schedActive.total;
+  $('#depSchedNowText').textContent = allOk
+    ? `🎯 Misión completa — ${total} intento${total === 1 ? '' : 's'} aprobado${total === 1 ? '' : 's'}`
+    : `✗ Misión terminada con errores`;
+  $('#depSchedCountdown').classList.add('hidden');
+  $('#depExec').textContent = '⏰ Nueva misión';
+  _schedActive = null;
+}
+
+function _schedOnAborted(ev) {
+  if (!_schedActive || ev.sched_id !== _schedActive.sched_id) return;
+  if (_schedCountdownTimer) { clearInterval(_schedCountdownTimer); _schedCountdownTimer = null; }
+  $('#depScheduledRun').classList.add('aborted');
+  $('#depSchedNowText').textContent = `✗ Misión abortada — ${esc(ev.code || 'fallo')}`;
+  $('#depSchedCountdown').classList.add('hidden');
+  $('#depExec').textContent = '⏰ Nueva misión';
+  _schedActive = null;
+}
+
+function _schedOnCancelled(ev) {
+  if (!_schedActive || ev.sched_id !== _schedActive.sched_id) return;
+  if (_schedCountdownTimer) { clearInterval(_schedCountdownTimer); _schedCountdownTimer = null; }
+  $('#depScheduledRun').classList.add('aborted');
+  $('#depSchedNowText').textContent = `⏹ Misión cancelada`;
+  $('#depSchedCountdown').classList.add('hidden');
+  $('#depExec').textContent = '⏰ Nueva misión';
+  _schedActive = null;
+}
+
 async function executeScheduled(pipe, amount) {
   _depBusy = true;
   $('#depExec').disabled = true;
   $('#depExec').textContent = 'Programando…';
+  _schedReset();
+  $('#depResult').classList.add('hidden');
   try {
     const r = await fetch('/api/deposits/scheduled/create', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -3529,12 +3702,10 @@ async function executeScheduled(pipe, amount) {
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
-    const res = $('#depResult');
-    res.className = 'dep-result success';
-    res.classList.remove('hidden');
-    res.innerHTML = `<b>⏰ Misión programada</b> — ${_depReps} repeticiones cada 1min<br><span class="dim mono">id: ${esc(data.sched_id)}</span><br><span class="dim">Sigue el progreso en el feed de Actividad. Si una rep falla, la misión se aborta automáticamente.</span>`;
+    // Activar vista live — el resto viene por SSE
+    _schedShow(data.sched_id, _depReps);
     pushNotif({ icon: '⏰', msg: `Misión ${data.sched_id}: ${_depReps} reps en ${data.email}` });
-    $('#depExec').textContent = '✓ Programada — ciérralo cuando quieras';
+    $('#depExec').textContent = '⏳ Misión activa';
   } catch (e) {
     toast(`Error: ${e.message}`, 'error');
     $('#depExec').textContent = '⏰ Programar misión';
