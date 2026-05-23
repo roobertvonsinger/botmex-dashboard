@@ -34,6 +34,76 @@ AUTOLOCK_HOURS_MULTI = 2
 AUTOLOCK_HOURS_SCHEDULED = 4  # más amplio porque corre N reps cada 1 min
 
 
+# ── Tracking de BINes que lanzan 3DS ────────────────────────────────────────
+# Cada vez que detectamos 3DS en un intento → incrementamos total_3ds del BIN
+# correspondiente. Endpoint `/api/deposits/bin-check` permite al frontend
+# preguntar antes del intento si el BIN tiene historial 3DS y avisar al user.
+
+def _record_bin_3ds(bin6: str) -> None:
+    """Incrementa total_3ds + last_3ds_at en bin_stats. UPSERT-safe."""
+    if not bin6 or len(bin6) < 6:
+        return
+    bin6 = bin6[:6]
+    from app import db
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        with db(write=True) as c:
+            # Intentar UPDATE primero
+            cur = c.execute(
+                "UPDATE bin_stats SET "
+                "total_3ds = COALESCE(total_3ds, 0) + 1, "
+                "last_3ds_at = ?, "
+                "updated_at = ? "
+                "WHERE bin = ?",
+                (now, now, bin6),
+            )
+            if cur.rowcount == 0:
+                # No existía → INSERT
+                c.execute(
+                    "INSERT INTO bin_stats (bin, total_attempts, total_approved, "
+                    "total_rejected, total_3ds, last_3ds_at, updated_at) "
+                    "VALUES (?, 0, 0, 0, 1, ?, ?)",
+                    (bin6, now, now),
+                )
+        logger.info(f"[Deposits] BIN {bin6} marcado como 3DS-prone")
+    except Exception as e:
+        logger.warning(f"[Deposits] _record_bin_3ds error: {e}")
+
+
+def _bin_3ds_stats(bin6: str) -> dict:
+    """Lee historial 3DS de un BIN. Devuelve dict con count, last_seen, total_attempts."""
+    if not bin6 or len(bin6) < 6:
+        return {"bin": bin6, "total_3ds": 0, "last_3ds_at": None,
+                "total_attempts": 0, "total_approved": 0}
+    bin6 = bin6[:6]
+    from app import db
+    try:
+        with db() as c:
+            r = c.execute(
+                "SELECT bin, COALESCE(total_3ds,0) AS total_3ds, last_3ds_at, "
+                "COALESCE(total_attempts,0) AS total_attempts, "
+                "COALESCE(total_approved,0) AS total_approved "
+                "FROM bin_stats WHERE bin = ?",
+                (bin6,),
+            ).fetchone()
+            if not r:
+                return {"bin": bin6, "total_3ds": 0, "last_3ds_at": None,
+                        "total_attempts": 0, "total_approved": 0}
+            return dict(r)
+    except Exception:
+        return {"bin": bin6, "total_3ds": 0, "last_3ds_at": None,
+                "total_attempts": 0, "total_approved": 0}
+
+
+@router.get("/bin-check/{bin6}")
+def bin_check(bin6: str, _user: dict = Depends(require_session)):
+    """Devuelve historial 3DS del BIN para que el frontend avise al user.
+    `is_3ds_prone = total_3ds >= 1` (cualquier 3DS previo es señal)."""
+    stats = _bin_3ds_stats(bin6[:6] if bin6 else "")
+    stats["is_3ds_prone"] = stats.get("total_3ds", 0) >= 1
+    return stats
+
+
 def _auto_lock_for_deposit(
     account_id: int,
     operator_id: int,
@@ -492,12 +562,10 @@ async def _run_deposit_with_phases(
 
         result_code = step2.get("resultCode", "UNKNOWN")
         payload = step2.get("payload", {}) or {}
-        # Detección 3DS robusta — chequea múltiples keys que processorpay/BetMexico
-        # han usado o pueden usar. Si CUALQUIERA es truthy → tratamos como 3DS.
-        # Antes solo `payload.threeDs` → si BetMexico renombra/anida, se nos pasaba
-        # como aprobado falso. Bug visto 2026-05-23 con marckovzz40 (resultCode
-        # APPROVED pero saldo NO subió → fue 3DS no detectado).
-        is_3ds = bool(
+        # Detección 3DS robusta (3 niveles):
+        #
+        # NIVEL 1 — flags explícitos del payload:
+        is_3ds_explicit = bool(
             payload.get("threeDs")
             or payload.get("threeDS")
             or payload.get("three_ds")
@@ -509,6 +577,18 @@ async def _run_deposit_with_phases(
             or step2.get("threeDs")
             or step2.get("redirectUrl")
         )
+        # NIVEL 2 — 3DS implícito por JWT cardinal:
+        # Cardinal Commerce 3DS 2.0 devuelve `payload={"jwt": "..."}` sin flags
+        # explícitos. Bug visto 2026-05-23 con marckovzz40: el dashboard reportó
+        # APPROVED pero la transacción quedó en "Created" (no acreditada) — era
+        # 3DS pendiente. Detectamos: payload contiene SOLO jwt (sin otros campos
+        # de éxito) → es 3DS challenge.
+        is_3ds_via_jwt = bool(
+            payload.get("jwt")
+            and "transactionId" not in payload
+            and "redirectStatus" not in payload
+        )
+        is_3ds = is_3ds_explicit or is_3ds_via_jwt
         # Log raw para diagnóstico (truncado a 1500 chars para no inundar)
         try:
             import json as _json
@@ -584,12 +664,37 @@ async def _run_deposit_with_phases(
     TXN_STATUS_FAILED = -4
 
     rc_ok = (result_code == "BANK_APPROVED")
-    if rc_ok and check_exc is None:
-        # Tenemos check válido → confiar en transactionStatus
+    # NIVEL 3 — 3DS implícito post-check: la transacción se creó en BetMexico
+    # pero quedó en status "Created"/"Pending" sin acreditar. Robert (2026-05-23):
+    # "el 3d a veces no se nota, solo se queda ahí abierto... si se cierra el modal
+    # sin darle cancelar, no nota el procesador que se intentó un pago".
+    # Síntoma exacto: txnStatus=0 + transactionStatusDescription en (Created,Pending,Processing).
+    status_desc = str((step3 or {}).get("transactionStatusDescription", "")).strip().lower()
+    is_3ds_implicit = (
+        rc_ok
+        and txn_status == TXN_STATUS_PENDING
+        and status_desc in ("created", "pending", "processing", "")
+    )
+    if is_3ds_implicit and not is_3ds:
+        is_3ds = True
+        # Re-emit done phase como 3DS para que UI lo muestre así
+        await _safe_phase(phase_cb, "implicit_3ds_detected", {
+            "txn_status_desc": status_desc, "txn_id": txn_id,
+        })
+
+    if is_3ds:
+        # Cualquier 3DS (explícito o implícito) → no approved
+        approved = False
+        result_code = "3DS_REQUIRED"
+        # Registrar BIN en bin_stats (total_3ds, last_3ds_at)
+        try:
+            _record_bin_3ds(cc_num[:6])
+        except Exception as _e:
+            logger.debug(f"[Deposits/phases] _record_bin_3ds: {_e}")
+    elif rc_ok and check_exc is None:
+        # Check válido y no 3DS → confiar en transactionStatus
         approved = (txn_status == TXN_STATUS_SUCCESS)
         if not approved:
-            # rc dijo aprobado pero el banco no acreditó. Reportar como
-            # PENDING/FAILED según txn_status (no false success).
             if txn_status == TXN_STATUS_PENDING:
                 result_code = "PENDING_NOT_APPLIED"
             elif txn_status == TXN_STATUS_FAILED:
@@ -597,7 +702,7 @@ async def _run_deposit_with_phases(
             else:
                 result_code = f"UNKNOWN_TXN_STATUS_{txn_status}"
     elif rc_ok and check_exc is not None:
-        # Check falló por network — aceptamos como ambiguo para no perder approvals
+        # Check falló por network — aceptamos como ambiguo
         approved = True
         result_code = "BANK_APPROVED_UNVERIFIED"
     else:
@@ -605,10 +710,13 @@ async def _run_deposit_with_phases(
 
     error_msg = None
     if not approved:
-        decline = (payload.get("message")
-                   or payload.get("statusDescription")
-                   or "decline genérico")
-        error_msg = f"{result_code} — {decline}"
+        if result_code == "3DS_REQUIRED":
+            error_msg = "3DS_REQUIRED — BIN lanza 3DS (transacción no acreditada)"
+        else:
+            decline = (payload.get("message")
+                       or payload.get("statusDescription")
+                       or "decline genérico")
+            error_msg = f"{result_code} — {decline}"
 
     await _safe_phase(phase_cb, "done", {
         "success": approved, "result_code": result_code, "error": error_msg,

@@ -6,6 +6,8 @@ from __future__ import annotations
 import sqlite3, os, sys
 import asyncio
 import json as _json
+import logging as _logging
+import logging.handlers as _logging_handlers
 import queue as _stdlib_queue
 import threading
 import urllib.request
@@ -13,6 +15,34 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
+
+# ── File logging para que /api/logs pueda servir desde Docker ─────────────────
+# Antes el endpoint usaba `journalctl -u betmexico-web.service` pero en KVM4
+# corremos en Docker (no hay systemd). Resultado: logs no se cargaban en el
+# dashboard desde la migración 2026-05-11. Fix: agregar FileHandler que escriba
+# a /data/logs/dashboard.log (volumen montado, persiste entre restarts) y leer
+# de ahí en el endpoint.
+_LOGS_DIR = Path("/data/logs")
+try:
+    _LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    _LOG_FILE = _LOGS_DIR / "dashboard.log"
+    _root_logger = _logging.getLogger()
+    # Solo agregar si no existe ya (evita duplicar en hot-reload)
+    if not any(isinstance(h, _logging_handlers.RotatingFileHandler)
+               and getattr(h, "_dashboard_handler", False)
+               for h in _root_logger.handlers):
+        _fh = _logging_handlers.RotatingFileHandler(
+            str(_LOG_FILE), maxBytes=10 * 1024 * 1024, backupCount=3, encoding="utf-8"
+        )
+        _fh._dashboard_handler = True  # marker
+        _fh.setFormatter(_logging.Formatter(
+            "%(asctime)s [%(levelname)s] [%(name)s] %(message)s"
+        ))
+        _root_logger.addHandler(_fh)
+        if _root_logger.level == _logging.NOTSET or _root_logger.level > _logging.INFO:
+            _root_logger.setLevel(_logging.INFO)
+except Exception as _e:
+    print(f"[boot] file logger init failed: {_e}")
 
 # Permitir importar módulos del bot (betmexico_db, betmexico_login_service, etc.)
 # que viven en el directorio padre cuando el VPS los tiene desplegados.
@@ -105,6 +135,11 @@ def _migrate():
         ("notif_pre24h_sent_at", "ALTER TABLE accounts ADD COLUMN notif_pre24h_sent_at TEXT"),
         ("notif_at24h_sent_at", "ALTER TABLE accounts ADD COLUMN notif_at24h_sent_at TEXT"),
         ("notif_at24h10_sent_at", "ALTER TABLE accounts ADD COLUMN notif_at24h10_sent_at TEXT"),
+        # Tracking 3DS por BIN: cada vez que se detecta 3DS (explícito o implícito
+        # por JWT cardinal + status Created), se incrementa total_3ds y se actualiza
+        # last_3ds_at. Frontend consulta `/api/deposits/bin-check` antes del intento.
+        ("total_3ds", "ALTER TABLE bin_stats ADD COLUMN total_3ds INTEGER DEFAULT 0"),
+        ("last_3ds_at", "ALTER TABLE bin_stats ADD COLUMN last_3ds_at TEXT"),
     ]:
         try:
             with db(write=True) as c:
@@ -918,21 +953,30 @@ def accounts_refresh(req: RefreshRequest, _user: dict = Depends(require_session)
 @app.get("/api/logs")
 def get_logs(limit: int = 200, since: Optional[str] = None,
              user: dict = Depends(require_session)):
+    """Lee las últimas N líneas del log del dashboard.
+    Fix 2026-05-23: antes usaba journalctl, pero en Docker no hay systemd. Ahora
+    lee `/data/logs/dashboard.log` que escribe el RotatingFileHandler de app.py."""
     if user.get("role") != "superadmin":
         raise HTTPException(403, "Solo superadmin")
-    import subprocess
+    log_file = Path("/data/logs/dashboard.log")
+    if not log_file.exists():
+        return {"lines": ["(log file no creado todavía — esperar primer flush)"]}
     try:
-        cmd = ["journalctl", "-u", "betmexico-web", "-n", str(min(limit, 1000)),
-               "--no-pager", "--output=short-iso"]
+        n = max(1, min(int(limit or 200), 2000))
+        # Lee tail eficiente: lee últimos ~512KB y toma últimas N líneas
+        size = log_file.stat().st_size
+        with log_file.open("rb") as f:
+            if size > 524288:
+                f.seek(-524288, 2)
+                f.readline()  # descarta línea parcial
+            data = f.read().decode("utf-8", errors="replace")
+        lines = data.splitlines()[-n:]
         if since:
-            cmd.extend(["--since", since])
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
-        lines = res.stdout.splitlines()
-    except FileNotFoundError:
-        lines = ["(journalctl no disponible en este entorno)"]
+            # Filtro simple por prefijo timestamp (las líneas empiezan con "YYYY-MM-DD HH:MM:SS,ms")
+            lines = [ln for ln in lines if ln[:19] >= since[:19]]
+        return {"lines": lines}
     except Exception as e:
-        lines = [f"Error: {e}"]
-    return {"lines": lines}
+        return {"lines": [f"Error leyendo log: {e}"]}
 
 
 # ─── Health check ──────────────────────────────────────────────────────────────
