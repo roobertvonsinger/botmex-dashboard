@@ -492,7 +492,31 @@ async def _run_deposit_with_phases(
 
         result_code = step2.get("resultCode", "UNKNOWN")
         payload = step2.get("payload", {}) or {}
-        is_3ds = bool(payload.get("threeDs", False))
+        # Detección 3DS robusta — chequea múltiples keys que processorpay/BetMexico
+        # han usado o pueden usar. Si CUALQUIERA es truthy → tratamos como 3DS.
+        # Antes solo `payload.threeDs` → si BetMexico renombra/anida, se nos pasaba
+        # como aprobado falso. Bug visto 2026-05-23 con marckovzz40 (resultCode
+        # APPROVED pero saldo NO subió → fue 3DS no detectado).
+        is_3ds = bool(
+            payload.get("threeDs")
+            or payload.get("threeDS")
+            or payload.get("three_ds")
+            or payload.get("threeDsRequired")
+            or payload.get("requires3DS")
+            or payload.get("is3DS")
+            or payload.get("redirectUrl")    # 3DS challenge URL
+            or payload.get("acsUrl")          # Access Control Server (3DS)
+            or step2.get("threeDs")
+            or step2.get("redirectUrl")
+        )
+        # Log raw para diagnóstico (truncado a 1500 chars para no inundar)
+        try:
+            import json as _json
+            logger.info(f"[Deposits/phases] {email} submit raw resultCode={result_code} "
+                        f"is_3ds={is_3ds} payload_keys={list(payload.keys())[:15]} "
+                        f"step2={_json.dumps(step2, default=str)[:1500]}")
+        except Exception:
+            pass
 
         await _safe_phase(phase_cb, "gateway_submit_done", {
             "result_code": result_code, "is_3ds": is_3ds,
@@ -509,6 +533,7 @@ async def _run_deposit_with_phases(
                 "success": False, "result_code": "3DS_REQUIRED",
                 "error": "3DS_REQUIRED — Tarjeta requiere autenticación",
                 "duration_ms": int((time.time() - t_total) * 1000),
+                "raw_submit": step2,
             }
 
         # ── PASO 4: check_transaction ────────────────────────────────────
@@ -525,6 +550,14 @@ async def _run_deposit_with_phases(
         txn_status = (step3.get("transactionStatus", 0)
                       if "error" not in step3 else 0)
 
+        # Log raw del check para diagnóstico
+        try:
+            import json as _json
+            logger.info(f"[Deposits/phases] {email} check raw txnStatus={txn_status} "
+                        f"step3={_json.dumps(step3, default=str)[:1500]}")
+        except Exception:
+            pass
+
         check_done_payload: dict = {
             "txn_status": txn_status, "duration_ms": check_ms,
         }
@@ -538,7 +571,38 @@ async def _run_deposit_with_phases(
         await _safe_phase(phase_cb, "gateway_check_done", check_done_payload)
 
     # ── Resultado final ──────────────────────────────────────────────────
-    approved = (result_code == "BANK_APPROVED")
+    # Para considerar APPROVED REAL requerimos:
+    #   1) resultCode == BANK_APPROVED del processorpay (lo que ya teníamos)
+    #   2) transactionStatus == SUCCESS (6) en BetMexico — confirma que el
+    #      depósito SE APLICÓ al balance. Si está pendiente (0) o failed (-4),
+    #      el banco quizá aprobó pero BetMexico todavía no acreditó → no es real.
+    # Si check_transaction falló por excepción (check_exc), aceptamos resultCode
+    # solo para no perder approvals legítimos por network blips. Caveat: en ese
+    # caso quedará marcado AMBIGUOUS para que el operador verifique manualmente.
+    TXN_STATUS_SUCCESS = 6
+    TXN_STATUS_PENDING = 0
+    TXN_STATUS_FAILED = -4
+
+    rc_ok = (result_code == "BANK_APPROVED")
+    if rc_ok and check_exc is None:
+        # Tenemos check válido → confiar en transactionStatus
+        approved = (txn_status == TXN_STATUS_SUCCESS)
+        if not approved:
+            # rc dijo aprobado pero el banco no acreditó. Reportar como
+            # PENDING/FAILED según txn_status (no false success).
+            if txn_status == TXN_STATUS_PENDING:
+                result_code = "PENDING_NOT_APPLIED"
+            elif txn_status == TXN_STATUS_FAILED:
+                result_code = "BANK_REJECTED_AFTER_APPROVE"
+            else:
+                result_code = f"UNKNOWN_TXN_STATUS_{txn_status}"
+    elif rc_ok and check_exc is not None:
+        # Check falló por network — aceptamos como ambiguo para no perder approvals
+        approved = True
+        result_code = "BANK_APPROVED_UNVERIFIED"
+    else:
+        approved = False
+
     error_msg = None
     if not approved:
         decline = (payload.get("message")
@@ -557,6 +621,9 @@ async def _run_deposit_with_phases(
         "duration_ms": int((time.time() - t_total) * 1000),
         "txn_id": txn_id,
         "order_id": order_id,
+        "txn_status": txn_status,
+        "raw_submit": step2,
+        "raw_check": step3,
     }
 
 
