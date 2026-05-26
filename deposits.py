@@ -1647,6 +1647,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
     async def loop():
         pool = None
         try:
+            logger.info(f"[Scheduled {sched_id}] loop arrancó — email={email} reps={repetitions} amount={amount}")
             # Heartbeat inicial: confirma al frontend que la misión arrancó
             # ANTES del pool warm-up (5-15s). Sin esto, el modal quedaba en
             # "Preparando intento 1…" estático durante ese gap y el operador
@@ -1660,12 +1661,16 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                     "ts": datetime.now(timezone.utc).isoformat(),
                     "who": operator_id,
                 })
+                logger.info(f"[Scheduled {sched_id}] heartbeat scheduled_started broadcasted")
             except Exception as e:
                 logger.warning(f"[Scheduled {sched_id}] started broadcast failed: {e}")
             # Init pool INSIDE try so _active_schedules cleanup runs in finally
             # even if start_factory fails (prevents orphaned scheduled entry).
+            logger.info(f"[Scheduled {sched_id}] llamando make_pool…")
             pool = make_pool(cap_key, size=1, workers=1)
+            logger.info(f"[Scheduled {sched_id}] make_pool OK, start_factory…")
             await pool.start_factory()
+            logger.info(f"[Scheduled {sched_id}] start_factory OK, prefetch + entrando al for")
             asyncio.create_task(pool.prefetch(1))
             for i in range(repetitions):
                 iter_num = i + 1
@@ -1776,6 +1781,28 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                 "ts": datetime.now(timezone.utc).isoformat(),
             })
             raise
+        except Exception as e:
+            # Histórico: este except era SOLO para CancelledError → cualquier
+            # otra excepción (start_factory fail, make_pool error, _run_deposit
+            # crash) moría silenciosa en la asyncio task sin loguear nada y el
+            # frontend solo veía "Preparando…" eterno sin watchdog.
+            # Fix 2026-05-25: capturar todo, loguear stacktrace, broadcastear
+            # scheduled_aborted para que el frontend salga del estado "vivo".
+            import traceback
+            logger.error(
+                f"[Scheduled {sched_id}] ERROR INESPERADO en loop(): {e}\n"
+                f"{traceback.format_exc()}"
+            )
+            try:
+                _broadcast({
+                    "type": "activity", "kind": "scheduled_aborted",
+                    "sched_id": sched_id, "email": email,
+                    "code": f"LOOP_ERROR: {type(e).__name__}",
+                    "iter": 0, "total": repetitions,
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                })
+            except Exception:
+                pass
         finally:
             if pool is not None:
                 try:
@@ -1783,6 +1810,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                 except Exception:
                     pass
             _active_schedules.pop(sched_id, None)
+            logger.info(f"[Scheduled {sched_id}] loop terminó — entry removido de _active_schedules")
 
     task = asyncio.create_task(loop())
     _active_schedules[sched_id] = {

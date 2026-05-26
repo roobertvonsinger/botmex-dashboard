@@ -187,8 +187,22 @@ def _broadcast(event: dict) -> None:
     """Push event a todos los SSE clients. Thread-safe."""
     msg = f"data: {_json.dumps(event)}\n\n"
     with _sse_lock:
+        n_clients = len(_sse_queues)
+        q_ids = [id(q) for q in _sse_queues]  # snapshot para diagnóstico
         for q in _sse_queues:
             q.put(msg)
+    # Log eventos del schedule para diagnosticar cuando no llegan al frontend
+    # (race, proxy buffering, cliente desconectado). Incluye n_clients y los
+    # IDs de las queues para detectar drift entre append y remove.
+    kind = event.get("kind") or event.get("type", "?")
+    if kind in ("scheduled_started", "scheduled_phase", "scheduled",
+                "scheduled_aborted", "scheduled_cancelled"):
+        import logging as _lg
+        _lg.getLogger("betmexico.dashboard.sse").info(
+            f"[SSE broadcast] kind={kind} clients={n_clients} q_ids={q_ids} "
+            f"sched_id={event.get('sched_id')} iter={event.get('iter')} "
+            f"phase_name={event.get('name')}"
+        )
 
 
 def _dequeue_blocking(q, timeout: float) -> str:
@@ -1697,8 +1711,14 @@ def unlock_account(account_id: int, user: dict = Depends(require_session)):
 
 async def _sse_generator():
     q = _stdlib_queue.SimpleQueue()
+    q_id = id(q)
+    import logging as _lg
+    _sse_log = _lg.getLogger("betmexico.dashboard.sse")
     with _sse_lock:
         _sse_queues.append(q)
+        n_after_join = len(_sse_queues)
+        all_ids = [id(x) for x in _sse_queues]
+    _sse_log.info(f"[SSE] cliente conectado q_id={q_id} total={n_after_join} all_ids={all_ids}")
     try:
         yield ": heartbeat\n\n"
         while True:
@@ -1706,10 +1726,17 @@ async def _sse_generator():
                 None, _dequeue_blocking, q, 25.0
             )
             yield msg
+    except Exception as e:
+        _sse_log.warning(f"[SSE] q_id={q_id} excepción no-Cancelled: {type(e).__name__}: {e}")
+        raise
     finally:
         with _sse_lock:
-            if q in _sse_queues:
+            was_in = q in _sse_queues
+            if was_in:
                 _sse_queues.remove(q)
+            n_after_leave = len(_sse_queues)
+            all_ids = [id(x) for x in _sse_queues]
+        _sse_log.info(f"[SSE] cliente desconectado q_id={q_id} was_in_list={was_in} total={n_after_leave} all_ids={all_ids}")
 
 
 @app.get("/api/events")
