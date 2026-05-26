@@ -2,13 +2,13 @@
    Tokens del diseño handoff: hue 169, chr 0.20, blur 7, tricolor on. */
 
 :root {
-  /* Verde mexicano neón — antes era hue 169 (teal/cian "Tron"). Robert
-     2026-05-26: pidió tono más cálido, más bandera mexicana. hue 142
-     da verde con leve calidez, alejado del cian. Chroma subido a 0.23
-     para más vibración tipo letrero neón. */
-  --hue: 142; --chr: 0.23;
+  /* Verde mexicano más profundo — Robert 2026-05-26 round 2: el lightness
+     0.82 era demasiado brillante/lime. Bajamos a 0.66 para verde tipo
+     bandera, más serio. Glow neón mantiene capas brillantes encima para
+     conservar el efecto "letrero" sin agotar la vista. */
+  --hue: 142; --chr: 0.20;
   --bg: #08090c;
-  --bg-accent: radial-gradient(ellipse 1100px 700px at 12% -8%, oklch(0.40 0.23 142 / 0.10), transparent 55%), #08090c;
+  --bg-accent: radial-gradient(ellipse 1100px 700px at 12% -8%, oklch(0.34 0.20 142 / 0.10), transparent 55%), #08090c;
   --surface: rgba(18, 20, 24, 0.60);
   --surface-solid: #101216;
   --surface-elev: rgba(24, 27, 32, 0.78);
@@ -18,24 +18,26 @@
   --text-dim: rgba(238,240,243,0.58);
   --text-muted: rgba(238,240,243,0.34);
   --text-faint: rgba(238,240,243,0.18);
-  --accent: oklch(0.82 0.23 142);
-  --accent-mid: oklch(0.65 0.23 142);
-  --accent-deep: oklch(0.48 0.20 142);
-  --accent-soft: oklch(0.82 0.23 142 / 0.10);
-  --accent-soft-2: oklch(0.82 0.23 142 / 0.18);
-  --accent-glow: oklch(0.82 0.23 142 / 0.35);
+  --accent: oklch(0.66 0.20 142);
+  --accent-mid: oklch(0.52 0.18 142);
+  --accent-deep: oklch(0.38 0.16 142);
+  --accent-soft: oklch(0.66 0.20 142 / 0.12);
+  --accent-soft-2: oklch(0.66 0.20 142 / 0.22);
+  --accent-glow: oklch(0.70 0.22 142 / 0.40);
   /* Multi-layer neón: 3 capas (interna nítida, media, halo amplio).
-     Usar con: box-shadow: var(--neon-sm/md/lg). */
-  --neon-sm: 0 0 4px oklch(0.85 0.23 142 / 0.60), 0 0 10px oklch(0.85 0.23 142 / 0.30);
-  --neon-md: 0 0 6px oklch(0.88 0.23 142 / 0.70), 0 0 14px oklch(0.85 0.23 142 / 0.40), 0 0 24px oklch(0.82 0.23 142 / 0.20);
-  --neon-lg: 0 0 8px oklch(0.92 0.23 142 / 0.80), 0 0 18px oklch(0.85 0.23 142 / 0.50), 0 0 36px oklch(0.82 0.23 142 / 0.25);
+     Las capas DEL GLOW se mantienen más luminosas que el accent base
+     porque un letrero neón real tiene tubo de gas brillante (claro)
+     irradiando sobre fondo oscuro. */
+  --neon-sm: 0 0 4px oklch(0.78 0.22 142 / 0.65), 0 0 10px oklch(0.70 0.22 142 / 0.32);
+  --neon-md: 0 0 6px oklch(0.82 0.22 142 / 0.75), 0 0 14px oklch(0.75 0.22 142 / 0.45), 0 0 24px oklch(0.66 0.20 142 / 0.22);
+  --neon-lg: 0 0 8px oklch(0.86 0.22 142 / 0.85), 0 0 18px oklch(0.78 0.22 142 / 0.55), 0 0 36px oklch(0.66 0.20 142 / 0.28);
   --danger: oklch(0.66 0.21 24);
   --danger-soft: oklch(0.66 0.21 24 / 0.12);
   --warn: oklch(0.80 0.16 75);
   --warn-soft: oklch(0.80 0.16 75 / 0.12);
   --purple: oklch(0.74 0.17 295);
 
-  --grade-a: oklch(0.78 0.23 142);
+  --grade-a: oklch(0.68 0.20 142);
   --grade-b: oklch(0.86 0.02 95);
   --grade-c: oklch(0.66 0.21 24);
   --grade-u: rgba(255,255,255,0.14);
@@ -43,7 +45,7 @@
   /* Colores de operador (consistentes lock-chip + borde fila + avatares L invertida) */
   --op-warn:    oklch(0.80 0.16 75);
   --op-purple:  oklch(0.74 0.17 295);
-  --op-accent:  oklch(0.78 0.23 142);
+  --op-accent:  oklch(0.68 0.20 142);
   --op-azure:   oklch(0.62 0.16 250);
 
   --font: 'Inter', system-ui, sans-serif;
@@ -326,7 +328,7 @@ body.no-kpis .seg[data-seg="view"] { display: none !important; }
 .seg button:hover { color: var(--text); }
 .seg button.on {
   background: var(--accent-soft-2); color: var(--accent);
-  box-shadow: inset 0 0 0 1px oklch(0.78 0.23 142 / 0.25);
+  box-shadow: inset 0 0 0 1px oklch(0.68 0.20 142 / 0.25);
 }
 
 /* ─── Table ─── */
@@ -357,7 +359,7 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
   display: inline-flex; align-items: center; justify-content: center;
   width: 22px; height: 22px; border-radius: 6px; font-weight: 700; font-size: 11px; font-family: var(--font-display);
 }
-.grade.A { background: oklch(0.78 0.23 142 / 0.16); color: var(--grade-a); border: 1px solid oklch(0.78 0.23 142 / 0.30); }
+.grade.A { background: oklch(0.68 0.20 142 / 0.16); color: var(--grade-a); border: 1px solid oklch(0.68 0.20 142 / 0.30); }
 .grade.B { background: rgba(238,240,243,0.06); color: var(--grade-b); border: 1px solid rgba(238,240,243,0.14); }
 .grade.C { background: oklch(0.66 0.21 24 / 0.12); color: var(--grade-c); border: 1px solid oklch(0.66 0.21 24 / 0.28); }
 .grade.U { background: rgba(255,255,255,0.04); color: var(--text-muted); border: 1px solid var(--hairline); }
@@ -667,7 +669,8 @@ td.combo b:hover + .copyhint { color: var(--accent); }
 .cmd-btn:active { transform: translateY(0); }
 .cmd-btn.primary {
   background: linear-gradient(180deg, var(--accent) 0%, var(--accent-mid) 100%);
-  color: #051210;
+  color: #f0fff8;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.40);
   border-color: transparent;
   font-weight: 800;
   box-shadow:
@@ -877,8 +880,8 @@ select.seg-btn option:checked {
 }
 /* Aura del modal según grade — verde A / azul B / amarillo C / rojo D */
 .modal.grade-A {
-  box-shadow: 0 24px 64px rgba(0,0,0,0.65), 0 0 70px oklch(0.78 0.23 142 / 0.45);
-  border-color: oklch(0.78 0.23 142 / 0.30);
+  box-shadow: 0 24px 64px rgba(0,0,0,0.65), 0 0 70px oklch(0.68 0.20 142 / 0.45);
+  border-color: oklch(0.68 0.20 142 / 0.30);
 }
 .modal.grade-B {
   box-shadow: 0 24px 64px rgba(0,0,0,0.65), 0 0 70px oklch(0.70 0.16 235 / 0.45);
@@ -1051,7 +1054,7 @@ select.seg-btn option:checked {
 .dep-hint.hidden { display: none; }
 .dep-input.dep-prefilled {
   border-color: var(--accent-soft-2);
-  background: oklch(0.78 0.23 142 / 0.04);
+  background: oklch(0.68 0.20 142 / 0.04);
 }
 
 /* Fila en Trastienda (solo visible para SA, indicador sutil) */
@@ -1067,7 +1070,8 @@ tr.row-trastienda td.combo b::before {
 .dep-exec {
   width: 100%;
   background: linear-gradient(180deg, var(--accent) 0%, var(--accent-mid) 100%);
-  color: #051210;
+  color: #f0fff8;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.40);
   border: 0;
   border-radius: 10px;
   padding: 13px 14px;
@@ -1123,7 +1127,7 @@ tr.r-grade-U .grade-bar-cell { background: rgba(255,255,255,0.10); }
 /* Glassy gradient: difumina del grade hacia la derecha, se desvanece ANTES de
    llegar al saldo. */
 tbody tr.r-grade-A {
-  background-image: linear-gradient(to right, oklch(0.78 0.23 142 / 0.18) 0%, oklch(0.78 0.23 142 / 0.04) 4%, transparent 9%);
+  background-image: linear-gradient(to right, oklch(0.68 0.20 142 / 0.18) 0%, oklch(0.68 0.20 142 / 0.04) 4%, transparent 9%);
 }
 tbody tr.r-grade-B {
   background-image: linear-gradient(to right, oklch(0.70 0.16 235 / 0.16) 0%, oklch(0.70 0.16 235 / 0.04) 4%, transparent 9%);
@@ -1137,7 +1141,7 @@ tbody tr.r-grade-D {
 tbody tr.r-grade-U {
   background-image: linear-gradient(to right, rgba(255,255,255,0.04) 0%, transparent 8%);
 }
-tbody tr.r-grade-A:hover { background-image: linear-gradient(to right, oklch(0.78 0.23 142 / 0.26) 0%, oklch(0.78 0.23 142 / 0.06) 5%, rgba(255,255,255,0.03) 10%); }
+tbody tr.r-grade-A:hover { background-image: linear-gradient(to right, oklch(0.68 0.20 142 / 0.26) 0%, oklch(0.68 0.20 142 / 0.06) 5%, rgba(255,255,255,0.03) 10%); }
 tbody tr.r-grade-B:hover { background-image: linear-gradient(to right, oklch(0.70 0.16 235 / 0.22) 0%, oklch(0.70 0.16 235 / 0.06) 5%, rgba(255,255,255,0.03) 10%); }
 tbody tr.r-grade-C:hover { background-image: linear-gradient(to right, oklch(0.86 0.16 75 / 0.22) 0%, oklch(0.86 0.16 75 / 0.06) 5%, rgba(255,255,255,0.03) 10%); }
 tbody tr.r-grade-D:hover { background-image: linear-gradient(to right, oklch(0.66 0.21 24 / 0.26) 0%, oklch(0.66 0.21 24 / 0.06) 5%, rgba(255,255,255,0.03) 10%); }
@@ -1168,8 +1172,8 @@ tr.row-sel { background: var(--accent-soft) !important; }
 .balance.glow {
   color: var(--accent);
   text-shadow:
-    0 0 6px oklch(0.78 0.23 142 / 0.55),
-    0 0 14px oklch(0.78 0.23 142 / 0.30);
+    0 0 6px oklch(0.68 0.20 142 / 0.55),
+    0 0 14px oklch(0.68 0.20 142 / 0.30);
   font-weight: 700;
 }
 .balance.dim-amount {
@@ -1511,9 +1515,9 @@ td.sel-cell:hover { background: rgba(255,255,255,0.04); }
 .sb-status b.danger, .nav .b.danger { color: var(--danger); }
 
 /* ─── Activity rows ─── */
-.act-deposit td { background: linear-gradient(90deg, oklch(0.78 0.23 142 / 0.04), transparent 50%); }
+.act-deposit td { background: linear-gradient(90deg, oklch(0.68 0.20 142 / 0.04), transparent 50%); }
 .act-lock td    { background: linear-gradient(90deg, oklch(0.66 0.21 24 / 0.04), transparent 50%); }
-.act-unlock td  { background: linear-gradient(90deg, oklch(0.78 0.23 142 / 0.03), transparent 50%); }
+.act-unlock td  { background: linear-gradient(90deg, oklch(0.68 0.20 142 / 0.03), transparent 50%); }
 .act-who, .act-target { cursor: pointer; transition: color 120ms; }
 .act-who:hover, .act-target:hover { color: var(--accent); }
 
@@ -1533,7 +1537,7 @@ td.sel-cell:hover { background: rgba(255,255,255,0.04); }
 .lock-chip-time { margin-left: 4px; font-weight: 500; }
 .lock-chip.op-warn   { color: var(--warn);   background: oklch(0.80 0.16 75 / 0.14); border-color: oklch(0.80 0.16 75 / 0.34); }
 .lock-chip.op-purple { color: var(--purple); background: oklch(0.74 0.17 295 / 0.14); border-color: oklch(0.74 0.17 295 / 0.34); }
-.lock-chip.op-accent { color: var(--accent); background: oklch(0.78 0.23 142 / 0.14); border-color: oklch(0.78 0.23 142 / 0.34); }
+.lock-chip.op-accent { color: var(--accent); background: oklch(0.68 0.20 142 / 0.14); border-color: oklch(0.68 0.20 142 / 0.34); }
 .lock-chip.op-azure  { color: oklch(0.78 0.16 250); background: oklch(0.62 0.16 250 / 0.14); border-color: oklch(0.62 0.16 250 / 0.34); }
 .lock-chip.expired   { color: var(--danger); background: var(--danger-soft); border-color: oklch(0.66 0.21 24 / 0.40); }
 
