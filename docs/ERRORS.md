@@ -76,6 +76,42 @@ Si hay rows → cuentas que tenían approved attempts pero 0 cards (regresión h
 
 ---
 
+### `_sse_queues` siempre vacío durante broadcasts del scheduled — clients=0 fantasma (2026-05-26)
+
+**Síntoma**: el frontend SE conecta al SSE (`/api/events`), el browser reporta la conexión activa, pero NUNCA recibe los eventos `scheduled_*` del schedule que disparó. El watchdog 30s del frontend dispara la alerta "⚠️ Sin señal del backend".
+
+**Causa raíz**: `app.py` se cargaba **DOS VECES** en `sys.modules` con nombres distintos:
+- `__main__` — instancia creada cuando uvicorn arranca con `python web/app.py` (entry point del Dockerfile).
+- `app` — instancia creada cuando `deposits.py`, `prewarm.py`, etc. hacen `from app import _broadcast`. Python no encuentra `app` en sys.modules y reimporta el archivo.
+
+Aunque ambas instancias apuntan al mismo `/app/web/app.py`, son módulos Python distintos con namespaces independientes. Cada uno tiene su propio `_sse_queues` (list separada).
+
+**Consecuencia**: El endpoint `/api/events` está registrado en la app FastAPI de `__main__`, así que los clientes SSE se agregan a `__main__._sse_queues`. Pero `_broadcast` invocado desde `deposits.scheduled_create.loop()` empuja a `app._sse_queues` (otra lista, siempre vacía). Los eventos se "broadcastean" pero ningún cliente está suscrito a esa queue.
+
+Verificación runtime:
+```python
+import app as a1
+import web.app as a2  # o cualquier path que encuentre el mismo file
+assert a1 is a2  # FALSE — son módulos distintos
+assert a1._sse_queues is a2._sse_queues  # FALSE — listas distintas
+```
+
+**Fix aplicado** (2026-05-26, [app.py:18](../app.py)): alias en sys.modules apenas arrancamos como __main__:
+```python
+if __name__ == "__main__":
+    sys.modules.setdefault("app", sys.modules[__name__])
+```
+
+Cuando `deposits.py` luego hace `from app import _broadcast`, Python encuentra `app` ya en sys.modules y reutiliza la instancia de `__main__`. Una sola lista `_sse_queues`, todos los broadcasts encuentran clientes.
+
+**Diagnóstico que confirmó el bug**: instrumenté `_broadcast` y `_sse_generator` con `id(q)` (identidad de la queue) y `all_ids = [id(x) for x in _sse_queues]`. Pre-fix los logs mostraban:
+- Conexión: `q_id=134005432697216 all_ids=[134005432697216]`
+- Broadcast (mismo proceso, segundos después): `clients=0 q_ids=[]`
+
+El cliente seguía conectado al server (no había log de desconexión), pero el `_broadcast` veía otra lista vacía. Post-fix los `q_ids` del broadcast coinciden con el `q_id` del client conectado.
+
+---
+
 ### Modal Programado se queda "Preparando intento 1 de 10…" por 30s+ sin actualizar (2026-05-25)
 
 **Síntoma**: el operador lanza una misión Programada de N depósitos. El panel premium muestra `0/N` con el texto "Preparando intento 1 de N…" y NO cambia durante medio minuto o más. El depósito sí está corriendo en backend (los `deposit_attempts` se persisten), pero el feed live del modal no responde.

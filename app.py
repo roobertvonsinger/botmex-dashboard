@@ -16,6 +16,24 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
+# ── FIX CRÍTICO: doble-import de este archivo ───────────────────────────────
+# El container arranca con `python web/app.py` → este script se carga como
+# `__main__`. Pero `deposits.py`, `prewarm.py` y otros hacen `from app import …`
+# que carga el ARCHIVO DE NUEVO como módulo `app` (instancia distinta en
+# sys.modules). Resultado: cada uno tiene su propio `_sse_queues`.
+#
+# Síntoma: clientes SSE se registran en `__main__._sse_queues`, pero las
+# misiones Programado hacían `_broadcast` desde `app._sse_queues` (otra lista,
+# siempre vacía). El frontend nunca recibía `scheduled_phase` aunque el
+# backend los emitía correctamente.
+#
+# Fix: aliasear `sys.modules['app']` a este mismo módulo apenas arrancamos.
+# Cuando `deposits.py` haga `from app import _broadcast`, Python encuentra
+# 'app' ya en sys.modules y reutiliza esta instancia. Una sola lista
+# `_sse_queues`, un solo `_broadcast`.
+if __name__ == "__main__":
+    sys.modules.setdefault("app", sys.modules[__name__])
+
 # ── File logging para que /api/logs pueda servir desde Docker ─────────────────
 # Antes el endpoint usaba `journalctl -u betmexico-web.service` pero en KVM4
 # corremos en Docker (no hay systemd). Resultado: logs no se cargaban en el

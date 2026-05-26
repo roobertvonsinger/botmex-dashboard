@@ -81,6 +81,7 @@
 | Modal scheduled NO se cierra solo | ✅ usuario decide cuándo cerrar | ✅ (desde 2026-05-11) | ✅ |
 | **Drawer lateral derecho (no-bloqueante)** | ✅ reemplaza al ex-modal centrado bloqueante. Slide-in 260ms, 420px de ancho. El dashboard atrás sigue interactuable (tabla, sidebar, scroll). Tabs `⚡ Una · 👥 Multi · ⏰ Prog.` en una sola vista. Si se cierra mid-misión, queda mini-pill flotante abajo-derecha que reabre el drawer sin perder state. | ✅ desde 2026-05-25 | ✅ |
 | **Feedback live durante pool warm-up del scheduled** | ✅ hint rotator (`⚡ Calentando captcha pool` → `🔑 Solicitando token` → `🚀 Levantando worker`) durante los 5-15s previos al primer `scheduled_phase`. Watchdog 30s en frontend que alerta si no llega ninguna señal. Heartbeat `kind:scheduled_started` desde backend antes de `pool.start_factory()`. Buffer de eventos pre-`_schedShow` para evitar race condition de sched_id. | ✅ desde 2026-05-25 — fix tras reporte "modal Programado se queda fijo 30s+" | ✅ |
+| **SSE bus comparte estado entre módulos (fix doble-import)** | ✅ `sys.modules.setdefault("app", sys.modules[__name__])` en el entry point garantiza que `from app import _broadcast` desde `deposits.py` reutilice la instancia de `__main__`. Una sola `_sse_queues` global → broadcasts encuentran clientes. | ✅ desde 2026-05-26 — bug real causante de "Sin señal del backend (>30s)" | ✅ |
 | Listar schedules activos | ✅ GET `/scheduled/list` | ✅ | ✅ |
 | Cancelar schedule | ✅ POST `/scheduled/{id}/cancel` | ✅ | ✅ |
 | Cap check pre-deposit | ✅ $499/intento, $1499/24h | ✅ | ✅ |
