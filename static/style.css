@@ -2968,3 +2968,160 @@ td.row-details-cell, th.row-details-th {
 }
 .dep-sched-run.aborted .dep-sched-bar-fill::after { animation: none; }
 .dep-sched-run.done .dep-sched-bar-fill::after { animation: none; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Drawer lateral derecho — reemplaza al modal centrado #depModalOverlay.
+   Diseño operativo: el operador conserva interacción con el dashboard
+   (tabla, sidebar, scroll) mientras el drawer está abierto. NO backdrop
+   bloqueante. Slide-in 260ms desde el borde derecho.
+   ────────────────────────────────────────────────────────────────────── */
+.dep-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 420px;
+  height: 100vh;
+  z-index: 150;
+  background: var(--surface-elev);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  border-left: 1px solid var(--hairline-h);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 260ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -8px 0 32px rgba(0,0,0,0.35);
+}
+.dep-drawer.dep-drawer-open { transform: translateX(0); }
+
+.dep-drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--hairline);
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.20);
+}
+.dep-drawer-title {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-display);
+  font-size: 14px; font-weight: 600;
+  flex-shrink: 0;
+}
+.dep-drawer-tabs {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+  background: rgba(0,0,0,0.30);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 2px;
+}
+.dep-drawer-tab {
+  flex: 1;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-dim);
+  padding: 5px 6px;
+  font-size: 11px;
+  font-family: var(--font);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 140ms ease;
+  white-space: nowrap;
+}
+.dep-drawer-tab:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+.dep-drawer-tab.on {
+  background: var(--accent-soft);
+  border-color: var(--accent-soft-2);
+  color: var(--accent);
+}
+.dep-drawer-close {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 140ms ease;
+}
+.dep-drawer-close:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+
+.dep-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+}
+.dep-drawer-footer {
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--hairline);
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.15);
+  display: flex;
+  gap: 8px;
+}
+.dep-drawer-footer .dep-exec { width: 100%; }
+.dep-drawer-footer .dep-exec.hidden { display: none; }
+
+/* Mini-pill flotante: visible cuando el drawer se cierra DURANTE una misión.
+   Muestra estado compacto (iter actual / countdown) y reabre al click. */
+.dep-mission-pill {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  z-index: 140;
+  background: var(--surface-elev);
+  border: 1px solid var(--accent-soft-2);
+  border-radius: 99px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.30), 0 0 16px var(--accent-glow);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  transition: transform 180ms ease, opacity 180ms ease;
+  animation: pill-pulse 2.2s ease-in-out infinite;
+}
+.dep-mission-pill.hidden { display: none; }
+.dep-mission-pill:hover { transform: translateY(-2px); }
+.dep-mission-pill #depPillIcon { font-size: 14px; }
+.dep-mission-pill #depPillText { white-space: nowrap; }
+.dep-mission-pill #depPillReopen {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+  margin-left: 4px;
+}
+@keyframes pill-pulse {
+  0%, 100% { box-shadow: 0 4px 14px rgba(0,0,0,0.30), 0 0 12px var(--accent-glow); }
+  50%      { box-shadow: 0 4px 14px rgba(0,0,0,0.30), 0 0 22px var(--accent-glow); }
+}
+
+/* Responsive: en mobile el drawer ocupa todo el ancho. */
+@media (max-width: 600px) {
+  .dep-drawer { width: 100vw; border-left: none; }
+  .dep-mission-pill { right: 12px; bottom: 12px; }
+}
+
+/* Dentro del drawer (420px) el grid 3-col del matchmaker no cabe → vertical.
+   La columna ACTIVIDAD queda primera (más alta) y a los lados van tarjetas/cuentas
+   colapsadas verticalmente. Caps de altura para que entren los 3 sin scroll outer. */
+.dep-drawer .dep-mm-grid {
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr auto;
+  min-height: auto;
+  gap: 8px;
+}
+.dep-drawer .dep-mm-col { max-height: 160px; }
+.dep-drawer .dep-mm-col-feed { max-height: 220px; }

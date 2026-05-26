@@ -48,6 +48,64 @@ Si ves 2 archivos → la fantasma está creándose y desviando escrituras.
 
 ---
 
+### Tarjetas no se guardan en `account_cards` tras APPROVED por single moderno / multi / scheduled (2026-05-25)
+
+**Síntoma**: el operador deposita exitosamente con una tarjeta nueva. La próxima vez que abre la cuenta, la tarjeta NO aparece en "💳 Tarjetas guardadas" y tiene que volverla a pegar manualmente. Solo persiste en `deposit_attempts.card_pipe`, no en `account_cards`.
+
+**Causa raíz**: tres endpoints distintos comparten el wrapper `_run_deposit_with_phases` ([deposits.py:490](../deposits.py)):
+- `POST /api/deposits/execute-stream` (single moderno)
+- `POST /api/deposits/multi/stream` (matchmaker)
+- `POST /api/deposits/scheduled/create` (programado)
+
+Ese wrapper **NO** llama a `db.register_card_to_account`. Solo el legacy `_run_deposit` del bot (usado por `/api/deposits/execute` legacy, no consumido por el UI moderno) lo hace. El persister centralizado `_record_attempt` ([deposits.py:391](../deposits.py)) escribía en `deposit_attempts` con `card_pipe` pero ignoraba `account_cards`. El AUDIT viejo marcaba esa fila como ✅ pero era falso para los 3 endpoints modernos.
+
+**Fix aplicado** (2026-05-25):
+- Bloque dedicado en `_record_attempt` ([deposits.py:441-477](../deposits.py)):
+  - Si `status == "approved"` y hay `card_pipe`: parsea pipe → `(cc_num, cc_exp, cc_cvv)`, busca password de la cuenta vía `app.db()`, resuelve nombre del operador desde `web_auth.WEB_USERS_RAW`, llama `db.register_card_to_account` (idempotente por UNIQUE card_number).
+  - 3DS_REQUIRED NO guarda (la tarjeta no se acreditó). Regla operativa Robert: solo APPROVED real cuenta como tarjeta marriage.
+  - Cubre los 3 endpoints en un solo punto.
+
+**Diagnóstico**:
+```bash
+docker exec betmexico-web sqlite3 /data/betmexico_accounts.db \
+  "SELECT a.email, a.cards_count, COUNT(da.id) as approved_attempts FROM accounts a
+   LEFT JOIN deposit_attempts da ON da.account_email=a.email AND da.status='approved'
+   GROUP BY a.email HAVING approved_attempts > 0 AND a.cards_count = 0"
+```
+Si hay rows → cuentas que tenían approved attempts pero 0 cards (regresión histórica). Para retro-poblar: correr un script que recorra `deposit_attempts` con status=approved y haga register_card_to_account por cada row.
+
+---
+
+### Modal Programado se queda "Preparando intento 1 de 10…" por 30s+ sin actualizar (2026-05-25)
+
+**Síntoma**: el operador lanza una misión Programada de N depósitos. El panel premium muestra `0/N` con el texto "Preparando intento 1 de N…" y NO cambia durante medio minuto o más. El depósito sí está corriendo en backend (los `deposit_attempts` se persisten), pero el feed live del modal no responde.
+
+**Causa raíz (dos componentes)**:
+
+1. **Pool warm-up invisible**: `scheduled_create.loop()` espera `await pool.start_factory()` y `pool.prefetch(1)` antes de iterar — 5-15s sin ningún `phase_cb` emitido. El frontend no tiene señal de vida durante esa ventana → operador ve "Preparando…" estático y asume backend muerto.
+
+2. **Race condition de `sched_id`**: si el captcha pool ya estaba warm, el primer `phase_cb("login_start", ...)` puede dispararse en <100ms — antes de que la respuesta HTTP de `/scheduled/create` haya retornado al frontend y `_schedShow(sched_id, ...)` haya seteado `_schedActive`. La guarda en `_schedOnPhase` (`if (!_schedActive ...) return`) descartaba silenciosamente el evento. Los siguientes eventos SÍ entraban, pero el operador veía el primer iter sin transición visual.
+
+**Fix aplicado** (2026-05-25):
+
+Backend ([deposits.py:1610-1625](../deposits.py)):
+- Heartbeat `kind:scheduled_started` broadcasted **inmediatamente** dentro de `loop()`, ANTES de `pool.start_factory()`. Confirma backend vivo en <50ms.
+
+Frontend ([static/app.js:3545-3625](../static/app.js)):
+- **Buffer**: si `scheduled_phase/scheduled/scheduled_aborted/scheduled_cancelled` llega con `_schedActive=null`, se acumula en `_schedPendingEvents` y se reproduce desde `_schedShow` cuando el state está listo.
+- **Hint rotator** (`_schedHintTimer`): durante el pool warm-up el texto cicla cada 3.5s: `⚡ Calentando captcha pool` → `🔑 Solicitando token CapMonster` → `🚀 Levantando worker` → `⏳ Esperando primer login`. Se cancela al recibir el primer `scheduled_phase` real.
+- **Watchdog 30s** (`_schedWatchdogTimer`): si no llega ningún `scheduled_phase` en 30s desde `_schedShow`, alerta al operador: `⚠️ Sin señal del backend (>30s). La misión sigue corriendo, pero el feed live no responde.` Permite distinguir "pool lento" de "SSE muerto" en producción.
+
+**Diagnóstico runtime**:
+```js
+// En consola del navegador durante un Programado:
+console.log('_schedActive:', _schedActive, 'pending:', _schedPendingEvents.length);
+```
+- Si `_schedActive=null` y misión activa → race fix no corrió (revisar versión deploy).
+- Si pending > 0 al final → buffer ayudó, eventos huérfanos.
+
+---
+
 ### Cuentas muestran balance/depósito/check desactualizados después del prewarm
 
 **Síntoma**: pulsar "Actualizar visibles" consume Capsolver pero el dashboard sigue mostrando balance viejo, sin fecha de último depósito y `last_checked_at` que no avanza.

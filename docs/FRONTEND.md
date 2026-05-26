@@ -58,15 +58,23 @@
 4. 🎯 Intentos del dashboard (de `deposit_attempts` table — incluye `card_pipe` desde 2026-05-11)
 5. 📝 Notas (con form para crear; SA puede borrar)
 
-## Modal Depósito (`#depModalOverlay`)
+## Drawer Depósito (`#depDrawer`) — 2026-05-25
 
-3 modos seleccionables con seg-buttons `#depModeSeg`:
+> Reemplaza al ex-modal centrado `#depModalOverlay`. **No bloqueante**: el dashboard
+> atrás sigue interactuable mientras el drawer está abierto. Slide-in 260ms desde
+> el borde derecho. Ancho fijo 420px (100vw en mobile <600px). Z-index 150.
+>
+> El **mini-pill flotante** `#depMissionPill` (abajo-derecha) aparece si el drawer
+> se cierra durante una misión activa (scheduled o matchmaker). Click reabre.
+> La misión sigue corriendo en backend aunque el drawer esté cerrado.
+
+3 modos seleccionables con tabs `#depModeSeg .dep-drawer-tab`:
 
 | Modo | Estado interno | Endpoint | Handler |
 |---|---|---|---|
-| `single` | `_depMode = 'single'` | `POST /api/deposits/execute-stream` (SSE) | `executeDeposit()` SINGLE branch + `_handleExecStreamEvent()` (app.js:~3300) — live phase stepper `#depStepper` (4 pasos: login/begin/submit/check) |
-| `multi` | `_depMode = 'multi'` | `POST /api/deposits/multi/stream` (SSE) | `executeMulti(...)` (app.js:~3280) |
-| `schedule` | `_depMode = 'schedule'` | `POST /api/deposits/scheduled/create` | `executeScheduled(pipe, amount)` (app.js:3128) |
+| `single` | `_depMode = 'single'` | `POST /api/deposits/execute-stream` (SSE) | `executeDeposit()` SINGLE branch + `_handleExecStreamEvent()` — live phase stepper `#depStepper` (4 pasos: login/begin/submit/check) |
+| `multi` | `_depMode = 'multi'` | `POST /api/deposits/multi/stream` (SSE) | `executeMatchmaker()` |
+| `schedule` | `_depMode = 'schedule'` | `POST /api/deposits/scheduled/create` | `executeScheduled(pipe, amount)` |
 
 **Inputs principales**:
 - `#depCardPipe` — single/schedule (1 tarjeta `num|MM/YY|CVV`)
@@ -151,10 +159,15 @@ Ver `docs/SSE_EVENTS.md` para tabla maestra de `kind` y su handler.
 | `notifications` | array | Notificaciones in-memory |
 | `_evtSrc` | EventSource | Conexión SSE activa |
 | `_depMode` | string | `'single' | 'multi' | 'schedule'` |
-| `_depAccountIds` | array | IDs en el modal de depósito |
+| `_depAccountIds` | array | IDs en el drawer de depósito |
 | `_depBusy` | bool | Lock para evitar doble-submit |
 | `_depMmRunId` | string | run_id del matchmaker activo (para cancelar) |
 | `_depReps` | int | Repeticiones del schedule |
+| `_depDrawerOpen` | bool | `true` cuando el drawer tiene `.dep-drawer-open` (controla Escape/Enter) |
+| `_depPillTickTimer` | interval | Refresca el texto del mini-pill cada 1s |
+| `_schedPendingEvents` | array | Buffer de `scheduled_*` que llegan antes de `_schedShow` (race fix) |
+| `_schedHintTimer` | interval | Rotador de hints durante pool warm-up del scheduled |
+| `_schedWatchdogTimer` | timeout | Watchdog 30s — alerta si no llega ningún `scheduled_phase` |
 
 ## Helpers principales
 
@@ -185,8 +198,8 @@ Ver `docs/SSE_EVENTS.md` para tabla maestra de `kind` y su handler.
 - Tabla compacta 24px de fila (hoy 36px)
 - Multi-selección drag por columna de checkboxes
 - Detail panel inline `grid-template-rows: 1fr ↔ 0fr` smooth
-- Drawer depósitos lateral 480px (hoy modal centrado)
-- Mini-widget PiP para procesos en curso
+- ~~Drawer depósitos lateral 480px~~ ✅ implementado 2026-05-25 (420px, no-bloqueante)
+- ~~Mini-widget PiP para procesos en curso~~ ✅ implementado 2026-05-25 (mini-pill flotante `#depMissionPill`)
 - Auditoría de glow verde residual en `style.css`
 
 Ver `AUDIT.md` para gap-analysis spec vs actual.

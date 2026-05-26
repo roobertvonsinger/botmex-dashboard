@@ -400,24 +400,24 @@
   </div>
 </div>
 
-<!-- Modal Depósito -->
-<div id="depModalOverlay" class="modal-overlay hidden">
-  <div class="modal" id="depModal">
-    <header class="modal-head">
-      <div class="modal-title">
-        <span class="modal-icon">💳</span>
-        <span id="depModalTitle">Depositar</span>
-      </div>
-      <button class="modal-close" id="depModalClose" title="Cerrar (Esc)">×</button>
-    </header>
-    <div class="modal-body">
-      <!-- Modo (segmented) -->
-      <div class="dep-mode-seg" id="depModeSeg">
-        <button class="dep-mode-btn on" data-mode="single" title="Una tarjeta a una cuenta — rápido y al punto">⚡ Una</button>
-        <button class="dep-mode-btn" data-mode="multi" title="Pool de tarjetas vs varias cuentas — empareja la que pase">👥 Multi (Matchmaker)</button>
-        <button class="dep-mode-btn" data-mode="schedule" title="Goteo automático: N intentos cada 1 min">⏰ Programado</button>
-      </div>
-
+<!-- Drawer Depósito — lateral derecho, no bloquea el dashboard.
+     Reemplaza al ex-modal #depModalOverlay. Los IDs internos se conservan
+     idénticos para no romper el JS existente — solo cambia el wrapper. -->
+<div id="depDrawer" class="dep-drawer">
+  <header class="dep-drawer-head">
+    <div class="dep-drawer-title">
+      <span>💳</span>
+      <span id="depDrawerTitle">Depositar</span>
+    </div>
+    <!-- Tabs de modo: siempre visibles arriba, agiles -->
+    <div class="dep-drawer-tabs" id="depModeSeg">
+      <button class="dep-drawer-tab on" data-mode="single" title="Una tarjeta a una cuenta — rápido y al punto">⚡ Una</button>
+      <button class="dep-drawer-tab" data-mode="multi" title="Pool de tarjetas vs varias cuentas — empareja la que pase">👥 Multi</button>
+      <button class="dep-drawer-tab" data-mode="schedule" title="Goteo automático: N intentos cada 1 min">⏰ Prog.</button>
+    </div>
+    <button class="dep-drawer-close" id="depDrawerClose" title="Cerrar (Esc). Si hay misión activa, queda un pill flotante.">×</button>
+  </header>
+  <div class="dep-drawer-body">
       <!-- Banner de instrucciones del modo activo -->
       <div id="depHelpBanner" class="dep-help-banner"></div>
 
@@ -570,17 +570,24 @@
         </div>
       </div>
 
-      <div class="dep-exec-row">
-        <button id="depExec" class="dep-exec" title="Lanza el depósito o misión">🚀 Ejecutar</button>
-        <button id="depCancel" class="dep-exec dep-exec-cancel hidden" title="Cancela el matchmaker en curso">⏹ Detener</button>
-      </div>
-    </div>
-  </div>
+  </div><!-- /dep-drawer-body -->
+  <footer class="dep-drawer-footer">
+    <button id="depExec" class="dep-exec" title="Lanza el depósito o misión">🚀 Ejecutar</button>
+    <button id="depCancel" class="dep-exec dep-exec-cancel hidden" title="Cancela el matchmaker en curso">⏹ Detener</button>
+  </footer>
+</div><!-- /depDrawer -->
+
+<!-- Mini-pill flotante: visible cuando se cierra el drawer DURANTE una misión activa.
+     Click reabre el drawer; la misión sigue corriendo en backend aunque el drawer esté cerrado. -->
+<div id="depMissionPill" class="dep-mission-pill hidden" title="Misión activa — click para reabrir el drawer">
+  <span id="depPillIcon">⏰</span>
+  <span id="depPillText" class="mono">—</span>
+  <button id="depPillReopen" title="Reabrir drawer">↗</button>
 </div>
 
 <!-- Toast -->
 <div id="toast" class="toast hidden"></div>
 
-<script src="/static/app.js?v=20260523a"></script>
+<script src="/static/app.js?v=20260525a"></script>
 </body>
 </html>

@@ -1192,6 +1192,13 @@ function connectSSE() {
             msg: `${ev.who} depositó ${fmtMoney(ev.amount)} en ${ev.target} → ${ev.status}`,
           });
           if (ok) reload();
+        } else if (ev.kind === 'scheduled_started') {
+          // Heartbeat de arranque — confirma backend vivo antes del pool warm-up.
+          // Si _schedActive aún no existe (race con HTTP response), el watchdog
+          // del frontend igual cubre. Solo logueamos confirmación.
+          if (_schedActive && ev.sched_id === _schedActive.sched_id) {
+            console.info(`[Sched] backend confirmó arranque de ${ev.sched_id}`);
+          }
         } else if (ev.kind === 'scheduled_phase') {
           _schedOnPhase(ev);
         } else if (ev.kind === 'scheduled') {
@@ -3017,7 +3024,7 @@ let _depMmAbort = null;         // AbortController del SSE fetch
 
 function setDepMode(mode) {
   _depMode = mode;
-  $$('#depModeSeg .dep-mode-btn').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+  $$('#depModeSeg .dep-drawer-tab').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
 
   const isSingle = mode === 'single';
   const isMulti  = mode === 'multi';
@@ -3035,7 +3042,7 @@ function setDepMode(mode) {
   if (!isSched) { try { _schedReset(); } catch {} }
 
   // título
-  $('#depModalTitle').textContent = isSingle ? 'Depositar' : isMulti ? 'Multicuenta (Matchmaker)' : 'Programado';
+  $('#depDrawerTitle').textContent = isSingle ? 'Depositar' : isMulti ? 'Multicuenta' : 'Programado';
   $('#depAmountHint').textContent = isMulti ? '— por intento (max $50)' : isSched ? '— cada repetición' : '';
 
   // botón principal
@@ -3205,7 +3212,10 @@ async function openDepositModal(accountId, opts = {}) {
   $('#depRepsVal').textContent = '5';
   $('#depExec').disabled = false;
   $('#depCancel').classList.add('hidden');
-  $('#depModalOverlay').classList.remove('hidden');
+  $('#depDrawer').classList.add('dep-drawer-open');
+  _depDrawerOpen = true;
+  // Si había un pill flotante de misión previa, lo ocultamos al re-abrir.
+  _depPillHide();
 
   // Mostrar/ocultar botones de modo según contexto
   const multiBtn = document.querySelector('#depModeSeg [data-mode="multi"]');
@@ -3286,9 +3296,21 @@ async function refreshSavedCards() {
 }
 
 function closeDepositModal() {
-  if (_depBusy) { toast('Detén la misión primero', 'error'); return; }
-  $('#depModalOverlay').classList.add('hidden');
-  $('#depModal').classList.remove('dep-modal-wide');
+  // Si hay misión activa (scheduled o matchmaker), cerramos el drawer pero
+  // dejamos la mini-pill flotante para reabrir sin interrumpir el run.
+  // Para single (_depBusy puro sin _schedActive ni _mmRunId): bloquear cierre
+  // — un single dura segundos, no vale tener pill efímero.
+  const hasActiveMission = !!(_schedActive || _depMmRunId);
+  if (_depBusy && !hasActiveMission) {
+    toast('Esperando intento en curso…', 'error');
+    return;
+  }
+  $('#depDrawer').classList.remove('dep-drawer-open');
+  _depDrawerOpen = false;
+  if (hasActiveMission) {
+    _depPillShow();
+    return;  // NO reset del state — la misión sigue
+  }
   $('#depMatchView').classList.add('hidden');
   $('#depCap').style.display = 'none';
   // Limpiar la vista live del schedule (si quedó algún render previo)
@@ -3542,13 +3564,80 @@ const _PHASE_TEXTS = {
   done: '✓ Intento completado',
 };
 
+// ─────────────────────────────────────────────────────────────────────────
+// Drawer lateral + mini-pill flotante
+// ─────────────────────────────────────────────────────────────────────────
+let _depDrawerOpen = false;
+let _depPillTickTimer = null;     // refresca el texto del pill cada 1s
+
+function _depPillShow() {
+  const pill = $('#depMissionPill');
+  if (!pill) return;
+  pill.classList.remove('hidden');
+  _depPillTick();   // pinta texto inicial
+  if (_depPillTickTimer) clearInterval(_depPillTickTimer);
+  _depPillTickTimer = setInterval(_depPillTick, 1000);
+}
+
+function _depPillHide() {
+  const pill = $('#depMissionPill');
+  if (pill) pill.classList.add('hidden');
+  if (_depPillTickTimer) { clearInterval(_depPillTickTimer); _depPillTickTimer = null; }
+}
+
+function _depPillTick() {
+  const txtEl = $('#depPillText');
+  const iconEl = $('#depPillIcon');
+  if (!txtEl) return;
+  // Prioridad: schedule activo > matchmaker activo
+  if (_schedActive) {
+    iconEl.textContent = '⏰';
+    const done = _schedActive.currentIter;
+    const tot = _schedActive.total;
+    // Si hay countdown corriendo, muéstralo
+    const cdEl = $('#depSchedCountdown');
+    let cdText = '';
+    if (cdEl && !cdEl.classList.contains('hidden')) {
+      cdText = ' · ' + (cdEl.textContent || '').trim();
+    }
+    txtEl.textContent = `${done}/${tot}${cdText}`;
+  } else if (_depMmRunId) {
+    iconEl.textContent = '🎯';
+    txtEl.textContent = `${_mm.matches} match · ${_mm.attempts} intentos`;
+  } else {
+    // Misión terminó mientras el pill estaba visible → ocultar.
+    _depPillHide();
+  }
+}
+
+function _depPillReopen() {
+  // Reabre el drawer sin tocar el state — la misión sigue viva.
+  $('#depDrawer').classList.add('dep-drawer-open');
+  _depDrawerOpen = true;
+  _depPillHide();
+}
+
 // Estado del schedule activo (un solo schedule a la vez por user)
 let _schedActive = null;          // { sched_id, total, currentIter, lastIterStart, results: [] }
 let _schedCountdownTimer = null;
+// Buffer de eventos scheduled_* que pueden llegar ANTES de que _schedShow corra
+// (race: el background task `loop()` arranca con asyncio.create_task y, si el
+// captcha pool ya estaba warm, el primer phase_cb se dispara en <50ms — antes
+// de que la respuesta HTTP del POST /scheduled/create haya retornado al
+// frontend). Sin buffer, esos eventos quedan descartados en la guarda de
+// _schedActive y el operador ve "Preparando…" eternamente.
+let _schedPendingEvents = [];     // [{handler:'phase'|'iter'|'aborted'|'cancelled', ev}]
+// Watchdog del 1er evento. Si en 25s no llegamos a NINGÚN phase, casi seguro
+// el SSE bus está caído o el backend explotó silencioso. Anunciamos al user.
+let _schedWatchdogTimer = null;
+let _schedHintTimer = null;       // rotador de hints durante el pool warm-up
 
 function _schedReset() {
   if (_schedCountdownTimer) { clearInterval(_schedCountdownTimer); _schedCountdownTimer = null; }
+  if (_schedWatchdogTimer) { clearTimeout(_schedWatchdogTimer); _schedWatchdogTimer = null; }
+  if (_schedHintTimer) { clearInterval(_schedHintTimer); _schedHintTimer = null; }
   _schedActive = null;
+  _schedPendingEvents = [];
   const el = $('#depScheduledRun');
   if (!el) return;
   el.classList.add('hidden');
@@ -3569,8 +3658,50 @@ function _schedShow(sched_id, total) {
   $('#depSchedIterTot').textContent = String(total);
   $('#depSchedBarFill').style.width = '0%';
   $('#depSchedTimeline').innerHTML = '';
-  $('#depSchedNowText').textContent = `⚡ Preparando intento 1 de ${total}…`;
+  $('#depSchedNowText').textContent = `⚡ Calentando captcha pool…`;
   $('#depSchedCountdown').classList.add('hidden');
+
+  // Rotador de hints — feedback continuo durante los ~5-15s antes del primer
+  // phase event (login_start). Sin esto, "Preparando…" no cambia y parece
+  // congelado. Se cancela al primer phase real (en _schedOnPhase).
+  const hints = [
+    `⚡ Calentando captcha pool…`,
+    `🔑 Solicitando token CapMonster…`,
+    `🚀 Levantando worker…`,
+    `⏳ Esperando primer login…`,
+  ];
+  let hintIdx = 1;
+  _schedHintTimer = setInterval(() => {
+    if (!_schedActive) return;
+    $('#depSchedNowText').textContent = hints[hintIdx % hints.length];
+    hintIdx++;
+  }, 3500);
+
+  // Watchdog: si en 30s no llegó ningún scheduled_phase, casi seguro el bus
+  // SSE está roto o el backend murió. Alertamos al operador en vez de dejarlo
+  // viendo hints rotativos eternos.
+  _schedWatchdogTimer = setTimeout(() => {
+    if (!_schedActive) return;
+    if (_schedActive.currentIter === 0 && !_schedActive.lastIterStart) {
+      console.warn(`[Sched] watchdog: sin scheduled_phase en 30s para ${sched_id}`);
+      if (_schedHintTimer) { clearInterval(_schedHintTimer); _schedHintTimer = null; }
+      $('#depSchedNowText').textContent = `⚠️ Sin señal del backend (>30s). La misión sigue corriendo, pero el feed live no responde.`;
+    }
+  }, 30000);
+
+  // Drena eventos que llegaron mientras _schedActive era null (race).
+  if (_schedPendingEvents.length) {
+    console.info(`[Sched] drenando ${_schedPendingEvents.length} eventos pendientes para ${sched_id}`);
+    const buffered = _schedPendingEvents;
+    _schedPendingEvents = [];
+    for (const { handler, ev } of buffered) {
+      if (ev.sched_id !== sched_id) continue;
+      if (handler === 'phase') _schedOnPhase(ev);
+      else if (handler === 'iter') _schedOnIterDone(ev);
+      else if (handler === 'aborted') _schedOnAborted(ev);
+      else if (handler === 'cancelled') _schedOnCancelled(ev);
+    }
+  }
 }
 
 function _schedUpdateProgress() {
@@ -3581,12 +3712,21 @@ function _schedUpdateProgress() {
 }
 
 function _schedOnPhase(ev) {
-  if (!_schedActive || ev.sched_id !== _schedActive.sched_id) return;
+  if (!_schedActive) {
+    // _schedShow aún no corrió (race con respuesta HTTP /scheduled/create).
+    // Buffereamos para replay cuando _schedShow se ejecute.
+    _schedPendingEvents.push({ handler: 'phase', ev });
+    return;
+  }
+  if (ev.sched_id !== _schedActive.sched_id) return;
   const iter = ev.iter || 1;
   // Marca inicio de un nuevo intento (primer phase)
   if (iter > _schedActive.currentIter || (iter === 1 && !_schedActive.lastIterStart)) {
     _schedActive.lastIterStart = Date.now();
   }
+  // Primer phase real → matamos el rotador de hints y el watchdog.
+  if (_schedHintTimer) { clearInterval(_schedHintTimer); _schedHintTimer = null; }
+  if (_schedWatchdogTimer) { clearTimeout(_schedWatchdogTimer); _schedWatchdogTimer = null; }
   const txt = _PHASE_TEXTS[ev.name] || `· ${ev.name}`;
   $('#depSchedNowText').textContent = `Intento ${iter}/${_schedActive.total} — ${txt}`;
   $('#depSchedCountdown').classList.add('hidden');
@@ -3594,7 +3734,11 @@ function _schedOnPhase(ev) {
 }
 
 function _schedOnIterDone(ev) {
-  if (!_schedActive || ev.sched_id !== _schedActive.sched_id) return;
+  if (!_schedActive) {
+    _schedPendingEvents.push({ handler: 'iter', ev });
+    return;
+  }
+  if (ev.sched_id !== _schedActive.sched_id) return;
   const iter = ev.iter || 1;
   const ok = !!ev.success;
   const code = ev.code || (ok ? 'APPROVED' : 'REJECTED');
@@ -3654,6 +3798,8 @@ function _schedStartCountdown(seconds) {
 
 function _schedFinish(allOk) {
   if (!_schedActive) return;
+  if (_schedHintTimer) { clearInterval(_schedHintTimer); _schedHintTimer = null; }
+  if (_schedWatchdogTimer) { clearTimeout(_schedWatchdogTimer); _schedWatchdogTimer = null; }
   if (_schedCountdownTimer) { clearInterval(_schedCountdownTimer); _schedCountdownTimer = null; }
   const el = $('#depScheduledRun');
   if (el) el.classList.add(allOk ? 'done' : 'aborted');
@@ -3667,7 +3813,13 @@ function _schedFinish(allOk) {
 }
 
 function _schedOnAborted(ev) {
-  if (!_schedActive || ev.sched_id !== _schedActive.sched_id) return;
+  if (!_schedActive) {
+    _schedPendingEvents.push({ handler: 'aborted', ev });
+    return;
+  }
+  if (ev.sched_id !== _schedActive.sched_id) return;
+  if (_schedHintTimer) { clearInterval(_schedHintTimer); _schedHintTimer = null; }
+  if (_schedWatchdogTimer) { clearTimeout(_schedWatchdogTimer); _schedWatchdogTimer = null; }
   if (_schedCountdownTimer) { clearInterval(_schedCountdownTimer); _schedCountdownTimer = null; }
   $('#depScheduledRun').classList.add('aborted');
   $('#depSchedNowText').textContent = `✗ Misión abortada — ${esc(ev.code || 'fallo')}`;
@@ -3677,7 +3829,13 @@ function _schedOnAborted(ev) {
 }
 
 function _schedOnCancelled(ev) {
-  if (!_schedActive || ev.sched_id !== _schedActive.sched_id) return;
+  if (!_schedActive) {
+    _schedPendingEvents.push({ handler: 'cancelled', ev });
+    return;
+  }
+  if (ev.sched_id !== _schedActive.sched_id) return;
+  if (_schedHintTimer) { clearInterval(_schedHintTimer); _schedHintTimer = null; }
+  if (_schedWatchdogTimer) { clearTimeout(_schedWatchdogTimer); _schedWatchdogTimer = null; }
   if (_schedCountdownTimer) { clearInterval(_schedCountdownTimer); _schedCountdownTimer = null; }
   $('#depScheduledRun').classList.add('aborted');
   $('#depSchedNowText').textContent = `⏹ Misión cancelada`;
@@ -3887,8 +4045,7 @@ async function executeMatchmaker() {
   $('#depMultiAccts').classList.add('hidden');
   $('#depResult').classList.add('hidden');
   $('#depMatchView').classList.remove('hidden');
-  // El modal se ensancha
-  $('#depModal').classList.add('dep-modal-wide');
+  // (Drawer tiene ancho fijo — el matchmaker se renderiza vertical adentro.)
 
   _mmReset(_depAccountIds, cards, amount);
   _mmRender();
@@ -4141,12 +4298,16 @@ async function cancelMatchmaker() {
 }
 
 // ── Wire-up ──
-$('#depModalClose').addEventListener('click', closeDepositModal);
-$('#depModalOverlay').addEventListener('click', e => {
-  if (e.target.id === 'depModalOverlay') closeDepositModal();
+$('#depDrawerClose').addEventListener('click', closeDepositModal);
+// Mini-pill reabre el drawer sin tocar el state (la misión sigue activa).
+$('#depMissionPill').addEventListener('click', e => {
+  // Ignorar clicks que ya manejó el botón interno (evita doble open).
+  if (e.target.id === 'depPillReopen') return;
+  _depPillReopen();
 });
+$('#depPillReopen').addEventListener('click', _depPillReopen);
 $('#depModeSeg').addEventListener('click', e => {
-  const btn = e.target.closest('.dep-mode-btn');
+  const btn = e.target.closest('.dep-drawer-tab');
   if (!btn) return;
   if (_depBusy) { toast('Espera a que termine', 'error'); return; }
   setDepMode(btn.dataset.mode);
@@ -4195,8 +4356,8 @@ document.querySelector('#depScheduleBlock')?.addEventListener('click', e => {
   $('#depRepsVal').textContent = String(_depReps);
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !$('#depModalOverlay').classList.contains('hidden')) closeDepositModal();
-  if (e.key === 'Enter' && !$('#depModalOverlay').classList.contains('hidden') && document.activeElement?.id === 'depCardPipe') {
+  if (e.key === 'Escape' && _depDrawerOpen) closeDepositModal();
+  if (e.key === 'Enter' && _depDrawerOpen && document.activeElement?.id === 'depCardPipe') {
     executeDeposit();
   }
 });

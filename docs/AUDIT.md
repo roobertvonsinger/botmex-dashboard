@@ -3,7 +3,7 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
-## Captura: 2026-05-11 (post-migración KVM4 + fixes BETMEX_DB + trazabilidad cards)
+## Captura: 2026-05-25 (drawer lateral + fix persist cards en _record_attempt + fix SSE scheduled_phase race)
 
 ## Auth / Sesión
 
@@ -71,7 +71,7 @@
 |---|---|---|---|
 | Single deposit (`/execute`) | ✅ 1 cuenta, 1 tarjeta, $1-$499. `_record_attempt` corre siempre (incluso si client disconnect mid-deposit) | ✅ desde 2026-05-21 | ✅ |
 | **Single deposit con fases en vivo (`/execute-stream`)** | ✅ SSE emite `start`/`phase`/`done` para stepper UI; mismas validaciones que `/execute` (cap, velocity, auto-lock); frontend consume stream y pinta `#depStepper` con 4 fases (login/begin/submit/check) — `na` para `check` cuando `is_3ds=true` | ✅ 2026-05-15 — backend (Task 1+2) + frontend (Task 3) listos. `/execute` queda como endpoint legacy no consumido por single mode (multi/scheduled siguen usando sus endpoints) | ✅ |
-| Persistir tarjeta al APPROVE | ✅ INSERT en `account_cards` | ✅ (desde fix BETMEX_DB 2026-05-11) | ✅ |
+| Persistir tarjeta al APPROVE (single moderno, multi, scheduled) | ✅ INSERT en `account_cards` vía `_record_attempt` cuando `status=approved` (idempotente por UNIQUE card_number) | ✅ desde 2026-05-25 — fix retroactivo: el wrapper `_run_deposit_with_phases` NUNCA llamaba a `register_card_to_account` (solo el legacy `_run_deposit` lo hacía). Resultado: tras un APPROVED por endpoints modernos, la tarjeta quedaba huérfana y el operador tenía que pegarla de nuevo. AUDIT viejo decía ✅ pero era falso para single/multi/scheduled. Fix: bloque dedicado en `_record_attempt` ([deposits.py:441](../deposits.py)). | ✅ |
 | Persistir cada intento en `deposit_attempts` | ✅ con `card_pipe`, `status`, `rejection_reason` | ✅ (desde fix 2026-05-11) | ✅ |
 | Loguear card al inicio del deposit | ✅ logger.info | ✅ (desde fix 2026-05-11) | ✅ |
 | Multi/matchmaker SSE | ✅ N cuentas × M tarjetas, pairing greedy, cooldown 5s, velocity-skip throttle 30s, pool init dentro de try (lock release garantizado si CapMonster down) | ✅ desde 2026-05-21 | ✅ |
@@ -79,6 +79,8 @@
 | Scheduled N reps cada 1 min | ✅ aborta al primer fail | ✅ | ✅ |
 | **Scheduled con fases en vivo** | ✅ `scheduled_create.loop()` usa `_run_deposit_with_phases` con `phase_cb` que emite `kind:scheduled_phase` por sub-fase (login/begin/submit/check/done). Feed renderiza con `_schedPhaseLabel()`. Eventos summary `scheduled`/`scheduled_aborted`/`scheduled_cancelled` siguen igual | ✅ 2026-05-15 — Task 5 deposit-live-progress | ✅ |
 | Modal scheduled NO se cierra solo | ✅ usuario decide cuándo cerrar | ✅ (desde 2026-05-11) | ✅ |
+| **Drawer lateral derecho (no-bloqueante)** | ✅ reemplaza al ex-modal centrado bloqueante. Slide-in 260ms, 420px de ancho. El dashboard atrás sigue interactuable (tabla, sidebar, scroll). Tabs `⚡ Una · 👥 Multi · ⏰ Prog.` en una sola vista. Si se cierra mid-misión, queda mini-pill flotante abajo-derecha que reabre el drawer sin perder state. | ✅ desde 2026-05-25 | ✅ |
+| **Feedback live durante pool warm-up del scheduled** | ✅ hint rotator (`⚡ Calentando captcha pool` → `🔑 Solicitando token` → `🚀 Levantando worker`) durante los 5-15s previos al primer `scheduled_phase`. Watchdog 30s en frontend que alerta si no llega ninguna señal. Heartbeat `kind:scheduled_started` desde backend antes de `pool.start_factory()`. Buffer de eventos pre-`_schedShow` para evitar race condition de sched_id. | ✅ desde 2026-05-25 — fix tras reporte "modal Programado se queda fijo 30s+" | ✅ |
 | Listar schedules activos | ✅ GET `/scheduled/list` | ✅ | ✅ |
 | Cancelar schedule | ✅ POST `/scheduled/{id}/cancel` | ✅ | ✅ |
 | Cap check pre-deposit | ✅ $499/intento, $1499/24h | ✅ | ✅ |

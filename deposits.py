@@ -438,14 +438,51 @@ def _record_attempt(
     except Exception as e:
         logger.error(f"[Deposits] _record_attempt log_attempt error: {e}")
 
-    # ── 2. Recalcular grade (BD viva) ──────────────────────────
+    # ── 2. Persistir tarjeta en account_cards si APPROVED ──────
+    # Histórico: el wrapper `_run_deposit_with_phases` (usado por single/execute-stream,
+    # multi/stream y scheduled/create) NO llama a `register_card_to_account` — solo el
+    # legacy `_run_deposit` del bot lo hacía. Resultado: tras un APPROVED por estos
+    # endpoints, la tarjeta no quedaba ligada a la cuenta y el operador tenía que
+    # volverla a pegar manualmente. Fix 2026-05-25: persistimos aquí (idempotente
+    # por UNIQUE card_number — INSERT OR IGNORE).
+    # Regla operativa (Robert): solo APPROVED real cuenta. 3DS_REQUIRED no guarda
+    # porque la tarjeta no se acreditó.
+    if status == "approved" and card_pipe:
+        try:
+            cc_num, cc_exp, cc_cvv = _parse_pipe(card_pipe)
+            from betmexico_db import db as _bot_db
+            # Buscar password de la cuenta (la firma de register_card_to_account
+            # requiere el marriage completo email+password).
+            from app import db as _dash_db
+            with _dash_db() as c:
+                acc_row = c.execute(
+                    "SELECT password FROM accounts WHERE email=?", (email,)
+                ).fetchone()
+            password = acc_row["password"] if acc_row else ""
+            # registered_by_name: resolver del roster por telegram_id (con casing original)
+            from web_auth import WEB_USERS_RAW as _USERS_RAW
+            op_name = ""
+            for uname, u in _USERS_RAW.items():
+                if u.get("telegram_id") == operator_id:
+                    op_name = uname
+                    break
+            _bot_db.register_card_to_account(
+                cc_num, cc_exp, cc_cvv,
+                email, password,
+                int(operator_id) if operator_id else 0,
+                op_name,
+            )
+        except Exception as e:
+            logger.warning(f"[Deposits] _record_attempt register_card_to_account error: {e}")
+
+    # ── 3. Recalcular grade (BD viva) ──────────────────────────
     try:
         from web_grading import recalc_grade_from_db
         recalc_grade_from_db(email)
     except Exception as e:
         logger.debug(f"[Deposits] _record_attempt recalc_grade: {e}")
 
-    # ── 3. Broadcast SSE para feed de actividad ────────────────
+    # ── 4. Broadcast SSE para feed de actividad ────────────────
     try:
         _broadcast({
             "type": "activity",
@@ -1610,6 +1647,21 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
     async def loop():
         pool = None
         try:
+            # Heartbeat inicial: confirma al frontend que la misión arrancó
+            # ANTES del pool warm-up (5-15s). Sin esto, el modal quedaba en
+            # "Preparando intento 1…" estático durante ese gap y el operador
+            # no sabía si el backend estaba vivo. Si _broadcast falla aquí,
+            # el frontend lo nota por su watchdog de 30s.
+            try:
+                _broadcast({
+                    "type": "activity", "kind": "scheduled_started",
+                    "sched_id": sched_id, "total": repetitions,
+                    "email": email,
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "who": operator_id,
+                })
+            except Exception as e:
+                logger.warning(f"[Scheduled {sched_id}] started broadcast failed: {e}")
             # Init pool INSIDE try so _active_schedules cleanup runs in finally
             # even if start_factory fails (prevents orphaned scheduled entry).
             pool = make_pool(cap_key, size=1, workers=1)
