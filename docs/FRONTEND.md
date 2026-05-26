@@ -122,6 +122,16 @@ Visible cuando `selectedIds.size > 0`. Actualizado por `updateCmdBar()` (app.js:
 - `width: 128px; min-width: 128px; white-space: nowrap;`
 - El ancho cabe `$X,XXX.XX` + botón ↻ (22px + 6px margen) sin wrap. Antes era 92px y con montos 4+ dígitos el botón saltaba a la línea siguiente, ensanchando la fila. Cualquier ajuste futuro debe verificar que `$99,999.99 ↻` cabe.
 
+**Tiers visuales del saldo** — `balanceCls(v)` en `app.js:322` + `.balance.{low,mid,hot}` en `style.css:1170+` (cambio 2026-05-26):
+
+| Rango | Clase | Render |
+|---|---|---|
+| `< $10`        | `.low` | Gris (`--text-muted`), peso 500, sin glow |
+| `$10 – $49.99` | `.mid` | Blanco (`--text`), peso 600, sin glow |
+| `≥ $50`        | `.hot` | Verde radiactivo (`oklch(0.86 0.26 142)`), peso 700, glow multi-capa + animación `balanceHotPulse` 2.6s ease-in-out infinite alternate (tintilante lento entre opacidad 0.88 ↔ 1.0 y glow tenue ↔ intenso). Respeta `prefers-reduced-motion`. |
+
+Reemplazó el sistema viejo (`zero`/`dim-amount`/`glow` con cortes en $5/$10). Si cambian los umbrales, actualizar ambos puntos a la vez (JS + CSS docstring).
+
 ## Feed de Actividad (`#actTable`)
 
 **Render**: `renderActivity()` (app.js:809).

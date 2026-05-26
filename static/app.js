@@ -314,16 +314,15 @@ function computeCurp(fullname, birthdate, address, sexOverride) {
   const ver = _curpVerifier(curp17);
   return curp17 + ver;
 }
-// Glow tiers para el saldo:
-//   ≥ $10  → glow (verde brillante)
-//   $5-$10 → tenue/grisecito
-//   ≤ $5   → default (verde normal)
-//   $0     → zero (gris)
+// Tiers de saldo:
+//   ≥ $50      → hot   (verde radiactivo + glow + flicker)
+//   $10–$49.99 → mid   (blanco)
+//   < $10      → low   (gris)
 const balanceCls = v => {
-  if (!v || v <= 0) return 'zero';
-  if (v >= 10) return 'glow';
-  if (v > 5) return 'dim-amount';
-  return '';
+  const n = Number(v) || 0;
+  if (n >= 50) return 'hot';
+  if (n >= 10) return 'mid';
+  return 'low';
 };
 function getVisible() {
   if (state.refreshMode) return state.refreshMode.updatedRows;
