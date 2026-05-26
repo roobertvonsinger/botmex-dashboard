@@ -55,6 +55,14 @@ body {
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+  /* Push: cuando el drawer derecho está abierto, el body se contrae 420px hacia
+     la izquierda. El drawer NO se superpone — empuja al dashboard como hace
+     el sidebar izquierdo. Coherente. */
+  transition: padding-right 260ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+body.dep-drawer-pushing { padding-right: 420px; }
+@media (max-width: 600px) {
+  body.dep-drawer-pushing { padding-right: 0; }
 }
 
 .mono { font-family: var(--font-mono); font-size: 11px; }
@@ -3112,6 +3120,27 @@ td.row-details-cell, th.row-details-th {
 @media (max-width: 600px) {
   .dep-drawer { width: 100vw; border-left: none; }
   .dep-mission-pill { right: 12px; bottom: 12px; }
+}
+
+/* Placeholder dentro del modo Multi cuando hay <2 cuentas — guía al operador
+   a seleccionar desde la tabla principal (el drawer empuja, no bloquea). */
+.dep-multi-empty {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 14px;
+  background: rgba(0,0,0,0.30);
+  border: 1px dashed var(--hairline-h);
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.dep-multi-empty-icon { font-size: 22px; line-height: 1; flex-shrink: 0; animation: empty-bounce 1.8s ease-in-out infinite; }
+.dep-multi-empty b { color: var(--text); font-weight: 600; }
+@keyframes empty-bounce {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(-6px); }
 }
 
 /* Dentro del drawer (420px) el grid 3-col del matchmaker no cabe → vertical.

@@ -608,6 +608,14 @@ function updateCmdBar() {
   const n = selectedIds.size;
   const bar = $('#cmdBar');
   $('#cmdSelCount').textContent = n;
+  // Sync con drawer en modo Multi: cuando el operador tickea/destickea cuentas
+  // en la tabla atrás (drawer empuja, no bloquea), reflejamos en _depAccountIds
+  // para que renderMultiAccounts se actualice live. Solo si NO hay misión multi
+  // corriendo (durante un run, las cuentas están fijas).
+  if (_depDrawerOpen && _depMode === 'multi' && !_depMmRunId) {
+    _depAccountIds = [...selectedIds].slice(0, 5);
+    try { renderMultiAccounts(); } catch {}
+  }
   if (n === 0) { bar.classList.add('hidden'); return; }
   bar.classList.remove('hidden');
 
@@ -3213,13 +3221,16 @@ async function openDepositModal(accountId, opts = {}) {
   $('#depExec').disabled = false;
   $('#depCancel').classList.add('hidden');
   $('#depDrawer').classList.add('dep-drawer-open');
+  // El body empuja contenido a la izquierda — el drawer NO se superpone al
+  // dashboard, lo comprime. Coherente con el sidebar izq (también empuja).
+  document.body.classList.add('dep-drawer-pushing');
   _depDrawerOpen = true;
   // Si había un pill flotante de misión previa, lo ocultamos al re-abrir.
   _depPillHide();
 
-  // Mostrar/ocultar botones de modo según contexto
-  const multiBtn = document.querySelector('#depModeSeg [data-mode="multi"]');
-  if (multiBtn) multiBtn.style.display = (_depAccountIds.length >= 2) ? '' : 'none';
+  // Tab Multi SIEMPRE visible — el operador puede entrar a Multi con 1 sola
+  // cuenta seleccionada y desde ahí ir agregando más desde la tabla atrás
+  // (drawer empuja, NO bloquea el dashboard).
 
   // Mode default: single si 1 cuenta, multi si más
   setDepMode(_depAccountIds.length > 1 ? 'multi' : 'single');
@@ -3251,6 +3262,20 @@ async function openDepositModal(accountId, opts = {}) {
 function renderMultiAccounts() {
   const list = $('#depMultiList');
   $('#depMultiAcctsCount').textContent = `${_depAccountIds.length}/5`;
+  // Placeholder cuando hay <2 cuentas: el drawer empuja al dashboard, así que
+  // el operador puede tickear cuentas en la tabla atrás sin cerrar el drawer.
+  if (_depAccountIds.length < 2) {
+    const have = _depAccountIds.length;
+    list.innerHTML = `<div class="dep-multi-empty">
+      <div class="dep-multi-empty-icon">👈</div>
+      <div class="dep-multi-empty-msg">
+        <b>${have === 0 ? 'Sin cuentas' : '1 cuenta'} seleccionada${have === 0 ? 's' : ''}.</b><br>
+        Tickea ${have === 0 ? '2–5 cuentas' : '1–4 más'} en la tabla de la izquierda
+        para armar el matchmaker. Las cuentas seleccionadas aparecen aquí.
+      </div>
+    </div>`;
+    return;
+  }
   list.innerHTML = _depAccountIds.map(id => {
     const acc = state.rows.find(r => r.id === id);
     if (!acc) return '';
@@ -3306,6 +3331,7 @@ function closeDepositModal() {
     return;
   }
   $('#depDrawer').classList.remove('dep-drawer-open');
+  document.body.classList.remove('dep-drawer-pushing');
   _depDrawerOpen = false;
   if (hasActiveMission) {
     _depPillShow();
@@ -3613,6 +3639,7 @@ function _depPillTick() {
 function _depPillReopen() {
   // Reabre el drawer sin tocar el state — la misión sigue viva.
   $('#depDrawer').classList.add('dep-drawer-open');
+  document.body.classList.add('dep-drawer-pushing');
   _depDrawerOpen = true;
   _depPillHide();
 }
@@ -4023,7 +4050,7 @@ function _mmFeedAdd(cls, html) {
 
 async function executeMatchmaker() {
   if (_depBusy) return;
-  if (_depAccountIds.length < 1) { toast('Selecciona al menos 1 cuenta', 'error'); return; }
+  if (_depAccountIds.length < 2) { toast('Selecciona 2-5 cuentas desde la tabla para el matchmaker', 'error'); return; }
   if (_depAccountIds.length > 5) { toast('Máximo 5 cuentas', 'error'); return; }
 
   const raw = $('#depMultiPool').value.trim();
