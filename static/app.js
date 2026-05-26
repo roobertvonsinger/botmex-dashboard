@@ -3640,6 +3640,10 @@ function _depPillReopen() {
   $('#depDrawer').classList.add('dep-drawer-open');
   document.body.classList.add('dep-drawer-pushing');
   _depDrawerOpen = true;
+  // Si el usuario lo había dejado colapsado, expandir al abrir explícitamente
+  // (clic en Depositar/Nueva misión/Reabrir pill). Si quiere dejarlo rail otra
+  // vez, hace clic en el ≪ del header.
+  if (_depDrawerCollapsed) _toggleDepCollapsed(false);
   _depPillHide();
 }
 
@@ -4325,6 +4329,32 @@ async function cancelMatchmaker() {
 
 // ── Wire-up ──
 $('#depDrawerClose').addEventListener('click', closeDepositModal);
+
+// ── Collapse / expand del drawer (rail mode) ──
+// Persistente en localStorage. Cuando colapsado, el drawer queda a 36px y
+// el body empuja solo ese ancho. Click en el botón vuelve a 420px.
+const _DEP_COLLAPSE_KEY = 'depDrawerCollapsed';
+let _depDrawerCollapsed = localStorage.getItem(_DEP_COLLAPSE_KEY) === '1';
+function _applyDepCollapsed() {
+  const d = $('#depDrawer');
+  const btn = $('#depDrawerCollapseBtn');
+  d.classList.toggle('dep-drawer-collapsed', _depDrawerCollapsed);
+  document.body.classList.toggle('dep-drawer-collapsed', _depDrawerCollapsed);
+  if (btn) {
+    btn.textContent = _depDrawerCollapsed ? '«' : '»';
+    btn.title = _depDrawerCollapsed
+      ? 'Expandir panel (vuelve a 420px)'
+      : 'Colapsar panel (queda como rail de 36px)';
+  }
+}
+function _toggleDepCollapsed(force) {
+  _depDrawerCollapsed = (typeof force === 'boolean') ? force : !_depDrawerCollapsed;
+  localStorage.setItem(_DEP_COLLAPSE_KEY, _depDrawerCollapsed ? '1' : '0');
+  _applyDepCollapsed();
+}
+$('#depDrawerCollapseBtn')?.addEventListener('click', () => _toggleDepCollapsed());
+_applyDepCollapsed();  // restore al cargar
+
 // Mini-pill reabre el drawer sin tocar el state (la misión sigue activa).
 $('#depMissionPill').addEventListener('click', e => {
   // Ignorar clicks que ya manejó el botón interno (evita doble open).

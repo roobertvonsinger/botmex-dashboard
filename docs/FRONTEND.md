@@ -68,6 +68,13 @@
 > se cierra durante una misión activa (scheduled o matchmaker). Click reabre.
 > La misión sigue corriendo en backend aunque el drawer esté cerrado.
 
+**Collapse / expand (rail mode)** — 2026-05-26 (`#depDrawerCollapseBtn` `»` ↔ `«`):
+- Click en el `»` del header → drawer se contrae a un rail de 36px; el contenido se oculta y el body sigue empujado pero solo en 36px.
+- Click en el `«` del rail → vuelve a 420px.
+- Estado persistente en `localStorage['depDrawerCollapsed']` (`'1'` / `'0'`).
+- Al abrir el drawer desde una acción explícita (botón Depositar / Nueva misión / reabrir pill), si estaba colapsado se auto-expande — Robert no se queda viendo un rail vacío sin saber por qué.
+- CSS: clase `dep-drawer-collapsed` en `#depDrawer` + `body`. Hace `display:none` a `title/tabs/close/body/footer` y deja solo el botón de expand visible.
+
 3 modos seleccionables con tabs `#depModeSeg .dep-drawer-tab`:
 
 | Modo | Estado interno | Endpoint | Handler |

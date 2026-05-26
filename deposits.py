@@ -215,9 +215,10 @@ def _auto_lock_for_deposit(
         )
         email = row["email"]
     try:
+        from app import _resolve_who
         _broadcast({
             "type": "activity", "kind": "lock",
-            "ts": locked_at, "who": operator_id, "target": email,
+            "ts": locked_at, **_resolve_who(operator_id), "target": email,
             "id": account_id, "locked_until": locked_until,
             "auto": True,
         })
@@ -484,11 +485,12 @@ def _record_attempt(
 
     # ── 4. Broadcast SSE para feed de actividad ────────────────
     try:
+        from app import _resolve_who
         _broadcast({
             "type": "activity",
             "kind": "deposit",
             "ts": now_str,
-            "who": operator_id,
+            **_resolve_who(operator_id),
             "target": email,
             "amount": amount,
             "status": status,
@@ -1546,10 +1548,11 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                 # Notifica al SSE global del activity feed
                 for m in matches[-len(batch):]:
                     try:
+                        from app import _resolve_who
                         _broadcast({
                             "type": "activity", "kind": "deposit",
                             "ts": datetime.now(timezone.utc).isoformat(),
-                            "who": operator_id, "target": m["email"],
+                            **_resolve_who(operator_id), "target": m["email"],
                             "amount": amount, "status": "approved",
                         })
                     except Exception:
@@ -1617,7 +1620,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
     except ValueError as e:
         raise HTTPException(400, str(e))
 
-    from app import db, _broadcast
+    from app import db, _broadcast, _resolve_who
     with db() as c:
         row = c.execute(
             "SELECT id, email, password FROM accounts WHERE id=?", (account_id,)
@@ -1659,7 +1662,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                     "sched_id": sched_id, "total": repetitions,
                     "email": email,
                     "ts": datetime.now(timezone.utc).isoformat(),
-                    "who": operator_id,
+                    **_resolve_who(operator_id),
                 })
                 logger.info(f"[Scheduled {sched_id}] heartbeat scheduled_started broadcasted")
             except Exception as e:
@@ -1686,7 +1689,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                             "name": name, "data": payload or {},
                             "email": email,
                             "ts": datetime.now(timezone.utc).isoformat(),
-                            "who": operator_id,
+                            **_resolve_who(operator_id),
                         })
                     except Exception as e:
                         logger.warning(f"[Scheduled {sched_id}] phase broadcast failed: {e}")
@@ -1743,7 +1746,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                     "email": email, "amount": amount,
                     "success": ok, "code": code,
                     "ts": datetime.now(timezone.utc).isoformat(),
-                    "who": operator_id,
+                    **_resolve_who(operator_id),
                 })
                 # Cualquier falla aborta el loop completo: no tiene sentido
                 # reintentar el mismo monto que ya rechazó (quema cuentas).
@@ -1753,6 +1756,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                         "sched_id": sched_id, "email": email, "code": code,
                         "iter": i + 1, "total": repetitions,
                         "ts": datetime.now(timezone.utc).isoformat(),
+                        **_resolve_who(operator_id),
                     })
                     break
                 if i < repetitions - 1:
@@ -1779,6 +1783,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                 "type": "activity", "kind": "scheduled_cancelled",
                 "sched_id": sched_id, "email": email,
                 "ts": datetime.now(timezone.utc).isoformat(),
+                **_resolve_who(operator_id),
             })
             raise
         except Exception as e:
@@ -1800,6 +1805,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                     "code": f"LOOP_ERROR: {type(e).__name__}",
                     "iter": 0, "total": repetitions,
                     "ts": datetime.now(timezone.utc).isoformat(),
+                    **_resolve_who(operator_id),
                 })
             except Exception:
                 pass

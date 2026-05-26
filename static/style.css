@@ -1372,10 +1372,12 @@ tr.row-sel { background: var(--accent-soft) !important; }
 
 /* Tabla de transacciones */
 .d-txn-scroll {
-  max-height: 420px; overflow-y: auto;
+  max-height: 420px;
+  overflow-y: auto;
+  overflow-x: auto;            /* si las columnas no caben, scroll horizontal en vez de truncar */
   border: 1px solid var(--hairline); border-radius: 6px;
 }
-.d-txn-scroll::-webkit-scrollbar { width: 4px; }
+.d-txn-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
 .d-txn-scroll::-webkit-scrollbar-track { background: transparent; }
 .d-txn-scroll::-webkit-scrollbar-thumb { background: var(--hairline-h); border-radius: 2px; }
 .d-txn-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
@@ -1383,6 +1385,13 @@ tr.row-sel { background: var(--accent-soft) !important; }
   padding: 6px 10px; border-bottom: 1px solid var(--hairline);
   text-align: left;
 }
+/* Evita que la columna Cuándo (timestamp) ni Tarjeta (pipe completo) hagan wrap
+   y queden mutiladas en celdas estrechas. El scroll horizontal del contenedor
+   absorbe el desborde sin esconder caracteres. */
+.d-txn-table td.dim.mono,
+.d-txn-table td.combo,
+.d-txn-table td.combo b,
+.d-txn-table td.num { white-space: nowrap; }
 .d-txn-table th {
   position: sticky; top: 0; z-index: 1;
   background: var(--surface-solid);
@@ -3172,7 +3181,8 @@ td.row-details-cell, th.row-details-th {
     inset 0 1px 0 rgba(255,255,255,0.08),
     var(--neon-sm);
 }
-.dep-drawer-close {
+.dep-drawer-close,
+.dep-drawer-collapse-btn {
   background: transparent;
   border: none;
   color: var(--text-dim);
@@ -3183,7 +3193,32 @@ td.row-details-cell, th.row-details-th {
   border-radius: 6px;
   transition: all 140ms ease;
 }
-.dep-drawer-close:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+.dep-drawer-close:hover,
+.dep-drawer-collapse-btn:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+.dep-drawer-collapse-btn { font-size: 18px; font-weight: 700; }
+
+/* ── Estado colapsado: el drawer queda como rail de 36px y el body empuja
+   solo ese ancho. El único elemento visible es el botón de expand. ── */
+.dep-drawer.dep-drawer-collapsed { width: 36px; overflow: hidden; }
+.dep-drawer.dep-drawer-collapsed .dep-drawer-title,
+.dep-drawer.dep-drawer-collapsed .dep-drawer-tabs,
+.dep-drawer.dep-drawer-collapsed .dep-drawer-close,
+.dep-drawer.dep-drawer-collapsed .dep-drawer-body,
+.dep-drawer.dep-drawer-collapsed .dep-drawer-footer { display: none; }
+.dep-drawer.dep-drawer-collapsed .dep-drawer-head {
+  padding: 12px 2px;
+  justify-content: center;
+  border-bottom: none;
+}
+.dep-drawer.dep-drawer-collapsed .dep-drawer-collapse-btn {
+  font-size: 20px;
+  padding: 10px 4px;
+  color: var(--accent);
+}
+body.dep-drawer-pushing.dep-drawer-collapsed { padding-right: 36px; }
+@media (max-width: 600px) {
+  body.dep-drawer-pushing.dep-drawer-collapsed { padding-right: 0; }
+}
 
 .dep-drawer-body {
   flex: 1;

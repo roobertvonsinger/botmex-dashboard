@@ -3,6 +3,13 @@
 > Cada evento broadcast por el backend al frontend vía `text/event-stream`.
 > Mantener vivo al agregar/quitar un broadcast kind.
 
+> **Convención `who` / `who_color`** (desde 2026-05-26): los broadcasts de
+> tipo `activity` que llevan `who` lo envían **ya resuelto** al display name
+> (`"RobertVS"`, `"Luisito"`, etc.) y acompañado de `who_color` (slug del color
+> del operador). Usar siempre `**_resolve_who(operator_id)` en `deposits.py`
+> en lugar de pasar el `telegram_id` crudo — si no, el feed muestra el chat_id
+> numérico (ver `docs/ERRORS.md`).
+
 ## Tabla de eventos
 
 | `type` | `kind` | Disparado por | Payload | Handler frontend |

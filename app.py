@@ -704,6 +704,17 @@ def _operator_color(tg_id):
     return _auth.USER_COLORS.get(int(tg_id)) if tg_id else None
 
 
+def _resolve_who(val):
+    """Para broadcasts SSE: pareja {who, who_color} con display name resuelto.
+    Usar con spread: `_broadcast({"type":..., **_resolve_who(operator_id), ...})`.
+    Sin esto los broadcasts de deposits.py enviaban el telegram_id crudo y el
+    feed de Actividad lo mostraba como '1341812706' en vez de 'RobertVS'."""
+    return {
+        "who": _resolve_operator(val),
+        "who_color": _operator_color(val),
+    }
+
+
 @app.get("/api/superadmin/kpis")
 def superadmin_kpis(user: dict = Depends(require_session)):
     """L invertida del SuperAdmin (spec chat2):

@@ -492,6 +492,34 @@ docker logs traefik-traefik-1 2>&1 | grep -i 'letsencrypt\|acme' | tail -20
 
 ---
 
+### Feed de Actividad muestra telegram_id numérico en columna "Quién"
+
+**Síntoma**: la columna Quién muestra `1341812706` en vez de `RobertVS` (o el display name correspondiente) — pero solo para depósitos/locks que llegaron por SSE en vivo. Si se recargaba la página, los nombres aparecían bien.
+
+**Causa raíz**: los broadcasts SSE en `deposits.py` enviaban `"who": operator_id` (entero crudo del telegram_id). El endpoint REST `/api/activity` sí pasaba el valor por `_resolve_operator()`, pero los eventos vivos no — el frontend los recibía sin resolver y los pintaba tal cual.
+
+**Diagnóstico**: comparar payload SSE en consola del browser (`F12 → Network → /api/events`) contra el JSON de `/api/activity`. Si el SSE trae `"who": 1341812706` y el REST trae `"who": "RobertVS"`, es este bug.
+
+**Fix** (aplicado 2026-05-26): agregar helper `_resolve_who(val)` en `app.py:707` que devuelve `{"who": ..., "who_color": ...}` ya resueltos. En `deposits.py`, late-import el helper y reemplazar cada `"who": operator_id` por `**_resolve_who(operator_id)` en los 8 broadcasts (lock auto, deposit, multi, scheduled_started, scheduled_phase, scheduled, scheduled_aborted ×2, scheduled_cancelled).
+
+**Histórico**: el bug entró cuando los broadcasts se agregaron con el shape `who: operator_id` directo (no pasaba por `_resolve_operator`). El feed REST estaba bien desde el principio, lo que enmascaró el problema hasta que se notó la inconsistencia visual entre página recién cargada vs eventos en vivo.
+
+---
+
+### Tabla "Intentos del dashboard" trunca la tarjeta (`...|0628|` sin CVV)
+
+**Síntoma**: en el modal de detalles de cuenta, la sección "🎯 INTENTOS DEL DASHBOARD" muestra la columna Tarjeta cortada (`4913660004872817|0628|` sin el `|685` final), y la columna Cuándo se rompe a 3 líneas (`26-`, `may,`, `11:22`).
+
+**Causa raíz**: `.d-txn-scroll` tenía solo `overflow-y: auto`. Cuando el grid del modal (col 2, row 2) quedaba angosto, la tabla se comprimía y como las celdas no tenían `white-space: nowrap`, el texto se rompía en celdas estrechas — y los pipe de tarjeta (sin espacios) directamente se desbordaban y quedaban cortados sin scroll horizontal disponible.
+
+**Fix** (aplicado 2026-05-26): en `static/style.css`:
+- `.d-txn-scroll` → agregar `overflow-x: auto` (scroll horizontal si la suma de columnas excede el ancho).
+- `.d-txn-table td.dim.mono, td.combo, td.combo b, td.num` → `white-space: nowrap` (timestamp/tarjeta/monto no se rompen).
+
+**Histórico**: las celdas crecían cuando había espacio, pero al apretarse, los pipes se mutilaban silenciosamente. Lo notó Robert visualmente.
+
+---
+
 ## Plantilla para nuevos errores
 
 Agregar al cierre:
