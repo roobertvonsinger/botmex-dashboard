@@ -1677,6 +1677,11 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
             asyncio.create_task(pool.prefetch(1))
             for i in range(repetitions):
                 iter_num = i + 1
+                # Track del iter actual en _active_schedules para que GET /scheduled/list
+                # pueda devolverlo y el frontend rehidrate la barra de progreso tras
+                # un refresh sin esperar al próximo evento SSE.
+                if sched_id in _active_schedules:
+                    _active_schedules[sched_id]["current_iter"] = iter_num
 
                 # phase_cb por iter: emite scheduled_phase a SSE para visibilidad
                 # live. _it captura iter_num por default-arg para evitar late-bind.
@@ -1824,12 +1829,18 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
         "amount": amount, "repetitions": repetitions,
         "operator_id": operator_id,
         "started_at": datetime.now(timezone.utc).isoformat(),
+        "card_pipe": card_pipe,
+        "current_iter": 0,        # se actualiza en el loop, se expone vía /scheduled/list
     }
     return {"sched_id": sched_id, "email": email, "repetitions": repetitions}
 
 
 @router.get("/scheduled/list")
 def scheduled_list(user: dict = Depends(require_session)):
+    """Lista misiones programadas activas del user (SA ve todas).
+    Frontend la consulta al cargar para rehidratar el drawer si el operador
+    recargó la página en medio de una misión — TDAH-friendly: nunca perder
+    de vista lo que está corriendo."""
     tg = int(user.get("telegram_id") or 0)
     is_sa = user.get("role") == "superadmin"
     out = []
@@ -1843,6 +1854,9 @@ def scheduled_list(user: dict = Depends(require_session)):
             "sched_id": sid, "email": info["email"],
             "amount": info["amount"], "repetitions": info["repetitions"],
             "started_at": info["started_at"],
+            "card_pipe": info.get("card_pipe", ""),
+            "current_iter": info.get("current_iter", 0),
+            "operator_id": info["operator_id"],
         })
     return out
 

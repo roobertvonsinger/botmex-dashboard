@@ -120,9 +120,9 @@
 | GET | `/api/deposits/cap-status/{account_id}` | Cap status de una cuenta (window 24h, sesión 10min) | require_session | — | `{caps}` | `deposits.py:823` |
 | POST | `/api/deposits/multi/stream` | Matchmaker N cuentas × M tarjetas (SSE) | require_session | `{account_ids, cards, amount}` | `text/event-stream` | `deposits.py:855` |
 | POST | `/api/deposits/multi/{run_id}/cancel` | Cancelar matchmaker run | require_session | — | `{ok}` | `deposits.py:1118` |
-| POST | `/api/deposits/scheduled/create` | Programar N reps a 1 min de intervalo (aborta al primer fail) | require_session | `{account_id, card_pipe, amount, repetitions}` | `{sched_id, email, repetitions}` | `deposits.py:1134` |
-| GET | `/api/deposits/scheduled/list` | Listar schedules activos | require_session | — | `{schedules}` | `deposits.py:1254` |
-| POST | `/api/deposits/scheduled/{sched_id}/cancel` | Cancelar un schedule | require_session | — | `{ok}` | `deposits.py:1273` |
+| POST | `/api/deposits/scheduled/create` | Programar N reps a 1 min de intervalo (aborta al primer fail) | require_session | `{account_id, card_pipe, amount, repetitions}` | `{sched_id, email, repetitions}` | `deposits.py:1601` |
+| GET | `/api/deposits/scheduled/list` | Listar schedules activos del user (SA ve todos). Devuelve `[{sched_id, email, amount, repetitions, started_at, card_pipe, current_iter, operator_id}]` — el frontend lo usa al cargar para rehidratar el drawer si recargaron en medio de una misión. | require_session | — | array | `deposits.py:1840` |
+| POST | `/api/deposits/scheduled/{sched_id}/cancel` | Cancelar un schedule (task.cancel() → loop emite `scheduled_cancelled`). Solo dueño o SA. | require_session | — | `{cancelled: sched_id}` | `deposits.py:1860` |
 
 ## Tarjetas
 

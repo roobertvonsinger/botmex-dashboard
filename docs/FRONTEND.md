@@ -75,6 +75,18 @@
 - Al abrir el drawer desde una acción explícita (botón Depositar / Nueva misión / reabrir pill), si estaba colapsado se auto-expande — Robert no se queda viendo un rail vacío sin saber por qué.
 - CSS: clase `dep-drawer-collapsed` en `#depDrawer` + `body`. Hace `display:none` a `title/tabs/close/body/footer` y deja solo el botón de expand visible.
 
+**Cancel de misión scheduled** — 2026-05-26 (`#depSchedCancel` `⏹ Cancelar misión`):
+- Mientras `_schedActive` está vivo, el footer del drawer reemplaza `#depExec` (Ejecutar) por `#depSchedCancel` (rojo, danger). TDAH-friendly: el botón de aborto es siempre visible, no escondido.
+- Click → `confirm()` → `POST /api/deposits/scheduled/{sched_id}/cancel` → backend hace `task.cancel()`, el loop sale por `CancelledError` y emite `scheduled_cancelled`.
+- El handler SSE `_schedOnCancelled` muestra "⏹ Misión cancelada", limpia timers y restaura el botón Ejecutar.
+
+**Rehidratación de misión scheduled al recargar** — 2026-05-26 (`rehydrateActiveScheduled()`):
+- Tras `loadMe()` + `reload()` + `connectSSE()`, el init llama `rehydrateActiveScheduled()`.
+- Fetch `GET /api/deposits/scheduled/list`. Si hay misión activa del user (backend ya filtra para non-SA), reabre el drawer en modo schedule, llena `_depAccountIds`/`#depTargetEmail`/`#depTargetBalance` desde `state.rows`, repinta `#depCardPipe`, y llama `_schedShow(sched_id, repetitions, {currentIter, resumed: true})` para anclar la barra al iter actual sin esperar al próximo evento SSE.
+- Toast informa: `↺ Misión activa reanclada · iter X/N · email`.
+- Backend trackea `current_iter` en `_active_schedules[sid]["current_iter"]` (actualizado por el loop antes de cada iter). Sin esto, el frontend mostraba "0/N" hasta que llegara el primer `scheduled_phase` post-refresh.
+- Justificación TDAH: el operador puede recargar (intencional o accidentalmente) y NO perder de vista la misión. El flujo conductual se mantiene — sigue siendo obvio qué está corriendo.
+
 3 modos seleccionables con tabs `#depModeSeg .dep-drawer-tab`:
 
 | Modo | Estado interno | Endpoint | Handler |

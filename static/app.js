@@ -3676,20 +3676,35 @@ function _schedReset() {
   const bar = $('#depSchedBarFill'); if (bar) bar.style.width = '0%';
   const cd = $('#depSchedCountdown'); if (cd) cd.classList.add('hidden');
   const txt = $('#depSchedNowText'); if (txt) txt.textContent = 'Iniciando…';
+  // Esconder cancel + reactivar Ejecutar (vuelve al flujo normal de nueva misión)
+  $('#depSchedCancel')?.classList.add('hidden');
+  $('#depExec')?.classList.remove('hidden');
 }
 
-function _schedShow(sched_id, total) {
-  _schedActive = { sched_id, total, currentIter: 0, lastIterStart: 0, results: [] };
+function _schedShow(sched_id, total, opts = {}) {
+  _schedActive = {
+    sched_id, total,
+    currentIter: opts.currentIter || 0,
+    lastIterStart: 0,
+    results: [],
+  };
   const el = $('#depScheduledRun');
   if (!el) return;
   el.classList.remove('hidden', 'done', 'aborted');
   $('#depSchedId').textContent = `id: ${sched_id}`;
-  $('#depSchedIterNow').textContent = '0';
+  $('#depSchedIterNow').textContent = String(_schedActive.currentIter);
   $('#depSchedIterTot').textContent = String(total);
-  $('#depSchedBarFill').style.width = '0%';
+  const pct = total > 0 ? (_schedActive.currentIter / total) * 100 : 0;
+  $('#depSchedBarFill').style.width = `${pct}%`;
   $('#depSchedTimeline').innerHTML = '';
-  $('#depSchedNowText').textContent = `⚡ Calentando captcha pool…`;
+  $('#depSchedNowText').textContent = opts.resumed
+    ? `↺ Re-anclado tras refresh — esperando próximo evento…`
+    : `⚡ Calentando captcha pool…`;
   $('#depSchedCountdown').classList.add('hidden');
+  // Mientras hay misión activa, el botón Ejecutar se reemplaza por Cancelar.
+  // TDAH-friendly: el control de aborto es siempre visible y obvio.
+  $('#depExec')?.classList.add('hidden');
+  $('#depSchedCancel')?.classList.remove('hidden');
 
   // Rotador de hints — feedback continuo durante los ~5-15s antes del primer
   // phase event (login_start). Sin esto, "Preparando…" no cambia y parece
@@ -3839,6 +3854,8 @@ function _schedFinish(allOk) {
     : `✗ Misión terminada con errores`;
   $('#depSchedCountdown').classList.add('hidden');
   $('#depExec').textContent = '⏰ Nueva misión';
+  $('#depExec').classList.remove('hidden');
+  $('#depSchedCancel').classList.add('hidden');
   _schedActive = null;
 }
 
@@ -3855,6 +3872,8 @@ function _schedOnAborted(ev) {
   $('#depSchedNowText').textContent = `✗ Misión abortada — ${esc(ev.code || 'fallo')}`;
   $('#depSchedCountdown').classList.add('hidden');
   $('#depExec').textContent = '⏰ Nueva misión';
+  $('#depExec').classList.remove('hidden');
+  $('#depSchedCancel').classList.add('hidden');
   _schedActive = null;
 }
 
@@ -3871,6 +3890,8 @@ function _schedOnCancelled(ev) {
   $('#depSchedNowText').textContent = `⏹ Misión cancelada`;
   $('#depSchedCountdown').classList.add('hidden');
   $('#depExec').textContent = '⏰ Nueva misión';
+  $('#depExec').classList.remove('hidden');
+  $('#depSchedCancel').classList.add('hidden');
   _schedActive = null;
 }
 
@@ -4327,6 +4348,28 @@ async function cancelMatchmaker() {
   }
 }
 
+// Cancel del scheduled actualmente activo. El backend hace task.cancel() → el
+// loop sale por CancelledError y broadcastea scheduled_cancelled, que dispara
+// la limpieza de UI vía _schedReset() en el handler SSE.
+async function cancelScheduled() {
+  const sid = _schedActive?.sched_id;
+  if (!sid) return;
+  if (!confirm('¿Cancelar la misión programada? Los intentos ya enviados quedan guardados.')) return;
+  const btn = $('#depSchedCancel');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Cancelando…'; }
+  try {
+    const r = await fetch(`/api/deposits/scheduled/${sid}/cancel`, { method: 'POST' });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    toast('⏹ Misión cancelada', 'success');
+  } catch (e) {
+    toast(`Error cancelando: ${e.message}`, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '⏹ Cancelar misión'; }
+  }
+}
+
 // ── Wire-up ──
 $('#depDrawerClose').addEventListener('click', closeDepositModal);
 
@@ -4380,6 +4423,7 @@ $('#depAmounts').addEventListener('click', e => {
 });
 $('#depExec').addEventListener('click', executeDeposit);
 $('#depCancel').addEventListener('click', cancelMatchmaker);
+$('#depSchedCancel')?.addEventListener('click', cancelScheduled);
 $('#depCardPipe').addEventListener('input', () => {
   $('#depCardErr').classList.add('hidden');
 });
@@ -4495,6 +4539,64 @@ $$('.ico-btn[title="Salir"], .power').forEach(btn => {
   });
 });
 
+// ─── Rehidratación tras refresh ───
+// TDAH-friendly: si Robert recarga la página estando una misión scheduled
+// en curso, NO puede perderla de vista. El backend mantiene la misión viva
+// en _active_schedules y la expone vía /scheduled/list. Aquí la reanclamos
+// al drawer y dejamos el SSE seguir pintando eventos como si no hubiera
+// pasado nada — el operador retoma el contexto sin esfuerzo.
+async function rehydrateActiveScheduled() {
+  try {
+    const r = await fetch('/api/deposits/scheduled/list');
+    if (!r.ok) return;
+    const list = await r.json();
+    if (!Array.isArray(list) || list.length === 0) return;
+
+    // Si hay varias (caso SA viendo todas), elegir la del user actual o la primera
+    const meId = state.user?.telegram_id;
+    const sched = list.find(s => s.operator_id === meId) || list[0];
+
+    // Abrir el drawer (sin pasar por openDepositModal — no requiere cuenta seleccionada)
+    $('#depDrawer').classList.add('dep-drawer-open');
+    document.body.classList.add('dep-drawer-pushing');
+    _depDrawerOpen = true;
+    if (_depDrawerCollapsed) _toggleDepCollapsed(false);
+
+    // Forzar tab Prog. visible (los handlers de tab manejan el resto del layout)
+    setDepMode('schedule');
+
+    // Si encontramos la cuenta en state.rows, llenar target block para contexto
+    const acct = (state.rows || []).find(x => x.email === sched.email);
+    if (acct) {
+      _depAccountIds = [acct.id];
+      const tEl = $('#depTargetEmail');
+      if (tEl) {
+        tEl.textContent = acct.password ? `${acct.email}:${acct.password}` : acct.email;
+      }
+      const bEl = $('#depTargetBalance');
+      if (bEl) bEl.textContent = fmtMoney(acct.balance_total);
+    }
+    // Repins de la tarjeta usada (visible en el input para contexto)
+    if (sched.card_pipe) {
+      const cardEl = $('#depCardPipe');
+      if (cardEl) cardEl.value = sched.card_pipe;
+    }
+    $('#depRepsVal').textContent = String(sched.repetitions);
+
+    // Mostrar la vista live con el iter actual ya anclado (no esperar al primer SSE)
+    _schedShow(sched.sched_id, sched.repetitions, {
+      currentIter: sched.current_iter || 0,
+      resumed: true,
+    });
+    toast(
+      `↺ Misión activa reanclada · iter ${sched.current_iter || 0}/${sched.repetitions} · ${sched.email}`,
+      'success'
+    );
+  } catch (e) {
+    console.warn('[rehydrate] scheduled error:', e);
+  }
+}
+
 // ─── init ───
 (async () => {
   await loadMe();
@@ -4508,6 +4610,10 @@ $$('.ico-btn[title="Salir"], .power').forEach(btn => {
   setInterval(refreshKpis, 30_000);
   loadHealth(false);
   connectSSE();
+  // Reanclar misiones programadas activas DESPUÉS de reload() (necesitamos
+  // state.rows para resolver el target block) y de connectSSE (para que los
+  // próximos phase events lleguen al handler ya cargado).
+  rehydrateActiveScheduled();
 })();
 
 window.addEventListener('beforeunload', () => {
