@@ -72,10 +72,31 @@ Antes de cualquier `git commit` que toque el dashboard, verificar que `docs/` qu
 
 Default: `docs/AUDIT.md` con una nueva fila. Marca lo que cambió.
 
+## MAP.md — índice maestro auto-generado
+
+`MAP.md` en la raíz es el punto de entrada para orientarse rápido en el repo.
+**Leerlo primero** al inicio de cada sesión antes de tocar código.
+
+Contiene:
+- Tabla de módulos con L# y logger
+- Mapa de símbolos por módulo (funciones/clases con rango de líneas)
+- Endpoints detectados
+- Variables de entorno con defaults
+- Loggers disponibles
+- Logs, directorios críticos, docs de referencia (secciones manuales)
+
+Las secciones `[AUTO]` se regeneran solos en cada commit via `scripts/gen_map.py` (hook pre-commit).
+Para regenerar manualmente: `python scripts/gen_map.py`
+
+> **Nota:** el hook vive en `.git/hooks/pre-commit` (no commiteado). Si se hace clone fresco,
+> reinstalar con: `cp .git/hooks/pre-commit .git/hooks/pre-commit` — o correr
+> `echo '#!/bin/sh\npython scripts/gen_map.py\ngit add MAP.md' > .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit`
+
 ## Estructura del repo (visión rápida)
 
 ```
 repos/botmex-dashboard/
+├── MAP.md     # <-- LEER PRIMERO: índice maestro auto-generado
 ├── README.md  # entrada visible primera capa
 ├── DEPLOY.md  # protocolo legacy (overlaps con docs/protocols/deploy-protocol.md)
 ├── docs/
@@ -88,6 +109,8 @@ repos/botmex-dashboard/
 ├── infra/             Dockerfile, docker-compose.yml, .env.example
 ├── static/            frontend
 ├── *.py               backend
+├── scripts/gen_map.py # regenera MAP.md
+├── .git/hooks/pre-commit  # hook: corre gen_map.py en cada commit
 ├── .claude/skills/    este folder (skills locales del repo)
 └── templates/         template replicable para otros repos
 ```
