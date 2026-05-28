@@ -93,7 +93,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2378 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2400 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `conftest.py` | 79 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `deposits.py` | 1916 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
@@ -183,6 +183,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `78b4628` | feat(login): orquestación gentil (gentle_login) + fix matchmaker mata-cuentas |
 | `3c31ca5` | docs(map): Bóveda BetMexico marcada pendiente + guía de qué guardar |
 | `3ae9271` | docs(map): agregar Bóveda como sección en MAP.md |
 | `e4799cd` | docs(bitacora): skill actualizada para MAP.md lean + MAP_DEEP.md |
@@ -194,7 +195,6 @@ web_routes_prewarm.py → prewarm.py
 | `c08024d` | feat(scheduled): cancel desde UI + rehidratación tras refresh (TDAH-friendly) |
 | `7a0b37f` | fix+feat: SSE who resuelto, tabla intentos sin truncar, drawer collapse rail |
 | `899ba14` | ui(balance): tiers low/mid/hot — <$10 gris, <$50 blanco, >=$50 verde radiactivo + glow + pulse 2.6s |
-| `72056f2` | ui(green): swatch final — hue 160 chr 0.11 L 0.50 (verde bandera mx) |
 <!-- GEN:end:recientes -->
 
 ---

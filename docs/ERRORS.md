@@ -37,6 +37,16 @@ docker logs betmexico-web 2>&1 | grep "bot init failed"
 
 ---
 
+### Movimientos del modal: las horas "nuestras" salían +6h (corregido 2026-05-28)
+
+**Síntoma**: en el modal de detalle (sección MOVIMIENTOS), las transacciones propias (ícono rayo, `source=dashboard`) aparecían 6 horas adelante vs la página real de BetMexico. Ej: depósito mostrado a las 08:09 cuando la página lo muestra a 02:09. Las de BetMexico (`source=betmex`, globo) salían bien → "algunas bien, otras no".
+
+**Causa raíz (verificada con BD prod, NO supuesta)**: `deposit_attempts.created_at` se guarda en **UTC naïve** (`'2026-05-28 08:09:43'`, confirmado: ≈ `date -u` del host, no la hora CST del container). `account_transactions.txn_date` de BetMexico ya viene en **hora MX naïve** (confirmado: SPEI en BD coinciden con la franja de la página). El frontend (`parseTs` en `app.js`) trata **todo** timestamp naïve como hora local MX → las UTC salían +6h. Además el sort por `when` mezclaba UTC y MX → orden inconsistente entre fuentes.
+
+**Fix**: `app.py` (endpoint de detalle, armado de `movimientos`) convierte SOLO `created_at` de UTC→MX con `zoneinfo America/Mexico_City` (fallback `-6h`; MX no tiene DST desde 2022) antes de mandarlo en `when`. `txn_date` queda intacto (ya MX). Helper `_utc_to_mx()`. Bonus: el sort vuelve a ser correcto (ambas fuentes en MX).
+
+---
+
 ### El matchmaker marca cuentas BUENAS como DEAD cuando falla el login (corregido 2026-05-28)
 
 **Síntoma**: cuentas válidas quedan `status='DEAD'` con `dead_reason='LOGIN_FAILED'` y ya no se reintentan.

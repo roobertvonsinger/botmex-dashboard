@@ -1952,6 +1952,28 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
 
             movimientos = []
 
+            # created_at de deposit_attempts se guarda en UTC naïve (datetime.now(utc)/
+            # datetime('now') de SQLite). El frontend trata los timestamps naïve como
+            # hora local MX → mostraba las nuestras +6h. txn_date de BetMexico YA viene
+            # en hora MX (verificado: SPEI en BD coinciden con la franja horaria de la
+            # página). Por eso convertimos SOLO created_at: UTC → MX. Bonus: el sort por
+            # `when` deja de mezclar UTC y MX (antes desordenaba entre fuentes).
+            def _utc_to_mx(ts):
+                if not ts:
+                    return ts
+                try:
+                    s = str(ts).replace("T", " ")
+                    fmt = "%Y-%m-%d %H:%M:%S.%f" if "." in s else "%Y-%m-%d %H:%M:%S"
+                    dt = datetime.strptime(s, fmt)
+                    try:
+                        from zoneinfo import ZoneInfo
+                        dt = dt.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo("America/Mexico_City"))
+                    except Exception:
+                        dt = dt - timedelta(hours=6)  # MX = UTC-6 fijo (sin DST desde 2022)
+                    return dt.strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    return ts
+
             # deposit_attempts → siempre deposit, source dashboard
             for a in result.get("deposit_attempts", []):
                 st = (a.get("status") or "").lower()
@@ -1962,7 +1984,7 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                 else:
                     state = "pending"
                 movimientos.append({
-                    "when": a.get("created_at"),
+                    "when": _utc_to_mx(a.get("created_at")),
                     "source": "dashboard",
                     "kind": "deposit",
                     "method": "Pago con tarjeta",
