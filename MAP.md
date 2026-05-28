@@ -93,14 +93,14 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `_test_v3_login.py` | 80 | `—` | Script dev para testear login reCAPTCHA v3 — NO es parte del app |
+| `_test_v3_login.py` | 93 | `—` | Script dev para testear login reCAPTCHA v3 — NO es parte del app |
 | `app.py` | 2378 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `conftest.py` | 79 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `deposits.py` | 1902 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `prewarm.py` | 665 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 289 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
-| `scripts/gen_map.py` | 459 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
+| `scripts/gen_map.py` | 476 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
@@ -183,6 +183,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `e4799cd` | docs(bitacora): skill actualizada para MAP.md lean + MAP_DEEP.md |
 | `55d526d` | refactor(map): MAP.md lean (241L) + MAP_DEEP.md separado (475L) |
 | `9d5b71f` | feat(map): rediseño MAP.md como guía de navegación para agentes IA |
 | `eb733e3` | feat(map): MAP.md auto-generado + hook pre-commit |
@@ -194,7 +195,6 @@ web_routes_prewarm.py → prewarm.py
 | `72056f2` | ui(green): swatch final — hue 160 chr 0.11 L 0.50 (verde bandera mx) |
 | `04627e9` | ui(green): bajar lightness 0.82→0.66 — verde mexicano más serio |
 | `40e430c` | fix(sse): doble-import de app.py rompía bus SSE — clients=0 fantasma |
-| `0ad4044` | feat(ui): verde mexicano neón + botones premium + logo link + SSE diag |
 <!-- GEN:end:recientes -->
 
 ---
@@ -233,6 +233,23 @@ web_routes_prewarm.py → prewarm.py
 | `docs/SSE_EVENTS.md` | Catálogo de eventos SSE (kind, payload) |
 | `DEPLOY.md` | Deploy a KVM4 |
 | `MAP_DEEP.md` | Mapa de funciones por módulo (rangos de líneas) |
+
+---
+
+## Bóveda — código canónico protegido `[MANUAL]`
+
+> Si algo se rompe en el repo activo, aquí está la versión protegida para restaurar.
+> **No modificar la Bóveda** — es de solo lectura. Copiar al repo y modificar ahí.
+
+**Path absoluto (Dropbox local):** `C:\Users\rober\Dropbox\TESTING DEV\repos\Boveda\`
+**Path relativo desde repos/:** `../Boveda/` (o `Boveda/` si estás parado en `repos/`)
+
+| Archivo en Bóveda | Descripción |
+|-------------------|-------------|
+| `Boveda/Ruthopia/RGates/telcel_cipher_v1.0.py` | Cipher canónico Telcel v1.0 (Ruthopia/RGates) |
+| `Boveda/Ruthopia/RGates/wabox_bypass_v1.0.py` | Bypass WABox v1.0 (Ruthopia/RGates) |
+
+**Estructura:** `Boveda/<proyecto>/<módulo>/<archivo_vX.Y.py>` — versionado explícito en nombre.
 
 ---
 

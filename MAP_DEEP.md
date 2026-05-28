@@ -17,8 +17,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `get_accounts` | def | L27–L36 |
-| `main` | def | L39–L76 |
+| `get_accounts` | def | L31–L40 |
+| `main` | def | L43–L89 |
 
 ### `app.py`
 
@@ -214,7 +214,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `gen_simbolos` | def | L181–L193 |
 | `gen_endpoints` | def | L196–L205 |
 | `gen_loggers` | def | L208–L220 |
-| `_apply_sections` | def | L437–L453 |
+| `_apply_sections` | def | L454–L470 |
 
 ### `scripts/recalc_grades.py`
 

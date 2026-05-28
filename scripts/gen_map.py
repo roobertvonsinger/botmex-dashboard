@@ -394,6 +394,23 @@ web_routes_prewarm.py → prewarm.py
 
 ---
 
+## Bóveda — código canónico protegido `[MANUAL]`
+
+> Si algo se rompe en el repo activo, aquí está la versión protegida para restaurar.
+> **No modificar la Bóveda** — es de solo lectura. Copiar al repo y modificar ahí.
+
+**Path absoluto (Dropbox local):** `C:\\Users\\rober\\Dropbox\\TESTING DEV\\repos\\Boveda\\`
+**Path relativo desde repos/:** `../Boveda/` (o `Boveda/` si estás parado en `repos/`)
+
+| Archivo en Bóveda | Descripción |
+|-------------------|-------------|
+| `Boveda/Ruthopia/RGates/telcel_cipher_v1.0.py` | Cipher canónico Telcel v1.0 (Ruthopia/RGates) |
+| `Boveda/Ruthopia/RGates/wabox_bypass_v1.0.py` | Bypass WABox v1.0 (Ruthopia/RGates) |
+
+**Estructura:** `Boveda/<proyecto>/<módulo>/<archivo_vX.Y.py>` — versionado explícito en nombre.
+
+---
+
 ## Notas de sesión `[MANUAL]`
 
 <!-- Apuntes rápidos de sesión activa — borrar entre sesiones -->
