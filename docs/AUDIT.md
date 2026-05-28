@@ -3,6 +3,24 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-05-28 (rediseño detalle a panel INLINE + session-reuse en programados)
+
+### Detalle de cuenta — panel inline (rediseño 2026-05-28)
+
+| Función | Esperado | Actual | Estado |
+|---|---|---|---|
+| Panel inline acordeón (reemplaza modal) | ✅ se despliega bajo la fila; celda "Detalles" full-clickable; micro-animaciones open/close | ✅ `_injectExpandedDetail` + `_expandedNode` preservado entre re-renders | ✅ |
+| Clicks dentro del panel (en tabla) | ✅ TODO interactivo es `<button>` (divs/spans no reciben clicks en `<table>` — caían a la tabla) | ✅ En uso/copy/expand/paginador/validar = buttons | ✅ |
+| SSE no rompe el panel abierto | ✅ `_liveReload()` difiere reload de la tabla mientras hay panel abierto; aplica al cerrar | ✅ | ✅ |
+| Movimientos unificados | ✅ `GET /details.movimientos` = `account_transactions` + `deposit_attempts`, ordenados, con `who` (resuelto de WEB_USERS_RAW) y flag nuestros/página | ✅ `app.py` endpoint | ✅ |
+| Movimientos: paginador 10/pág | ✅ interno, no choca con paginador de tabla | ✅ `_mvPage` | ✅ |
+| Expand transacción nuestra | ✅ revela tarjeta usada (pipe `\|MM\|YY\|`, copiable) + estado Approved/Rejected/3DS a la derecha | ✅ | ✅ |
+| Tarjetas + Notas en "Guardado" | ✅ filas colapsables (💳/📝), Agregar tarjeta/nota; auto-guarda tarjeta al aprobar | ✅ | ✅ |
+| Toggle "En uso" | ✅ amarillo, lock 2h / unlock vía endpoints existentes | ✅ | ✅ |
+| Validar/corregir CURP | ✅ botón abre flujo gob.mx + edita/guarda (handler movido de `#detModalBody` al panel) | ✅ | ✅ |
+| CURP estimado `_detectStateCode` | ✅ "COL"(Colonia)≠Colima; "MEX"→MC | ✅ fix 2026-05-28 | ✅ |
+| Notas en buscador global | ✅ `note_text LIKE` ya estaba en `/api/accounts?q=` | ✅ | ✅ |
+
 ## Captura: 2026-05-25 (drawer lateral + fix persist cards en _record_attempt + fix SSE scheduled_phase race)
 
 ## Auth / Sesión
@@ -76,7 +94,9 @@
 | Loguear card al inicio del deposit | ✅ logger.info | ✅ (desde fix 2026-05-11) | ✅ |
 | Multi/matchmaker SSE | ✅ N cuentas × M tarjetas, pairing greedy, cooldown 5s, velocity-skip throttle 30s, pool init dentro de try (lock release garantizado si CapMonster down) | ✅ desde 2026-05-21 | ✅ |
 | Cancelar matchmaker run | ✅ POST `/multi/{id}/cancel` | ✅ | ✅ |
-| Scheduled N reps cada 1 min | ✅ aborta al primer fail | ✅ | ✅ |
+| Scheduled N reps cada 1 min | ✅ aborta al primer fail | ✅ |
+| **Scheduled: reuso de sesión (sin re-login)** | ✅ iter 0 hace login real (1 captcha) y captura `jwt`+`used_proxy`; iters 1..N reusan esa sesión vía `session_jwt`/`session_proxy` en `_run_deposit_with_phases` → **0 captchas extra**, sin latencia de login, misma IP todo el run. JWT vive ~7 días (medido en prod), run ≤20 min → seguro. Emite `login_reused` en vez de `login_start`/`login_done`. Si la sesión fallara mid-run, aborta como cualquier fail (sin re-login automático — decisión 2026-05-28). | ✅ desde 2026-05-28 | ✅ |
+| **Scheduled: cadencia 1 min desde fin del depósito** | ✅ `await asyncio.sleep(60)` completo DESPUÉS de lograr el depósito (antes era `interval - elapsed` desde el inicio del intento). Robert 2026-05-28: "debe pasar 1 minuto a partir de que se logra el depósito, no a partir de que se inicia". Se eliminó toda la maquinaria de pre-refresh de captcha entre iters (ya no se necesita con reuso de sesión). | ✅ desde 2026-05-28 | ✅ | ✅ |
 | **Scheduled con fases en vivo** | ✅ `scheduled_create.loop()` usa `_run_deposit_with_phases` con `phase_cb` que emite `kind:scheduled_phase` por sub-fase (login/begin/submit/check/done). Feed renderiza con `_schedPhaseLabel()`. Eventos summary `scheduled`/`scheduled_aborted`/`scheduled_cancelled` siguen igual | ✅ 2026-05-15 — Task 5 deposit-live-progress | ✅ |
 | Modal scheduled NO se cierra solo | ✅ usuario decide cuándo cerrar | ✅ (desde 2026-05-11) | ✅ |
 | **Drawer lateral derecho (no-bloqueante)** | ✅ reemplaza al ex-modal centrado bloqueante. Slide-in 260ms, 420px de ancho. El dashboard atrás sigue interactuable (tabla, sidebar, scroll). Tabs `⚡ Una · 👥 Multi · ⏰ Prog.` en una sola vista. Si se cierra mid-misión, queda mini-pill flotante abajo-derecha que reabre el drawer sin perder state. | ✅ desde 2026-05-25 | ✅ |

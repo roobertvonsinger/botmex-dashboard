@@ -41,6 +41,35 @@ let notifications = [];
 let _evtSrc = null;
 let _sortCol = null, _sortDir = -1;
 
+// ─── Detalle de cuenta inline (acordeón) ───
+// expandedAccountId: id de la cuenta cuyo panel de detalle está desplegado
+// (o null). detailDataCache: cache del JSON de /details por id, para re-inyectar
+// el panel tras un re-render de renderTable (SSE/sort/filtro) sin re-fetch ni
+// flicker. Se invalida al cerrar o al pedir refresh explícito.
+let expandedAccountId = null;
+const detailDataCache = {};
+// Paginación interna de movimientos por cuenta (10 por página). Persiste entre
+// re-inyecciones del panel. Independiente del paginador de la tabla completa.
+const _mvPage = {};
+const _MV_PER_PAGE = 10;
+// Nodo DOM del panel inline. Se PRESERVA entre re-renders de renderTable (SSE/
+// sort/filtro): se re-inserta el mismo nodo en vez de reconstruir el HTML, para
+// no resetear el estado del DOM (p.ej. <details open> de transacciones, focus).
+// Solo se reconstruye en acciones explícitas (abrir cuenta, fetch, ver más, etc).
+let _expandedNode = null;
+// Mientras un panel está abierto, los reload() disparados por SSE (lock/unlock/
+// depósito de OTROS operadores) se DIFIEREN: reconstruir la tabla debajo del
+// panel lo destruía/reinsertaba y robaba los clicks del usuario. Se aplica un
+// reload al cerrar el panel.
+let _deferredTableRender = false;
+function _liveReload() {
+  if (expandedAccountId) { _deferredTableRender = true; return; }
+  reload();
+}
+function _flushDeferredRender() {
+  if (_deferredTableRender) { _deferredTableRender = false; reload(); }
+}
+
 function sortRows(col) {
   if (_sortCol === col) _sortDir = -_sortDir;
   else { _sortCol = col; _sortDir = -1; }
@@ -225,7 +254,7 @@ const _CURP_CODE_ALIASES = {
   'PUE': 'PL', 'QRO': 'QT', 'SLP': 'SP', 'SIN': 'SL',
   'SON': 'SR', 'TAB': 'TC', 'TAMS': 'TS', 'TAMPS': 'TS',
   'TLAX': 'TL', 'VER': 'VZ', 'YUC': 'YN', 'ZAC': 'ZS',
-  'CAMP': 'CC', 'COL': 'CM',
+  'CAMP': 'CC', 'MEX': 'MC', 'MEXICO': 'MC', 'EDO DE MEXICO': 'MC',
   'QROO': 'QR', 'Q ROO': 'QR',
 };
 
@@ -490,7 +519,7 @@ function renderTable() {
     });
   });
 
-  const colspan = state.view === 'simple' ? 6 : 8;
+  const colspan = state.view === 'simple' ? 7 : 9;
   const rowsHtml = visible.map(r => {
     const g = gradeClass(r.grade);
     const until = r.locked_by ? fmtUntil(r.locked_until) : null;
@@ -557,6 +586,11 @@ function renderTable() {
   }).join('');
 
   t.querySelector('tbody').innerHTML = rowsHtml || `<tr><td colspan="${colspan}" class="loading">Sin cuentas</td></tr>`;
+
+  // Re-inyecta el panel de detalle inline (acordeón) tras reconstruir el tbody.
+  // renderTable reescribe innerHTML completo en cada tick SSE/sort/filtro, así
+  // que el acordeón sobrevive re-renders re-inyectándose desde expandedAccountId.
+  _injectExpandedDetail();
 
   // selectAll en sync con visible
   const allChecked = visible.length > 0 && visible.every(r => selectedIds.has(r.id));
@@ -743,6 +777,7 @@ function _schedPhaseLabel(name, data) {
   switch (name) {
     case 'login_start':         return '🔑 Login…';
     case 'login_done':          return (data.ok ? '🔑 ✓' : '🔑 ✗') + ms + (data.from_cache ? ' <span class="dim">cache</span>' : '');
+    case 'login_reused':        return '♻️ Sesión reutilizada';
     case 'gateway_begin':       return '📝 Orden…';
     case 'gateway_begin_done':  return (data.ok ? '📝 ✓' : '📝 ✗') + ms + (data.order_id ? ` <span class="dim mono">${esc(String(data.order_id).slice(0, 12))}</span>` : '');
     case 'gateway_submit':      return '💳 Tarjeta…';
@@ -1188,17 +1223,17 @@ function connectSSE() {
         // Notificaciones para acciones que importan
         if (ev.kind === 'lock') {
           pushNotif({ icon: '🔒', msg: `${ev.who} bloqueó ${ev.target}` });
-          reload();
+          _liveReload();
         } else if (ev.kind === 'unlock') {
           pushNotif({ icon: '🔓', msg: `${ev.who} liberó ${ev.target}` });
-          reload();
+          _liveReload();
         } else if (ev.kind === 'deposit') {
           const ok = ev.status === 'approved';
           pushNotif({
             icon: ok ? '✅' : '❌',
             msg: `${ev.who} depositó ${fmtMoney(ev.amount)} en ${ev.target} → ${ev.status}`,
           });
-          if (ok) reload();
+          if (ok) _liveReload();
         } else if (ev.kind === 'scheduled_started') {
           // Heartbeat de arranque — confirma backend vivo antes del pool warm-up.
           // Si _schedActive aún no existe (race con HTTP response), el watchdog
@@ -1249,7 +1284,7 @@ function connectSSE() {
         const myTg = state.user?.telegram_id;
         if (!myTg || ev.operator_id === myTg || state.user?.role === 'superadmin') {
           pushNotif({ icon: '↩️', msg: ev.msg || `${ev.email} liberada al pool` });
-          reload();
+          _liveReload();
         }
       }
     } catch {}
@@ -2195,6 +2230,10 @@ async function _quickAddNote(accId, email) {
 
 // ─── Tabla: click en checkbox, click en combo (copia), click en fila (detalle) ───
 $('#accTable').addEventListener('click', e => {
+  // Clicks DENTRO del panel inline de detalle los maneja su propio listener;
+  // este handler de tabla los ignora (si no, toggle-aría la selección de la
+  // cuenta al clickear cualquier parte del panel).
+  if (e.target.closest('.acc-detail')) return;
   // Botón ↻ por fila — refresh SOLO esa cuenta, no toca paginación ni filtros
   const refOne = e.target.closest('.row-refresh-one');
   if (refOne?.dataset.id) {
@@ -2387,6 +2426,209 @@ async function openCurpValidator(accId) {
       } catch (e) { toast(`Error: ${e.message}`, 'error'); }
     }
   });
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// Listeners del PANEL INLINE de detalle (acordeón en #accTable).
+// Delegación sobre #accTable para sobrevivir re-renders de renderTable.
+// El copiar [data-copy] ya lo maneja el listener global de document.body
+// (capture). Aquí: Depositar, toggle "En uso", agregar/borrar nota,
+// agregar tarjeta, ver más/menos movimientos.
+// ════════════════════════════════════════════════════════════════════════
+$('#accTable').addEventListener('click', async e => {
+  // No interceptar si el click fue dentro de la tabla normal (no del panel).
+  const panel = e.target.closest('.acc-detail');
+  if (!panel) return;
+
+  // --- Depositar (toggle: mismo botón abre/cierra el panel de depósito) ---
+  const depBtn = e.target.closest('.d-deposit-btn');
+  if (depBtn?.dataset.accId) {
+    e.preventDefault(); e.stopPropagation();
+    const accId = parseInt(depBtn.dataset.accId);
+    const sameSingle = _depDrawerOpen && _depMode === 'single'
+      && _depAccountIds.length === 1 && _depAccountIds[0] === accId;
+    if (sameSingle) {
+      closeDepositModal();
+    } else {
+      openDepositModal(accId);
+    }
+    return;
+  }
+
+  // --- Toggle "En uso" (lock/unlock) ---
+  const inuse = e.target.closest('[data-inuse]');
+  if (inuse) {
+    e.preventDefault(); e.stopPropagation();
+    const accId = parseInt(inuse.dataset.inuse);
+    const turningOn = !inuse.classList.contains('on');
+    // Optimista (microanimación pop la da el .on en CSS)
+    inuse.classList.toggle('on', turningOn);
+    try {
+      if (turningOn) {
+        const op = state.user?.username || 'op';
+        const r = await fetch(`/api/accounts/${accId}/lock`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ operator: op, hours: 2 }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+        if (detailDataCache[accId]) { detailDataCache[accId].locked_by = data.locked_by; detailDataCache[accId].locked_until = data.locked_until; }
+        toast('🔖 En uso (lock 2h)', 'success');
+      } else {
+        const r = await fetch(`/api/accounts/${accId}/unlock`, { method: 'POST' });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        if (detailDataCache[accId]) { detailDataCache[accId].locked_by = null; detailDataCache[accId].locked_until = null; }
+        toast('🔓 Liberada', '');
+      }
+      // refresca fila en la tabla (lock chip) sin reconstruir el panel abierto
+      _liveReload();
+    } catch (err) {
+      inuse.classList.toggle('on', !turningOn);  // revert
+      toast(`Error: ${err.message}`, 'error');
+    }
+    return;
+  }
+
+  // --- Validar/corregir CURP en gob.mx (el handler viejo estaba en #detModalBody,
+  //     que ya no se usa con el panel inline) ---
+  const vBtn = e.target.closest('.curp-validate-btn');
+  if (vBtn?.dataset.accId) {
+    e.preventDefault(); e.stopPropagation();
+    openCurpValidator(parseInt(vBtn.dataset.accId));
+    return;
+  }
+
+  // --- expandir/cerrar una transacción nuestra (revela la tarjeta usada) ---
+  const tog = e.target.closest('[data-mv-toggle]');
+  if (tog) {
+    e.preventDefault(); e.stopPropagation();
+    const item = tog.closest('.mitem');
+    const rev = item?.querySelector('.mrev');
+    if (rev) { rev.hidden = !rev.hidden; item.classList.toggle('mitem-open', !rev.hidden); }
+    return;
+  }
+
+  // --- paginador de movimientos (10/pág) ---
+  const pg = e.target.closest('[data-mv-pg]');
+  if (pg) {
+    e.preventDefault(); e.stopPropagation();
+    const np = parseInt(pg.dataset.mvPg);
+    if (!isNaN(np) && np >= 0) { _mvPage[expandedAccountId] = np; _injectExpandedDetail(true); }
+    return;
+  }
+
+  // --- Borrar nota (SA) ---
+  const del = e.target.closest('.srow-del');
+  if (del?.dataset.noteId) {
+    e.preventDefault(); e.stopPropagation();
+    const accId = expandedAccountId;
+    const noteId = parseInt(del.dataset.noteId);
+    if (!confirm('¿Borrar esta nota?')) return;
+    try {
+      await deleteNote(accId, noteId);
+      if (detailDataCache[accId]) detailDataCache[accId].notes = (detailDataCache[accId].notes || []).filter(n => n.id !== noteId);
+      toast('✓ Nota borrada', 'success');
+      _injectExpandedDetail(true);
+    } catch (err) { toast(`Error: ${err.message}`, 'error'); }
+    return;
+  }
+
+  // --- Agregar nota: muestra textarea inline ---
+  const addNote = e.target.closest('[data-add-note]');
+  if (addNote) {
+    e.preventDefault(); e.stopPropagation();
+    _showInlineAddForm(parseInt(addNote.dataset.addNote), 'note');
+    return;
+  }
+
+  // --- Agregar tarjeta: muestra input inline ---
+  const addCard = e.target.closest('[data-add-card]');
+  if (addCard) {
+    e.preventDefault(); e.stopPropagation();
+    _showInlineAddForm(parseInt(addCard.dataset.addCard), 'card');
+    return;
+  }
+
+  // --- Guardar/cancelar del form inline ---
+  const saveBtn = e.target.closest('.addform .save');
+  if (saveBtn) {
+    e.preventDefault(); e.stopPropagation();
+    await _submitInlineAddForm(saveBtn.closest('.addform'));
+    return;
+  }
+  const cancelBtn = e.target.closest('.addform .cancel');
+  if (cancelBtn) {
+    e.preventDefault(); e.stopPropagation();
+    const host = cancelBtn.closest('.addform-host');
+    if (host) host.innerHTML = '';
+    return;
+  }
+});
+
+// Render del form inline para agregar nota/tarjeta dentro del panel "Guardado".
+function _showInlineAddForm(accId, kind) {
+  const host = document.querySelector(`.acc-detail .addform-host[data-acc-id="${accId}"]`);
+  if (!host) return;
+  if (kind === 'note') {
+    host.innerHTML = `<div class="addform" data-acc-id="${accId}" data-kind="note">
+      <textarea class="addform-input" placeholder="Nueva nota…" maxlength="2000"></textarea>
+      <div class="addform-row"><button class="cancel">Cancelar</button><button class="save">Guardar nota</button></div>
+    </div>`;
+  } else {
+    // Las tarjetas se guardan al APROBARSE un depósito (auto-save en deposits.py).
+    // No hay endpoint de alta manual y no tocamos la BD del bot. Por eso este
+    // form abre el drawer de depósito con la tarjeta precargada: al aprobar,
+    // la tarjeta queda guardada por el flujo existente.
+    host.innerHTML = `<div class="addform" data-acc-id="${accId}" data-kind="card">
+      <input class="addform-input" type="text" placeholder="5264246817962301|06|28|123" autocomplete="off" spellcheck="false">
+      <div class="addform-row"><button class="cancel">Cancelar</button><button class="save">Probar y guardar (depositar)</button></div>
+    </div>`;
+  }
+  const inp = host.querySelector('.addform-input');
+  if (inp) inp.focus();
+}
+
+// Submit del form inline. Notas → POST /notes. Tarjetas → POST /cards (pipe).
+async function _submitInlineAddForm(form) {
+  if (!form) return;
+  const accId = parseInt(form.dataset.accId);
+  const kind = form.dataset.kind;
+  const inp = form.querySelector('.addform-input');
+  const val = (inp?.value || '').trim();
+  if (!val) { inp?.focus(); return; }
+  const saveBtn = form.querySelector('.save');
+  if (saveBtn) saveBtn.disabled = true;
+  try {
+    if (kind === 'note') {
+      const data = await submitNote(accId, val);
+      // actualiza cache
+      if (detailDataCache[accId]) {
+        const me = state.user?.username || 'tú';
+        const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+        detailDataCache[accId].notes = [
+          { id: data.id, note_text: val, created_at: data.created_at || now, created_by_name: me, mine: true },
+          ...(detailDataCache[accId].notes || []),
+        ];
+      }
+      toast('✓ Nota guardada', 'success');
+    } else {
+      // Tarjeta: NO hay alta manual (las tarjetas se guardan al aprobarse un
+      // depósito). Abrimos el drawer de depósito con la tarjeta precargada;
+      // al aprobar, el flujo existente la guarda en account_cards.
+      const host = form.closest('.addform-host');
+      if (host) host.innerHTML = '';
+      openDepositModal(accId);
+      setTimeout(() => {
+        const inp2 = $('#depCardPipe');
+        if (inp2) { inp2.value = val; inp2.focus(); }
+      }, 120);
+      return;
+    }
+    _injectExpandedDetail(true);
+  } catch (err) {
+    toast(`Error: ${err.message}`, 'error');
+    if (saveBtn) saveBtn.disabled = false;
+  }
 }
 
 // Modal de detalle: botón "Depositar en esta cuenta"
@@ -2709,234 +2951,383 @@ function hideAdminHints() {
   document.querySelectorAll('.hint-target-glow').forEach(el => el.classList.remove('hint-target-glow'));
 }
 
-// ─── Modal de detalle (fijo con scroll interno solo en secciones largas) ───
+// ─── Detalle de cuenta inline (acordeón debajo de la fila) ───
+// openDetailModal conserva su nombre por compat con los callers existentes,
+// pero ahora TOGGLEA el panel inline en vez de abrir el modal #detModalOverlay.
 async function openDetailModal(id) {
-  const overlay = $('#detModalOverlay');
-  const body = $('#detModalBody');
-  const title = $('#detModalTitle');
-  body.innerHTML = '<div class="detail-loading"><span class="dep-spinner"></span> Cargando…</div>';
-  title.textContent = 'Detalle de cuenta';
-  overlay.classList.remove('hidden');
+  id = parseInt(id);
+  if (!id) return;
+  // Toggle: si ya está abierta, cerrar (con micro-animación).
+  if (expandedAccountId === id) {
+    _closePanelAnimated();
+    return;
+  }
+  expandedAccountId = id;
+  _expandedNode = null;  // cuenta distinta → forzar reconstrucción
+  // Pinta de inmediato (loading o cache) y luego fetch fresco.
+  _injectExpandedDetail(true);
   try {
     const r = await fetch(`/api/accounts/${id}/details`);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
-    // Combo en el title — clickable para copiar
-    const combo = `${data.email}:${data.password || ''}`;
-    title.innerHTML = `<span class="d-copy mono" data-copy="${esc(combo)}" title="Click para copiar combo">${esc(combo)}</span>`;
-    // try/catch defensivo: si renderDetail tira excepción a mitad del template,
-    // el `body.innerHTML` quedaba con secciones incompletas y faltaba todo el
-    // panel derecho. Aislamos para que un error parcial muestre fallback en
-    // lugar de un modal a medias. Robert (2026-05-23): "se perdió la info de
-    // detalles" — el render fallaba silenciosamente sin que apareciera error.
-    try {
-      body.innerHTML = renderDetail(data);
-    } catch (renderErr) {
-      console.error('[Detail] renderDetail failed:', renderErr, 'data keys:', Object.keys(data));
-      body.innerHTML = `<div class="detail-error">⚠️ Error renderizando los detalles: ${esc(renderErr.message)}<br><small>Abrí DevTools Console para el stack completo. Datos llegaron del servidor (${Object.keys(data).length} campos).</small></div>`;
-    }
-    // Hints contextuales solo para admin (no invasivos, dismissables)
-    showAdminHints();
-    // Aura del modal según grade
-    const modal = $('#detModal');
-    modal.classList.remove('grade-A', 'grade-B', 'grade-C', 'grade-D', 'grade-U');
-    const gc = gradeClass(data.grade);
-    modal.classList.add(`grade-${gc}`);
-    // Letra grande del grade en el header (premium feel)
-    const isSA = state.user?.role === 'superadmin';
-    const headerExtra = $('#detModalGradeBadge');
-    if (headerExtra) {
-      if (isSA && data.grade) {
-        headerExtra.textContent = data.grade;
-        headerExtra.className = `det-grade-badge grade-${gc}`;
-        headerExtra.style.display = '';
-      } else {
-        headerExtra.style.display = 'none';
-      }
-    }
+    detailDataCache[id] = data;
+    // Solo re-pinta si sigue abierta esta misma cuenta.
+    if (expandedAccountId === id) _injectExpandedDetail(true);
   } catch (e) {
-    body.innerHTML = `<div class="detail-error">Error: ${esc(e.message)}</div>`;
+    if (expandedAccountId === id) {
+      const cell = _expandedDetailCell();
+      if (cell) cell.innerHTML = `<div class="acc-detail"><div class="acc-error">Error: ${esc(e.message)}</div></div>`;
+    }
   }
 }
 function closeDetailModal() {
-  $('#detModalOverlay').classList.add('hidden');
-  hideAdminHints();
+  _closePanelAnimated();
+}
+// Cierra el panel con micro-animación: añade .closing, espera la animación y
+// recién entonces remueve el nodo y aplica los reload diferidos.
+function _closePanelAnimated() {
+  const row = document.querySelector('#accTable tbody tr.acc-detail-row');
+  if (!row) { expandedAccountId = null; _expandedNode = null; _injectExpandedDetail(); _flushDeferredRender(); return; }
+  const tid = expandedAccountId;
+  row.classList.add('closing');
+  setTimeout(() => {
+    if (expandedAccountId === tid) {
+      expandedAccountId = null; _expandedNode = null;
+      _injectExpandedDetail();
+      _flushDeferredRender();
+    }
+  }, 175);
+}
+
+// Devuelve el <td> del panel inline (si está montado), o null.
+function _expandedDetailCell() {
+  const row = document.querySelector('#accTable tbody tr.acc-detail-row');
+  return row ? row.querySelector('td') : null;
+}
+
+// Cuenta el número real de <td> de una fila de cuenta (para el colspan del
+// panel). La vista simple tiene 7 <td>; la detail, 9. Se cuenta del DOM para
+// no depender de constantes desincronizadas (app.js declara colspan 6/8 pero
+// genera 7/9 <td>).
+function _detailColspan() {
+  const anyRow = document.querySelector('#accTable tbody tr[data-id]');
+  if (anyRow) return anyRow.querySelectorAll('td').length;
+  return state.view === 'simple' ? 7 : 9;
+}
+
+// Formatea un pipe de tarjeta a "num|MM|YY|cvv" (pipe entre mes y año, sin "/").
+// _parse_pipe (backend) acepta este formato de 4 partes, así que sirve para copiar.
+function _pipeDisplay(raw) {
+  const parts = String(raw || '').replace(/\s/g, '').replace(/\//g, '|').split('|').filter(Boolean);
+  if (parts.length === 3) {
+    const [num, exp, cvv] = parts;
+    if (/^\d{4}$/.test(exp)) return `${num}|${exp.slice(0, 2)}|${exp.slice(2)}|${cvv}`;
+    return `${num}|${exp}|${cvv}`;
+  }
+  return parts.join('|');
+}
+
+// Inyecta / actualiza / quita el panel de detalle inline según expandedAccountId.
+// rebuild=true → reconstruye el HTML (abrir cuenta, fetch, ver más, agregar nota…).
+// rebuild=false (default, lo llama renderTable en cada SSE) → re-inserta el MISMO
+// nodo preservando su estado DOM (no se cierran los <details> ni se pierde focus).
+function _injectExpandedDetail(rebuild = false) {
+  const tbody = document.querySelector('#accTable tbody');
+  if (!tbody) return;
+  tbody.querySelectorAll('tr.acc-detail-row').forEach(r => r.remove());
+  if (!expandedAccountId) {
+    document.querySelectorAll('#accTable tbody tr.row-expanded').forEach(r => r.classList.remove('row-expanded'));
+    _expandedNode = null;
+    return;
+  }
+  const targetRow = tbody.querySelector(`tr[data-id="${expandedAccountId}"]`);
+  if (!targetRow) return;  // la cuenta no está en la página visible
+  document.querySelectorAll('#accTable tbody tr.row-expanded').forEach(r => r.classList.remove('row-expanded'));
+  targetRow.classList.add('row-expanded');
+
+  if (rebuild || !_expandedNode || _expandedNode.dataset.id !== String(expandedAccountId)) {
+    const data = detailDataCache[expandedAccountId];
+    const tr = document.createElement('tr');
+    tr.className = 'acc-detail-row';
+    tr.dataset.id = String(expandedAccountId);
+    const td = document.createElement('td');
+    td.colSpan = _detailColspan();
+    if (!data) {
+      td.innerHTML = `<div class="acc-detail"><div class="acc-loading"><span class="dep-spinner"></span> Cargando…</div></div>`;
+    } else {
+      try {
+        td.innerHTML = renderDetail(data);
+      } catch (renderErr) {
+        console.error('[Detail] renderDetail failed:', renderErr, 'data keys:', Object.keys(data));
+        td.innerHTML = `<div class="acc-detail"><div class="acc-error">⚠️ Error renderizando: ${esc(renderErr.message)}</div></div>`;
+      }
+    }
+    tr.appendChild(td);
+    _expandedNode = tr;
+  } else {
+    // Reusa el nodo existente (preserva estado DOM); solo ajusta colspan si cambió la vista.
+    const td = _expandedNode.querySelector('td');
+    if (td) td.colSpan = _detailColspan();
+  }
+  targetRow.after(_expandedNode);
+}
+
+// ─── Helpers de formato para el panel v14 ───
+// "28 may 2026 08:12" partido en día+mes (medio), año (tenue), hora (resaltada).
+const _MV_MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function _mvWhen(ts) {
+  const d = parseTs(ts);
+  if (isNaN(d.getTime())) return `<span class="when"><span class="d">—</span></span>`;
+  const dd = d.getDate();
+  const mes = _MV_MESES[d.getMonth()] || '';
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  return `<span class="when"><span class="d">${dd} ${mes}</span><span class="y">${yyyy}</span><span class="t">${hh}:${mi}</span></span>`;
+}
+// Edad en años a partir de birthdate (YYYY-MM-DD).
+function _ageFrom(bdate) {
+  if (!bdate) return null;
+  const m = bdate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const [, y, mo, da] = m.map(Number);
+  const now = new Date();
+  let age = now.getFullYear() - y;
+  if (now.getMonth() + 1 < mo || (now.getMonth() + 1 === mo && now.getDate() < da)) age--;
+  return age >= 0 && age < 120 ? age : null;
+}
+// DD/MM/YYYY desde YYYY-MM-DD.
+function _dmy(bdate) {
+  if (!bdate) return null;
+  const m = bdate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : null;
+}
+// Extrae ciudad + CP del address de forma best-effort (sin inventar).
+function _cityCp(address) {
+  if (!address) return null;
+  const cp = (address.match(/\b(\d{5})\b/) || [])[1] || null;
+  // Heurística simple: último segmento textual antes del CP / coma.
+  let city = null;
+  const parts = String(address).split(',').map(s => s.trim()).filter(Boolean);
+  if (parts.length >= 2) city = parts[parts.length - 2] || parts[parts.length - 1];
+  return { city, cp };
+}
+
+// Icono Phosphor de status por estado de movimiento.
+function _mvStatusIcon(state) {
+  return ({
+    ok:   '<i class="ph-fill ph-check-circle"></i>',
+    fail: '<i class="ph-fill ph-prohibit"></i>',
+    pending: '<i class="ph-fill ph-clock"></i>',
+    wd:   '<i class="ph-fill ph-arrow-circle-up"></i>',
+  })[state] || '<i class="ph-fill ph-circle"></i>';
+}
+// Clase de estado para la cápsula (colorea ícono+monto+contorno).
+function _mvStateCls(state) {
+  // Prefijo mv- para NO colisionar con clases globales (.dep ya existe en la
+  // tabla con font mono → causaba que las aprobadas salieran en otra tipografía).
+  return ({ ok: 'mv-dep', fail: 'mv-fail', pending: 'mv-pend', wd: 'mv-wd' })[state] || 'mv-dep';
+}
+// Monto con signo/triángulo según kind+state.
+function _mvAmount(m) {
+  const money = fmtMoney(m.amount);
+  if (m.kind === 'withdrawal') return `−${money} <span class="tri">▼</span>`;
+  if (m.state === 'ok') return `+${money} <span class="tri">▲</span>`;
+  if (m.state === 'pending') return `${money} <span class="tri">•</span>`;
+  // fail: sin signo, pero con triángulo INVISIBLE para que el número alinee
+  // a la derecha igual que las demás filas (mismo ancho de columna).
+  return `${money} <span class="tri" style="visibility:hidden">▲</span>`;
+}
+
+// Una cápsula de movimiento. Las nuestras son expandibles vía <button> (los
+// elementos no-button no reciben clicks fiables dentro de la tabla → bug de
+// hit-testing del navegador; los <button> sí).
+function _renderMovimiento(m) {
+  const stCls = _mvStateCls(m.state);
+  const isOurs = m.source === 'dashboard';
+  const kindLabel = m.kind === 'withdrawal' ? 'Retiro' : 'Depósito';
+  // En fallidas, "Depósito" va en rojo (resto de la tipografía uniforme).
+  const kindHtml = (m.state === 'fail')
+    ? `<b style="color:var(--danger)">${kindLabel}</b>`
+    : `<b>${kindLabel}</b>`;
+  const method = m.method || (m.kind === 'withdrawal' ? '' : '—');
+  const methodTxt = method ? ` · ${esc(method)}` : '';
+  // "Quién" inline en chiquito junto al método (solo nuestras).
+  const whoInline = (isOurs && m.who) ? ` · <span class="mwho">${esc(m.who)}</span>` : '';
+  const srcIcon = isOurs
+    ? '<i class="ph-fill ph-lightning us"></i>'
+    : '<i class="ph-duotone ph-globe-hemisphere-west us"></i>';
+  const head = `${_mvWhen(m.when)}<span class="sic">${_mvStatusIcon(m.state)}</span><span class="lbl">${srcIcon}${kindHtml}${methodTxt}${whoInline}</span><span class="amt">${_mvAmount(m)}</span>`;
+  if (isOurs) {
+    // Pipe con "|" entre mes y año (num|MM|YY|cvv) — parseable por _parse_pipe.
+    const pipe = _pipeDisplay(m.card_pipe);
+    const cardHtml = pipe
+      ? `<i class="ph-duotone ph-credit-card" style="color:var(--acc)"></i> Tarjeta: <button type="button" class="pp d-copy" data-copy="${esc(pipe)}" title="Click para copiar">${esc(pipe)}</button>`
+      : `<i class="ph-duotone ph-credit-card" style="color:var(--acc)"></i> <span class="dim">sin tarjeta registrada</span>`;
+    // Estado de la transacción a la DERECHA: Approved (verde) / Rejected · 3DS
+    // (rojo) / Pendiente (amarillo). Para fallidas usa la razón real si existe.
+    let stWord, stWordCls;
+    if (m.state === 'ok') { stWord = 'Approved'; stWordCls = 'mv-dep'; }
+    else if (m.state === 'pending') { stWord = 'Pendiente'; stWordCls = 'mv-pend'; }
+    else {
+      const r = (m.reason || '').toUpperCase();
+      stWord = r.includes('3DS') ? '3DS'
+             : (r.includes('REJECT') || r.includes('DECLIN') || r.includes('BANK')) ? 'Rejected'
+             : (m.reason ? m.reason.slice(0, 28) : 'Rejected');
+      stWordCls = 'mv-fail';
+    }
+    return `<div class="mitem ours ${stCls}">
+      <button type="button" class="mhead" data-mv-toggle>${head}<span class="exv"><i class="ph-bold ph-caret-down"></i></span></button>
+      <div class="mrev" hidden>
+        <span class="mrev-card">${cardHtml}</span>
+        <span class="mrev-status ${stWordCls}">${esc(stWord)}</span>
+      </div>
+    </div>`;
+  }
+  // De la página: NO expandible.
+  return `<div class="mitem page ${stCls}"><div class="mhead nohover">${head}<span class="exv noexp"><i class="ph-bold ph-minus"></i></span></div></div>`;
 }
 
 function renderDetail(d) {
   const isSA = state.user?.role === 'superadmin';
-  const naField = v => (!v || v === 'N/A') ? '<span class="dim">—</span>' : esc(v);
-  const lockHtml = d.locked_by
-    ? (() => {
-        const u = fmtUntil(d.locked_until);
-        return `por ${esc(d.locked_by)}${u ? ` <span class="${u.expired ? 'lock-expired' : (u.urgent ? 'lock-urgent' : 'dim')}">· ${u.text}</span>` : ''}`;
-      })()
-    : '<span class="dim">libre</span>';
 
-  // SA ve todo, users ven solo datos de la persona + saldo + lock + último depósito
-  const adminRows = isSA ? `
-        <li><span>Grade</span><b>${esc(d.grade) || '?'}${d.grade_score != null ? ` <span class="dim mono">(${d.grade_score})</span>` : ''}</b></li>
-        <li><span>Status</span><b>${esc(d.status)}</b></li>
-        <li><span>Últ. check</span><b>${fmtAgo(d.last_checked_at)}</b></li>
-        <li><span>Total checks</span><b>${d.check_count || 0}</b></li>
-  ` : '';
-
-  // Birthdate sin hora
+  // ── DATOS ──────────────────────────────────────────────────────────
   const bdate = d.birthdate ? String(d.birthdate).split('T')[0].split(' ')[0] : null;
-  // CURP — usa el de BD si existe y es válido, si no calcula
+  const age = _ageFrom(bdate);
+  // Domicilio COMPLETO (sin truncar) — importa el estado + CP. Si no hay, omite.
+  const addr = (d.address && d.address !== 'N/A') ? esc(d.address) : null;
+  const nameMeta = [
+    age != null ? `${age} años` : null,
+    addr,
+  ].filter(Boolean).join(' · ');
+  const nombre = (d.fullname && d.fullname !== 'N/A') ? esc(d.fullname) : '<span class="dim">Sin nombre</span>';
+
+  // CURP — real de BD o estimado (computeCurp). Copiable al click. Tag "est" si calculado.
   const curpStored = (d.curp && d.curp !== 'N/A') ? d.curp : null;
   const curpCalc = !curpStored ? computeCurp(d.fullname, bdate, d.address) : null;
   const curpShown = curpStored || curpCalc || '';
-  // Botón validar gob.mx (solo si tenemos los datos mínimos)
-  const canValidate = !!(d.fullname && bdate);
-  const curpValidateBtn = canValidate
-    ? `<button class="curp-validate-btn" data-acc-id="${d.id}" title="Copia los datos al portapapeles y abre gob.mx para validar el CURP en humano (Akamai bloquea bots)">🔍 Validar</button>`
-    : '';
-  const curpHtml = curpStored
-    ? `<div class="curp-cell"><b class="mono d-copy" data-copy="${esc(curpStored)}" title="Click para copiar">${esc(curpStored)}</b><span class="dim mono" style="font-size:9px">✓ guardado</span>${curpValidateBtn}</div>`
-    : curpCalc
-      ? `<div class="curp-cell"><b class="mono d-copy" data-copy="${esc(curpCalc)}" title="Estimado — click para copiar">${esc(curpCalc)}</b><span class="dim mono" style="font-size:9px">est</span>${curpValidateBtn}</div>`
-      : `<div class="curp-cell"><b><span class="dim">—</span></b>${curpValidateBtn}</div>`;
+  const curpTag = curpStored ? '' : (curpCalc ? '<span class="est">est</span>' : '');
+  const curpBody = curpShown
+    ? `<button type="button" class="curp d-copy" data-copy="${esc(curpShown)}" title="Click para copiar">${esc(curpShown)} ${curpTag}</button>`
+    : `<span class="curp"><span class="dim">—</span></span>`;
+  // Botón validar/corregir en gob.mx (handler existente .curp-validate-btn:
+  // abre modal con pasos gob.mx + permite guardar el CURP correcto).
+  const curpHtml = `<span class="curp-line">${curpBody}<button type="button" class="curp-validate-btn" data-acc-id="${d.id}" title="Validar / corregir CURP en gob.mx"><i class="ph-bold ph-seal-check"></i></button></span>`;
 
-  const personal = `
-    <div class="d-section">
-      <h4>📋 Datos personales</h4>
-      <ul class="d-list">
-        <li><span>Nombre</span><b>${naField(d.fullname)}</b></li>
-        <li><span>Fecha nac.</span><b>${bdate ? esc(bdate) : '<span class="dim">—</span>'}</b></li>
-        <li class="d-list-multiline"><span>Domicilio</span><b>${naField(d.address)}</b></li>
-        <li><span>Teléfono</span><b>${naField(d.phone)}</b></li>
-        <li><span>CURP</span>${curpHtml}</li>
-        <li><span>KYC</span><b>${d.kyc_verified ? '<span style="color:var(--accent)">✓ verificado</span>' : '<span class="dim">no</span>'}</b></li>
-        <li><span>Saldo</span><b>${fmtMoney(d.balance_total)}${d.balance_real != null && d.balance_real !== d.balance_total ? ` <span class="dim mono">(real ${fmtMoney(d.balance_real)})</span>` : ''}</b></li>
-        <li><span>Lock</span><b>${lockHtml}</b></li>
-        <li><span>Últ. dep.</span><b>${d.last_deposit_amount ? fmtMoney(d.last_deposit_amount) + ' · ' + fmtAgo(d.last_deposit_date) : '<span class="dim">—</span>'}</b></li>
-        ${adminRows}
-      </ul>
+  const nacimiento = _dmy(bdate) || '—';
+
+  const datos = `
+    <div class="datos">
+      <div class="dseg dseg-name">
+        <span class="nm">${nombre}</span>${age != null ? `<span class="nage">· ${age}</span>` : ''}
+      </div>
+      <div class="dseg grow">
+        <span class="lab">Dirección</span>
+        <span class="val addr">${addr || '<span class="dim">—</span>'}</span>
+      </div>
+      <div class="dseg">
+        <span class="lab">Nacimiento</span>
+        <span class="val">${nacimiento}</span>
+      </div>
+      <div class="dseg">
+        <span class="lab">CURP</span>
+        ${curpHtml}
+      </div>
     </div>`;
 
-  const cards = (d.cards && d.cards.length > 0)
-    ? `<div class="d-section">
-        <h4>💳 Tarjetas guardadas <span class="d-count">${d.cards.length}</span></h4>
-        <div class="d-cards">
-          ${d.cards.map(c => {
-            const num = c.card_number || '';
-            const exp = (c.card_expiry || '').replace('/', '');
-            const cvv = c.card_cvv || '';
-            const pipe = `${num}|${exp}|${cvv}`;
-            const stats = `${c.total_approved || 0}/${c.total_deposits || 0} ok`;
-            return `<div class="d-card" data-copy="${esc(pipe)}" title="Click para copiar pipe">
-              <div class="d-card-pipe">${esc(pipe)}</div>
-              <div class="d-card-meta">
-                <span class="d-card-stats">${stats}</span>
-                <span class="d-card-status ${esc((c.status || '').toLowerCase())}">${esc(c.status || '')}</span>
-              </div>
-            </div>`;
-          }).join('')}
-        </div>
-      </div>`
-    : `<div class="d-section"><h4>💳 Tarjetas</h4><div class="d-empty">Sin tarjetas guardadas.</div></div>`;
-
-  // BetMexico API: txn_type 1=depósito, 2=retiro. Gateway 1=tarjeta, 2=SPEI, 3=OXXO.
-  // Iconos sutiles (monocromos) — el color va por estado, no por tipo
-  const _txnType = t => ({1: '↓ Depósito', 2: '↑ Retiro'})[t] ?? '· Otro';
-  const _txnGateway = g => ({1: 'Tarjeta', 2: 'SPEI', 3: 'OXXO'})[g] || (g ? `gw${g}` : '—');
-  const _txnStatus = s => {
-    const m = {6: 'Exitoso', 0: 'Pendiente', '-4': 'Fallido', 5: 'Error'};
-    return m[s] ?? m[String(s)] ?? `cod ${s}`;
-  };
-  const _txnStatusCls = s => ({6: 'ok', 0: 'pending', '-4': 'fail', 5: 'fail'})[s]
-    ?? ({6: 'ok', 0: 'pending', '-4': 'fail', 5: 'fail'})[String(s)] ?? '';
-  const txns = (d.transactions && d.transactions.length > 0)
-    ? `<div class="d-section">
-        <h4>📊 Transacciones <span class="d-count">${d.transactions.length}</span></h4>
-        <div class="d-txn-scroll">
-          <table class="d-txn-table">
-            <thead><tr><th>Cuándo</th><th>Tipo</th><th>Método</th><th class="num">Monto</th><th>Estado</th></tr></thead>
-            <tbody>
-              ${d.transactions.map(t => {
-                const stCls = _txnStatusCls(t.status);
-                const isFail = stCls === 'fail';
-                const isCard = t.txn_type === 1 && t.gateway === 1;
-                // Si fail: toda la fila en rojo (monto + método incluidos)
-                // Si ok/pendiente: tarjeta acentuada (verde), SPEI/OXXO tenue
-                const rowCls = isFail ? 'txn-row-fail' : (isCard ? '' : 'txn-row-other');
-                const gwCls = isFail ? '' : (isCard ? 'txn-gw-card' : 'dim');
-                return `<tr class="${rowCls}">
-                  <td class="dim mono" title="${esc(t.txn_date || '')}">${fmtAbsYear(t.txn_date)}</td>
-                  <td class="txn-type">${_txnType(t.txn_type)}</td>
-                  <td class="txn-gw ${gwCls}">${esc(_txnGateway(t.gateway))}</td>
-                  <td class="num">${fmtMoney(t.amount)}</td>
-                  <td><span class="txn-st txn-st-${stCls}">${esc(_txnStatus(t.status))}</span></td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>`
-    : `<div class="d-section"><h4>📊 Transacciones</h4><div class="d-empty">Sin transacciones registradas.</div></div>`;
-
-  // Intentos hechos desde este dashboard (con tarjeta usada — sin enmascarar)
-  const attempts = (d.deposit_attempts && d.deposit_attempts.length > 0)
-    ? `<div class="d-section">
-        <h4>🎯 Intentos del dashboard <span class="d-count">${d.deposit_attempts.length}</span></h4>
-        <div class="d-txn-scroll">
-          <table class="d-txn-table">
-            <thead><tr><th>Cuándo</th><th>Monto</th><th>Tarjeta</th><th>Estado</th><th>Razón</th></tr></thead>
-            <tbody>
-              ${d.deposit_attempts.map(a => {
-                const ok = a.status === 'approved';
-                const rowCls = ok ? '' : 'txn-row-fail';
-                const card = a.card_pipe
-                  ? `<b class="mono d-copy" data-copy="${esc(a.card_pipe)}" title="Click para copiar">${esc(a.card_pipe)}</b>`
-                  : '<span class="dim">—</span>';
-                return `<tr class="${rowCls}">
-                  <td class="dim mono" title="${esc(a.created_at || '')}">${fmtAbsYear(a.created_at)}</td>
-                  <td class="num">${fmtMoney(a.amount)}</td>
-                  <td class="combo">${card}</td>
-                  <td><span class="txn-st txn-st-${ok ? 'ok' : 'fail'}">${esc(a.status || '')}</span></td>
-                  <td class="dim">${esc(a.rejection_reason || '')}</td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
+  // ── MOVIMIENTOS ────────────────────────────────────────────────────
+  const movs = Array.isArray(d.movimientos) ? d.movimientos : [];
+  const totalPages = Math.max(1, Math.ceil(movs.length / _MV_PER_PAGE));
+  let page = _mvPage[d.id] || 0;
+  if (page >= totalPages) page = totalPages - 1;
+  const start = page * _MV_PER_PAGE;
+  const shown = movs.slice(start, start + _MV_PER_PAGE);
+  const mvRows = shown.length
+    ? shown.map(_renderMovimiento).join('')
+    : `<div class="mv-empty">Sin movimientos registrados.</div>`;
+  // Paginador interno (10/pág). Clase propia para no chocar con el paginador
+  // de la tabla completa.
+  const pager = movs.length > _MV_PER_PAGE
+    ? `<div class="mv-pager">
+        <button type="button" class="mv-pg" data-mv-pg="${page - 1}" ${page === 0 ? 'disabled' : ''} title="Anterior"><i class="ph-bold ph-caret-left"></i></button>
+        <span class="mv-pg-info">${start + 1}–${Math.min(start + _MV_PER_PAGE, movs.length)} de ${movs.length}</span>
+        <button type="button" class="mv-pg" data-mv-pg="${page + 1}" ${page >= totalPages - 1 ? 'disabled' : ''} title="Siguiente"><i class="ph-bold ph-caret-right"></i></button>
       </div>`
     : '';
 
-  // Solo SA puede borrar notas (otros usuarios no, son immutables una vez enviadas)
-  const renderNoteLi = n => `<li data-note-id="${n.id}">
-    <div class="d-note-head">
-      <span class="d-note-by">${esc(n.created_by_name || '—')}</span>
-      <span class="d-note-when dim mono" title="${esc(n.created_at || '')}">${fmtAbs(n.created_at)} · ${fmtAgo(n.created_at)}</span>
-      ${isSA ? `<button class="d-note-del" data-note-id="${n.id}" title="Borrar (SA)">✕</button>` : ''}
+  const movimientos = `
+    <div class="sec-h">
+      <span class="ttl"><i class="ph-duotone ph-arrows-down-up"></i> Movimientos <span class="cnt">${movs.length}</span></span>
+      <span class="mv-leg">
+        <span><i class="ph-fill ph-lightning" style="color:var(--gold)"></i> nosotros</span>
+        <span><i class="ph-duotone ph-globe-hemisphere-west"></i> en la página</span>
+      </span>
     </div>
-    <div class="d-note-body">${esc(n.note_text)}</div>
-  </li>`;
+    <div class="mlist">${mvRows}</div>
+    ${pager}`;
 
-  const notesList = (d.notes && d.notes.length > 0)
-    ? `<ul class="d-notes" id="dNotesList">${d.notes.map(renderNoteLi).join('')}</ul>`
-    : '<ul class="d-notes" id="dNotesList"></ul><div class="d-empty" id="dNotesEmpty">Sin notas todavía.</div>';
-
-  const notes = `<div class="d-section d-section-notes">
-      <h4>📝 Notas <span class="d-count" id="dNotesCount">${(d.notes || []).length}</span></h4>
-      <form class="d-note-form" data-acc-id="${d.id}">
-        <textarea class="d-note-input" placeholder="Nueva nota (visible solo para ti${isSA ? '' : ' y SA'})…" maxlength="2000" rows="2"></textarea>
-        <button type="submit" class="d-note-submit">Guardar</button>
-      </form>
-      ${notesList}
+  // ── GUARDADO (tarjetas + notas) — plegado por default ──────────────
+  const cards = (d.cards || []);
+  const notes = (d.notes || []);
+  const cardRows = cards.map(c => {
+    const num = c.card_number || '';
+    const cvv = c.card_cvv || '';
+    const pipe = _pipeDisplay(`${num}|${c.card_expiry || ''}|${cvv}`);  // num|MM|YY|cvv
+    const approved = c.total_approved || 0;
+    const total = c.total_deposits || 0;
+    const pct = total > 0 ? Math.round((approved / total) * 100) : null;
+    const stats = `${approved}/${total} aprobados${pct != null ? ` · <b>${pct}%</b>` : ''}`;
+    const isAuto = (c.status || '').toLowerCase() === 'auto' || (c.status || '').toLowerCase().includes('auto');
+    const autoTag = isAuto ? ' <span class="autotag">auto</span>' : '';
+    const when = c.last_used_at || c.registered_at;
+    return `<div class="srow">
+      <span class="emo">💳</span>
+      <div class="sbody">
+        <button type="button" class="pp d-copy" data-copy="${esc(pipe)}" title="Click para copiar">${esc(pipe)}</button>
+        <div class="cmeta">${stats}${autoTag}</div>
+      </div>
+      <span class="rmeta"><i class="ph-fill ph-clock"></i> ${esc(fmtAbsYear(when))}</span>
     </div>`;
+  }).join('');
+  const noteRows = notes.map(n => `<div class="srow" data-note-id="${n.id}">
+      <span class="emo">📝</span>
+      <div class="sbody"><div class="ntext">${esc(n.note_text)}</div></div>
+      <span class="rmeta"><i class="ph-fill ph-user"></i> ${esc(n.created_by_name || '—')} · ${esc(fmtAbs(n.created_at))}${isSA ? `<button class="srow-del" data-note-id="${n.id}" title="Borrar (SA)">✕</button>` : ''}</span>
+    </div>`).join('');
+  const savedRows = (cardRows + noteRows) || `<div class="mv-empty">Nada guardado todavía.</div>`;
+  const guardado = `
+    <details class="coll" open>
+      <summary>
+        <span class="ttl"><i class="ph-duotone ph-archive"></i> Guardado</span>
+        <span class="cnt">💳 ${cards.length} · 📝 ${notes.length}</span>
+        <span class="cv2"><i class="ph-bold ph-caret-down"></i></span>
+      </summary>
+      <div class="srows">${savedRows}</div>
+      <div class="addrow">
+        <button class="addbtn" data-add-card="${d.id}"><i class="ph-bold ph-plus"></i> Agregar tarjeta</button>
+        <button class="addbtn" data-add-note="${d.id}"><i class="ph-bold ph-plus"></i> Agregar nota</button>
+      </div>
+      <div class="addform-host" data-acc-id="${d.id}"></div>
+    </details>`;
 
-  // Botones al footer: Seleccionar (toggle multi-selección, no cierra modal) + Depositar
-  const isSelected = selectedIds.has(d.id);
-  const selBtnLabel = isSelected ? '✓ Seleccionada · click para quitar' : '+ Seleccionar (multi)';
-  const selBtnClass = isSelected ? 'd-select-btn is-selected' : 'd-select-btn';
-  const depositFooter = `<div class="d-deposit-footer">
-    <button class="${selBtnClass}" data-acc-id="${d.id}" title="Marca/desmarca esta cuenta para depósito multi (Matchmaker). NO cierra este panel.">${selBtnLabel}</button>
-    <button class="d-deposit-btn" data-acc-id="${d.id}" title="Abrir modal de depósito en esta cuenta">💳 Depositar</button>
+  // ── EN USO toggle (lock) + Depositar — arriba a la derecha ─────────
+  const isLocked = !!d.locked_by;
+  const inuse = `<button type="button" class="inuse${isLocked ? ' on' : ''}" data-inuse="${d.id}" title="${isLocked ? `En uso por ${esc(d.locked_by)}` : 'Marcar en uso (lock 2h)'}"><i class="ph-fill ph-bookmark-simple"></i> En uso</button>`;
+  const depBtn = `<button class="b pri d-deposit-btn" data-acc-id="${d.id}"><i class="ph-duotone ph-credit-card"></i><span>Depositar</span></button>`;
+
+  // datos ocupa el ancho de la columna izquierda (flex:5); el cluster derecho
+  // (En uso + Depositar) ocupa el ancho de la columna derecha (flex:3). Así el
+  // botón Depositar queda ARRIBA-derecha y todo cabe sin scroll.
+  return `<div class="acc-detail">
+    <div class="acc-top">
+      ${datos}
+      <div class="acc-top-right">${depBtn}${inuse}</div>
+    </div>
+    <div class="acc-cols">
+      <div class="acc-col acc-col-mv">${movimientos}</div>
+      <div class="acc-col acc-col-saved">${guardado}</div>
+    </div>
   </div>`;
-
-  return `<div class="d-grid">${personal}${cards}${txns}${attempts}${notes}</div>${depositFooter}`;
 }
 
 async function submitNote(accId, text) {

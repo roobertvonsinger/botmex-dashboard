@@ -538,6 +538,8 @@ async def _run_deposit_with_phases(
     phase_cb,  # Callable[[str, dict], Awaitable[None]] | None
     proxy: Optional[str] = None,
     persist_login_data: bool = True,
+    session_jwt: Optional[str] = None,
+    session_proxy: Optional[str] = None,
 ) -> dict:
     """Orquesta deposit emitiendo fases. Mismo shape que _run_deposit.
 
@@ -567,52 +569,65 @@ async def _run_deposit_with_phases(
     # para forzar uno; si None, el failover rota por el pool.
     used_proxy: Optional[str] = None
 
-    # ── PASO 1: Login ─────────────────────────────────────────────────────
-    await _safe_phase(phase_cb, "login_start", {})
-    t0 = time.time()
+    # ── PASO 1: Login (o reuso de sesión) ─────────────────────────────────
     jwt = None
     login_result: dict = {}
-    try:
-        # use_cache=False: mirrors prewarm.py — un JWT cacheado puede devolver 401
-        # silencioso y balance=0 falso. Para depósitos eso es inaceptable.
-        # Trade-off: en loops repetidos (matchmaker, scheduled), esto implica un
-        # captcha solve por iteración — caller debe estar consciente del costo.
-        # Failover real: si el primer proxy timeout, rota al siguiente.
-        from proxy_pool import call_with_proxy_failover
-        # max_retries=1: get_jwt hace 1 intento de captcha por IP (no quema 3 en
-        # la misma IP quemada). El retry-con-rotación-de-IP lo maneja
-        # call_with_proxy_failover, que es donde está el token de captcha bueno.
-        (jwt, login_result), used_proxy = await call_with_proxy_failover(
-            _get_jwt, email, password, pool, proxy=proxy, use_cache=False,
-            max_retries=1,
+    from_cache = False
+
+    if session_jwt:
+        # Reuso de sesión (scheduled iter>0): el JWT de BetMexico vive ~7 días
+        # (medido en prod) y se obtuvo hace ~1 min en la iter 0 de este run —
+        # saltamos login + captcha por completo. used_proxy se hereda para
+        # mantener afinidad de IP durante todo el run (misma IP = más natural
+        # para el antifraude). Esto NO es el JWT-cache de BD de hace días (que
+        # da 401 silencioso); es el token recién validado de ESTE run.
+        jwt = session_jwt
+        used_proxy = session_proxy
+        await _safe_phase(phase_cb, "login_reused", {
+            "ok": True, "duration_ms": 0, "reused": True,
+        })
+    else:
+        await _safe_phase(phase_cb, "login_start", {})
+        t0 = time.time()
+        try:
+            # use_cache=False: mirrors prewarm.py — un JWT cacheado puede devolver 401
+            # silencioso y balance=0 falso. Para depósitos eso es inaceptable.
+            # Failover real: si el primer proxy timeout, rota al siguiente.
+            from proxy_pool import call_with_proxy_failover
+            # max_retries=1: get_jwt hace 1 intento de captcha por IP (no quema 3 en
+            # la misma IP quemada). El retry-con-rotación-de-IP lo maneja
+            # call_with_proxy_failover, que es donde está el token de captcha bueno.
+            (jwt, login_result), used_proxy = await call_with_proxy_failover(
+                _get_jwt, email, password, pool, proxy=proxy, use_cache=False,
+                max_retries=1,
+            )
+        except Exception as e:
+            logger.error(f"[Deposits/phases] get_jwt {email}: {e}")
+            login_result = {"status": "ERROR", "error": str(e)}
+        login_ms = int((time.time() - t0) * 1000)
+        from_cache = bool(
+            isinstance(login_result, dict) and login_result.get("from_cache")
         )
-    except Exception as e:
-        logger.error(f"[Deposits/phases] get_jwt {email}: {e}")
-        login_result = {"status": "ERROR", "error": str(e)}
-    login_ms = int((time.time() - t0) * 1000)
-    from_cache = bool(
-        isinstance(login_result, dict) and login_result.get("from_cache")
-    )
 
-    if not jwt:
+        if not jwt:
+            await _safe_phase(phase_cb, "login_done", {
+                "ok": False, "duration_ms": login_ms, "from_cache": from_cache,
+            })
+            err = None
+            if isinstance(login_result, dict):
+                err = login_result.get("error") or login_result.get("status")
+            err = err or "Login falló"
+            await _safe_phase(phase_cb, "done", {
+                "success": False, "result_code": "LOGIN_FAILED", "error": err,
+            })
+            return {
+                "success": False, "result_code": "LOGIN_FAILED",
+                "error": err, "duration_ms": int((time.time() - t_total) * 1000),
+            }
+
         await _safe_phase(phase_cb, "login_done", {
-            "ok": False, "duration_ms": login_ms, "from_cache": from_cache,
+            "ok": True, "duration_ms": login_ms, "from_cache": from_cache,
         })
-        err = None
-        if isinstance(login_result, dict):
-            err = login_result.get("error") or login_result.get("status")
-        err = err or "Login falló"
-        await _safe_phase(phase_cb, "done", {
-            "success": False, "result_code": "LOGIN_FAILED", "error": err,
-        })
-        return {
-            "success": False, "result_code": "LOGIN_FAILED",
-            "error": err, "duration_ms": int((time.time() - t_total) * 1000),
-        }
-
-    await _safe_phase(phase_cb, "login_done", {
-        "ok": True, "duration_ms": login_ms, "from_cache": from_cache,
-    })
 
     # ── Persistir detalles del login en BD ───────────────────────────────
     # persist_login_data=False (scheduled iter>0): skip — _record_attempt
@@ -869,6 +884,8 @@ async def _run_deposit_with_phases(
         "txn_status": txn_status,
         "raw_submit": step2,
         "raw_check": step3,
+        "jwt": jwt,
+        "used_proxy": used_proxy,
     }
 
 
@@ -1692,6 +1709,11 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
             await pool.start_factory()
             logger.info(f"[Scheduled {sched_id}] start_factory OK, prefetch + entrando al for")
             asyncio.create_task(pool.prefetch(1))
+            # Sesión reutilizada entre iteraciones: la iter 0 hace login real
+            # (1 captcha) y captura el JWT + proxy; las iters 1..N lo reusan sin
+            # volver a loguear. El JWT vive ~7 días, el run dura <20 min → seguro.
+            session_jwt = None
+            session_proxy = None
             for i in range(repetitions):
                 iter_num = i + 1
                 # Track del iter actual en _active_schedules para que GET /scheduled/list
@@ -1716,15 +1738,8 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                     except Exception as e:
                         logger.warning(f"[Scheduled {sched_id}] phase broadcast failed: {e}")
 
-                # Garantía de token captcha fresco para este intento.
-                # Bug visto 2026-05-23: tras el sleep de 60s, el token del pool
-                # ya tenía >55s de edad y se descartaba en get_token, obligando
-                # a esperar al factory loop (a veces 70s+ extra). El refresh
-                # debe haberse hecho ~10s antes vía _refresh_captcha_pool, pero
-                # como segunda red de seguridad lo dejamos aquí también.
-                if i > 0:
-                    await _ensure_fresh_captcha(pool)
-
+                # Solo la iter 0 necesita captcha (para el login real). Las iters
+                # 1..N reusan la sesión → sin captcha, sin refresh de tokens.
                 t0 = time.time()
                 r = None
                 try:
@@ -1736,6 +1751,8 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                         pool=pool,
                         phase_cb=phase_cb,
                         persist_login_data=(i == 0),
+                        session_jwt=session_jwt,
+                        session_proxy=session_proxy,
                     )
                 except asyncio.CancelledError:
                     # Cancel mid-iter: registrar el intento antes de propagar para
@@ -1757,6 +1774,13 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                 duration = int((time.time() - t0) * 1000)
                 ok = bool(r.get("success"))
                 code = r.get("result_code", "UNKNOWN")
+                # Captura la sesión de la iter 0 (login exitoso) para reusarla en
+                # las siguientes. Solo se setea una vez; iters posteriores ya
+                # vienen con session_jwt y no re-loguean.
+                if ok and session_jwt is None and r.get("jwt"):
+                    session_jwt = r.get("jwt")
+                    session_proxy = r.get("used_proxy")
+                    logger.info(f"[Scheduled {sched_id}] sesión capturada en iter {i+1} — reuso activado para las siguientes")
                 _record_attempt(
                     uuid.uuid4().hex, email, amount,
                     "approved" if ok else "rejected",
@@ -1783,24 +1807,11 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                     })
                     break
                 if i < repetitions - 1:
-                    # Sleep dinámico: cadencia fija de `interval` segundos desde
-                    # el INICIO del intento actual (no desde el fin). Si el
-                    # intento tomó 18s, dormimos 42s — no 60s. Así sale un
-                    # depósito cada minuto exacto.
-                    elapsed = time.time() - t0
-                    sleep_total = max(0.0, interval - elapsed)
-                    # Refresh del token captcha ~10s antes del próximo intento:
-                    # drena tokens viejos del pool y dispara un prefetch nuevo,
-                    # que típicamente termina en 4-7s. Al empezar el siguiente
-                    # iter, el token estará fresco (edad ~3-6s).
-                    pre_refresh = min(10.0, sleep_total)
-                    sleep_before = max(0.0, sleep_total - pre_refresh)
-                    if sleep_before > 0:
-                        await asyncio.sleep(sleep_before)
-                    _drain_stale_tokens(pool, max_age=30)
-                    asyncio.create_task(pool.prefetch(1))
-                    if pre_refresh > 0:
-                        await asyncio.sleep(pre_refresh)
+                    # Cadencia: `interval` segundos completos DESPUÉS de lograr el
+                    # depósito (Robert 2026-05-28). Como las iters siguientes reusan
+                    # la sesión (sin login ni captcha), ya no hay que pre-refrescar
+                    # tokens ni descontar el tiempo del intento — es un sleep limpio.
+                    await asyncio.sleep(interval)
         except asyncio.CancelledError:
             _broadcast({
                 "type": "activity", "kind": "scheduled_cancelled",

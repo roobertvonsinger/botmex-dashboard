@@ -50,7 +50,7 @@
 | POST | `/api/accounts/hide-all` | Despublicar todas | require_session | — | `{ok, count}` | `app.py:1421` |
 | GET | `/api/accounts/{account_id}/cards-pipe` | Pipe puro de tarjetas (copy-paste) | require_session | — | `{pipes: ["num\|exp\|cvv"]}` | `app.py:1513` |
 | GET | `/api/accounts/{account_id}/notes-summary` | Resumen para iconito de fila | require_session | — | `{count, mine}` | `app.py:1542` |
-| GET | `/api/accounts/{account_id}/details` | Detalle completo (modal) — incluye `cards`, `transactions`, `deposit_attempts`, `notes` | require_session | — | `{...}` | `app.py:1571` |
+| GET | `/api/accounts/{account_id}/details` | Detalle completo (panel inline acordeón v14) — incluye `cards`, `transactions`, `deposit_attempts`, `notes` y **`movimientos`** (lista unificada dashboard+betmex: `{when, source, kind, method, amount, state, who, card_pipe, reason}`, orden DESC) | require_session | — | `{...}` | `app.py:1838` |
 | POST | `/api/accounts/{account_id}/notes` | Crear nota | require_session | `{text}` | `{ok, id}` | `app.py:1657` |
 | DELETE | `/api/accounts/{account_id}/notes/{note_id}` | Borrar nota (superadmin) | superadmin | — | `{ok}` | `app.py:1709` |
 | POST | `/api/accounts/{account_id}/curp` | Guardar CURP validado | require_session | `{curp}` | `{ok}` | `app.py:1694` |

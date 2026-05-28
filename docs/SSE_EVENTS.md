@@ -17,7 +17,7 @@
 | `activity` | `deposit` | `_record_attempt()` en `deposits.py` | `{ts, who, target, amount, status, reason, duration_ms, card_pipe}` | `pushActivityEvent()` → `renderActivity()` |
 | `activity` | `scheduled_started` | `scheduled_create.loop()` ANTES de `pool.start_factory()` | `{sched_id, total, email, ts, who}` | log info — sirve como heartbeat para confirmar al frontend que la misión arrancó. Sin esto, los 5-15s del pool warm-up dejaban el modal en "Preparando…" estático sin señal de vida. |
 | `activity` | `scheduled` | `scheduled_create.loop()` en `deposits.py` (summary por iter) | `{sched_id, iter, total, email, amount, success, code, ts, who}` | `pushActivityEvent()` |
-| `activity` | `scheduled_phase` | `scheduled_create.loop()` via `phase_cb` → `_run_deposit_with_phases` (1 por sub-fase) | `{sched_id, iter, total, name, data, email, ts, who}`. `name` ∈ {login_start, login_done, gateway_begin, gateway_begin_done, gateway_submit, gateway_submit_done, gateway_check, gateway_check_done, done}. `data` igual al de execute-stream. | `pushActivityEvent()` (`_schedPhaseLabel()` formatea) |
+| `activity` | `scheduled_phase` | `scheduled_create.loop()` via `phase_cb` → `_run_deposit_with_phases` (1 por sub-fase) | `{sched_id, iter, total, name, data, email, ts, who}`. `name` ∈ {login_start, login_done, **login_reused**, gateway_begin, gateway_begin_done, gateway_submit, gateway_submit_done, gateway_check, gateway_check_done, done}. `data` igual al de execute-stream. **iter 0** emite `login_start`/`login_done` (login real); **iter 1..N** emite `login_reused` (sesión reutilizada, sin captcha). | `pushActivityEvent()` (`_schedPhaseLabel()` formatea) |
 | `activity` | `scheduled_aborted` | `scheduled_create.loop()` (al primer fail) | `{sched_id, email, code, iter, total, ts}` | `pushActivityEvent()` (chip "abortado") |
 | `activity` | `scheduled_cancelled` | Cancel manual | `{sched_id, email, ts}` | `pushActivityEvent()` |
 | `activity` | `lock` | `lock_account()` en `app.py` | `{ts, who, target, until}` | `pushActivityEvent()` |
@@ -78,6 +78,7 @@ Coinciden 1:1 con lo que emite `_run_deposit_with_phases`:
 |---|---|
 | `login_start` | `{}` |
 | `login_done` | `{ok: bool, duration_ms: int, from_cache: bool}` |
+| `login_reused` | `{ok: true, duration_ms: 0, reused: true}` — **scheduled iter>0**: la sesión (JWT+proxy) de la iter 0 se reusa, NO hay login. Reemplaza al par `login_start`/`login_done` en esas iters. UI: `♻️ Sesión reutilizada`. |
 | `gateway_begin` | `{}` |
 | `gateway_begin_done` | `{order_id: str|None, ok: bool, duration_ms: int}` |
 | `gateway_submit` | `{order_id: str}` |

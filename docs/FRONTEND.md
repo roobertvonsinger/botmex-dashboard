@@ -39,24 +39,32 @@
 | WSai | `#stWsai` | `/api/superadmin/kpis` | dentro de KPIs | Calls disponibles WebScraping.ai |
 | 🔔 (bell) | `#notifBell` | n/a | `renderNotifBadge()` (app.js:893) | Notificaciones no leídas |
 
-## Modal Detalle (`#detModalOverlay`)
+## Detalle de cuenta — panel INLINE (acordeón) — 2026-05-28
 
-| Elemento | Función |
-|---|---|
-| `#detModalTitle` | Combo `email:password` clickeable para copiar |
-| `#detModalGradeBadge` | Letra grande A/B/C/D para SA |
-| `#detModalBody` | Renderizado por `renderDetail(data)` (app.js:2552+) |
-| Footer botones | `.d-select-btn` (toggle multi sin cerrar modal) + `.d-deposit-btn` (abre modal depósito) |
+> **Rediseño completo 2026-05-28**: reemplaza el modal centrado `#detModalOverlay`
+> por un panel que se despliega INLINE debajo de la fila (acordeón en `#accTable`).
+> El `#detModalOverlay` quedó inerte (no se borró). Diseño v14: Satoshi (Fontshare)
+> + iconos Phosphor (duotone/bold/fill, vía `<link>` en index.html), tokens oklch.
 
-**Apertura**: `openDetailModal(id)` (app.js:2509)
-**Endpoint**: `GET /api/accounts/{id}/details` → devuelve `{...persona, cards, transactions, deposit_attempts, notes}`
+**Apertura/cierre**: `openDetailModal(id)` (toggle) → `_injectExpandedDetail(rebuild)`.
+- El panel se inyecta como `<tr class="acc-detail-row"><td colspan=N>` con `_expandedNode`
+  PRESERVADO entre re-renders de `renderTable` (no se reconstruye en cada SSE → no se
+  resetea estado DOM). `rebuild=true` solo en acciones explícitas (abrir/fetch/paginar/notas).
+- **Clave de hit-testing**: dentro de la tabla, solo los `<button>` reciben clicks fiables
+  (divs/spans/summary "caen" a la `<table>`). Por eso TODO lo interactivo del panel es
+  `<button>`: En uso, copiar CURP/tarjeta (`.d-copy`), expandir transacción (`.mhead[data-mv-toggle]`),
+  paginador (`.mv-pg`), validar CURP (`.curp-validate-btn`).
+- Micro-animaciones: `panelOpen`/`panelClose` (JS añade `.closing` antes de remover).
+- SSE diferido: `_liveReload()` evita reconstruir la tabla mientras el panel está abierto
+  (los reload de lock/unlock/deposit de otros operadores se aplican al cerrar).
 
-**Secciones renderizadas** (`renderDetail`):
-1. 📋 Datos personales (nombre, fecha nac, domicilio, tel, CURP estimado/guardado, KYC, saldo, lock, último dep, grade, status, checks)
-2. 💳 Tarjetas guardadas (de `account_cards` table) — pipe completo clickeable
-3. 📊 Transacciones (de `account_transactions` table — historial BetMexico)
-4. 🎯 Intentos del dashboard (de `deposit_attempts` table — incluye `card_pipe` desde 2026-05-11)
-5. 📝 Notas (con form para crear; SA puede borrar)
+**Endpoint**: `GET /api/accounts/{id}/details` → `{...persona, cards, transactions, deposit_attempts, notes, movimientos}`
+
+**Layout v14** (`renderDetail`):
+- **Barra superior**: datos (ancho = columna de movimientos, flex:5) + cluster derecho (flex:3) con **Depositar** + **En uso** (toggle amarillo, lock 2h/unlock). Datos: nombre grande + edad chica (· N) a la derecha · Dirección (completa) · Nacimiento · CURP (mono, copiable, + botón validar gob.mx que también edita/guarda).
+- **2 columnas**: izquierda **Movimientos** (unificados `d.movimientos`: nuestros con ⚡ + "quién" inline + expand revela tarjeta + estado Approved/Rejected/3DS a la derecha; de la página con 🌐), paginador interno 10/pág (`_mvPage`). Derecha **Guardado** (💳 tarjetas + 📝 notas en filas, colapsable, con Agregar; auto-guarda tarjeta al aprobar).
+- Estado por color SOLO en el ícono (montos en blanco uniforme); fallidas: "Depósito" + ícono en rojo, resto igual.
+- CURP estimado: `computeCurp()` + `_detectStateCode()` (fix 2026-05-28: "COL"=Colonia ya no se confunde con Colima; "MEX"→MC).
 
 ## Drawer Depósito (`#depDrawer`) — 2026-05-25
 

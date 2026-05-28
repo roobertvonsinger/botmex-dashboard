@@ -1914,6 +1914,110 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
         except sqlite3.OperationalError:
             result["notes"] = []
 
+        # ── Movimientos UNIFICADOS (dashboard + betmex) ─────────────────────
+        # Mezcla deposit_attempts (nuestros, source="dashboard") con
+        # account_transactions (de la página, source="betmex"). Normaliza a un
+        # shape común y ordena por fecha DESC. NO sustituye a transactions/
+        # deposit_attempts (se conservan arriba para compat); esto es additivo.
+        #
+        # Shape de cada item:
+        #   {when, source, kind, method, amount, state, who, card_pipe, reason}
+        #     when      : ISO TEXT (created_at | txn_date)
+        #     source    : "dashboard" | "betmex"
+        #     kind      : "deposit" | "withdrawal"
+        #     method    : "Pago con tarjeta" | "SPEI" | "OXXO" | None
+        #     amount    : float
+        #     state     : "ok" | "fail" | "pending" | "wd"
+        #     who       : nombre operador (solo dashboard) | None
+        #     card_pipe : pipe COMPLETO sin enmascarar (solo dashboard) | None
+        #     reason    : rejection_reason si fail | None
+        try:
+            # Resolver telegram_id -> nombre operador (como deposits.py:464)
+            try:
+                from web_auth import WEB_USERS_RAW as _USERS_RAW
+            except Exception:
+                _USERS_RAW = {}
+
+            def _op_name(op_id):
+                if not op_id:
+                    return None
+                try:
+                    op_id_int = int(op_id)
+                except (TypeError, ValueError):
+                    return None
+                for uname, u in _USERS_RAW.items():
+                    if u.get("telegram_id") == op_id_int:
+                        return uname
+                return None
+
+            movimientos = []
+
+            # deposit_attempts → siempre deposit, source dashboard
+            for a in result.get("deposit_attempts", []):
+                st = (a.get("status") or "").lower()
+                if st == "approved":
+                    state = "ok"
+                elif st in ("rejected", "error"):
+                    state = "fail"
+                else:
+                    state = "pending"
+                movimientos.append({
+                    "when": a.get("created_at"),
+                    "source": "dashboard",
+                    "kind": "deposit",
+                    "method": "Pago con tarjeta",
+                    "amount": a.get("amount"),
+                    "state": state,
+                    "who": _op_name(a.get("operator_id")),
+                    "card_pipe": a.get("card_pipe"),
+                    "reason": a.get("rejection_reason") if state == "fail" else None,
+                })
+
+            # account_transactions → betmex. txn_type 1=dep, 2=retiro.
+            # gateway 1=tarjeta, 2=SPEI, 3=OXXO. status 6=ok,0=pending,-4/5=fail.
+            _gw_method = {1: "Pago con tarjeta", 2: "SPEI", 3: "OXXO"}
+            for t in result.get("transactions", []):
+                is_wd = t.get("txn_type") == 2
+                kind = "withdrawal" if is_wd else "deposit"
+                if is_wd:
+                    state = "wd"
+                else:
+                    s = t.get("status")
+                    if s == 6:
+                        state = "ok"
+                    elif s == 0:
+                        state = "pending"
+                    elif s in (-4, 5):
+                        state = "fail"
+                    else:
+                        state = "pending"
+                movimientos.append({
+                    "when": t.get("txn_date"),
+                    "source": "betmex",
+                    "kind": kind,
+                    "method": _gw_method.get(t.get("gateway")),
+                    "amount": t.get("amount"),
+                    "state": state,
+                    "who": None,
+                    "card_pipe": None,
+                    "reason": None,
+                })
+
+            # Orden DESC por fecha. Normaliza antes del sort: 'T'→espacio y
+            # microsegundos a 6 dígitos (la BD tiene casos con 5 dígitos como
+            # '.94907' que rompen el orden lexicográfico crudo entre fuentes).
+            import re as _mv_re
+            def _mv_sort_key(m):
+                w = (m.get("when") or "").replace("T", " ")
+                return _mv_re.sub(r"\.(\d+)", lambda x: "." + (x.group(1) + "000000")[:6], w)
+            movimientos.sort(key=_mv_sort_key, reverse=True)
+            result["movimientos"] = movimientos
+        except Exception as _mv_err:
+            _logging.getLogger("betmexico.dashboard").warning(
+                f"[Details] movimientos merge failed: {_mv_err}"
+            )
+            result["movimientos"] = []
+
     return result
 
 
