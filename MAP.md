@@ -1,42 +1,223 @@
 # MAP — botmex-dashboard
+### Guía de navegación para agentes IA
 
-> `scripts/gen_map.py` regenera las secciones `[AUTO]` en cada commit.
-> Editar manualmente **solo** las secciones marcadas `[MANUAL]`.
-> Para regenerar ahora: `python scripts/gen_map.py`
+> Las secciones `[AUTO]` se regeneran en cada `git commit` via `scripts/gen_map.py`.
+> **No editar** esas secciones — se pisarán. Editar solo las `[MANUAL]`.
+> Regenerar ahora: `python scripts/gen_map.py`
 
 ---
 
-## Módulos del repo `[AUTO]`
+## Si necesitas... (leer primero) `[MANUAL]`
+
+| Si necesitas... | Ve a | Nota |
+|-----------------|------|------|
+| Modificar flujo de depósito (lógica core) | `deposits.py` | Motor principal |
+| Modificar endpoints HTTP de depósito | `web_routes_deposits.py` | FastAPI router |
+| Modificar flujo de misiones (batch/scheduled) | `web_routes_missions.py` | 803L, leer reglas al inicio |
+| Modificar prewarm | `prewarm.py` + `web_routes_prewarm.py` | |
+| Agregar endpoint nuevo | `web_routes_X.py` (crear o editar) + registrar en `app.py` | Ver sección registros en app.py |
+| Cambiar pool de proxies / failover | `proxy_pool.py` | `call_with_proxy_failover` es la API recomendada |
+| Cambiar lógica de grading de cuentas | `web_grading.py` + `shared/betmexico_payment_analyzer.py` | Algoritmo V10 |
+| Cambiar autenticación / sesiones | `auth.py` + `web_auth.py` | |
+| Ver logs en vivo (endpoint) | `web_routes_logs.py` L1–L98 | Lee /data/logs/dashboard.log |
+| Modificar watchdog de balance | `web_watchdog.py` | Loop background |
+| Cambiar BD (schema) | `app.py` `_migrate()` L143–L167 | Migraciones aditivas solo |
+| SSE broadcast nuevo evento | `app.py` `_broadcast()` L204–L223 → `docs/SSE_EVENTS.md` | |
+| Cambiar caps duros de depósito | `deposits.py` L28–L35 | DEP_MAX_PER_TXN, DEP_MAX_24H, AUTOLOCK_HOURS_* |
+| Analizar si una tarjeta está quemada | `shared/betmexico_payment_analyzer.py` | Algoritmo V10 |
+| Ver estado funcional de features | `docs/AUDIT.md` | ✅❌⚠️🔵❓ |
+| Ver errores conocidos + fix | `docs/ERRORS.md` | |
+| Deploy a KVM4 | `DEPLOY.md` + `docs/protocols/deploy-protocol.md` | |
+| Ver todos los endpoints documentados | `docs/ENDPOINTS.md` | |
+
+---
+
+## Flujos principales `[MANUAL]`
+
+### Depósito único
+```
+web_routes_deposits.py → deposits.py (_run_deposit)
+  → betmexico_login_api (JWT/login) [bot dep]
+  → proxy_pool.py (call_with_proxy_failover)
+  → CapMonster API (captcha)
+  → BetMexico API (BeginDeposit → makePayment → verify)
+  → web_grading.py (recalc_grade_from_db)
+  → app.py _broadcast() → SSE al frontend
+```
+
+### Misión batch (matchmaker)
+```
+web_routes_missions.py → deposits.py _run_deposit (por cada cuenta×tarjeta)
+  Regla: max 5 cuentas × 5 tarjetas, gap 3-8s
+  APROBADA → vincular tarjeta↔cuenta
+  Rechazo específico → marcar tarjeta, siguiente
+  Gateway 5xx ×2 → PAUSE TOTAL
+```
+
+### Misión programada (scheduled)
+```
+web_routes_missions.py → loop: cada 60s → deposits.py _run_deposit
+  APROBADO → completed
+  Rechazo → STOP inmediato (no reintentar sin override manual)
+  Captcha pool: tokens se prefetchean, evitar tokens expirados (TOKEN_MAX_AGE=55s)
+```
+
+### Prewarm
+```
+web_routes_prewarm.py → prewarm.py
+  Cap: max 30 pre-warms/operador en últimos 10 min
+  Skip si JWT vigente AND last_check < 5 min
+  Timeout 25s por task. Logs en process_log (process_type='prewarm')
+```
+
+---
+
+## Gotchas críticos — no repetir `[MANUAL]`
+
+| # | Síntoma / Error | Causa raíz | Fix / Dónde está |
+|---|-----------------|------------|------------------|
+| 1 | SSE no llega al frontend aunque backend emite | Doble-import de `app.py` crea dos instancias de `_sse_queues` | Fix en `app.py` L18-32: `sys.modules.setdefault("app", sys.modules[__name__])` |
+| 2 | 406 FAILURE_IN_CAPTCHA masivo (desde build v26.5.25) | BetMexico migró a reCAPTCHA **v3**; nosotros mandábamos v2 | `deposits.py` usa `RECAPTCHA_V2_SITE_KEY` — actualizar a v3 key `6LdoqOUk...` |
+| 3 | Logs no cargan en dashboard tras restart container | Antes usaba journalctl (systemd, VPS). KVM4 es Docker sin systemd | Fix en `app.py` L40-62: RotatingFileHandler a `/data/logs/dashboard.log` |
+| 4 | Token captcha expirado en scheduled después de sleep(60) | TOKEN_MAX_AGE=55s, sleep 60 → token viejo al despertar | Pool prefetchea tokens; ver `deposits.py` sección captcha pool |
+| 5 | `create_task(gather())` crashea en Py3.11+ | Bug de asyncio en multi-depósito | Fix aplicado en `web_routes_deposits.py` |
+| 6 | BANK_REJECTED confundido con error de captcha | Son cosas distintas: BANK_REJECTED = banco rechazó la tarjeta | No reintentar en BANK_REJECTED; ver `deposits.py` lógica de rechazo |
+| 7 | Proxy LitPort siempre falla (0% éxito) | Reputación IP baja para BetMexico | Excluido via `_EXCLUDED_PROXY_HOSTS` en `proxy_pool.py` |
+
+---
+
+## Módulos — propósito + métricas `[AUTO métricas / MANUAL propósito]`
+
+> Edita la columna **Propósito** directamente aquí. El script preserva tus ediciones.
 
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2378 | `betmexico.dashboard.sse` | _[completar]_ |
-| `auth.py` | 164 | `—` | _[completar]_ |
-| `conftest.py` | 79 | `—` | _[completar]_ |
-| `deposits.py` | 1902 | `betmexico.dashboard.deposits` | _[completar]_ |
-| `prewarm.py` | 665 | `betmexico.dashboard.prewarm` | _[completar]_ |
-| `proxy_pool.py` | 288 | `dashboard.proxy_pool` | _[completar]_ |
-| `scripts/gen_map.py` | 271 | `name` | _[completar]_ |
-| `scripts/recalc_grades.py` | 131 | `—` | _[completar]_ |
-| `shared/betmexico_payment_analyzer.py` | 578 | `—` | _[completar]_ |
-| `web_auth.py` | 138 | `betmexico.web.auth` | _[completar]_ |
-| `web_grading.py` | 113 | `betmexico.web.grading` | _[completar]_ |
-| `web_routes_cards.py` | 136 | `betmexico.web.cards` | _[completar]_ |
-| `web_routes_deposits.py` | 391 | `betmexico.web.deposit` | _[completar]_ |
-| `web_routes_logs.py` | 98 | `betmexico.web.logs` | _[completar]_ |
-| `web_routes_missions.py` | 803 | `betmexico.web.missions` | _[completar]_ |
-| `web_routes_notifications.py` | 111 | `betmexico.web.notif` | _[completar]_ |
-| `web_routes_prewarm.py` | 260 | `betmexico.web.prewarm` | _[completar]_ |
-| `web_utils.py` | 243 | `betmexico.web.utils` | _[completar]_ |
-| `web_watchdog.py` | 276 | `betmexico.web.watchdog` | _[completar]_ |
+| `_test_v3_login.py` | 69 | `—` | Script dev para testear login reCAPTCHA v3 — NO es parte del app |
+| `app.py` | 2378 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
+| `conftest.py` | 79 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
+| `deposits.py` | 1902 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `prewarm.py` | 665 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
+| `proxy_pool.py` | 289 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `scripts/gen_map.py` | 443 | `name` | Regenerador de este MAP.md — AST + git log. Corre en pre-commit hook |
+| `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
+| `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica si pasarela/tarjeta está quemada (A=sana/B=recuperando/C=lenta/D=quemada) |
+| `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: `/api/auth/login`, `/logout`, `/me`, cambio de password |
+| `web_grading.py` | 113 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
+| `web_routes_cards.py` | 136 | `betmexico.web.cards` | Endpoints CRUD de tarjetas — listar, agregar, eliminar |
+| `web_routes_deposits.py` | 391 | `betmexico.web.deposit` | Endpoints HTTP del flujo de depósito: single, multi, scheduled start/stop |
+| `web_routes_logs.py` | 98 | `betmexico.web.logs` | Endpoint `/api/logs`: lee `/data/logs/dashboard.log` y stream SSE en vivo |
+| `web_routes_missions.py` | 803 | `betmexico.web.missions` | Endpoints de misiones batch y scheduled: crear, cancelar, estado, historial |
+| `web_routes_notifications.py` | 111 | `betmexico.web.notif` | Endpoints de notificaciones push / alertas al operador |
+| `web_routes_prewarm.py` | 260 | `betmexico.web.prewarm` | Endpoints HTTP de prewarm: start, cancel, status |
+| `web_utils.py` | 243 | `betmexico.web.utils` | Helpers compartidos: `_friendly_error`, `_normalize_ccexp`, `_build_proxy_url` |
+| `web_watchdog.py` | 276 | `betmexico.web.watchdog` | Loop background: refresca balance de cuentas LIVE cada N min, genera notificaciones |
 <!-- GEN:end:modulos -->
+
+---
+
+## Constantes críticas del sistema `[AUTO]`
+
+<!-- GEN:start:constantes -->
+| Constante | Valor | Módulo |
+|-----------|-------|--------|
+| `BOT_DEPS_OK` | `False` | `app.py` |
+| `BOT_RUN_DEPOSIT` | `None` | `app.py` |
+| `BOT_MAKE_POOL` | `None` | `app.py` |
+| `BOT_SCORE_PAYMENT` | `None` | `app.py` |
+| `ROOT` | `Path(__file__).parent` | `app.py` |
+| `STATIC` | `ROOT / "static"` | `app.py` |
+| `DB_PATH` | `Path(os.environ.get("BETMEX_DB", str(ROOT.parent / "betmexico_accounts` | `app.py` |
+| `SESSION_TTL` | `86_400` | `auth.py` |
+| `PERSISTENT_USERS` | `{"robertvs"}` | `auth.py` |
+| `PERSISTENT_TTL` | `60 * 60 * 24 * 365 * 10` | `auth.py` |
+| `DEP_MAX_PER_TXN` | `499.0` | `deposits.py` |
+| `DEP_MAX_24H` | `1499.0` | `deposits.py` |
+| `AUTOLOCK_HOURS_SINGLE` | `2` | `deposits.py` |
+| `AUTOLOCK_HOURS_MULTI` | `2` | `deposits.py` |
+| `AUTOLOCK_HOURS_SCHEDULED` | `4` | `deposits.py` |
+| `CARD_VELOCITY_MEMORY_MIN` | `30` | `deposits.py` |
+| `CARD_VELOCITY_FREE_PAIR` | `2` | `deposits.py` |
+| `CARD_VELOCITY_COOLDOWN_SEC` | `60` | `deposits.py` |
+| `MM_COOLDOWN` | `5` | `deposits.py` |
+| `MM_MAX_FAILS` | `2` | `deposits.py` |
+| `CAP_PER_OPERATOR_10MIN` | `9999` | `prewarm.py` |
+| `ACCOUNT_FRESH_MINUTES` | `30` | `prewarm.py` |
+| `ACCOUNT_DAILY_LIMIT` | `3` | `prewarm.py` |
+| `REFRESH_PARALLEL` | `15` | `prewarm.py` |
+| `CAPMONSTER_MIN_BALANCE` | `5.0` | `prewarm.py` |
+| `BALANCE_FRESH_SEC` | `5 * 60` | `prewarm.py` |
+| `TASK_TIMEOUT_SEC` | `25` | `prewarm.py` |
+| `REPO_ROOT` | `Path(__file__).resolve().parent.parent` | `scripts/gen_map.py` |
+| `MAP_PATH` | `REPO_ROOT / "MAP.md"` | `scripts/gen_map.py` |
+| `PY_MODULES` | `_collect_modules()` | `scripts/gen_map.py` |
+| `SECTIONS` | `{` | `scripts/gen_map.py` |
+| `INITIAL_MAP` | `"""\` | `scripts/gen_map.py` |
+| `MX_TZ` | `ZoneInfo("America/Mexico_City")` | `shared/betmexico_payment_analyzer.py` |
+| `TXN_STATUS_SUCCESS` | `6` | `shared/betmexico_payment_analyzer.py` |
+| `TXN_STATUS_PENDING` | `0` | `shared/betmexico_payment_analyzer.py` |
+| `TXN_STATUS_FAILED` | `-4` | `shared/betmexico_payment_analyzer.py` |
+| `TXN_TYPE_DEPOSIT` | `1` | `shared/betmexico_payment_analyzer.py` |
+| `GATEWAY_CARD` | `1` | `shared/betmexico_payment_analyzer.py` |
+| `GRADE_THRESHOLDS` | `[` | `shared/betmexico_payment_analyzer.py` |
+| `GRADE_EMOJI` | `{` | `shared/betmexico_payment_analyzer.py` |
+| `GRADE_LABEL` | `{` | `shared/betmexico_payment_analyzer.py` |
+| `A_NO_FAIL_DAYS_MIN` | `60` | `shared/betmexico_payment_analyzer.py` |
+| `A_MAX_TOTAL_FAILS` | `3` | `shared/betmexico_payment_analyzer.py` |
+| `A_MAX_BIGFAIL_SESS` | `0` | `shared/betmexico_payment_analyzer.py` |
+| `D_RECENT_FAIL_DAYS` | `14` | `shared/betmexico_payment_analyzer.py` |
+| `D_MASSACRE_COUNT` | `3` | `shared/betmexico_payment_analyzer.py` |
+| `C_DEEP_REST_DAYS` | `90` | `shared/betmexico_payment_analyzer.py` |
+| `SCORE_FLOOR` | `{"A": 80, "B": 60, "C": 40, "D": 0}` | `shared/betmexico_payment_analyzer.py` |
+| `SCORE_CEIL` | `{"A": 100, "B": 79, "C": 59, "D": 39}` | `shared/betmexico_payment_analyzer.py` |
+| `WEB_USERS_RAW` | `{` | `web_auth.py` |
+| `WEB_USERS` | `{k.lower(): v for k, v in WEB_USERS_RAW.items()}` | `web_auth.py` |
+| `BETMEXICO_PAYMENTS_API` | `"https://paymentsapi.betmexico.mx"` | `web_routes_deposits.py` |
+| `PROCESSORPAY_MAKE_PAYMENT_URL` | `"https://processorpay.com/sanval/api/IframeGames/makePayment"` | `web_routes_deposits.py` |
+| `NO_PROXY` | `os.getenv("BMX_NO_PROXY", "0") == "1"` | `web_routes_deposits.py` |
+| `CAPMONSTER_API_KEY` | `os.getenv("BMX_CAPMONSTER_KEY", "a9040840fdb3828ecc6090a6010afcad")` | `web_routes_prewarm.py` |
+| `CAPMONSTER_ENDPOINT` | `"https://api.capmonster.cloud"` | `web_routes_prewarm.py` |
+| `CAPMONSTER_API_KEY` | `os.getenv("BMX_CAPMONSTER_KEY", "a9040840fdb3828ecc6090a6010afcad")` | `web_watchdog.py` |
+| `CAPMONSTER_ENDPOINT` | `"https://api.capmonster.cloud"` | `web_watchdog.py` |
+<!-- GEN:end:constantes -->
+
+---
+
+## Cambios recientes `[AUTO]`
+
+<!-- GEN:start:recientes -->
+| Hash | Mensaje |
+|------|---------|
+| `eb733e3` | feat(map): MAP.md auto-generado + hook pre-commit |
+| `68121cf` | feat(detalle+scheduled): panel de detalle inline (acordeÃ³n v14) + reuso de sesiÃ³n en programados |
+| `6908af3` | fix(deposits): rescatar 406 con retry-rotaciÃ³n-IP + IPRoyal + crash del multi |
+| `c08024d` | feat(scheduled): cancel desde UI + rehidrataciÃ³n tras refresh (TDAH-friendly) |
+| `7a0b37f` | fix+feat: SSE who resuelto, tabla intentos sin truncar, drawer collapse rail |
+| `899ba14` | ui(balance): tiers low/mid/hot â€” <$10 gris, <$50 blanco, >=$50 verde radiactivo + glow + pulse 2.6s |
+| `72056f2` | ui(green): swatch final â€” hue 160 chr 0.11 L 0.50 (verde bandera mx) |
+| `04627e9` | ui(green): bajar lightness 0.82â†’0.66 â€” verde mexicano mÃ¡s serio |
+| `40e430c` | fix(sse): doble-import de app.py rompÃ­a bus SSE â€” clients=0 fantasma |
+| `0ad4044` | feat(ui): verde mexicano neÃ³n + botones premium + logo link + SSE diag |
+| `7b43898` | fix(drawer): empujar dashboard en vez de superponerse + tab Multi siempre visible |
+| `3269039` | feat(deposits): drawer lateral + persist cards + SSE feedback Programado |
+| `3604c7b` | feat(ui): vista live premium para depÃ³sito Programado (sin sacar al user del modal) |
+| `6aabec6` | fix(refresh): acelera el botÃ³n Actualizar + try/catch al modal |
+| `66ac94b` | fix(deposits): cadencia fija scheduled + token captcha fresco + persist details |
+<!-- GEN:end:recientes -->
 
 ---
 
 ## Símbolos por módulo — funciones/clases con rango de líneas `[AUTO]`
 
 <!-- GEN:start:simbolos -->
+
+### `_test_v3_login.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `get_accounts` | def | L23–L32 |
+| `main` | def | L35–L65 |
 
 ### `app.py`
 
@@ -200,17 +381,17 @@
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `_bot_proxies` | def | L52–L58 |
-| `all_proxies` | def | L61–L69 |
-| `_to_url` | def | L72–L82 |
-| `get_admin_proxy` | def | L85–L90 |
-| `build_admin_proxy_url` | def | L93–L96 |
-| `shuffled_proxy_urls` | def | L99–L107 |
-| `_retry_exceptions` | def | L115–L141 |
-| `_proxy_host` | def | L144–L148 |
-| `call_with_proxy_failover` | def | L151–L242 |
-| `_looks_like_proxy_failure_result` | def | L251–L270 |
-| `_looks_like_captcha_failure_result` | def | L273–L288 |
+| `_bot_proxies` | def | L53–L59 |
+| `all_proxies` | def | L62–L70 |
+| `_to_url` | def | L73–L83 |
+| `get_admin_proxy` | def | L86–L91 |
+| `build_admin_proxy_url` | def | L94–L97 |
+| `shuffled_proxy_urls` | def | L100–L108 |
+| `_retry_exceptions` | def | L116–L142 |
+| `_proxy_host` | def | L145–L149 |
+| `call_with_proxy_failover` | def | L152–L243 |
+| `_looks_like_proxy_failure_result` | def | L252–L271 |
+| `_looks_like_captcha_failure_result` | def | L274–L289 |
 
 ### `scripts/gen_map.py`
 
@@ -222,12 +403,16 @@
 | `extract_env_vars` | def | L50–L54 |
 | `extract_loggers` | def | L57–L59 |
 | `extract_endpoints` | def | L62–L66 |
-| `gen_modulos` | def | L71–L80 |
-| `gen_simbolos` | def | L83–L95 |
-| `gen_endpoints` | def | L98–L107 |
-| `gen_env` | def | L110–L123 |
-| `gen_loggers` | def | L126–L138 |
-| `update_map` | def | L246–L267 |
+| `extract_constants` | def | L69–L80 |
+| `_read_existing_propositos` | def | L85–L104 |
+| `gen_modulos` | def | L109–L120 |
+| `gen_simbolos` | def | L123–L135 |
+| `gen_endpoints` | def | L138–L147 |
+| `gen_env` | def | L150–L163 |
+| `gen_loggers` | def | L166–L178 |
+| `gen_constantes` | def | L181–L191 |
+| `gen_recientes` | def | L194–L210 |
+| `update_map` | def | L418–L439 |
 
 ### `scripts/recalc_grades.py`
 
@@ -510,25 +695,26 @@
 | Dashboard principal | `/data/logs/dashboard.log` | 10 MB × 3 archivos |
 | Tail en vivo (UI) | `GET /api/logs/stream` (SSE) | — |
 | Ver en dashboard | Pestaña **Logs** | — |
+| Logger raíz del dashboard | `betmexico.dashboard` | en app.py L47 |
 
 ---
 
 ## Directorios críticos `[MANUAL]`
 
-| Directorio | Propósito |
-|------------|-----------|
-| `/data/` | Volumen Docker — BD SQLite + logs |
+| Directorio (container) | Propósito |
+|------------------------|-----------|
+| `/data/` | Volumen Docker persistente — BD + logs |
 | `/data/logs/` | Log files (RotatingFileHandler) |
-| `static/` | Frontend (HTML/CSS/JS) |
+| `/data/betmexico_accounts.db` | BD SQLite principal (misma que usa el bot TG) |
+| `static/` | Frontend: `index.html`, `app.js`, `style.css` |
 | `docs/` | Documentación operativa completa |
-| `infra/` | Dockerfile + docker-compose.yml |
-| `scripts/` | Utilerías dev (recalc_grades, gen_map) |
+| `infra/` | `Dockerfile` + `docker-compose.yml` |
+| `scripts/` | Utilerías dev (`recalc_grades.py`, `gen_map.py`) |
 | `shared/` | Módulos compartidos con bot Telegram |
-| `templates/` | Plantilla replicable para otros repos |
 
 ---
 
-## Documentación de referencia `[MANUAL]`
+## Docs de referencia `[MANUAL]`
 
 | Doc | Qué tiene |
 |-----|-----------|
@@ -540,9 +726,10 @@
 | `docs/AUDIT.md` | Estado por función (✅ ❌ ⚠️ 🔵 ❓) |
 | `DEPLOY.md` | Protocolo de deploy a KVM4 |
 | `docs/protocols/deploy-checklist.md` | Checklist funcional post-deploy |
+| `docs/diagrams/` | Flujos Mermaid: deposit-single, deposit-multi, sse-bus, infra |
 
 ---
 
 ## Notas de sesión `[MANUAL]`
 
-<!-- Espacio libre para apuntes rápidos de sesión — borrar entre sesiones -->
+<!-- Apuntes rápidos de sesión activa — borrar entre sesiones -->
