@@ -13,13 +13,6 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 <!-- GEN:start:simbolos -->
 
-### `_test_v3_login.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `get_accounts` | def | L31–L40 |
-| `main` | def | L43–L89 |
-
 ### `app.py`
 
 | Símbolo | Tipo | Líneas |
@@ -145,15 +138,29 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_record_attempt` | def | L392–L502 |
 | `_safe_phase` | def | L512–L519 |
 | `_build_admin_proxy_url` | def | L522–L526 |
-| `_run_deposit_with_phases` | def | L529–L889 |
-| `deposit_execute` | def | L893–L1030 |
-| `deposit_execute_stream` | def | L1034–L1242 |
-| `cap_status` | def | L1246–L1258 |
-| `multi_stream` | def | L1278–L1616 |
-| `multi_cancel` | def | L1620–L1625 |
-| `scheduled_create` | def | L1636–L1864 |
-| `scheduled_list` | def | L1868–L1890 |
-| `scheduled_cancel` | def | L1894–L1902 |
+| `_run_deposit_with_phases` | def | L529–L890 |
+| `deposit_execute` | def | L894–L1031 |
+| `deposit_execute_stream` | def | L1035–L1243 |
+| `cap_status` | def | L1247–L1259 |
+| `multi_stream` | def | L1280–L1630 |
+| `multi_cancel` | def | L1634–L1639 |
+| `scheduled_create` | def | L1650–L1878 |
+| `scheduled_list` | def | L1882–L1904 |
+| `scheduled_cancel` | def | L1908–L1916 |
+
+### `login_orchestrator.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `StickySession` | class | L41–L49 |
+| `parse_nodemaven_line` | def | L52–L69 |
+| `StickySessionManager` | class | L72–L113 |
+| `LoginResult` | class | L118–L130 |
+| `_import_get_jwt` | def | L134–L137 |
+| `_classify_dead` | def | L140–L152 |
+| `_pool_session` | def | L155–L166 |
+| `_jitter_base` | def | L169–L176 |
+| `gentle_login` | def | L180–L300 |
 
 ### `prewarm.py`
 
@@ -172,27 +179,27 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_db_invalidate_jwt` | def | L274–L285 |
 | `_is_balance_fresh` | def | L288–L296 |
 | `_capmonster_balance` | def | L301–L317 |
-| `_run_prewarm` | def | L322–L428 |
-| `prewarm_select` | def | L434–L504 |
-| `prewarm_cancel` | def | L508–L518 |
-| `prewarm_status` | def | L522–L537 |
-| `prewarm_refresh_stream` | def | L543–L665 |
+| `_run_prewarm` | def | L322–L433 |
+| `prewarm_select` | def | L439–L509 |
+| `prewarm_cancel` | def | L513–L523 |
+| `prewarm_status` | def | L527–L542 |
+| `prewarm_refresh_stream` | def | L548–L670 |
 
 ### `proxy_pool.py`
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `_bot_proxies` | def | L53–L59 |
-| `all_proxies` | def | L62–L70 |
-| `_to_url` | def | L73–L83 |
-| `get_admin_proxy` | def | L86–L91 |
-| `build_admin_proxy_url` | def | L94–L97 |
-| `shuffled_proxy_urls` | def | L100–L108 |
-| `_retry_exceptions` | def | L116–L142 |
-| `_proxy_host` | def | L145–L149 |
-| `call_with_proxy_failover` | def | L152–L243 |
-| `_looks_like_proxy_failure_result` | def | L252–L271 |
-| `_looks_like_captcha_failure_result` | def | L274–L289 |
+| `_bot_proxies` | def | L56–L62 |
+| `all_proxies` | def | L65–L73 |
+| `_to_url` | def | L76–L86 |
+| `get_admin_proxy` | def | L89–L94 |
+| `build_admin_proxy_url` | def | L97–L100 |
+| `shuffled_proxy_urls` | def | L103–L111 |
+| `_retry_exceptions` | def | L119–L145 |
+| `_proxy_host` | def | L148–L152 |
+| `call_with_proxy_failover` | def | L155–L246 |
+| `_looks_like_proxy_failure_result` | def | L255–L274 |
+| `_looks_like_captcha_failure_result` | def | L277–L292 |
 
 ### `scripts/gen_map.py`
 
@@ -459,6 +466,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 |--------|--------|
 | `betmexico.dashboard` | `app.py` |
 | `betmexico.dashboard.deposits` | `deposits.py` |
+| `betmexico.dashboard.login_orch` | `login_orchestrator.py` |
 | `betmexico.dashboard.prewarm` | `prewarm.py` |
 | `betmexico.dashboard.sse` | `app.py` |
 | `betmexico.web.auth` | `web_auth.py` |

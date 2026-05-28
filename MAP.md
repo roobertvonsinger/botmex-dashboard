@@ -77,7 +77,7 @@ web_routes_prewarm.py → prewarm.py
 | # | Síntoma | Causa raíz | Fix |
 |---|---------|------------|-----|
 | 1 | SSE no llega al frontend aunque backend emite | Doble-import de `app.py` = dos instancias de `_sse_queues` | `app.py` L18–32: `sys.modules.setdefault("app", sys.modules[__name__])` |
-| 2 | 406 FAILURE_IN_CAPTCHA masivo (build v26.5.25+) | BetMexico migró a reCAPTCHA **v3**; enviábamos v2 | `deposits.py`: usar v3 site key `6LdoqOUk...` |
+| 2 | 406 FAILURE_IN_CAPTCHA masivo (build v26.5.25+) | Reputación de IP de proxies + antifraude BetMexico. **NO es mismatch de versión** — v3 probado con Playwright real = 0%. v2 sigue siendo el token correcto. | Fix real: login v2 gentil (anti-ráfaga, jitter, backoff) + **NO matar cuentas por 406** (`LOGIN_FAILED` → `login_retry`, jamás DEAD). Ver `docs/ERRORS.md` §"matchmaker mata cuentas buenas". |
 | 3 | Logs no cargan en dashboard tras restart | Antes: journalctl (VPS). KVM4 es Docker sin systemd | `app.py` L40–62: RotatingFileHandler a `/data/logs/dashboard.log` |
 | 4 | Token captcha expirado en scheduled | TOKEN_MAX_AGE=55s · sleep(60) = token viejo al despertar | Captcha pool prefetchea; ver `deposits.py` sección "captcha pool" |
 | 5 | `create_task(gather())` crashea Py3.11+ | Bug asyncio en multi-depósito | Fix en `web_routes_deposits.py` |
@@ -93,13 +93,13 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `_test_v3_login.py` | 93 | `—` | Script dev para testear login reCAPTCHA v3 — NO es parte del app |
 | `app.py` | 2378 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `conftest.py` | 79 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 1902 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
-| `prewarm.py` | 665 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
-| `proxy_pool.py` | 289 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `deposits.py` | 1916 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `login_orchestrator.py` | 300 | `betmexico.dashboard.login_orch` | _[completar]_ |
+| `prewarm.py` | 670 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
+| `proxy_pool.py` | 292 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `scripts/gen_map.py` | 486 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
@@ -138,7 +138,7 @@ web_routes_prewarm.py → prewarm.py
 | `CAP_PER_OPERATOR_10MIN` | `9999` | `prewarm.py` |
 | `ACCOUNT_FRESH_MINUTES` | `30` | `prewarm.py` |
 | `ACCOUNT_DAILY_LIMIT` | `3` | `prewarm.py` |
-| `REFRESH_PARALLEL` | `15` | `prewarm.py` |
+| `REFRESH_PARALLEL` | `8` | `prewarm.py` |
 | `CAPMONSTER_MIN_BALANCE` | `5.0` | `prewarm.py` |
 | `BALANCE_FRESH_SEC` | `5 * 60` | `prewarm.py` |
 | `TASK_TIMEOUT_SEC` | `25` | `prewarm.py` |
@@ -183,6 +183,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `3c31ca5` | docs(map): Bóveda BetMexico marcada pendiente + guía de qué guardar |
 | `3ae9271` | docs(map): agregar Bóveda como sección en MAP.md |
 | `e4799cd` | docs(bitacora): skill actualizada para MAP.md lean + MAP_DEEP.md |
 | `55d526d` | refactor(map): MAP.md lean (241L) + MAP_DEEP.md separado (475L) |
@@ -194,7 +195,6 @@ web_routes_prewarm.py → prewarm.py
 | `7a0b37f` | fix+feat: SSE who resuelto, tabla intentos sin truncar, drawer collapse rail |
 | `899ba14` | ui(balance): tiers low/mid/hot — <$10 gris, <$50 blanco, >=$50 verde radiactivo + glow + pulse 2.6s |
 | `72056f2` | ui(green): swatch final — hue 160 chr 0.11 L 0.50 (verde bandera mx) |
-| `04627e9` | ui(green): bajar lightness 0.82→0.66 — verde mexicano más serio |
 <!-- GEN:end:recientes -->
 
 ---

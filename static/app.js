@@ -4664,6 +4664,21 @@ function handleMmEvent(ev) {
       break;
     }
 
+    case 'login_retry': {
+      // 406 / captcha / proxy = NUESTRO lado, NO la cuenta. La cuenta NO murió:
+      // sale del run actual para no martillar IPs, pero queda reintentable.
+      // Ni la cuenta ni la tarjeta se penalizan.
+      const tail = (ev.tail || '').replace('···', '');
+      const card = _mm.cards.get(tail);
+      const acc = _mm.accounts.get(ev.email);
+      if (card) { card.status = 'idle'; card.busyEmail = null; card.currentPhase = ''; }
+      if (acc)  { acc.status = 'idle'; acc.busyTail = null; acc.currentPhase = ''; acc.lastCode = ev.code; }
+      _mmRender();
+      _mmFeedAdd('mm-cooldown',
+        `🔄 <b>${esc(ev.email)}</b> · login falló (nuestro lado, NO muerta) <span class="dim mono">${esc(ev.code)}</span> · reintenta el run`);
+      break;
+    }
+
     case 'velocity_skip': {
       // Backend marcó VELOCITY_SKIP — la tarjeta no se consumió pero el par
       // (email, tail) ya pasó por el 'trying' que dejó ambos en busy. Sin

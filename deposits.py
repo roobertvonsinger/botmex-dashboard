@@ -550,7 +550,8 @@ async def _run_deposit_with_phases(
       {"success": bool, "result_code": str, "error": str|None, "duration_ms": int}
     """
     try:
-        from betmexico_login_service import get_jwt as _get_jwt
+        # Login lo maneja gentle_login (importa get_jwt internamente). Aquí solo
+        # validamos que las deps de depósito del bot estén disponibles.
         from betmexico_deposit import (
             begin_deposit as _begin_deposit,
             submit_card as _submit_card,
@@ -589,39 +590,39 @@ async def _run_deposit_with_phases(
     else:
         await _safe_phase(phase_cb, "login_start", {})
         t0 = time.time()
-        try:
-            # use_cache=False: mirrors prewarm.py — un JWT cacheado puede devolver 401
-            # silencioso y balance=0 falso. Para depósitos eso es inaceptable.
-            # Failover real: si el primer proxy timeout, rota al siguiente.
-            from proxy_pool import call_with_proxy_failover
-            # max_retries=1: get_jwt hace 1 intento de captcha por IP (no quema 3 en
-            # la misma IP quemada). El retry-con-rotación-de-IP lo maneja
-            # call_with_proxy_failover, que es donde está el token de captcha bueno.
-            (jwt, login_result), used_proxy = await call_with_proxy_failover(
-                _get_jwt, email, password, pool, proxy=proxy, use_cache=False,
-                max_retries=1,
-            )
-        except Exception as e:
-            logger.error(f"[Deposits/phases] get_jwt {email}: {e}")
-            login_result = {"status": "ERROR", "error": str(e)}
-        login_ms = int((time.time() - t0) * 1000)
-        from_cache = bool(
-            isinstance(login_result, dict) and login_result.get("from_cache")
+        # gentle_login (rework 2026-05-28): login gentil con jitter anti-ráfaga +
+        # reintentos espaciados rotando IP + timeout POR INTENTO. Reemplaza
+        # call_with_proxy_failover (cuya rotación interna era ráfaga sin throttle
+        # → quemaba IPs y disparaba el antifraude). Devuelve taxonomía estricta
+        # (REGLA DE ROBERT): solo LOGIN_DENIED/KYC_PENDING/AUTOEXCLUSION matan.
+        from login_orchestrator import gentle_login, StickySession
+        forced = StickySession(proxy_url=proxy, label="forced", expires_at=0.0) if proxy else None
+        login_res = await gentle_login(
+            email, password, max_login_retries=4, throttle=True,
+            pool=pool, sticky_session=forced,
         )
+        jwt = login_res.jwt
+        used_proxy = login_res.used_proxy
+        login_result = {"status": login_res.code, "error": login_res.error}
+        login_ms = int((time.time() - t0) * 1000)
+        from_cache = False
 
         if not jwt:
             await _safe_phase(phase_cb, "login_done", {
                 "ok": False, "duration_ms": login_ms, "from_cache": from_cache,
             })
-            err = None
-            if isinstance(login_result, dict):
-                err = login_result.get("error") or login_result.get("status")
-            err = err or "Login falló"
+            # Mapeo a result_code:
+            #  LOGIN_RETRY_LATER (nuestro lado, agotó reintentos) → LOGIN_FAILED:
+            #    el matchmaker lo trata como `login_retry` → NUNCA DEAD; single y
+            #    scheduled devuelven error claro al operador.
+            #  LOGIN_DENIED/KYC_PENDING/AUTOEXCLUSION → muerte real (3 razones de Robert).
+            rc = "LOGIN_FAILED" if login_res.code in ("LOGIN_RETRY_LATER", "", None) else login_res.code
+            err = login_res.error or login_res.code or "Login falló"
             await _safe_phase(phase_cb, "done", {
-                "success": False, "result_code": "LOGIN_FAILED", "error": err,
+                "success": False, "result_code": rc, "error": err,
             })
             return {
-                "success": False, "result_code": "LOGIN_FAILED",
+                "success": False, "result_code": rc,
                 "error": err, "duration_ms": int((time.time() - t_total) * 1000),
             }
 
@@ -1263,7 +1264,8 @@ def cap_status(account_id: int, _user: dict = Depends(require_session)):
 #  - 5s cooldown por tarjeta y por cuenta
 #  - 2 fails por tarjeta → retirada; 2 fails por cuenta → retirada
 #  - 3DS_REQUIRED solo strike a tarjeta, NO a cuenta
-#  - LOGIN_FAILED/AUTOEXCLUSION/KYC_PENDING/3DS_UNDETECTED → cuenta DEAD
+#  - AUTOEXCLUSION/KYC_PENDING → cuenta DEAD (estado real de la API)
+#  - LOGIN_FAILED (406/captcha/proxy) → login_retry, NUNCA DEAD (nuestro lado)
 #  - Tarjeta éxitosa NO se retira (sigue probando otras cuentas)
 #  - Par (card, account) sólo se intenta una vez
 
@@ -1546,8 +1548,20 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                         card["retired"] = True  # tarjeta se casa con la cuenta — nunca más se prueba en otras
                         matches.append({"email": acc["email"], "tail": card["tail"], "pipe": card["pipe"]})
                         yield f"data: {json.dumps({'type':'match','email':acc['email'],'tail':card['tail'],'pipe':card['pipe'],'amount':amount,'duration_ms':duration,'attempt':n})}\n\n"
-                    elif code in ("LOGIN_FAILED", "AUTOEXCLUSION", "KYC_PENDING", "3DS_UNDETECTED", "SHADOW_BAN?"):
-                        # Cuenta fuera del run + persistir DEAD en BD para no volver a intentarla
+                    elif code == "LOGIN_FAILED":
+                        # 406 / captcha / proxy = NUESTRO lado, NUNCA la cuenta.
+                        # NO marcar DEAD ni penalizar permanente. Sale del run
+                        # actual (fail_count en memoria, no persiste) para no
+                        # martillar IPs. El reintento gentil se cablea aparte
+                        # (gentle_login — plan login-orchestration-rework §4).
+                        acc["login_retry"] = True
+                        acc["fail_count"] = MM_MAX_FAILS
+                        yield f"data: {json.dumps({'type':'login_retry','email':acc['email'],'code':code,'tail':card['tail'],'attempt':n})}\n\n"
+                    elif code in ("AUTOEXCLUSION", "KYC_PENDING", "LOGIN_DENIED"):
+                        # Las 3 ÚNICAS razones de muerte (REGLA DE ROBERT):
+                        # LOGIN_DENIED = 401 credenciales/lock (login denegado
+                        # DEFINITIVAMENTE, NO un 406); AUTOEXCLUSION; KYC_PENDING.
+                        # Estado REAL → DEAD persistente.
                         acc["fail_count"] = MM_MAX_FAILS
                         try:
                             from app import db as _appdb

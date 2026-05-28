@@ -43,9 +43,13 @@ EXTRA_ADMIN_PROXIES: List[Dict[str, str]] = [
 ]
 
 # Hosts excluidos del pool — proxies con reputación quemada para el reCAPTCHA
-# de BetMexico. LitPort dio 0/6 (0%) en pruebas 2026-05-27: rota IP pero todas
-# las IPs salen rechazadas con 406 FAILURE_IN_CAPTCHA. Se filtra desde aquí
-# (vive en ADMIN_PROXIES del monorepo) sin tocar el bot.
+# de BetMexico.
+# LitPort RE-EXCLUIDO 2026-05-28 (Robert): la premisa que lo devolvió ("el problema
+# era v2-vs-v3") quedó REFUTADA con datos — v3 dio 0% aun con navegador real; el 406
+# es reputación de IP/antifraude. LitPort `hub-us-7.litport.net:1337` da 0% Y es IP
+# de US (no MX) → veneno para BetMexico (MX). gentle_login hace random.choice del
+# pool; dejarlo gastaba ~1/3 de intentos en una IP muerta US. Quedan IPRoyal MX y
+# NodeMaven MX. Ver docs/plans/login-orchestration-rework.md.
 _EXCLUDED_PROXY_HOSTS: tuple = ("litport",)
 
 

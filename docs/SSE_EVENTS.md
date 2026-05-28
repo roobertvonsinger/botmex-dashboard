@@ -49,7 +49,8 @@ Endpoint `/api/deposits/multi/stream` devuelve eventos SSE específicos del run 
 | `phase` | `{email, tail, name, data}` | Sub-fase del intento activo. `name`/`data` idénticos a execute-stream (login_start, login_done, gateway_begin, etc.). Permite mostrar progreso vivo por par. |
 | `match` | `{email, tail, pipe, amount, duration_ms, attempt}` | Aprobado — par casado |
 | `rejected` | `{email, tail, code, card_fails, acct_fails?, attempt, card_only?}` | Rechazado por gateway. `card_only:true` cuando el strike es solo a la tarjeta (3DS/BANK_REJECTED). |
-| `account_dead` | `{email, code, tail, attempt, persisted}` | Cuenta DEAD por LOGIN_FAILED/AUTOEXCLUSION/KYC_PENDING/3DS_UNDETECTED/SHADOW_BAN? |
+| `account_dead` | `{email, code, tail, attempt, persisted}` | Cuenta DEAD persistente. `code` ∈ `{AUTOEXCLUSION, KYC_PENDING}` — SOLO estos dos matan la cuenta. `persisted:true` indica que se escribió en BD. |
+| `login_retry` | `{email, code, tail, attempt}` | Login falló por causa de NUESTRA infraestructura (406/captcha/proxy). La cuenta **NO muere** ni se penaliza en BD. Sale del run actual en memoria (`fail_count=MM_MAX_FAILS`) para no martillar IPs. `code` siempre `LOGIN_FAILED`. Frontend pinta la cuenta como no-muerta/reintentable. Emitido desde `deposits.py` L1558 (matchmaker). |
 | `velocity_skip` | `{email, tail, wait_sec, distinct_count, message}` | Tarjeta ya usada en N cuentas recientes — skip sin penalizar |
 | `card_retired` | `{tail, fails}` | Tarjeta retirada por max fails |
 | `cooldown` | `{wait}` | Esperando cooldown mínimo entre intentos |

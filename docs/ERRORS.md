@@ -25,6 +25,62 @@ docker logs betmexico-web 2>&1 | grep "bot init failed"
 
 ---
 
+### Spike de 406 FAILURE_IN_CAPTCHA en login (depósitos + actualización de cuentas)
+
+**Síntoma**: muchos logins fallan con `[API] Status: 406` / `RETRY_CAPTCHA`. Tasa real por intento subió 0% (05-23) → 24% (05-26) → 48% (05-27). Pasa en updates y depósitos.
+
+**Causa raíz (medida, NO supuesta)**: BetMexico endureció su antifraude ~25-may (frontend build `bmx-prod-v26.5.25` agregó reCAPTCHA **v3**). El 406 es rechazo por **reputación de IP / score**, disfrazado de fallo de captcha. NO fue cambio nuestro (`betmexico_login_api.py` intacto desde 11-may). El commit `6908af3` (rotación agresiva de 5 IPs) lo empeoró: martillar **quema IPs**.
+
+**Descartado con datos** (NO reintentar): migrar a v3 (0% aun con navegador real Playwright); token v2 declarado `captchaVersion:"v3"` (0%); misma-IP solve+submit (10%, peor); reportar a CapMonster (riesgo de ban, los 406 no son tokens malos).
+
+**Fix**: quedarse en v2; **dejar de martillar** y portar la estrategia gentil del bot (`betmexico_check.py`: jitter + throttle por `captcha_fail_streak` + backoff 403/429); resolver v2 proxyless + submit por sticky residencial MX fresco; reintentos gentiles (p≈50%/intento fresco → 4 intentos ≈ 94%). **Plan completo: `docs/plans/login-orchestration-rework.md`.**
+
+---
+
+### El matchmaker marca cuentas BUENAS como DEAD cuando falla el login (corregido 2026-05-28)
+
+**Síntoma**: cuentas válidas quedan `status='DEAD'` con `dead_reason='LOGIN_FAILED'` y ya no se reintentan.
+
+**Causa raíz**: `deposits.py` (matchmaker `multi_stream`) metía `LOGIN_FAILED` en la misma rama que `AUTOEXCLUSION`/`KYC_PENDING` y persistía `status='DEAD'` en BD.  
+Pero `LOGIN_FAILED` = 406/captcha/proxy = fallo de **nuestra infraestructura**, nunca de la cuenta.  
+Agravante: `LOGIN_FAILED` es el ÚNICO código que el matchmaker puede producir (`AUTOEXCLUSION`, `KYC_PENDING`, `3DS_UNDETECTED`, `SHADOW_BAN?` nacen en `web_routes_deposits.py` y nunca llegan a `multi_stream`). O sea esa rama mataba cuentas buenas el 100% de las veces que se activaba. Con la tasa de 406 alta (may 2026), a escala masacraba.
+
+**Daño documentado**: 5 cuentas marcadas DEAD innecesariamente (11–15 may 2026):
+- `fcojavii2662@gmail.com`
+- `azul_171175@live.com`
+- `memo.teo10@gmail.com`
+- `danoscene@gmail.com`
+- `silcas22@gmail.com`
+
+**Diagnóstico**:
+```bash
+sqlite3 /data/betmexico_accounts.db \
+  "SELECT email, dead_reason, dead_at FROM accounts WHERE status='DEAD' AND dead_reason='LOGIN_FAILED'"
+```
+
+**Fix aplicado** (`deposits.py` L1550-1558, 2026-05-28):
+- `LOGIN_FAILED` ya NO toca BD ni `dead_reason`.  
+- Emite evento SSE `type:'login_retry'` con `{email, code, tail, attempt}`.  
+- Marca `acc["login_retry"]=True` y `acc["fail_count"]=MM_MAX_FAILS` en memoria (solo sale del run actual — no persiste).  
+- `3DS_UNDETECTED` / `SHADOW_BAN?` salieron de la rama DEAD → caen en el `else` genérico (strike a tarjeta + cuenta, no DEAD).  
+- Solo `AUTOEXCLUSION` y `KYC_PENDING` siguen marcando `status='DEAD'` persistente.
+
+**Regla de Robert (2026-05-28, no negociable)**:  
+Una cuenta solo muere por (1) 401 credenciales/lock definitivo, (2) KYC_PENDING, (3) AUTOEXCLUSION.  
+Todo lo demás — incluido cualquier LOGIN_FAILED (406/captcha/proxy/BAN-429/timeout) — se convierte en REINTENTOS, jamás DEAD.
+
+**Recovery SQL ejecutado en prod KVM4** (backup previo en `/docker/betmexico/data/backups/`):
+```sql
+UPDATE accounts
+SET status='LIVE', dead_reason=NULL, dead_at=NULL
+WHERE status='DEAD' AND dead_reason='LOGIN_FAILED';
+-- Filas afectadas: 5
+```
+
+**Histórico**: detectado 2026-05-28. Raíz introducida en el diseño inicial del matchmaker. Ver también `docs/plans/login-orchestration-rework.md` §4.
+
+---
+
 ### Las tarjetas no se persisten en `account_cards` después de un depósito aprobado
 
 **Síntoma**: depósito BANK_APPROVED en `deposit_attempts` pero `account_cards` para esa cuenta = 0 rows. El panel detalles muestra "Sin tarjetas guardadas".

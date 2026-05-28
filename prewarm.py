@@ -50,7 +50,7 @@ _PREWARM_TASKS: Dict[str, asyncio.Task] = {}
 CAP_PER_OPERATOR_10MIN = 9999  # sin tope práctico — el operador decide
 ACCOUNT_FRESH_MINUTES = 30      # < 30min desde last check → skip con warning
 ACCOUNT_DAILY_LIMIT = 3          # >= 3 prewarms en el día → skip con warning
-REFRESH_PARALLEL = 15           # max logins concurrentes (anti rate-limit BetMexico)
+REFRESH_PARALLEL = 8            # max logins concurrentes — bajado 15→8 (anti-quemado de IP; gentle_login añade jitter)
 CAPMONSTER_MIN_BALANCE = 5.0
 BALANCE_FRESH_SEC = 5 * 60
 TASK_TIMEOUT_SEC = 25
@@ -335,33 +335,38 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
         # invalidado server-side antes de su exp local (nueva sesión desde otro IP).
         # Reusar JWT muerto → 401 silencioso → balance_real=0 → no se actualiza nada.
         jwt_from_cache = False
-        pool = make_pool(cap_key, size=1, workers=1)
+        pool = make_pool(cap_key, size=2, workers=1)
         await pool.prefetch(1)
         await pool.start_factory()
 
-        # Failover real: si el primer proxy timeout/conn-error, rota al siguiente
-        # del pool en vez de fallar el intento entero.
-        #
-        # use_cache=True (cambio 2026-05-23): aprovecha JWT cacheado si está
-        # vigente. Ahorra ~5-10s vs forzar captcha+login fresh. El guard
-        # `api_succeeded` en _db_upsert_balance evita madrear balance si el
-        # JWT cacheado devuelve 401 silencioso.
-        from proxy_pool import call_with_proxy_failover
-        (jwt, login_result), used_proxy = await asyncio.wait_for(
-            call_with_proxy_failover(
-                get_jwt, email, password, pool, use_cache=True,
-            ),
-            timeout=float(TASK_TIMEOUT_SEC),
+        # gentle_login (rework 2026-05-28): reemplaza call_with_proxy_failover
+        # (cuya rotación interna era ráfaga sin jitter → quemaba IPs). Añade
+        # jitter anti-ráfaga + reintentos espaciados + timeout POR INTENTO (no
+        # global de 25s que mataba a media-rotación). use_cache=True aprovecha
+        # JWT cacheado vigente (sin captcha) en el intento 0 — updates baratos.
+        # max_login_retries=5: el update solo trae balance, vale reintentar.
+        from login_orchestrator import gentle_login
+        login_res = await gentle_login(
+            email, password, max_login_retries=5, throttle=True,
+            pool=pool, use_cache=True,
         )
+        jwt = login_res.jwt
+        used_proxy = login_res.used_proxy
         if not jwt:
-            status = login_result.get("status") if isinstance(login_result, dict) else None
+            # LOGIN_RETRY_LATER / LOGIN_DENIED / KYC_PENDING / AUTOEXCLUSION.
+            # En prewarm NO marcamos DEAD (el único punto que escribe DEAD es el
+            # matchmaker; el flujo de depósito real re-clasificará). Solo dejamos
+            # la cuenta para reintento — NUNCA invalidamos nada agresivo aquí.
             _db_log_phase(
                 process_id, "no_jwt",
-                {"email": email, "operator_id": operator_id, "status": status},
+                {"email": email, "operator_id": operator_id,
+                 "status": login_res.code, "attempts": login_res.attempts,
+                 "account_dead": login_res.account_dead},
                 int((time.time() - t0) * 1000),
             )
-            return {"ok": False, "status": status or "no_jwt",
-                    "error": (login_result.get("error") if isinstance(login_result, dict) else None) or status or "Login falló"}
+            await asyncio.to_thread(_db_update_last_checked, email)
+            return {"ok": False, "status": login_res.code or "no_jwt",
+                    "error": login_res.error or login_res.code or "Login falló"}
 
         # Mantener afinidad: ApiChecker usa el mismo proxy que validó el login.
         # fetch_mode="balance_only" (cambio 2026-05-23): trae balance +
