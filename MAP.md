@@ -100,7 +100,7 @@ web_routes_prewarm.py → prewarm.py
 | `deposits.py` | 1902 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `prewarm.py` | 665 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 289 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
-| `scripts/gen_map.py` | 476 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
+| `scripts/gen_map.py` | 486 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
@@ -183,6 +183,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `3ae9271` | docs(map): agregar Bóveda como sección en MAP.md |
 | `e4799cd` | docs(bitacora): skill actualizada para MAP.md lean + MAP_DEEP.md |
 | `55d526d` | refactor(map): MAP.md lean (241L) + MAP_DEEP.md separado (475L) |
 | `9d5b71f` | feat(map): rediseño MAP.md como guía de navegación para agentes IA |
@@ -194,7 +195,6 @@ web_routes_prewarm.py → prewarm.py
 | `899ba14` | ui(balance): tiers low/mid/hot — <$10 gris, <$50 blanco, >=$50 verde radiactivo + glow + pulse 2.6s |
 | `72056f2` | ui(green): swatch final — hue 160 chr 0.11 L 0.50 (verde bandera mx) |
 | `04627e9` | ui(green): bajar lightness 0.82→0.66 — verde mexicano más serio |
-| `40e430c` | fix(sse): doble-import de app.py rompía bus SSE — clients=0 fantasma |
 <!-- GEN:end:recientes -->
 
 ---
@@ -248,8 +248,18 @@ web_routes_prewarm.py → prewarm.py
 |-------------------|-------------|
 | `Boveda/Ruthopia/RGates/telcel_cipher_v1.0.py` | Cipher canónico Telcel v1.0 (Ruthopia/RGates) |
 | `Boveda/Ruthopia/RGates/wabox_bypass_v1.0.py` | Bypass WABox v1.0 (Ruthopia/RGates) |
+| `Boveda/BetMexico/` | ⚠️ **PENDIENTE** — carpeta no creada aún. Ver nota abajo. |
 
-**Estructura:** `Boveda/<proyecto>/<módulo>/<archivo_vX.Y.py>` — versionado explícito en nombre.
+**BetMexico Dashboard — qué guardar en Bóveda (pendiente de hacer):**
+Cuando se trabaje el backend en la sesión correspondiente, crear:
+```
+Boveda/BetMexico/deposits/          deposits_vX.Y.py      (motor _run_deposit + captcha pool)
+Boveda/BetMexico/analyzer/          betmexico_payment_analyzer_vX.Y.py  (Algoritmo V10)
+Boveda/BetMexico/proxy/             proxy_pool_vX.Y.py    (call_with_proxy_failover)
+```
+Criterio: guardar cuando un módulo alcanza un estado estable y probado que no queremos perder.
+
+**Estructura general:** `Boveda/<proyecto>/<módulo>/<archivo_vX.Y.py>` — versionado explícito en nombre.
 
 ---
 

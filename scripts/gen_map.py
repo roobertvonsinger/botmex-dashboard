@@ -406,8 +406,18 @@ web_routes_prewarm.py → prewarm.py
 |-------------------|-------------|
 | `Boveda/Ruthopia/RGates/telcel_cipher_v1.0.py` | Cipher canónico Telcel v1.0 (Ruthopia/RGates) |
 | `Boveda/Ruthopia/RGates/wabox_bypass_v1.0.py` | Bypass WABox v1.0 (Ruthopia/RGates) |
+| `Boveda/BetMexico/` | ⚠️ **PENDIENTE** — carpeta no creada aún. Ver nota abajo. |
 
-**Estructura:** `Boveda/<proyecto>/<módulo>/<archivo_vX.Y.py>` — versionado explícito en nombre.
+**BetMexico Dashboard — qué guardar en Bóveda (pendiente de hacer):**
+Cuando se trabaje el backend en la sesión correspondiente, crear:
+```
+Boveda/BetMexico/deposits/          deposits_vX.Y.py      (motor _run_deposit + captcha pool)
+Boveda/BetMexico/analyzer/          betmexico_payment_analyzer_vX.Y.py  (Algoritmo V10)
+Boveda/BetMexico/proxy/             proxy_pool_vX.Y.py    (call_with_proxy_failover)
+```
+Criterio: guardar cuando un módulo alcanza un estado estable y probado que no queremos perder.
+
+**Estructura general:** `Boveda/<proyecto>/<módulo>/<archivo_vX.Y.py>` — versionado explícito en nombre.
 
 ---
 
