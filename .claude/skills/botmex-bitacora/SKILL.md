@@ -72,31 +72,43 @@ Antes de cualquier `git commit` que toque el dashboard, verificar que `docs/` qu
 
 Default: `docs/AUDIT.md` con una nueva fila. Marca lo que cambió.
 
-## MAP.md — índice maestro auto-generado
+## Guías de navegación — leer al inicio de cada sesión
 
-`MAP.md` en la raíz es el punto de entrada para orientarse rápido en el repo.
-**Leerlo primero** al inicio de cada sesión antes de tocar código.
+### MAP.md — guía rápida (SIEMPRE leer primero, ~240 líneas)
+
+Contiene todo lo necesario para orientarse sin explorar el código:
+- "Si necesitas..." — tabla directa: qué tocar para qué
+- Flujos principales (depósito, batch, scheduled, prewarm)
+- Gotchas críticos — errores ya resueltos que no hay que repetir
+- Módulos con propósito, L# y logger
+- Constantes operacionales (caps, timeouts, TTLs)
+- Variables de entorno
+- Cambios recientes (git log)
+- Logs, directorios, docs de referencia
+
+### MAP_DEEP.md — mapa interno (leer SOLO cuando navegas un módulo específico)
 
 Contiene:
-- Tabla de módulos con L# y logger
-- Mapa de símbolos por módulo (funciones/clases con rango de líneas)
-- Endpoints detectados
-- Variables de entorno con defaults
+- Funciones/clases de cada módulo con rangos de líneas exactos (buscable por nombre)
+- Endpoints completos detectados por AST
 - Loggers disponibles
-- Logs, directorios críticos, docs de referencia (secciones manuales)
 
-Las secciones `[AUTO]` se regeneran solos en cada commit via `scripts/gen_map.py` (hook pre-commit).
-Para regenerar manualmente: `python scripts/gen_map.py`
+### Mecanismo de actualización
 
-> **Nota:** el hook vive en `.git/hooks/pre-commit` (no commiteado). Si se hace clone fresco,
-> reinstalar con: `cp .git/hooks/pre-commit .git/hooks/pre-commit` — o correr
-> `echo '#!/bin/sh\npython scripts/gen_map.py\ngit add MAP.md' > .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit`
+Las secciones `[AUTO]` se regeneran en cada `git commit` via pre-commit hook.
+Regenerar manualmente: `python scripts/gen_map.py`
+
+> Hook: `.git/hooks/pre-commit` (no commiteado, reinstalar en clone fresco)
+> ```sh
+> echo '#!/bin/sh\npython scripts/gen_map.py\ngit add MAP.md MAP_DEEP.md' > .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+> ```
 
 ## Estructura del repo (visión rápida)
 
 ```
 repos/botmex-dashboard/
-├── MAP.md     # <-- LEER PRIMERO: índice maestro auto-generado
+├── MAP.md        # <-- LEER PRIMERO: guía rápida (~240L) — flujos, gotchas, módulos
+├── MAP_DEEP.md   # leer solo al navegar código interno — funciones con rangos L#
 ├── README.md  # entrada visible primera capa
 ├── DEPLOY.md  # protocolo legacy (overlaps con docs/protocols/deploy-protocol.md)
 ├── docs/

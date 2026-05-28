@@ -183,6 +183,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `55d526d` | refactor(map): MAP.md lean (241L) + MAP_DEEP.md separado (475L) |
 | `9d5b71f` | feat(map): rediseño MAP.md como guía de navegación para agentes IA |
 | `eb733e3` | feat(map): MAP.md auto-generado + hook pre-commit |
 | `68121cf` | feat(detalle+scheduled): panel de detalle inline (acordeón v14) + reuso de sesión en programados |
@@ -194,7 +195,6 @@ web_routes_prewarm.py → prewarm.py
 | `04627e9` | ui(green): bajar lightness 0.82→0.66 — verde mexicano más serio |
 | `40e430c` | fix(sse): doble-import de app.py rompía bus SSE — clients=0 fantasma |
 | `0ad4044` | feat(ui): verde mexicano neón + botones premium + logo link + SSE diag |
-| `7b43898` | fix(drawer): empujar dashboard en vez de superponerse + tab Multi siempre visible |
 <!-- GEN:end:recientes -->
 
 ---
