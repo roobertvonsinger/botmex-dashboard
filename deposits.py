@@ -537,6 +537,7 @@ async def _run_deposit_with_phases(
     pool,
     phase_cb,  # Callable[[str, dict], Awaitable[None]] | None
     proxy: Optional[str] = None,
+    persist_login_data: bool = True,
 ) -> dict:
     """Orquesta deposit emitiendo fases. Mismo shape que _run_deposit.
 
@@ -578,8 +579,12 @@ async def _run_deposit_with_phases(
         # captcha solve por iteración — caller debe estar consciente del costo.
         # Failover real: si el primer proxy timeout, rota al siguiente.
         from proxy_pool import call_with_proxy_failover
+        # max_retries=1: get_jwt hace 1 intento de captcha por IP (no quema 3 en
+        # la misma IP quemada). El retry-con-rotación-de-IP lo maneja
+        # call_with_proxy_failover, que es donde está el token de captcha bueno.
         (jwt, login_result), used_proxy = await call_with_proxy_failover(
             _get_jwt, email, password, pool, proxy=proxy, use_cache=False,
+            max_retries=1,
         )
     except Exception as e:
         logger.error(f"[Deposits/phases] get_jwt {email}: {e}")
@@ -610,29 +615,27 @@ async def _run_deposit_with_phases(
     })
 
     # ── Persistir detalles del login en BD ───────────────────────────────
-    # Bug visto 2026-05-23: scheduled depositaba 4 veces pero last_checked_at
-    # de la cuenta seguía en marzo. El flow _run_deposit (legacy) hacía
-    # `db.upsert_account` después del login; _run_deposit_with_phases NO. Como
-    # resultado, balance/txns/last_checked nunca se refrescaban y el modal de
-    # detalles mostraba data stale.
-    try:
-        from betmexico_db import db as _bot_db
-        from web_grading import recalc_grade_from_db
-        if login_result and not from_cache:
-            # login_result incluye account_details (balance, txns, kyc, etc.)
-            await asyncio.to_thread(
-                _bot_db.upsert_account, login_result, user.get("telegram_id", 0)
-            )
-            txns_data = (login_result.get("account_details") or {}).get("transactions", {}) or {}
-            txn_items = txns_data.get("items") or []
-            if txn_items:
+    # persist_login_data=False (scheduled iter>0): skip — _record_attempt
+    # ya recalcula grade; upsert/txns solo aportan en la primera iteración
+    # de una secuencia sobre la misma cuenta.
+    if persist_login_data:
+        try:
+            from betmexico_db import db as _bot_db
+            from web_grading import recalc_grade_from_db
+            if login_result and not from_cache:
                 await asyncio.to_thread(
-                    _bot_db.save_account_transactions,
-                    email, txn_items, user.get("telegram_id", 0),
+                    _bot_db.upsert_account, login_result, user.get("telegram_id", 0)
                 )
-            await asyncio.to_thread(recalc_grade_from_db, email)
-    except Exception as e:
-        logger.warning(f"[Deposits/phases] persist login details failed: {e}")
+                txns_data = (login_result.get("account_details") or {}).get("transactions", {}) or {}
+                txn_items = txns_data.get("items") or []
+                if txn_items:
+                    await asyncio.to_thread(
+                        _bot_db.save_account_transactions,
+                        email, txn_items, user.get("telegram_id", 0),
+                    )
+                await asyncio.to_thread(recalc_grade_from_db, email)
+        except Exception as e:
+            logger.warning(f"[Deposits/phases] persist login details failed: {e}")
 
     # ── HTTPX client compartido para pasos 2/3/4 ──────────────────────────
     # Reusa el proxy que validó el login (afinidad — evita rotar a un proxy
@@ -927,9 +930,9 @@ async def deposit_execute(request: Request, user: dict = Depends(require_session
     # lockeada por otro y el caller no es superadmin.
     _auto_lock_for_deposit(account_id, operator_id, user, hours=AUTOLOCK_HOURS_SINGLE)
 
-    # Pool de captcha — start_factory arranca workers (rápido, no bloquea).
-    # NO awaiteamos prefetch: si get_jwt usa caché, ni token necesita; si no,
-    # factory está produciendo en background y get_token() espera al primero.
+    # Pool de captcha — factory ON: el retry-con-rotación-de-IP puede pedir
+    # varios tokens (1 por IP hasta acertar una limpia), y sin factory el pool
+    # quedaría vacío tras el primer token → get_token() timeout en el reintento.
     cap_key = os.environ.get("CAPMONSTER_KEY", "") or os.environ.get("BMX_CAPMONSTER_KEY", "")
     pool = None
     prefetch_task = None
@@ -939,7 +942,6 @@ async def deposit_execute(request: Request, user: dict = Depends(require_session
     try:
         pool = make_pool(cap_key, size=1, workers=1)
         await pool.start_factory()
-        # Prefetch en background — útil si no hay JWT cacheado, gratis si sí lo hay
         prefetch_task = asyncio.create_task(pool.prefetch(1))
 
         result = await _run_deposit(
@@ -1096,9 +1098,8 @@ async def deposit_execute_stream(request: Request, user: dict = Depends(require_
             # Start event con attempt_id para que el frontend correlacione
             yield f"data: {json.dumps({'type':'start','attempt_id':attempt_id,'email':email,'amount':amount})}\n\n"
 
-            # Arranca pool (mismo patrón que /execute)
             pool = make_pool(cap_key, size=1, workers=1)
-            await pool.start_factory()
+            await pool.start_factory()  # necesario: retry-con-rotación pide varios tokens
             prefetch_task = asyncio.create_task(pool.prefetch(1))
 
             # Lanza deposit en background — emite fases vía phase_cb → queue
@@ -1334,6 +1335,10 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
         tried: set[tuple[str, int]] = set()  # (card_num, account_id)
         matches: list[dict] = []
         attempts = 0
+        # Tracking de attempt() tasks vivas — para cancelarlas en finally si
+        # el generator explota a mitad del run (evita orphan tasks queriendo
+        # captcha tokens de un pool ya detenido).
+        _inflight_tasks: list[asyncio.Task] = []
 
         # Queue compartida para emisión live de fases desde attempt() → outer gen().
         # Cada attempt() escribe eventos {type:"phase", email, tail, name, data}
@@ -1470,9 +1475,12 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                 # Lanza tasks en paralelo y drena phase_queue mientras corren —
                 # los eventos `phase` salen en tiempo real, no acumulados al final.
                 tasks = [asyncio.create_task(attempt(acc, card, n)) for acc, card, n in batch]
-                gather_task = asyncio.create_task(
-                    asyncio.gather(*tasks, return_exceptions=True)
-                )
+                _inflight_tasks.extend(tasks)
+                # asyncio.gather() ya devuelve un _GatheringFuture awaitable —
+                # envolverlo con create_task() crashea con "a coroutine was
+                # expected" en Py 3.11+. El Future tiene .done() y se awaitea
+                # igual; no necesita wrap.
+                gather_task = asyncio.gather(*tasks, return_exceptions=True)
 
                 while not gather_task.done():
                     try:
@@ -1569,6 +1577,15 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
             except Exception:
                 pass
         finally:
+            # Cancelar attempt tasks vivas antes de matar el pool — sin esto,
+            # las que seguían corriendo se quedan haciendo get_token() contra
+            # un pool ya detenido y producen "Pool vacío" 90s después.
+            try:
+                for t in list(_inflight_tasks):
+                    if not t.done():
+                        t.cancel()
+            except Exception:
+                pass
             if prefetch is not None and not prefetch.done():
                 prefetch.cancel()
             if pool is not None:
@@ -1718,6 +1735,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                         user={"telegram_id": operator_id, "username": user.get("username", "")},
                         pool=pool,
                         phase_cb=phase_cb,
+                        persist_login_data=(i == 0),
                     )
                 except asyncio.CancelledError:
                     # Cancel mid-iter: registrar el intento antes de propagar para

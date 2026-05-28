@@ -134,8 +134,10 @@ async def _run_deposit(
     else:
         from proxy_pool import call_with_proxy_failover
         try:
+            # max_retries=1: 1 captcha por IP; el retry-con-rotación-de-IP (donde
+            # se rescata el 406 FAILURE_IN_CAPTCHA) lo maneja el failover.
             (jwt, login_result), admin_proxy_url = await call_with_proxy_failover(
-                get_jwt, email, password, pool,
+                get_jwt, email, password, pool, max_retries=1,
             )
         except Exception as e:
             logger.error(f"[Deposit] proxy failover exhausted para {email}: {e}")

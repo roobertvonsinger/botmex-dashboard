@@ -26,6 +26,14 @@ logger = logging.getLogger("dashboard.proxy_pool")
 # Mismo formato: {server, username, password}. El sufijo `_country-mx` o
 # `-country-mx` en username fuerza ruteo por IP México.
 EXTRA_ADMIN_PROXIES: List[Dict[str, str]] = [
+    # IPRoyal (Premium MX residencial, Ciudad Obregón) — agregado 2026-05-27.
+    # Mejor reputación reCAPTCHA: 4/5 (80%) en pruebas vs NodeMaven 30%, LitPort 0%.
+    # Compartido con Ruthopia (telcel gate) — vigilar consumo de datos.
+    {
+        "server": "geo.iproyal.com:11200",
+        "username": "sH3PhyrRotHpRxYY2sEiS",
+        "password": "u7JSejn6ZTSHfbpR_country-mx_city-ciudadobregon_streaming-1",
+    },
     # NodeMaven (Premium MX) — agregado 2026-05-21
     {
         "server": "gate.nodemaven.com:8080",
@@ -33,6 +41,12 @@ EXTRA_ADMIN_PROXIES: List[Dict[str, str]] = [
         "password": "5qpn3scda5",
     },
 ]
+
+# Hosts excluidos del pool — proxies con reputación quemada para el reCAPTCHA
+# de BetMexico. LitPort dio 0/6 (0%) en pruebas 2026-05-27: rota IP pero todas
+# las IPs salen rechazadas con 406 FAILURE_IN_CAPTCHA. Se filtra desde aquí
+# (vive en ADMIN_PROXIES del monorepo) sin tocar el bot.
+_EXCLUDED_PROXY_HOSTS: tuple = ("litport",)
 
 
 def _bot_proxies() -> List[Dict[str, str]]:
@@ -45,8 +59,14 @@ def _bot_proxies() -> List[Dict[str, str]]:
 
 
 def all_proxies() -> List[Dict[str, str]]:
-    """Lista completa: bot + extras locales."""
-    return _bot_proxies() + EXTRA_ADMIN_PROXIES
+    """Lista completa: bot + extras locales, excluyendo hosts quemados
+    (`_EXCLUDED_PROXY_HOSTS`). El filtro se aplica acá para que TODO el
+    pool (failover, random pick, shuffled) herede la exclusión."""
+    combined = _bot_proxies() + EXTRA_ADMIN_PROXIES
+    return [
+        p for p in combined
+        if not any(bad in p.get("server", "").lower() for bad in _EXCLUDED_PROXY_HOSTS)
+    ]
 
 
 def _to_url(p: Optional[Dict[str, str]]) -> Optional[str]:
@@ -133,14 +153,25 @@ async def call_with_proxy_failover(
     *args: Any,
     proxy: Optional[str] = None,
     proxy_kwarg: str = "proxy",
+    captcha_retries: int = 5,
     **kwargs: Any,
 ) -> Tuple[Any, Optional[str]]:
-    """Llama `fn(*args, proxy=URL, **kwargs)` con failover automático.
+    """Llama `fn(*args, proxy=URL, **kwargs)` con failover + retry de captcha.
 
     - Si `proxy` está dado explícito → lo usa SIN failover (caller manda).
-    - Si `proxy` es None → itera el pool en orden aleatorio, reintenta con
-      el siguiente proxy si la llamada lanza una excepción de conexión/timeout.
+    - Si `proxy` es None → cicla el pool reconectando (cada intento = IP nueva,
+      los proxies son rotativos), reintentando cuando:
+        a) la llamada lanza excepción de conexión/timeout, O
+        b) devuelve un resultado de fallo de proxy, O
+        c) devuelve un resultado de fallo de captcha (406 FAILURE_IN_CAPTCHA →
+           status RETRY_CAPTCHA). Esto es la clave: el 406 NO es error de la
+           cuenta sino de la REPUTACIÓN de la IP del proxy (lotería ~70% con
+           IPRoyal). Rotar IP y reintentar convierte ~70%/intento en ~99.x%.
+      Total de intentos = max(len(pool), captcha_retries).
     - Si el pool está vacío → llama una vez con proxy=None.
+
+    Nota: pasar `max_retries=1` a get_jwt como kwarg para que NO queme 3 captchas
+    en la MISMA IP (inútil si está quemada) — el retry de IP lo maneja acá.
 
     Returns:
         (resultado, proxy_url_usado). El caller puede reusar `proxy_url_usado`
@@ -148,7 +179,7 @@ async def call_with_proxy_failover(
         afinidad de proxy validado.
 
     Raises:
-        La última excepción si TODOS los proxies del pool fallaron.
+        La última excepción si TODOS los intentos fallaron por conexión.
         Cualquier excepción no-proxy (ej. 401 de BetMexico) se re-lanza
         inmediatamente sin reintentar.
     """
@@ -164,34 +195,48 @@ async def call_with_proxy_failover(
     retry_excs = _retry_exceptions()
     last_err: Optional[BaseException] = None
     last_result: Any = None
-    for i, url in enumerate(urls):
+    # Cicla el pool hasta cubrir captcha_retries — cada vuelta reconecta al
+    # proxy (rotativo) dando una IP fresca, que es lo que rescata del 406.
+    n_attempts = max(len(urls), captcha_retries)
+    for i in range(n_attempts):
+        url = urls[i % len(urls)]
         try:
             result = await fn(*args, **{proxy_kwarg: url, **kwargs})
             # Algunas funciones (get_jwt) atrapan ProxyError adentro y devuelven
             # un tuple `(None, {"status": "ERROR", "error": "...ProxyError..."})`
-            # en vez de propagar. Detectarlo y reintentar con el siguiente proxy.
+            # en vez de propagar. Detectarlo y reintentar con otra IP.
             if _looks_like_proxy_failure_result(result):
                 logger.warning(
-                    f"[proxy_pool] {_proxy_host(url)} returned proxy-failure result "
-                    f"— try {i+1}/{len(urls)}"
+                    f"[proxy_pool] {_proxy_host(url)} proxy-failure result "
+                    f"— try {i+1}/{n_attempts}"
+                )
+                last_result = result
+                continue
+            # 406 FAILURE_IN_CAPTCHA → IP quemada. Rotar IP y reintentar.
+            if _looks_like_captcha_failure_result(result):
+                logger.warning(
+                    f"[proxy_pool] {_proxy_host(url)} captcha 406 (IP quemada) "
+                    f"— rotando IP, try {i+1}/{n_attempts}"
                 )
                 last_result = result
                 continue
             if i > 0:
                 logger.info(
-                    f"[proxy_pool] failover ok via {_proxy_host(url)} "
-                    f"(después de {i} fallo{'s' if i != 1 else ''})"
+                    f"[proxy_pool] ok via {_proxy_host(url)} (intento {i+1})"
                 )
             return result, url
         except retry_excs as e:  # type: ignore[misc]
             logger.warning(
                 f"[proxy_pool] {_proxy_host(url)} fail "
-                f"({type(e).__name__}: {str(e)[:120]}) — try {i+1}/{len(urls)}"
+                f"({type(e).__name__}: {str(e)[:120]}) — try {i+1}/{n_attempts}"
             )
             last_err = e
             continue
-    # Todos fallaron: si hubo result-style failure, devolvemos el último resultado
-    # (mantiene compatibilidad con callers que esperan tuple); si fue excepción, raise.
+    # Agotados los intentos: si hubo result-style failure (proxy o captcha),
+    # devolvemos el último resultado (el caller verá RETRY_CAPTCHA → LOGIN_FAILED);
+    # si solo hubo excepciones de conexión, raise.
+    if last_result is not None:
+        return last_result, urls[-1]
     if last_err is not None:
         raise last_err
     return last_result, urls[-1] if urls else None
@@ -221,5 +266,23 @@ def _looks_like_proxy_failure_result(result: Any) -> bool:
             return False
         err_str = str(meta.get("error", ""))
         return any(tok in err_str for tok in _PROXY_FAILURE_TOKENS)
+    except Exception:
+        return False
+
+
+def _looks_like_captcha_failure_result(result: Any) -> bool:
+    """Detecta el fallo de captcha de get_jwt: tuple (None, {status: ...}) con
+    status RETRY_CAPTCHA (BetMexico devolvió 406 FAILURE_IN_CAPTCHA) o
+    CAPTCHA_TIMEOUT (pool sin tokens). En ambos casos vale rotar IP y reintentar:
+    el 406 depende de la reputación de la IP del proxy, no de la cuenta."""
+    try:
+        if not isinstance(result, tuple) or len(result) < 2:
+            return False
+        primary, meta = result[0], result[1]
+        if primary is not None:
+            return False
+        if not isinstance(meta, dict):
+            return False
+        return meta.get("status") in ("RETRY_CAPTCHA", "CAPTCHA_TIMEOUT")
     except Exception:
         return False
