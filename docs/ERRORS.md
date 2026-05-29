@@ -35,6 +35,8 @@ docker logs betmexico-web 2>&1 | grep "bot init failed"
 
 **Fix**: quedarse en v2; **dejar de martillar** y portar la estrategia gentil del bot (`betmexico_check.py`: jitter + throttle por `captcha_fail_streak` + backoff 403/429); resolver v2 proxyless + submit por sticky residencial MX fresco; reintentos gentiles (p≈50%/intento fresco → 4 intentos ≈ 94%). **Plan completo: `docs/plans/login-orchestration-rework.md`.**
 
+**Causa concreta encontrada 2026-05-29 (commit `2d469a8`)**: el IPRoyal del pool (`proxy_pool.EXTRA_ADMIN_PROXIES`) estaba mal configurado con `_country-mx_city-ciudadobregon_streaming-1` (puerto 11200) = **IP PEGADA a Ciudad Obregón** → una sola IP que se quemó y daba 84% de 406 (medido: 26×406 vs 5×200). Robert dio el correcto: **puerto 11201 + `_country-mx_streaming-1` (sin city)** = rotación nacional MX, IP fresca por intento. Resultado inmediato: 406 cayó a ~40% y 100% de cuentas lograron LIVE (4/4). LECCIÓN: un proxy "residencial MX" con `city`/`streaming` fijo NO rota → se quema igual que una IP estática. Para BetMexico hay que usar rotación nacional. Además el matchmaker ahora reintenta `LOGIN_FAILED` `MM_MAX_LOGIN_RETRIES=3` veces (antes descartaba al primer 406).
+
 ---
 
 ### Movimientos del modal: las horas "nuestras" salían +6h (corregido 2026-05-28)

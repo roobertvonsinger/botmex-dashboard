@@ -189,6 +189,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `2d469a8` | fix(proxy+multi): IPRoyal rotativo (no IP fija quemada) + reintentos de login en matchmaker |
 | `7b8a195` | feat(proxy-health): mostrar salud del POOL EN USO (alive/total), no un proxy suelto |
 | `eb4c3ba` | fix(proxy-health): chequear el pool ACTIVO, no LitPort excluido (falsa alarma 'caido') |
 | `24ff785` | docs(errors): programado reintenta transitorios en vez de abortar (sesion 2026-05-29) |
@@ -200,7 +201,6 @@ web_routes_prewarm.py → prewarm.py
 | `3c31ca5` | docs(map): Bóveda BetMexico marcada pendiente + guía de qué guardar |
 | `3ae9271` | docs(map): agregar Bóveda como sección en MAP.md |
 | `e4799cd` | docs(bitacora): skill actualizada para MAP.md lean + MAP_DEEP.md |
-| `55d526d` | refactor(map): MAP.md lean (241L) + MAP_DEEP.md separado (475L) |
 <!-- GEN:end:recientes -->
 
 ---
