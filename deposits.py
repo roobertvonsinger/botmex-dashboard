@@ -932,16 +932,36 @@ async def _run_deposit_with_phases(
                 "raw_submit": step2,
             }
 
-        # ── PASO 4: check_transaction ────────────────────────────────────
+        # ── PASO 4: check_transaction (retry ante 504/timeout transitorios) ──
+        # El check solo CONSULTA el estado de la transacción (idempotente, no
+        # cobra) → reintentarlo es seguro. Un 504 acá dejaba la verificación en
+        # blanco y antes disparaba un 3DS falso (corregido) + dejaba el resultado
+        # UNVERIFIED; reintentar recupera el estado real (Robert 2026-05-29).
         await _safe_phase(phase_cb, "gateway_check", {})
         t0 = time.time()
         check_exc: Optional[str] = None
-        try:
-            step3 = await _check_transaction(client, jwt, txn_id)
-        except Exception as e:
-            logger.error(f"[Deposits/phases] check_transaction {email}: {e}")
-            step3 = {"error": str(e)}
-            check_exc = str(e)[:200]
+        step3 = {"error": "check_transaction no ejecutado"}
+        for _cattempt in range(BEGIN_MAX_ATTEMPTS):
+            check_exc = None
+            try:
+                step3 = await _check_transaction(client, jwt, txn_id)
+            except Exception as e:
+                step3 = {"error": str(e)}
+                check_exc = str(e)[:200]
+            if "error" not in step3:
+                break
+            _cerr = step3.get("error", "")
+            if _is_transient_gateway_error(_cerr) and _cattempt < BEGIN_MAX_ATTEMPTS - 1:
+                logger.warning(f"[Deposits/phases] check_transaction transitorio {email} "
+                               f"(intento {_cattempt + 1}/{BEGIN_MAX_ATTEMPTS}): {_cerr} — reintentando")
+                await _safe_phase(phase_cb, "gateway_check_retry", {
+                    "attempt": _cattempt + 1, "max": BEGIN_MAX_ATTEMPTS, "error": _cerr,
+                })
+                await asyncio.sleep(BEGIN_RETRY_BACKOFF_SEC)
+                continue
+            # Error no transitorio o se agotaron intentos → loguear y salir.
+            logger.error(f"[Deposits/phases] check_transaction {email}: {_cerr}")
+            break
         check_ms = int((time.time() - t0) * 1000)
         txn_status = (step3.get("transactionStatus", 0)
                       if "error" not in step3 else 0)
