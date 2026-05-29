@@ -1440,17 +1440,18 @@ def cap_status(account_id: int, _user: dict = Depends(require_session)):
 #  - Par (card, account) sólo se intenta una vez
 
 MM_COOLDOWN = 5
-MM_MAX_FAILS = 2
+# Límites separados (Robert 2026-05-29): máx 2 intentos por CUENTA, 3 por TARJETA.
+# Una cuenta sale del run a los 2 fallos (su pasarela rechaza); una tarjeta se
+# retira a los 3 (el banco la declina). Antes ambos compartían MM_MAX_FAILS=2.
+MM_MAX_ACCOUNT_FAILS = 2
+MM_MAX_CARD_FAILS = 3
 # Reintentos de LOGIN (406/captcha/proxy = nuestro lado) por cuenta dentro del run.
 # Antes el matchmaker descartaba la cuenta al PRIMER LOGIN_FAILED; ahora reintenta
 # el par (sin marcarlo `tried`) hasta este tope (Robert 2026-05-29). Con IPRoyal
 # rotativo, cada reintento sale por IP fresca → más chance contra el 406.
+# OJO: los reintentos de login NO cuentan como "intentos de depósito" (no llegan
+# al gateway), por eso son aparte del tope de 2 fallos de cuenta.
 MM_MAX_LOGIN_RETRIES = 3
-# Tope de BANK_REJECTED por CUENTA en el run. BANK_REJECTED es del banco de la
-# tarjeta, pero si una cuenta lo acumula con tarjetas distintas, su pasarela
-# rechaza todo → retirarla del run (NO DEAD) para no martillarla con login+captcha
-# por cada tarjeta. Evita la "masacre de intentos" (Robert 2026-05-29).
-MM_MAX_BANK_REJECTS = 2
 
 # Runs activos del matchmaker — para soporte de cancelación
 _active_mm_runs: dict[str, asyncio.Event] = {}
@@ -1609,12 +1610,12 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                     break
                 # Retira tarjetas con max fails
                 for c in cards:
-                    if not c["retired"] and c["fail_count"] >= MM_MAX_FAILS:
+                    if not c["retired"] and c["fail_count"] >= MM_MAX_CARD_FAILS:
                         c["retired"] = True
                         yield f"data: {json.dumps({'type':'card_retired','tail':c['tail'],'fails':c['fail_count']})}\n\n"
 
                 live_cards = [c for c in cards if not c["retired"]]
-                live_accs  = [a for a in accounts if not a["done"] and a["fail_count"] < MM_MAX_FAILS]
+                live_accs  = [a for a in accounts if not a["done"] and a["fail_count"] < MM_MAX_ACCOUNT_FAILS]
                 if not live_cards or not live_accs:
                     break
 
@@ -1730,7 +1731,7 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                         acc["login_retries"] = acc.get("login_retries", 0) + 1
                         if acc["login_retries"] >= MM_MAX_LOGIN_RETRIES:
                             acc["login_retry"] = True
-                            acc["fail_count"] = MM_MAX_FAILS
+                            acc["fail_count"] = MM_MAX_ACCOUNT_FAILS
                             yield f"data: {json.dumps({'type':'login_retry','email':acc['email'],'code':code,'tail':card['tail'],'attempt':n,'exhausted':True,'tries':acc['login_retries']})}\n\n"
                         else:
                             # NO tried.add → el par se reintenta en la próxima vuelta.
@@ -1750,7 +1751,7 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                         # LOGIN_DENIED = 401 credenciales/lock (login denegado
                         # DEFINITIVAMENTE, NO un 406); AUTOEXCLUSION; KYC_PENDING.
                         # Estado REAL → DEAD persistente.
-                        acc["fail_count"] = MM_MAX_FAILS
+                        acc["fail_count"] = MM_MAX_ACCOUNT_FAILS
                         try:
                             from app import db as _appdb
                             with _appdb(write=True) as cdb:
@@ -1767,19 +1768,18 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                         card["fail_count"] += 1
                         yield f"data: {json.dumps({'type':'rejected','email':acc['email'],'tail':card['tail'],'code':code,'card_fails':card['fail_count'],'attempt':n,'card_only':True})}\n\n"
                     elif code == "BANK_REJECTED":
-                        # BANK_REJECTED viene del banco emisor de la TARJETA → strike a
-                        # tarjeta. PERO si una cuenta acumula N rechazos (con tarjetas
-                        # distintas), su PASARELA está rechazando todo → retirar la
-                        # cuenta del run para no martillarla con login+captcha por cada
-                        # tarjeta (Robert 2026-05-29: "la masacre de intentos está mal").
-                        # NO es DEAD — la cuenta puede servir después; solo sale del run.
+                        # BANK_REJECTED es del banco de la TARJETA → strike a tarjeta
+                        # (tope MM_MAX_CARD_FAILS=3). PERO cuenta TAMBIÉN contra la
+                        # CUENTA: si su pasarela rechaza 2 tarjetas distintas
+                        # (MM_MAX_ACCOUNT_FAILS), sale del run (NO DEAD) para no
+                        # martillarla con login+captcha por cada tarjeta. Evita la
+                        # "masacre de intentos" (Robert 2026-05-29).
                         card["fail_count"] += 1
-                        acc["bank_rejects"] = acc.get("bank_rejects", 0) + 1
-                        if acc["bank_rejects"] >= MM_MAX_BANK_REJECTS:
-                            acc["fail_count"] = MM_MAX_FAILS  # retira la cuenta del run (NO DEAD)
-                            yield f"data: {json.dumps({'type':'account_paused','email':acc['email'],'code':'BANK_REJECTED','tail':card['tail'],'rejects':acc['bank_rejects'],'attempt':n,'reason':'pasarela rechaza esta cuenta (varias tarjetas)'})}\n\n"
+                        acc["fail_count"] += 1
+                        if acc["fail_count"] >= MM_MAX_ACCOUNT_FAILS:
+                            yield f"data: {json.dumps({'type':'account_paused','email':acc['email'],'code':'BANK_REJECTED','tail':card['tail'],'rejects':acc['fail_count'],'attempt':n,'reason':'pasarela rechaza esta cuenta (2 tarjetas)'})}\n\n"
                         else:
-                            yield f"data: {json.dumps({'type':'rejected','email':acc['email'],'tail':card['tail'],'code':code,'card_fails':card['fail_count'],'acct_rejects':acc['bank_rejects'],'attempt':n,'card_only':True})}\n\n"
+                            yield f"data: {json.dumps({'type':'rejected','email':acc['email'],'tail':card['tail'],'code':code,'card_fails':card['fail_count'],'acct_fails':acc['fail_count'],'attempt':n,'card_only':True})}\n\n"
                     else:
                         card["fail_count"] += 1
                         acc["fail_count"] += 1
@@ -1801,7 +1801,7 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
             # done MUST emit aquí dentro del try — si quedaba fuera del try/finally,
             # una excepción en el while haría que finally limpie pero el frontend
             # nunca recibe 'done' y las pair rows quedan stuck en busy.
-            yield f"data: {json.dumps({'type':'done','matches':len(matches),'attempts':attempts,'pending':sum(1 for a in accounts if not a['done'] and a['fail_count']<MM_MAX_FAILS)})}\n\n"
+            yield f"data: {json.dumps({'type':'done','matches':len(matches),'attempts':attempts,'pending':sum(1 for a in accounts if not a['done'] and a['fail_count']<MM_MAX_ACCOUNT_FAILS)})}\n\n"
         except Exception as e:
             logger.error(f"[Matchmaker {run_id}] generator error: {e}")
             try:

@@ -139,9 +139,9 @@ web_routes_prewarm.py → prewarm.py
 | `CARD_VELOCITY_FREE_PAIR` | `2` | `deposits.py` |
 | `CARD_VELOCITY_COOLDOWN_SEC` | `60` | `deposits.py` |
 | `MM_COOLDOWN` | `5` | `deposits.py` |
-| `MM_MAX_FAILS` | `2` | `deposits.py` |
+| `MM_MAX_ACCOUNT_FAILS` | `2` | `deposits.py` |
+| `MM_MAX_CARD_FAILS` | `3` | `deposits.py` |
 | `MM_MAX_LOGIN_RETRIES` | `3` | `deposits.py` |
-| `MM_MAX_BANK_REJECTS` | `2` | `deposits.py` |
 | `CAP_PER_OPERATOR_10MIN` | `9999` | `prewarm.py` |
 | `ACCOUNT_FRESH_MINUTES` | `30` | `prewarm.py` |
 | `ACCOUNT_DAILY_LIMIT` | `3` | `prewarm.py` |
@@ -190,6 +190,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a31dcff` | fix(matchmaker): retirar cuenta tras N BANK_REJECTED (parar masacre de intentos) |
 | `0faf6c3` | docs(errors): causa del 406 = IPRoyal con IP fija (city) -> rotativo nacional (2026-05-29) |
 | `2d469a8` | fix(proxy+multi): IPRoyal rotativo (no IP fija quemada) + reintentos de login en matchmaker |
 | `7b8a195` | feat(proxy-health): mostrar salud del POOL EN USO (alive/total), no un proxy suelto |
@@ -201,7 +202,6 @@ web_routes_prewarm.py → prewarm.py
 | `ff9044a` | fix(movimientos): horas propias salían +6h (UTC sin convertir a MX) |
 | `78b4628` | feat(login): orquestación gentil (gentle_login) + fix matchmaker mata-cuentas |
 | `3c31ca5` | docs(map): Bóveda BetMexico marcada pendiente + guía de qué guardar |
-| `3ae9271` | docs(map): agregar Bóveda como sección en MAP.md |
 <!-- GEN:end:recientes -->
 
 ---
