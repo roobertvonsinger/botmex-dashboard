@@ -985,11 +985,20 @@ async def _run_deposit_with_phases(
     # "el 3d a veces no se nota, solo se queda ahí abierto... si se cierra el modal
     # sin darle cancelar, no nota el procesador que se intentó un pago".
     # Síntoma exacto: txnStatus=0 + transactionStatusDescription en (Created,Pending,Processing).
+    #
+    # BUG corregido 2026-05-29 (Robert: "de dónde se inventó el 3DS, nunca sucedió"):
+    # cuando check_transaction falla por 504/timeout, step3={"error":...} →
+    # txn_status=0 y status_desc="" → ESTO disparaba un 3DS FALSO y abortaba la
+    # misión, aunque el depósito SÍ se acreditó (balance subió). El 504 del check
+    # NO es evidencia de 3DS. Por eso exigimos `check_exc is None` (el check
+    # RESPONDIÓ de verdad) y quitamos "" del set (un check válido siempre trae
+    # descripción; vacío = no concluir 3DS). Un 504 cae al rama UNVERIFIED de abajo.
     status_desc = str((step3 or {}).get("transactionStatusDescription", "")).strip().lower()
     is_3ds_implicit = (
         rc_ok
+        and check_exc is None
         and txn_status == TXN_STATUS_PENDING
-        and status_desc in ("created", "pending", "processing", "")
+        and status_desc in ("created", "pending", "processing")
     )
     if is_3ds_implicit and not is_3ds:
         is_3ds = True

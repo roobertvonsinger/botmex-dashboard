@@ -151,15 +151,15 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_safe_phase` | def | L548–L555 |
 | `_build_admin_proxy_url` | def | L558–L562 |
 | `_refresh_account_after_deposit` | def | L565–L612 |
-| `_run_deposit_with_phases` | def | L615–L1060 |
-| `deposit_execute` | def | L1064–L1201 |
-| `deposit_execute_stream` | def | L1205–L1413 |
-| `cap_status` | def | L1417–L1429 |
-| `multi_stream` | def | L1461–L1831 |
-| `multi_cancel` | def | L1835–L1840 |
-| `scheduled_create` | def | L1853–L2142 |
-| `scheduled_list` | def | L2146–L2168 |
-| `scheduled_cancel` | def | L2172–L2180 |
+| `_run_deposit_with_phases` | def | L615–L1069 |
+| `deposit_execute` | def | L1073–L1210 |
+| `deposit_execute_stream` | def | L1214–L1422 |
+| `cap_status` | def | L1426–L1438 |
+| `multi_stream` | def | L1470–L1840 |
+| `multi_cancel` | def | L1844–L1849 |
+| `scheduled_create` | def | L1862–L2151 |
+| `scheduled_list` | def | L2155–L2177 |
+| `scheduled_cancel` | def | L2181–L2189 |
 
 ### `login_orchestrator.py`
 
