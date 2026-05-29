@@ -155,11 +155,11 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `deposit_execute` | def | L1064–L1201 |
 | `deposit_execute_stream` | def | L1205–L1413 |
 | `cap_status` | def | L1417–L1429 |
-| `multi_stream` | def | L1450–L1800 |
-| `multi_cancel` | def | L1804–L1809 |
-| `scheduled_create` | def | L1822–L2111 |
-| `scheduled_list` | def | L2115–L2137 |
-| `scheduled_cancel` | def | L2141–L2149 |
+| `multi_stream` | def | L1455–L1813 |
+| `multi_cancel` | def | L1817–L1822 |
+| `scheduled_create` | def | L1835–L2124 |
+| `scheduled_list` | def | L2128–L2150 |
+| `scheduled_cancel` | def | L2154–L2162 |
 
 ### `login_orchestrator.py`
 
@@ -202,17 +202,17 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `_bot_proxies` | def | L56–L62 |
-| `all_proxies` | def | L65–L73 |
-| `_to_url` | def | L76–L86 |
-| `get_admin_proxy` | def | L89–L94 |
-| `build_admin_proxy_url` | def | L97–L100 |
-| `shuffled_proxy_urls` | def | L103–L111 |
-| `_retry_exceptions` | def | L119–L145 |
-| `_proxy_host` | def | L148–L152 |
-| `call_with_proxy_failover` | def | L155–L246 |
-| `_looks_like_proxy_failure_result` | def | L255–L274 |
-| `_looks_like_captcha_failure_result` | def | L277–L292 |
+| `_bot_proxies` | def | L59–L65 |
+| `all_proxies` | def | L68–L76 |
+| `_to_url` | def | L79–L89 |
+| `get_admin_proxy` | def | L92–L97 |
+| `build_admin_proxy_url` | def | L100–L103 |
+| `shuffled_proxy_urls` | def | L106–L114 |
+| `_retry_exceptions` | def | L122–L148 |
+| `_proxy_host` | def | L151–L155 |
+| `call_with_proxy_failover` | def | L158–L249 |
+| `_looks_like_proxy_failure_result` | def | L258–L277 |
+| `_looks_like_captcha_failure_result` | def | L280–L295 |
 
 ### `scripts/gen_map.py`
 

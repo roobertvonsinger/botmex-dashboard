@@ -26,13 +26,16 @@ logger = logging.getLogger("dashboard.proxy_pool")
 # Mismo formato: {server, username, password}. El sufijo `_country-mx` o
 # `-country-mx` en username fuerza ruteo por IP México.
 EXTRA_ADMIN_PROXIES: List[Dict[str, str]] = [
-    # IPRoyal (Premium MX residencial, Ciudad Obregón) — agregado 2026-05-27.
-    # Mejor reputación reCAPTCHA: 4/5 (80%) en pruebas vs NodeMaven 30%, LitPort 0%.
-    # Compartido con Ruthopia (telcel gate) — vigilar consumo de datos.
+    # IPRoyal (Premium MX residencial, ROTATIVO nacional) — corregido 2026-05-29.
+    # Antes estaba con `city-ciudadobregon` (puerto 11200) = IP PEGADA a una ciudad
+    # → se quemaba y daba 406 masivo. Robert dio el correcto: puerto 11201 +
+    # `_country-mx_streaming-1` (sin city) → rota IPs por todo MX = IP fresca por
+    # intento, mucho mejor contra el antifraude de BetMexico. Compartido con
+    # Ruthopia (telcel gate) — vigilar consumo.
     {
-        "server": "geo.iproyal.com:11200",
+        "server": "geo.iproyal.com:11201",
         "username": "sH3PhyrRotHpRxYY2sEiS",
-        "password": "u7JSejn6ZTSHfbpR_country-mx_city-ciudadobregon_streaming-1",
+        "password": "u7JSejn6ZTSHfbpR_country-mx_streaming-1",
     },
     # NodeMaven (Premium MX) — agregado 2026-05-21
     {

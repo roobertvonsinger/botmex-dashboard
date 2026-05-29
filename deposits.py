@@ -1441,6 +1441,11 @@ def cap_status(account_id: int, _user: dict = Depends(require_session)):
 
 MM_COOLDOWN = 5
 MM_MAX_FAILS = 2
+# Reintentos de LOGIN (406/captcha/proxy = nuestro lado) por cuenta dentro del run.
+# Antes el matchmaker descartaba la cuenta al PRIMER LOGIN_FAILED; ahora reintenta
+# el par (sin marcarlo `tried`) hasta este tope (Robert 2026-05-29). Con IPRoyal
+# rotativo, cada reintento sale por IP fresca → más chance contra el 406.
+MM_MAX_LOGIN_RETRIES = 3
 
 # Runs activos del matchmaker — para soporte de cancelación
 _active_mm_runs: dict[str, asyncio.Event] = {}
@@ -1706,27 +1711,35 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                         vel = r.get("velocity", {})
                         yield f"data: {json.dumps({'type':'velocity_skip','email':acc['email'],'tail':card['tail'],'wait_sec':vel.get('wait_sec'),'distinct_count':vel.get('distinct_count'),'message':vel.get('message','')})}\n\n"
                         continue
-                    # Sí se hizo intento real → marca tried + last_used
-                    tried.add((card["num"], acc["id"]))
                     now2 = asyncio.get_event_loop().time()
                     card["last_used"] = now2
                     acc["last_used"] = now2
                     ok = bool(r.get("success"))
+
+                    # LOGIN_FAILED (406/captcha/proxy = NUESTRO lado) → reintentar el
+                    # par SIN marcarlo `tried`, hasta MM_MAX_LOGIN_RETRIES. El cooldown
+                    # (last_used) espacia los reintentos; con IPRoyal rotativo cada uno
+                    # sale por IP fresca. Solo tras agotar reintentos sale del run
+                    # (NUNCA DEAD — es nuestra infra, no la cuenta).
+                    if code == "LOGIN_FAILED":
+                        acc["login_retries"] = acc.get("login_retries", 0) + 1
+                        if acc["login_retries"] >= MM_MAX_LOGIN_RETRIES:
+                            acc["login_retry"] = True
+                            acc["fail_count"] = MM_MAX_FAILS
+                            yield f"data: {json.dumps({'type':'login_retry','email':acc['email'],'code':code,'tail':card['tail'],'attempt':n,'exhausted':True,'tries':acc['login_retries']})}\n\n"
+                        else:
+                            # NO tried.add → el par se reintenta en la próxima vuelta.
+                            yield f"data: {json.dumps({'type':'login_retry','email':acc['email'],'code':code,'tail':card['tail'],'attempt':n,'retrying':True,'tries':acc['login_retries'],'max':MM_MAX_LOGIN_RETRIES})}\n\n"
+                        continue
+
+                    # Intento REAL (llegó al gateway) → marca el par como probado.
+                    tried.add((card["num"], acc["id"]))
 
                     if ok:
                         acc["done"] = True
                         card["retired"] = True  # tarjeta se casa con la cuenta — nunca más se prueba en otras
                         matches.append({"email": acc["email"], "tail": card["tail"], "pipe": card["pipe"]})
                         yield f"data: {json.dumps({'type':'match','email':acc['email'],'tail':card['tail'],'pipe':card['pipe'],'amount':amount,'duration_ms':duration,'attempt':n})}\n\n"
-                    elif code == "LOGIN_FAILED":
-                        # 406 / captcha / proxy = NUESTRO lado, NUNCA la cuenta.
-                        # NO marcar DEAD ni penalizar permanente. Sale del run
-                        # actual (fail_count en memoria, no persiste) para no
-                        # martillar IPs. El reintento gentil se cablea aparte
-                        # (gentle_login — plan login-orchestration-rework §4).
-                        acc["login_retry"] = True
-                        acc["fail_count"] = MM_MAX_FAILS
-                        yield f"data: {json.dumps({'type':'login_retry','email':acc['email'],'code':code,'tail':card['tail'],'attempt':n})}\n\n"
                     elif code in ("AUTOEXCLUSION", "KYC_PENDING", "LOGIN_DENIED"):
                         # Las 3 ÚNICAS razones de muerte (REGLA DE ROBERT):
                         # LOGIN_DENIED = 401 credenciales/lock (login denegado

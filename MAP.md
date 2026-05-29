@@ -97,10 +97,10 @@ web_routes_prewarm.py → prewarm.py
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 79 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2149 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2162 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `login_orchestrator.py` | 300 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 692 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
-| `proxy_pool.py` | 292 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `proxy_pool.py` | 295 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `scripts/gen_map.py` | 486 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
@@ -140,6 +140,7 @@ web_routes_prewarm.py → prewarm.py
 | `CARD_VELOCITY_COOLDOWN_SEC` | `60` | `deposits.py` |
 | `MM_COOLDOWN` | `5` | `deposits.py` |
 | `MM_MAX_FAILS` | `2` | `deposits.py` |
+| `MM_MAX_LOGIN_RETRIES` | `3` | `deposits.py` |
 | `CAP_PER_OPERATOR_10MIN` | `9999` | `prewarm.py` |
 | `ACCOUNT_FRESH_MINUTES` | `30` | `prewarm.py` |
 | `ACCOUNT_DAILY_LIMIT` | `3` | `prewarm.py` |
@@ -188,6 +189,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `7b8a195` | feat(proxy-health): mostrar salud del POOL EN USO (alive/total), no un proxy suelto |
 | `eb4c3ba` | fix(proxy-health): chequear el pool ACTIVO, no LitPort excluido (falsa alarma 'caido') |
 | `24ff785` | docs(errors): programado reintenta transitorios en vez de abortar (sesion 2026-05-29) |
 | `951c449` | fix(programado): reintentar fallos transitorios en vez de abortar la mision |
@@ -199,7 +201,6 @@ web_routes_prewarm.py → prewarm.py
 | `3ae9271` | docs(map): agregar Bóveda como sección en MAP.md |
 | `e4799cd` | docs(bitacora): skill actualizada para MAP.md lean + MAP_DEEP.md |
 | `55d526d` | refactor(map): MAP.md lean (241L) + MAP_DEEP.md separado (475L) |
-| `9d5b71f` | feat(map): rediseño MAP.md como guía de navegación para agentes IA |
 <!-- GEN:end:recientes -->
 
 ---
