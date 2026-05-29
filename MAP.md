@@ -97,7 +97,7 @@ web_routes_prewarm.py → prewarm.py
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 79 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2209 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2211 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `login_orchestrator.py` | 300 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 692 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 295 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
@@ -190,6 +190,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `491c040` | fix(deposits): check_transaction reintenta ante 504/timeout (idempotente, post-cobro seguro) |
 | `65c185d` | fix(deposits): no inventar 3DS cuando check_transaction da 504/timeout |
 | `b9e3be0` | fix(matchmaker): limites separados — 2 intentos por cuenta, 3 por tarjeta |
 | `a31dcff` | fix(matchmaker): retirar cuenta tras N BANK_REJECTED (parar masacre de intentos) |
@@ -201,7 +202,6 @@ web_routes_prewarm.py → prewarm.py
 | `951c449` | fix(programado): reintentar fallos transitorios en vez de abortar la mision |
 | `e6c5220` | docs(errors): autoexclusion -> DEAD, captcha en programado, refresh post-deposito (sesion 2026-05-29) |
 | `99d1523` | feat(autoexclusion): detectar autoexcluidas -> DEAD + mensaje explicito; refrescar movimientos post-deposito; cortar captcha en programado |
-| `ff9044a` | fix(movimientos): horas propias salían +6h (UTC sin convertir a MX) |
 <!-- GEN:end:recientes -->
 
 ---
@@ -237,6 +237,7 @@ web_routes_prewarm.py → prewarm.py
 | `docs/ENDPOINTS.md` | Endpoints completos con params y ejemplos |
 | `docs/AUDIT.md` | Estado por función (✅ ❌ ⚠️ 🔵 ❓) |
 | `docs/ERRORS.md` | Errores conocidos: síntoma / causa / fix |
+| `docs/BIN_THRESHOLDS.md` | Thresholds por BIN (límites $/24h, # txns, 3DS vs rechazo) — inteligencia de tarjetas |
 | `docs/SSE_EVENTS.md` | Catálogo de eventos SSE (kind, payload) |
 | `DEPLOY.md` | Deploy a KVM4 |
 | `MAP_DEEP.md` | Mapa de funciones por módulo (rangos de líneas) |
