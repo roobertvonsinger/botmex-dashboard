@@ -134,30 +134,31 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `_drain_stale_tokens` | def | L45–L77 |
-| `_ensure_fresh_captcha` | def | L80–L104 |
-| `_record_bin_3ds` | def | L112–L140 |
-| `_bin_3ds_stats` | def | L143–L165 |
-| `bin_check` | def | L169–L174 |
-| `_auto_lock_for_deposit` | def | L177–L226 |
-| `_window_status` | def | L229–L271 |
-| `_check_caps` | def | L274–L287 |
-| `_load_deps` | def | L290–L298 |
-| `_parse_pipe` | def | L301–L322 |
-| `_check_card_velocity` | def | L342–L389 |
-| `_record_attempt` | def | L392–L502 |
-| `_safe_phase` | def | L512–L519 |
-| `_build_admin_proxy_url` | def | L522–L526 |
-| `_refresh_account_after_deposit` | def | L529–L576 |
-| `_run_deposit_with_phases` | def | L579–L1004 |
-| `deposit_execute` | def | L1008–L1145 |
-| `deposit_execute_stream` | def | L1149–L1357 |
-| `cap_status` | def | L1361–L1373 |
-| `multi_stream` | def | L1394–L1744 |
-| `multi_cancel` | def | L1748–L1753 |
-| `scheduled_create` | def | L1764–L2009 |
-| `scheduled_list` | def | L2013–L2035 |
-| `scheduled_cancel` | def | L2039–L2047 |
+| `_is_transient_gateway_error` | def | L44–L54 |
+| `_drain_stale_tokens` | def | L81–L113 |
+| `_ensure_fresh_captcha` | def | L116–L140 |
+| `_record_bin_3ds` | def | L148–L176 |
+| `_bin_3ds_stats` | def | L179–L201 |
+| `bin_check` | def | L205–L210 |
+| `_auto_lock_for_deposit` | def | L213–L262 |
+| `_window_status` | def | L265–L307 |
+| `_check_caps` | def | L310–L323 |
+| `_load_deps` | def | L326–L334 |
+| `_parse_pipe` | def | L337–L358 |
+| `_check_card_velocity` | def | L378–L425 |
+| `_record_attempt` | def | L428–L538 |
+| `_safe_phase` | def | L548–L555 |
+| `_build_admin_proxy_url` | def | L558–L562 |
+| `_refresh_account_after_deposit` | def | L565–L612 |
+| `_run_deposit_with_phases` | def | L615–L1060 |
+| `deposit_execute` | def | L1064–L1201 |
+| `deposit_execute_stream` | def | L1205–L1413 |
+| `cap_status` | def | L1417–L1429 |
+| `multi_stream` | def | L1450–L1800 |
+| `multi_cancel` | def | L1804–L1809 |
+| `scheduled_create` | def | L1822–L2111 |
+| `scheduled_list` | def | L2115–L2137 |
+| `scheduled_cancel` | def | L2141–L2149 |
 
 ### `login_orchestrator.py`
 

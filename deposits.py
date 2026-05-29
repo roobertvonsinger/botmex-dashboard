@@ -33,6 +33,42 @@ AUTOLOCK_HOURS_SINGLE = 2
 AUTOLOCK_HOURS_MULTI = 2
 AUTOLOCK_HOURS_SCHEDULED = 4  # más amplio porque corre N reps cada 1 min
 
+# Retry de begin_deposit ante fallos TRANSITORIOS del gateway (504/502/503/timeout).
+# begin_deposit es PRE-COBRO (paso 1, antes de submit_card) → reintentarlo NO
+# duplica cargos. Antes un 504 momentáneo del gateway de BetMexico abortaba la
+# misión programada entera (Robert 2026-05-29). Reintentamos in-situ.
+BEGIN_MAX_ATTEMPTS = 3
+BEGIN_RETRY_BACKOFF_SEC = 6
+
+
+def _is_transient_gateway_error(err: str) -> bool:
+    """True si el error de begin_deposit es un blip transitorio del gateway de
+    pagos (reintentar tiene sentido). 401/redirectLogin NO entra aquí — eso es
+    sesión/autoexclusión y se maneja aparte."""
+    low = str(err or "").lower()
+    if "401" in low or "redirectlogin" in low:
+        return False
+    return any(s in low for s in (
+        "504", "502", "503", "gateway timeout", "bad gateway",
+        "service unavailable", "timeout", "timed out", "connection",
+        "temporarily", "read error", "server disconnect"))
+
+
+# ── Política de reintentos del PROGRAMADO (Robert 2026-05-29) ────────────────
+# Errores TRANSITORIOS (login 406/captcha/proxy, gateway 50x/timeout = NUESTRA
+# infraestructura) → reintentar la MISMA rep, NUNCA abortar la misión. Solo
+# razones REALES detienen: rechazo de tarjeta, autoexclusión, KYC, credenciales.
+# Mismo principio que gentle_login y el matchmaker: nuestro lado = reintentos.
+SCHED_MAX_TRANSIENT_RETRIES = 4   # reintentos por rep ante fallo transitorio
+SCHED_RETRY_BACKOFF_SEC = 25      # espera entre reintentos (enfría IP en 406)
+# Códigos que SÍ detienen la misión. TODO lo demás (LOGIN_FAILED, BEGIN_ERROR,
+# TIMEOUT, ERROR, etc.) = transitorio → reintentar.
+SCHED_TERMINAL_RC = frozenset({
+    "BANK_REJECTED", "BANK_REJECTED_AFTER_APPROVE", "3DS_REQUIRED",
+    "AUTOEXCLUSION", "KYC_PENDING", "LOGIN_DENIED",
+    "PENDING_NOT_APPLIED", "DEPS_MISSING",
+})
+
 
 # ── Helpers de captcha pool (scheduled / multi) ─────────────────────────────
 # Bug observado 2026-05-23: en /scheduled, después del sleep(60) el token del
@@ -741,14 +777,29 @@ async def _run_deposit_with_phases(
         client_kwargs["proxy"] = used_proxy
 
     async with httpx.AsyncClient(**client_kwargs) as client:
-        # ── PASO 2: begin_deposit ────────────────────────────────────────
+        # ── PASO 2: begin_deposit (retry ante 50x/timeout transitorios) ──
+        # Pre-cobro → reintentar es seguro (no duplica cargos). Un 504/502/503/
+        # timeout del gateway de BetMexico es transitorio; antes mataba la misión.
         await _safe_phase(phase_cb, "gateway_begin", {})
         t0 = time.time()
-        try:
-            step1 = await _begin_deposit(client, jwt, amount)
-        except Exception as e:
-            logger.error(f"[Deposits/phases] begin_deposit {email}: {e}")
-            step1 = {"error": str(e)}
+        step1 = {"error": "begin_deposit no ejecutado"}
+        for _battempt in range(BEGIN_MAX_ATTEMPTS):
+            try:
+                step1 = await _begin_deposit(client, jwt, amount)
+            except Exception as e:
+                step1 = {"error": f"begin_deposit: {e}"}
+            if "error" not in step1:
+                break
+            _berr = step1.get("error", "")
+            if _is_transient_gateway_error(_berr) and _battempt < BEGIN_MAX_ATTEMPTS - 1:
+                logger.warning(f"[Deposits/phases] begin_deposit transitorio {email} "
+                               f"(intento {_battempt + 1}/{BEGIN_MAX_ATTEMPTS}): {_berr} — reintentando")
+                await _safe_phase(phase_cb, "gateway_begin_retry", {
+                    "attempt": _battempt + 1, "max": BEGIN_MAX_ATTEMPTS, "error": _berr,
+                })
+                await asyncio.sleep(BEGIN_RETRY_BACKOFF_SEC)
+                continue
+            break
         begin_ms = int((time.time() - t0) * 1000)
 
         if "error" in step1:
@@ -783,6 +834,11 @@ async def _run_deposit_with_phases(
                     }
                 # 401 sin autoexclusión confirmada → sesión rechazada (JWT muerto)
                 err = f"Sesión rechazada por BetMexico (begin_deposit 401). Detalle: {err}"
+            elif _is_transient_gateway_error(err):
+                # Gateway de pagos no respondió tras todos los reintentos →
+                # mensaje explícito (no genérico). No es la cuenta ni la tarjeta.
+                err = (f"Gateway de pagos de BetMexico no responde tras "
+                       f"{BEGIN_MAX_ATTEMPTS} intentos ({err}). Transitorio — reintenta en unos minutos.")
             await _safe_phase(phase_cb, "done", {
                 "success": False, "result_code": "BEGIN_ERROR", "error": err,
             })
@@ -1754,8 +1810,10 @@ def multi_cancel(run_id: str, _user: dict = Depends(require_session)):
 
 
 # ── Programado ──────────────────────────────────────────────────────────────
-# 1 tarjeta → 1 cuenta, N repeticiones (max 20) cada 60s.
-# Cancela auto en LOGIN_FAILED / AUTOEXCLUSION / KYC_PENDING.
+# 1 tarjeta → 1 cuenta, N repeticiones EXITOSAS (max 20) cada 60s.
+# Reintenta la rep ante fallos TRANSITORIOS (login 406/captcha/proxy, gateway
+# 50x/timeout = nuestro lado) hasta SCHED_MAX_TRANSIENT_RETRIES. Solo aborta por
+# razón REAL (SCHED_TERMINAL_RC: rechazo de tarjeta, autoexclusión, KYC, creds).
 
 _active_schedules: dict = {}
 
@@ -1842,11 +1900,12 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
             # volver a loguear. El JWT vive ~7 días, el run dura <20 min → seguro.
             session_jwt = None
             session_proxy = None
-            for i in range(repetitions):
-                iter_num = i + 1
+            completed = 0       # reps EXITOSAS logradas (avanza solo con éxito)
+            iter_retries = 0    # reintentos transitorios de la rep en curso
+            while completed < repetitions:
+                iter_num = completed + 1
                 # Track del iter actual en _active_schedules para que GET /scheduled/list
-                # pueda devolverlo y el frontend rehidrate la barra de progreso tras
-                # un refresh sin esperar al próximo evento SSE.
+                # pueda devolverlo y el frontend rehidrate la barra de progreso.
                 if sched_id in _active_schedules:
                     _active_schedules[sched_id]["current_iter"] = iter_num
 
@@ -1866,8 +1925,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                     except Exception as e:
                         logger.warning(f"[Scheduled {sched_id}] phase broadcast failed: {e}")
 
-                # Solo la iter 0 necesita captcha (para el login real). Las iters
-                # 1..N reusan la sesión → sin captcha, sin refresh de tokens.
+                # persist_login_data solo cuando hacemos login fresco (sin sesión).
                 t0 = time.time()
                 r = None
                 try:
@@ -1878,14 +1936,12 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                         user={"telegram_id": operator_id, "username": user.get("username", "")},
                         pool=pool,
                         phase_cb=phase_cb,
-                        persist_login_data=(i == 0),
+                        persist_login_data=(session_jwt is None),
                         session_jwt=session_jwt,
                         session_proxy=session_proxy,
                     )
                 except asyncio.CancelledError:
-                    # Cancel mid-iter: registrar el intento antes de propagar para
-                    # que la tarjeta no quede "quemada invisible" en BD. El outer
-                    # except hace broadcast scheduled_cancelled.
+                    # Cancel mid-iter: registrar el intento antes de propagar.
                     duration = int((time.time() - t0) * 1000)
                     _record_attempt(
                         uuid.uuid4().hex, email, amount, "error",
@@ -1894,69 +1950,115 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                     )
                     raise
                 except Exception as e:
-                    # Excepción real: armar dict de error para que el flujo normal
-                    # de abajo broadcastee scheduled + scheduled_aborted y rompa
-                    # el loop. NO re-raise: el frontend debe ver el aborted.
                     logger.error(f"[Scheduled {sched_id}] {email}: {e}")
                     r = {"success": False, "result_code": "ERROR", "error": str(e)[:200]}
                 duration = int((time.time() - t0) * 1000)
                 ok = bool(r.get("success"))
                 code = r.get("result_code", "UNKNOWN")
-                # Captura la sesión de la iter 0 (login exitoso) para reusarla en
-                # las siguientes. Solo se setea una vez; iters posteriores ya
-                # vienen con session_jwt y no re-loguean.
+                reason = r.get("error") or code
+
+                # Captura la sesión del primer login OK para reusarla → detiene el
+                # factory de captcha (las iters siguientes reusan el JWT, 0 captcha).
                 if ok and session_jwt is None and r.get("jwt"):
                     session_jwt = r.get("jwt")
                     session_proxy = r.get("used_proxy")
-                    logger.info(f"[Scheduled {sched_id}] sesión capturada en iter {i+1} — reuso activado para las siguientes")
-                    # Sesión capturada → las iters siguientes reusan el JWT y NO
-                    # piden captcha. Detenemos el factory del pool para que deje de
-                    # resolver tokens cada ~55s durante toda la misión (Robert
-                    # 2026-05-29: "se pone a armar tanto token de captcha si debería
-                    # aprovechar el token de sesión"). stop() es idempotente — el
-                    # finally lo vuelve a llamar sin efecto. pool=None evita que un
-                    # fallo posterior intente usarlo.
+                    logger.info(f"[Scheduled {sched_id}] sesión capturada en iter {iter_num} — reuso activado")
                     try:
                         await pool.stop()
                         pool = None
                         logger.info(f"[Scheduled {sched_id}] factory de captcha detenida tras capturar sesión — 0 captcha en iters restantes")
                     except Exception as _pe:
                         logger.warning(f"[Scheduled {sched_id}] no pude detener factory: {_pe}")
+
+                # Registrar SIEMPRE el intento en BD (trazabilidad), exitoso o no.
                 _record_attempt(
                     uuid.uuid4().hex, email, amount,
                     "approved" if ok else "rejected",
-                    r.get("error") or code, duration, operator_id,
+                    reason, duration, operator_id,
                     card_pipe=card_pipe,
                 )
-                # reason = mensaje explícito del backend (ej. autoexclusión con
-                # fecha). El frontend lo muestra en vez del code pelón.
-                reason = r.get("error") or code
-                _broadcast({
-                    "type": "activity", "kind": "scheduled",
-                    "sched_id": sched_id, "iter": i + 1, "total": repetitions,
-                    "email": email, "amount": amount,
-                    "success": ok, "code": code, "reason": reason,
-                    "ts": datetime.now(timezone.utc).isoformat(),
-                    **_resolve_who(operator_id),
-                })
-                # Cualquier falla aborta el loop completo: no tiene sentido
-                # reintentar el mismo monto que ya rechazó (quema cuentas).
-                if not ok:
+
+                if ok:
+                    completed += 1
+                    iter_retries = 0
+                    _broadcast({
+                        "type": "activity", "kind": "scheduled",
+                        "sched_id": sched_id, "iter": iter_num, "total": repetitions,
+                        "email": email, "amount": amount,
+                        "success": True, "code": code, "reason": reason,
+                        "ts": datetime.now(timezone.utc).isoformat(),
+                        **_resolve_who(operator_id),
+                    })
+                    if completed < repetitions:
+                        # Cadencia: `interval` completos DESPUÉS de un depósito logrado.
+                        await asyncio.sleep(interval)
+                    continue
+
+                # ── FALLA ────────────────────────────────────────────────────
+                # Razón REAL (rechazo de tarjeta, autoexclusión, KYC…) → detener.
+                if code in SCHED_TERMINAL_RC:
+                    _broadcast({
+                        "type": "activity", "kind": "scheduled",
+                        "sched_id": sched_id, "iter": iter_num, "total": repetitions,
+                        "email": email, "amount": amount,
+                        "success": False, "code": code, "reason": reason,
+                        "ts": datetime.now(timezone.utc).isoformat(),
+                        **_resolve_who(operator_id),
+                    })
                     _broadcast({
                         "type": "activity", "kind": "scheduled_aborted",
                         "sched_id": sched_id, "email": email, "code": code,
-                        "reason": reason,
-                        "iter": i + 1, "total": repetitions,
+                        "reason": reason, "iter": iter_num, "total": repetitions,
                         "ts": datetime.now(timezone.utc).isoformat(),
                         **_resolve_who(operator_id),
                     })
                     break
-                if i < repetitions - 1:
-                    # Cadencia: `interval` segundos completos DESPUÉS de lograr el
-                    # depósito (Robert 2026-05-28). Como las iters siguientes reusan
-                    # la sesión (sin login ni captcha), ya no hay que pre-refrescar
-                    # tokens ni descontar el tiempo del intento — es un sleep limpio.
-                    await asyncio.sleep(interval)
+
+                # TRANSITORIO (login 406/captcha/proxy, gateway 50x/timeout = NUESTRO
+                # lado) → reintentar la MISMA rep, NO abortar (Robert 2026-05-29).
+                # Si la sesión reusada murió (401/sesión rechazada), forzar re-login
+                # reactivando el pool.
+                low_reason = str(reason).lower()
+                if session_jwt and ("sesión rechazada" in low_reason or "401" in low_reason
+                                    or "redirectlogin" in low_reason):
+                    session_jwt = None
+                    session_proxy = None
+                    if pool is None:
+                        try:
+                            pool = make_pool(cap_key, size=1, workers=1)
+                            await pool.start_factory()
+                            asyncio.create_task(pool.prefetch(1))
+                            logger.info(f"[Scheduled {sched_id}] sesión murió — pool reactivado para re-login")
+                        except Exception as _re:
+                            logger.warning(f"[Scheduled {sched_id}] no pude reactivar pool: {_re}")
+
+                if iter_retries < SCHED_MAX_TRANSIENT_RETRIES:
+                    iter_retries += 1
+                    logger.warning(f"[Scheduled {sched_id}] rep {iter_num} fallo TRANSITORIO "
+                                   f"({code}: {reason}) — reintento {iter_retries}/{SCHED_MAX_TRANSIENT_RETRIES}")
+                    _broadcast({
+                        "type": "activity", "kind": "scheduled_retry",
+                        "sched_id": sched_id, "email": email,
+                        "iter": iter_num, "total": repetitions,
+                        "attempt": iter_retries, "max": SCHED_MAX_TRANSIENT_RETRIES,
+                        "code": code, "reason": reason,
+                        "ts": datetime.now(timezone.utc).isoformat(),
+                        **_resolve_who(operator_id),
+                    })
+                    await asyncio.sleep(SCHED_RETRY_BACKOFF_SEC)
+                    continue
+
+                # Agotó los reintentos transitorios → recién aquí sí abortamos.
+                final_reason = f"{reason} (persistente tras {iter_retries} reintentos)"
+                logger.warning(f"[Scheduled {sched_id}] rep {iter_num} agotó reintentos transitorios → abortando")
+                _broadcast({
+                    "type": "activity", "kind": "scheduled_aborted",
+                    "sched_id": sched_id, "email": email, "code": code,
+                    "reason": final_reason, "iter": iter_num, "total": repetitions,
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                    **_resolve_who(operator_id),
+                })
+                break
         except asyncio.CancelledError:
             _broadcast({
                 "type": "activity", "kind": "scheduled_cancelled",

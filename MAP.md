@@ -97,7 +97,7 @@ web_routes_prewarm.py → prewarm.py
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 79 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2047 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2149 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `login_orchestrator.py` | 300 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 692 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 292 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
@@ -131,6 +131,10 @@ web_routes_prewarm.py → prewarm.py
 | `AUTOLOCK_HOURS_SINGLE` | `2` | `deposits.py` |
 | `AUTOLOCK_HOURS_MULTI` | `2` | `deposits.py` |
 | `AUTOLOCK_HOURS_SCHEDULED` | `4` | `deposits.py` |
+| `BEGIN_MAX_ATTEMPTS` | `3` | `deposits.py` |
+| `BEGIN_RETRY_BACKOFF_SEC` | `6` | `deposits.py` |
+| `SCHED_MAX_TRANSIENT_RETRIES` | `4` | `deposits.py` |
+| `SCHED_RETRY_BACKOFF_SEC` | `25` | `deposits.py` |
 | `CARD_VELOCITY_MEMORY_MIN` | `30` | `deposits.py` |
 | `CARD_VELOCITY_FREE_PAIR` | `2` | `deposits.py` |
 | `CARD_VELOCITY_COOLDOWN_SEC` | `60` | `deposits.py` |
@@ -184,6 +188,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `e6c5220` | docs(errors): autoexclusion -> DEAD, captcha en programado, refresh post-deposito (sesion 2026-05-29) |
 | `99d1523` | feat(autoexclusion): detectar autoexcluidas -> DEAD + mensaje explicito; refrescar movimientos post-deposito; cortar captcha en programado |
 | `ff9044a` | fix(movimientos): horas propias salían +6h (UTC sin convertir a MX) |
 | `78b4628` | feat(login): orquestación gentil (gentle_login) + fix matchmaker mata-cuentas |
@@ -195,7 +200,6 @@ web_routes_prewarm.py → prewarm.py
 | `eb733e3` | feat(map): MAP.md auto-generado + hook pre-commit |
 | `68121cf` | feat(detalle+scheduled): panel de detalle inline (acordeón v14) + reuso de sesión en programados |
 | `6908af3` | fix(deposits): rescatar 406 con retry-rotación-IP + IPRoyal + crash del multi |
-| `c08024d` | feat(scheduled): cancel desde UI + rehidratación tras refresh (TDAH-friendly) |
 <!-- GEN:end:recientes -->
 
 ---

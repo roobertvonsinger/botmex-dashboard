@@ -813,6 +813,11 @@ function statusPill(e) {
     const sid = e.sched_id ? `<span class="dim mono"> · ${esc(String(e.sched_id).slice(0, 6))}</span>` : '';
     return `${iter}${_schedPhaseLabel(e.name, e.data)}${sid}`;
   }
+  if (e.kind === 'scheduled_retry') {
+    const iter = (e.iter != null && e.total != null) ? `<span class="dim mono">${e.iter}/${e.total}</span> ` : '';
+    const detail = e.reason || e.code;
+    return `${iter}<span style="color:var(--warn,#e0a800)">reintentando</span>${detail ? `<span class="dim mono" title="${esc(e.reason || '')}"> · ${esc(String(detail).slice(0, 48))}</span>` : ''}`;
+  }
   if (e.kind === 'scheduled_aborted') {
     const iter = (e.iter != null && e.total != null) ? `<span class="dim mono">${e.iter}/${e.total}</span> ` : '';
     // reason explícito (truncado) si lo hay; cae al code.
@@ -1272,6 +1277,8 @@ function connectSSE() {
           _schedOnPhase(ev);
         } else if (ev.kind === 'scheduled') {
           _schedOnIterDone(ev);
+        } else if (ev.kind === 'scheduled_retry') {
+          _schedOnRetry(ev);
         } else if (ev.kind === 'scheduled_aborted') {
           _schedOnAborted(ev);
         } else if (ev.kind === 'scheduled_cancelled') {
@@ -4161,6 +4168,7 @@ function _schedShow(sched_id, total, opts = {}) {
       if (ev.sched_id !== sched_id) continue;
       if (handler === 'phase') _schedOnPhase(ev);
       else if (handler === 'iter') _schedOnIterDone(ev);
+      else if (handler === 'retry') _schedOnRetry(ev);
       else if (handler === 'aborted') _schedOnAborted(ev);
       else if (handler === 'cancelled') _schedOnCancelled(ev);
     }
@@ -4277,6 +4285,35 @@ function _schedFinish(allOk) {
   $('#depExec').classList.remove('hidden');
   $('#depSchedCancel').classList.add('hidden');
   _schedActive = null;
+}
+
+function _schedOnRetry(ev) {
+  // Fallo TRANSITORIO (login 406/captcha/proxy, gateway 50x) — NO aborta, el
+  // backend reintenta la misma rep. Mostramos el reintento para que el operador
+  // sepa que sigue vivo (Robert 2026-05-29: que no se detenga por login).
+  if (!_schedActive) {
+    _schedPendingEvents.push({ handler: 'retry', ev });
+    return;
+  }
+  if (ev.sched_id !== _schedActive.sched_id) return;
+  if (_schedCountdownTimer) { clearInterval(_schedCountdownTimer); _schedCountdownTimer = null; }
+  const a = ev.attempt || 1, mx = ev.max || 4;
+  const why = ev.reason || ev.code || 'transitorio';
+  const txt = $('#depSchedNowText');
+  if (txt) txt.textContent = `🔁 Reintentando intento ${ev.iter || ''} (${a}/${mx}) — ${String(why).slice(0, 70)}`;
+  // Append discreto al timeline para dejar rastro del reintento.
+  const tl = $('#depSchedTimeline');
+  if (tl) {
+    const item = document.createElement('div');
+    item.className = 'dep-sched-tl-item retry';
+    item.innerHTML = `
+      <span class="dep-sched-tl-iter">#${ev.iter || ''}</span>
+      <span class="dep-sched-tl-icon">🔁</span>
+      <span class="dep-sched-tl-code" title="${esc(String(why))}">retry ${a}/${mx} · ${esc(ev.code || '')}</span>
+      <span class="dep-sched-tl-dur"></span>
+    `;
+    tl.insertBefore(item, tl.firstChild);
+  }
 }
 
 function _schedOnAborted(ev) {
