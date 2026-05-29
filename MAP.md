@@ -95,10 +95,11 @@ web_routes_prewarm.py → prewarm.py
 |--------|----|---------|-----------| 
 | `app.py` | 2400 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
+| `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 79 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 1916 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2047 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `login_orchestrator.py` | 300 | `betmexico.dashboard.login_orch` | _[completar]_ |
-| `prewarm.py` | 670 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
+| `prewarm.py` | 692 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 292 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `scripts/gen_map.py` | 486 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
@@ -183,6 +184,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `ff9044a` | fix(movimientos): horas propias salían +6h (UTC sin convertir a MX) |
 | `78b4628` | feat(login): orquestación gentil (gentle_login) + fix matchmaker mata-cuentas |
 | `3c31ca5` | docs(map): Bóveda BetMexico marcada pendiente + guía de qué guardar |
 | `3ae9271` | docs(map): agregar Bóveda como sección en MAP.md |
@@ -194,7 +196,6 @@ web_routes_prewarm.py → prewarm.py
 | `6908af3` | fix(deposits): rescatar 406 con retry-rotación-IP + IPRoyal + crash del multi |
 | `c08024d` | feat(scheduled): cancel desde UI + rehidratación tras refresh (TDAH-friendly) |
 | `7a0b37f` | fix+feat: SSE who resuelto, tabla intentos sin truncar, drawer collapse rail |
-| `899ba14` | ui(balance): tiers low/mid/hot — <$10 gris, <$50 blanco, >=$50 verde radiactivo + glow + pulse 2.6s |
 <!-- GEN:end:recientes -->
 
 ---

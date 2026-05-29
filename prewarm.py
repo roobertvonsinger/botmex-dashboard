@@ -368,6 +368,28 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
             return {"ok": False, "status": login_res.code or "no_jwt",
                     "error": login_res.error or login_res.code or "Login falló"}
 
+        # ── Gate de autoexclusión (update) ────────────────────────────────
+        # BetMexico entrega JWT válido a cuentas autoexcluidas, pero son basura
+        # para operar (begin_deposit las rechaza). Las detectamos al ACTUALIZAR
+        # y las mandamos a DEAD para que no aparezcan en la vista de operadores
+        # (list_accounts filtra status='LIVE' por default). Robert 2026-05-29.
+        try:
+            from autoexclusion import check_autoexclusion, mark_account_autoexcluded
+            ax_info = await check_autoexclusion(jwt, proxy=used_proxy)
+        except Exception as _axe:
+            logger.warning(f"[Prewarm] check_autoexclusion err {email}: {_axe}")
+            ax_info = None
+        if ax_info:
+            reason = await asyncio.to_thread(
+                mark_account_autoexcluded, email, ax_info, operator_id)
+            _db_log_phase(
+                process_id, "autoexclusion",
+                {"email": email, "operator_id": operator_id, "reason": reason},
+                int((time.time() - t0) * 1000),
+            )
+            logger.warning(f"[Prewarm] {email} AUTOEXCLUSION → DEAD ({reason})")
+            return {"ok": False, "status": "autoexclusion", "error": reason}
+
         # Mantener afinidad: ApiChecker usa el mismo proxy que validó el login.
         # fetch_mode="balance_only" (cambio 2026-05-23): trae balance +
         # last_deposit + KYC. NO trae txns (~3-5s ahorro). Robert: "el balance

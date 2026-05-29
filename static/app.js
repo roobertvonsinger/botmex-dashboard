@@ -815,7 +815,9 @@ function statusPill(e) {
   }
   if (e.kind === 'scheduled_aborted') {
     const iter = (e.iter != null && e.total != null) ? `<span class="dim mono">${e.iter}/${e.total}</span> ` : '';
-    return `${iter}<span style="color:var(--danger)">abortado</span>${e.code ? `<span class="dim mono"> · ${esc(e.code)}</span>` : ''}`;
+    // reason explícito (truncado) si lo hay; cae al code.
+    const detail = e.reason || e.code;
+    return `${iter}<span style="color:var(--danger)">abortado</span>${detail ? `<span class="dim mono" title="${esc(e.reason || '')}"> · ${esc(String(detail).slice(0, 48))}</span>` : ''}`;
   }
   if (e.kind === 'scheduled_cancelled') return `<span class="dim">cancelado</span>`;
   return '';
@@ -1211,6 +1213,28 @@ async function reload() {
   }
 }
 
+// Refresco de cuenta post-depósito: el backend persistió balance+movimientos
+// frescos reusando el login. Repintamos la fila (balance) y, si el detalle de esa
+// cuenta está abierto, recargamos sus movimientos sin cerrar el panel.
+function _onAccountRefreshed(ev) {
+  const email = ev.email;
+  if (!email) return;
+  _liveReload();  // balance nuevo en la tabla
+  if (!expandedAccountId) return;
+  const openRow = (state.rows || []).find(r => r.id === expandedAccountId);
+  if (!openRow || openRow.email !== email) return;
+  const id = expandedAccountId;
+  fetch(`/api/accounts/${id}/details`)
+    .then(r => (r.ok ? r.json() : null))
+    .then(data => {
+      if (data && expandedAccountId === id) {
+        detailDataCache[id] = data;
+        _injectExpandedDetail(true);
+      }
+    })
+    .catch(() => {});
+}
+
 // ─── SSE ───
 function connectSSE() {
   _evtSrc = new EventSource('/api/events');
@@ -1218,6 +1242,9 @@ function connectSSE() {
     try {
       const ev = JSON.parse(e.data);
       if (ev.type === 'activity') {
+        // account_refreshed: refresco de cuenta post-depósito (balance+movimientos).
+        // No va al feed (sería ruido) — solo repinta tabla/detalle.
+        if (ev.kind === 'account_refreshed') { _onAccountRefreshed(ev); return; }
         // Feed de Actividad
         pushActivityEvent(ev);
         // Notificaciones para acciones que importan
@@ -4189,10 +4216,12 @@ function _schedOnIterDone(ev) {
   if (tl) {
     const item = document.createElement('div');
     item.className = `dep-sched-tl-item ${ok ? 'ok' : 'fail'}`;
+    // title = mensaje explícito completo en hover (reason); el chip muestra el code corto.
+    const reasonTitle = (!ok && ev.reason) ? esc(ev.reason) : '';
     item.innerHTML = `
       <span class="dep-sched-tl-iter">#${iter}</span>
       <span class="dep-sched-tl-icon">${ok ? '✓' : '✗'}</span>
-      <span class="dep-sched-tl-code">${esc(code)}</span>
+      <span class="dep-sched-tl-code"${reasonTitle ? ` title="${reasonTitle}"` : ''}>${esc(code)}</span>
       <span class="dep-sched-tl-dur">${esc(dur)}</span>
     `;
     tl.insertBefore(item, tl.firstChild);
@@ -4260,7 +4289,9 @@ function _schedOnAborted(ev) {
   if (_schedWatchdogTimer) { clearTimeout(_schedWatchdogTimer); _schedWatchdogTimer = null; }
   if (_schedCountdownTimer) { clearInterval(_schedCountdownTimer); _schedCountdownTimer = null; }
   $('#depScheduledRun').classList.add('aborted');
-  $('#depSchedNowText').textContent = `✗ Misión abortada — ${esc(ev.code || 'fallo')}`;
+  // reason = mensaje explícito del backend (ej. autoexclusión con fecha). Cae al
+  // code solo si no hay reason. Antes mostraba el code pelón ("BEGIN_ERROR").
+  $('#depSchedNowText').textContent = `✗ Misión abortada — ${esc(ev.reason || ev.code || 'fallo')}`;
   $('#depSchedCountdown').classList.add('hidden');
   $('#depExec').textContent = '⏰ Nueva misión';
   $('#depExec').classList.remove('hidden');

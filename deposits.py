@@ -526,6 +526,56 @@ def _build_admin_proxy_url() -> Optional[str]:
     return build_admin_proxy_url()
 
 
+async def _refresh_account_after_deposit(
+    email: str,
+    jwt: Optional[str],
+    used_proxy: Optional[str],
+    operator_id: int,
+) -> None:
+    """Tras un intento de depósito, refresca balance + movimientos de la cuenta
+    REUSANDO el JWT del login (sin gastar captcha) y los persiste en BD. Antes el
+    dashboard solo capturaba transacciones en el login (ANTES del depósito) → el
+    intento recién hecho nunca se reflejaba hasta picar "Actualizar" manual.
+    Robert 2026-05-29: "deberían actualizarse aprovechando el mismo login".
+
+    No-throws: un fallo aquí NO debe afectar el resultado del depósito ya emitido.
+    Emite `account_refreshed` por SSE para que el frontend repinte la fila /
+    el panel de movimientos si está abierto.
+    """
+    if not jwt:
+        return
+    try:
+        from betmexico_login_api import BetmexicoApiChecker
+        async with BetmexicoApiChecker(proxy=used_proxy) as checker:
+            details = await asyncio.wait_for(
+                checker.fetch_account_details_parallel(jwt, fetch_mode="full"),
+                timeout=15.0,
+            )
+        if not details:
+            return
+        # Reusa los persisters probados del prewarm (balance + txns + grade).
+        from prewarm import _db_upsert_balance, _db_save_txns_and_recalc
+        await asyncio.to_thread(_db_upsert_balance, email, details)
+        await asyncio.to_thread(_db_save_txns_and_recalc, email, details, operator_id)
+        logger.info(f"[Deposits/phases] refresh post-depósito OK {email} "
+                    f"(balance_real={details.get('balance_real')})")
+        try:
+            from app import _broadcast, _resolve_who
+            _broadcast({
+                "type": "activity", "kind": "account_refreshed",
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "email": email, "target": email,
+                "balance_real": details.get("balance_real"),
+                "balance_total": (float(details.get("balance_real", 0) or 0)
+                                  + float(details.get("balance_bonos", 0) or 0)),
+                **_resolve_who(operator_id),
+            })
+        except Exception:
+            pass
+    except Exception as e:
+        logger.warning(f"[Deposits/phases] refresh post-depósito {email}: {str(e)[:160]}")
+
+
 async def _run_deposit_with_phases(
     email: str,
     password: str,
@@ -653,6 +703,36 @@ async def _run_deposit_with_phases(
         except Exception as e:
             logger.warning(f"[Deposits/phases] persist login details failed: {e}")
 
+    # ── Gate de autoexclusión ─────────────────────────────────────────────
+    # BetMexico entrega JWT válido a cuentas autoexcluidas (login isSuccess=True
+    # → gentle_login las marca LIVE), pero begin_deposit las rechaza con un 401
+    # `redirectLogin:true` que el dashboard mostraba como críptico "BEGIN_ERROR".
+    # Detectamos la autoexclusión ANTES de gastar el begin (leyendo el perfil con
+    # el JWT que ya tenemos), marcamos la cuenta DEAD (autoexclusión = estado REAL
+    # de BetMexico, una de las 3 razones de muerte) y devolvemos mensaje explícito.
+    # Solo en login fresco: si la iter 0 del scheduled pasó limpia, las iters que
+    # reusan sesión no la re-checan (la autoexclusión no cambia a mitad de un run).
+    if not session_jwt and jwt:
+        try:
+            from autoexclusion import check_autoexclusion, mark_account_autoexcluded
+            ax_info = await check_autoexclusion(jwt, proxy=used_proxy)
+        except Exception as _axe:
+            logger.warning(f"[Deposits/phases] check_autoexclusion err {email}: {_axe}")
+            ax_info = None
+        if ax_info:
+            reason = mark_account_autoexcluded(
+                email, ax_info, operator_id=user.get("telegram_id"))
+            msg = (f"Cuenta autoexcluida en BetMexico — se reactiva el "
+                   f"{ax_info['resume_human']}. Marcada DEAD, no reintentar.")
+            logger.warning(f"[Deposits/phases] {email} AUTOEXCLUSION ({reason}) — abortando depósito")
+            await _safe_phase(phase_cb, "done", {
+                "success": False, "result_code": "AUTOEXCLUSION", "error": msg,
+            })
+            return {
+                "success": False, "result_code": "AUTOEXCLUSION",
+                "error": msg, "duration_ms": int((time.time() - t_total) * 1000),
+            }
+
     # ── HTTPX client compartido para pasos 2/3/4 ──────────────────────────
     # Reusa el proxy que validó el login (afinidad — evita rotar a un proxy
     # potencialmente caído a mitad del flujo).
@@ -676,6 +756,33 @@ async def _run_deposit_with_phases(
                 "order_id": None, "ok": False, "duration_ms": begin_ms,
             })
             err = step1.get("error") or "begin_deposit falló"
+            # Log SIEMPRE el body crudo (antes se perdía — solo viajaba al SSE).
+            logger.warning(f"[Deposits/phases] begin_deposit FALLÓ {email}: {err}")
+            # Fallback de autoexclusión: un 401 `redirectLogin:true` en begin
+            # suele ser sesión inválida — y la causa más común sin diagnóstico es
+            # autoexclusión sobre un JWT reusado (el gate previo solo corre en
+            # login fresco). Confirmamos antes de dar el mensaje al operador.
+            low = str(err).lower()
+            if "redirectlogin" in low or "401" in low:
+                try:
+                    from autoexclusion import check_autoexclusion, mark_account_autoexcluded
+                    ax_info = await check_autoexclusion(jwt, proxy=used_proxy)
+                except Exception:
+                    ax_info = None
+                if ax_info:
+                    reason = mark_account_autoexcluded(
+                        email, ax_info, operator_id=user.get("telegram_id"))
+                    msg = (f"Cuenta autoexcluida en BetMexico — se reactiva el "
+                           f"{ax_info['resume_human']}. Marcada DEAD, no reintentar.")
+                    await _safe_phase(phase_cb, "done", {
+                        "success": False, "result_code": "AUTOEXCLUSION", "error": msg,
+                    })
+                    return {
+                        "success": False, "result_code": "AUTOEXCLUSION",
+                        "error": msg, "duration_ms": int((time.time() - t_total) * 1000),
+                    }
+                # 401 sin autoexclusión confirmada → sesión rechazada (JWT muerto)
+                err = f"Sesión rechazada por BetMexico (begin_deposit 401). Detalle: {err}"
             await _safe_phase(phase_cb, "done", {
                 "success": False, "result_code": "BEGIN_ERROR", "error": err,
             })
@@ -874,6 +981,13 @@ async def _run_deposit_with_phases(
     await _safe_phase(phase_cb, "done", {
         "success": approved, "result_code": result_code, "error": error_msg,
     })
+
+    # ── Refresh de cuenta post-depósito ───────────────────────────────────
+    # Reusa el JWT del login (sin captcha) para traer balance + movimientos
+    # frescos y persistirlos, así el dashboard refleja el resultado del intento
+    # sin que el operador pique "Actualizar" (Robert 2026-05-29). No-throws.
+    await _refresh_account_after_deposit(
+        email, jwt, used_proxy, user.get("telegram_id", 0))
 
     return {
         "success": approved,
@@ -1795,17 +1909,33 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                     session_jwt = r.get("jwt")
                     session_proxy = r.get("used_proxy")
                     logger.info(f"[Scheduled {sched_id}] sesión capturada en iter {i+1} — reuso activado para las siguientes")
+                    # Sesión capturada → las iters siguientes reusan el JWT y NO
+                    # piden captcha. Detenemos el factory del pool para que deje de
+                    # resolver tokens cada ~55s durante toda la misión (Robert
+                    # 2026-05-29: "se pone a armar tanto token de captcha si debería
+                    # aprovechar el token de sesión"). stop() es idempotente — el
+                    # finally lo vuelve a llamar sin efecto. pool=None evita que un
+                    # fallo posterior intente usarlo.
+                    try:
+                        await pool.stop()
+                        pool = None
+                        logger.info(f"[Scheduled {sched_id}] factory de captcha detenida tras capturar sesión — 0 captcha en iters restantes")
+                    except Exception as _pe:
+                        logger.warning(f"[Scheduled {sched_id}] no pude detener factory: {_pe}")
                 _record_attempt(
                     uuid.uuid4().hex, email, amount,
                     "approved" if ok else "rejected",
                     r.get("error") or code, duration, operator_id,
                     card_pipe=card_pipe,
                 )
+                # reason = mensaje explícito del backend (ej. autoexclusión con
+                # fecha). El frontend lo muestra en vez del code pelón.
+                reason = r.get("error") or code
                 _broadcast({
                     "type": "activity", "kind": "scheduled",
                     "sched_id": sched_id, "iter": i + 1, "total": repetitions,
                     "email": email, "amount": amount,
-                    "success": ok, "code": code,
+                    "success": ok, "code": code, "reason": reason,
                     "ts": datetime.now(timezone.utc).isoformat(),
                     **_resolve_who(operator_id),
                 })
@@ -1815,6 +1945,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                     _broadcast({
                         "type": "activity", "kind": "scheduled_aborted",
                         "sched_id": sched_id, "email": email, "code": code,
+                        "reason": reason,
                         "iter": i + 1, "total": repetitions,
                         "ts": datetime.now(timezone.utc).isoformat(),
                         **_resolve_who(operator_id),

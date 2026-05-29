@@ -113,6 +113,16 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `delete_session` | def | L149–L152 |
 | `require_session` | def | L156–L164 |
 
+### `autoexclusion.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `_decode_jwt_userid` | def | L43–L57 |
+| `_parse_resume_date` | def | L60–L71 |
+| `check_autoexclusion` | def | L74–L134 |
+| `autoexclusion_reason` | def | L137–L142 |
+| `mark_account_autoexcluded` | def | L145–L177 |
+
 ### `conftest.py`
 
 | Símbolo | Tipo | Líneas |
@@ -138,15 +148,16 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_record_attempt` | def | L392–L502 |
 | `_safe_phase` | def | L512–L519 |
 | `_build_admin_proxy_url` | def | L522–L526 |
-| `_run_deposit_with_phases` | def | L529–L890 |
-| `deposit_execute` | def | L894–L1031 |
-| `deposit_execute_stream` | def | L1035–L1243 |
-| `cap_status` | def | L1247–L1259 |
-| `multi_stream` | def | L1280–L1630 |
-| `multi_cancel` | def | L1634–L1639 |
-| `scheduled_create` | def | L1650–L1878 |
-| `scheduled_list` | def | L1882–L1904 |
-| `scheduled_cancel` | def | L1908–L1916 |
+| `_refresh_account_after_deposit` | def | L529–L576 |
+| `_run_deposit_with_phases` | def | L579–L1004 |
+| `deposit_execute` | def | L1008–L1145 |
+| `deposit_execute_stream` | def | L1149–L1357 |
+| `cap_status` | def | L1361–L1373 |
+| `multi_stream` | def | L1394–L1744 |
+| `multi_cancel` | def | L1748–L1753 |
+| `scheduled_create` | def | L1764–L2009 |
+| `scheduled_list` | def | L2013–L2035 |
+| `scheduled_cancel` | def | L2039–L2047 |
 
 ### `login_orchestrator.py`
 
@@ -179,11 +190,11 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_db_invalidate_jwt` | def | L274–L285 |
 | `_is_balance_fresh` | def | L288–L296 |
 | `_capmonster_balance` | def | L301–L317 |
-| `_run_prewarm` | def | L322–L433 |
-| `prewarm_select` | def | L439–L509 |
-| `prewarm_cancel` | def | L513–L523 |
-| `prewarm_status` | def | L527–L542 |
-| `prewarm_refresh_stream` | def | L548–L670 |
+| `_run_prewarm` | def | L322–L455 |
+| `prewarm_select` | def | L461–L531 |
+| `prewarm_cancel` | def | L535–L545 |
+| `prewarm_status` | def | L549–L564 |
+| `prewarm_refresh_stream` | def | L570–L692 |
 
 ### `proxy_pool.py`
 
@@ -465,6 +476,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | Logger | Módulo |
 |--------|--------|
 | `betmexico.dashboard` | `app.py` |
+| `betmexico.dashboard.autoexclusion` | `autoexclusion.py` |
 | `betmexico.dashboard.deposits` | `deposits.py` |
 | `betmexico.dashboard.login_orch` | `login_orchestrator.py` |
 | `betmexico.dashboard.prewarm` | `prewarm.py` |
