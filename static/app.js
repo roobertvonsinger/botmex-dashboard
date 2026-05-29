@@ -1380,15 +1380,24 @@ async function refreshKpis() {
     if (stProxy) {
       const p = k?.proxy;
       stProxy.classList.remove('ok', 'warn', 'danger', 'dim');
+      // Tooltip con el detalle por proxy (host · ok/latencia o error).
+      const tip = (p && Array.isArray(p.hosts) && p.hosts.length)
+        ? p.hosts.map(h => `${h.ok ? '✓' : '✗'} ${h.host}` +
+            (h.ok ? ` · ${h.latency_ms}ms` : ` · ${h.error || 'sin respuesta'}`)).join('\n')
+        : '';
       if (p && p.ok) {
+        // alive/total: cuántos proxies EN USO responden. Verde si todos, ámbar si parcial.
+        const alive = p.alive ?? 1, total = p.total ?? 1;
         const lat = p.latency_ms != null ? `${p.latency_ms}ms` : 'OK';
-        stProxy.textContent = `${p.country || 'OK'} · ${lat}`;
-        stProxy.classList.add(p.latency_ms > 1500 ? 'warn' : 'ok');
-        stProxy.title = `Proxy pool ${p.host}\nIP: ${p.ip || '?'}\nLatencia: ${lat}`;
+        stProxy.textContent = `${alive}/${total} · ${p.country || 'OK'} · ${lat}`;
+        const partial = alive < total;
+        stProxy.classList.add((partial || p.latency_ms > 1500) ? 'warn' : 'ok');
+        stProxy.title = tip || `Proxy pool ${p.host}\nIP: ${p.ip || '?'}\nLatencia: ${lat}`;
       } else if (p) {
-        stProxy.textContent = 'caído';
+        const total = p.total ?? 0;
+        stProxy.textContent = total ? `0/${total} caído` : 'sin proxies';
         stProxy.classList.add('danger');
-        stProxy.title = `Proxy pool ${p.host || ''}\n${p.error || 'sin respuesta'}`;
+        stProxy.title = tip || `Proxy pool\n${p.error || 'sin respuesta'}`;
       } else {
         stProxy.textContent = '—';
         stProxy.classList.add('dim');

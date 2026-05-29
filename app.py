@@ -622,41 +622,13 @@ def _maybe_alert_broadcast(alert: dict) -> None:
     })
 
 
-def _proxy_health() -> dict:
-    """Verifica que el pool de proxies ACTIVO responde (IPRoyal/NodeMaven — el
-    mismo que usan login y depósito), haciendo GET a un endpoint de IP.
-
-    Antes chequeaba LitPort hardcodeado (`hub-us-7.litport.net`), pero LitPort
-    está EXCLUIDO del pool (`_EXCLUDED_PROXY_HOSTS`) por estar quemado/0% → el
-    indicador decía "caído" SIEMPRE aunque el sistema operara bien con otros
-    proxies (Robert 2026-05-29: "dice que están caídos los proxies"). Ahora mide
-    el proxy real del pool. Mide CONECTIVIDAD (no reputación ante BetMexico, que
-    es otra cosa). Cache 30s."""
+def _check_one_proxy(proxy_url: str, timeout: float = 6.0) -> dict:
+    """Chequea conectividad de UN proxy (GET a endpoint de IP). Devuelve
+    {ok, ip, country, latency_ms, host, error}. host sin credenciales."""
     import time as _time
-    now = _time.time()
-    if _proxy_cache["data"]:
-        ttl = _PROXY_TTL if _proxy_cache["data"].get("ok") else _PROXY_TTL_FAIL
-        if (now - _proxy_cache["ts"]) < ttl:
-            return _proxy_cache["data"]
-
-    # Proxy del pool activo (rota IPRoyal/NodeMaven; excluye LitPort).
-    proxy_url = None
-    try:
-        from proxy_pool import build_admin_proxy_url
-        proxy_url = build_admin_proxy_url()
-    except Exception as e:
-        print(f"[proxy_health] build_admin_proxy_url err: {e}")
-    if not proxy_url:
-        out = {"ok": False, "error": "pool de proxies vacío", "host": "pool"}
-        _proxy_cache.update({"ts": now, "data": out})
-        return out
-    host_label = proxy_url.split("@")[-1] if "@" in proxy_url else "pool"
-
+    host = proxy_url.split("@")[-1] if "@" in proxy_url else proxy_url
     handler = urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
     opener = urllib.request.build_opener(handler)
-
-    # Intenta ipinfo.io primero, ipify como fallback
-    out = None
     last_err = "sin respuesta"
     for endpoint, parse in [
         ("https://ipinfo.io/json", lambda b: (b.get("ip"), b.get("country"))),
@@ -665,24 +637,63 @@ def _proxy_health() -> dict:
         t0 = _time.time()
         try:
             req = urllib.request.Request(endpoint, headers={"User-Agent": "curl/8.0"})
-            with opener.open(req, timeout=12) as resp:
+            with opener.open(req, timeout=timeout) as resp:
                 body = _json.loads(resp.read())
             ip, country = parse(body)
-            latency = int((_time.time() - t0) * 1000)
-            out = {
-                "ok": True, "ip": ip, "country": country or "MX",
-                "latency_ms": latency,
-                "host": host_label,
-                "error": None, "endpoint": endpoint,
-            }
-            break
+            return {"ok": True, "ip": ip, "country": country or "MX",
+                    "latency_ms": int((_time.time() - t0) * 1000),
+                    "host": host, "error": None}
         except Exception as e:
             last_err = str(e)[:100]
-            print(f"[proxy_health] {endpoint} fail: {last_err}")
             continue
-    if out is None:
-        out = {"ok": False, "error": last_err, "host": host_label}
+    return {"ok": False, "host": host, "error": last_err,
+            "ip": None, "country": None, "latency_ms": None}
 
+
+def _proxy_health() -> dict:
+    """Salud del pool de proxies EN USO (IPRoyal/NodeMaven — los mismos que usan
+    login y depósito). Chequea TODOS y reporta `alive/total`.
+
+    Antes chequeaba LitPort hardcodeado, EXCLUIDO del pool por estar quemado → el
+    indicador decía "caído" siempre aunque el sistema operara bien (Robert
+    2026-05-29: "para qué me sirve saber de un proxy que no se está usando").
+    Mide CONECTIVIDAD (no reputación ante BetMexico). Cache 30s."""
+    import time as _time
+    now = _time.time()
+    if _proxy_cache["data"]:
+        ttl = _PROXY_TTL if _proxy_cache["data"].get("ok") else _PROXY_TTL_FAIL
+        if (now - _proxy_cache["ts"]) < ttl:
+            return _proxy_cache["data"]
+
+    try:
+        from proxy_pool import shuffled_proxy_urls
+        urls = shuffled_proxy_urls()
+    except Exception as e:
+        urls = []
+        print(f"[proxy_health] shuffled_proxy_urls err: {e}")
+    if not urls:
+        out = {"ok": False, "error": "pool de proxies vacío", "host": "pool",
+               "alive": 0, "total": 0}
+        _proxy_cache.update({"ts": now, "data": out})
+        return out
+
+    results = [_check_one_proxy(u) for u in urls]
+    alive = [r for r in results if r.get("ok")]
+    best = min(alive, key=lambda r: r["latency_ms"]) if alive else None
+    out = {
+        "ok": len(alive) > 0,
+        "alive": len(alive),
+        "total": len(results),
+        "country": (best or {}).get("country"),
+        "latency_ms": (best or {}).get("latency_ms"),
+        "ip": (best or {}).get("ip"),
+        "host": (best or results[0]).get("host"),
+        "error": None if alive else (results[0].get("error") if results else "sin proxies"),
+        # Detalle por proxy para el tooltip del UI.
+        "hosts": [{"host": r["host"], "ok": r.get("ok"),
+                   "latency_ms": r.get("latency_ms"), "error": r.get("error")}
+                  for r in results],
+    }
     _proxy_cache.update({"ts": now, "data": out})
     return out
 
