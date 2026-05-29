@@ -4741,18 +4741,37 @@ function handleMmEvent(ev) {
       break;
     }
 
+    case 'account_paused': {
+      // La pasarela de la cuenta rechazó N tarjetas (BANK_REJECTED) → sale del
+      // run para no martillarla con login+captcha por cada tarjeta. NO es DEAD.
+      const acc = _mm.accounts.get(ev.email);
+      if (acc) { acc.status = 'dead'; acc.lastCode = 'BANK_REJECTED'; acc.busyTail = null; acc.currentPhase = ''; acc.paused = true; }
+      if (ev.tail) {
+        const tail = ev.tail.replace('···', '');
+        const card = _mm.cards.get(tail);
+        if (card && card.status === 'busy') { card.status = 'idle'; card.busyEmail = null; card.currentPhase = ''; }
+      }
+      _mmRender();
+      _mmFeedAdd('mm-rej',
+        `⏸ <b>${esc(ev.email)}</b> · pasarela rechaza (${ev.rejects || 2} tarjetas) — fuera del run, NO muerta`);
+      break;
+    }
+
     case 'login_retry': {
-      // 406 / captcha / proxy = NUESTRO lado, NO la cuenta. La cuenta NO murió:
-      // sale del run actual para no martillar IPs, pero queda reintentable.
-      // Ni la cuenta ni la tarjeta se penalizan.
+      // 406 / captcha / proxy = NUESTRO lado, NO la cuenta. Con `retrying` el
+      // backend va a reintentar el par; con `exhausted` agotó los reintentos.
+      // Ni la cuenta ni la tarjeta se penalizan permanente.
       const tail = (ev.tail || '').replace('···', '');
       const card = _mm.cards.get(tail);
       const acc = _mm.accounts.get(ev.email);
       if (card) { card.status = 'idle'; card.busyEmail = null; card.currentPhase = ''; }
       if (acc)  { acc.status = 'idle'; acc.busyTail = null; acc.currentPhase = ''; acc.lastCode = ev.code; }
       _mmRender();
+      const detail = ev.retrying
+        ? `reintentando login (${ev.tries || 1}/${ev.max || 3})`
+        : 'login falló tras reintentos (NO muerta)';
       _mmFeedAdd('mm-cooldown',
-        `🔄 <b>${esc(ev.email)}</b> · login falló (nuestro lado, NO muerta) <span class="dim mono">${esc(ev.code)}</span> · reintenta el run`);
+        `🔄 <b>${esc(ev.email)}</b> · ${detail} <span class="dim mono">${esc(ev.code)}</span>`);
       break;
     }
 

@@ -1446,6 +1446,11 @@ MM_MAX_FAILS = 2
 # el par (sin marcarlo `tried`) hasta este tope (Robert 2026-05-29). Con IPRoyal
 # rotativo, cada reintento sale por IP fresca → más chance contra el 406.
 MM_MAX_LOGIN_RETRIES = 3
+# Tope de BANK_REJECTED por CUENTA en el run. BANK_REJECTED es del banco de la
+# tarjeta, pero si una cuenta lo acumula con tarjetas distintas, su pasarela
+# rechaza todo → retirarla del run (NO DEAD) para no martillarla con login+captcha
+# por cada tarjeta. Evita la "masacre de intentos" (Robert 2026-05-29).
+MM_MAX_BANK_REJECTS = 2
 
 # Runs activos del matchmaker — para soporte de cancelación
 _active_mm_runs: dict[str, asyncio.Event] = {}
@@ -1757,11 +1762,24 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                         except Exception as ex:
                             logger.error(f"[Matchmaker] no pude marcar DEAD {acc['email']}: {ex}")
                         yield f"data: {json.dumps({'type':'account_dead','email':acc['email'],'code':code,'tail':card['tail'],'attempt':n,'persisted':True})}\n\n"
-                    elif code in ("3DS_REQUIRED", "BANK_REJECTED"):
-                        # Solo strike a tarjeta — la cuenta está fina (BANK_REJECTED viene del banco
-                        # emisor de la tarjeta, no de BetMexico)
+                    elif code == "3DS_REQUIRED":
+                        # 3DS es de la tarjeta/BIN → solo strike a tarjeta.
                         card["fail_count"] += 1
                         yield f"data: {json.dumps({'type':'rejected','email':acc['email'],'tail':card['tail'],'code':code,'card_fails':card['fail_count'],'attempt':n,'card_only':True})}\n\n"
+                    elif code == "BANK_REJECTED":
+                        # BANK_REJECTED viene del banco emisor de la TARJETA → strike a
+                        # tarjeta. PERO si una cuenta acumula N rechazos (con tarjetas
+                        # distintas), su PASARELA está rechazando todo → retirar la
+                        # cuenta del run para no martillarla con login+captcha por cada
+                        # tarjeta (Robert 2026-05-29: "la masacre de intentos está mal").
+                        # NO es DEAD — la cuenta puede servir después; solo sale del run.
+                        card["fail_count"] += 1
+                        acc["bank_rejects"] = acc.get("bank_rejects", 0) + 1
+                        if acc["bank_rejects"] >= MM_MAX_BANK_REJECTS:
+                            acc["fail_count"] = MM_MAX_FAILS  # retira la cuenta del run (NO DEAD)
+                            yield f"data: {json.dumps({'type':'account_paused','email':acc['email'],'code':'BANK_REJECTED','tail':card['tail'],'rejects':acc['bank_rejects'],'attempt':n,'reason':'pasarela rechaza esta cuenta (varias tarjetas)'})}\n\n"
+                        else:
+                            yield f"data: {json.dumps({'type':'rejected','email':acc['email'],'tail':card['tail'],'code':code,'card_fails':card['fail_count'],'acct_rejects':acc['bank_rejects'],'attempt':n,'card_only':True})}\n\n"
                     else:
                         card["fail_count"] += 1
                         acc["fail_count"] += 1

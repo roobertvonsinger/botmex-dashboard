@@ -155,11 +155,11 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `deposit_execute` | def | L1064–L1201 |
 | `deposit_execute_stream` | def | L1205–L1413 |
 | `cap_status` | def | L1417–L1429 |
-| `multi_stream` | def | L1455–L1813 |
-| `multi_cancel` | def | L1817–L1822 |
-| `scheduled_create` | def | L1835–L2124 |
-| `scheduled_list` | def | L2128–L2150 |
-| `scheduled_cancel` | def | L2154–L2162 |
+| `multi_stream` | def | L1460–L1831 |
+| `multi_cancel` | def | L1835–L1840 |
+| `scheduled_create` | def | L1853–L2142 |
+| `scheduled_list` | def | L2146–L2168 |
+| `scheduled_cancel` | def | L2172–L2180 |
 
 ### `login_orchestrator.py`
 

@@ -97,7 +97,7 @@ web_routes_prewarm.py → prewarm.py
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 79 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2162 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2180 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `login_orchestrator.py` | 300 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 692 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 295 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
@@ -141,6 +141,7 @@ web_routes_prewarm.py → prewarm.py
 | `MM_COOLDOWN` | `5` | `deposits.py` |
 | `MM_MAX_FAILS` | `2` | `deposits.py` |
 | `MM_MAX_LOGIN_RETRIES` | `3` | `deposits.py` |
+| `MM_MAX_BANK_REJECTS` | `2` | `deposits.py` |
 | `CAP_PER_OPERATOR_10MIN` | `9999` | `prewarm.py` |
 | `ACCOUNT_FRESH_MINUTES` | `30` | `prewarm.py` |
 | `ACCOUNT_DAILY_LIMIT` | `3` | `prewarm.py` |
@@ -189,6 +190,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `0faf6c3` | docs(errors): causa del 406 = IPRoyal con IP fija (city) -> rotativo nacional (2026-05-29) |
 | `2d469a8` | fix(proxy+multi): IPRoyal rotativo (no IP fija quemada) + reintentos de login en matchmaker |
 | `7b8a195` | feat(proxy-health): mostrar salud del POOL EN USO (alive/total), no un proxy suelto |
 | `eb4c3ba` | fix(proxy-health): chequear el pool ACTIVO, no LitPort excluido (falsa alarma 'caido') |
@@ -200,7 +202,6 @@ web_routes_prewarm.py → prewarm.py
 | `78b4628` | feat(login): orquestación gentil (gentle_login) + fix matchmaker mata-cuentas |
 | `3c31ca5` | docs(map): Bóveda BetMexico marcada pendiente + guía de qué guardar |
 | `3ae9271` | docs(map): agregar Bóveda como sección en MAP.md |
-| `e4799cd` | docs(bitacora): skill actualizada para MAP.md lean + MAP_DEEP.md |
 <!-- GEN:end:recientes -->
 
 ---
