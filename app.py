@@ -2000,8 +2000,15 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
             # deposit_attempts → siempre deposit, source dashboard
             for a in result.get("deposit_attempts", []):
                 st = (a.get("status") or "").lower()
+                reason_txt = a.get("rejection_reason") or ""
+                # 3DS = estado propio (ámbar): NO se acreditó pero NO es rechazo del
+                # banco — el procesador pidió autenticación (Robert 2026-05-29).
+                # Guardamos/mostramos aunque BetMexico no liste la txn en su historial.
+                is_3ds = "3ds" in reason_txt.lower()
                 if st == "approved":
                     state = "ok"
+                elif is_3ds:
+                    state = "threeds"
                 elif st in ("rejected", "error"):
                     state = "fail"
                 else:
@@ -2015,7 +2022,7 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                     "state": state,
                     "who": _op_name(a.get("operator_id")),
                     "card_pipe": a.get("card_pipe"),
-                    "reason": a.get("rejection_reason") if state == "fail" else None,
+                    "reason": reason_txt if state in ("fail", "threeds") else None,
                 })
 
             # account_transactions → betmex. txn_type 1=dep, 2=retiro.

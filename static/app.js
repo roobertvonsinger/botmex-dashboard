@@ -3161,6 +3161,7 @@ function _mvStatusIcon(state) {
   return ({
     ok:   '<i class="ph-fill ph-check-circle"></i>',
     fail: '<i class="ph-fill ph-prohibit"></i>',
+    threeds: '<i class="ph-fill ph-warning-circle"></i>',
     pending: '<i class="ph-fill ph-clock"></i>',
     wd:   '<i class="ph-fill ph-arrow-circle-up"></i>',
   })[state] || '<i class="ph-fill ph-circle"></i>';
@@ -3169,7 +3170,7 @@ function _mvStatusIcon(state) {
 function _mvStateCls(state) {
   // Prefijo mv- para NO colisionar con clases globales (.dep ya existe en la
   // tabla con font mono → causaba que las aprobadas salieran en otra tipografía).
-  return ({ ok: 'mv-dep', fail: 'mv-fail', pending: 'mv-pend', wd: 'mv-wd' })[state] || 'mv-dep';
+  return ({ ok: 'mv-dep', fail: 'mv-fail', threeds: 'mv-threeds', pending: 'mv-pend', wd: 'mv-wd' })[state] || 'mv-dep';
 }
 // Monto con signo/triángulo según kind+state.
 function _mvAmount(m) {
@@ -3189,10 +3190,13 @@ function _renderMovimiento(m) {
   const stCls = _mvStateCls(m.state);
   const isOurs = m.source === 'dashboard';
   const kindLabel = m.kind === 'withdrawal' ? 'Retiro' : 'Depósito';
-  // En fallidas, "Depósito" va en rojo (resto de la tipografía uniforme).
+  // En fallidas, "Depósito" va en rojo; en 3DS, ámbar (no se acreditó pero no es
+  // rechazo del banco).
   const kindHtml = (m.state === 'fail')
     ? `<b style="color:var(--danger)">${kindLabel}</b>`
-    : `<b>${kindLabel}</b>`;
+    : (m.state === 'threeds')
+      ? `<b style="color:var(--warn)">${kindLabel} · 3DS</b>`
+      : `<b>${kindLabel}</b>`;
   const method = m.method || (m.kind === 'withdrawal' ? '' : '—');
   const methodTxt = method ? ` · ${esc(method)}` : '';
   // "Quién" inline en chiquito junto al método (solo nuestras).

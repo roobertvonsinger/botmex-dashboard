@@ -3458,6 +3458,7 @@ body.dep-drawer-pushing.dep-drawer-collapsed { padding-right: 36px; }
 .acc-detail .mv-dep .sic{color:var(--green)}
 .acc-detail .mv-wd .sic{color:var(--txt)}
 .acc-detail .mv-fail .sic{color:var(--danger)}
+.acc-detail .mv-threeds .sic{color:var(--warn)}
 .acc-detail .mv-pend .sic{color:var(--yellow)}
 .acc-detail .amt{color:var(--txt)}
 /* Sin contorno: las nuestras se distinguen SOLO por el ⚡ (el contorno
@@ -3474,6 +3475,7 @@ body.dep-drawer-pushing.dep-drawer-collapsed { padding-right: 36px; }
 .acc-detail .mrev-status{font-family:var(--sat);font-weight:700;font-size:11px;white-space:nowrap;flex-shrink:0}
 .acc-detail .mrev-status.mv-dep{color:var(--green)}
 .acc-detail .mrev-status.mv-fail{color:var(--danger)}
+.acc-detail .mrev-status.mv-threeds{color:var(--warn)}
 .acc-detail .mrev-status.mv-pend{color:var(--yellow)}
 @keyframes mvReveal{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
 .acc-detail .mrev .pp{font-family:var(--mono);font-size:11.5px;color:var(--txt);cursor:pointer;padding:2px 8px;border-radius:6px;background:rgba(255,255,255,.05)}

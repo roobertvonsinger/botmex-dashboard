@@ -93,7 +93,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2423 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2430 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 79 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -190,6 +190,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `919d38e` | ui(programado): 3DS en AMBAR (no rojo dramatico) + icono advertencia |
 | `0a26449` | docs(bin): thresholds por BIN — 511916/491366/526424 (limites $/24h, 3DS vs rechazo) |
 | `491c040` | fix(deposits): check_transaction reintenta ante 504/timeout (idempotente, post-cobro seguro) |
 | `65c185d` | fix(deposits): no inventar 3DS cuando check_transaction da 504/timeout |
@@ -201,7 +202,6 @@ web_routes_prewarm.py → prewarm.py
 | `eb4c3ba` | fix(proxy-health): chequear el pool ACTIVO, no LitPort excluido (falsa alarma 'caido') |
 | `24ff785` | docs(errors): programado reintenta transitorios en vez de abortar (sesion 2026-05-29) |
 | `951c449` | fix(programado): reintentar fallos transitorios en vez de abortar la mision |
-| `e6c5220` | docs(errors): autoexclusion -> DEAD, captcha en programado, refresh post-deposito (sesion 2026-05-29) |
 <!-- GEN:end:recientes -->
 
 ---
