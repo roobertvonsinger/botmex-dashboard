@@ -561,7 +561,7 @@ def stats(_user: dict = Depends(require_session)):
     return {"live": live, "total": total, "totalBalance": balance, "withBalance": with_balance, "inUse": in_use}
 
 
-# ── LitPort proxy health (cache 60s) ───────────────────────────────────────────
+# ── Proxy pool health (cache 30s) — pool activo IPRoyal/NodeMaven ───────────────
 _proxy_cache: dict = {"ts": 0.0, "data": None}
 _PROXY_TTL = 30.0       # cache si OK
 _PROXY_TTL_FAIL = 5.0   # cache corto si falló — re-intenta rápido
@@ -623,10 +623,15 @@ def _maybe_alert_broadcast(alert: dict) -> None:
 
 
 def _proxy_health() -> dict:
-    """Verifica que el proxy LitPort responde haciendo GET a un endpoint de IP.
-    Devuelve {ok, ip, latency_ms, country, error}.
-    Vars de entorno: LITPORT_HOST, LITPORT_PORT, LITPORT_USER, LITPORT_PASS.
-    Cache 60s para no saturar."""
+    """Verifica que el pool de proxies ACTIVO responde (IPRoyal/NodeMaven — el
+    mismo que usan login y depósito), haciendo GET a un endpoint de IP.
+
+    Antes chequeaba LitPort hardcodeado (`hub-us-7.litport.net`), pero LitPort
+    está EXCLUIDO del pool (`_EXCLUDED_PROXY_HOSTS`) por estar quemado/0% → el
+    indicador decía "caído" SIEMPRE aunque el sistema operara bien con otros
+    proxies (Robert 2026-05-29: "dice que están caídos los proxies"). Ahora mide
+    el proxy real del pool. Mide CONECTIVIDAD (no reputación ante BetMexico, que
+    es otra cosa). Cache 30s."""
     import time as _time
     now = _time.time()
     if _proxy_cache["data"]:
@@ -634,18 +639,25 @@ def _proxy_health() -> dict:
         if (now - _proxy_cache["ts"]) < ttl:
             return _proxy_cache["data"]
 
-    # Defaults desde betmexico_config.py (mismo proxy que usa el bot)
-    host = os.environ.get("LITPORT_HOST", "hub-us-7.litport.net")
-    port = os.environ.get("LITPORT_PORT", "1337")
-    user = os.environ.get("LITPORT_USER", "bmxutop_country-mx")
-    pwd  = os.environ.get("LITPORT_PASS", "49O3mC6hl4")
+    # Proxy del pool activo (rota IPRoyal/NodeMaven; excluye LitPort).
+    proxy_url = None
+    try:
+        from proxy_pool import build_admin_proxy_url
+        proxy_url = build_admin_proxy_url()
+    except Exception as e:
+        print(f"[proxy_health] build_admin_proxy_url err: {e}")
+    if not proxy_url:
+        out = {"ok": False, "error": "pool de proxies vacío", "host": "pool"}
+        _proxy_cache.update({"ts": now, "data": out})
+        return out
+    host_label = proxy_url.split("@")[-1] if "@" in proxy_url else "pool"
 
-    proxy_url = f"http://{user}:{pwd}@{host}:{port}"
     handler = urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
     opener = urllib.request.build_opener(handler)
 
     # Intenta ipinfo.io primero, ipify como fallback
     out = None
+    last_err = "sin respuesta"
     for endpoint, parse in [
         ("https://ipinfo.io/json", lambda b: (b.get("ip"), b.get("country"))),
         ("https://api.ipify.org?format=json", lambda b: (b.get("ip"), None)),
@@ -660,7 +672,7 @@ def _proxy_health() -> dict:
             out = {
                 "ok": True, "ip": ip, "country": country or "MX",
                 "latency_ms": latency,
-                "host": f"{host}:{port}",
+                "host": host_label,
                 "error": None, "endpoint": endpoint,
             }
             break
@@ -669,7 +681,7 @@ def _proxy_health() -> dict:
             print(f"[proxy_health] {endpoint} fail: {last_err}")
             continue
     if out is None:
-        out = {"ok": False, "error": last_err, "host": f"{host}:{port}"}
+        out = {"ok": False, "error": last_err, "host": host_label}
 
     _proxy_cache.update({"ts": now, "data": out})
     return out
@@ -889,7 +901,7 @@ def superadmin_kpis(user: dict = Depends(require_session)):
         if ph and not ph.get("ok"):
             alerts.append({
                 "kind": "proxy_down", "severity": "danger",
-                "msg": f"Proxy LitPort caído: {ph.get('error') or 'sin respuesta'}",
+                "msg": f"Proxy pool caído: {ph.get('error') or 'sin respuesta'}",
                 "ts": now.isoformat(),
             })
         out["alerts"] = alerts
@@ -953,7 +965,7 @@ def superadmin_kpis(user: dict = Depends(require_session)):
         out["capmonster_balance"] = cm.get("balance")
         out["capmonster_error"] = cm.get("error")
 
-        # ── Proxies (LitPort health check) ──
+        # ── Proxies (pool activo health check) ──
         out["proxy"] = _proxy_health()
 
         # ── WebScraping.ai (saldo de API calls) ──
@@ -1102,7 +1114,7 @@ def admin_diag(user: dict = Depends(require_session)):
         out["checks"].append({"name": "CapMonster", "ok": False, "error": cm.get("error", "?")})
     # Proxy
     p = _proxy_health()
-    out["checks"].append({"name": "Proxy LitPort", "ok": p.get("ok", False),
+    out["checks"].append({"name": "Proxy pool", "ok": p.get("ok", False),
                           "info": f"{p.get('country','?')} · {p.get('latency_ms','?')}ms" if p.get("ok") else None,
                           "error": p.get("error") if not p.get("ok") else None})
     # Bot deps

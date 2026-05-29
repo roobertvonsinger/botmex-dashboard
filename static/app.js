@@ -1384,11 +1384,11 @@ async function refreshKpis() {
         const lat = p.latency_ms != null ? `${p.latency_ms}ms` : 'OK';
         stProxy.textContent = `${p.country || 'OK'} · ${lat}`;
         stProxy.classList.add(p.latency_ms > 1500 ? 'warn' : 'ok');
-        stProxy.title = `LitPort ${p.host}\nIP: ${p.ip || '?'}\nLatencia: ${lat}`;
+        stProxy.title = `Proxy pool ${p.host}\nIP: ${p.ip || '?'}\nLatencia: ${lat}`;
       } else if (p) {
         stProxy.textContent = 'caído';
         stProxy.classList.add('danger');
-        stProxy.title = `LitPort ${p.host || ''}\n${p.error || 'sin respuesta'}`;
+        stProxy.title = `Proxy pool ${p.host || ''}\n${p.error || 'sin respuesta'}`;
       } else {
         stProxy.textContent = '—';
         stProxy.classList.add('dim');

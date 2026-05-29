@@ -93,7 +93,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2400 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2412 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 79 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -188,6 +188,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `24ff785` | docs(errors): programado reintenta transitorios en vez de abortar (sesion 2026-05-29) |
 | `951c449` | fix(programado): reintentar fallos transitorios en vez de abortar la mision |
 | `e6c5220` | docs(errors): autoexclusion -> DEAD, captcha en programado, refresh post-deposito (sesion 2026-05-29) |
 | `99d1523` | feat(autoexclusion): detectar autoexcluidas -> DEAD + mensaje explicito; refrescar movimientos post-deposito; cortar captcha en programado |
@@ -199,7 +200,6 @@ web_routes_prewarm.py → prewarm.py
 | `55d526d` | refactor(map): MAP.md lean (241L) + MAP_DEEP.md separado (475L) |
 | `9d5b71f` | feat(map): rediseño MAP.md como guía de navegación para agentes IA |
 | `eb733e3` | feat(map): MAP.md auto-generado + hook pre-commit |
-| `68121cf` | feat(detalle+scheduled): panel de detalle inline (acordeón v14) + reuso de sesión en programados |
 <!-- GEN:end:recientes -->
 
 ---
