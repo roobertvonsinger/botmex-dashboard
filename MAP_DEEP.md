@@ -141,25 +141,26 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_record_bin_3ds` | def | L148–L176 |
 | `_bin_3ds_stats` | def | L179–L201 |
 | `bin_check` | def | L205–L210 |
-| `_auto_lock_for_deposit` | def | L213–L262 |
-| `_window_status` | def | L265–L307 |
-| `_check_caps` | def | L310–L323 |
-| `_load_deps` | def | L326–L334 |
-| `_parse_pipe` | def | L337–L358 |
-| `_check_card_velocity` | def | L378–L425 |
-| `_record_attempt` | def | L428–L538 |
-| `_safe_phase` | def | L548–L555 |
-| `_build_admin_proxy_url` | def | L558–L562 |
-| `_refresh_account_after_deposit` | def | L565–L612 |
-| `_run_deposit_with_phases` | def | L615–L1091 |
-| `deposit_execute` | def | L1095–L1232 |
-| `deposit_execute_stream` | def | L1236–L1444 |
-| `cap_status` | def | L1448–L1460 |
-| `multi_stream` | def | L1492–L1862 |
-| `multi_cancel` | def | L1866–L1871 |
-| `scheduled_create` | def | L1884–L2173 |
-| `scheduled_list` | def | L2177–L2199 |
-| `scheduled_cancel` | def | L2203–L2211 |
+| `bin_stats_overview` | def | L214–L259 |
+| `_auto_lock_for_deposit` | def | L262–L311 |
+| `_window_status` | def | L314–L356 |
+| `_check_caps` | def | L359–L372 |
+| `_load_deps` | def | L375–L383 |
+| `_parse_pipe` | def | L386–L407 |
+| `_check_card_velocity` | def | L427–L474 |
+| `_record_attempt` | def | L477–L587 |
+| `_safe_phase` | def | L597–L604 |
+| `_build_admin_proxy_url` | def | L607–L611 |
+| `_refresh_account_after_deposit` | def | L614–L661 |
+| `_run_deposit_with_phases` | def | L664–L1140 |
+| `deposit_execute` | def | L1144–L1281 |
+| `deposit_execute_stream` | def | L1285–L1493 |
+| `cap_status` | def | L1497–L1509 |
+| `multi_stream` | def | L1541–L1911 |
+| `multi_cancel` | def | L1915–L1920 |
+| `scheduled_create` | def | L1933–L2222 |
+| `scheduled_list` | def | L2226–L2248 |
+| `scheduled_cancel` | def | L2252–L2260 |
 
 ### `login_orchestrator.py`
 
@@ -434,6 +435,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `GET` | `/api/deposits` | `app.py` |
 | `GET` | `/api/deposits/stats` | `app.py` |
 | `GET` | `/bin-check/{bin6}` | `deposits.py` |
+| `GET` | `/bin-stats` | `deposits.py` |
 | `POST` | `/execute` | `deposits.py` |
 | `POST` | `/execute-stream` | `deposits.py` |
 | `GET` | `/cap-status/{account_id}` | `deposits.py` |

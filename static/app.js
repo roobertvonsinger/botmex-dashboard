@@ -422,6 +422,10 @@ async function loadMe() {
     $('#navLogs').style.display = 'none';
     $('#navHealth').style.display = 'none';
   }
+  // BINes (inteligencia de tarjetas) solo superadmin
+  if (!isSuper) {
+    const nb = $('#navBinStats'); if (nb) nb.style.display = 'none';
+  }
   // Pool solo superadmin
   if (!isSuper) {
     const np = $('#navPool'); if (np) np.style.display = 'none';
@@ -1125,6 +1129,7 @@ function showSection(name) {
   const logsM = $('#logsMain'); if (logsM) logsM.style.display = name === 'logs' ? 'flex' : 'none';
   const healthM = $('#healthMain'); if (healthM) healthM.style.display = name === 'health' ? 'flex' : 'none';
   const adminM = $('#adminMain'); if (adminM) adminM.style.display = name === 'admin' ? 'flex' : 'none';
+  const binM = $('#binStatsMain'); if (binM) binM.style.display = name === 'bin-stats' ? 'flex' : 'none';
   $$('.nav[data-section]').forEach(btn => btn.classList.toggle('on', btn.dataset.section === name));
   if (name === 'pool') reloadPool();
   if (name === 'activity') reloadActivity();
@@ -1132,6 +1137,83 @@ function showSection(name) {
   if (name === 'logs') startLogsPolling(); else stopLogsPolling();
   if (name === 'health') loadHealth(false);
   if (name === 'admin') loadAdminState();
+  if (name === 'bin-stats') reloadBinStats();
+}
+
+// ─── BIN intelligence (SA only) ───
+async function reloadBinStats() {
+  const tbody = $('#binStatsTable')?.querySelector('tbody');
+  const chart = $('#binChart');
+  try {
+    const r = await fetch('/api/deposits/bin-stats');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    renderBinStats(data);
+  } catch (e) {
+    if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="loading" style="color:var(--danger)">Error: ${esc(e.message)}</td></tr>`;
+    if (chart) chart.innerHTML = `<div class="dim" style="padding:20px">Error cargando</div>`;
+  }
+}
+
+function _binRateColor(rate) {
+  if (rate >= 70) return 'var(--accent)';
+  if (rate >= 40) return 'var(--warn)';
+  return 'var(--danger)';
+}
+
+function renderBinStats(data) {
+  const bins = (data && data.bins) || [];
+  const totals = (data && data.totals) || {};
+  // Totales en el header
+  const tt = $('#binStatsTotals');
+  if (tt) {
+    tt.textContent = `${totals.bins || 0} BINes · ${totals.attempts || 0} intentos · ${totals.approved || 0} aprob · ${totals.threeds || 0} 3DS · ${fmtMoney(totals.approved_amount || 0)}`;
+  }
+  // Gráfica: barras horizontales de tasa de aprobación, ordenadas por tasa.
+  const chart = $('#binChart');
+  if (chart) {
+    if (!bins.length) {
+      chart.innerHTML = `<div class="dim" style="padding:20px">Sin intentos registrados todavía.</div>`;
+    } else {
+      const maxAtt = Math.max(...bins.map(b => b.attempts), 1);
+      const byRate = [...bins].sort((a, b) => b.approval_rate - a.approval_rate);
+      chart.innerHTML = byRate.map(b => {
+        const col = _binRateColor(b.approval_rate);
+        const wgt = Math.max(8, Math.round((b.attempts / maxAtt) * 100)); // grosor ~ # intentos
+        return `<div class="bin-bar-row" title="${b.bin} · ${b.approved}/${b.attempts} aprob · ${b.threeds} 3DS · ${b.rejected} rech">
+          <span class="bin-bar-label mono">${esc(b.bin)}</span>
+          <div class="bin-bar-track" style="height:${Math.max(10, Math.round(wgt/6))}px">
+            <div class="bin-bar-fill" style="width:${b.approval_rate}%;background:${col}"></div>
+          </div>
+          <span class="bin-bar-pct mono" style="color:${col}">${b.approval_rate}%</span>
+          <span class="bin-bar-n dim mono">${b.attempts}</span>
+        </div>`;
+      }).join('');
+    }
+  }
+  // Tabla
+  const tbody = $('#binStatsTable')?.querySelector('tbody');
+  if (tbody) {
+    if (!bins.length) {
+      tbody.innerHTML = `<tr><td colspan="9" class="loading">Sin intentos registrados todavía.</td></tr>`;
+    } else {
+      tbody.innerHTML = bins.map(b => {
+        const col = _binRateColor(b.approval_rate);
+        const last = b.last_seen ? esc(String(b.last_seen).slice(0, 16).replace('T', ' ')) : '—';
+        return `<tr>
+          <td class="mono"><b>${esc(b.bin)}</b></td>
+          <td class="num mono">${b.attempts}</td>
+          <td class="num mono" style="color:var(--accent)">${b.approved}</td>
+          <td class="num mono" style="color:${col};font-weight:700">${b.approval_rate}%</td>
+          <td class="num mono" style="color:var(--warn)">${b.threeds || 0}</td>
+          <td class="num mono" style="color:var(--danger)">${b.rejected || 0}</td>
+          <td class="num mono">${fmtMoney(b.approved_amount || 0)}</td>
+          <td class="num mono dim">${b.accounts || 0}</td>
+          <td class="dim mono">${last}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
 }
 
 // ─── Pool view (SA only) ───
@@ -1902,6 +1984,7 @@ $('#btnLogsPause')?.addEventListener('click', () => {
   if (_logsPaused) stopLogsPolling(); else startLogsPolling();
 });
 $('#btnLogsClear')?.addEventListener('click', () => { $('#logsView').textContent = ''; });
+$('#btnBinRefresh')?.addEventListener('click', reloadBinStats);
 $('#btnLogsCopy')?.addEventListener('click', async () => {
   const txt = $('#logsView').textContent || '';
   if (!txt) { toast('Sin logs para copiar', 'error'); return; }

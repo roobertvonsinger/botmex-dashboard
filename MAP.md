@@ -97,7 +97,7 @@ web_routes_prewarm.py → prewarm.py
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 79 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2211 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2260 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `login_orchestrator.py` | 300 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 692 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 295 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
@@ -190,6 +190,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `6e5b6f1` | ui(detalle): 3DS en ambar tambien en la tabla de movimientos/intentos |
 | `919d38e` | ui(programado): 3DS en AMBAR (no rojo dramatico) + icono advertencia |
 | `0a26449` | docs(bin): thresholds por BIN — 511916/491366/526424 (limites $/24h, 3DS vs rechazo) |
 | `491c040` | fix(deposits): check_transaction reintenta ante 504/timeout (idempotente, post-cobro seguro) |
@@ -201,7 +202,6 @@ web_routes_prewarm.py → prewarm.py
 | `7b8a195` | feat(proxy-health): mostrar salud del POOL EN USO (alive/total), no un proxy suelto |
 | `eb4c3ba` | fix(proxy-health): chequear el pool ACTIVO, no LitPort excluido (falsa alarma 'caido') |
 | `24ff785` | docs(errors): programado reintenta transitorios en vez de abortar (sesion 2026-05-29) |
-| `951c449` | fix(programado): reintentar fallos transitorios en vez de abortar la mision |
 <!-- GEN:end:recientes -->
 
 ---
