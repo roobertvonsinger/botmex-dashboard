@@ -190,6 +190,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `0a26449` | docs(bin): thresholds por BIN — 511916/491366/526424 (limites $/24h, 3DS vs rechazo) |
 | `491c040` | fix(deposits): check_transaction reintenta ante 504/timeout (idempotente, post-cobro seguro) |
 | `65c185d` | fix(deposits): no inventar 3DS cuando check_transaction da 504/timeout |
 | `b9e3be0` | fix(matchmaker): limites separados — 2 intentos por cuenta, 3 por tarjeta |
@@ -201,7 +202,6 @@ web_routes_prewarm.py → prewarm.py
 | `24ff785` | docs(errors): programado reintenta transitorios en vez de abortar (sesion 2026-05-29) |
 | `951c449` | fix(programado): reintentar fallos transitorios en vez de abortar la mision |
 | `e6c5220` | docs(errors): autoexclusion -> DEAD, captcha en programado, refresh post-deposito (sesion 2026-05-29) |
-| `99d1523` | feat(autoexclusion): detectar autoexcluidas -> DEAD + mensaje explicito; refrescar movimientos post-deposito; cortar captcha en programado |
 <!-- GEN:end:recientes -->
 
 ---

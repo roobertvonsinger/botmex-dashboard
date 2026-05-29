@@ -3060,6 +3060,19 @@ td.row-details-cell, th.row-details-th {
   border-color: oklch(0.55 0.22 18 / 0.25);
   color: var(--danger);
 }
+/* 3DS NO es un fallo rojo: la tarjeta sirve, el procesador pidió autenticación
+   y la transacción no se acreditó. Ámbar (Robert 2026-05-29). */
+.dep-sched-tl-item.threeds {
+  background: var(--warn-soft);
+  border-color: oklch(0.80 0.16 75 / 0.30);
+  color: var(--warn);
+}
+.dep-sched-tl-item.retry {
+  background: var(--warn-soft);
+  border-color: oklch(0.80 0.16 75 / 0.22);
+  color: var(--warn);
+  opacity: 0.85;
+}
 .dep-sched-tl-iter { font-weight: 700; min-width: 30px; }
 .dep-sched-tl-icon { font-size: 12px; }
 .dep-sched-tl-code { flex: 1; opacity: 0.85; }
@@ -3103,6 +3116,30 @@ td.row-details-cell, th.row-details-th {
 }
 .dep-sched-run.aborted .dep-sched-bar-fill::after { animation: none; }
 .dep-sched-run.done .dep-sched-bar-fill::after { animation: none; }
+
+/* Detenida por 3DS = ÁMBAR (no rojo). La tarjeta sirve; el procesador pidió
+   autenticación y la txn no se acreditó (Robert 2026-05-29). */
+.dep-sched-run.threeds-stop {
+  border-color: oklch(0.80 0.16 75 / 0.5);
+  background:
+    radial-gradient(circle at 100% 0%, oklch(0.80 0.16 75 / 0.15), transparent 50%),
+    linear-gradient(180deg, oklch(0.80 0.16 75 / 0.06) 0%, transparent 100%);
+}
+.dep-sched-run.threeds-stop::before {
+  background: linear-gradient(180deg, var(--warn), oklch(0.62 0.14 75));
+}
+.dep-sched-run.threeds-stop .dep-sched-title,
+.dep-sched-run.threeds-stop .dep-sched-num { color: var(--warn); text-shadow: 0 0 10px oklch(0.80 0.16 75 / 0.35); }
+.dep-sched-run.threeds-stop .dep-sched-now-dot {
+  animation: none;
+  background: var(--warn);
+  box-shadow: 0 0 8px oklch(0.80 0.16 75 / 0.5);
+}
+.dep-sched-run.threeds-stop .dep-sched-bar-fill {
+  background: linear-gradient(90deg, oklch(0.62 0.14 75), var(--warn));
+  box-shadow: 0 0 8px oklch(0.80 0.16 75 / 0.4);
+}
+.dep-sched-run.threeds-stop .dep-sched-bar-fill::after { animation: none; }
 
 /* ──────────────────────────────────────────────────────────────────────────
    Drawer lateral derecho — reemplaza al modal centrado #depModalOverlay.

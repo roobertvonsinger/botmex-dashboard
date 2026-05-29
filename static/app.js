@@ -4228,16 +4228,20 @@ function _schedOnIterDone(ev) {
   _schedActive.currentIter = iter;
   _schedUpdateProgress();
 
-  // Append a timeline (más reciente arriba)
+  // Append a timeline (más reciente arriba). 3DS = ámbar (no rojo): la tarjeta
+  // sirve, solo el procesador pidió autenticación y la txn no se acreditó.
+  const is3ds = /3ds/i.test(code) || /3ds/i.test(ev.reason || '');
   const tl = $('#depSchedTimeline');
   if (tl) {
     const item = document.createElement('div');
-    item.className = `dep-sched-tl-item ${ok ? 'ok' : 'fail'}`;
+    const cls = ok ? 'ok' : (is3ds ? 'threeds' : 'fail');
+    const icon = ok ? '✓' : (is3ds ? '⚠' : '✗');
+    item.className = `dep-sched-tl-item ${cls}`;
     // title = mensaje explícito completo en hover (reason); el chip muestra el code corto.
     const reasonTitle = (!ok && ev.reason) ? esc(ev.reason) : '';
     item.innerHTML = `
       <span class="dep-sched-tl-iter">#${iter}</span>
-      <span class="dep-sched-tl-icon">${ok ? '✓' : '✗'}</span>
+      <span class="dep-sched-tl-icon">${icon}</span>
       <span class="dep-sched-tl-code"${reasonTitle ? ` title="${reasonTitle}"` : ''}>${esc(code)}</span>
       <span class="dep-sched-tl-dur">${esc(dur)}</span>
     `;
@@ -4334,10 +4338,16 @@ function _schedOnAborted(ev) {
   if (_schedHintTimer) { clearInterval(_schedHintTimer); _schedHintTimer = null; }
   if (_schedWatchdogTimer) { clearTimeout(_schedWatchdogTimer); _schedWatchdogTimer = null; }
   if (_schedCountdownTimer) { clearInterval(_schedCountdownTimer); _schedCountdownTimer = null; }
-  $('#depScheduledRun').classList.add('aborted');
-  // reason = mensaje explícito del backend (ej. autoexclusión con fecha). Cae al
-  // code solo si no hay reason. Antes mostraba el code pelón ("BEGIN_ERROR").
-  $('#depSchedNowText').textContent = `✗ Misión abortada — ${esc(ev.reason || ev.code || 'fallo')}`;
+  // 3DS no es un fallo "rojo": la tarjeta sirve, el procesador escaló a 3DS
+  // (ej. threshold del BIN) y la txn no se acreditó. Ámbar + ⚠ (Robert 2026-05-29).
+  const is3ds = /3ds/i.test(ev.code || '') || /3ds/i.test(ev.reason || '');
+  const run = $('#depScheduledRun');
+  run.classList.remove('aborted', 'threeds-stop');
+  run.classList.add(is3ds ? 'threeds-stop' : 'aborted');
+  const detail = esc(ev.reason || ev.code || 'fallo');
+  $('#depSchedNowText').textContent = is3ds
+    ? `⚠ Detenida por 3DS — ${detail}`
+    : `✗ Misión abortada — ${detail}`;
   $('#depSchedCountdown').classList.add('hidden');
   $('#depExec').textContent = '⏰ Nueva misión';
   $('#depExec').classList.remove('hidden');
