@@ -188,6 +188,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `951c449` | fix(programado): reintentar fallos transitorios en vez de abortar la mision |
 | `e6c5220` | docs(errors): autoexclusion -> DEAD, captcha en programado, refresh post-deposito (sesion 2026-05-29) |
 | `99d1523` | feat(autoexclusion): detectar autoexcluidas -> DEAD + mensaje explicito; refrescar movimientos post-deposito; cortar captcha en programado |
 | `ff9044a` | fix(movimientos): horas propias salían +6h (UTC sin convertir a MX) |
@@ -199,7 +200,6 @@ web_routes_prewarm.py → prewarm.py
 | `9d5b71f` | feat(map): rediseño MAP.md como guía de navegación para agentes IA |
 | `eb733e3` | feat(map): MAP.md auto-generado + hook pre-commit |
 | `68121cf` | feat(detalle+scheduled): panel de detalle inline (acordeón v14) + reuso de sesión en programados |
-| `6908af3` | fix(deposits): rescatar 406 con retry-rotación-IP + IPRoyal + crash del multi |
 <!-- GEN:end:recientes -->
 
 ---

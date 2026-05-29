@@ -345,6 +345,21 @@ docker exec betmexico-web python3 -c "import sqlite3;c=sqlite3.connect('/data/be
 
 ---
 
+### El programado abortaba la misión entera ante fallos TRANSITORIOS (corregido 2026-05-29)
+
+**Síntoma**: misiones programadas de N reps morían en la iter 1-2 con `✗ Misión abortada — BEGIN_ERROR` (504 Gateway Timeout) o `— LOGIN_FAILED` (406 FAILURE_IN_CAPTCHA), sin reintentar. Robert: *"¿por qué chingados se detiene si falla el login? eso ya lo habíamos ajustado"*.
+
+**Causa raíz**: el loop del scheduled hacía `if not ok: scheduled_aborted; break` ante **cualquier** falla. El ajuste previo (commit `78b4628`) fue solo para el MATCHMAKER (no marcar DEAD por `LOGIN_FAILED`); el programado seguía abortando. Un `504` del gateway de pagos o un `406` de captcha — ambos **infraestructura NUESTRA, no la cuenta** — mataban la misión completa.
+
+**Fix** (`deposits.py` + `static/app.js`, commit `951c449`):
+- **`begin_deposit` con retry** (`_run_deposit_with_phases`, los 3 flujos): es PRE-COBRO (paso 1, antes de `submit_card`) → reintentarlo NO duplica cargos. Ante `50x`/`timeout`/`connection` reintenta `BEGIN_MAX_ATTEMPTS=3` con backoff 6s. `_is_transient_gateway_error()` excluye 401/redirectLogin (eso es sesión/autoexclusión).
+- **Loop del programado reescrito (`for`→`while`)**: cuenta reps **EXITOSAS**. Ante fallo TRANSITORIO (todo lo que NO está en `SCHED_TERMINAL_RC`) reintenta la **misma rep** hasta `SCHED_MAX_TRANSIENT_RETRIES=4` con backoff `25s` (enfría IP en 406), **sin abortar**. Si la sesión reusada muere (401) reactiva el pool para re-login. Solo detienen razones REALES: `BANK_REJECTED`, `BANK_REJECTED_AFTER_APPROVE`, `3DS_REQUIRED`, `AUTOEXCLUSION`, `KYC_PENDING`, `LOGIN_DENIED`, `PENDING_NOT_APPLIED`, `DEPS_MISSING`.
+- **Frontend**: evento `scheduled_retry` → panel muestra `🔁 Reintentando intento N (x/4)` + rastro en timeline + label en feed. No se queda pegado.
+
+**Regla de Robert (2026-05-29)**: errores de NUESTRA infraestructura (captcha/proxy/gateway/login 406) = REINTENTOS, jamás detener. Igual principio que `gentle_login` y el matchmaker. Solo el estado REAL de BetMexico (tarjeta rechazada, autoexclusión, KYC, credenciales) detiene.
+
+---
+
 ## Frontend
 
 ### El feed de actividad muestra 2 entradas por 1 mismo depósito fallido
