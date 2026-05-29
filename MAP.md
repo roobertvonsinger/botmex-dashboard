@@ -184,6 +184,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `99d1523` | feat(autoexclusion): detectar autoexcluidas -> DEAD + mensaje explicito; refrescar movimientos post-deposito; cortar captcha en programado |
 | `ff9044a` | fix(movimientos): horas propias salían +6h (UTC sin convertir a MX) |
 | `78b4628` | feat(login): orquestación gentil (gentle_login) + fix matchmaker mata-cuentas |
 | `3c31ca5` | docs(map): Bóveda BetMexico marcada pendiente + guía de qué guardar |
@@ -195,7 +196,6 @@ web_routes_prewarm.py → prewarm.py
 | `68121cf` | feat(detalle+scheduled): panel de detalle inline (acordeón v14) + reuso de sesión en programados |
 | `6908af3` | fix(deposits): rescatar 406 con retry-rotación-IP + IPRoyal + crash del multi |
 | `c08024d` | feat(scheduled): cancel desde UI + rehidratación tras refresh (TDAH-friendly) |
-| `7a0b37f` | fix+feat: SSE who resuelto, tabla intentos sin truncar, drawer collapse rail |
 <!-- GEN:end:recientes -->
 
 ---

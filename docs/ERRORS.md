@@ -303,6 +303,48 @@ curl -X POST https://api.capmonster.cloud/getBalance -H 'Content-Type: applicati
 
 ---
 
+### Cuentas autoexcluidas se colaban como LIVE y fallaban con críptico `BEGIN_ERROR` (corregido 2026-05-29)
+
+**Síntoma**: depósito (programado/single/matchmaker) sobre una cuenta autoexcluida fallaba en `gateway_begin` con `BEGIN_ERROR` en ~0–2s, sin avisar al operador qué pasó. La cuenta seguía apareciendo LIVE (como "basura" en la lista) y se reintentaba.
+
+**Causa raíz (verificada con login fresco real, NO supuesta)**: la API de login de BetMexico (`/api/Session/login`) devuelve `isSuccess=True` + JWT **incluso para cuentas autoexcluidas** → `gentle_login` las clasifica `LIVE`. La restricción solo se manifiesta al depositar: `begin_deposit` (paymentsapi) devuelve `401 {"redirectLogin":true}`. El campo de autoexclusión SÍ viene en el perfil (`GET https://betmexico.mx/api/Users/{userId}` → `data.autoexclusion = {exclusionMonth, resumeExclusionDate}`), pero el extractor del bot (`fetch_account_details_parallel`) lo ignora.
+
+**Fix aplicado** (commit `99d1523`, todo en el repo dashboard — el monorepo NO se tocó, solo se leyó):
+- `autoexclusion.py` (nuevo): `check_autoexclusion(jwt, proxy)` consulta `/api/Users/{userId}` con el JWT que el dashboard ya tiene tras `gentle_login` y devuelve la info si `resumeExclusionDate` es futura. `mark_account_autoexcluded()` → `status='DEAD'`, `dead_reason='AUTOEXCLUSION hasta DD/MM/YYYY (N meses)'`.
+- **Update** (`prewarm._run_prewarm`): gate tras login → autoexcluida pasa a DEAD y sale de la vista (`list_accounts` filtra `status='LIVE'`).
+- **Depósito** (`deposits._run_deposit_with_phases`): gate tras login, ANTES de `begin_deposit` → `AUTOEXCLUSION` + DEAD + mensaje con fecha. Cubre los 3 flujos (comparten el wrapper). Fallback: un `401 redirectLogin` en `begin_deposit` re-verifica autoexclusión. Body crudo de `begin_deposit` ahora se loguea (antes se perdía).
+- Frontend: misión abortada y feed muestran el `reason` explícito, no el code pelón.
+
+**Regla de Robert (2026-05-29)**: autoexclusión = una de las 3 razones de muerte → DEAD es correcto y persistente.
+
+**Diagnóstico**:
+```bash
+docker exec betmexico-web sqlite3 ... # (no hay sqlite3 en el container; usar python3)
+docker exec betmexico-web python3 -c "import sqlite3;c=sqlite3.connect('/data/betmexico_accounts.db');print(c.execute(\"SELECT email,status,dead_reason FROM accounts WHERE dead_reason LIKE 'AUTOEXCLUSION%'\").fetchall())"
+```
+
+---
+
+### Programado quemaba captcha toda la misión aunque reusara la sesión (corregido 2026-05-29)
+
+**Síntoma**: una misión Programada (1 tarjeta, N reps, reuso de JWT) seguía resolviendo tokens CapMonster cada ~55s durante todos los minutos del run, aunque solo la iter 0 hace login.
+
+**Causa raíz**: `scheduled_create.loop()` arranca `pool.start_factory()`, cuyo `_factory_loop` mantiene el pool lleno a `max_pool` indefinidamente: cada token expira a los `TOKEN_MAX_AGE=55s` y el factory lo regenera. Las iters 1..N reusan `session_jwt` (0 captcha), pero el factory seguía produciendo. Una misión de 9 reps (~9 min) resolvía ~9 tokens innecesarios.
+
+**Fix** (`deposits.py`, commit `99d1523`): tras capturar la sesión en iter 0 (`session_jwt`), `await pool.stop()` (idempotente) y `pool=None`. El factory sólo vive durante el login inicial (donde sí se necesita para reintentos de `gentle_login`); después se apaga. 1 token por misión en vez de ~N.
+
+---
+
+### Movimientos/balance no se actualizaban tras un intento de depósito (corregido 2026-05-29)
+
+**Síntoma**: tras depositar (aprobado o rechazado), el panel de detalle seguía mostrando movimientos/saldo viejos hasta picar "Actualizar visibles" manual.
+
+**Causa raíz**: las transacciones solo se capturaban en el LOGIN (que ocurre ANTES del depósito) → el intento recién hecho nunca se reflejaba. En programado, las iters con reuso de sesión (`persist_login_data=False`) ni refrescaban.
+
+**Fix** (`deposits.py`, commit `99d1523`): helper `_refresh_account_after_deposit()` corre al final de `_run_deposit_with_phases` (los 3 flujos): reusa el JWT del login (sin captcha) para `fetch_account_details_parallel(fetch_mode="full")` y persiste balance+txns+grade vía los persisters de `prewarm`. Emite SSE `account_refreshed`; el frontend repinta la fila y, si el detalle de esa cuenta está abierto, recarga los movimientos sin cerrar el panel. Costo: +2–5s por intento (sin captcha).
+
+---
+
 ## Frontend
 
 ### El feed de actividad muestra 2 entradas por 1 mismo depósito fallido
