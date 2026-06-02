@@ -210,6 +210,7 @@ async def gentle_login(
     sticky_mgr: Optional[StickySessionManager] = None,
     use_cache: bool = False,
     attempt_timeout: float = 35.0,
+    allow_proxyless: bool = False,
 ) -> LoginResult:
     """Login gentil con reintentos espaciados rotando IP. Una sesión sticky por
     intento; fresca al reintentar.
@@ -252,6 +253,7 @@ async def gentle_login(
     attempts_done = 0
     last_status: Optional[str] = None
     pool_dry_waits = 0  # cota de esperas por pool seco (no son intentos)
+    proxyless_waits = 0  # cota de esperas por falta de proxy (REGLA: nunca proxyless en prod)
 
     # Estado del token REUSABLE. Se pide uno nuevo solo si no hay / expiró / se
     # reusó demasiado. Un 406 NO consume el token → lo reusamos rotando IP.
@@ -292,6 +294,22 @@ async def gentle_login(
             if cur is None:
                 cur = _pool_session()
         proxy_url = cur.proxy_url if cur else None
+
+        # 2.5 REGLA DURA (Robert): NUNCA loguear proxyless en prod — filtraría la
+        # IP real del server. Si el pool no dio proxy → esperar/reintentar; tras la
+        # cota → LOGIN_RETRY_LATER. (El captcha SÍ se resuelve proxyless; esto es
+        # solo el SUBMIT del login.) Pasar allow_proxyless=True solo en tests.
+        if not proxy_url and not allow_proxyless:
+            if proxyless_waits < 5:
+                proxyless_waits += 1
+                logger.error(f"[gentle_login] {email} SIN PROXY disponible — espera "
+                             f"{proxyless_waits}/5 (NO se loguea proxyless)")
+                await asyncio.sleep(2.0)
+                continue
+            logger.error(f"[gentle_login] {email} sin proxy tras esperas → LOGIN_RETRY_LATER (bloqueado proxyless)")
+            return LoginResult(ok=False, code="LOGIN_RETRY_LATER",
+                               error="no proxy disponible (proxyless bloqueado por regla)",
+                               attempts=attempts_done)
 
         # 3. Jitter ANTES del intento (anti-ráfaga)
         base = _jitter_base(bool(proxy_url), streak)

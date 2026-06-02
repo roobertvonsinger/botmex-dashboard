@@ -186,7 +186,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_classify_dead` | def | L162–L174 |
 | `_pool_session` | def | L177–L188 |
 | `_jitter_base` | def | L191–L198 |
-| `gentle_login` | def | L202–L361 |
+| `gentle_login` | def | L202–L379 |
 
 ### `prewarm.py`
 
