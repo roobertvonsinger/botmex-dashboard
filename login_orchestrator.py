@@ -35,6 +35,17 @@ logger = logging.getLogger("betmexico.dashboard.login_orch")
 # NodeMaven sticky dura ~2 min; margen para no usarla a punto de expirar.
 _STICKY_TTL_SEC = 110
 
+# ── Reuso de token v2 (insight Robert 2026-06-01) ────────────────────────────
+# Un 406 FAILURE_IN_CAPTCHA NO consume el token: BetMexico rechaza el request
+# (por reputación de IP o por esperar otra versión) ANTES de mandarlo a verificar
+# con Google, así que el token v2 sigue vivo su TTL (~120s). En vez de quemar un
+# token de CapMonster por cada reintento, REUSAMOS el mismo rotando IP/jitter.
+_TOKEN_REUSE_MAX_AGE = 100.0  # seg: < 120s de vida real del v2 (margen seguro)
+# Tras N reusos forzamos un token fresco. Defensa por si en prod resultara que el
+# 406 SÍ consume el token (el test del 2026-06-01 no llegó a observar un 406):
+# así el login se auto-cura en vez de martillar con un token muerto.
+_TOKEN_MAX_REUSES = 8
+
 
 # ── Sticky sessions (NodeMaven) ──────────────────────────────────────────────
 @dataclass
@@ -137,6 +148,17 @@ def _import_get_jwt():
     return get_jwt
 
 
+def _import_login_primitives():
+    """Runtime import de los primitivos para el loop con reuso de token: el checker
+    HTTP del bot, el persistidor de JWT cache y el handle de BD. Permite llamar
+    `test_login` directo (reusando el mismo token) en vez de pasar por `get_jwt`,
+    que pide un token nuevo del pool en cada llamada."""
+    from betmexico_login_api import BetmexicoApiChecker  # type: ignore
+    from betmexico_login_service import _persist_jwt_cache  # type: ignore
+    from betmexico_db import db  # type: ignore
+    return BetmexicoApiChecker, _persist_jwt_cache, db
+
+
 def _classify_dead(login_result: dict) -> str:
     """Sub-clasifica un status='DEAD' del bot en una de las 3 razones de muerte
     leyendo `api.message`. 401 sin mensaje claro → LOGIN_DENIED (credenciales)."""
@@ -210,18 +232,59 @@ async def gentle_login(
         account_dead=True SOLO en LOGIN_DENIED/KYC_PENDING/AUTOEXCLUSION.
     """
     try:
-        get_jwt = _import_get_jwt()
+        BetmexicoApiChecker, _persist_jwt_cache, _db = _import_login_primitives()
     except Exception as e:
-        logger.error(f"[gentle_login] no pude importar get_jwt: {e}")
+        logger.error(f"[gentle_login] no pude importar primitivos de login: {e}")
         return LoginResult(ok=False, code="DEPS_MISSING", error=str(e))
+
+    # ── JWT cache fast-path (intento 0): sin captcha ni POST si hay JWT vigente ──
+    if use_cache:
+        try:
+            cached = _db.get_jwt_cache(email)
+            if cached and cached.get("expires_at", 0) > (time.time() + 60):
+                logger.info(f"[gentle_login] {email} JWT cache HIT (sin captcha)")
+                return LoginResult(ok=True, jwt=cached["token"], code="LIVE",
+                                   sticky_session=sticky_session, attempts=0)
+        except Exception as e:
+            logger.debug(f"[gentle_login] {email} cache lookup err: {e}")
 
     streak = 0
     attempts_done = 0
     last_status: Optional[str] = None
     pool_dry_waits = 0  # cota de esperas por pool seco (no son intentos)
 
+    # Estado del token REUSABLE. Se pide uno nuevo solo si no hay / expiró / se
+    # reusó demasiado. Un 406 NO consume el token → lo reusamos rotando IP.
+    cur_token: Optional[str] = None
+    cur_task_id = None
+    token_born = 0.0
+    token_reuses = 0
+
     while attempts_done < max_login_retries:
-        # 1. Elegir IP para este intento
+        # 1. Garantizar token: pedir del pool solo si hace falta.
+        token_age = (time.time() - token_born) if cur_token else 1e9
+        if cur_token is None or token_age >= _TOKEN_REUSE_MAX_AGE or token_reuses >= _TOKEN_MAX_REUSES:
+            if pool is None:
+                logger.error(f"[gentle_login] {email} sin pool de captcha")
+                return LoginResult(ok=False, code="DEPS_MISSING", error="no captcha pool")
+            res = await pool.get_token(timeout=30)
+            if not res:
+                # Pool de captcha seco → esperar y NO gastar intento (cota 5).
+                if pool_dry_waits < 5:
+                    pool_dry_waits += 1
+                    logger.info(f"[gentle_login] {email} pool seco — espera {pool_dry_waits}/5")
+                    await asyncio.sleep(2.0)
+                    continue
+                attempts_done += 1
+                last_status = "CAPTCHA_TIMEOUT"
+                continue
+            cur_token, cur_task_id = res
+            token_born = time.time()
+            token_reuses = 0
+            logger.info(f"[gentle_login] {email} token {'inicial' if attempts_done == 0 else 'refrescado'} "
+                        f"(task {cur_task_id})")
+
+        # 2. Elegir IP para este intento
         if sticky_session is not None and attempts_done == 0:
             cur = sticky_session
         else:
@@ -230,40 +293,47 @@ async def gentle_login(
                 cur = _pool_session()
         proxy_url = cur.proxy_url if cur else None
 
-        # 2. Jitter ANTES del intento (anti-ráfaga)
+        # 3. Jitter ANTES del intento (anti-ráfaga)
         base = _jitter_base(bool(proxy_url), streak)
         if throttle:
             await asyncio.sleep(random.uniform(0.1, base))
 
-        # 3. Login: 1 captcha en 1 IP (max_retries=1). Timeout POR INTENTO.
+        # 4. Login REUSANDO el token actual. Timeout POR INTENTO.
         try:
-            jwt, login_result = await asyncio.wait_for(
-                get_jwt(email, password, pool, proxy=proxy_url,
-                        use_cache=(use_cache and attempts_done == 0), max_retries=1),
-                timeout=attempt_timeout,
-            )
+            async with BetmexicoApiChecker(proxy=proxy_url) as checker:
+                login_result = await asyncio.wait_for(
+                    checker.test_login(email, password,
+                                       captcha_token=cur_token, captcha_task_id=cur_task_id,
+                                       fetch_mode="minimal"),
+                    timeout=attempt_timeout,
+                )
         except asyncio.TimeoutError:
             logger.warning(f"[gentle_login] {email} timeout intento {attempts_done+1}")
-            streak += 1
-            attempts_done += 1
-            last_status = "TIMEOUT"
+            streak += 1; attempts_done += 1; token_reuses += 1; last_status = "TIMEOUT"
             continue
         except Exception as e:
             # proxy/conexión → rotar IP, NO mata
             logger.warning(f"[gentle_login] {email} excepción intento {attempts_done+1}: {str(e)[:120]}")
-            streak += 1
-            attempts_done += 1
-            last_status = "ERROR"
+            streak += 1; attempts_done += 1; token_reuses += 1; last_status = "ERROR"
             continue
 
         status = login_result.get("status") if isinstance(login_result, dict) else None
 
-        # 4. Clasificar (REGLA DE ROBERT)
-        if jwt and status in (None, "LIVE"):
-            logger.info(f"[gentle_login] {email} LIVE en intento {attempts_done+1} "
-                        f"({'cache' if isinstance(login_result, dict) and login_result.get('from_cache') else 'fresh'})")
-            return LoginResult(ok=True, jwt=jwt, code="LIVE",
-                               sticky_session=cur, attempts=attempts_done + 1)
+        # 5. Clasificar (REGLA DE ROBERT)
+        if status == "LIVE":
+            jwt = (login_result.get("api") or {}).get("token")
+            if jwt:
+                try:
+                    _persist_jwt_cache(email, jwt)
+                except Exception:
+                    pass
+                logger.info(f"[gentle_login] {email} LIVE en intento {attempts_done+1} "
+                            f"(token reusado {token_reuses}x, edad {time.time()-token_born:.0f}s)")
+                return LoginResult(ok=True, jwt=jwt, code="LIVE",
+                                   sticky_session=cur, attempts=attempts_done + 1)
+            logger.warning(f"[gentle_login] {email} LIVE sin JWT — reintento")
+            streak += 1; attempts_done += 1; token_reuses += 1; last_status = "LIVE_NO_JWT"
+            continue
 
         if status == "DEAD":
             code = _classify_dead(login_result if isinstance(login_result, dict) else {})
@@ -271,26 +341,17 @@ async def gentle_login(
             return LoginResult(ok=False, code=code, account_dead=True,
                                error=str(login_result)[:200], attempts=attempts_done + 1)
 
-        if status == "CAPTCHA_TIMEOUT":
-            # Pool de captcha seco → esperar y NO gastar intento (cota 5).
-            if pool_dry_waits < 5:
-                pool_dry_waits += 1
-                logger.info(f"[gentle_login] {email} pool seco — espera {pool_dry_waits}/5")
-                await asyncio.sleep(2.0)
-                continue
-            # demasiadas esperas → cuenta como intento para no colgar
-            attempts_done += 1
-            last_status = status
-            continue
-
         if status == "BAN":
             # 403/429 rate-limit → backoff extra (portado: sleep(jitter*2)). NO mata.
             if throttle:
                 await asyncio.sleep(random.uniform(0.1, base) * 2)
 
-        # RETRY_CAPTCHA / BAN / ERROR / desconocido → reintentar rotando IP
+        # RETRY_CAPTCHA(406) / BAN / ERROR / desconocido → reintentar.
+        # 406: el token SOBREVIVE → lo REUSAMOS (solo rotamos IP). token_reuses++
+        # fuerza un token fresco tras _TOKEN_MAX_REUSES (auto-cura defensiva).
         streak += 1
         attempts_done += 1
+        token_reuses += 1
         last_status = status
 
     # Agotados los reintentos → NUNCA DEAD.

@@ -39,6 +39,20 @@ docker logs betmexico-web 2>&1 | grep "bot init failed"
 
 ---
 
+### Token v2 de CapMonster desperdiciado: 1 token quemado por cada reintento de login
+
+**Síntoma**: cada 406 `RETRY_CAPTCHA` durante el login gastaba un token nuevo de CapMonster. En un login que reintenta 4 veces = 4 tokens solicitados (3 "tirados").
+
+**Causa**: `gentle_login` reintentaba llamando `get_jwt(..., max_retries=1)`, y `get_jwt` saca **un token nuevo del pool** en cada llamada (`betmexico_login_service.py` L94 `pool.get_token`). El token del intento previo se descartaba.
+
+**Insight (Robert, 2026-06-01)**: un 406 `FAILURE_IN_CAPTCHA` **NO consume el token v2**. BetMexico rechaza el request (por reputación de IP o por esperar otra versión) **antes de mandarlo a verificar con Google**, así que el token sigue vivo su TTL (~120s). No hay por qué tirarlo.
+
+**Fix (2026-06-01, deploy scp + restart)**: `login_orchestrator.py` — `gentle_login` ahora llama `betmexico_login_api.BetmexicoApiChecker.test_login` directo **reusando el mismo token** entre reintentos (solo rota IP + jitter). Pide un token nuevo solo si: no hay, edad ≥ `_TOKEN_REUSE_MAX_AGE` (100s) o se reusó ≥ `_TOKEN_MAX_REUSES` (8, auto-cura defensiva por si en prod resultara que sí se consume). JWT cache fast-path y REGLA DE ROBERT (solo LOGIN_DENIED/KYC/AUTOEXCLUSION matan) intactos. Prefetch de pool subido a 2 en programado/single (spare caliente).
+
+**Caveat medido**: el test del 2026-06-01 (`_test_token_reuse.py`, cuenta `olimpo.flor`) cuadró LIVE **al primer intento proxyless** → NO llegó a observar un 406 que reusar. El reuso es bajo riesgo (peor caso = comportamiento viejo, pero ahorra solves); la supervivencia-al-406 aún **no está confirmada en prod**. Verificar en `dashboard.log` cuando vuelvan los 406: buscar `token reusado Nx` con N>0 en un `LIVE`. Dato extra: el pool de proxies salió **vacío** en el container y proxyless cuadró igual (coincide con "v2 proxyless").
+
+---
+
 ### Movimientos del modal: las horas "nuestras" salían +6h (corregido 2026-05-28)
 
 **Síntoma**: en el modal de detalle (sección MOVIMIENTOS), las transacciones propias (ícono rayo, `source=dashboard`) aparecían 6 horas adelante vs la página real de BetMexico. Ej: depósito mostrado a las 08:09 cuando la página lo muestra a 02:09. Las de BetMexico (`source=betmex`, globo) salían bien → "algunas bien, otras no".

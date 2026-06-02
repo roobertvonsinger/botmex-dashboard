@@ -3,6 +3,19 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-06-01 (reuso de token v2 en gentle_login — anti-desperdicio captcha)
+
+### Login — reuso de token (`login_orchestrator.gentle_login`)
+
+| Función | Esperado | Actual | Estado |
+|---|---|---|---|
+| Reuso de token entre reintentos | ✅ un 406 no consume el token → reusar el mismo (rota solo IP) hasta TTL; pedir nuevo solo si edad≥100s o reusos≥8 | ✅ `test_login` directo con `captcha_token` fijo; `_TOKEN_REUSE_MAX_AGE`/`_TOKEN_MAX_REUSES` | ⚠️ supervivencia-al-406 NO observada en prod aún (test cuadró LIVE 1er intento, sin 406) |
+| JWT cache fast-path (intento 0) | ✅ si hay JWT vigente, sin captcha ni POST | ✅ `_db.get_jwt_cache` + margen 60s | ✅ |
+| REGLA DE ROBERT (3 razones de muerte) | ✅ solo LOGIN_DENIED/KYC_PENDING/AUTOEXCLUSION matan; resto → retry → LOGIN_RETRY_LATER | ✅ preservada en el refactor | ✅ |
+| Persist JWT en LIVE | ✅ guardar en cache tras login fresco | ✅ `_persist_jwt_cache` | ✅ |
+| Prefetch pool (programado/single) | ✅ 2 tokens calientes → reintento sin esperar solve | ✅ `make_pool(size=2)` + `prefetch(2)` en scheduled/single | ✅ |
+| Smoke funcional (1 cuenta LIVE) | ✅ gentle_login devuelve ok/LIVE/jwt | ✅ 2026-06-01 `ok=True code=LIVE attempts=1 jwt=True` | ✅ |
+
 ## Captura: 2026-05-28 (rediseño detalle a panel INLINE + session-reuse en programados)
 
 ### Detalle de cuenta — panel inline (rediseño 2026-05-28)

@@ -93,12 +93,13 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
+| `_test_token_reuse.py` | 176 | `—` | _[completar]_ |
 | `app.py` | 2430 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 79 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2260 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
-| `login_orchestrator.py` | 300 | `betmexico.dashboard.login_orch` | _[completar]_ |
+| `deposits.py` | 2263 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `login_orchestrator.py` | 361 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 692 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 295 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `scripts/gen_map.py` | 486 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
@@ -178,9 +179,10 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:env -->
 | Variable | Default | Definida en |
 |----------|---------|-------------|
-| `BMX_CAPMONSTER_KEY` | `"a9040840fdb3828ecc6090a6010afcad"` | `web_routes_missions.py` |
+| `BMX_CAPMONSTER_KEY` | `""` | `_test_token_reuse.py` |
 | `BMX_NO_PROXY` | `"0"` | `web_routes_deposits.py` |
 | `BMX_WATCHDOG_INTERVAL_MIN` | `"90"` | `web_watchdog.py` |
+| `CAPMONSTER_KEY` | `""` | `_test_token_reuse.py` |
 <!-- GEN:end:env -->
 
 ---
@@ -190,6 +192,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `4ba18eb` | feat(bines): panel de inteligencia de BINes en sidebar (SA) — tasa de aprobacion |
 | `6e5b6f1` | ui(detalle): 3DS en ambar tambien en la tabla de movimientos/intentos |
 | `919d38e` | ui(programado): 3DS en AMBAR (no rojo dramatico) + icono advertencia |
 | `0a26449` | docs(bin): thresholds por BIN — 511916/491366/526424 (limites $/24h, 3DS vs rechazo) |
@@ -201,7 +204,6 @@ web_routes_prewarm.py → prewarm.py
 | `2d469a8` | fix(proxy+multi): IPRoyal rotativo (no IP fija quemada) + reintentos de login en matchmaker |
 | `7b8a195` | feat(proxy-health): mostrar salud del POOL EN USO (alive/total), no un proxy suelto |
 | `eb4c3ba` | fix(proxy-health): chequear el pool ACTIVO, no LitPort excluido (falsa alarma 'caido') |
-| `24ff785` | docs(errors): programado reintenta transitorios en vez de abortar (sesion 2026-05-29) |
 <!-- GEN:end:recientes -->
 
 ---

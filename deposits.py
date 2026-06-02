@@ -1198,9 +1198,9 @@ async def deposit_execute(request: Request, user: dict = Depends(require_session
     # lockeada por otro y el caller no es superadmin.
     _auto_lock_for_deposit(account_id, operator_id, user, hours=AUTOLOCK_HOURS_SINGLE)
 
-    # Pool de captcha — factory ON: el retry-con-rotación-de-IP puede pedir
-    # varios tokens (1 por IP hasta acertar una limpia), y sin factory el pool
-    # quedaría vacío tras el primer token → get_token() timeout en el reintento.
+    # Pool de captcha — factory ON. Con reuso de token (login_orchestrator) un
+    # token sirve para varios reintentos; size/prefetch 2 deja un spare caliente
+    # por si el token expira o se agota su cuota de reusos a media-rotación.
     cap_key = os.environ.get("CAPMONSTER_KEY", "") or os.environ.get("BMX_CAPMONSTER_KEY", "")
     pool = None
     prefetch_task = None
@@ -1208,9 +1208,9 @@ async def deposit_execute(request: Request, user: dict = Depends(require_session
     result = None
     _exc = None
     try:
-        pool = make_pool(cap_key, size=1, workers=1)
+        pool = make_pool(cap_key, size=2, workers=1)
         await pool.start_factory()
-        prefetch_task = asyncio.create_task(pool.prefetch(1))
+        prefetch_task = asyncio.create_task(pool.prefetch(2))
 
         result = await _run_deposit(
             email=email,
@@ -1366,9 +1366,9 @@ async def deposit_execute_stream(request: Request, user: dict = Depends(require_
             # Start event con attempt_id para que el frontend correlacione
             yield f"data: {json.dumps({'type':'start','attempt_id':attempt_id,'email':email,'amount':amount})}\n\n"
 
-            pool = make_pool(cap_key, size=1, workers=1)
-            await pool.start_factory()  # necesario: retry-con-rotación pide varios tokens
-            prefetch_task = asyncio.create_task(pool.prefetch(1))
+            pool = make_pool(cap_key, size=2, workers=1)
+            await pool.start_factory()  # spare caliente; con reuso un token cubre varios reintentos
+            prefetch_task = asyncio.create_task(pool.prefetch(2))
 
             # Lanza deposit en background — emite fases vía phase_cb → queue
             deposit_task = asyncio.create_task(
@@ -2001,11 +2001,14 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
             # Init pool INSIDE try so _active_schedules cleanup runs in finally
             # even if start_factory fails (prevents orphaned scheduled entry).
             logger.info(f"[Scheduled {sched_id}] llamando make_pool…")
-            pool = make_pool(cap_key, size=1, workers=1)
+            # size/prefetch 2: el login-semilla (iter 0) reintenta con token caliente
+            # ya listo en vez de esperar el solve (~4-7s). Las iters 1..N reusan JWT
+            # (0 captcha) y la factory se detiene tras capturar sesión.
+            pool = make_pool(cap_key, size=2, workers=1)
             logger.info(f"[Scheduled {sched_id}] make_pool OK, start_factory…")
             await pool.start_factory()
             logger.info(f"[Scheduled {sched_id}] start_factory OK, prefetch + entrando al for")
-            asyncio.create_task(pool.prefetch(1))
+            asyncio.create_task(pool.prefetch(2))
             # Sesión reutilizada entre iteraciones: la iter 0 hace login real
             # (1 captcha) y captura el JWT + proxy; las iters 1..N lo reusan sin
             # volver a loguear. El JWT vive ~7 días, el run dura <20 min → seguro.

@@ -13,6 +13,17 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 <!-- GEN:start:simbolos -->
 
+### `_test_token_reuse.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `_short` | def | L43–L51 |
+| `solve_token` | def | L54–L62 |
+| `attempt` | def | L65–L74 |
+| `run_block` | def | L77–L109 |
+| `verdict` | def | L112–L141 |
+| `main` | def | L144–L172 |
+
 ### `app.py`
 
 | Símbolo | Tipo | Líneas |
@@ -158,23 +169,24 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `cap_status` | def | L1497–L1509 |
 | `multi_stream` | def | L1541–L1911 |
 | `multi_cancel` | def | L1915–L1920 |
-| `scheduled_create` | def | L1933–L2222 |
-| `scheduled_list` | def | L2226–L2248 |
-| `scheduled_cancel` | def | L2252–L2260 |
+| `scheduled_create` | def | L1933–L2225 |
+| `scheduled_list` | def | L2229–L2251 |
+| `scheduled_cancel` | def | L2255–L2263 |
 
 ### `login_orchestrator.py`
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `StickySession` | class | L41–L49 |
-| `parse_nodemaven_line` | def | L52–L69 |
-| `StickySessionManager` | class | L72–L113 |
-| `LoginResult` | class | L118–L130 |
-| `_import_get_jwt` | def | L134–L137 |
-| `_classify_dead` | def | L140–L152 |
-| `_pool_session` | def | L155–L166 |
-| `_jitter_base` | def | L169–L176 |
-| `gentle_login` | def | L180–L300 |
+| `StickySession` | class | L52–L60 |
+| `parse_nodemaven_line` | def | L63–L80 |
+| `StickySessionManager` | class | L83–L124 |
+| `LoginResult` | class | L129–L141 |
+| `_import_get_jwt` | def | L145–L148 |
+| `_import_login_primitives` | def | L151–L159 |
+| `_classify_dead` | def | L162–L174 |
+| `_pool_session` | def | L177–L188 |
+| `_jitter_base` | def | L191–L198 |
+| `gentle_login` | def | L202–L361 |
 
 ### `prewarm.py`
 
