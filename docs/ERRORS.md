@@ -376,6 +376,40 @@ docker exec betmexico-web python3 -c "import sqlite3;c=sqlite3.connect('/data/be
 
 ---
 
+### Login masivo cae en `402 Payment Required` — proxy IPRoyal sin saldo (2026-06-23)
+
+**Síntoma**: ráfaga de logins fallando, ~50% con `[ERROR] test_login: 402 Payment Required` (sin un `[API] Status:` previo), el resto alternando `406 FAILURE_IN_CAPTCHA` y `429 Rate limit`. `gentle_login` agota los 4 intentos → `LOGIN_RETRY_LATER`. Robert preguntó alarmado si el dashboard estaba logueando **proxyless**.
+
+**Causa raíz (verificada con curl directo, NO supuesta)**: el proxy **IPRoyal** (`geo.iproyal.com:11201`, en `proxy_pool.EXTRA_ADMIN_PROXIES`) **se quedó sin saldo**. Rechaza cada CONNECT con:
+```
+> CONNECT api.ipify.org:443 HTTP/1.1
+< HTTP/1.1 402 Payment Required
+< X-Response-Origin: proxy-server      ← el propio proxy, no BetMexico
+* CONNECT tunnel failed, response 402
+```
+El 402 se levanta como **excepción durante el CONNECT** (antes de llegar a BetMexico) → cae en el `except Exception` de `betmexico_login_api.test_login` que loguea `[ERROR] test_login: {e}`. Por eso NO hay `[API] Status: 402` previo (contraste: 406/429 sí muestran `[API] Status:` porque la request sí llegó). El pool del dashboard hace `random.choice` entre 2 proxies (IPRoyal + NodeMaven; LitPort ya estaba excluido), así que ~50% de los intentos caían en IPRoyal y morían al instante.
+
+**Proxyless descartado (importante)**: NO se estaba logueando sin proxy. `gentle_login` tiene `allow_proxyless=False` por default ([login_orchestrator.py:213](../login_orchestrator.py)) y bloquea el submit si el pool no da proxy ([login_orchestrator.py:302](../login_orchestrator.py)) → `LOGIN_RETRY_LATER`. Confirmado además por ausencia de cualquier log `SIN PROXY disponible`. La IP real del server nunca se expuso.
+
+**Fix aplicado** (2026-06-23, `proxy_pool.py`): IPRoyal agregado a `_EXCLUDED_PROXY_HOSTS = ("litport", "iproyal")`. `all_proxies()` lo filtra → el pool queda solo con **NodeMaven** (instrucción de Robert: "redirige el tráfico por NodeMaven"). Los 402 desaparecen.
+
+**Caveat**: con IPRoyal fuera, el pool queda con **un solo proxy** (NodeMaven). Si NodeMaven se cae o se queda sin saldo, el pool queda vacío → `gentle_login` bloquea (LOGIN_RETRY_LATER, NUNCA proxyless). El **406/429 de NodeMaven sigue siendo problema de fondo** (reputación IP vs antifraude BetMexico — ver entries de 406 arriba); excluir IPRoyal solo elimina el desperdicio del 402, no arregla el 406.
+
+**Reversión**: cuando se recargue saldo en IPRoyal, quitar `"iproyal"` de la tupla. Verificar antes:
+```bash
+curl -sv -x "http://USER:PASS@geo.iproyal.com:11201" https://api.ipify.org 2>&1 | grep -iE "HTTP/|402"
+# Debe dar HTTP 200, no 402.
+```
+
+**Diagnóstico** (para distinguir 402-proxy de 402-otro en el futuro):
+```bash
+# Probar cada proxy del pool directo:
+curl -sv -m 20 -x "<proxy_url>" https://api.ipify.org 2>&1 | grep -iE "CONNECT|402|Payment|X-Response-Origin"
+# 402 + X-Response-Origin: proxy-server  →  proxy sin saldo
+```
+
+---
+
 ## Frontend
 
 ### El feed de actividad muestra 2 entradas por 1 mismo depósito fallido

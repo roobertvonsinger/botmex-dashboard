@@ -46,14 +46,22 @@ EXTRA_ADMIN_PROXIES: List[Dict[str, str]] = [
 ]
 
 # Hosts excluidos del pool — proxies con reputación quemada para el reCAPTCHA
-# de BetMexico.
+# de BetMexico o sin saldo.
 # LitPort RE-EXCLUIDO 2026-05-28 (Robert): la premisa que lo devolvió ("el problema
 # era v2-vs-v3") quedó REFUTADA con datos — v3 dio 0% aun con navegador real; el 406
 # es reputación de IP/antifraude. LitPort `hub-us-7.litport.net:1337` da 0% Y es IP
 # de US (no MX) → veneno para BetMexico (MX). gentle_login hace random.choice del
-# pool; dejarlo gastaba ~1/3 de intentos en una IP muerta US. Quedan IPRoyal MX y
-# NodeMaven MX. Ver docs/plans/login-orchestration-rework.md.
-_EXCLUDED_PROXY_HOSTS: tuple = ("litport",)
+# pool; dejarlo gastaba ~1/3 de intentos en una IP muerta US. Ver
+# docs/plans/login-orchestration-rework.md.
+# IPRoyal EXCLUIDO 2026-06-23 (Robert): SIN SALDO. El CONNECT al proxy devuelve
+# `HTTP/1.1 402 Payment Required` + header `X-Response-Origin: proxy-server`
+# (verificado con curl directo). ~50% de los intentos de login morían al instante
+# en el 402 (random.choice entre IPRoyal y NodeMaven). Excluirlo deja el tráfico por
+# NodeMaven (instrucción de Robert). QUITAR "iproyal" de esta tupla cuando se recargue
+# saldo en IPRoyal — verificar con:
+#   curl -sv -x "http://USER:PASS@geo.iproyal.com:11201" https://api.ipify.org
+# (debe dar HTTP 200, no 402). Ver docs/ERRORS.md §"402 Payment Required".
+_EXCLUDED_PROXY_HOSTS: tuple = ("litport", "iproyal")
 
 
 def _bot_proxies() -> List[Dict[str, str]]:
