@@ -193,6 +193,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `ee1685f` | feat(proxy): Data Impulse 50 sticky MX como pool primario — rompe monoproxy + 504 |
 | `80122c2` | docs: agregar CLAUDE.md con pointer acceso Hostinger API/MCP (KVM2+KVM4) |
 | `564647c` | fix(proxy): excluir IPRoyal del pool — sin saldo (402 Payment Required) |
 | `c00a422` | fix(login): blindar gentle_login contra login proxyless (regla de Robert) |
@@ -204,7 +205,6 @@ web_routes_prewarm.py → prewarm.py
 | `491c040` | fix(deposits): check_transaction reintenta ante 504/timeout (idempotente, post-cobro seguro) |
 | `65c185d` | fix(deposits): no inventar 3DS cuando check_transaction da 504/timeout |
 | `b9e3be0` | fix(matchmaker): limites separados — 2 intentos por cuenta, 3 por tarjeta |
-| `a31dcff` | fix(matchmaker): retirar cuenta tras N BANK_REJECTED (parar masacre de intentos) |
 <!-- GEN:end:recientes -->
 
 ---
