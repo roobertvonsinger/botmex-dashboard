@@ -216,17 +216,17 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `_bot_proxies` | def | L67–L73 |
-| `all_proxies` | def | L76–L84 |
-| `_to_url` | def | L87–L97 |
-| `get_admin_proxy` | def | L100–L105 |
-| `build_admin_proxy_url` | def | L108–L111 |
-| `shuffled_proxy_urls` | def | L114–L122 |
-| `_retry_exceptions` | def | L130–L156 |
-| `_proxy_host` | def | L159–L163 |
-| `call_with_proxy_failover` | def | L166–L257 |
-| `_looks_like_proxy_failure_result` | def | L266–L285 |
-| `_looks_like_captcha_failure_result` | def | L288–L303 |
+| `_bot_proxies` | def | L96–L102 |
+| `all_proxies` | def | L105–L113 |
+| `_to_url` | def | L116–L126 |
+| `get_admin_proxy` | def | L129–L134 |
+| `build_admin_proxy_url` | def | L137–L140 |
+| `shuffled_proxy_urls` | def | L143–L151 |
+| `_retry_exceptions` | def | L159–L185 |
+| `_proxy_host` | def | L188–L192 |
+| `call_with_proxy_failover` | def | L195–L286 |
+| `_looks_like_proxy_failure_result` | def | L295–L314 |
+| `_looks_like_captcha_failure_result` | def | L317–L332 |
 
 ### `scripts/gen_map.py`
 

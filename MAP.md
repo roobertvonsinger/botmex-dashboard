@@ -102,7 +102,7 @@ web_routes_prewarm.py → prewarm.py
 | `deposits.py` | 2263 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `login_orchestrator.py` | 379 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 692 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
-| `proxy_pool.py` | 303 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `proxy_pool.py` | 332 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `scripts/gen_map.py` | 486 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
@@ -193,6 +193,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `80122c2` | docs: agregar CLAUDE.md con pointer acceso Hostinger API/MCP (KVM2+KVM4) |
 | `564647c` | fix(proxy): excluir IPRoyal del pool — sin saldo (402 Payment Required) |
 | `c00a422` | fix(login): blindar gentle_login contra login proxyless (regla de Robert) |
 | `d2d9c16` | feat(login): reuso de token v2 en gentle_login — no quemar 1 token por reintento |
@@ -204,7 +205,6 @@ web_routes_prewarm.py → prewarm.py
 | `65c185d` | fix(deposits): no inventar 3DS cuando check_transaction da 504/timeout |
 | `b9e3be0` | fix(matchmaker): limites separados — 2 intentos por cuenta, 3 por tarjeta |
 | `a31dcff` | fix(matchmaker): retirar cuenta tras N BANK_REJECTED (parar masacre de intentos) |
-| `0faf6c3` | docs(errors): causa del 406 = IPRoyal con IP fija (city) -> rotativo nacional (2026-05-29) |
 <!-- GEN:end:recientes -->
 
 ---

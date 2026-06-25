@@ -410,6 +410,35 @@ curl -sv -m 20 -x "<proxy_url>" https://api.ipify.org 2>&1 | grep -iE "CONNECT|4
 
 ---
 
+### Login no procesa: `httpx.ProxyError: 504 Gateway Timeout` — pool quedó monoproxy (NodeMaven) (2026-06-24)
+
+**Síntoma**: matchmaker / depósito multicuenta nunca completa login. Ráfaga nocturna (2026-06-25 01:01–02:00 UTC, 42 eventos) de:
+```
+File "/app/betmexico_login_api.py", line 443, in test_login
+File "/app/betmexico_login_api.py", line 528, in _login_api   (resp = await client.post(...))
+httpx.ProxyError: 504 Gateway Timeout
+```
+`gentle_login` rota IP, agota los intentos → `LOGIN_RETRY_LATER`. (El contenedor `betmexico-bot` aparecía `Exited(1)`, pero es **a propósito** — sin token Telegram; NO relacionado con el login del dashboard.)
+
+**Causa raíz (verificada con sonda en vivo desde el contenedor, NO supuesta)**: tras excluir IPRoyal (402, 2026-06-23) y LitPort, el pool quedó con **un solo proxy**: NodeMaven (`gate.nodemaven.com:8080`), que da **504 Gateway Timeout intermitente ~22% (2/9 requests, ~10s)** en el CONNECT/upstream de su propio gateway. Prueba de que NO es BetMexico: el 504 golpea hasta `api.ipify.org` (target neutral). Como es el único proxy, cada "rotación" de `gentle_login` cae en el MISMO gateway flaky → sin IP alterna → agota intentos. Es exactamente el **caveat monoproxy** que predecía la entry del 402 (arriba).
+
+**Modo dominante distinto del 504**: en 24h el fallo de login dominante fue **406 FAILURE_IN_CAPTCHA (46) + 429 (22)**, no el 504 (10). El 406 = reputación de IP de NodeMaven (quemada) vs antifraude BetMexico.
+
+**Fix aplicado** (2026-06-24, `proxy_pool.py`): agregado **Data Impulse** (50 sticky residenciales MX premium) como proxy **primario** (`DATAIMPULSE_PROXIES`). Mecanismo: host/user/pass fijos, el **puerto** define la sticky session → `10000..10049` = 50 IPs MX distintas (~2 min c/u); `__cr.mx` en el username = país MX. `all_proxies()` ahora combina `bot + EXTRA_ADMIN_PROXIES + DATAIMPULSE_PROXIES`. NodeMaven se mantiene como fallback minoritario (~2/52) por diversidad de proveedor; IPRoyal sigue excluido (sin saldo).
+
+**Verificación en vivo** ✅ (6 puertos desde `betmexico-web`, 2026-06-24): 12/12 → 200, **0% 504**, IPs MX reales y distintas (177.225.x, 187.190.x, 201.141.x, 45.177.x), latencia 620-1150ms, `betmexico.mx/login` 200. Rompe el monoproxy y aporta 50 IPs frescas contra el 406.
+
+**Pendiente**: el 406 por reputación se mitiga con IPs frescas, pero la cura de fondo es cargar lotes sticky frescos en runtime (`StickySessionManager`, ver `docs/plans/login-orchestration-rework.md`). Medir la tasa real de 406/429 con Data Impulse en producción.
+
+**Diagnóstico** (distinguir 504-proxy de 504-BetMexico):
+```bash
+# Sonda neutral por el proxy sospechoso desde el contenedor:
+docker exec -i betmexico-web python3 -c "import httpx;print(httpx.get('https://api.ipify.org',proxy='<proxy_url>',timeout=20).status_code)"
+# 504 contra ipify (target neutral)  →  es el GATEWAY del proxy, no BetMexico.
+```
+
+---
+
 ## Frontend
 
 ### El feed de actividad muestra 2 entradas por 1 mismo depósito fallido

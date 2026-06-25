@@ -37,12 +37,41 @@ EXTRA_ADMIN_PROXIES: List[Dict[str, str]] = [
         "username": "sH3PhyrRotHpRxYY2sEiS",
         "password": "u7JSejn6ZTSHfbpR_country-mx_streaming-1",
     },
-    # NodeMaven (Premium MX) — agregado 2026-05-21
+    # NodeMaven (Premium MX) — agregado 2026-05-21.
+    # ⚠️ DEGRADADO: 504 Gateway Timeout intermitente (~22% medido 2026-06-24) +
+    # 406 crónico (IP quemada). Se mantiene SOLO como fallback de OTRO proveedor
+    # (diversidad ante caída de Data Impulse); su peso real es ~2/52. Ver Data
+    # Impulse abajo, que pasa a ser el proxy primario.
     {
         "server": "gate.nodemaven.com:8080",
         "username": "andregutti97_gmail_com-country-mx",
         "password": "5qpn3scda5",
     },
+]
+
+# Data Impulse (Premium MX residencial, STICKY por puerto ~2 min) — PRIMARIO desde
+# 2026-06-24. Robert contrató 50 sticky MX. Mecanismo: host/user/pass FIJOS; el
+# PUERTO define la sticky session (cada puerto = 1 IP que se mantiene ~2 min).
+# Puerto base 10000, +1 por sesión → 10000..10049 = 50 IPs MX distintas. El sufijo
+# `__cr.mx` en el username fuerza país México.
+# Probado en vivo 2026-06-24 (6 puertos desde betmexico-web): 12/12 requests → 200,
+# 0% 504, IPs MX reales y distintas por puerto (177.225.x, 187.190.x, 201.141.x,
+# 45.177.x), latencia 620-1150ms, betmexico.mx/login alcanzable. Rompe el pool
+# monoproxy que causaba el LOGIN_RETRY_LATER (NodeMaven único + 504). Ver
+# docs/ERRORS.md §"504 / pool monoproxy".
+_DATAIMPULSE_HOST = "gw.dataimpulse.com"
+_DATAIMPULSE_USER = "edb0501e430b94a664c0__cr.mx"
+_DATAIMPULSE_PASS = "e689a5016d540f47"
+_DATAIMPULSE_PORT_BASE = 10000
+_DATAIMPULSE_COUNT = 50  # puertos 10000..10000+COUNT-1 (una IP sticky por puerto)
+
+DATAIMPULSE_PROXIES: List[Dict[str, str]] = [
+    {
+        "server": f"{_DATAIMPULSE_HOST}:{_DATAIMPULSE_PORT_BASE + i}",
+        "username": _DATAIMPULSE_USER,
+        "password": _DATAIMPULSE_PASS,
+    }
+    for i in range(_DATAIMPULSE_COUNT)
 ]
 
 # Hosts excluidos del pool — proxies con reputación quemada para el reCAPTCHA
@@ -77,7 +106,7 @@ def all_proxies() -> List[Dict[str, str]]:
     """Lista completa: bot + extras locales, excluyendo hosts quemados
     (`_EXCLUDED_PROXY_HOSTS`). El filtro se aplica acá para que TODO el
     pool (failover, random pick, shuffled) herede la exclusión."""
-    combined = _bot_proxies() + EXTRA_ADMIN_PROXIES
+    combined = _bot_proxies() + EXTRA_ADMIN_PROXIES + DATAIMPULSE_PROXIES
     return [
         p for p in combined
         if not any(bad in p.get("server", "").lower() for bad in _EXCLUDED_PROXY_HOSTS)
