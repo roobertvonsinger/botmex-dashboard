@@ -26,3 +26,21 @@ def test_load_deps_returns_pool_without_bot_run_deposit():
     # En el entorno de test las deps del bot no están → None. Lo clave: NO crashea
     # y NO es una tupla de 2 (contrato nuevo: un solo valor).
     assert res is None or callable(res)
+
+import os
+
+def test_legacy_modules_archived():
+    """Los 4 módulos muertos están en _legacy/, no en la raíz."""
+    for m in ("web_routes_deposits.py", "web_routes_missions.py",
+              "web_routes_prewarm.py", "web_watchdog.py"):
+        assert not os.path.exists(m), f"{m} sigue en raíz"
+        assert os.path.exists(os.path.join("_legacy", m)), f"{m} no está en _legacy/"
+
+def test_no_live_import_of_legacy():
+    """Ningún módulo vivo (en raíz) importa los legacy."""
+    import glob, re
+    pat = re.compile(r"^\s*(from|import)\s+(web_routes_deposits|web_routes_missions|"
+                     r"web_routes_prewarm|web_watchdog)\b", re.M)
+    for f in glob.glob("*.py"):
+        txt = open(f, encoding="utf-8").read()
+        assert not pat.search(txt), f"{f} aún importa un módulo legacy"

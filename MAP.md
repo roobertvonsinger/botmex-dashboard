@@ -106,17 +106,13 @@ web_routes_prewarm.py → prewarm.py
 | `scripts/gen_map.py` | 486 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
-| `test_unificacion_sp1.py` | 28 | `—` | _[completar]_ |
+| `test_unificacion_sp1.py` | 46 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
 | `web_grading.py` | 113 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
 | `web_routes_cards.py` | 136 | `betmexico.web.cards` | Endpoints CRUD de tarjetas — listar, agregar, eliminar |
-| `web_routes_deposits.py` | 391 | `betmexico.web.deposit` | Endpoints HTTP del flujo de depósito: single, multi, scheduled start/stop |
 | `web_routes_logs.py` | 98 | `betmexico.web.logs` | Endpoint `/api/logs`: lee `/data/logs/dashboard.log` y stream SSE en vivo |
-| `web_routes_missions.py` | 803 | `betmexico.web.missions` | Endpoints de misiones batch y scheduled: crear, cancelar, estado, historial |
 | `web_routes_notifications.py` | 111 | `betmexico.web.notif` | Endpoints de notificaciones push / alertas al operador |
-| `web_routes_prewarm.py` | 260 | `betmexico.web.prewarm` | Endpoints HTTP de prewarm: start, cancel, status |
 | `web_utils.py` | 243 | `betmexico.web.utils` | Helpers compartidos: _friendly_error, _normalize_ccexp, _build_proxy_url |
-| `web_watchdog.py` | 276 | `betmexico.web.watchdog` | Loop background: refresca balance de cuentas LIVE cada N min, genera notificaciones |
 <!-- GEN:end:modulos -->
 
 ---
@@ -169,10 +165,6 @@ web_routes_prewarm.py → prewarm.py
 | `SCORE_CEIL` | `{"A": 100, "B": 79, "C": 59, "D": 39}` | `shared/betmexico_payment_analyzer.py` |
 | `PIPE` | `"4111111111111111|12|30|123"` | `test_unificacion_sp1.py` |
 | `WEB_USERS` | `{k.lower(): v for k, v in WEB_USERS_RAW.items()}` | `web_auth.py` |
-| `BETMEXICO_PAYMENTS_API` | `"https://paymentsapi.betmexico.mx"` | `web_routes_deposits.py` |
-| `PROCESSORPAY_MAKE_PAYMENT_URL` | `"https://processorpay.com/sanval/api/IframeGames/makePayment"` | `web_routes_deposits.py` |
-| `CAPMONSTER_ENDPOINT` | `"https://api.capmonster.cloud"` | `web_routes_prewarm.py` |
-| `CAPMONSTER_ENDPOINT` | `"https://api.capmonster.cloud"` | `web_watchdog.py` |
 <!-- GEN:end:constantes -->
 
 ---
@@ -183,8 +175,6 @@ web_routes_prewarm.py → prewarm.py
 | Variable | Default | Definida en |
 |----------|---------|-------------|
 | `BMX_CAPMONSTER_KEY` | `""` | `_test_token_reuse.py` |
-| `BMX_NO_PROXY` | `"0"` | `web_routes_deposits.py` |
-| `BMX_WATCHDOG_INTERVAL_MIN` | `"90"` | `web_watchdog.py` |
 | `CAPMONSTER_KEY` | `""` | `_test_token_reuse.py` |
 <!-- GEN:end:env -->
 
@@ -195,6 +185,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `0d51a91` | feat(login): SP-1 unificacion — borra /execute legacy (fuga proxyless), _load_deps solo make_pool |
 | `debcd3e` | docs(unificacion): spec + plan SP-1/SP-2 + aparta maintenance.html a _legacy |
 | `286bb4e` | chore(session): rituales /abrir-bmx y /cerrar-bmx + NEXT-SESSION |
 | `ee1685f` | feat(proxy): Data Impulse 50 sticky MX como pool primario — rompe monoproxy + 504 |
@@ -206,7 +197,6 @@ web_routes_prewarm.py → prewarm.py
 | `6e5b6f1` | ui(detalle): 3DS en ambar tambien en la tabla de movimientos/intentos |
 | `919d38e` | ui(programado): 3DS en AMBAR (no rojo dramatico) + icono advertencia |
 | `0a26449` | docs(bin): thresholds por BIN — 511916/491366/526424 (limites $/24h, 3DS vs rechazo) |
-| `491c040` | fix(deposits): check_transaction reintenta ante 504/timeout (idempotente, post-cobro seguro) |
 <!-- GEN:end:recientes -->
 
 ---

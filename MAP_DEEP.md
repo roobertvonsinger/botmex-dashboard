@@ -281,6 +281,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_execute_stream_still_registered` | def | L10–L14 |
 | `test_multi_and_scheduled_still_registered` | def | L16–L20 |
 | `test_load_deps_returns_pool_without_bot_run_deposit` | def | L22–L28 |
+| `test_legacy_modules_archived` | def | L32–L37 |
+| `test_no_live_import_of_legacy` | def | L39–L46 |
 
 ### `web_auth.py`
 
@@ -313,40 +315,12 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `patch_card_notes` | def | L100–L117 |
 | `ban_card` | def | L121–L136 |
 
-### `web_routes_deposits.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `_run_deposit` | def | L32–L391 |
-
 ### `web_routes_logs.py`
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
 | `_parse_line` | def | L34–L64 |
 | `get_logs_monitor` | def | L68–L98 |
-
-### `web_routes_missions.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `_emit` | def | L50–L56 |
-| `_control_get` | def | L59–L63 |
-| `_normalize_cards` | def | L66–L84 |
-| `_ensure_card_record` | def | L87–L95 |
-| `_classify_result` | def | L98–L111 |
-| `_persist_attempt` | def | L114–L148 |
-| `_run_batch_mission` | def | L155–L298 |
-| `_run_batch_mission_smart` | def | L305–L534 |
-| `_run_scheduled_mission` | def | L541–L641 |
-| `create_batch_mission` | def | L649–L680 |
-| `create_scheduled_mission` | def | L684–L714 |
-| `list_missions` | def | L718–L722 |
-| `get_mission_detail` | def | L726–L733 |
-| `pause_mission` | def | L737–L742 |
-| `resume_mission` | def | L746–L750 |
-| `stop_mission` | def | L754–L763 |
-| `stream_mission` | def | L767–L803 |
 
 ### `web_routes_notifications.py`
 
@@ -358,17 +332,6 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `mark_read` | def | L67–L70 |
 | `mark_all_read` | def | L74–L77 |
 | `stream` | def | L81–L111 |
-
-### `web_routes_prewarm.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `_capmonster_balance` | def | L48–L60 |
-| `_is_balance_fresh` | def | L63–L77 |
-| `_run_prewarm` | def | L80–L151 |
-| `prewarm_select` | def | L155–L222 |
-| `prewarm_cancel` | def | L226–L237 |
-| `prewarm_status` | def | L241–L260 |
 
 ### `web_utils.py`
 
@@ -383,20 +346,6 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_extract_user_from_message` | def | L157–L176 |
 | `_categorize_event` | def | L179–L199 |
 | `_parse_log_entry` | def | L202–L243 |
-
-### `web_watchdog.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `_capmonster_balance` | def | L52–L64 |
-| `_check_one` | def | L67–L130 |
-| `_run_one_pass` | def | L133–L186 |
-| `_watchdog_loop` | def | L189–L232 |
-| `start_watchdog` | def | L235–L237 |
-| `watchdog_status` | def | L243–L256 |
-| `watchdog_run_now` | def | L260–L262 |
-| `watchdog_pause` | def | L266–L269 |
-| `watchdog_resume` | def | L273–L276 |
 <!-- GEN:end:simbolos -->
 
 ---
@@ -471,24 +420,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `GET` | `/{card_id}/usage` | `web_routes_cards.py` |
 | `PATCH` | `/{card_id}/notes` | `web_routes_cards.py` |
 | `POST` | `/{card_id}/ban` | `web_routes_cards.py` |
-| `POST` | `/batch` | `web_routes_missions.py` |
-| `POST` | `/scheduled` | `web_routes_missions.py` |
-| `GET` | `/{mission_id}` | `web_routes_missions.py` |
-| `POST` | `/{mission_id}/pause` | `web_routes_missions.py` |
-| `POST` | `/{mission_id}/resume` | `web_routes_missions.py` |
-| `POST` | `/{mission_id}/stop` | `web_routes_missions.py` |
-| `GET` | `/{mission_id}/stream` | `web_routes_missions.py` |
 | `GET` | `/count` | `web_routes_notifications.py` |
 | `POST` | `/{notification_id}/read` | `web_routes_notifications.py` |
 | `POST` | `/mark-all-read` | `web_routes_notifications.py` |
 | `GET` | `/stream` | `web_routes_notifications.py` |
-| `POST` | `/select` | `web_routes_prewarm.py` |
-| `POST` | `/cancel` | `web_routes_prewarm.py` |
-| `GET` | `/status` | `web_routes_prewarm.py` |
-| `GET` | `/status` | `web_watchdog.py` |
-| `POST` | `/run-now` | `web_watchdog.py` |
-| `POST` | `/pause` | `web_watchdog.py` |
-| `POST` | `/resume` | `web_watchdog.py` |
 <!-- GEN:end:endpoints -->
 
 ---
@@ -506,13 +441,9 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `betmexico.dashboard.sse` | `app.py` |
 | `betmexico.web.auth` | `web_auth.py` |
 | `betmexico.web.cards` | `web_routes_cards.py` |
-| `betmexico.web.deposit` | `web_routes_deposits.py` |
 | `betmexico.web.grading` | `web_grading.py` |
 | `betmexico.web.logs` | `web_routes_logs.py` |
-| `betmexico.web.missions` | `web_routes_missions.py` |
 | `betmexico.web.notif` | `web_routes_notifications.py` |
-| `betmexico.web.prewarm` | `web_routes_prewarm.py` |
 | `betmexico.web.utils` | `web_utils.py` |
-| `betmexico.web.watchdog` | `web_watchdog.py` |
 | `dashboard.proxy_pool` | `proxy_pool.py` |
 <!-- GEN:end:loggers -->
