@@ -3,29 +3,26 @@ sequenceDiagram
     participant U as Usuario (Browser)
     participant W as betmexico-web (FastAPI)
     participant D as deposits.py
-    participant R as web_routes_deposits.<br/>_run_deposit
     participant P as ProcessorPay<br/>(gateway banco)
     participant DB as BD SQLite
 
-    U->>W: POST /api/deposits/execute<br/>{account_id, card_pipe, amount}
-    W->>D: deposit_execute()
+    U->>W: POST /api/deposits/execute-stream<br/>{account_id, card_pipe, amount}
+    W->>D: execute_stream() SSE
     D->>D: _check_caps(email, amount)
     D->>D: _parse_pipe(card_pipe)
-    D->>R: _run_deposit(email, password,<br/>cc_num, cc_exp, cc_cvv, ...)
-    R->>R: logger.info("card={num}|{exp}|{cvv}")
-    R->>P: login BetMexico (con proxy MX)
-    P-->>R: jwt
-    R->>P: getBalance (pre)
-    R->>P: makePayment(jwt, card)
-    P-->>R: BANK_APPROVED / BANK_REJECTED / 3DS
+    D->>D: _run_deposit_with_phases(...)
+    D->>D: gentle_login (proxy pool, captcha v2)
+    D-->>U: SSE phase: login_start / login_done
+    D->>P: BeginDeposit (jwt, amount)
+    D-->>U: SSE phase: begin_done
+    D->>P: makePayment(jwt, card)
+    P-->>D: BANK_APPROVED / BANK_REJECTED / 3DS
+    D-->>U: SSE phase: submit_done
     alt approved
-        R->>P: verify bankTransaction
-        R->>DB: payment_tests INSERT<br/>(record_deposit_result)
-        R->>DB: account_cards INSERT<br/>(register_card_to_account, idempotent)
+        D->>P: verify bankTransaction
+        D->>DB: account_cards INSERT<br/>(register_card_to_account, idempotent)
     end
-    R->>DB: deposit_attempts INSERT<br/>(log_attempt: card_id, gateway_response_raw)
-    R-->>D: {success, result_code, ...}
     D->>DB: deposit_attempts INSERT<br/>(_record_attempt: card_pipe, status)
+    D-->>U: SSE phase: check_done / done
     D->>W: _broadcast SSE<br/>{type:activity, kind:deposit, card_pipe, ...}
-    W-->>U: response JSON {success, result_code, duration_ms}
-    Note over W,U: Simultáneamente: SSE event<br/>via /api/events
+    Note over W,U: SSE stream de fases (stepper UI)<br/>+ SSE actividad via /api/events

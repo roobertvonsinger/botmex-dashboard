@@ -8,12 +8,8 @@
 |---|---|---|---|
 | `_prewarm_router` | `/api/prewarm` | `prewarm.py` | ✅ `app.py:165` |
 | `_deposits_router` | `/api/deposits` | `deposits.py` | ✅ `app.py:166` |
-| `cards` | `/api/cards` | `web_routes_cards.py` | ❌ NO incluido (legacy) |
-| `missions` | `/api/missions` | `web_routes_missions.py` | ❌ NO incluido (legacy) |
-| `logs` | `/api/logs` | `web_routes_logs.py` | ❌ NO incluido (legacy) |
-| `notifications` | `/api/notifications` | `web_routes_notifications.py` | ❌ NO incluido (legacy) |
 
-> Los routers "NO incluidos" tienen código completo pero no están publicados. Sus endpoints existen en disco pero el frontend NO los puede llamar. Ver `AUDIT.md` para gap analysis.
+> Routers legacy (`web_routes_cards/missions/logs/notifications`) archivados en `_legacy/` (SP-1). Ver sección "Módulos archivados" abajo.
 
 ---
 
@@ -115,7 +111,6 @@
 
 | Método | Path | Función | Auth | Body / Query | Respuesta | File:line |
 |---|---|---|---|---|---|---|
-| POST | `/api/deposits/execute` | Single deposit (1 cuenta, 1 tarjeta) | require_session | `{account_id, card_pipe, amount, force?}` | `{success, result_code, error, duration_ms, attempt_id}` | `deposits.py:531` |
 | POST | `/api/deposits/execute-stream` | Single deposit SSE (live phases: login/begin/submit/check) | require_session | `{account_id, card_pipe, amount, force?}` | `text/event-stream` (`start`/`phase`/`done`/`fatal`) | `deposits.py:648` |
 | GET | `/api/deposits/cap-status/{account_id}` | Cap status de una cuenta (window 24h, sesión 10min) | require_session | — | `{caps}` | `deposits.py:823` |
 | POST | `/api/deposits/multi/stream` | Matchmaker N cuentas × M tarjetas (SSE) | require_session | `{account_ids, cards, amount}` | `text/event-stream` | `deposits.py:855` |
@@ -148,18 +143,20 @@
 
 ---
 
-## Endpoints NO incluidos (routers legacy en `web_routes_*.py`)
+## Módulos archivados (SP-1, 2026-06-25)
 
-Los siguientes routers están **definidos pero NO montados en `app.py`**. Sus endpoints existen en código pero el dashboard NO los expone hoy:
+Los siguientes módulos fueron movidos a `_legacy/` en SP-1. Sus endpoints ya no están disponibles. Su funcionalidad migró a los módulos activos indicados:
 
-| Router | Endpoints en código | Acción recomendada |
-|---|---|---|
-| `web_routes_cards.py` (`/api/cards`) | POST `/`, GET `/`, GET `/{id}`, GET `/{id}/usage`, PATCH `/{id}/notes`, POST `/{id}/ban` | Decidir si activar (sería `app.include_router(...)`). Funcionalidad: CRUD de tarjetas + tracking de uso/ban. Útil para la bitácora — recomendado activar. |
-| `web_routes_missions.py` (`/api/missions`) | POST `/batch`, POST `/scheduled`, GET `/`, GET `/{id}`, POST `/{id}/pause`, POST `/{id}/resume`, POST `/{id}/stop`, GET `/{id}/stream` | Sistema de misiones más completo que `/api/deposits/scheduled/*`. Decidir si reemplazar el actual o coexistir. |
-| `web_routes_logs.py` (`/api/logs`) | GET `/` | Versión más completa de logs (filtros por nivel/módulo). El `/api/logs` actual de `app.py:884` es simple tail. |
-| `web_routes_notifications.py` (`/api/notifications`) | GET `/`, GET `/count`, POST `/{id}/read`, POST `/mark-all-read`, GET `/stream` | Sistema de notificaciones persistente (con BD). Actual usa solo SSE in-memory. |
-| `web_routes_prewarm.py` | POST `/select`, POST `/cancel`, GET `/status` | Duplicado del actual `prewarm.py`. Probablemente borrar uno. |
-| `web_routes_watchdog.py` | (TBD — leer archivo) | Watchdog del sistema |
-| `web_routes_deposits.py` | Sin endpoints `@router`; solo provee `_run_deposit(...)` | Función auxiliar, no router. ✅ Usado por `deposits.py` actual. |
+| Módulo archivado | Funcionalidad migrada a |
+|---|---|
+| `_legacy/web_routes_deposits.py` | `deposits.py` (`/execute-stream`, `/multi/stream`, `/scheduled/*`) |
+| `_legacy/web_routes_missions.py` | `deposits.py` (`multi_stream` / `scheduled_create`) |
+| `_legacy/web_routes_prewarm.py` | `prewarm.py` (router activo) |
+| `_legacy/web_routes_cards.py` | `app.py` (`GET /api/cards/all`, inline) |
+| `_legacy/web_routes_logs.py` | `app.py` (`GET /api/logs`, inline) |
+| `_legacy/web_routes_notifications.py` | SSE in-memory en `app.py` |
+| `_legacy/web_watchdog.py` | — (watchdog de balance no reemplazado; auto-release de locks en `app.py:_release_watchdog_loop`) |
+
+> `/api/deposits/execute` fue **eliminado** en SP-1 (fuga proxyless, sin consumidor; el UI usa `/execute-stream`).
 
 Ver `AUDIT.md` para decisiones pendientes.

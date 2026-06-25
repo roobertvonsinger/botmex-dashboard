@@ -722,6 +722,18 @@ docker logs traefik-traefik-1 2>&1 | grep -i 'letsencrypt\|acme' | tail -20
 
 ---
 
+### Fuga proxyless en `/api/deposits/execute` — cerrada eliminando el endpoint (SP-1, 2026-06-25)
+
+**Síntoma**: el endpoint `POST /api/deposits/execute` podía ejecutar un depósito sin proxy si `_load_deps` inyectaba `BOT_RUN_DEPOSIT` = `web_routes_deposits._run_deposit` sin la guarda de `gentle_login`. El endpoint no tenía consumidor activo (el UI ya usaba `/execute-stream`).
+
+**Causa**: diseño heredado — `/execute` fue el endpoint original antes de que `/execute-stream` existiera. Al migrar a `_run_deposit_with_phases` + `gentle_login`, `/execute` quedó como código muerto con la fuga intacta.
+
+**Fix**: `/api/deposits/execute` **eliminado** en SP-1 (commit `0d51a91`). Los 3 flujos activos (`/execute-stream`, `/multi/stream`, `/scheduled/create`) usan `gentle_login` con `allow_proxyless=False` → la IP real del server nunca se expone.
+
+**Referencia**: `docs/superpowers/specs/2026-06-25-unificacion-login-deposito-design.md`.
+
+---
+
 ## Plantilla para nuevos errores
 
 Agregar al cierre:

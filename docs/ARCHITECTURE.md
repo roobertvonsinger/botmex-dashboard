@@ -22,8 +22,7 @@ Solo se reintenta en errores de conexión. Errores HTTP del servidor (401, 403, 
 
 Call sites:
 - [`prewarm.py:_run_prewarm`](../prewarm.py) — `get_jwt` via failover, `ApiChecker` con `used_proxy`
-- [`deposits.py:_run_deposit_with_phases`](../deposits.py) — `get_jwt` via failover (matchmaker + scheduled + single con phases)
-- [`web_routes_deposits.py:_run_deposit`](../web_routes_deposits.py) — `/execute` y `/execute-stream`. Si exhausted → emite `PROXY_FAILOVER_EXHAUSTED` y persiste row.
+- [`deposits.py:_run_deposit_with_phases`](../deposits.py) — `get_jwt` via failover (matchmaker + scheduled + single con phases vía `/execute-stream`). Si exhausted → emite `PROXY_FAILOVER_EXHAUSTED` y persiste row.
 
 Agregar/quitar proxies en el dashboard NO requiere tocar el monorepo del bot — editar `EXTRA_ADMIN_PROXIES` en `proxy_pool.py`.
 
@@ -63,10 +62,10 @@ Comparten:
 └────────────────────────────────────────────────────────────┘
        │            │            │                │
        ▼            ▼            ▼                ▼
-   auth.py     prewarm.py    deposits.py    web_routes_*.py
-                                            (cards, logs, missions,
-                                             notifications, prewarm,
-                                             watchdog, auth)
+   auth.py     prewarm.py    deposits.py    _legacy/web_routes_*.py
+                                            (archivados SP-1: deposits, missions,
+                                             prewarm, cards, logs, notifications,
+                                             watchdog)
        │            │            │                │
        └────────────┴────────────┴────────────────┘
                           │
@@ -82,19 +81,18 @@ Comparten:
 
 ## Flujo de un depósito (single, dashboard)
 
-1. **Frontend**: usuario abre modal → tab "Una" → `executeSingleAccount(pipe, amount)`
-2. `POST /api/deposits/execute` con `{account_id, card_pipe, amount}`
-3. `deposits._load_deps()` resuelve `BOT_RUN_DEPOSIT` = `web_routes_deposits._run_deposit`
-4. `_run_deposit(email, password, cc_num, cc_exp, cc_cvv, ...)` →
-   - `logger.info` con card (trazabilidad obligatoria)
-   - Login a BetMexico (con proxy MX si configurado)
-   - `processorpay.makePayment` (gateway del banco)
-   - Persiste en `payment_tests` + `account_cards` (si approved + save_card)
-   - Persiste en `deposit_attempts` vía `_persist_final` (con `card_id`, `gateway_response_raw`)
-5. `deposits._record_attempt(..., card_pipe=...)` → segundo INSERT en `deposit_attempts` (con `card_pipe`)
-6. `_broadcast({"type":"activity","kind":"deposit", ...})` → SSE a clientes
-7. Frontend recibe SSE → `pushActivityEvent()` → re-render del feed
-8. Frontend resuelve el `await fetch` → muestra resultado en modal
+1. **Frontend**: usuario abre drawer → tab "Una" → `executeSingleAccount(pipe, amount)`
+2. `POST /api/deposits/execute-stream` con `{account_id, card_pipe, amount}` (SSE)
+3. `deposits._run_deposit_with_phases(...)` →
+   - `gentle_login` vía `call_with_proxy_failover` (JWT/login)
+   - `CapMonster API` (reCAPTCHA v2, captcha pool)
+   - `BetMexico API: BeginDeposit → makePayment → verify`
+   - Persiste en `deposit_attempts` + `account_cards` (si approved) vía `_record_attempt`
+4. `_broadcast({"type":"activity","kind":"deposit", ...})` → SSE a clientes
+5. Frontend recibe SSE fases (`start`/`phase`/`done`) → pinta stepper `#depStepper`
+6. Frontend recibe SSE actividad → `pushActivityEvent()` → re-render del feed
+
+> `POST /api/deposits/execute` fue **eliminado** en SP-1 (fuga proxyless, sin consumidor).
 
 ## Flujo de matchmaker (multi)
 

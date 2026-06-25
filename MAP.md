@@ -12,15 +12,14 @@
 | Si necesitas... | Ve a | Nota |
 |-----------------|------|------|
 | Modificar flujo de depósito (lógica core) | `deposits.py` | Motor principal |
-| Modificar endpoints HTTP de depósito | `web_routes_deposits.py` | FastAPI router |
-| Modificar flujo de misiones (batch/scheduled) | `web_routes_missions.py` | 803L, leer reglas al inicio del archivo |
-| Modificar prewarm | `prewarm.py` + `web_routes_prewarm.py` | |
-| Agregar endpoint nuevo | `web_routes_X.py` + registrar en `app.py` | Grep `include_router` en app.py |
+| Modificar endpoints HTTP de depósito | `deposits.py` (router) | execute-stream / multi / scheduled |
+| Modificar matchmaker / programado | `deposits.py` (`multi_stream` / `scheduled_create`) | |
+| Modificar prewarm | `prewarm.py` (router) | |
+| Agregar endpoint nuevo | `app.py` (`@app.X` inline) o `deposits.py`/`prewarm.py` (router) | Routers vivos: prewarm + deposits |
 | Cambiar pool de proxies / failover | `proxy_pool.py` | `call_with_proxy_failover` es la API recomendada |
 | Cambiar lógica de grading | `web_grading.py` + `shared/betmexico_payment_analyzer.py` | Algoritmo V10 |
 | Cambiar autenticación / sesiones | `auth.py` + `web_auth.py` | |
-| Ver logs en vivo (endpoint) | `web_routes_logs.py` | Lee `/data/logs/dashboard.log` |
-| Modificar watchdog de balance | `web_watchdog.py` | Loop background |
+| Ver logs en vivo (endpoint) | `app.py` (`@app.get /api/logs`, inline) | Lee `/data/logs/dashboard.log` |
 | Cambiar esquema BD | `app.py` → `_migrate()` | Migraciones aditivas solamente |
 | Agregar evento SSE | `app.py` → `_broadcast()` + `docs/SSE_EVENTS.md` | |
 | Cambiar caps duros de depósito | `deposits.py` L28–L35 | DEP_MAX_PER_TXN, DEP_MAX_24H, AUTOLOCK_HOURS_* |
@@ -37,10 +36,9 @@
 
 ### Depósito único
 ```
-web_routes_deposits.py → deposits.py (_run_deposit)
-  → betmexico_login_api (JWT/login)  [dep del bot, runtime import]
+deposits.py router (/execute-stream) → _run_deposit_with_phases → gentle_login (login único)
   → proxy_pool.py (call_with_proxy_failover)
-  → CapMonster API (reCAPTCHA v3)
+  → CapMonster API (reCAPTCHA v2)
   → BetMexico API: BeginDeposit → makePayment → verify
   → web_grading.py (recalc_grade_from_db)
   → app.py _broadcast() → SSE → frontend
@@ -48,7 +46,7 @@ web_routes_deposits.py → deposits.py (_run_deposit)
 
 ### Misión batch (matchmaker)
 ```
-web_routes_missions.py → deposits.py _run_deposit (cuenta×tarjeta)
+deposits.py (/multi/stream → multi_stream) → _run_deposit_with_phases (cuenta×tarjeta)
   max 5 cuentas × 5 tarjetas · gap aleatorio 3-8s
   APROBADA → vincular tarjeta↔cuenta
   Rechazo específico (TARJETA_INVALIDA/INSUF/EXPIRED) → marcar tarjeta, siguiente
@@ -57,7 +55,7 @@ web_routes_missions.py → deposits.py _run_deposit (cuenta×tarjeta)
 
 ### Misión programada (scheduled)
 ```
-web_routes_missions.py → loop 60s → deposits.py _run_deposit
+deposits.py (/scheduled/create → loop) → _run_deposit_with_phases
   APROBADO → completed
   Rechazo → STOP (no reintentar, requiere override manual)
   Captcha pool prefetchea tokens; TOKEN_MAX_AGE=55s
@@ -65,7 +63,7 @@ web_routes_missions.py → loop 60s → deposits.py _run_deposit
 
 ### Prewarm
 ```
-web_routes_prewarm.py → prewarm.py
+prewarm.py (router)
   Cap: 30 pre-warms/operador/10min · skip si JWT vigente y last_check < 5min
   Timeout 25s/task · logs en process_log (process_type='prewarm')
 ```
@@ -80,7 +78,7 @@ web_routes_prewarm.py → prewarm.py
 | 2 | 406 FAILURE_IN_CAPTCHA masivo (build v26.5.25+) | Reputación de IP de proxies + antifraude BetMexico. **NO es mismatch de versión** — v3 probado con Playwright real = 0%. v2 sigue siendo el token correcto. | Fix real: login v2 gentil (anti-ráfaga, jitter, backoff) + **NO matar cuentas por 406** (`LOGIN_FAILED` → `login_retry`, jamás DEAD). Ver `docs/ERRORS.md` §"matchmaker mata cuentas buenas". |
 | 3 | Logs no cargan en dashboard tras restart | Antes: journalctl (VPS). KVM4 es Docker sin systemd | `app.py` L40–62: RotatingFileHandler a `/data/logs/dashboard.log` |
 | 4 | Token captcha expirado en scheduled | TOKEN_MAX_AGE=55s · sleep(60) = token viejo al despertar | Captcha pool prefetchea; ver `deposits.py` sección "captcha pool" |
-| 5 | `create_task(gather())` crashea Py3.11+ | Bug asyncio en multi-depósito | Fix en `web_routes_deposits.py` |
+| 5 | `create_task(gather())` crashea Py3.11+ | Bug asyncio en multi-depósito | Fix en `deposits.py` (`multi_stream`) |
 | 6 | BANK_REJECTED ≠ error de captcha | BANK_REJECTED = banco rechazó la tarjeta, no el captcha | No reintentar en BANK_REJECTED |
 | 7 | LitPort falla 0% | Reputación IP baja para BetMexico | Excluido via `_EXCLUDED_PROXY_HOSTS` en `proxy_pool.py` |
 | 8 | `402 Payment Required` masivo en login (sin `[API] Status:` previo) | **Proxy sin saldo** (IPRoyal). El 402 es del CONNECT al proxy (`X-Response-Origin: proxy-server`), NO de BetMexico ni proxyless. | IPRoyal en `_EXCLUDED_PROXY_HOSTS`. Recargar saldo y quitarlo. Ver `docs/ERRORS.md` §"402 Payment Required". |
@@ -103,7 +101,7 @@ web_routes_prewarm.py → prewarm.py
 | `login_orchestrator.py` | 379 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 692 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 332 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
-| `scripts/gen_map.py` | 486 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
+| `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
@@ -182,6 +180,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `9febd21` | chore(legacy): SP-1 archiva web_routes_{cards,logs,notifications} — 7 legacy total a _legacy/ |
 | `f973fe0` | chore(legacy): SP-1 archiva web_routes_{deposits,missions,prewarm} + web_watchdog a _legacy/ |
 | `0d51a91` | feat(login): SP-1 unificacion — borra /execute legacy (fuga proxyless), _load_deps solo make_pool |
 | `debcd3e` | docs(unificacion): spec + plan SP-1/SP-2 + aparta maintenance.html a _legacy |
@@ -193,7 +192,6 @@ web_routes_prewarm.py → prewarm.py
 | `d2d9c16` | feat(login): reuso de token v2 en gentle_login — no quemar 1 token por reintento |
 | `4ba18eb` | feat(bines): panel de inteligencia de BINes en sidebar (SA) — tasa de aprobacion |
 | `6e5b6f1` | ui(detalle): 3DS en ambar tambien en la tabla de movimientos/intentos |
-| `919d38e` | ui(programado): 3DS en AMBAR (no rojo dramatico) + icono advertencia |
 <!-- GEN:end:recientes -->
 
 ---

@@ -3,6 +3,20 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-06-25 (SP-1: eliminación /execute + archivado 7 módulos)
+
+### SP-1 — Unificación login/depósito
+
+| Función | Esperado | Actual | Estado |
+|---|---|---|---|
+| `/api/deposits/execute` eliminado | ✅ endpoint fuga-proxyless borrado — nadie lo consumía; UI usa `/execute-stream` | ✅ eliminado en SP-1 | ✅ |
+| `/execute-stream` como único single | ✅ transporte SSE con fases live + `gentle_login` | ✅ desde SP-1 | ✅ |
+| `/multi/stream` y `/scheduled/create` | ✅ transporte único vía `gentle_login` | ✅ | ✅ |
+| 7 módulos archivados a `_legacy/` | `web_routes_deposits/missions/prewarm/cards/logs/notifications.py` + `web_watchdog.py` → `_legacy/` | ✅ commit `f973fe0` | ✅ |
+| `_load_deps` retorna solo `make_pool` | ✅ dependencia simplificada — ya no inyecta `BOT_RUN_DEPOSIT` | ✅ commit `0d51a91` | ✅ |
+
+---
+
 ## Captura: 2026-06-01 (reuso de token v2 en gentle_login — anti-desperdicio captcha)
 
 ### Login — reuso de token (`login_orchestrator.gentle_login`)
@@ -88,7 +102,7 @@
 | Bug parser microsegundos | `_parse_txn_date` tolera microsegundos de cualquier longitud (BD tiene `.94907` con 5 dígitos que rompía `fromisoformat` en Python <3.11) | ✅ fix V10 | ✅ |
 | Backfill on-demand | `scripts/recalc_grades.py` recorre `accounts`, recalcula desde `account_transactions`, persiste grade+score | ✅ ejecutado 2026-05-22: 810/902 cambiaron | ✅ |
 | Distribución post-V10 | A:145, B:300, C:142, D:307 (era A:605, B:209, C:78, D:1) | ✅ refleja realidad de pasarelas | ✅ |
-| **BD viva: deposit hooks** | Login pre-deposit guarda txns + recalc grade; `_persist_final` post-intento recalc grade | ✅ `web_routes_deposits.py:160-165, 67-101` | ✅ |
+| **BD viva: deposit hooks** | Login pre-deposit guarda txns + recalc grade; `_persist_final` post-intento recalc grade | ✅ lógica migrada a `deposits.py` (`_run_deposit_with_phases`, `_record_attempt`) | ✅ |
 | **BD viva: prewarm hooks** | `_db_save_txns_and_recalc` guarda txns + recalc grade vía BOT_SCORE_PAYMENT (V10 después del deploy 2026-05-22) | ✅ `prewarm.py:234` | ✅ |
 | BD viva: watchdog | Solo actualiza balance (`fetch_mode=balance_only`). NO trae txns nuevas → grade no se recalcula desde watchdog | ⚠️ por diseño (performance) | ⚠️ |
 | **Conflict 409 si cuenta lockeada por otro** | ✅ rechaza depósito; SA puede override | ✅ desde 2026-05-11 | ✅ |
@@ -100,8 +114,8 @@
 
 | Función | Esperado | Actual | Estado |
 |---|---|---|---|
-| Single deposit (`/execute`) | ✅ 1 cuenta, 1 tarjeta, $1-$499. `_record_attempt` corre siempre (incluso si client disconnect mid-deposit) | ✅ desde 2026-05-21 | ✅ |
-| **Single deposit con fases en vivo (`/execute-stream`)** | ✅ SSE emite `start`/`phase`/`done` para stepper UI; mismas validaciones que `/execute` (cap, velocity, auto-lock); frontend consume stream y pinta `#depStepper` con 4 fases (login/begin/submit/check) — `na` para `check` cuando `is_3ds=true` | ✅ 2026-05-15 — backend (Task 1+2) + frontend (Task 3) listos. `/execute` queda como endpoint legacy no consumido por single mode (multi/scheduled siguen usando sus endpoints) | ✅ |
+| Single deposit (`/execute`) | ❌ eliminado SP-1 (fuga proxyless; sin consumidor — UI usaba `/execute-stream`) | ❌ eliminado 2026-06-25 | ✅ (correcto eliminar) |
+| **Single deposit con fases en vivo (`/execute-stream`)** | ✅ SSE emite `start`/`phase`/`done` para stepper UI; validaciones (cap, velocity, auto-lock); frontend pinta `#depStepper` con 4 fases (login/begin/submit/check) — `na` para `check` cuando `is_3ds=true` | ✅ único endpoint single desde SP-1 | ✅ |
 | Persistir tarjeta al APPROVE (single moderno, multi, scheduled) | ✅ INSERT en `account_cards` vía `_record_attempt` cuando `status=approved` (idempotente por UNIQUE card_number) | ✅ desde 2026-05-25 — fix retroactivo: el wrapper `_run_deposit_with_phases` NUNCA llamaba a `register_card_to_account` (solo el legacy `_run_deposit` lo hacía). Resultado: tras un APPROVED por endpoints modernos, la tarjeta quedaba huérfana y el operador tenía que pegarla de nuevo. AUDIT viejo decía ✅ pero era falso para single/multi/scheduled. Fix: bloque dedicado en `_record_attempt` ([deposits.py:441](../deposits.py)). | ✅ |
 | Persistir cada intento en `deposit_attempts` | ✅ con `card_pipe`, `status`, `rejection_reason` | ✅ (desde fix 2026-05-11) | ✅ |
 | Loguear card al inicio del deposit | ✅ logger.info | ✅ (desde fix 2026-05-11) | ✅ |
@@ -137,7 +151,7 @@
 | Feed actividad LIVE | ✅ SSE push + scrollable feed | ✅ | ✅ |
 | Columna "Tarjeta" en actividad | ✅ pipe completo clickeable | ✅ (desde 2026-05-11) | ✅ |
 | Histórico paginado de actividad | ✅ GET `/api/activity` con filtros | ✅ | ✅ |
-| `payment_tests` legacy escribiendo | ⚠️ era legacy del bot. Hoy `web_routes_deposits` escribe ahí + en `deposit_attempts` | ⚠️ duplicación entre tablas (no rows) | 🔵 |
+| `payment_tests` legacy escribiendo | ⚠️ era legacy del bot. Hoy `deposits.py` (`_run_deposit_with_phases`) escribe en `deposit_attempts`; `payment_tests` ya no se escribe activamente | ⚠️ tabla potencialmente obsoleta | 🔵 |
 | Persistir `gateway_response_raw` con info útil | ✅ JSON serializable con resultCode, orderId, etc. | ✅ `_persist_final` lo guarda | ✅ |
 | 1 sola row en `deposit_attempts` por intento (sin duplicación) | ✅ | ✅ desde 2026-05-11 (consolidado en `_persist_final`) | ✅ |
 | Histórico de tarjetas por cuenta (último uso, fails, status) | ✅ tabla `account_cards` con total_deposits/approved/rejected | ✅ | ✅ |
@@ -163,18 +177,19 @@
 | Lista de notif (modal/section) | ✅ | ✅ | ✅ |
 | Mark all read | ✅ | ✅ (in-memory) | ⚠️ no persistente |
 | Notificaciones críticas (CapMonster low, proxy down, etc.) | ✅ pushadas vía SSE | ✅ | ✅ |
-| Histórico persistente | ❌ no implementado | ❌ | 🔵 — `web_routes_notifications.py` lo tiene pero NO está montado |
+| Histórico persistente | ❌ no implementado | ❌ | 🔵 — código en `_legacy/web_routes_notifications.py` (archivado SP-1) |
 
-## Routers legacy NO montados
+## Módulos archivados a `_legacy/` (SP-1, 2026-06-25)
 
-| Router | Función teórica | Acción |
+| Módulo | Función original | Estado |
 |---|---|---|
-| `web_routes_cards.py` (`/api/cards`) | CRUD tarjetas + ban + usage tracking | 🔵 evaluar activar |
-| `web_routes_missions.py` (`/api/missions`) | Sistema misiones más completo que `/api/deposits/scheduled` | 🔵 evaluar reemplazo o coexistencia |
-| `web_routes_notifications.py` (`/api/notifications`) | Notificaciones persistentes en BD | 🔵 activar (fix gap arriba) |
-| `web_routes_logs.py` (`/api/logs`) | Logs con filtros avanzados | 🔵 evaluar reemplazo de `/api/logs` actual |
-| `web_routes_prewarm.py` | Duplicado de `prewarm.py` actual | 🔵 borrar uno (evaluar diferencias) |
-| `web_routes_watchdog.py` | Watchdog del sistema | 🔵 leer y decidir |
+| `_legacy/web_routes_deposits.py` | Router HTTP de depósito single (`/execute`) | ✅ archivado — funcionalidad en `deposits.py` (`/execute-stream`) |
+| `_legacy/web_routes_missions.py` | Sistema de misiones batch/scheduled | ✅ archivado — funcionalidad en `deposits.py` (`multi_stream`/`scheduled_create`) |
+| `_legacy/web_routes_prewarm.py` | Router de prewarm (duplicado) | ✅ archivado — `prewarm.py` es el activo |
+| `_legacy/web_routes_cards.py` | CRUD tarjetas + ban + usage tracking | ✅ archivado — `GET /api/cards/all` inline en `app.py` |
+| `_legacy/web_routes_logs.py` | Logs con filtros avanzados | ✅ archivado — `GET /api/logs` inline en `app.py` |
+| `_legacy/web_routes_notifications.py` | Notificaciones persistentes en BD | ✅ archivado — SSE in-memory en `app.py` |
+| `_legacy/web_watchdog.py` | Watchdog de balance | ✅ archivado — watchdog de balance no reemplazado; auto-release de locks en `app.py:_release_watchdog_loop` |
 
 ## Infra / Deploy
 
@@ -191,8 +206,8 @@
 ## Pendientes de spec confirmada (preguntar a Robert)
 
 - ¿`payment_tests` se debería deprecar? (duplicación con `deposit_attempts`)
-- ¿Activar `web_routes_notifications` para que las notif persistan?
-- ¿Reemplazar `/api/deposits/scheduled` por `web_routes_missions` (sistema más completo)?
+- ¿Desarchivar/reimplementar `_legacy/web_routes_notifications.py` para que las notif persistan?
+- ¿Desarchivar/reimplementar `_legacy/web_routes_missions.py` (sistema más completo que `/api/deposits/scheduled`)?
 - ¿Cadencia para backups BD?
 
 ## Test rápido del principio operativo
@@ -201,6 +216,6 @@
 > - ✅ Ver intentos del dashboard en `deposit_attempts` con `card_pipe`
 > - ✅ Ver tarjetas validadas en `account_cards` con last_used + total_*
 > - ✅ Ver eventos en feed `/api/activity` con filtros por who, kind, time, search
-> - ✅ Ver respuesta cruda del banco en `gateway_response_raw` (cuando viene por web_routes_deposits)
+> - ✅ Ver respuesta cruda del banco en `gateway_response_raw` (persistido por `deposits.py:_record_attempt`)
 > - ⚠️ NO persisten notificaciones del bell (se pierden al refresh)
-> - 🔵 NO hay vista de misiones largo plazo (web_routes_missions legacy)
+> - 🔵 NO hay vista de misiones largo plazo (`_legacy/web_routes_missions.py` archivado SP-1)

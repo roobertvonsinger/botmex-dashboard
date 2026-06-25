@@ -246,7 +246,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `gen_simbolos` | def | L181–L193 |
 | `gen_endpoints` | def | L196–L205 |
 | `gen_loggers` | def | L208–L220 |
-| `_apply_sections` | def | L464–L480 |
+| `_apply_sections` | def | L462–L478 |
 
 ### `scripts/recalc_grades.py`
 
