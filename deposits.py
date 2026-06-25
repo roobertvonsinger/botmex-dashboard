@@ -373,14 +373,17 @@ def _check_caps(email: str, amount: float, projected_extra: float = 0.0) -> Opti
 
 
 def _load_deps():
-    """Reusa deps ya cargadas eager en app.py (evita circular imports)."""
+    """Reusa el make_pool del bot ya cargado eager en app.py (evita circular
+    imports). Retorna el callable make_pool o None si las deps del bot no están.
+    (SP-1 2026-06-25: ya no expone _run_deposit del bot — /execute fue eliminado;
+    todos los flujos modernos loguean por gentle_login dentro de _run_deposit_with_phases.)"""
     try:
-        from app import BOT_RUN_DEPOSIT, BOT_MAKE_POOL, BOT_DEPS_OK
-        if BOT_DEPS_OK and BOT_RUN_DEPOSIT and BOT_MAKE_POOL:
-            return BOT_RUN_DEPOSIT, BOT_MAKE_POOL
+        from app import BOT_MAKE_POOL, BOT_DEPS_OK
+        if BOT_DEPS_OK and BOT_MAKE_POOL:
+            return BOT_MAKE_POOL
     except Exception as e:
-        logger.warning(f"[Deposits] deps no disponibles: {e}")
-    return None, None
+        logger.warning(f"[Deposits] make_pool no disponible: {e}")
+    return None
 
 
 def _parse_pipe(pipe: str) -> tuple[str, str, str]:
@@ -1140,147 +1143,6 @@ async def _run_deposit_with_phases(
     }
 
 
-@router.post("/execute")
-async def deposit_execute(request: Request, user: dict = Depends(require_session)):
-    _run_deposit, make_pool = _load_deps()
-    if _run_deposit is None or make_pool is None:
-        raise HTTPException(503, "Módulo de depósitos no disponible en este entorno")
-
-    body = await request.json()
-    try:
-        account_id = int(body.get("account_id") or 0)
-        amount = float(body.get("amount") or 0)
-        card_pipe = (body.get("card_pipe") or "").strip()
-    except (TypeError, ValueError):
-        raise HTTPException(400, "Campos inválidos")
-
-    if not account_id or not card_pipe or amount <= 0:
-        raise HTTPException(400, "Faltan campos: account_id, card_pipe, amount")
-
-    if amount < 1 or amount > DEP_MAX_PER_TXN:
-        raise HTTPException(400, f"Monto fuera de rango (1-{DEP_MAX_PER_TXN:.0f})")
-
-    try:
-        cc_num, cc_exp, cc_cvv = _parse_pipe(card_pipe)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-
-    # Lookup cuenta
-    from app import db
-    with db() as c:
-        row = c.execute(
-            "SELECT id, email, password FROM accounts WHERE id=? LIMIT 1",
-            (account_id,),
-        ).fetchone()
-    if not row:
-        raise HTTPException(404, "Cuenta no encontrada")
-
-    email = row["email"]
-    password = row["password"]
-    operator_id = int(user.get("telegram_id") or 0)
-    attempt_id = uuid.uuid4().hex
-
-    # Cap check
-    cap_err = _check_caps(email, amount)
-    if cap_err:
-        raise HTTPException(400, cap_err)
-
-    # Velocity check (saltarse con force=true, solo SA)
-    force = bool(body.get("force"))
-    is_sa = (user.get("role") == "superadmin")
-    if not (force and is_sa):
-        vel = _check_card_velocity(card_pipe, email)
-        if vel:
-            raise HTTPException(409, {"detail": vel["message"], "velocity": vel})
-
-    # Auto-lock: la cuenta queda lockeada para el operador. Otros operadores
-    # NO la verán hasta que se libere (manual o expiración). Falla 409 si está
-    # lockeada por otro y el caller no es superadmin.
-    _auto_lock_for_deposit(account_id, operator_id, user, hours=AUTOLOCK_HOURS_SINGLE)
-
-    # Pool de captcha — factory ON. Con reuso de token (login_orchestrator) un
-    # token sirve para varios reintentos; size/prefetch 2 deja un spare caliente
-    # por si el token expira o se agota su cuota de reusos a media-rotación.
-    cap_key = os.environ.get("CAPMONSTER_KEY", "") or os.environ.get("BMX_CAPMONSTER_KEY", "")
-    pool = None
-    prefetch_task = None
-    t0 = time.time()
-    result = None
-    _exc = None
-    try:
-        pool = make_pool(cap_key, size=2, workers=1)
-        await pool.start_factory()
-        prefetch_task = asyncio.create_task(pool.prefetch(2))
-
-        result = await _run_deposit(
-            email=email,
-            password=password,
-            cc_num=cc_num,
-            cc_exp=cc_exp,
-            cc_cvv=cc_cvv,
-            amount=amount,
-            user={"telegram_id": operator_id, "username": user.get("username", "")},
-            pool=pool,
-            save_card=True,
-            check_marriage=False,
-        )
-    except BaseException as e:
-        # BaseException = atrapa CancelledError también (Py 3.8+). Sin esto, el
-        # client-disconnect mid-deposit dejaba `_record_attempt` sin correr → BD
-        # sin row → tarjeta "quemada invisible".
-        _exc = e
-        logger.error(f"[Deposits] {email} ${amount}: {type(e).__name__}: {e}")
-        # Re-raise abajo en el finally para que el _record_attempt corra primero
-    finally:
-        if prefetch_task is not None and not prefetch_task.done():
-            prefetch_task.cancel()
-            try:
-                await prefetch_task
-            except (asyncio.CancelledError, Exception):
-                pass
-        if pool is not None:
-            try:
-                await pool.stop()
-            except Exception:
-                pass
-        # _record_attempt SIEMPRE — el finally garantiza row en BD aunque
-        # CancelledError propague (cliente desconectó mid-deposit).
-        duration_ms = int((time.time() - t0) * 1000)
-        if _exc is not None:
-            _record_attempt(
-                attempt_id, email, amount, "error",
-                f"{type(_exc).__name__}: {str(_exc)[:280]}",
-                duration_ms, operator_id, card_pipe=card_pipe,
-            )
-        elif result is not None:
-            success = bool(result.get("success"))
-            _record_attempt(
-                attempt_id, email, amount,
-                "approved" if success else "rejected",
-                result.get("error") or result.get("result_code"),
-                duration_ms, operator_id, card_pipe=card_pipe,
-            )
-
-    if _exc is not None:
-        # CancelledError → propagar bare (no la envolvemos en HTTPException;
-        # debe seguir como cancelación). Exception normal → HTTPException 500
-        # para que el frontend reciba mensaje útil en el toast.
-        if isinstance(_exc, Exception):
-            raise HTTPException(500, f"Error: {str(_exc)[:200]}")
-        raise _exc
-
-    duration_ms = int((time.time() - t0) * 1000)
-    success = bool(result.get("success"))
-
-    return {
-        "success": success,
-        "result_code": result.get("result_code"),
-        "error": result.get("error"),
-        "duration_ms": duration_ms,
-        "attempt_id": attempt_id,
-    }
-
-
 @router.post("/execute-stream")
 async def deposit_execute_stream(request: Request, user: dict = Depends(require_session)):
     """SSE variant de /execute — emite fases en vivo (login/begin/submit/check).
@@ -1294,8 +1156,8 @@ async def deposit_execute_stream(request: Request, user: dict = Depends(require_
       - `{type:'done', attempt_id, success, result_code, error, duration_ms}`
       - `{type:'fatal', attempt_id, error}` — solo si el generator explota
     """
-    _run_deposit, make_pool = _load_deps()
-    if _run_deposit is None or make_pool is None:
+    make_pool = _load_deps()
+    if make_pool is None:
         raise HTTPException(503, "Módulo de depósitos no disponible en este entorno")
 
     body = await request.json()
@@ -1539,8 +1401,8 @@ _active_mm_runs: dict[str, asyncio.Event] = {}
 
 @router.post("/multi/stream")
 async def multi_stream(request: Request, user: dict = Depends(require_session)):
-    _run_deposit, make_pool = _load_deps()
-    if _run_deposit is None or make_pool is None:
+    make_pool = _load_deps()
+    if make_pool is None:
         raise HTTPException(503, "Módulo de depósitos no disponible")
 
     body = await request.json()
@@ -1931,8 +1793,8 @@ _active_schedules: dict = {}
 
 @router.post("/scheduled/create")
 async def scheduled_create(request: Request, user: dict = Depends(require_session)):
-    _run_deposit, make_pool = _load_deps()
-    if _run_deposit is None or make_pool is None:
+    make_pool = _load_deps()
+    if make_pool is None:
         raise HTTPException(503, "Módulo de depósitos no disponible")
 
     body = await request.json()

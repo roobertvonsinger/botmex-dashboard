@@ -95,17 +95,18 @@ web_routes_prewarm.py → prewarm.py
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `_test_token_reuse.py` | 176 | `—` | _[completar]_ |
-| `app.py` | 2430 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2428 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 79 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2263 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2125 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `login_orchestrator.py` | 379 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 692 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 332 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `scripts/gen_map.py` | 486 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
+| `test_unificacion_sp1.py` | 28 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
 | `web_grading.py` | 113 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
 | `web_routes_cards.py` | 136 | `betmexico.web.cards` | Endpoints CRUD de tarjetas — listar, agregar, eliminar |
@@ -166,6 +167,7 @@ web_routes_prewarm.py → prewarm.py
 | `C_DEEP_REST_DAYS` | `90` | `shared/betmexico_payment_analyzer.py` |
 | `SCORE_FLOOR` | `{"A": 80, "B": 60, "C": 40, "D": 0}` | `shared/betmexico_payment_analyzer.py` |
 | `SCORE_CEIL` | `{"A": 100, "B": 79, "C": 59, "D": 39}` | `shared/betmexico_payment_analyzer.py` |
+| `PIPE` | `"4111111111111111|12|30|123"` | `test_unificacion_sp1.py` |
 | `WEB_USERS` | `{k.lower(): v for k, v in WEB_USERS_RAW.items()}` | `web_auth.py` |
 | `BETMEXICO_PAYMENTS_API` | `"https://paymentsapi.betmexico.mx"` | `web_routes_deposits.py` |
 | `PROCESSORPAY_MAKE_PAYMENT_URL` | `"https://processorpay.com/sanval/api/IframeGames/makePayment"` | `web_routes_deposits.py` |
@@ -193,6 +195,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `debcd3e` | docs(unificacion): spec + plan SP-1/SP-2 + aparta maintenance.html a _legacy |
 | `286bb4e` | chore(session): rituales /abrir-bmx y /cerrar-bmx + NEXT-SESSION |
 | `ee1685f` | feat(proxy): Data Impulse 50 sticky MX como pool primario — rompe monoproxy + 504 |
 | `80122c2` | docs: agregar CLAUDE.md con pointer acceso Hostinger API/MCP (KVM2+KVM4) |
@@ -204,7 +207,6 @@ web_routes_prewarm.py → prewarm.py
 | `919d38e` | ui(programado): 3DS en AMBAR (no rojo dramatico) + icono advertencia |
 | `0a26449` | docs(bin): thresholds por BIN — 511916/491366/526424 (limites $/24h, 3DS vs rechazo) |
 | `491c040` | fix(deposits): check_transaction reintenta ante 504/timeout (idempotente, post-cobro seguro) |
-| `65c185d` | fix(deposits): no inventar 3DS cuando check_transaction da 504/timeout |
 <!-- GEN:end:recientes -->
 
 ---

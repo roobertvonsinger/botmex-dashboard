@@ -1,0 +1,28 @@
+# Tests SP-1: /execute borrado, modernos intactos, app importa sin BOT_RUN_DEPOSIT.
+PIPE = "4111111111111111|12|30|123"
+
+def test_execute_endpoint_removed(client):
+    """La ruta legacy /api/deposits/execute ya no existe → 404."""
+    r = client.post("/api/deposits/execute",
+                    json={"account_id": 1, "card_pipe": PIPE, "amount": 50})
+    assert r.status_code == 404
+
+def test_execute_stream_still_registered(client):
+    """El single moderno sigue registrado (no 404; sin deps del bot da 503, no 404)."""
+    r = client.post("/api/deposits/execute-stream",
+                    json={"account_id": 1, "card_pipe": PIPE, "amount": 50})
+    assert r.status_code != 404
+
+def test_multi_and_scheduled_still_registered(client):
+    r1 = client.post("/api/deposits/multi/stream", json={})
+    r2 = client.post("/api/deposits/scheduled/create", json={})
+    assert r1.status_code != 404
+    assert r2.status_code != 404
+
+def test_load_deps_returns_pool_without_bot_run_deposit():
+    """_load_deps ya no depende de BOT_RUN_DEPOSIT; retorna make_pool (o None)."""
+    import deposits
+    res = deposits._load_deps()
+    # En el entorno de test las deps del bot no están → None. Lo clave: NO crashea
+    # y NO es una tupla de 2 (contrato nuevo: un solo valor).
+    assert res is None or callable(res)

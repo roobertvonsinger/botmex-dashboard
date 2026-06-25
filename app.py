@@ -72,7 +72,6 @@ if (_BOT_DIR / "betmexico_db.py").exists() and str(_BOT_DIR) not in sys.path:
 # Carga EAGER de deps del bot — antes que prewarm/deposits los importen lazy.
 # Evita circular imports en betmexico_db (carga partial → crash).
 BOT_DEPS_OK = False
-BOT_RUN_DEPOSIT = None
 BOT_MAKE_POOL = None
 BOT_SCORE_PAYMENT = None
 try:
@@ -82,7 +81,6 @@ try:
         # ya esté completo, y betmexico_config no necesite re-import betmexico_db.
         import betmexico_config as _bot_cfg_mod  # noqa
         import betmexico_db as _bot_db_mod  # noqa
-        from web_routes_deposits import _run_deposit as BOT_RUN_DEPOSIT  # noqa
         from betmexico_login_service import make_pool as BOT_MAKE_POOL  # noqa
         try:
             from betmexico_payment_analyzer import score_payment_readiness as BOT_SCORE_PAYMENT  # noqa
