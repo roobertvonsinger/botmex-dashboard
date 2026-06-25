@@ -30,9 +30,11 @@ def test_load_deps_returns_pool_without_bot_run_deposit():
 import os
 
 def test_legacy_modules_archived():
-    """Los 4 módulos muertos están en _legacy/, no en la raíz."""
+    """Los 7 módulos muertos están en _legacy/, no en la raíz."""
     for m in ("web_routes_deposits.py", "web_routes_missions.py",
-              "web_routes_prewarm.py", "web_watchdog.py"):
+              "web_routes_prewarm.py", "web_watchdog.py",
+              "web_routes_cards.py", "web_routes_logs.py",
+              "web_routes_notifications.py"):
         assert not os.path.exists(m), f"{m} sigue en raíz"
         assert os.path.exists(os.path.join("_legacy", m)), f"{m} no está en _legacy/"
 
@@ -40,7 +42,8 @@ def test_no_live_import_of_legacy():
     """Ningún módulo vivo (en raíz) importa los legacy."""
     import glob, re
     pat = re.compile(r"^\s*(from|import)\s+(web_routes_deposits|web_routes_missions|"
-                     r"web_routes_prewarm|web_watchdog)\b", re.M)
+                     r"web_routes_prewarm|web_watchdog|web_routes_cards|web_routes_logs|"
+                     r"web_routes_notifications)\b", re.M)
     for f in glob.glob("*.py"):
         txt = open(f, encoding="utf-8").read()
         assert not pat.search(txt), f"{f} aún importa un módulo legacy"

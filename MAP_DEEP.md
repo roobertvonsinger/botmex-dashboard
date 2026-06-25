@@ -281,8 +281,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_execute_stream_still_registered` | def | L10–L14 |
 | `test_multi_and_scheduled_still_registered` | def | L16–L20 |
 | `test_load_deps_returns_pool_without_bot_run_deposit` | def | L22–L28 |
-| `test_legacy_modules_archived` | def | L32–L37 |
-| `test_no_live_import_of_legacy` | def | L39–L46 |
+| `test_legacy_modules_archived` | def | L32–L39 |
+| `test_no_live_import_of_legacy` | def | L41–L49 |
 
 ### `web_auth.py`
 
@@ -302,36 +302,6 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_load_analyzer` | def | L27–L35 |
 | `recalc_grade_from_db` | def | L47–L88 |
 | `recalc_grade_from_details` | def | L91–L113 |
-
-### `web_routes_cards.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `_is_visible` | def | L32–L37 |
-| `create_card` | def | L41–L67 |
-| `list_cards` | def | L71–L75 |
-| `get_card` | def | L79–L85 |
-| `get_card_usage` | def | L89–L96 |
-| `patch_card_notes` | def | L100–L117 |
-| `ban_card` | def | L121–L136 |
-
-### `web_routes_logs.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `_parse_line` | def | L34–L64 |
-| `get_logs_monitor` | def | L68–L98 |
-
-### `web_routes_notifications.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `push_notification_event` | def | L31–L43 |
-| `list_notifications` | def | L47–L56 |
-| `count_unread` | def | L60–L63 |
-| `mark_read` | def | L67–L70 |
-| `mark_all_read` | def | L74–L77 |
-| `stream` | def | L81–L111 |
 
 ### `web_utils.py`
 
@@ -416,14 +386,6 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `POST` | `/cancel` | `prewarm.py` |
 | `GET` | `/status` | `prewarm.py` |
 | `POST` | `/refresh-stream` | `prewarm.py` |
-| `GET` | `/{card_id}` | `web_routes_cards.py` |
-| `GET` | `/{card_id}/usage` | `web_routes_cards.py` |
-| `PATCH` | `/{card_id}/notes` | `web_routes_cards.py` |
-| `POST` | `/{card_id}/ban` | `web_routes_cards.py` |
-| `GET` | `/count` | `web_routes_notifications.py` |
-| `POST` | `/{notification_id}/read` | `web_routes_notifications.py` |
-| `POST` | `/mark-all-read` | `web_routes_notifications.py` |
-| `GET` | `/stream` | `web_routes_notifications.py` |
 <!-- GEN:end:endpoints -->
 
 ---
@@ -440,10 +402,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `betmexico.dashboard.prewarm` | `prewarm.py` |
 | `betmexico.dashboard.sse` | `app.py` |
 | `betmexico.web.auth` | `web_auth.py` |
-| `betmexico.web.cards` | `web_routes_cards.py` |
 | `betmexico.web.grading` | `web_grading.py` |
-| `betmexico.web.logs` | `web_routes_logs.py` |
-| `betmexico.web.notif` | `web_routes_notifications.py` |
 | `betmexico.web.utils` | `web_utils.py` |
 | `dashboard.proxy_pool` | `proxy_pool.py` |
 <!-- GEN:end:loggers -->

@@ -106,12 +106,9 @@ web_routes_prewarm.py → prewarm.py
 | `scripts/gen_map.py` | 486 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
-| `test_unificacion_sp1.py` | 46 | `—` | _[completar]_ |
+| `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
 | `web_grading.py` | 113 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
-| `web_routes_cards.py` | 136 | `betmexico.web.cards` | Endpoints CRUD de tarjetas — listar, agregar, eliminar |
-| `web_routes_logs.py` | 98 | `betmexico.web.logs` | Endpoint `/api/logs`: lee `/data/logs/dashboard.log` y stream SSE en vivo |
-| `web_routes_notifications.py` | 111 | `betmexico.web.notif` | Endpoints de notificaciones push / alertas al operador |
 | `web_utils.py` | 243 | `betmexico.web.utils` | Helpers compartidos: _friendly_error, _normalize_ccexp, _build_proxy_url |
 <!-- GEN:end:modulos -->
 
@@ -185,6 +182,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `f973fe0` | chore(legacy): SP-1 archiva web_routes_{deposits,missions,prewarm} + web_watchdog a _legacy/ |
 | `0d51a91` | feat(login): SP-1 unificacion — borra /execute legacy (fuga proxyless), _load_deps solo make_pool |
 | `debcd3e` | docs(unificacion): spec + plan SP-1/SP-2 + aparta maintenance.html a _legacy |
 | `286bb4e` | chore(session): rituales /abrir-bmx y /cerrar-bmx + NEXT-SESSION |
@@ -196,7 +194,6 @@ web_routes_prewarm.py → prewarm.py
 | `4ba18eb` | feat(bines): panel de inteligencia de BINes en sidebar (SA) — tasa de aprobacion |
 | `6e5b6f1` | ui(detalle): 3DS en ambar tambien en la tabla de movimientos/intentos |
 | `919d38e` | ui(programado): 3DS en AMBAR (no rojo dramatico) + icono advertencia |
-| `0a26449` | docs(bin): thresholds por BIN — 511916/491366/526424 (limites $/24h, 3DS vs rechazo) |
 <!-- GEN:end:recientes -->
 
 ---
