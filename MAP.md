@@ -193,6 +193,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `564647c` | fix(proxy): excluir IPRoyal del pool — sin saldo (402 Payment Required) |
 | `c00a422` | fix(login): blindar gentle_login contra login proxyless (regla de Robert) |
 | `d2d9c16` | feat(login): reuso de token v2 en gentle_login — no quemar 1 token por reintento |
 | `4ba18eb` | feat(bines): panel de inteligencia de BINes en sidebar (SA) — tasa de aprobacion |
@@ -204,7 +205,6 @@ web_routes_prewarm.py → prewarm.py
 | `b9e3be0` | fix(matchmaker): limites separados — 2 intentos por cuenta, 3 por tarjeta |
 | `a31dcff` | fix(matchmaker): retirar cuenta tras N BANK_REJECTED (parar masacre de intentos) |
 | `0faf6c3` | docs(errors): causa del 406 = IPRoyal con IP fija (city) -> rotativo nacional (2026-05-29) |
-| `2d469a8` | fix(proxy+multi): IPRoyal rotativo (no IP fija quemada) + reintentos de login en matchmaker |
 <!-- GEN:end:recientes -->
 
 ---
