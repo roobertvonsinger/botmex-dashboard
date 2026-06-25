@@ -95,7 +95,7 @@ web_routes_prewarm.py → prewarm.py
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `_test_token_reuse.py` | 176 | `—` | _[completar]_ |
-| `app.py` | 2442 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2430 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 79 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -193,6 +193,7 @@ web_routes_prewarm.py → prewarm.py
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `286bb4e` | chore(session): rituales /abrir-bmx y /cerrar-bmx + NEXT-SESSION |
 | `ee1685f` | feat(proxy): Data Impulse 50 sticky MX como pool primario — rompe monoproxy + 504 |
 | `80122c2` | docs: agregar CLAUDE.md con pointer acceso Hostinger API/MCP (KVM2+KVM4) |
 | `564647c` | fix(proxy): excluir IPRoyal del pool — sin saldo (402 Payment Required) |
@@ -204,7 +205,6 @@ web_routes_prewarm.py → prewarm.py
 | `0a26449` | docs(bin): thresholds por BIN — 511916/491366/526424 (limites $/24h, 3DS vs rechazo) |
 | `491c040` | fix(deposits): check_transaction reintenta ante 504/timeout (idempotente, post-cobro seguro) |
 | `65c185d` | fix(deposits): no inventar 3DS cuando check_transaction da 504/timeout |
-| `b9e3be0` | fix(matchmaker): limites separados — 2 intentos por cuenta, 3 por tarjeta |
 <!-- GEN:end:recientes -->
 
 ---
