@@ -4,43 +4,45 @@
 
 ## 🎯 Objetivo en curso
 
-**Unificación login + depósito.** Un solo login (`gentle_login`) como transporte único hacia BetMexico, un solo core de depósito, y una sola vista de depósito (matchmaker + programado + single) con la info "a los ojos". **Rumbo APROBADO por Robert** — pausado justo antes de escribir el spec formal (sesión 2026-06-24/25).
+**Unificación login + depósito.** SP-1 (login único) y SP-2 (matchmaker reusa sesión) **HECHOS, deployados y mergeados a `main`** (2026-06-25). Falta **SP-3 — la vista de depósito unificada** (matchmaker + programado + single con la info "a los ojos" y persistente).
 
 ## ▶ Con qué arrancas (1ra acción concreta)
 
-Escribir el **spec formal** en `docs/superpowers/specs/2026-06-25-unificacion-login-deposito-design.md` (brainstorming ya hecho, rumbo aprobado). De ahí → `writing-plans`.
+**SP-3, fase 0: mockear la vista visualmente** ANTES de codear (Robert quiere verla, no imaginarla). Tras aprobar el mockup → `writing-plans` para SP-3, luego subagent-driven.
 
 ## 🧭 Recomendación de approach
 
-Ir **directo al spec** — NO re-investigar: dos workflows ya mapearon todo esta sesión (auditoría `gentle_login` + mapa arquitectura login/depósito). Implementar en orden **SP-1 + SP-2 (backend) de corrido → deploy/smoke → SP-3 (vista)**. La vista (SP-3): **mockear visual** antes de codear (Robert quiere verla, no imaginarla).
+SP-1+SP-2 ya dejaron el backend limpio (1 core `_run_deposit_with_phases` + `gentle_login` único). SP-3 es **frontend + persistencia**: un componente "run" único por (cuenta·tarjeta·intento) para los 3 modos; feed **persistente** (lee `process_log`/`deposit_attempts`); canal SSE único (matar bus global del programado); info visible (result_code humano, proxy/IP usada, cap 24h por cuenta, balance antes→después). Empezar por el mockup.
 
 ## ⏳ Pendientes próximos
 
-- [ ] **Escribir el spec de unificación** (siguiente acción).
-- **SP-1 — Login único:** migrar `POST /api/deposits/execute` a `_run_deposit_with_phases` (gentle_login); cortar import `BOT_RUN_DEPOSIT` (`app.py:85`); **archivar** a `_legacy/` los 4 módulos muertos (`web_routes_deposits.py`, `web_routes_missions.py`, `web_routes_prewarm.py`, `web_watchdog.py`). Mata la fuga proxyless de `/execute`.
-- **SP-2 — Fix matchmaker:** reusar `session_jwt` por cuenta (`deposits.py:~1661`, patrón del scheduled `deposits.py:2076-2078`). Menos captcha/quema de IP.
-- **SP-3 — Vista depósito unificada:** un componente "run" único por (cuenta·tarjeta·intento) para los 3 modos; feed **persistente** (lee `process_log`/`deposit_attempts`); canal SSE único (matar bus global del programado); info visible (result_code humano, proxy/IP usada, cap 24h por cuenta, balance antes→después).
-- [ ] **Hilo aparte — modo mantenimiento:** `app.py` ya tiene `_maintenance_gate` + `static/maintenance.html` **sin commitear** (working tree). Robert pidió **ordenarlo coherente, funcional pero apagado** (flag en `/data/`, eximir `/api/health`, encender/apagar claro + doc en `docs/protocols/maintenance.md`). NO está hecho.
-- Mejora de visibilidad: resumen post-run del "actualizar visibles" (N/N OK, balance antes→después). La data ya está en `process_log`; falta mostrarla en UI.
+- [ ] **SP-2 smoke FUNCIONAL** (Robert, pendiente): correr un matchmaker chico (1 cuenta × 2 tarjetas) y verificar `login_reused` en el 2º intento de la cuenta (1 login/cuenta, no 1/par). Log: `docker logs --since 5m betmexico-web | grep -iE "login_start|login_reused|login_done"`.
+- [ ] **SP-3 — Vista depósito unificada** (siguiente objetivo): mockup → plan → implementación.
+- [ ] **Modo mantenimiento** (pospuesto, revertido del working tree): HTML hecho en `_legacy/maintenance.html`. Rehacer el gate bien — 2 fixes obligatorios: **eximir `/api/health`** (o Traefik tumba el container) + **flag en `/data/` persistente** (no `ROOT/data`). Doc en `docs/protocols/maintenance.md`. Ver memoria `project_maintenance_mode_pending`.
+- Minors anotados (review final, no bloqueantes): docstring de `/execute-stream` menciona `/execute` borrado; `docs/AUDIT.md:107` describe el `web_watchdog` archivado como vivo; comentarios en `deposits.py:1413,1498` citan líneas del scheduled imprecisas.
+- `_test_token_reuse.py` = residuo en raíz (untracked, candidato a borrar — confirmar).
 
-## ✅ Hecho esta sesión (2026-06-24/25)
+## ✅ Hecho esta sesión (2026-06-25)
 
-- **`ee1685f`** feat(proxy): **Data Impulse 50 sticky MX** como pool primario → deployado KVM4, **resolvió el 504 monoproxy** que tumbaba el login del matchmaker. Smoke OK.
-- **Auditoría `gentle_login`** (workflow): está bien hecho y NO estorba; el cuello real es **captcha-exhaustion (reputación de IP)**, no el orquestador.
-- **Mapa arquitectura** login+depósito (workflow): 1 fuga viva de login (`/execute` legacy + proxyless) + 4 módulos legacy muertos; UI ya es 1 drawer/3 tabs con gaps de persistencia.
-- **Verificado** que el "actualizar visibles" de 20 cuentas SÍ corrió de verdad (`process_log`: 20/20 complete, `jwt_cache=False`, balance persistido) — no fue cuenteo.
+Unificación SP-1 + SP-2 completa vía subagent-driven (7 tasks, TDD, 14/14 tests, review final opus = listo para prod). Mergeado a `main` + Forgejo. Deployado a KVM4 con smoke estructural verde.
+- **`0d51a91`** SP-1: borra `/execute` (fuga proxyless, D1=borrar — sin consumidor); `_load_deps` retorna solo `make_pool`; simplifica 3 guards.
+- **`f973fe0` + `9febd21`** SP-1: archiva **7** módulos muertos a `_legacy/` (los 4 del plan + `web_routes_cards/logs/notifications` que el mapa no había detectado — Robert aprobó los 7).
+- **`26d9f62`** SP-1: corrige MAP/gen_map/ENDPOINTS/ARCHITECTURE/AUDIT/ERRORS/diagrama.
+- **`7795983` + `7ce3f9b`** SP-2: helpers `_mm_session_get/_update` + reuso de `session_jwt` por cuenta en `multi_stream`.
+- Modo mantenimiento (gate a medias) **revertido**; HTML apartado a `_legacy/`.
 
 ## 🔧 Decisiones tomadas
 
-- **Data Impulse = proxy primario** (50 sticky MX; el **puerto** define la sticky session, `10000..10049`). NodeMaven = fallback minoritario. **IPRoyal excluido** (sin saldo, 402).
-- Rumbo unificación aprobado: **A** login único · **B** core+fix matchmaker · **C** vista unificada. Orden **A+B → C**.
-- Módulos legacy → **archivar a `_legacy/`** (no borrar).
-- Captcha v3 **descartado** (datos previos). `gentle_login` **NO se reescribe** (auditado, está bien).
+- **D1: `/execute` BORRADO** (no migrado) — sin consumidor de código en todo el workspace.
+- **7 módulos legacy** archivados a `_legacy/` (no 4 — los endpoints de cards/logs/notifications viven inline en `app.py`).
+- Deploy SP-1+SP-2 **juntos** (1 deploy) — el review final validó el conjunto.
+- Modo mantenimiento **pospuesto** (rehacer bien, no a medias).
+- `gentle_login` NO se reescribe; captcha v3 descartado (decisiones previas, siguen firmes).
 
 ## 🖥️ Estado del sistema al cerrar
 
-`betmexico-web` **Up** · `betmexico-bot` **Exited** (sin token, esperado) · health **200** (923 cuentas) · pool = **52 proxies** (50 Data Impulse + 2 NodeMaven) · login **funcionando** (504 resuelto).
+`betmexico-web` **Up** (reiniciado con el código nuevo) · `betmexico-bot` **Exited** (sin token, esperado) · health **200** (923 cuentas) · pool = **52 proxies** (50 Data Impulse + 2 NodeMaven). Smoke estructural post-deploy: `/execute`→404, modernos→401 (no 503), logs sin errores de import.
 
-## ⚠️ Working tree (NO arrastrar al commit sin decidir)
+## ⚠️ Working tree
 
-`app.py` + `static/maintenance.html` = modo mantenimiento a medias (ver pendiente arriba). `_test_token_reuse.py` = residuo temporal del feature ya commiteado `d2d9c16` (candidato a borrar, pendiente confirmar con Robert).
+Limpio salvo `_test_token_reuse.py` (residuo untracked, candidato a borrar). La rama `feat/unificacion-login-deposito` quedó en local + Forgejo (mergeada a main vía fast-forward; se puede borrar cuando quieras).

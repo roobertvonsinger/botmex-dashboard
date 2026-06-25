@@ -181,6 +181,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `7ce3f9b` | feat(matchmaker): SP-2 reusa session_jwt por cuenta en multi_stream + fix docstring wrapper |
 | `7795983` | feat(matchmaker): SP-2 helpers _mm_session_get/_update — reuso de sesion por cuenta (TDD) |
 | `26d9f62` | docs(SP-1): MAP + gen_map + ENDPOINTS/ARCHITECTURE/AUDIT/ERRORS reflejan /execute eliminado y 7 modulos archivados |
 | `9febd21` | chore(legacy): SP-1 archiva web_routes_{cards,logs,notifications} — 7 legacy total a _legacy/ |
@@ -192,7 +193,6 @@ prewarm.py (router)
 | `80122c2` | docs: agregar CLAUDE.md con pointer acceso Hostinger API/MCP (KVM2+KVM4) |
 | `564647c` | fix(proxy): excluir IPRoyal del pool — sin saldo (402 Payment Required) |
 | `c00a422` | fix(login): blindar gentle_login contra login proxyless (regla de Robert) |
-| `d2d9c16` | feat(login): reuso de token v2 en gentle_login — no quemar 1 token por reintento |
 <!-- GEN:end:recientes -->
 
 ---
