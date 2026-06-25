@@ -685,7 +685,8 @@ async def _run_deposit_with_phases(
     Solo visibilidad — caller persiste resultado.
 
     Returns:
-      {"success": bool, "result_code": str, "error": str|None, "duration_ms": int}
+      {"success": bool, "result_code": str, "error": str|None, "duration_ms": int,
+       "jwt": str|None, "used_proxy": str|None}  # jwt/used_proxy: para reuso de sesión
     """
     try:
         # Login lo maneja gentle_login (importa get_jwt internamente). Aquí solo
@@ -1492,6 +1493,10 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
     async def gen():
         pool = None
         prefetch = None
+        # SP-2: sesión por cuenta. La 1ª vez que una cuenta loguea OK guardamos
+        # (jwt, proxy); los siguientes intentos de esa cuenta (otra tarjeta) reusan
+        # → 1 login por cuenta en vez de 1 por par. Patrón del scheduled (L2076).
+        account_sessions: dict[str, tuple[str, str]] = {}
 
         tried: set[tuple[str, int]] = set()  # (card_num, account_id)
         matches: list[dict] = []
@@ -1539,12 +1544,16 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
             # bloque) con _record_attempt + la lógica de estado del matchmaker.
             phase_cb = make_attempt_phase_cb(email, card["tail"])
             try:
+                sess_jwt, sess_proxy = _mm_session_get(account_sessions, email)
                 r = await _run_deposit_with_phases(
                     email=email, password=acc["password"],
                     cc_num=card["num"], cc_exp=card["exp"], cc_cvv=card["cvv"],
                     amount=amount, user=user_ctx, pool=pool,
                     phase_cb=phase_cb,
+                    session_jwt=sess_jwt, session_proxy=sess_proxy,
+                    persist_login_data=(sess_jwt is None),
                 )
+                _mm_session_update(account_sessions, email, r)
             except Exception as e:
                 logger.error(f"[Matchmaker] {email}/{card['tail']}: {e}")
                 r = {"success": False, "result_code": "ERROR", "error": str(e)[:200]}

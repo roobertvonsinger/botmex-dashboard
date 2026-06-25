@@ -163,16 +163,16 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_safe_phase` | def | L600–L607 |
 | `_build_admin_proxy_url` | def | L610–L614 |
 | `_refresh_account_after_deposit` | def | L617–L664 |
-| `_run_deposit_with_phases` | def | L667–L1143 |
-| `deposit_execute_stream` | def | L1147–L1355 |
-| `cap_status` | def | L1359–L1371 |
-| `_mm_session_get` | def | L1402–L1406 |
-| `_mm_session_update` | def | L1409–L1418 |
-| `multi_stream` | def | L1422–L1792 |
-| `multi_cancel` | def | L1796–L1801 |
-| `scheduled_create` | def | L1814–L2106 |
-| `scheduled_list` | def | L2110–L2132 |
-| `scheduled_cancel` | def | L2136–L2144 |
+| `_run_deposit_with_phases` | def | L667–L1144 |
+| `deposit_execute_stream` | def | L1148–L1356 |
+| `cap_status` | def | L1360–L1372 |
+| `_mm_session_get` | def | L1403–L1407 |
+| `_mm_session_update` | def | L1410–L1419 |
+| `multi_stream` | def | L1423–L1801 |
+| `multi_cancel` | def | L1805–L1810 |
+| `scheduled_create` | def | L1823–L2115 |
+| `scheduled_list` | def | L2119–L2141 |
+| `scheduled_cancel` | def | L2145–L2153 |
 
 ### `login_orchestrator.py`
 
@@ -296,6 +296,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_update_does_not_overwrite_existing` | def | L20–L24 |
 | `test_update_invalidates_on_401` | def | L27–L32 |
 | `test_update_keeps_session_on_normal_rejection` | def | L35–L41 |
+| `test_update_invalidates_on_bare_401` | def | L44–L48 |
+| `test_update_invalidates_on_redirectlogin` | def | L51–L55 |
 
 ### `web_auth.py`
 

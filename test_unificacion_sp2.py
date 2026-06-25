@@ -39,3 +39,17 @@ def test_update_keeps_session_on_normal_rejection():
         {"success": False, "result_code": "BANK_REJECTED",
          "error": "Tarjeta rechazada por el banco"})
     assert s["a@test.com"] == ("JWT1", "P1")
+
+
+def test_update_invalidates_on_bare_401():
+    s = {"a@test.com": ("JWT1", "P1")}
+    deposits._mm_session_update(s, "a@test.com",
+        {"success": False, "error": "gateway devolvió 401"})
+    assert "a@test.com" not in s
+
+
+def test_update_invalidates_on_redirectlogin():
+    s = {"a@test.com": ("JWT1", "P1")}
+    deposits._mm_session_update(s, "a@test.com",
+        {"success": False, "error": "respuesta: redirectLogin true"})
+    assert "a@test.com" not in s
