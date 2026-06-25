@@ -166,11 +166,13 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_run_deposit_with_phases` | def | L667–L1143 |
 | `deposit_execute_stream` | def | L1147–L1355 |
 | `cap_status` | def | L1359–L1371 |
-| `multi_stream` | def | L1403–L1773 |
-| `multi_cancel` | def | L1777–L1782 |
-| `scheduled_create` | def | L1795–L2087 |
-| `scheduled_list` | def | L2091–L2113 |
-| `scheduled_cancel` | def | L2117–L2125 |
+| `_mm_session_get` | def | L1402–L1406 |
+| `_mm_session_update` | def | L1409–L1418 |
+| `multi_stream` | def | L1422–L1792 |
+| `multi_cancel` | def | L1796–L1801 |
+| `scheduled_create` | def | L1814–L2106 |
+| `scheduled_list` | def | L2110–L2132 |
+| `scheduled_cancel` | def | L2136–L2144 |
 
 ### `login_orchestrator.py`
 
@@ -283,6 +285,17 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_load_deps_returns_pool_without_bot_run_deposit` | def | L22–L28 |
 | `test_legacy_modules_archived` | def | L32–L39 |
 | `test_no_live_import_of_legacy` | def | L41–L49 |
+
+### `test_unificacion_sp2.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `test_session_get_empty` | def | L4–L5 |
+| `test_session_get_returns_cached` | def | L8–L10 |
+| `test_update_caches_on_first_success` | def | L13–L17 |
+| `test_update_does_not_overwrite_existing` | def | L20–L24 |
+| `test_update_invalidates_on_401` | def | L27–L32 |
+| `test_update_keeps_session_on_normal_rejection` | def | L35–L41 |
 
 ### `web_auth.py`
 

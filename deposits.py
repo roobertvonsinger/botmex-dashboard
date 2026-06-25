@@ -1399,6 +1399,25 @@ MM_MAX_LOGIN_RETRIES = 3
 _active_mm_runs: dict[str, asyncio.Event] = {}
 
 
+def _mm_session_get(sessions: dict, email: str) -> tuple[Optional[str], Optional[str]]:
+    """(jwt, proxy) cacheados para esta cuenta en el run del matchmaker, o (None, None).
+    Si hay sesión, _run_deposit_with_phases salta login+captcha (reuso por cuenta)."""
+    s = sessions.get(email)
+    return (s[0], s[1]) if s else (None, None)
+
+
+def _mm_session_update(sessions: dict, email: str, r: dict) -> None:
+    """Cachea la sesión la PRIMERA vez que la cuenta loguea OK; la invalida si el
+    intento murió por sesión rechazada (401/redirectLogin), forzando re-login en el
+    siguiente intento de esa cuenta. Mismo criterio que el scheduled (deposits.py:2136)."""
+    reason = (r.get("error") or "").lower()
+    if "sesión rechazada" in reason or "401" in reason or "redirectlogin" in reason:
+        sessions.pop(email, None)
+        return
+    if email not in sessions and r.get("jwt"):
+        sessions[email] = (r["jwt"], r.get("used_proxy"))
+
+
 @router.post("/multi/stream")
 async def multi_stream(request: Request, user: dict = Depends(require_session)):
     make_pool = _load_deps()
