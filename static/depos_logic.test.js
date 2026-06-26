@@ -62,3 +62,30 @@ test('phaseToPct monotonic', () => {
   assert.equal(D.phaseToPct('done'), 100);
   assert.equal(D.phaseToPct('login_retry'), null); // retry no mueve %
 });
+
+// ── Task 3: validatePipe (null=ok, string=error; alineado a app.js:3896) + parseCombo + fmtMoney ──
+test('validatePipe 4 partes válido -> null', () =>
+  assert.equal(D.validatePipe('4111111111111111|12|30|123'), null));
+test('validatePipe 3 partes (MMYY) válido -> null', () =>
+  assert.equal(D.validatePipe('4111111111111111|1230|123'), null));
+test('validatePipe acepta espacios y / en exp', () => {
+  assert.equal(D.validatePipe('4111111111111111 | 12/30 | 123'), null);
+});
+test('validatePipe mes inválido -> string error', () => {
+  assert.ok(typeof D.validatePipe('4111111111111111|13|30|123') === 'string');
+});
+test('validatePipe basura -> string error', () => {
+  assert.ok(typeof D.validatePipe('hola') === 'string');
+  assert.ok(typeof D.validatePipe('4111|12|30') === 'string'); // num corto
+});
+test('validatePipe vacío -> string error', () => {
+  assert.ok(typeof D.validatePipe('') === 'string');
+});
+test('parseCombo split en primer :', () => {
+  assert.deepEqual(D.parseCombo('a@b.mx:Pass:word!'), { email: 'a@b.mx', password: 'Pass:word!' });
+});
+test('parseCombo sin : -> null', () => assert.equal(D.parseCombo('nope'), null));
+test('fmtMoney', () => {
+  assert.equal(D.fmtMoney(512), '$512.00');
+  assert.equal(D.fmtMoney(1234.5), '$1,234.50');
+});

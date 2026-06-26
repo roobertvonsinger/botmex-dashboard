@@ -54,5 +54,41 @@
     return name in _PCT ? _PCT[name] : null;
   }
 
-  return { deriveMode, presetsForMode, mapPhaseToScene, phaseToPct };
+  // Valida pipe de tarjeta. Devuelve null si OK, o string de error (semántica de app.js:3896).
+  // Soporta NNNN|MMYY|CVV (3 partes) y NNNN|MM|YY|CVV (4 partes).
+  function validatePipe(s) {
+    if (!s) return 'Formato: numero|MMYY|CVV';
+    const parts = s.replace(/\s/g, '').split('|').filter(Boolean);
+    if (parts.length === 3) {
+      const [num, exp, cvv] = parts;
+      if (!/^\d{13,19}$/.test(num)) return 'Número de tarjeta inválido';
+      if (!/^(0[1-9]|1[0-2])\/?(\d{2}|\d{4})$/.test(exp)) return 'Vencimiento inválido (MMYY)';
+      if (!/^\d{3,4}$/.test(cvv)) return 'CVV inválido';
+      return null;
+    }
+    if (parts.length === 4) {
+      const [num, mm, yy, cvv] = parts;
+      if (!/^\d{13,19}$/.test(num)) return 'Número de tarjeta inválido';
+      if (!/^(0?[1-9]|1[0-2])$/.test(mm)) return 'Mes inválido';
+      if (!/^\d{2,4}$/.test(yy)) return 'Año inválido';
+      if (!/^\d{3,4}$/.test(cvv)) return 'CVV inválido';
+      return null;
+    }
+    return 'Formato: numero|MMYY|CVV';
+  }
+
+  // Parte el combo en el PRIMER ':' (la password puede contener ':').
+  function parseCombo(s) {
+    if (typeof s !== 'string') return null;
+    const i = s.indexOf(':');
+    if (i < 0) return null;
+    return { email: s.slice(0, i), password: s.slice(i + 1) };
+  }
+
+  function fmtMoney(n) {
+    const v = Number(n) || 0;
+    return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  return { deriveMode, presetsForMode, mapPhaseToScene, phaseToPct, validatePipe, parseCombo, fmtMoney };
 });
