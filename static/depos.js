@@ -86,9 +86,20 @@
     if (!cfg.manual && cfg.presets.indexOf(_dx.amount) < 0) _dx.amount = cfg.presets.length > 1 ? cfg.presets[1] : cfg.presets[0];
     if (cfg.manual && _dx.amount < 10) _dx.amount = cfg.presets[0];
     setPresets(cfg.presets, cfg.manual);
-    const note = qs('#amtNote'); if (note) note.textContent = cfg.note;
     const mt = qs('#modeText'); if (mt) mt.textContent = modeLabel(_dx.mode, _dx.reps);
     const inp = qs('#amtInput'); if (inp && cfg.manual) inp.value = _dx.amount;
+    // nota de monto + advertencia de cap 24h (el v8 no tiene barra; lo reflejamos en la nota)
+    const note = qs('#amtNote');
+    if (note) {
+      let txt = cfg.note;
+      if (_dx.cap) {
+        const used = Number(_dx.cap.used != null ? _dx.cap.used : (_dx.cap.total || 0));
+        const max24 = Number(_dx.cap.max_24h || 1499);
+        if (used + _dx.amount > max24) txt = '⚠ Excede el tope 24h ($' + max24 + ', usado $' + used + ')';
+        else if (used > 0) txt = cfg.note + ' · usado hoy $' + used + ' / $' + max24;
+      }
+      note.textContent = txt;
+    }
   }
 
   // ── cuentas (chips combo+grado). Stub Task5; resolución de password/grade en Task6 ──
@@ -107,11 +118,93 @@
     });
   }
 
+  // ── tarjetas (chips: pegadas + guardadas) ──
+  function renderCards() {
+    const box = qs('#cardChips'); if (!box) return;
+    box.innerHTML = '';
+    _dx.cards.forEach((pipe, idx) => {
+      const chip = document.createElement('span');
+      chip.className = 'chip copyable';
+      chip.setAttribute('data-copy', pipe);
+      chip.innerHTML = '<span class="txt">' + pipe + '</span><span class="chip-x" data-idx="' + idx + '">x</span>';
+      box.appendChild(chip);
+    });
+    const add = document.createElement('span');
+    add.className = 'chip chip-add';
+    add.textContent = '+ agregar tarjeta';
+    box.appendChild(add);
+    const cc = qs('#cardCount'); if (cc) cc.textContent = _dx.cards.length;
+  }
+  function startAddCard(addEl) {
+    const inp = document.createElement('input');
+    inp.className = 'chip';
+    inp.placeholder = 'NNNN|MM|YY|CVV';
+    inp.style.minWidth = '0';
+    addEl.replaceWith(inp);
+    inp.focus();
+    let done = false;
+    const commit = () => {
+      if (done) return; done = true;
+      const v = inp.value.trim();
+      if (!v) { renderCards(); return; }
+      const err = D.validatePipe(v);
+      if (err) { showToast(err); done = false; inp.focus(); return; }
+      if (_dx.cards.indexOf(v) < 0) _dx.cards.push(v);
+      renderCards();
+    };
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      else if (e.key === 'Escape') { done = true; renderCards(); }
+    });
+    inp.addEventListener('blur', commit);
+  }
+
+  // ── resolución contra el backend (no bloquea la apertura; degrada en error) ──
+  async function resolveAccounts() {
+    const need = _dx.accounts.filter((a) => !a.password && a.id).map((a) => a.id);
+    if (!need.length) return;
+    try {
+      const r = await fetch('/api/accounts/combos', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: need }),
+      });
+      if (!r.ok) return;
+      const data = await r.json();
+      const map = {};
+      (data.combos || []).forEach((c) => { map[c.id] = c; });
+      _dx.accounts = _dx.accounts.map((a) =>
+        map[a.id] ? Object.assign({}, a, { email: map[a.id].email || a.email, password: map[a.id].password }) : a);
+    } catch (e) { /* red: degradar, no romper la UI */ }
+  }
+  async function loadSavedCards() {
+    if (_dx.accounts.length !== 1 || !_dx.accounts[0].id) return;
+    try {
+      const r = await fetch('/api/accounts/' + _dx.accounts[0].id + '/cards-pipe');
+      if (!r.ok) return;
+      const data = await r.json();
+      (data.cards || []).forEach((c) => { if (c.pipe && _dx.cards.indexOf(c.pipe) < 0) _dx.cards.push(c.pipe); });
+      renderCards();
+    } catch (e) { /* degradar */ }
+  }
+  async function refreshCap() {
+    _dx.cap = null;
+    if (_dx.accounts.length !== 1 || !_dx.accounts[0].id) return;
+    try {
+      const r = await fetch('/api/deposits/cap-status/' + _dx.accounts[0].id);
+      if (r.ok) _dx.cap = await r.json();
+    } catch (e) { /* degradar */ }
+  }
+
   // ── montaje ──
   function mount() {
     if (_mounted) return;
     root.appendChild(tpl.content.cloneNode(true));
     el = document.getElementById('depos');
+    // La 2ª columna (.duo .col) es Tarjetas; el mockup no le puso IDs — se los damos.
+    const cols = el.querySelectorAll('.duo .col');
+    if (cols[1]) {
+      const chips = cols[1].querySelector('.chips'); if (chips) chips.id = 'cardChips';
+      const cnt = cols[1].querySelector('.count'); if (cnt) cnt.id = 'cardCount';
+    }
     wireStatic();
     _mounted = true;
   }
@@ -131,6 +224,16 @@
         const email = combo.split(':')[0];
         _dx.accounts = _dx.accounts.filter((a) => a.email !== email);
         renderAccounts(); refreshMode();
+      }
+    });
+
+    // tarjetas: agregar (+) / quitar (x)
+    const cardBox = qs('#cardChips');
+    if (cardBox) cardBox.addEventListener('click', (e) => {
+      if (e.target.classList.contains('chip-add')) { startAddCard(e.target); return; }
+      if (e.target.classList.contains('chip-x')) {
+        const idx = parseInt(e.target.getAttribute('data-idx'), 10);
+        if (!isNaN(idx)) { _dx.cards.splice(idx, 1); renderCards(); }
       }
     });
 
@@ -173,17 +276,21 @@
   // ── open/close ──
   function onEsc(e) { if (e.key === 'Escape') window.closeDepos(); }
 
-  window.openDepos = function (opts) {
+  window.openDepos = async function (opts) {
     opts = opts || {};
     mount();
     _dx.accounts = opts.accounts || (opts.ids || []).map((id) => ({ id, email: 'cuenta#' + id, password: '', grade: '' }));
-    _dx.cards = []; _dx.reps = 1; _dx.amount = 50; _dx.running = false;
-    renderAccounts();
-    refreshMode();
+    _dx.cards = []; _dx.reps = 1; _dx.amount = 50; _dx.running = false; _dx.cap = null;
+    // mostrar de inmediato (optimista); los datos del backend se completan en background
+    renderAccounts(); renderCards(); refreshMode();
     root.classList.remove('hidden');
     root.setAttribute('aria-hidden', 'false');
     _dx.open = true;
     document.addEventListener('keydown', onEsc);
+    // completar contra el backend sin bloquear la apertura (frictionless)
+    await resolveAccounts(); renderAccounts(); refreshMode();
+    await loadSavedCards();
+    await refreshCap(); refreshMode();
   };
 
   window.closeDepos = function () {
