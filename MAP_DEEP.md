@@ -13,17 +13,6 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 <!-- GEN:start:simbolos -->
 
-### `_test_token_reuse.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `_short` | def | L43–L51 |
-| `solve_token` | def | L54–L62 |
-| `attempt` | def | L65–L74 |
-| `run_block` | def | L77–L109 |
-| `verdict` | def | L112–L141 |
-| `main` | def | L144–L172 |
-
 ### `app.py`
 
 | Símbolo | Tipo | Líneas |
@@ -31,82 +20,84 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `db` | def | L124–L138 |
 | `_migrate` | def | L141–L165 |
 | `_resolve_operator` | def | L171–L195 |
-| `_broadcast` | def | L202–L221 |
-| `_dequeue_blocking` | def | L224–L229 |
-| `_no_cache_static_assets` | def | L237–L249 |
-| `favicon` | def | L257–L258 |
-| `login_page` | def | L262–L265 |
-| `index` | def | L269–L282 |
-| `auth_login` | def | L291–L316 |
-| `auth_set_password` | def | L320–L344 |
-| `auth_logout` | def | L348–L352 |
-| `auth_me` | def | L356–L361 |
-| `health` | def | L367–L373 |
-| `list_accounts` | def | L377–L466 |
-| `list_users` | def | L472–L480 |
-| `list_assignments` | def | L484–L505 |
-| `AssignRequest` | class | L508–L510 |
-| `assign_accounts` | def | L514–L533 |
-| `unassign_accounts` | def | L537–L548 |
-| `stats` | def | L552–L559 |
-| `_wsai_status` | def | L571–L596 |
-| `_maybe_alert_broadcast` | def | L603–L620 |
-| `_check_one_proxy` | def | L623–L648 |
-| `_proxy_health` | def | L651–L696 |
-| `_capmonster_balance` | def | L699–L719 |
-| `_operator_color` | def | L724–L725 |
-| `_resolve_who` | def | L728–L736 |
-| `superadmin_kpis` | def | L740–L983 |
-| `RefreshRequest` | class | L988–L989 |
-| `accounts_refresh` | def | L993–L1012 |
-| `get_logs` | def | L1018–L1043 |
-| `_run_health_checks` | def | L1051–L1087 |
-| `health_full` | def | L1091–L1092 |
-| `_require_sa` | def | L1100–L1102 |
-| `admin_diag` | def | L1106–L1137 |
-| `admin_ping` | def | L1141–L1162 |
-| `admin_refresh_proxy` | def | L1166–L1173 |
-| `admin_services_restart` | def | L1177–L1191 |
-| `admin_export_logs` | def | L1195–L1207 |
-| `admin_pause_state` | def | L1215–L1217 |
-| `admin_pause` | def | L1221–L1233 |
-| `admin_resume` | def | L1237–L1243 |
-| `admin_emergency_stop` | def | L1247–L1282 |
-| `admin_vps_reboot` | def | L1286–L1298 |
-| `health_last` | def | L1302–L1303 |
-| `health_dismiss` | def | L1307–L1310 |
-| `_health_loop` | def | L1313–L1323 |
-| `_run_lock_janitor` | def | L1326–L1384 |
-| `_janitor_loop` | def | L1387–L1397 |
-| `_run_window_watcher` | def | L1406–L1480 |
-| `_window_watcher_loop` | def | L1483–L1492 |
-| `_release_watchdog_tick` | def | L1495–L1611 |
-| `_release_watchdog_loop` | def | L1614–L1622 |
-| `_start_bg_tasks` | def | L1626–L1630 |
-| `LockRequest` | class | L1633–L1635 |
-| `lock_account` | def | L1639–L1667 |
-| `PublishRequest` | class | L1670–L1672 |
-| `publish_accounts` | def | L1676–L1691 |
-| `hide_all_accounts` | def | L1695–L1706 |
-| `pool_accounts` | def | L1710–L1728 |
-| `unlock_account` | def | L1732–L1759 |
-| `_sse_generator` | def | L1762–L1789 |
-| `events` | def | L1793–L1798 |
-| `account_cards_pipe` | def | L1802–L1827 |
-| `account_notes_summary` | def | L1831–L1856 |
-| `account_details` | def | L1860–L2071 |
-| `NoteCreate` | class | L2074–L2075 |
-| `create_note` | def | L2079–L2108 |
-| `CurpUpdate` | class | L2111–L2112 |
-| `update_curp` | def | L2116–L2127 |
-| `delete_note` | def | L2131–L2143 |
-| `CombosRequest` | class | L2146–L2147 |
-| `accounts_combos` | def | L2151–L2160 |
-| `accounts_pass_map` | def | L2164–L2168 |
-| `list_all_cards` | def | L2172–L2242 |
-| `activity_feed` | def | L2246–L2363 |
-| `list_deposits` | def | L2367–L2392 |
-| `deposits_stats` | def | L2396–L2421 |
+| `_is_sa` | def | L198–L200 |
+| `_visible_emails` | def | L203–L225 |
+| `_broadcast` | def | L232–L251 |
+| `_dequeue_blocking` | def | L254–L259 |
+| `_no_cache_static_assets` | def | L267–L279 |
+| `favicon` | def | L287–L288 |
+| `login_page` | def | L292–L295 |
+| `index` | def | L299–L312 |
+| `auth_login` | def | L321–L346 |
+| `auth_set_password` | def | L350–L374 |
+| `auth_logout` | def | L378–L382 |
+| `auth_me` | def | L386–L391 |
+| `health` | def | L397–L403 |
+| `list_accounts` | def | L407–L496 |
+| `list_users` | def | L502–L510 |
+| `list_assignments` | def | L514–L535 |
+| `AssignRequest` | class | L538–L540 |
+| `assign_accounts` | def | L544–L563 |
+| `unassign_accounts` | def | L567–L578 |
+| `stats` | def | L582–L589 |
+| `_wsai_status` | def | L601–L626 |
+| `_maybe_alert_broadcast` | def | L633–L650 |
+| `_check_one_proxy` | def | L653–L678 |
+| `_proxy_health` | def | L681–L726 |
+| `_capmonster_balance` | def | L729–L749 |
+| `_operator_color` | def | L754–L755 |
+| `_resolve_who` | def | L758–L766 |
+| `superadmin_kpis` | def | L770–L1013 |
+| `RefreshRequest` | class | L1018–L1019 |
+| `accounts_refresh` | def | L1023–L1042 |
+| `get_logs` | def | L1048–L1073 |
+| `_run_health_checks` | def | L1081–L1117 |
+| `health_full` | def | L1121–L1122 |
+| `_require_sa` | def | L1130–L1132 |
+| `admin_diag` | def | L1136–L1167 |
+| `admin_ping` | def | L1171–L1192 |
+| `admin_refresh_proxy` | def | L1196–L1203 |
+| `admin_services_restart` | def | L1207–L1221 |
+| `admin_export_logs` | def | L1225–L1237 |
+| `admin_pause_state` | def | L1245–L1247 |
+| `admin_pause` | def | L1251–L1263 |
+| `admin_resume` | def | L1267–L1273 |
+| `admin_emergency_stop` | def | L1277–L1312 |
+| `admin_vps_reboot` | def | L1316–L1328 |
+| `health_last` | def | L1332–L1333 |
+| `health_dismiss` | def | L1337–L1340 |
+| `_health_loop` | def | L1343–L1353 |
+| `_run_lock_janitor` | def | L1356–L1414 |
+| `_janitor_loop` | def | L1417–L1427 |
+| `_run_window_watcher` | def | L1436–L1510 |
+| `_window_watcher_loop` | def | L1513–L1522 |
+| `_release_watchdog_tick` | def | L1525–L1641 |
+| `_release_watchdog_loop` | def | L1644–L1652 |
+| `_start_bg_tasks` | def | L1656–L1660 |
+| `LockRequest` | class | L1663–L1665 |
+| `lock_account` | def | L1669–L1697 |
+| `PublishRequest` | class | L1700–L1702 |
+| `publish_accounts` | def | L1706–L1721 |
+| `hide_all_accounts` | def | L1725–L1736 |
+| `pool_accounts` | def | L1740–L1758 |
+| `unlock_account` | def | L1762–L1789 |
+| `_sse_generator` | def | L1792–L1819 |
+| `events` | def | L1823–L1828 |
+| `account_cards_pipe` | def | L1832–L1857 |
+| `account_notes_summary` | def | L1861–L1886 |
+| `account_details` | def | L1890–L2101 |
+| `NoteCreate` | class | L2104–L2105 |
+| `create_note` | def | L2109–L2138 |
+| `CurpUpdate` | class | L2141–L2142 |
+| `update_curp` | def | L2146–L2157 |
+| `delete_note` | def | L2161–L2173 |
+| `CombosRequest` | class | L2176–L2177 |
+| `accounts_combos` | def | L2181–L2194 |
+| `accounts_pass_map` | def | L2198–L2203 |
+| `list_all_cards` | def | L2207–L2282 |
+| `activity_feed` | def | L2286–L2403 |
+| `list_deposits` | def | L2407–L2436 |
+| `deposits_stats` | def | L2440–L2465 |
 
 ### `auth.py`
 
@@ -139,8 +130,9 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `seed_db` | def | L7–L72 |
-| `client` | def | L75–L79 |
+| `seed_db` | def | L7–L93 |
+| `client` | def | L96–L100 |
+| `make_client` | def | L103–L115 |
 
 ### `deposits.py`
 
@@ -274,6 +266,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `analyze_gateway_ban_pattern` | def | L422–L492 |
 | `generate_payment_analysis_summary` | def | L499–L547 |
 | `generate_payment_ready_txt` | def | L550–L578 |
+
+### `test_a21_visibilidad.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `test_visible_emails_sa_sees_all` | def | L6–L9 |
+| `test_visible_emails_operator_scoped` | def | L11–L15 |
+| `test_cards_all_sa_sees_both` | def | L19–L23 |
+| `test_cards_all_operator_scoped` | def | L25–L30 |
+| `test_pass_map_operator_scoped` | def | L34–L37 |
+| `test_combos_operator_cannot_get_foreign` | def | L39–L43 |
+| `test_deposits_operator_only_own` | def | L47–L52 |
+| `test_deposits_sa_sees_all` | def | L54–L57 |
 
 ### `test_unificacion_sp1.py`
 

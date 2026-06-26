@@ -21,6 +21,7 @@ def seed_db(tmp_path, monkeypatch):
                 first_checked_at TEXT NOT NULL, last_checked_at TEXT NOT NULL, check_count INTEGER DEFAULT 1,
                 checked_by INTEGER DEFAULT 0,
                 locked_by INTEGER DEFAULT NULL, locked_at TEXT DEFAULT NULL, locked_until TEXT DEFAULT NULL,
+                published_to_pool INTEGER DEFAULT 1,
                 grade TEXT DEFAULT '?'
             )
         """)
@@ -51,7 +52,7 @@ def seed_db(tmp_path, monkeypatch):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 card_number TEXT, card_expiry TEXT, card_cvv TEXT,
                 account_email TEXT, account_password TEXT,
-                registered_by INTEGER, registered_at TEXT,
+                registered_by INTEGER, registered_by_name TEXT, registered_at TEXT,
                 last_used_at TEXT,
                 total_deposits INTEGER DEFAULT 0,
                 total_approved INTEGER DEFAULT 0,
@@ -66,6 +67,26 @@ def seed_db(tmp_path, monkeypatch):
                 assigned_at TEXT, UNIQUE(email, user_id)
             )
         """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS account_notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, account_email TEXT,
+                account_password TEXT, note_type TEXT, card_number TEXT,
+                card_expiry TEXT, card_cvv TEXT, note_text TEXT, amount REAL,
+                created_by INTEGER, created_by_name TEXT, created_at TEXT, updated_at TEXT
+            )
+        """)
+        # Seed A2.1: a@ asignada al operador 555; c@ lockeada por 555; b@ ajena (del SA)
+        con.execute("INSERT INTO account_assignments (email,user_id,assigned_by,assigned_at) VALUES (?,?,?,?)",
+                    ("a@test.com", 555, 1341812706, "2026-06-01 00:00:00"))
+        con.execute("UPDATE accounts SET locked_by='555' WHERE email='c@test.com'")
+        con.execute("INSERT INTO account_cards (card_number,card_expiry,card_cvv,account_email,account_password,registered_by,registered_at) VALUES (?,?,?,?,?,?,?)",
+                    ("4111111111111111","1230","123","a@test.com","x",555,"2026-06-01"))
+        con.execute("INSERT INTO account_cards (card_number,card_expiry,card_cvv,account_email,account_password,registered_by,registered_at) VALUES (?,?,?,?,?,?,?)",
+                    ("4222222222222222","1230","321","b@test.com","x",1341812706,"2026-06-01"))
+        con.execute("INSERT INTO deposit_attempts (account_email,amount,status,operator_id,created_at) VALUES (?,?,?,?,?)",
+                    ("a@test.com", 50, "APPROVED", 555, "2026-06-10 10:00:00"))
+        con.execute("INSERT INTO deposit_attempts (account_email,amount,status,operator_id,created_at) VALUES (?,?,?,?,?)",
+                    ("b@test.com", 99, "APPROVED", 1341812706, "2026-06-10 11:00:00"))
         con.commit()
     finally:
         con.close()
@@ -77,3 +98,18 @@ def client(seed_db):
     import importlib, app as app_mod
     importlib.reload(app_mod)
     return TestClient(app_mod.app)
+
+@pytest.fixture
+def make_client(seed_db):
+    """TestClient con rol inyectado (el modo `open` del conftest fuerza SA;
+    aquí override por test para simular admin/user)."""
+    import importlib, app as app_mod
+    importlib.reload(app_mod)
+    def _make(role="superadmin", telegram_id=1341812706, username="robertvs"):
+        app_mod.app.dependency_overrides[app_mod.require_session] = lambda: {
+            "role": role, "telegram_id": telegram_id,
+            "username": username, "display": username,
+        }
+        return TestClient(app_mod.app)
+    yield _make
+    app_mod.app.dependency_overrides.clear()

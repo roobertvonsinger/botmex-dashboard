@@ -195,6 +195,36 @@ def _resolve_operator(val):
         return val
 
 
+def _is_sa(user: dict) -> bool:
+    """True si el caller es superadmin (Robert). Único rol que ve TODO."""
+    return user.get("role") == "superadmin"
+
+
+def _visible_emails(user: dict, c) -> "set[str] | None":
+    """Universo de cuentas que el caller puede ver. None = SA (sin restricción).
+
+    Operador (admin/user): cuentas asignadas (account_assignments) ∪ las que
+    tiene lockeadas (locked_by = su telegram_id o username). El acto de ganchar
+    una cuenta del pool es lo que le da acceso a sus credenciales — frictionless
+    a prueba de desmadre: no se exhibe lo ajeno, no se rafaguea.
+    """
+    if _is_sa(user):
+        return None
+    tg = int(user.get("telegram_id") or 0)
+    uname = (user.get("username") or "__none__").lower()
+    out: set[str] = set()
+    try:
+        for r in c.execute("SELECT email FROM account_assignments WHERE user_id=?", (tg,)):
+            out.add(r["email"])
+    except sqlite3.OperationalError:
+        pass
+    for r in c.execute(
+        "SELECT email FROM accounts WHERE locked_by IN (?, ?)", (str(tg), uname)
+    ):
+        out.add(r["email"])
+    return out
+
+
 _sse_lock = threading.Lock()
 _sse_queues: list = []  # list[queue.SimpleQueue]
 
@@ -2148,24 +2178,29 @@ class CombosRequest(BaseModel):
 
 
 @app.post("/api/accounts/combos")
-def accounts_combos(req: CombosRequest, _user: dict = Depends(require_session)):
+def accounts_combos(req: CombosRequest, user: dict = Depends(require_session)):
     if not req.ids:
         return {"combos": []}
     placeholders = ",".join("?" * len(req.ids))
     with db() as c:
+        vis = _visible_emails(user, c)   # None = SA; set = universo del operador
         rows = c.execute(
             f"SELECT id, email, password FROM accounts WHERE id IN ({placeholders})",
             req.ids,
         ).fetchall()
-    return {"combos": [{"id": r["id"], "email": r["email"], "password": r["password"]} for r in rows]}
+    return {"combos": [
+        {"id": r["id"], "email": r["email"], "password": r["password"]}
+        for r in rows if vis is None or r["email"] in vis
+    ]}
 
 
 @app.get("/api/accounts/pass-map")
-def accounts_pass_map(_user: dict = Depends(require_session)):
-    """Mapa email→password para todas las cuentas. Uso: resolver combos en activity/live feed."""
+def accounts_pass_map(user: dict = Depends(require_session)):
+    """Mapa email→password acotado al universo del caller (SA = todos)."""
     with db() as c:
+        vis = _visible_emails(user, c)
         rows = c.execute("SELECT email, password FROM accounts WHERE password IS NOT NULL").fetchall()
-    return {r["email"]: r["password"] for r in rows}
+    return {r["email"]: r["password"] for r in rows if vis is None or r["email"] in vis}
 
 
 @app.get("/api/cards/all")
@@ -2178,6 +2213,7 @@ def list_all_cards(user: dict = Depends(require_session)):
     out = []
     seen = set()
     with db() as c:
+        vis = _visible_emails(user, c)   # None = SA (ve todo); set = universo del operador
         # 1) account_cards (registradas formalmente)
         try:
             rows = c.execute(
@@ -2187,6 +2223,8 @@ def list_all_cards(user: dict = Depends(require_session)):
                 "FROM account_cards ORDER BY registered_at DESC"
             ).fetchall()
             for r in rows:
+                if vis is not None and r["account_email"] not in vis:
+                    continue
                 key = (r["card_number"], r["account_email"])
                 seen.add(key)
                 out.append({
@@ -2217,6 +2255,8 @@ def list_all_cards(user: dict = Depends(require_session)):
                 "ORDER BY created_at DESC"
             ).fetchall()
             for r in rows:
+                if vis is not None and r["account_email"] not in vis:
+                    continue
                 key = (r["card_number"], r["account_email"])
                 if key in seen:
                     continue
@@ -2368,9 +2408,13 @@ def list_deposits(
     status: Optional[str] = None,
     operator_id: Optional[int] = None,
     limit: int = Query(100, le=500),
-    _user: dict = Depends(require_session),
+    user: dict = Depends(require_session),
 ):
     where, params = [], []
+    # Non-SA: forzado a sus propios depositos (ignora operator_id ajeno). Frictionless:
+    # cada quien ve su bitacora, sin roces ni ruido ajeno.
+    if user.get("role") != "superadmin":
+        operator_id = int(user.get("telegram_id") or 0)
     if status:
         where.append("status = ?"); params.append(status)
     if operator_id is not None:

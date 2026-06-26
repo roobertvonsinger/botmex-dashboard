@@ -92,11 +92,10 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `_test_token_reuse.py` | 176 | `—` | _[completar]_ |
-| `app.py` | 2428 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2472 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
-| `conftest.py` | 79 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
+| `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `deposits.py` | 2153 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `login_orchestrator.py` | 379 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 692 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -104,6 +103,7 @@ prewarm.py (router)
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
+| `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 55 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
@@ -170,8 +170,7 @@ prewarm.py (router)
 <!-- GEN:start:env -->
 | Variable | Default | Definida en |
 |----------|---------|-------------|
-| `BMX_CAPMONSTER_KEY` | `""` | `_test_token_reuse.py` |
-| `CAPMONSTER_KEY` | `""` | `_test_token_reuse.py` |
+| — | — | — |
 <!-- GEN:end:env -->
 
 ---
@@ -181,6 +180,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `29d4938` | docs(SP-3): mockup v7 aprobado (modal unificado) + diseño optimizacion estado-cuentas |
 | `b8913e7` | docs(session): cierre SP-1+SP-2 unificacion deployado y mergeado, siguiente SP-3 (vista) |
 | `7ce3f9b` | feat(matchmaker): SP-2 reusa session_jwt por cuenta en multi_stream + fix docstring wrapper |
 | `7795983` | feat(matchmaker): SP-2 helpers _mm_session_get/_update — reuso de sesion por cuenta (TDD) |
@@ -192,7 +192,6 @@ prewarm.py (router)
 | `286bb4e` | chore(session): rituales /abrir-bmx y /cerrar-bmx + NEXT-SESSION |
 | `ee1685f` | feat(proxy): Data Impulse 50 sticky MX como pool primario — rompe monoproxy + 504 |
 | `80122c2` | docs: agregar CLAUDE.md con pointer acceso Hostinger API/MCP (KVM2+KVM4) |
-| `564647c` | fix(proxy): excluir IPRoyal del pool — sin saldo (402 Payment Required) |
 <!-- GEN:end:recientes -->
 
 ---
