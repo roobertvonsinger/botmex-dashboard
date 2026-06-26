@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c082657` | fix(c1): hardening post-review adversarial — 5 bugs de estado/leaks entre misiones |
 | `fd9ae30` | feat(c1): suplencia controlada — openDepositModal branch a openDepos v8 bajo flag deposV8 |
 | `49955df` | feat(c1): run controls + pill — pause oculto (sin soporte backend, honesto), abort cancela, pill al cerrar con misión activa, Otro depósito=toast (B4) |
 | `966d8b8` | feat(c1): SCHEDULED (/scheduled/create + bus) y MULTI (/multi/stream) cableados |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `dee5d74` | feat(c1): validatePipe (semántica null|error de app.js) + parseCombo + fmtMoney (TDD 22 verde) |
 | `a3887ba` | feat(c1): mapPhaseToScene + phaseToPct (fase backend -> escena v8, TDD verde) |
 | `c84168b` | feat(c1): deriveMode + presetsForMode (la UI impone las reglas, TDD verde) |
-| `c11bc8e` | docs(session): cierre — próximo objetivo C1 (módulo depósitos real en static/), ositos no-bloqueante |
 <!-- GEN:end:recientes -->
 
 ---
