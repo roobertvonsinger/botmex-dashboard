@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `e63f450` | feat(c1): SINGLE cableado a /execute-stream — fase->escena, balance before/after, movimiento, E-RED |
 | `ccecc82` | feat(c1): cuentas (combos email:password+grado), tarjetas (guardadas+agregar), cap 24h en nota — verificado con shapes reales |
 | `ed7bc41` | docs(c1): plan bite-sized del modal v8 (13 tasks, 4 fases) |
 | `f73f851` | feat(c1): depos.js esqueleto — modal v8 monta, open/close, modo emerge, greetings, reps 7-seg (verificado en navegador via eval) |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `b033647` | docs(session): A1 deployado+mergeado + logo global; siguiente A2 (capas/visibilidad) |
 | `17d1226` | docs(a1): modelo de 5 estados + consolidación watchdogs en ARCHITECTURE/AUDIT (bitácora) |
 | `0ad99ad` | test(a1): refuerzo backfill con locked_at formato real isoformat+tz (review adversarial) |
-| `6290611` | feat(a1): T7 _auto_lock_for_deposit SA perpetuo (locked_until NULL) — A1 completo (TDD verde) |
 <!-- GEN:end:recientes -->
 
 ---

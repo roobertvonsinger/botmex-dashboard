@@ -231,6 +231,7 @@
       '<span class="mov-tag ' + state + '">' + (state === 'ok' ? 'real' : 'en curso') + '</span>';
     mov.prepend(r);
     _lastMov = r;
+    return r;
   }
   function movSetState(state, label) {
     if (!_lastMov) return;
@@ -351,11 +352,181 @@
     }
   }
 
+  // mini 7-seg para el ETA (countdown entre reps)
+  function segMini(elm, label, n) {
+    const t = ('0' + Math.max(0, Math.min(99, n))).slice(-2);
+    elm.innerHTML = '<span class="lbl">' + label + '</span>' + segDigit(+t[0]) + segDigit(+t[1]);
+    elm.style.display = 'flex';
+  }
+  let _schedCountdown = null;
+  function clearSchedCountdown() { if (_schedCountdown) { clearInterval(_schedCountdown); _schedCountdown = null; } const e = qs('#etaSeg'); if (e) e.style.display = 'none'; }
+  function startSchedCountdown(sec) {
+    clearSchedCountdown();
+    let t = sec; const e = qs('#etaSeg'); if (e) segMini(e, 'ETA', t);
+    _schedCountdown = setInterval(() => { t -= 1; if (e) segMini(e, 'ETA', Math.max(0, t)); if (t <= 0) clearSchedCountdown(); }, 1000);
+  }
+
+  // ── SCHEDULED: /scheduled/create + eventos por el bus global ──
+  async function runScheduled() {
+    const acc = _dx.accounts[0];
+    const pipe = _dx.cards[0];
+    if (!acc) { showToast('Selecciona 1 cuenta'); return; }
+    if (!pipe) { showToast('Agrega una tarjeta'); return; }
+    const err = D.validatePipe(pipe); if (err) { showToast(err); return; }
+    const amount = _dx.amount, reps = _dx.reps;
+
+    _dx.running = true; journeyStart(); busOpen();
+    _dx.sched = { sched_id: null, total: reps, iter: 0, done: 0, pending: [] };
+    setScene('login'); setSub('Preparando…'); setPct(0);
+    const fromBal = Number(acc.balance || 0);
+    const balNow = qs('#balNow'), balTo = qs('#balTo');
+    if (balNow) balNow.textContent = D.fmtMoney(fromBal);
+    if (balTo) balTo.textContent = D.fmtMoney(fromBal);
+    try {
+      const r = await fetch('/api/deposits/scheduled/create', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account_id: acc.id, card_pipe: pipe, amount, repetitions: reps }),
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      _dx.sched.sched_id = data.sched_id;
+      _dx.sched.total = data.total || reps;
+      // los eventos del run llegan por el bus (onBusEvent -> _schedOnBus). Drenar buffer de carrera.
+      const buf = _dx.sched.pending; _dx.sched.pending = [];
+      buf.forEach(_schedOnBus);
+    } catch (e) {
+      setSub('No se pudo iniciar, reintenta'); _dx.running = false; _dx.sched = null; journeyEnd(); busClose();
+    }
+  }
+
+  function _schedOnBus(ev) {
+    const s = _dx.sched; if (!s) return;
+    // carrera: si aún no tenemos sched_id, bufferear
+    if (!s.sched_id) { s.pending.push(ev); return; }
+    if (ev.sched_id && ev.sched_id !== s.sched_id) return;
+    const acc = _dx.accounts[0], amount = _dx.amount;
+    if (ev.kind === 'scheduled_started') {
+      setSub('Preparando…');
+    } else if (ev.kind === 'scheduled_phase') {
+      if (ev.iter != null) s.iter = ev.iter;
+      setScene(D.mapPhaseToScene(ev.name));
+      const pct = D.phaseToPct(ev.name); if (pct != null) setPct(pct);
+      setSub(phaseLabel(ev.name) + ' · ' + (s.iter + 1) + '/' + s.total);
+      clearSchedCountdown();
+    } else if (ev.kind === 'scheduled') {
+      s.done = (ev.iter != null ? ev.iter + 1 : s.done + 1);
+      if (ev.success) { movRow(acc.email, amount, 'ok'); setSub('Acreditado ✓ · ' + s.done + '/' + s.total, true); }
+      else if (D.isRealRejection(ev.code)) { movRow(acc.email, amount, 'wait'); movSetState('wait', 'no aplicado'); }
+      if (s.done >= s.total) { schedFinish(); }
+      else if (ev.success) { startSchedCountdown(60); }
+    } else if (ev.kind === 'scheduled_retry') {
+      setScene('retry'); setSub('Reintentando · intento ' + (ev.attempt || '') + '/' + (ev.max || ''));
+    } else if (ev.kind === 'scheduled_aborted') {
+      setSub(D.isRealRejection(ev.code) ? humanError(ev.code) : 'Misión detenida'); schedFinish();
+    } else if (ev.kind === 'scheduled_cancelled') {
+      setSub('Misión cancelada'); schedFinish();
+    }
+  }
+  function schedFinish() {
+    clearSchedCountdown();
+    _dx.running = false; journeyEnd();
+    setTimeout(() => { _dx.sched = null; busClose(); }, 4000);
+  }
+
+  // rehidratar una misión programada activa al cargar (se invoca bajo flag — Task 11)
+  async function rehydrateScheduled() {
+    try {
+      const r = await fetch('/api/deposits/scheduled/list'); if (!r.ok) return;
+      const data = await r.json();
+      const active = (data.schedules || data.active || data || []).filter ? (data.schedules || data.active || []) : [];
+      if (active && active.length) {
+        const m = active[0];
+        await window.openDepos({ accounts: [{ id: m.account_id, email: m.email || '', grade: '' }] });
+        _dx.reps = m.total || m.repetitions || 1; drawReps(); refreshMode();
+        if (m.card_pipe && _dx.cards.indexOf(m.card_pipe) < 0) { _dx.cards.push(m.card_pipe); renderCards(); }
+        _dx.running = true; journeyStart(); busOpen();
+        _dx.sched = { sched_id: m.sched_id, total: m.total || m.repetitions || 1, iter: m.current_iter || 0, done: m.current_iter || 0, pending: [] };
+        setSub('Misión en curso · ' + (_dx.sched.iter) + '/' + _dx.sched.total);
+      }
+    } catch (e) { /* degradar */ }
+  }
+  window.rehydrateDepos = rehydrateScheduled;
+
+  async function onAbort() {
+    if (_dx.sched && _dx.sched.sched_id) {
+      try { await fetch('/api/deposits/scheduled/' + _dx.sched.sched_id + '/cancel', { method: 'POST' }); } catch (_) {}
+      showToast('Cancelando misión…');
+    } else if (_dx.mm && _dx.mm.run_id) {
+      try { await fetch('/api/deposits/multi/' + _dx.mm.run_id + '/cancel', { method: 'POST' }); } catch (_) {}
+      if (_dx.mm.abort) try { _dx.mm.abort.abort(); } catch (_) {}
+      showToast('Cancelando…');
+    } else { _dx.cancelled = true; }
+  }
+
+  // ── MULTI (matchmaker): /multi/stream. v8 no tiene lanes: la animación central refleja
+  //    el par activo más reciente; Movimientos lleva la bitácora por par. ──
+  let _mmRows = {};
+  function shortEmail(e) { return (e || '').split('@')[0]; }
+  function mmUpdate(email, state, label) {
+    const r = _mmRows[email]; if (!r) return;
+    if (state === null) { r.remove(); }
+    else {
+      const dot = r.querySelector('.mov-dot'); if (dot) dot.className = 'mov-dot ' + state;
+      const tag = r.querySelector('.mov-tag'); if (tag) { tag.className = 'mov-tag ' + state; tag.textContent = label || (state === 'ok' ? 'real' : 'en curso'); }
+    }
+    delete _mmRows[email];
+  }
+  async function runMulti() {
+    const ids = _dx.accounts.map((a) => a.id).filter(Boolean);
+    const cards = _dx.cards.slice();
+    if (ids.length < 2) { showToast('Selecciona 2+ cuentas'); return; }
+    if (!cards.length) { showToast('Agrega tarjetas al pool'); return; }
+    for (const p of cards) { const e = D.validatePipe(p); if (e) { showToast(e); return; } }
+    const amount = _dx.amount;
+
+    _dx.running = true; journeyStart(); busOpen(); _mmRows = {};
+    const abort = new AbortController();
+    _dx.mm = { run_id: null, abort, matches: 0 };
+    setScene('login'); setSub('Buscando coincidencias…'); setPct(0);
+    let gotDone = false;
+    try {
+      const r = await fetch('/api/deposits/multi/stream', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account_ids: ids, cards, amount }), signal: abort.signal,
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      await consumeStream(r, (ev) => {
+        switch (ev.type) {
+          case 'start': _dx.mm.run_id = ev.run_id; break;
+          case 'trying': setSub('Probando · ' + shortEmail(ev.email)); _mmRows[ev.email] = movRow(ev.email, amount, 'wait'); break;
+          case 'phase': {
+            setScene(D.mapPhaseToScene(ev.name));
+            const pct = D.phaseToPct(ev.name); if (pct != null) setPct(pct);
+            setSub(phaseLabel(ev.name) + ' · ' + shortEmail(ev.email)); break;
+          }
+          case 'match': setScene('done'); setPct(100); _dx.mm.matches += 1; mmUpdate(ev.email, 'ok'); setSub('Acreditado ✓ · ' + shortEmail(ev.email), true); break;
+          case 'rejected': if (D.isRealRejection(ev.code)) mmUpdate(ev.email, 'wait', 'no aplicado'); else mmUpdate(ev.email, null); break;
+          case 'login_retry': setScene('retry'); setSub('Reintentando · ' + shortEmail(ev.email)); break;
+          case 'account_dead': mmUpdate(ev.email, 'wait', humanError(ev.code)); break;
+          case 'velocity_skip': case 'card_retired': case 'cooldown': case 'error': break; // invisible (L3)
+          case 'done': gotDone = true; setSub('Listo · ' + _dx.mm.matches + ' acreditada(s)', _dx.mm.matches > 0); break;
+          case 'fatal': gotDone = true; setSub('Algo falló, reintenta'); break;
+          case 'cancelled': gotDone = true; setSub('Misión cancelada'); break;
+        }
+      });
+      if (!gotDone) setSub('Conexión interrumpida');
+    } catch (e) {
+      if (e.name !== 'AbortError') setSub('Algo falló, reintenta');
+    } finally {
+      _dx.running = false; journeyEnd(); setTimeout(() => { _dx.mm = null; busClose(); }, 4000);
+    }
+  }
+
   function onDeposit() {
     if (_dx.running) return;
     if (_dx.mode === 'single') return runSingle();
-    if (_dx.mode === 'scheduled') return showToast('Programado — Task 8');
-    if (_dx.mode === 'multi') return showToast('Multi — Task 9');
+    if (_dx.mode === 'scheduled') return runScheduled();
+    if (_dx.mode === 'multi') return runMulti();
   }
 
   // ── montaje ──
@@ -432,8 +603,8 @@
     // botón depositar — router por modo (single ya cableado; scheduled/multi en Tasks 8/9)
     const dep = qs('#dep');
     if (dep) dep.onclick = onDeposit;
-    // controles de run (pause/abort cableados por flujo en Tasks 8-10)
-    const ab = qs('#abort'); if (ab) ab.onclick = () => { _dx.cancelled = true; showToast('Cancelando…'); };
+    // controles de run: abort (cancela scheduled/multi); pause se decide en Task 10
+    const ab = qs('#abort'); if (ab) ab.onclick = onAbort;
     // "Otro depósito" — B4, stub en Task 10
     const np = qs('.newproc');
     if (np) np.onclick = () => showToast('Otro depósito (B4) — pendiente');
