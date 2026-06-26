@@ -1,0 +1,606 @@
+<h2 class="sr-only">Mockup del drawer de depositos: controles comprimidos arriba (cuentas pre-seleccionadas, tarjetas, monto y repeticiones), animacion del viaje del deposito en medio, y log de intentos abajo.</h2>
+<div class="bmx-stage">
+  <div class="bmx-dashboard-hint" aria-hidden="true">
+    <div class="bmx-dh-row"><span class="bmx-dh-pill"></span><span class="bmx-dh-bar w60"></span></div>
+    <div class="bmx-dh-row"><span class="bmx-dh-pill"></span><span class="bmx-dh-bar w40"></span></div>
+    <div class="bmx-dh-row"><span class="bmx-dh-pill"></span><span class="bmx-dh-bar w70"></span></div>
+    <div class="bmx-dh-row"><span class="bmx-dh-pill"></span><span class="bmx-dh-bar w50"></span></div>
+    <div class="bmx-dh-row"><span class="bmx-dh-pill"></span><span class="bmx-dh-bar w65"></span></div>
+  </div>
+
+  <aside class="bmx" role="dialog" aria-label="Depositos">
+    <div class="bmx-noise" aria-hidden="true"></div>
+    <div class="bmx-edge" aria-hidden="true"></div>
+
+    <header class="bmx-head">
+      <div class="bmx-head-l">
+        <span class="bmx-head-ic" aria-hidden="true"><i class="ti ti-arrow-bar-to-down"></i></span>
+        <div class="bmx-head-tx">
+          <h3 class="bmx-title">Depositos</h3>
+          <div class="bmx-orq" id="orq">
+            <span class="bmx-orq-dot" aria-hidden="true"></span>
+            <span id="orq-text">Matchmaker · 3 cuentas</span>
+            <span class="bmx-orq-sep" id="orq-sep">·</span>
+            <span id="orq-reps">Goteo · x5</span>
+          </div>
+        </div>
+      </div>
+      <div class="bmx-missions" aria-label="Misiones activas">
+        <button class="bmx-mtab is-active" type="button" data-tip="Mision activa · Matchmaker">M1</button>
+        <button class="bmx-mtab" type="button" data-tip="Programado · olimpo.flor">M2</button>
+        <button class="bmx-mtab bmx-mtab-add" type="button" aria-label="Nueva mision" data-tip="Nueva mision"><i class="ti ti-plus" aria-hidden="true"></i></button>
+      </div>
+    </header>
+
+    <section class="bmx-controls" aria-label="Controles del deposito">
+      <div class="bmx-field">
+        <div class="bmx-field-head">
+          <span class="bmx-label">Cuentas</span>
+          <span class="bmx-help" tabindex="0" data-tip="Vienen pre-seleccionadas del dashboard. Quita una con la X." aria-label="Ayuda cuentas"><i class="ti ti-help" aria-hidden="true"></i></span>
+          <span class="bmx-count" id="acct-count">3</span>
+        </div>
+        <div class="bmx-chips" id="accts"></div>
+      </div>
+
+      <div class="bmx-field">
+        <div class="bmx-field-head">
+          <span class="bmx-label">Tarjetas</span>
+          <span class="bmx-mode-tag" id="card-mode-tag">Matchmaker · pool manual</span>
+          <span class="bmx-help" tabindex="0" id="card-help" data-tip="Varias cuentas: el matchmaker prueba tarjetas nuevas. Ingresa pipe cc|mm|aaaa|cvv y haz click fuera para lockear." aria-label="Ayuda tarjetas"><i class="ti ti-help" aria-hidden="true"></i></span>
+        </div>
+
+        <div class="bmx-saved" id="card-saved" hidden>
+          <span class="bmx-saved-lbl">Reutilizable</span>
+          <div class="bmx-saved-slot" id="card-saved-slot"></div>
+        </div>
+
+        <div class="bmx-chips bmx-chips-card" id="card-chips"></div>
+
+        <input class="bmx-input bmx-input-mono" id="card-input" type="text" inputmode="numeric"
+          placeholder="cc|mm|aaaa|cvv  —  click fuera para lockear" autocomplete="off" spellcheck="false" />
+      </div>
+
+      <div class="bmx-row-mr">
+        <div class="bmx-mini">
+          <span class="bmx-mini-lbl">Monto</span>
+          <div class="bmx-amt">
+            <span class="bmx-amt-sign">$</span>
+            <input class="bmx-input bmx-input-mono bmx-amt-in" id="amount" type="text" inputmode="numeric" value="50" aria-label="Monto" />
+          </div>
+        </div>
+        <div class="bmx-mini bmx-mini-reps">
+          <span class="bmx-mini-lbl">Repeticiones <span class="bmx-help bmx-help-sm" tabindex="0" data-tip="1 = una vez. 2 a 20 = goteo." aria-label="Ayuda repeticiones"><i class="ti ti-help" aria-hidden="true"></i></span></span>
+          <div class="bmx-stepper">
+            <button class="bmx-step" type="button" id="rep-minus" aria-label="Menos"><i class="ti ti-minus" aria-hidden="true"></i></button>
+            <span class="bmx-step-val bmx-input-mono" id="rep-val">5</span>
+            <button class="bmx-step" type="button" id="rep-plus" aria-label="Mas"><i class="ti ti-plus" aria-hidden="true"></i></button>
+          </div>
+        </div>
+        <button class="bmx-deposit" id="deposit" type="button">
+          <span class="bmx-deposit-glow" aria-hidden="true"></span>
+          <span class="bmx-deposit-shine" aria-hidden="true"></span>
+          <i class="ti ti-bolt" aria-hidden="true"></i>
+          <span>Depositar</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="bmx-journey" aria-label="Viaje del deposito">
+      <div class="bmx-journey-top">
+        <div class="bmx-orient">
+          <span class="bmx-orient-node bmx-input-mono" id="o-from">memo.teo10</span>
+          <span class="bmx-orient-arrow" aria-hidden="true"><i class="ti ti-arrow-narrow-right"></i></span>
+          <span class="bmx-orient-here" id="o-here">Pagando</span>
+          <span class="bmx-orient-arrow" aria-hidden="true"><i class="ti ti-arrow-narrow-right"></i></span>
+          <span class="bmx-orient-node bmx-input-mono">BetMexico</span>
+        </div>
+        <div class="bmx-rep-counter">
+          <span class="bmx-rep-now bmx-input-mono" id="rep-now">2</span><span class="bmx-rep-of bmx-input-mono" id="rep-of">/5</span>
+          <span class="bmx-pips" id="pips" aria-hidden="true"></span>
+        </div>
+      </div>
+
+      <div class="bmx-phases" id="phases" role="list">
+        <div class="bmx-phase" role="listitem" data-ph="0"><span class="bmx-ph-ic"><i class="ti ti-login-2" aria-hidden="true"></i></span><span class="bmx-ph-name">Entrando</span></div>
+        <div class="bmx-phase" role="listitem" data-ph="1"><span class="bmx-ph-ic"><i class="ti ti-adjustments" aria-hidden="true"></i></span><span class="bmx-ph-name">Preparando</span></div>
+        <div class="bmx-phase is-active" role="listitem" data-ph="2"><span class="bmx-ph-ic"><i class="ti ti-cash" aria-hidden="true"></i></span><span class="bmx-ph-name">Pagando</span></div>
+        <div class="bmx-phase" role="listitem" data-ph="3"><span class="bmx-ph-ic"><i class="ti ti-shield-check" aria-hidden="true"></i></span><span class="bmx-ph-name">Confirmando</span></div>
+        <div class="bmx-phase" role="listitem" data-ph="4"><span class="bmx-ph-ic"><i class="ti ti-flag" aria-hidden="true"></i></span><span class="bmx-ph-name">Resultado</span></div>
+      </div>
+
+      <div class="bmx-stage-card" id="stage-card">
+        <div class="bmx-ring-wrap" aria-hidden="true">
+          <svg class="bmx-ring" viewBox="0 0 120 120" width="120" height="120">
+            <defs><linearGradient id="bmx-ring-grad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="oklch(0.50 0.11 160)"/><stop offset="1" stop-color="oklch(0.72 0.14 160)"/>
+            </linearGradient></defs>
+            <circle class="bmx-ring-track" cx="60" cy="60" r="52" />
+            <circle class="bmx-ring-prog" id="ring-prog" cx="60" cy="60" r="52" />
+          </svg>
+          <div class="bmx-ring-center">
+            <span class="bmx-ring-pct bmx-input-mono" id="ring-pct">64%</span>
+            <span class="bmx-ring-sub" id="ring-sub">procesando</span>
+          </div>
+        </div>
+        <div class="bmx-stage-info">
+          <div class="bmx-retry" id="retry-line">
+            <span class="bmx-retry-spin" aria-hidden="true"></span>
+            <span>Un momento, reintentando</span>
+          </div>
+          <div class="bmx-balance" id="balance-block">
+            <span class="bmx-balance-lbl">Balance</span>
+            <div class="bmx-balance-row">
+              <span class="bmx-balance-mono bmx-input-mono" id="bal-now">$512.00</span>
+              <i class="ti ti-arrow-narrow-right bmx-balance-arrow" aria-hidden="true"></i>
+              <span class="bmx-balance-mono bmx-balance-to bmx-input-mono" id="bal-to">$562.00</span>
+            </div>
+          </div>
+          <div class="bmx-badges" id="badges">
+            <span class="bmx-badge bmx-badge-a" id="badge-a" hidden data-tip="Pasarela lista — calidad A+"><i class="ti ti-award" aria-hidden="true"></i> A+</span>
+            <span class="bmx-badge bmx-badge-err" id="badge-err" hidden data-tip="Error de red — reintenta o rota IP">E-RED</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bmx-lanes" id="lanes" aria-label="Viajes por cuenta">
+        <div class="bmx-lane is-running" data-lane="memo.teo10"><span class="bmx-lane-name bmx-input-mono">memo.teo10</span><span class="bmx-lane-track"><span class="bmx-lane-fill" style="width:64%"></span></span><span class="bmx-lane-state">Pagando</span></div>
+        <div class="bmx-lane is-ok" data-lane="olimpo.flor"><span class="bmx-lane-name bmx-input-mono">olimpo.flor</span><span class="bmx-lane-track"><span class="bmx-lane-fill" style="width:100%"></span></span><span class="bmx-lane-state">Aprobada</span></div>
+        <div class="bmx-lane is-wait" data-lane="fcojavii"><span class="bmx-lane-name bmx-input-mono">fcojavii</span><span class="bmx-lane-track"><span class="bmx-lane-fill" style="width:18%"></span></span><span class="bmx-lane-state">En cola</span></div>
+      </div>
+
+      <div class="bmx-controls-run" id="run-controls">
+        <button class="bmx-runbtn" id="btn-pause" type="button" data-tip="Pausar"><i class="ti ti-player-pause" aria-hidden="true"></i></button>
+        <button class="bmx-runbtn" id="btn-resume" type="button" data-tip="Reanudar" hidden><i class="ti ti-player-play" aria-hidden="true"></i></button>
+        <button class="bmx-runbtn bmx-runbtn-stop" id="btn-cancel" type="button" data-tip="Cancelar"><i class="ti ti-player-stop" aria-hidden="true"></i></button>
+        <span class="bmx-run-spacer"></span>
+        <button class="bmx-demo" id="demo" type="button" data-tip="Solo mockup — recorre los finales"><i class="ti ti-eye" aria-hidden="true"></i> Demo</button>
+      </div>
+    </section>
+
+    <section class="bmx-log" aria-label="Log de intentos">
+      <div class="bmx-log-head">
+        <span class="bmx-label">Intentos de la mision</span>
+        <span class="bmx-log-live"><i aria-hidden="true"></i>en vivo</span>
+        <span class="bmx-log-count" id="log-count">3</span>
+      </div>
+      <ul class="bmx-log-list" id="log-list">
+        <li class="bmx-log-row bmx-r-ok"><span class="bmx-r-dot" aria-hidden="true"></span><span class="bmx-r-acct bmx-input-mono">memo.teo10</span><span class="bmx-r-res">aprobada</span><span class="bmx-r-time bmx-input-mono">14:32</span></li>
+        <li class="bmx-log-row bmx-r-retry"><span class="bmx-r-dot" aria-hidden="true"></span><span class="bmx-r-acct bmx-input-mono">olimpo.flor</span><span class="bmx-r-res">reintento</span><span class="bmx-r-time bmx-input-mono">14:33</span></li>
+        <li class="bmx-log-row bmx-r-na"><span class="bmx-r-dot" aria-hidden="true"></span><span class="bmx-r-acct bmx-input-mono">fcojavii</span><span class="bmx-r-res">no disponible</span><span class="bmx-r-time bmx-input-mono">14:34</span></li>
+      </ul>
+    </section>
+  </aside>
+</div>
+
+<style>
+.bmx-stage{position:relative;width:100%;min-height:838px;background:#060709;border-radius:14px;overflow:hidden;display:flex;justify-content:flex-end;font-family:Inter,system-ui,sans-serif}
+.bmx-stage::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 80% at 88% 8%,oklch(0.5 0.09 160 / .10),transparent 52%),radial-gradient(90% 70% at 4% 100%,oklch(0.4 0.05 250 / .08),transparent 60%)}
+.bmx-dashboard-hint{position:absolute;inset:0;padding:26px 460px 26px 26px;display:flex;flex-direction:column;gap:18px;opacity:.16;filter:blur(1px);pointer-events:none}
+.bmx-dh-row{display:flex;align-items:center;gap:12px}
+.bmx-dh-pill{width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.06);flex:none}
+.bmx-dh-bar{height:11px;border-radius:6px;background:rgba(255,255,255,.05)}
+.bmx-dh-bar.w40{width:40%}.bmx-dh-bar.w50{width:50%}.bmx-dh-bar.w60{width:60%}.bmx-dh-bar.w65{width:65%}.bmx-dh-bar.w70{width:70%}
+.bmx{position:relative;width:420px;height:838px;display:flex;flex-direction:column;
+  --bg:#060709;--surface-elev:rgba(20,23,28,0.72);--glass:rgba(255,255,255,0.03);--glass-edge:rgba(255,255,255,0.08);
+  --hairline:rgba(255,255,255,0.06);--hairline-h:rgba(255,255,255,0.10);--text:#eef0f3;--text-dim:rgba(238,240,243,0.56);--text-muted:rgba(238,240,243,0.32);
+  --accent:oklch(0.50 0.11 160);--accent-mid:oklch(0.40 0.10 160);--accent-soft:oklch(0.50 0.11 160 / 0.13);--accent-glow:oklch(0.60 0.13 160 / 0.38);--accent-bright:oklch(0.72 0.14 160);
+  --neon-sm:0 0 4px oklch(0.68 0.14 160 / 0.6),0 0 10px oklch(0.58 0.13 160 / 0.3);--neon-md:0 0 6px oklch(0.72 0.14 160 / 0.7),0 0 16px oklch(0.62 0.13 160 / 0.4);
+  --cold:oklch(0.72 0.03 240);--warn:oklch(0.80 0.16 75);--danger:oklch(0.66 0.21 24);
+  --eo:cubic-bezier(.22,1,.36,1);--es:cubic-bezier(.4,0,.2,1);--eb:cubic-bezier(.34,1.56,.64,1);
+  --fd:"Space Grotesk",Inter,system-ui;--fm:"JetBrains Mono",ui-monospace,monospace;
+  background:linear-gradient(180deg,rgba(19,22,27,0.82),rgba(10,12,16,0.9));backdrop-filter:blur(26px) saturate(120%);-webkit-backdrop-filter:blur(26px) saturate(120%);
+  border-left:1px solid var(--glass-edge);box-shadow:-34px 0 90px rgba(0,0,0,.6),inset 1px 0 0 rgba(255,255,255,.045);color:var(--text);overflow:hidden}
+.bmx-edge{position:absolute;top:0;left:0;width:1px;height:100%;pointer-events:none;background:linear-gradient(180deg,transparent,oklch(0.7 0.13 160 / .28) 18%,oklch(0.7 0.13 160 / .12) 50%,transparent);z-index:3}
+.bmx-noise{position:absolute;inset:0;pointer-events:none;opacity:.045;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E")}
+.bmx *{box-sizing:border-box}
+.bmx button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+.bmx-input-mono,.bmx-chip-mono{font-family:var(--fm);font-variant-ligatures:none}
+.bmx-label{font-family:var(--fd);font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim)}
+.bmx-head{position:relative;z-index:2;padding:15px 18px 11px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border-bottom:1px solid var(--hairline)}
+.bmx-head-l{display:flex;gap:11px;align-items:flex-start;min-width:0}
+.bmx-head-tx{min-width:0}
+.bmx-head-ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--accent-bright);flex:none;
+  background:var(--accent-soft);border:1px solid var(--glass-edge);box-shadow:inset 0 0 12px oklch(0.6 0.13 160 / .14),0 0 0 0 var(--accent-glow);transition:box-shadow .4s var(--eo)}
+.bmx-head:hover .bmx-head-ic{box-shadow:inset 0 0 12px oklch(0.6 0.13 160 / .2),var(--neon-sm)}
+.bmx-title{font-family:var(--fd);font-size:17px;font-weight:500;margin:0;letter-spacing:-.01em;line-height:1.1}
+.bmx-orq{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11.5px;color:var(--text-dim);flex-wrap:wrap}
+.bmx-orq-dot{width:6px;height:6px;border-radius:50%;background:var(--accent-bright);box-shadow:var(--neon-sm);animation:bmx-breathe 2.6s var(--es) infinite;flex:none}
+.bmx-orq-sep{color:var(--text-muted)}
+.bmx-orq #orq-reps{color:var(--text-dim)}
+.bmx-missions{display:flex;gap:5px;align-items:center;flex:none}
+.bmx-mtab{height:26px;min-width:30px;padding:0 8px;border-radius:8px;font-family:var(--fm);font-size:11px;color:var(--text-dim);
+  background:var(--glass);border:1px solid var(--hairline);transition:color .3s var(--eo),border-color .3s var(--eo),background .3s var(--eo),transform .3s var(--eo),box-shadow .3s var(--eo)}
+.bmx-mtab:hover{color:var(--text);border-color:var(--hairline-h);transform:translateY(-1px)}
+.bmx-mtab:active{transform:translateY(0) scale(.95)}
+.bmx-mtab.is-active{color:var(--accent-bright);border-color:var(--accent);background:var(--accent-soft);box-shadow:var(--neon-sm)}
+.bmx-mtab-add{font-size:13px;color:var(--text-muted)}
+.bmx-controls{position:relative;z-index:2;padding:12px 18px;display:flex;flex-direction:column;gap:11px;border-bottom:1px solid var(--hairline)}
+.bmx-field{display:flex;flex-direction:column;gap:7px}
+.bmx-field-head{display:flex;align-items:center;gap:8px}
+.bmx-count,.bmx-log-count{margin-left:auto;font-family:var(--fm);font-size:10.5px;min-width:18px;height:18px;padding:0 5px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;
+  background:var(--accent-soft);color:var(--accent-bright);border:1px solid var(--glass-edge)}
+.bmx-mode-tag{font-family:var(--fm);font-size:10px;color:var(--text-dim);padding:2px 7px;border-radius:6px;background:var(--glass);border:1px solid var(--hairline);transition:color .3s var(--eo),border-color .3s var(--eo),background .3s var(--eo)}
+.bmx-help{display:inline-flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-muted);cursor:help;position:relative;transition:color .25s var(--es),transform .25s var(--eb)}
+.bmx-help.bmx-help-sm{font-size:11px}
+.bmx-help:hover,.bmx-help:focus{color:var(--accent-bright);outline:none;transform:scale(1.15)}
+.bmx-chips{display:flex;flex-direction:column;gap:6px}
+.bmx-chips-card{margin-bottom:2px}
+.bmx-chips-card:empty{display:none}
+.bmx-chip{display:flex;align-items:center;gap:8px;padding:7px 9px 7px 11px;border-radius:9px;background:var(--glass);border:1px solid var(--hairline);position:relative;overflow:hidden;
+  transition:border-color .3s var(--eo),transform .3s var(--eo),background .3s var(--eo),box-shadow .3s var(--eo);animation:bmx-chip-in .42s var(--eb) both}
+.bmx-chip::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--accent);opacity:.45;transition:opacity .3s var(--eo),box-shadow .3s var(--eo)}
+.bmx-chip:hover{border-color:var(--hairline-h);background:rgba(255,255,255,.05);transform:translateX(2px);box-shadow:0 4px 14px rgba(0,0,0,.22)}
+.bmx-chip:hover::before{opacity:1;box-shadow:var(--neon-sm)}
+.bmx-chip.is-out{animation:bmx-chip-out .34s var(--es) forwards}
+.bmx-chip-mono{flex:1;font-size:11.5px;color:var(--text);letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:2px}
+.bmx-chip-mono b{color:var(--accent-bright);font-weight:400}
+.bmx-chip-ic{font-size:14px;color:var(--accent-bright);flex:none;display:flex}
+.bmx-chip-card{border-color:rgba(255,255,255,.07)}
+.bmx-chip-card::before{display:none}
+.bmx-chip-card .bmx-chip-mono{color:var(--text-dim);padding-left:0}
+.bmx-chip-saved{background:var(--accent-soft);border-color:var(--accent-mid)}
+.bmx-chip-saved::before{display:block;opacity:.9;box-shadow:var(--neon-sm)}
+.bmx-chip-saved .bmx-chip-mono{color:var(--text);padding-left:2px}
+.bmx-chip-x{width:20px;height:20px;flex:none;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-muted);transition:color .25s var(--es),background .25s var(--es),transform .35s var(--eb)}
+.bmx-chip-x:hover{color:var(--danger);background:oklch(0.66 0.21 24 / .12);transform:rotate(90deg)}
+.bmx-chip-x:active{transform:rotate(90deg) scale(.85)}
+.bmx-saved{display:flex;align-items:center;gap:8px;margin-bottom:2px}
+.bmx-saved-lbl{font-family:var(--fm);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--accent-bright);flex:none}
+.bmx-saved-slot{flex:1;display:flex}
+.bmx-saved-slot .bmx-chip{flex:1;animation:none}
+.bmx-input{width:100%;height:34px;padding:0 11px;border-radius:9px;font-size:12px;color:var(--text);
+  background:rgba(0,0,0,.3);border:1px solid var(--hairline);transition:border-color .3s var(--eo),box-shadow .3s var(--eo),background .3s var(--eo);outline:none}
+.bmx-input::placeholder{color:var(--text-muted);font-family:var(--fm);font-size:11px}
+.bmx-input:hover{border-color:var(--hairline-h);background:rgba(0,0,0,.34)}
+.bmx-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),inset 0 0 12px oklch(0.6 0.13 160 / .1)}
+.bmx-input.is-flash{animation:bmx-lockflash .5s var(--eo)}
+.bmx-input-mono{letter-spacing:-.02em}
+.bmx-row-mr{display:flex;align-items:flex-end;gap:9px;margin-top:1px}
+.bmx-mini{display:flex;flex-direction:column;gap:5px}
+.bmx-mini-lbl{font-family:var(--fd);font-size:10px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--text-dim);display:flex;align-items:center;gap:4px}
+.bmx-amt{display:flex;align-items:center;height:34px;border-radius:9px;background:rgba(0,0,0,.3);border:1px solid var(--hairline);padding:0 10px;width:96px;transition:border-color .3s var(--eo),box-shadow .3s var(--eo)}
+.bmx-amt:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.bmx-amt-sign{color:var(--accent-bright);font-family:var(--fm);font-size:12px;margin-right:2px}
+.bmx-amt-in{height:32px;border:none;background:none;box-shadow:none;padding:0;font-size:13px}
+.bmx-amt-in:hover{background:none}
+.bmx-amt-in:focus{box-shadow:none}
+.bmx-mini-reps .bmx-stepper{display:flex;align-items:center;height:34px;border-radius:9px;background:rgba(0,0,0,.3);border:1px solid var(--hairline);overflow:hidden;transition:border-color .3s var(--eo)}
+.bmx-mini-reps .bmx-stepper:hover{border-color:var(--hairline-h)}
+.bmx-step{width:30px;height:34px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-dim);transition:color .25s var(--es),background .25s var(--es),transform .2s var(--eb)}
+.bmx-step:hover{color:var(--accent-bright);background:var(--accent-soft)}
+.bmx-step:active{transform:scale(.82)}
+.bmx-step-val{width:30px;text-align:center;font-size:13px;color:var(--text)}
+.bmx-deposit{position:relative;margin-left:auto;height:34px;padding:0 16px;border-radius:10px;display:flex;align-items:center;gap:7px;font-family:var(--fd);font-size:12.5px;font-weight:500;
+  color:#eafff6;background:linear-gradient(180deg,oklch(0.47 0.11 160),oklch(0.37 0.10 160));border:1px solid oklch(0.56 0.12 160 / .5);
+  box-shadow:var(--neon-sm),inset 0 1px 0 oklch(0.72 0.13 160 / .28);overflow:hidden;transition:transform .28s var(--eb),box-shadow .35s var(--eo)}
+.bmx-deposit i{font-size:14px;position:relative;z-index:1}
+.bmx-deposit span:not(.bmx-deposit-glow):not(.bmx-deposit-shine){position:relative;z-index:1}
+.bmx-deposit:hover{transform:translateY(-1px);box-shadow:var(--neon-md),inset 0 1px 0 oklch(0.72 0.13 160 / .34)}
+.bmx-deposit:active{transform:translateY(0) scale(.97)}
+.bmx-deposit-glow{position:absolute;inset:-40%;background:radial-gradient(circle at 50% 125%,oklch(0.72 0.13 160 / .55),transparent 58%);opacity:.45;animation:bmx-glow 3.4s var(--es) infinite;z-index:0}
+.bmx-deposit-shine{position:absolute;top:0;left:-60%;width:45%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.18),transparent);transform:skewX(-18deg);z-index:0;animation:bmx-shine 4.6s var(--es) infinite}
+.bmx-journey{position:relative;z-index:2;flex:1;min-height:0;padding:13px 18px;display:flex;flex-direction:column;gap:11px;overflow:hidden}
+.bmx-journey-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.bmx-orient{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--text-dim);min-width:0}
+.bmx-orient-node{padding:3px 8px;border-radius:7px;background:var(--glass);border:1px solid var(--hairline);font-size:11px;color:var(--text);white-space:nowrap;max-width:88px;overflow:hidden;text-overflow:ellipsis}
+.bmx-orient-arrow{color:var(--text-muted);font-size:14px;display:flex;flex:none}
+.bmx-orient-here{padding:3px 9px;border-radius:7px;font-size:11px;font-weight:500;color:var(--accent-bright);background:var(--accent-soft);border:1px solid var(--accent-mid);box-shadow:var(--neon-sm);white-space:nowrap;flex:none;transition:color .4s var(--eo),background .4s var(--eo),box-shadow .4s var(--eo)}
+.bmx-rep-counter{display:flex;align-items:center;gap:7px;flex:none}
+.bmx-rep-now{font-size:14px;color:var(--accent-bright)}
+.bmx-rep-of{font-size:11px;color:var(--text-muted)}
+.bmx-pips{display:flex;gap:3px;margin-left:2px}
+.bmx-pip{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.12);transition:background .4s var(--eo),box-shadow .4s var(--eo),transform .4s var(--eb)}
+.bmx-pip.is-done{background:var(--accent-bright);box-shadow:var(--neon-sm)}
+.bmx-pip.is-now{background:var(--accent-bright);box-shadow:var(--neon-md);transform:scale(1.35)}
+.bmx-phases{display:flex;align-items:flex-start;justify-content:space-between;gap:4px;padding:2px 0}
+.bmx-phase{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;position:relative;opacity:.4;transition:opacity .45s var(--eo),transform .45s var(--eo)}
+.bmx-phase:not(:last-child)::after{content:"";position:absolute;top:14px;left:62%;width:76%;height:1px;background:var(--hairline);transition:background .45s var(--eo)}
+.bmx-phase.is-done:not(:last-child)::after{background:var(--accent-mid)}
+.bmx-ph-ic{width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--text-dim);
+  background:var(--glass);border:1px solid var(--hairline);position:relative;z-index:1;transition:color .45s var(--eb),border-color .45s var(--eb),background .45s var(--eb),box-shadow .45s var(--eb)}
+.bmx-ph-name{font-size:9.5px;color:var(--text-dim);letter-spacing:.01em;text-align:center;transition:color .45s var(--eo)}
+.bmx-phase.is-done{opacity:.85}
+.bmx-phase.is-done .bmx-ph-ic{color:var(--accent-bright);border-color:var(--accent-mid);background:var(--accent-soft)}
+.bmx-phase.is-active{opacity:1;transform:translateY(-1px)}
+.bmx-phase.is-active .bmx-ph-ic{color:#eafff6;border-color:var(--accent);background:linear-gradient(180deg,oklch(0.46 0.11 160),oklch(0.36 0.10 160));box-shadow:var(--neon-md);animation:bmx-pulse 1.8s var(--es) infinite}
+.bmx-phase.is-active .bmx-ph-name{color:var(--accent-bright);font-weight:500}
+.bmx-stage-card{position:relative;display:flex;align-items:center;gap:16px;padding:13px 14px;border-radius:13px;background:var(--surface-elev);border:1px solid var(--glass-edge);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 12px 34px rgba(0,0,0,.34);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);overflow:hidden}
+.bmx-stage-card::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(72% 82% at 28% 36%,transparent 40%,rgba(0,0,0,.36) 100%)}
+.bmx-ring-wrap{position:relative;width:118px;height:118px;flex:none;z-index:1}
+.bmx-ring{transform:rotate(-90deg);width:118px;height:118px}
+.bmx-ring-track{fill:none;stroke:rgba(255,255,255,.07);stroke-width:7}
+.bmx-ring-prog{fill:none;stroke:url(#bmx-ring-grad);stroke-width:7;stroke-linecap:round;stroke-dasharray:326.7;stroke-dashoffset:117.6;
+  filter:drop-shadow(0 0 4px oklch(0.68 0.14 160 / .6));transition:stroke-dashoffset 1s var(--eo),stroke .5s var(--eo),filter .5s var(--eo)}
+.bmx-ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.bmx-ring-pct{font-size:21px;font-weight:500;color:var(--text);letter-spacing:-.02em}
+.bmx-ring-sub{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);transition:color .4s var(--eo)}
+.bmx-stage-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;position:relative;z-index:1}
+.bmx-retry{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--warn);height:14px;opacity:1;transition:opacity .3s var(--eo)}
+.bmx-retry[hidden]{display:flex;opacity:0;pointer-events:none}
+.bmx-retry-spin{width:11px;height:11px;border-radius:50%;border:1.5px solid oklch(0.80 0.16 75 / .3);border-top-color:var(--warn);animation:bmx-spin .8s linear infinite;flex:none}
+.bmx-balance-lbl{font-family:var(--fd);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim)}
+.bmx-balance-row{display:flex;align-items:center;gap:9px;margin-top:3px}
+.bmx-balance-mono{font-size:17px;color:var(--text-dim)}
+.bmx-balance-arrow{color:var(--text-muted);font-size:15px}
+.bmx-balance-to{color:var(--accent-bright);font-weight:500;text-shadow:var(--neon-sm)}
+.bmx-badges{display:flex;gap:6px;min-height:20px}
+.bmx-badge{display:inline-flex;align-items:center;gap:4px;font-family:var(--fm);font-size:10px;font-weight:500;padding:3px 8px;border-radius:7px;position:relative;animation:bmx-chip-in .4s var(--eb) both}
+.bmx-badge i{font-size:12px}
+.bmx-badge-a{color:var(--accent-bright);background:var(--accent-soft);border:1px solid var(--accent-mid);box-shadow:var(--neon-sm)}
+.bmx-badge-err{color:var(--danger);background:oklch(0.66 0.21 24 / .12);border:1px solid oklch(0.66 0.21 24 / .4);cursor:help}
+.bmx-lanes{display:flex;flex-direction:column;gap:5px}
+.bmx-lane{display:flex;align-items:center;gap:9px;padding:6px 10px;border-radius:8px;background:var(--glass);border:1px solid var(--hairline);transition:border-color .3s var(--eo),transform .3s var(--eo),background .3s var(--eo)}
+.bmx-lane:hover{border-color:var(--hairline-h);transform:translateX(2px);background:rgba(255,255,255,.045)}
+.bmx-lane-name{width:78px;flex:none;font-size:11px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bmx-lane-track{flex:1;height:5px;border-radius:3px;background:rgba(0,0,0,.34);overflow:hidden;position:relative}
+.bmx-lane-fill{position:absolute;inset:0;width:0;border-radius:3px;background:linear-gradient(90deg,var(--accent-mid),var(--accent-bright));transition:width .9s var(--eo)}
+.bmx-lane-state{font-size:10px;color:var(--text-muted);width:62px;flex:none;text-align:right}
+.bmx-lane.is-running .bmx-lane-fill{box-shadow:var(--neon-sm)}
+.bmx-lane.is-running .bmx-lane-state{color:var(--warn)}
+.bmx-lane.is-running{border-color:var(--accent-mid)}
+.bmx-lane.is-ok .bmx-lane-state{color:var(--accent-bright)}
+.bmx-lane.is-wait .bmx-lane-fill{background:var(--cold)}
+.bmx-controls-run{display:flex;align-items:center;gap:7px;margin-top:auto;padding-top:2px}
+.bmx-runbtn{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--text-dim);
+  background:var(--glass);border:1px solid var(--hairline);position:relative;transition:color .28s var(--eo),border-color .28s var(--eo),background .28s var(--eo),transform .28s var(--eo)}
+.bmx-runbtn:hover{color:var(--text);border-color:var(--hairline-h);transform:translateY(-1px)}
+.bmx-runbtn:active{transform:scale(.9)}
+.bmx-runbtn-stop:hover{color:var(--danger);border-color:oklch(0.66 0.21 24 / .4);background:oklch(0.66 0.21 24 / .1)}
+.bmx-run-spacer{flex:1}
+.bmx-demo{display:flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:9px;font-size:11px;color:var(--text-dim);position:relative;
+  background:var(--glass);border:1px dashed var(--hairline-h);transition:color .28s var(--eo),border-color .28s var(--eo),background .28s var(--eo),transform .28s var(--eo)}
+.bmx-demo i{font-size:13px}
+.bmx-demo:hover{color:var(--accent-bright);border-color:var(--accent-mid);background:var(--accent-soft);transform:translateY(-1px)}
+.bmx-demo:active{transform:scale(.96)}
+.bmx-log{position:relative;z-index:2;padding:10px 18px 14px;border-top:1px solid var(--hairline);background:rgba(0,0,0,.2)}
+.bmx-log-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.bmx-log-live{display:inline-flex;align-items:center;gap:5px;font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-dim)}
+.bmx-log-live i{width:5px;height:5px;border-radius:50%;background:var(--accent-bright);box-shadow:var(--neon-sm);animation:bmx-breathe 2s infinite}
+.bmx-log-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;max-height:100px;overflow-y:auto}
+.bmx-log-list::-webkit-scrollbar{width:5px}
+.bmx-log-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
+.bmx-log-row{display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:7px;background:var(--glass);border:1px solid transparent;font-size:11px;
+  transition:border-color .25s var(--eo),background .25s var(--eo),transform .25s var(--eo);animation:bmx-chip-in .4s var(--eo) both}
+.bmx-log-row:hover{border-color:var(--hairline);background:rgba(255,255,255,.045);transform:translateX(2px)}
+.bmx-r-dot{width:6px;height:6px;border-radius:50%;flex:none;background:var(--text-muted)}
+.bmx-r-acct{flex:none;color:var(--text);font-size:11px}
+.bmx-r-res{flex:1;color:var(--text-dim);font-size:11px}
+.bmx-r-time{color:var(--text-muted);font-size:10.5px}
+.bmx-r-ok .bmx-r-dot{background:var(--accent-bright);box-shadow:var(--neon-sm)}
+.bmx-r-ok .bmx-r-res{color:var(--accent-bright)}
+.bmx-r-retry .bmx-r-dot{background:var(--warn)}
+.bmx-r-retry .bmx-r-res{color:var(--warn)}
+.bmx-r-na .bmx-r-dot{background:var(--cold)}
+.bmx-r-na .bmx-r-res{color:var(--cold)}
+.bmx-r-rej .bmx-r-dot{background:var(--danger)}
+.bmx-r-rej .bmx-r-res{color:var(--danger)}
+[data-tip]{position:relative}
+[data-tip]::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 7px);left:50%;transform:translateX(-50%) translateY(4px);
+  padding:6px 9px;border-radius:7px;background:rgba(8,10,13,.97);border:1px solid var(--glass-edge);color:var(--text);font-family:Inter,sans-serif;font-size:10.5px;line-height:1.35;
+  max-width:220px;white-space:normal;width:max-content;opacity:0;pointer-events:none;transition:opacity .25s var(--es),transform .25s var(--eo);
+  box-shadow:0 8px 22px rgba(0,0,0,.5);z-index:30}
+[data-tip]:hover::after,[data-tip]:focus::after,[data-tip]:focus-visible::after{opacity:1;transform:translateX(-50%) translateY(0)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@keyframes bmx-chip-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@keyframes bmx-chip-out{to{opacity:0;transform:translateX(20px);height:0;padding-top:0;padding-bottom:0;margin-bottom:-6px}}
+@keyframes bmx-breathe{0%,100%{opacity:.5;transform:scale(.9)}50%{opacity:1;transform:scale(1.15)}}
+@keyframes bmx-pulse{0%,100%{box-shadow:var(--neon-sm)}50%{box-shadow:var(--neon-md)}}
+@keyframes bmx-glow{0%,100%{opacity:.32}50%{opacity:.62}}
+@keyframes bmx-shine{0%,72%{left:-60%}100%{left:130%}}
+@keyframes bmx-lockflash{0%{box-shadow:0 0 0 3px var(--accent-glow)}100%{box-shadow:0 0 0 3px rgba(0,0,0,0)}}
+@keyframes bmx-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.bmx *{animation-duration:.01ms!important;animation-iteration-count:1!important}}
+</style>
+
+<script>
+(function(){
+  var root=document.currentScript.parentNode;
+  var $=function(s){return root.querySelector(s)};
+  var $$=function(s){return Array.prototype.slice.call(root.querySelectorAll(s))};
+
+  var accounts=[
+    "memo.teo10@gmail.com:Mexico2024",
+    "olimpo.flor@gmail.com:Flor1985",
+    "fcojavii2662@gmail.com:Javier77."
+  ];
+  var savedCards={ "memo.teo10@gmail.com:Mexico2024":"4915610112233445|03|2028|789" };
+  var cards=["4111111111111111|12|2030|123","5512345678901234|08|2029|456"];
+  var reps=5;
+  var shortOf=function(c){return c.split('@')[0]};
+  var esc=function(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')};
+  function comboHTML(c){var i=c.indexOf(':');return i<0?esc(c):esc(c.slice(0,i))+'<b>:</b>'+esc(c.slice(i+1));}
+
+  function renderAccounts(){
+    var box=$('#accts');box.innerHTML='';
+    accounts.forEach(function(c){
+      var span=document.createElement('span');
+      span.className='bmx-chip';span.setAttribute('data-acct',shortOf(c));
+      span.innerHTML='<span class="bmx-chip-mono">'+comboHTML(c)+'</span><button class="bmx-chip-x" type="button" aria-label="Quitar cuenta"><i class="ti ti-x" aria-hidden="true"></i></button>';
+      box.appendChild(span);
+    });
+    $('#acct-count').textContent=accounts.length;
+  }
+
+  function renderCards(){
+    var box=$('#card-chips');box.innerHTML='';
+    cards.forEach(function(pipe){
+      var span=document.createElement('span');
+      span.className='bmx-chip bmx-chip-card';span.setAttribute('data-card','');
+      span.innerHTML='<span class="bmx-chip-ic" aria-hidden="true"><i class="ti ti-credit-card"></i></span><span class="bmx-chip-mono">'+esc(pipe)+'</span><button class="bmx-chip-x" type="button" aria-label="Quitar tarjeta"><i class="ti ti-x" aria-hidden="true"></i></button>';
+      box.appendChild(span);
+    });
+  }
+
+  function renderSaved(){
+    var wrap=$('#card-saved'),slot=$('#card-saved-slot');slot.innerHTML='';
+    if(accounts.length!==1){wrap.hidden=true;return;}
+    var pipe=savedCards[accounts[0]];
+    if(!pipe){wrap.hidden=true;return;}
+    wrap.hidden=false;
+    var span=document.createElement('span');
+    span.className='bmx-chip bmx-chip-card bmx-chip-saved';
+    span.innerHTML='<span class="bmx-chip-ic" aria-hidden="true"><i class="ti ti-credit-card"></i></span><span class="bmx-chip-mono">'+esc(pipe)+'</span><button class="bmx-chip-x" type="button" data-saved aria-label="Quitar tarjeta"><i class="ti ti-x" aria-hidden="true"></i></button>';
+    slot.appendChild(span);
+  }
+
+  function syncMode(){
+    var n=accounts.length;
+    var t=$('#orq-text'),r=$('#orq-reps'),sep=$('#orq-sep'),tag=$('#card-mode-tag'),help=$('#card-help');
+    if(n===0){
+      t.textContent='Sin cuentas';
+      tag.textContent='—';
+      help.setAttribute('data-tip','Agrega cuentas desde el dashboard para operar.');
+    } else if(n===1){
+      t.textContent=reps>1?('Programado a '+shortOf(accounts[0])):('Individual a '+shortOf(accounts[0]));
+      tag.textContent='Individual · reutiliza o nueva';
+      help.setAttribute('data-tip','1 cuenta: puedes reutilizar la tarjeta preguardada o ingresar una nueva. Click fuera lockea.');
+    } else {
+      t.textContent='Matchmaker · '+n+' cuentas';
+      tag.textContent='Matchmaker · pool manual';
+      help.setAttribute('data-tip','Varias cuentas: el matchmaker prueba tarjetas nuevas. Ingresa pipe cc|mm|aaaa|cvv y click fuera para lockear.');
+    }
+    if(reps>1){r.textContent='Goteo · x'+reps;r.hidden=false;sep.hidden=false;}
+    else{r.textContent='';r.hidden=true;sep.hidden=true;}
+    if(n>=1)$('#o-from').textContent=shortOf(accounts[0]);
+    renderSaved();
+  }
+
+  root.addEventListener('click',function(e){
+    var x=e.target.closest('.bmx-chip-x');if(!x)return;
+    var chip=x.closest('.bmx-chip');
+    if(chip.classList.contains('bmx-chip-saved')){chip.classList.add('is-out');setTimeout(renderSaved,300);return;}
+    if(chip.hasAttribute('data-card')){
+      var idx=$$('#card-chips .bmx-chip').indexOf(chip);
+      chip.classList.add('is-out');setTimeout(function(){if(idx>=0)cards.splice(idx,1);renderCards();},300);return;
+    }
+    if(chip.hasAttribute('data-acct')){
+      var ai=$$('#accts .bmx-chip').indexOf(chip);
+      chip.classList.add('is-out');setTimeout(function(){if(ai>=0)accounts.splice(ai,1);renderAccounts();syncMode();},300);return;
+    }
+  });
+
+  function bump(s){var el=$(s);if(!el)return;el.style.transition='transform .3s var(--eb)';el.style.transform='scale(1.25)';setTimeout(function(){el.style.transform='scale(1)';},160);}
+  function setReps(v){reps=Math.max(1,Math.min(20,v));$('#rep-val').textContent=reps;$('#rep-of').textContent='/'+reps;bump('#rep-val');buildPips(reps,Math.min(2,reps));syncMode();}
+  $('#rep-plus').addEventListener('click',function(){setReps(reps+1);});
+  $('#rep-minus').addEventListener('click',function(){setReps(reps-1);});
+
+  var ci=$('#card-input');
+  function lockCards(){
+    var raw=ci.value.split(/[\n,;]+/).map(function(s){return s.trim()}).filter(Boolean);
+    if(!raw.length)return;
+    raw.forEach(function(p){if(cards.indexOf(p)<0)cards.push(p);});
+    ci.value='';renderCards();
+    ci.classList.add('is-flash');setTimeout(function(){ci.classList.remove('is-flash');},520);
+  }
+  ci.addEventListener('blur',lockCards);
+  ci.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();lockCards();}});
+
+  function setRing(pct){var c=2*Math.PI*52;$('#ring-prog').style.strokeDashoffset=(c*(1-pct/100)).toFixed(1);$('#ring-pct').textContent=Math.round(pct)+'%';}
+
+  var PH=['Entrando','Preparando','Pagando','Confirmando','Resultado'];
+  function setPhase(idx,activeRunning){
+    $$('#phases .bmx-phase').forEach(function(p,i){
+      p.classList.remove('is-active','is-done');
+      if(i<idx)p.classList.add('is-done');
+      else if(i===idx)p.classList.add('is-'+(activeRunning?'active':'done'));
+    });
+    $('#o-here').textContent=PH[idx];
+  }
+
+  function buildPips(total,now){
+    var b=$('#pips');b.innerHTML='';var max=Math.min(total,8);
+    for(var i=1;i<=max;i++){var d=document.createElement('span');d.className='bmx-pip'+(i<now?' is-done':i===now?' is-now':'');b.appendChild(d);}
+  }
+
+  var paused=false,timer=null;
+  function clearT(){if(timer){clearTimeout(timer);timer=null;}}
+  var pause=$('#btn-pause'),resume=$('#btn-resume');
+  pause.addEventListener('click',function(){paused=true;clearT();pause.hidden=true;resume.hidden=false;$$('#lanes .bmx-lane.is-running .bmx-lane-state').forEach(function(s){s.textContent='Pausado';});});
+  resume.addEventListener('click',function(){paused=false;resume.hidden=true;pause.hidden=false;$$('#lanes .bmx-lane.is-running .bmx-lane-state').forEach(function(s){s.textContent='Pagando';});loop();});
+  $('#btn-cancel').addEventListener('click',function(){clearT();paused=false;setPhase(0,false);setRing(8);$('#ring-sub').textContent='cancelado';$('#retry-line').hidden=true;addLog(shortOf(accounts[0]||'cuenta'),'cancelada','bmx-r-na',nowt());});
+
+  function nowt(){var d=new Date();return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);}
+  function addLog(acct,res,cls,time){
+    var li=document.createElement('li');li.className='bmx-log-row '+cls;
+    li.innerHTML='<span class="bmx-r-dot" aria-hidden="true"></span><span class="bmx-r-acct bmx-input-mono">'+esc(acct)+'</span><span class="bmx-r-res">'+esc(res)+'</span><span class="bmx-r-time bmx-input-mono">'+time+'</span>';
+    $('#log-list').appendChild(li);$('#log-count').textContent=$$('#log-list .bmx-log-row').length;
+    $('#log-list').scrollTop=$('#log-list').scrollHeight;
+  }
+
+  function animBal(from,to){
+    var el=$('#bal-now'),t0=null;
+    function tick(ts){if(!t0)t0=ts;var k=Math.min((ts-t0)/900,1);var v=from+(to-from)*(1-Math.pow(1-k,3));el.textContent='$'+v.toFixed(2);if(k<1)requestAnimationFrame(tick);}
+    requestAnimationFrame(tick);
+  }
+
+  var phaseMeta=[
+    {p:12,sub:'login'},{p:34,sub:'preparando'},{p:58,sub:'pagando'},{p:82,sub:'confirmando'}
+  ];
+  var step=0,retried=false,demoMode='aplus';
+  function loop(){
+    if(paused)return;
+    if(step>=phaseMeta.length){finish(demoMode);return;}
+    var m=phaseMeta[step];
+    setPhase(step,true);setRing(m.p);$('#ring-sub').textContent=m.sub;$('#retry-line').hidden=true;
+    if(step===2 && !retried){
+      retried=true;
+      timer=setTimeout(function(){
+        if(paused)return;
+        $('#retry-line').hidden=false;$('#ring-sub').textContent='reintento';
+        addLog(shortOf(accounts[0]||'memo.teo10'),'reintento','bmx-r-retry',nowt());
+        timer=setTimeout(function(){if(paused)return;$('#retry-line').hidden=true;step++;loop();},1500);
+      },1300);return;
+    }
+    step++;timer=setTimeout(loop,1400);
+  }
+
+  function finish(mode){
+    clearT();setPhase(4,false);$('#retry-line').hidden=true;
+    var rp=$('#ring-prog'),sub=$('#ring-sub'),ba=$('#badge-a'),be=$('#badge-err');
+    ba.hidden=true;be.hidden=true;setRing(100);
+    var who=shortOf(accounts[0]||'memo.teo10');
+    if(mode==='ok'||mode==='aplus'){
+      rp.style.stroke='url(#bmx-ring-grad)';sub.textContent='aprobada';
+      if(mode==='aplus')ba.hidden=false;
+      $('#bal-now').textContent='$512.00';animBal(512,562);bump('#bal-to');
+      addLog(who,'aprobada','bmx-r-ok',nowt());
+    } else if(mode==='na'){
+      rp.style.stroke='var(--cold)';sub.textContent='no disponible';
+      addLog(who,'no disponible','bmx-r-na',nowt());
+    } else if(mode==='rej'){
+      rp.style.stroke='var(--danger)';sub.textContent='rechazada';
+      addLog(who,'rechazada · banco','bmx-r-rej',nowt());
+    } else if(mode==='err'){
+      rp.style.stroke='var(--danger)';sub.textContent='error';be.hidden=false;
+      addLog(who,'error · E-RED','bmx-r-rej',nowt());
+    }
+  }
+
+  function runJourney(){
+    clearT();step=0;retried=false;paused=false;
+    pause.hidden=false;resume.hidden=true;
+    $('#ring-prog').style.stroke='url(#bmx-ring-grad)';
+    $('#badge-a').hidden=true;$('#badge-err').hidden=true;
+    loop();
+  }
+
+  var demoSeq=['aplus','ok','na','rej','err'];var di=0;
+  $('#demo').addEventListener('click',function(){demoMode=demoSeq[di%demoSeq.length];di++;clearT();finish(demoMode);});
+
+  $('#deposit').addEventListener('click',function(){
+    var b=this;b.style.transform='scale(.96)';setTimeout(function(){b.style.transform='';},150);
+    demoMode='aplus';runJourney();
+  });
+
+  $$('.bmx-mtab:not(.bmx-mtab-add)').forEach(function(t){
+    t.addEventListener('click',function(){$$('.bmx-mtab').forEach(function(x){x.classList.remove('is-active');});t.classList.add('is-active');});
+  });
+
+  renderAccounts();renderCards();syncMode();
+  setReps(5);
+  setRing(64);setPhase(2,true);$('#ring-sub').textContent='pagando';
+  $('#retry-line').hidden=true;
+})();
+</script>
