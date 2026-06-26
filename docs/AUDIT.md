@@ -91,6 +91,11 @@
 | **Filtro lock-aware en `/api/accounts`** | ✅ non-SA solo ve libres O propias; SA ve todo | ✅ desde 2026-05-11 | ✅ |
 | **Filtro published_to_pool en `/api/accounts`** | ✅ non-SA solo ve `published_to_pool=1`; SA ve todo (trastienda + pool) | ✅ (`app.py:347-348`) | ✅ |
 | **Bulk unpublish 2026-05-22** | n/a — operación manual: 45 cuentas publicadas (todas `status=DEAD`) → `published_to_pool=0` para ocultarlas a admins. Total pool ahora 0 visibles a non-SA. | ✅ ejecutado en KVM4 prod | ✅ |
+| **A1 · Modelo de 5 estados** | TRASTIENDA / POOL / EN_USO / RESERVADA_SA / DEAD derivados de `locked_by`+`locked_until`+`published_to_pool`. Ver `docs/ARCHITECTURE.md` §Modelo de estados. | ✅ rama `feat/sp3-a1-estados-cuentas` (11 tests verde) — **sin deploy** | ⚠️ |
+| **A1 · RESERVADA_SA** | SA que lockea/deposita → `locked_until=NULL` = lock perpetuo, invisible a operadores, intocable por watchdogs; solo lo libera unlock manual del SA. | ✅ `lock_account`+`_auto_lock_for_deposit`+`unlock_account` | ⚠️ sin deploy |
+| **A1 · Liberador canónico único** | `_release_account()` = el ÚNICO release automático (janitor). Atómico: limpia lock+notif_*, **republica** `published_to_pool=1`, 1 broadcast. `window_watcher` y `release_watchdog` = notificadores puros (perdieron sus releases: fase 3 muerta + caso 1 27h). | ✅ consolidación 3→1 | ⚠️ sin deploy |
+| **A1 · Guardrail publish/hide** | `publish(False)`/`hide-all` no ocultan cuentas con `locked_by IS NOT NULL` (evita fantasma published=0+lock). | ✅ | ⚠️ sin deploy |
+| **A1 · Backfill legacy** | `_migrate`: locks legacy sin `locked_until` → `locked_at+24h` (no toca SA). Defensivo+idempotente; medido 0 filas hoy. | ✅ | ⚠️ sin deploy |
 
 ## Grading / Payment Analyzer
 

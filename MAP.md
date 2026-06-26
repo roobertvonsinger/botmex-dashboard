@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `0ad99ad` | test(a1): refuerzo backfill con locked_at formato real isoformat+tz (review adversarial) |
 | `6290611` | feat(a1): T7 _auto_lock_for_deposit SA perpetuo (locked_until NULL) — A1 completo (TDD verde) |
 | `c04f37a` | feat(a1): T4 guardrail publish/hide vs EN_USO + T5 lock manual override SA (TDD verde) |
 | `f43eb5c` | feat(a1): T3+T6 consolidación watchdogs — janitor único liberador (TDD verde) |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `662a0cc` | feat(a2.1): acotar info por rol — _visible_emails + cards/all/pass-map/combos/deposits (TDD 22 verde, sin deploy) |
 | `29d4938` | docs(SP-3): mockup v7 aprobado (modal unificado) + diseño optimizacion estado-cuentas |
 | `b8913e7` | docs(session): cierre SP-1+SP-2 unificacion deployado y mergeado, siguiente SP-3 (vista) |
-| `7ce3f9b` | feat(matchmaker): SP-2 reusa session_jwt por cuenta en multi_stream + fix docstring wrapper |
 <!-- GEN:end:recientes -->
 
 ---

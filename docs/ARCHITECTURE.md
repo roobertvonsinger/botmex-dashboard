@@ -79,6 +79,30 @@ Comparten:
                    /data/betmexico_accounts.db (SQLite WAL)
 ```
 
+## Modelo de estados de cuenta (A1, 2026-06-26)
+
+Fuente única de verdad = **3 campos** (`locked_by` + `locked_until` + `published_to_pool`), sin columna de rol. Cada cuenta vive en EXACTAMENTE 1 de 5 estados. SA tg = `1341812706`.
+
+| Estado | `published_to_pool` | `locked_by` | `locked_until` | Visible a |
+|--------|---------------------|-------------|----------------|-----------|
+| **TRASTIENDA** | 0 | NULL | NULL | solo SA (reposo admin) |
+| **POOL** | 1 | NULL | NULL | todos los non-SA (disponible) |
+| **EN_USO** | 1 | tg operador | ISO no-nulo (reloj) | dueño + SA |
+| **RESERVADA_SA** | — | `1341812706` | **NULL** | solo SA (perpetua, invisible) |
+| **DEAD** | — | — | — | `status != 'LIVE'` |
+
+**Discriminador EN_USO vs RESERVADA_SA = `locked_until`** (reloj presente = temporal; NULL = perpetuo, solo lo pone el SA). Los watchdogs exigen `locked_until IS NOT NULL` → la RESERVADA_SA es inmune sin código de rol.
+
+**Invariantes:** I1 `locked_by NULL ⟺ locked_until NULL` · I3 `locked_until NULL + locked_by NOT NULL ⇒ perpetuo (solo SA)` · el trabajo (cards/balance/txns) se ata a `email`, nunca a `locked_by` (liberar no borra ni expone).
+
+**Consolidación de watchdogs (3 que se pisaban → 1 liberador + 2 notificadores):**
+- `_release_account()` = **único** release automático (lo llama el **janitor** `_run_lock_janitor`, origen de tiempo = `locked_until`). Atómico: limpia lock + `notif_*`, **republica** `published_to_pool=1`, 1 broadcast.
+- `_run_window_watcher` = notificador puro (perdió la fase 3 de release, que además era código muerto: filtro `created_at >= -25h` vs condición `first_at < -25h`).
+- `_release_watchdog_tick` = notificador puro (perdió el caso 1 de auto-release a 27h); SELECT con guard `AND locked_until IS NOT NULL`.
+- `unlock_account` (manual) y `lock_account` (SA → override + perpetuo) también pasan por el modelo. `publish/hide-all` no ocultan cuentas con `locked_by IS NOT NULL`.
+
+> Plan + diseño: `docs/superpowers/plans/2026-06-26-a1-estados-cuentas-plan.md`, `docs/superpowers/specs/2026-06-25-optimizacion-estado-cuentas-design.md`. Tests: `test_a1_estados.py` (11 verde).
+
 ## Flujo de un depósito (single, dashboard)
 
 1. **Frontend**: usuario abre drawer → tab "Una" → `executeSingleAccount(pipe, amount)`
