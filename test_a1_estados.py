@@ -85,3 +85,28 @@ def test_release_account_atomico_y_republica(a1):
     assert ev.get("kind") == "unlock_auto"
     assert ev.get("prev_locked_by") == "555"
     assert ev.get("target") == "en_uso@test.com"
+
+
+def test_backfill_legacy_no_toca_reservada_sa(a1):
+    """T2: _migrate re-temporiza locks legacy sin locked_until; deja intacta la RESERVADA_SA."""
+    app_mod, con, _ = a1
+    c0 = con()
+    legacy = _ins(c0, "legacy@test.com", locked_by="777",
+                  locked_at="2026-06-20 00:00:00", locked_until=None)
+    sa = _ins(c0, "reservada@test.com", locked_by=SA,
+              locked_at="2026-06-20 00:00:00", locked_until=None)
+    pool = _ins(c0, "pool@test.com")  # sin lock
+    c0.commit(); c0.close()
+
+    app_mod._migrate()   # idempotente; backfill defensivo
+
+    r = con().execute("SELECT id,locked_until FROM accounts").fetchall()
+    by_id = {x["id"]: x["locked_until"] for x in r}
+    assert by_id[legacy] == "2026-06-21 00:00:00"   # locked_at + 24h
+    assert by_id[sa] is None                          # RESERVADA_SA intacta
+    assert by_id[pool] is None                        # sin lock, sin cambio
+
+    # idempotencia: 2da corrida no altera el ya-seteado
+    app_mod._migrate()
+    again = con().execute("SELECT locked_until FROM accounts WHERE id=?", (legacy,)).fetchone()
+    assert again["locked_until"] == "2026-06-21 00:00:00"

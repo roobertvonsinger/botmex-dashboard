@@ -163,6 +163,19 @@ def _migrate():
         except sqlite3.OperationalError as e:
             if "duplicate column name" not in str(e) and "no such table" not in str(e):
                 raise
+    # Backfill A1 (defensivo, idempotente): locks legacy sin locked_until quedan
+    # eternos porque el janitor exige locked_until IS NOT NULL. Re-temporiza a
+    # locked_at+24h. NO toca al SA (locked_until NULL = RESERVADA_SA perpetua).
+    try:
+        with db(write=True) as c:
+            c.execute(
+                "UPDATE accounts SET locked_until=datetime(locked_at,'+24 hours') "
+                "WHERE locked_by IS NOT NULL AND locked_until IS NULL "
+                "AND locked_at IS NOT NULL AND locked_by != '1341812706'"
+            )
+    except sqlite3.OperationalError as e:
+        if "no such" not in str(e):
+            raise
 
 
 _migrate()

@@ -92,7 +92,7 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2495 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2508 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -103,7 +103,7 @@ prewarm.py (router)
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
-| `test_a1_estados.py` | 87 | `—` | _[completar]_ |
+| `test_a1_estados.py` | 112 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 55 | `—` | _[completar]_ |
@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d5d5f34` | feat(a1): T1 helper canónico _release_account (TDD verde) + plan A1 |
 | `ebf63d9` | chore(mockup): ositos reacciones limpios (scipy, sin sombreros sueltos) — reserva para cablear |
 | `0e19165` | feat(frontend): logo global del dashboard = osito Depp-oso transparente (190px) |
 | `ba5f8c6` | docs(SP-3): mockup v8 panel Depos (escenas+branding osito+greetings) + spec paraguas + revision flujo + NORTE + NEXT-SESSION |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `26d9f62` | docs(SP-1): MAP + gen_map + ENDPOINTS/ARCHITECTURE/AUDIT/ERRORS reflejan /execute eliminado y 7 modulos archivados |
 | `9febd21` | chore(legacy): SP-1 archiva web_routes_{cards,logs,notifications} — 7 legacy total a _legacy/ |
 | `f973fe0` | chore(legacy): SP-1 archiva web_routes_{deposits,missions,prewarm} + web_watchdog a _legacy/ |
-| `0d51a91` | feat(login): SP-1 unificacion — borra /execute legacy (fuga proxyless), _load_deps solo make_pool |
 <!-- GEN:end:recientes -->
 
 ---
