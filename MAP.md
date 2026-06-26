@@ -103,7 +103,7 @@ prewarm.py (router)
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
-| `test_a1_estados.py` | 287 | `—` | _[completar]_ |
+| `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 55 | `—` | _[completar]_ |
@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `6290611` | feat(a1): T7 _auto_lock_for_deposit SA perpetuo (locked_until NULL) — A1 completo (TDD verde) |
 | `c04f37a` | feat(a1): T4 guardrail publish/hide vs EN_USO + T5 lock manual override SA (TDD verde) |
 | `f43eb5c` | feat(a1): T3+T6 consolidación watchdogs — janitor único liberador (TDD verde) |
 | `242d1dc` | feat(a1): T2 backfill legacy locked_until en _migrate (TDD verde) |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `29d4938` | docs(SP-3): mockup v7 aprobado (modal unificado) + diseño optimizacion estado-cuentas |
 | `b8913e7` | docs(session): cierre SP-1+SP-2 unificacion deployado y mergeado, siguiente SP-3 (vista) |
 | `7ce3f9b` | feat(matchmaker): SP-2 reusa session_jwt por cuenta en multi_stream + fix docstring wrapper |
-| `7795983` | feat(matchmaker): SP-2 helpers _mm_session_get/_update — reuso de sesion por cuenta (TDD) |
 <!-- GEN:end:recientes -->
 
 ---

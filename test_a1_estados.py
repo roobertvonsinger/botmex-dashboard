@@ -112,6 +112,24 @@ def test_backfill_legacy_no_toca_reservada_sa(a1):
     assert again["locked_until"] == "2026-06-21 00:00:00"
 
 
+def test_backfill_con_locked_at_formato_real_isoformat_tz(a1):
+    """Refuerzo (review adversarial): en prod locked_at = datetime.now(utc).isoformat() (con 'T',
+    microsegundos y '+00:00'), NO formato espacio. Verifica que el backfill lo procesa y NO deja
+    locked_until NULL (violaría I1). Medido: SQLite 3.37.2 (prod) y 3.50.4 (local) parsean ISO8601 completo."""
+    from datetime import datetime, timezone
+    app_mod, con, _ = a1
+    real = datetime(2026, 6, 20, 0, 0, 0, 123456, tzinfo=timezone.utc).isoformat()  # 2026-06-20T00:00:00.123456+00:00
+    c0 = con()
+    legacy = _ins(c0, "legacy_iso@test.com", locked_by="777", locked_at=real, locked_until=None)
+    c0.commit(); c0.close()
+
+    app_mod._migrate()
+
+    r = con().execute("SELECT locked_by, locked_until FROM accounts WHERE id=?", (legacy,)).fetchone()
+    assert r["locked_until"] is not None           # I1: no quedó NULL con locked_by no-nulo
+    assert r["locked_until"].startswith("2026-06-21")
+
+
 def test_janitor_unico_liberador_republica_y_respeta_sa(a1):
     """T6: janitor libera vía _release_account (republica+limpia notif) y NO toca RESERVADA_SA."""
     app_mod, con, broadcasts = a1

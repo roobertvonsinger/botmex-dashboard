@@ -276,15 +276,16 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `a1` | def | L43–L57 |
 | `test_release_account_atomico_y_republica` | def | L60–L87 |
 | `test_backfill_legacy_no_toca_reservada_sa` | def | L90–L112 |
-| `test_janitor_unico_liberador_republica_y_respeta_sa` | def | L115–L133 |
-| `test_window_watcher_notifica_normal_pero_no_a_sa_ni_libera` | def | L136–L160 |
-| `test_release_watchdog_no_autorelease_y_guard_sa` | def | L163–L180 |
-| `test_unlock_manual_republica_via_helper` | def | L183–L206 |
-| `_client` | def | L209–L213 |
-| `test_lock_sa_override_y_perpetuo` | def | L216–L230 |
-| `test_lock_operador_409_si_ocupada_y_temporal_si_libre` | def | L233–L249 |
-| `test_publish_hide_no_oculta_cuentas_en_uso` | def | L252–L268 |
-| `test_auto_lock_deposit_sa_perpetuo_operador_temporal` | def | L271–L287 |
+| `test_backfill_con_locked_at_formato_real_isoformat_tz` | def | L115–L130 |
+| `test_janitor_unico_liberador_republica_y_respeta_sa` | def | L133–L151 |
+| `test_window_watcher_notifica_normal_pero_no_a_sa_ni_libera` | def | L154–L178 |
+| `test_release_watchdog_no_autorelease_y_guard_sa` | def | L181–L198 |
+| `test_unlock_manual_republica_via_helper` | def | L201–L224 |
+| `_client` | def | L227–L231 |
+| `test_lock_sa_override_y_perpetuo` | def | L234–L248 |
+| `test_lock_operador_409_si_ocupada_y_temporal_si_libre` | def | L251–L267 |
+| `test_publish_hide_no_oculta_cuentas_en_uso` | def | L270–L286 |
+| `test_auto_lock_deposit_sa_perpetuo_operador_temporal` | def | L289–L305 |
 
 ### `test_a21_visibilidad.py`
 
