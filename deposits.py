@@ -277,8 +277,10 @@ def _auto_lock_for_deposit(
     from app import db, _broadcast
     now = datetime.now(timezone.utc)
     locked_at = now.isoformat()
-    locked_until = (now + timedelta(hours=hours)).isoformat()
     is_sa = user.get("role") == "superadmin"
+    # A1: SA que deposita → RESERVADA_SA perpetua (locked_until NULL = ningún watchdog la
+    # libera, invisible a operadores). Operador → lock temporal (Nh) como hoy.
+    locked_until = None if is_sa else (now + timedelta(hours=hours)).isoformat()
 
     with db(write=True) as c:
         row = c.execute(

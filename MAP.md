@@ -96,14 +96,14 @@ prewarm.py (router)
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2153 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2155 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `login_orchestrator.py` | 379 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 692 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 332 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
-| `test_a1_estados.py` | 268 | `—` | _[completar]_ |
+| `test_a1_estados.py` | 287 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 55 | `—` | _[completar]_ |
@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c04f37a` | feat(a1): T4 guardrail publish/hide vs EN_USO + T5 lock manual override SA (TDD verde) |
 | `f43eb5c` | feat(a1): T3+T6 consolidación watchdogs — janitor único liberador (TDD verde) |
 | `242d1dc` | feat(a1): T2 backfill legacy locked_until en _migrate (TDD verde) |
 | `d5d5f34` | feat(a1): T1 helper canónico _release_account (TDD verde) + plan A1 |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `b8913e7` | docs(session): cierre SP-1+SP-2 unificacion deployado y mergeado, siguiente SP-3 (vista) |
 | `7ce3f9b` | feat(matchmaker): SP-2 reusa session_jwt por cuenta en multi_stream + fix docstring wrapper |
 | `7795983` | feat(matchmaker): SP-2 helpers _mm_session_get/_update — reuso de sesion por cuenta (TDD) |
-| `26d9f62` | docs(SP-1): MAP + gen_map + ENDPOINTS/ARCHITECTURE/AUDIT/ERRORS reflejan /execute eliminado y 7 modulos archivados |
 <!-- GEN:end:recientes -->
 
 ---

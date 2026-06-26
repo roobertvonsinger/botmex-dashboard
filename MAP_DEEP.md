@@ -146,26 +146,26 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_bin_3ds_stats` | def | L179–L201 |
 | `bin_check` | def | L205–L210 |
 | `bin_stats_overview` | def | L214–L259 |
-| `_auto_lock_for_deposit` | def | L262–L311 |
-| `_window_status` | def | L314–L356 |
-| `_check_caps` | def | L359–L372 |
-| `_load_deps` | def | L375–L386 |
-| `_parse_pipe` | def | L389–L410 |
-| `_check_card_velocity` | def | L430–L477 |
-| `_record_attempt` | def | L480–L590 |
-| `_safe_phase` | def | L600–L607 |
-| `_build_admin_proxy_url` | def | L610–L614 |
-| `_refresh_account_after_deposit` | def | L617–L664 |
-| `_run_deposit_with_phases` | def | L667–L1144 |
-| `deposit_execute_stream` | def | L1148–L1356 |
-| `cap_status` | def | L1360–L1372 |
-| `_mm_session_get` | def | L1403–L1407 |
-| `_mm_session_update` | def | L1410–L1419 |
-| `multi_stream` | def | L1423–L1801 |
-| `multi_cancel` | def | L1805–L1810 |
-| `scheduled_create` | def | L1823–L2115 |
-| `scheduled_list` | def | L2119–L2141 |
-| `scheduled_cancel` | def | L2145–L2153 |
+| `_auto_lock_for_deposit` | def | L262–L313 |
+| `_window_status` | def | L316–L358 |
+| `_check_caps` | def | L361–L374 |
+| `_load_deps` | def | L377–L388 |
+| `_parse_pipe` | def | L391–L412 |
+| `_check_card_velocity` | def | L432–L479 |
+| `_record_attempt` | def | L482–L592 |
+| `_safe_phase` | def | L602–L609 |
+| `_build_admin_proxy_url` | def | L612–L616 |
+| `_refresh_account_after_deposit` | def | L619–L666 |
+| `_run_deposit_with_phases` | def | L669–L1146 |
+| `deposit_execute_stream` | def | L1150–L1358 |
+| `cap_status` | def | L1362–L1374 |
+| `_mm_session_get` | def | L1405–L1409 |
+| `_mm_session_update` | def | L1412–L1421 |
+| `multi_stream` | def | L1425–L1803 |
+| `multi_cancel` | def | L1807–L1812 |
+| `scheduled_create` | def | L1825–L2117 |
+| `scheduled_list` | def | L2121–L2143 |
+| `scheduled_cancel` | def | L2147–L2155 |
 
 ### `login_orchestrator.py`
 
@@ -284,6 +284,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_lock_sa_override_y_perpetuo` | def | L216–L230 |
 | `test_lock_operador_409_si_ocupada_y_temporal_si_libre` | def | L233–L249 |
 | `test_publish_hide_no_oculta_cuentas_en_uso` | def | L252–L268 |
+| `test_auto_lock_deposit_sa_perpetuo_operador_temporal` | def | L271–L287 |
 
 ### `test_a21_visibilidad.py`
 

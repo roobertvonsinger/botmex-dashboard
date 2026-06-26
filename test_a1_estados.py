@@ -266,3 +266,22 @@ def test_publish_hide_no_oculta_cuentas_en_uso(a1):
     rows = {x["id"]: x["published_to_pool"] for x in con().execute("SELECT id,published_to_pool FROM accounts").fetchall()}
     assert rows[enuso] == 1     # lockeada NO se oculta
     assert rows[libre] == 0     # libre sí
+
+
+def test_auto_lock_deposit_sa_perpetuo_operador_temporal(a1):
+    """T7: _auto_lock_for_deposit — SA deposita → locked_until NULL (RESERVADA_SA); operador → temporal."""
+    import importlib, deposits
+    importlib.reload(deposits)
+    app_mod, con, _ = a1
+    c0 = con()
+    sa_acc = _ins(c0, "depsa@test.com")
+    op_acc = _ins(c0, "depop@test.com")
+    c0.commit(); c0.close()
+
+    deposits._auto_lock_for_deposit(sa_acc, 1341812706,
+                                    {"role": "superadmin", "telegram_id": 1341812706})
+    deposits._auto_lock_for_deposit(op_acc, 999, {"role": "user", "telegram_id": 999})
+
+    rows = {x["id"]: x for x in con().execute("SELECT id,locked_by,locked_until FROM accounts").fetchall()}
+    assert rows[sa_acc]["locked_until"] is None         # SA perpetuo
+    assert rows[op_acc]["locked_until"] is not None     # operador temporal
