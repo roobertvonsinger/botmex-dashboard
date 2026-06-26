@@ -1353,6 +1353,29 @@ async def _health_loop():
         await asyncio.sleep(6 * 3600)
 
 
+def _release_account(c, account_id, email, reason, prev_locked_by,
+                     kind="unlock_auto", who="janitor"):
+    """Liberador canónico ÚNICO (A1). Atómico y uniforme: limpia lock + notif_*,
+    SIEMPRE republica al pool (published_to_pool=1) y emite 1 solo broadcast.
+    Reemplaza las 3 variantes inconsistentes (janitor / window_watcher / release_watchdog)
+    que liberaban la misma cuenta desde 3 orígenes de tiempo distintos.
+    `c` = conexión abierta en modo write (el caller maneja el `with db(write=True)`).
+    NO toca cuentas con locked_until NULL salvo que el caller lo decida: el guard
+    `locked_until IS NOT NULL` vive en quien selecciona (janitor), no aquí."""
+    c.execute(
+        "UPDATE accounts SET locked_by=NULL, locked_at=NULL, locked_until=NULL, "
+        "notif_pre24h_sent_at=NULL, notif_at24h_sent_at=NULL, notif_at24h10_sent_at=NULL, "
+        "published_to_pool=1 WHERE id=?",
+        (account_id,),
+    )
+    _broadcast({
+        "type": "activity", "kind": kind,
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "who": who, "target": email, "id": account_id,
+        "prev_locked_by": prev_locked_by, "reason": reason,
+    })
+
+
 def _run_lock_janitor() -> int:
     """Auto-unlock (spec chat2):
       - Lock vencido (locked_until < now) Y sin depósito aprobado en últimas 24h → liberar
