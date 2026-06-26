@@ -110,3 +110,97 @@ def test_backfill_legacy_no_toca_reservada_sa(a1):
     app_mod._migrate()
     again = con().execute("SELECT locked_until FROM accounts WHERE id=?", (legacy,)).fetchone()
     assert again["locked_until"] == "2026-06-21 00:00:00"
+
+
+def test_janitor_unico_liberador_republica_y_respeta_sa(a1):
+    """T6: janitor libera vía _release_account (republica+limpia notif) y NO toca RESERVADA_SA."""
+    app_mod, con, broadcasts = a1
+    c0 = con()
+    venc = _ins(c0, "vencida@test.com", locked_by="555",
+                locked_at="2020-01-01 00:00:00", locked_until="2020-01-01 02:00:00",
+                published_to_pool=0, notif_at24h_sent_at="2020-01-01 00:00:00")
+    sa = _ins(c0, "reservada@test.com", locked_by=SA, locked_until=None)
+    c0.commit(); c0.close()
+
+    freed = app_mod._run_lock_janitor()
+
+    rows = {x["id"]: x for x in con().execute("SELECT * FROM accounts").fetchall()}
+    assert freed == 1
+    assert rows[venc]["locked_by"] is None
+    assert rows[venc]["published_to_pool"] == 1          # republica (antes NO lo hacía)
+    assert rows[venc]["notif_at24h_sent_at"] is None     # limpia notif (antes NO)
+    assert rows[sa]["locked_by"] == SA                    # RESERVADA_SA intocable
+    assert any(b.get("kind") == "unlock_auto" for b in broadcasts)
+
+
+def test_window_watcher_notifica_normal_pero_no_a_sa_ni_libera(a1):
+    """T3: guard RESERVADA_SA (no notif). T6: ya no libera (fase 3 muerta eliminada)."""
+    from datetime import datetime, timezone, timedelta
+    app_mod, con, broadcasts = a1
+    # depósito hace ~24h05m -> mins_left ≈ -5 -> fase 2 (expired) para cuenta normal
+    ts = (datetime.now(timezone.utc) - timedelta(hours=24, minutes=5)).strftime("%Y-%m-%d %H:%M:%S")
+    c0 = con()
+    normal = _ins(c0, "wnormal@test.com", locked_by="555",
+                  locked_at="2026-06-20 00:00:00", locked_until="2026-06-27 00:00:00")
+    sa = _ins(c0, "wsa@test.com", locked_by=SA, locked_until=None)  # RESERVADA_SA
+    for em in ("wnormal@test.com", "wsa@test.com"):
+        c0.execute("INSERT INTO deposit_attempts (account_email,amount,status,operator_id,created_at) "
+                   "VALUES (?,?,?,?,?)", (em, 50, "approved", 555, ts))
+    c0.commit(); c0.close()
+
+    out = app_mod._run_window_watcher()
+
+    # cuenta normal: notificada (fase 2 expired); RESERVADA_SA: ninguna notif
+    assert any(b.get("email") == "wnormal@test.com" for b in broadcasts)
+    assert not any(b.get("email") == "wsa@test.com" for b in broadcasts)
+    # T6: window_watcher ya no libera a nadie (sin fase 3)
+    assert out["released"] == 0
+    rows = {x["id"]: x for x in con().execute("SELECT * FROM accounts").fetchall()}
+    assert rows[normal]["locked_by"] == "555"
+    assert rows[sa]["locked_by"] == SA
+
+
+def test_release_watchdog_no_autorelease_y_guard_sa(a1):
+    """T6: release_watchdog pierde el auto-release 27h. T3: no notifica a RESERVADA_SA."""
+    app_mod, con, broadcasts = a1
+    c0 = con()
+    enuso = _ins(c0, "enuso@test.com", locked_by="555",
+                 locked_at="2026-06-20 00:00:00", locked_until="2026-12-31 00:00:00",
+                 last_deposit_date="01/01/2026 00:00")          # hace >27h -> antes auto-release
+    sa = _ins(c0, "reservada@test.com", locked_by=SA, locked_until=None,
+              last_deposit_date="01/01/2026 00:00")
+    c0.commit(); c0.close()
+
+    app_mod._release_watchdog_tick()
+
+    rows = {x["id"]: x for x in con().execute("SELECT * FROM accounts").fetchall()}
+    assert rows[enuso]["locked_by"] == "555"                    # NO auto-liberada
+    assert not any(b.get("kind") == "unlock_auto" for b in broadcasts)
+    # RESERVADA_SA: ninguna notif (guard locked_until IS NOT NULL)
+    assert not any(b.get("account_id") == sa for b in broadcasts)
+
+
+def test_unlock_manual_republica_via_helper(a1):
+    """T6: unlock manual pasa por _release_account → republica + limpia notif (antes NO republicaba)."""
+    from fastapi.testclient import TestClient
+    app_mod, con, broadcasts = a1
+    c0 = con()
+    aid = _ins(c0, "manual@test.com", locked_by="555",
+               locked_at="2026-06-26 00:00:00", locked_until="2026-06-26 02:00:00",
+               published_to_pool=0, notif_at24h_sent_at="2026-06-26 01:00:00")
+    c0.commit(); c0.close()
+
+    app_mod.app.dependency_overrides[app_mod.require_session] = lambda: {
+        "role": "superadmin", "telegram_id": 1341812706, "username": "robertvs"}
+    try:
+        cli = TestClient(app_mod.app)
+        rsp = cli.post(f"/api/accounts/{aid}/unlock")
+        assert rsp.status_code == 200
+    finally:
+        app_mod.app.dependency_overrides.clear()
+
+    r = con().execute("SELECT * FROM accounts WHERE id=?", (aid,)).fetchone()
+    assert r["locked_by"] is None
+    assert r["published_to_pool"] == 1                 # republica (antes NO)
+    assert r["notif_at24h_sent_at"] is None
+    assert any(b.get("kind") == "unlock" for b in broadcasts)

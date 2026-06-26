@@ -1431,20 +1431,10 @@ def _run_lock_janitor() -> int:
                         (new_until, r["id"])
                     )
                 else:
-                    # Vomitada — liberar y broadcast
-                    prev = r["locked_by"]
-                    c.execute(
-                        "UPDATE accounts SET locked_by=NULL, locked_at=NULL, locked_until=NULL "
-                        "WHERE id=?",
-                        (r["id"],)
-                    )
+                    # A1: liberador canónico ÚNICO. Republica + limpia notif_* + 1 broadcast.
+                    _release_account(c, r["id"], r["email"],
+                                     "lock vencido sin trabajo 24h", r["locked_by"])
                     freed += 1
-                    _broadcast({
-                        "type": "activity", "kind": "unlock_auto",
-                        "ts": datetime.now(timezone.utc).isoformat(),
-                        "who": "janitor", "target": r["email"],
-                        "id": r["id"], "prev_locked_by": prev,
-                    })
     except Exception as e:
         print(f"[janitor] error: {e}")
     return freed
@@ -1463,10 +1453,10 @@ async def _janitor_loop():
         await asyncio.sleep(5 * 60)
 
 
-# ── Watcher de ventanas de depósito 24h ──────────────────────────────────
+# ── Watcher de ventanas de depósito 24h (A1: notificador puro) ────────────
 # Emite notif al operador cuando su window 24h está por cerrar (~30 min antes)
-# Emite notif "ya cerró, vuelve" cuando expira
-# Auto-libera la cuenta a las 25h post primer-depósito si nadie hizo nada
+# Emite notif "ya cerró, vuelve" cuando expira.
+# NO libera (A1): el único liberador automático es el janitor (_release_account).
 _window_notified: dict = {}  # email → set de fases ya notificadas
 
 def _run_window_watcher() -> dict:
@@ -1487,6 +1477,17 @@ def _run_window_watcher() -> dict:
         now = datetime.now(timezone.utc)
         for r in rows:
             email = r["account_email"]
+            # A1: no notificar sobre RESERVADA_SA (lock perpetuo del SA: locked_until NULL)
+            try:
+                with db() as c2:
+                    lk = c2.execute(
+                        "SELECT locked_by, locked_until FROM accounts WHERE email=?",
+                        (email,),
+                    ).fetchone()
+                if lk and lk["locked_by"] is not None and lk["locked_until"] is None:
+                    continue
+            except Exception:
+                pass
             try:
                 first_at = datetime.fromisoformat(r["first_at"].replace(" ", "T"))
                 if first_at.tzinfo is None:
@@ -1521,21 +1522,8 @@ def _run_window_watcher() -> dict:
                 })
                 out["expired"] += 1
 
-            # Fase 3: pasaron 25h sin acción → auto-libera (publish=1, unlock)
-            if mins_left <= -60 and "released" not in phases:
-                phases.add("released")
-                with db(write=True) as c:
-                    c.execute(
-                        "UPDATE accounts SET locked_by=NULL, locked_at=NULL, locked_until=NULL, "
-                        "published_to_pool=1 WHERE email=?",
-                        (email,),
-                    )
-                _broadcast({
-                    "type": "window_released",
-                    "email": email, "operator_id": operator_id,
-                    "msg": f"Cuenta {email} liberada al pool tras 25h sin actividad",
-                })
-                out["released"] += 1
+            # A1: fase 3 (auto-release a 25h) ELIMINADA. El janitor es el único
+            # liberador (vía _release_account). window_watcher = notificador puro.
 
         # Limpia tracking de cuentas viejas (> 26h sin actividad)
         for email in list(_window_notified.keys()):
@@ -1559,13 +1547,14 @@ async def _window_watcher_loop():
 
 
 def _release_watchdog_tick():
-    """Watchdog post-depósito: notif progresivas y auto-release a las 27h.
+    """Watchdog post-depósito: SOLO notifs progresivas (A1: ya no auto-libera).
 
     Timeline desde `last_deposit_date`:
     - T+23h55m → notif "disponible en 5 min" (info)
     - T+24h    → notif "ya puedes volver a depositar" (warn) + acciones [deposit, release]
     - T+24h10m → notif "segundo aviso" (warn) + acciones [deposit, release]
-    - T+27h    → auto-release silencioso
+    (El auto-release a 27h se ELIMINÓ en A1: el janitor es el único liberador,
+     con origen de tiempo = locked_until. Guard locked_until IS NOT NULL = no toca RESERVADA_SA.)
 
     Las notifs son por-usuario (target_user = locked_by). El frontend filtra para
     mostrar solo al operador dueño del lock. SA siempre las ve.
@@ -1582,6 +1571,7 @@ def _release_watchdog_tick():
                 "notif_pre24h_sent_at, notif_at24h_sent_at, notif_at24h10_sent_at "
                 "FROM accounts "
                 "WHERE locked_by IS NOT NULL "
+                "AND locked_until IS NOT NULL "          # A1: no notificar a RESERVADA_SA (SA perpetuo)
                 "AND last_deposit_date IS NOT NULL "
                 "AND last_deposit_date != 'N/A' "
                 "AND TRIM(last_deposit_date) != ''"
@@ -1607,27 +1597,8 @@ def _release_watchdog_tick():
         owner = r["locked_by"]
         now_iso = now.isoformat()
 
-        # Caso 1: ≥27h → auto-release
-        if hours >= 27:
-            with db(write=True) as c:
-                c.execute(
-                    "UPDATE accounts SET locked_by=NULL, locked_at=NULL, locked_until=NULL, "
-                    "notif_pre24h_sent_at=NULL, notif_at24h_sent_at=NULL, notif_at24h10_sent_at=NULL "
-                    "WHERE id=?",
-                    (acc_id,),
-                )
-            _broadcast({
-                "type": "activity", "kind": "unlock_auto",
-                "ts": now_iso, "target": email, "id": acc_id,
-                "reason": "27h post-deposit, sin acción del operador",
-            })
-            _broadcast({
-                "type": "notification", "kind": "release_auto",
-                "severity": "info", "icon": "🕒",
-                "msg": f"{email} liberada automáticamente (27h sin actividad)",
-                "target_user": owner, "account_id": acc_id,
-            })
-            continue
+        # A1: caso 1 (auto-release a 27h) ELIMINADO. El janitor es el único liberador
+        # (origen de tiempo = locked_until, vía _release_account). Aquí solo notifs.
 
         # Caso 2: 24h+10m → segundo aviso con acciones
         if hours >= 24.166 and not r["notif_at24h10_sent_at"]:
@@ -1810,18 +1781,9 @@ def unlock_account(account_id: int, user: dict = Depends(require_session)):
             owner = str(prev_locked_by or "").lower()
             if not prev_locked_by or (owner != tg and owner != uname):
                 raise HTTPException(403, "Solo puedes desbloquear cuentas que tú bloqueaste")
-        c.execute(
-            "UPDATE accounts SET locked_by=NULL, locked_at=NULL, locked_until=NULL, "
-            "notif_pre24h_sent_at=NULL, notif_at24h_sent_at=NULL, notif_at24h10_sent_at=NULL "
-            "WHERE id=?",
-            (account_id,),
-        )
-    _broadcast({
-        "type": "activity", "kind": "unlock",
-        "ts": datetime.now(timezone.utc).isoformat(),
-        "who": user.get("username"), "target": row["email"],
-        "id": account_id, "prev_locked_by": prev_locked_by,
-    })
+        # A1: liberar SIEMPRE vía el liberador canónico (republica + limpia notif + broadcast).
+        _release_account(c, account_id, row["email"], "unlock manual", prev_locked_by,
+                         kind="unlock", who=user.get("username"))
     return {"id": account_id, "locked_by": None, "locked_until": None}
 
 
