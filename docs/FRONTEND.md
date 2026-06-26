@@ -21,6 +21,14 @@
 +------------------------------------------------------------+
 ```
 
+## Branding / logo
+
+- **Logo del dashboard** (sidebar `.sb-brand` + favicon): `static/assets/botmexico_logo.png`.
+  - Desde 2026-06-26: osito-mascota "Depp-oso" con jersey de la selección + "botmexico.com.mx" tricolor, fondo transparente real (476×218). Reemplazó el emblema hacker previo (respaldo en `static/assets/botmexico_logo_hacker_prev.png`).
+  - Fuente/recortes en `docs/mockups/assets-depos/` (`logo_principal.png` = recortado sin marca de agua Gemini; `logo_principal_v2_transparent.png` = ancho original con alfa).
+  - Tamaño en sidebar: `.sb-brand img { width: 190px }` (`static/style.css`). El glow verde lo da un `drop-shadow` CSS.
+  - **Distinto** del avatar del panel de depósitos (`depos_avatar.png` / osito busto del modal) — ese es branding "Depos", no el logo global.
+
 ## Secciones (vías `showSection(name)` — app.js:926)
 
 | Sección | Container HTML | Render | Endpoint inicial |

@@ -180,6 +180,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `ba5f8c6` | docs(SP-3): mockup v8 panel Depos (escenas+branding osito+greetings) + spec paraguas + revision flujo + NORTE + NEXT-SESSION |
 | `662a0cc` | feat(a2.1): acotar info por rol — _visible_emails + cards/all/pass-map/combos/deposits (TDD 22 verde, sin deploy) |
 | `29d4938` | docs(SP-3): mockup v7 aprobado (modal unificado) + diseño optimizacion estado-cuentas |
 | `b8913e7` | docs(session): cierre SP-1+SP-2 unificacion deployado y mergeado, siguiente SP-3 (vista) |
@@ -191,7 +192,6 @@ prewarm.py (router)
 | `0d51a91` | feat(login): SP-1 unificacion — borra /execute legacy (fuga proxyless), _load_deps solo make_pool |
 | `debcd3e` | docs(unificacion): spec + plan SP-1/SP-2 + aparta maintenance.html a _legacy |
 | `286bb4e` | chore(session): rituales /abrir-bmx y /cerrar-bmx + NEXT-SESSION |
-| `ee1685f` | feat(proxy): Data Impulse 50 sticky MX como pool primario — rompe monoproxy + 504 |
 <!-- GEN:end:recientes -->
 
 ---

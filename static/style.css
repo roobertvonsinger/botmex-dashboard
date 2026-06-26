@@ -106,7 +106,7 @@ body.dep-drawer-pushing { padding-right: 420px; }
 .sb-brand a { display: block; line-height: 0; outline: 0; }
 .sb-brand a:focus-visible img { filter: drop-shadow(0 0 14px var(--accent)) drop-shadow(0 0 4px var(--accent)); }
 .sb-brand img {
-  width: 152px; height: auto;
+  width: 190px; height: auto;
   filter: drop-shadow(0 0 12px var(--accent-glow));
   transition: filter 200ms ease, transform 200ms ease;
 }
