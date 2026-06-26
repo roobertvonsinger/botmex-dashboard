@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `fd9ae30` | feat(c1): suplencia controlada — openDepositModal branch a openDepos v8 bajo flag deposV8 |
 | `49955df` | feat(c1): run controls + pill — pause oculto (sin soporte backend, honesto), abort cancela, pill al cerrar con misión activa, Otro depósito=toast (B4) |
 | `966d8b8` | feat(c1): SCHEDULED (/scheduled/create + bus) y MULTI (/multi/stream) cableados |
 | `e63f450` | feat(c1): SINGLE cableado a /execute-stream — fase->escena, balance before/after, movimiento, E-RED |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `a3887ba` | feat(c1): mapPhaseToScene + phaseToPct (fase backend -> escena v8, TDD verde) |
 | `c84168b` | feat(c1): deriveMode + presetsForMode (la UI impone las reglas, TDD verde) |
 | `c11bc8e` | docs(session): cierre — próximo objetivo C1 (módulo depósitos real en static/), ositos no-bloqueante |
-| `b033647` | docs(session): A1 deployado+mergeado + logo global; siguiente A2 (capas/visibilidad) |
 <!-- GEN:end:recientes -->
 
 ---

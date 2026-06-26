@@ -276,9 +276,23 @@
     }
   }
 
+  // greetings rotativos: timer gestionado por apertura/cierre (no leak en background)
+  function startGreet() {
+    stopGreet();
+    const g = qs('#greet'); if (!g) return;
+    let gi = 0; g.textContent = GREETS[0];
+    _greetTimer = setInterval(() => {
+      g.style.opacity = 0;
+      setTimeout(() => { gi = (gi + 1) % GREETS.length; g.textContent = GREETS[gi]; g.style.opacity = 1; }, 320);
+    }, 6000);
+  }
+  function stopGreet() { if (_greetTimer) { clearInterval(_greetTimer); _greetTimer = null; } }
+
   // ── bus global (/api/events): balance fresco (account_refreshed) + scheduled (Task 8) ──
   let _bus = null;
+  let _busCloseTimer = null;
   function busOpen() {
+    if (_busCloseTimer) { clearTimeout(_busCloseTimer); _busCloseTimer = null; } // cancela cierre pendiente
     if (_bus) return;
     try {
       _bus = new EventSource('/api/events');
@@ -287,6 +301,12 @@
     } catch (_) { _bus = null; }
   }
   function busClose() { if (_bus) { try { _bus.close(); } catch (_) {} _bus = null; } }
+  // cierre diferido (deja llegar account_refreshed/eventos tardíos); cancelable por busOpen
+  // al arrancar otra misión, para no borrar el estado de la nueva.
+  function busCloseDeferred() {
+    if (_busCloseTimer) clearTimeout(_busCloseTimer);
+    _busCloseTimer = setTimeout(() => { _dx.sched = null; _dx.mm = null; busClose(); _busCloseTimer = null; }, 4000);
+  }
   function onBusEvent(ev) {
     if (!ev) return;
     // balance fresco tras depósito (single/multi) — L2: jala el real de BetMexico
@@ -349,7 +369,7 @@
     } finally {
       _dx.running = false; journeyEnd();
       if (!_dx.open) pillHide();
-      setTimeout(busClose, 4000); // deja llegar account_refreshed antes de cerrar
+      busCloseDeferred(); // deja llegar account_refreshed antes de cerrar (cancelable)
     }
   }
 
@@ -432,7 +452,7 @@
     clearSchedCountdown();
     _dx.running = false; journeyEnd();
     if (!_dx.open) pillHide();
-    setTimeout(() => { _dx.sched = null; busClose(); }, 4000);
+    busCloseDeferred();
   }
 
   // rehidratar una misión programada activa al cargar (se invoca bajo flag — Task 11)
@@ -522,7 +542,7 @@
     } finally {
       _dx.running = false; journeyEnd();
       if (!_dx.open) pillHide();
-      setTimeout(() => { _dx.mm = null; busClose(); }, 4000);
+      busCloseDeferred();
     }
   }
 
@@ -593,16 +613,7 @@
       if (!isNaN(v)) _dx.amount = v;
     });
 
-    // greetings
-    const g = qs('#greet');
-    if (g) {
-      g.textContent = GREETS[0];
-      let gi = 0;
-      _greetTimer = setInterval(() => {
-        g.style.opacity = 0;
-        setTimeout(() => { gi = (gi + 1) % GREETS.length; g.textContent = GREETS[gi]; g.style.opacity = 1; }, 320);
-      }, 6000);
-    }
+    // greetings: el timer se gestiona en startGreet/stopGreet (openDepos/closeDepos)
 
     // botón depositar — router por modo (single ya cableado; scheduled/multi en Tasks 8/9)
     const dep = qs('#dep');
@@ -623,14 +634,24 @@
   window.openDepos = async function (opts) {
     opts = opts || {};
     mount();
+    // reset COMPLETO de estado entre aperturas (evita movimientos/misiones stale)
     _dx.accounts = opts.accounts || (opts.ids || []).map((id) => ({ id, email: 'cuenta#' + id, password: '', grade: '' }));
     _dx.cards = []; _dx.reps = 1; _dx.amount = 50; _dx.running = false; _dx.cap = null;
+    _dx.sched = null; _dx.mm = null; _dx.cancelled = false;
+    _lastMov = null; _mmRows = {};
+    const movEl = qs('#mov'); if (movEl) movEl.innerHTML = '';
+    setSub('Listo'); setPct(0);
+    const jb = qs('#jbal'); if (jb) jb.style.visibility = 'hidden';
+    const jst = qs('#jstatus'); if (jst) jst.style.visibility = 'hidden';
+    const gd = qs('#guide'); if (gd) gd.classList.remove('hide');
     // mostrar de inmediato (optimista); los datos del backend se completan en background
     renderAccounts(); renderCards(); refreshMode();
     root.classList.remove('hidden');
     root.setAttribute('aria-hidden', 'false');
     _dx.open = true;
+    document.removeEventListener('keydown', onEsc); // evita listener duplicado si ya estaba abierto
     document.addEventListener('keydown', onEsc);
+    startGreet();
     // completar contra el backend sin bloquear la apertura (frictionless)
     await resolveAccounts(); renderAccounts(); refreshMode();
     await loadSavedCards();
@@ -642,6 +663,7 @@
     root.setAttribute('aria-hidden', 'true');
     _dx.open = false;
     document.removeEventListener('keydown', onEsc);
+    stopGreet(); // no rotar greetings con el modal cerrado (evita trabajo en background)
     // si hay misión activa, la dejamos correr en background y mostramos la pill
     if (_dx.running) pillShow(); else pillHide();
   };
