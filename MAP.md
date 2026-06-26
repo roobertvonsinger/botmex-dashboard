@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c11bc8e` | docs(session): cierre — próximo objetivo C1 (módulo depósitos real en static/), ositos no-bloqueante |
 | `b033647` | docs(session): A1 deployado+mergeado + logo global; siguiente A2 (capas/visibilidad) |
 | `17d1226` | docs(a1): modelo de 5 estados + consolidación watchdogs en ARCHITECTURE/AUDIT (bitácora) |
 | `0ad99ad` | test(a1): refuerzo backfill con locked_at formato real isoformat+tz (review adversarial) |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `ebf63d9` | chore(mockup): ositos reacciones limpios (scipy, sin sombreros sueltos) — reserva para cablear |
 | `0e19165` | feat(frontend): logo global del dashboard = osito Depp-oso transparente (190px) |
 | `ba5f8c6` | docs(SP-3): mockup v8 panel Depos (escenas+branding osito+greetings) + spec paraguas + revision flujo + NORTE + NEXT-SESSION |
-| `662a0cc` | feat(a2.1): acotar info por rol — _visible_emails + cards/all/pass-map/combos/deposits (TDD 22 verde, sin deploy) |
 <!-- GEN:end:recientes -->
 
 ---
