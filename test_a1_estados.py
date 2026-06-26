@@ -204,3 +204,65 @@ def test_unlock_manual_republica_via_helper(a1):
     assert r["published_to_pool"] == 1                 # republica (antes NO)
     assert r["notif_at24h_sent_at"] is None
     assert any(b.get("kind") == "unlock" for b in broadcasts)
+
+
+def _client(app_mod, role="superadmin", tg=1341812706, username="robertvs"):
+    from fastapi.testclient import TestClient
+    app_mod.app.dependency_overrides[app_mod.require_session] = lambda: {
+        "role": role, "telegram_id": tg, "username": username, "display": username}
+    return TestClient(app_mod.app)
+
+
+def test_lock_sa_override_y_perpetuo(a1):
+    """T5: SA lockea cuenta YA ocupada por operador → override + locked_until NULL (RESERVADA_SA)."""
+    app_mod, con, _ = a1
+    c0 = con(); aid = _ins(c0, "ocupada@test.com", locked_by="555",
+                           locked_at="2026-06-26 00:00:00", locked_until="2026-06-26 02:00:00")
+    c0.commit(); c0.close()
+    try:
+        rsp = _client(app_mod).post(f"/api/accounts/{aid}/lock", json={"operator": "robertvs", "hours": 2})
+    finally:
+        app_mod.app.dependency_overrides.clear()
+    assert rsp.status_code == 200
+    assert rsp.json()["locked_until"] is None          # perpetuo
+    r = con().execute("SELECT locked_by, locked_until FROM accounts WHERE id=?", (aid,)).fetchone()
+    assert r["locked_by"] == "robertvs"
+    assert r["locked_until"] is None
+
+
+def test_lock_operador_409_si_ocupada_y_temporal_si_libre(a1):
+    """T5: operador NO hace override (409 si ocupada); si libre, lock temporal (locked_until no-nulo)."""
+    app_mod, con, _ = a1
+    c0 = con()
+    ocup = _ins(c0, "ocup@test.com", locked_by="555", locked_at="2026-06-26 00:00:00",
+                locked_until="2026-06-26 02:00:00")
+    libre = _ins(c0, "libre@test.com")
+    c0.commit(); c0.close()
+    try:
+        r409 = _client(app_mod, role="user", tg=999, username="op999").post(
+            f"/api/accounts/{ocup}/lock", json={"operator": "op999", "hours": 2})
+        rok = _client(app_mod, role="user", tg=999, username="op999").post(
+            f"/api/accounts/{libre}/lock", json={"operator": "op999", "hours": 2})
+    finally:
+        app_mod.app.dependency_overrides.clear()
+    assert r409.status_code == 409
+    assert rok.status_code == 200 and rok.json()["locked_until"] is not None
+
+
+def test_publish_hide_no_oculta_cuentas_en_uso(a1):
+    """T4: publish/hide NO oculta (published=0) cuentas lockeadas → evita fantasma."""
+    app_mod, con, _ = a1
+    c0 = con()
+    enuso = _ins(c0, "enuso@test.com", locked_by="555", locked_at="2026-06-26 00:00:00",
+                 locked_until="2026-06-26 02:00:00", published_to_pool=1)
+    libre = _ins(c0, "libre@test.com", published_to_pool=1)
+    c0.commit(); c0.close()
+    try:
+        cli = _client(app_mod)
+        cli.post("/api/accounts/publish", json={"ids": [enuso, libre], "publish": False})
+        cli.post("/api/accounts/hide-all")
+    finally:
+        app_mod.app.dependency_overrides.clear()
+    rows = {x["id"]: x["published_to_pool"] for x in con().execute("SELECT id,published_to_pool FROM accounts").fetchall()}
+    assert rows[enuso] == 1     # lockeada NO se oculta
+    assert rows[libre] == 0     # libre sí

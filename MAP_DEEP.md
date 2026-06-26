@@ -76,29 +76,29 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_release_watchdog_loop` | def | L1651–L1659 |
 | `_start_bg_tasks` | def | L1663–L1667 |
 | `LockRequest` | class | L1670–L1672 |
-| `lock_account` | def | L1676–L1704 |
-| `PublishRequest` | class | L1707–L1709 |
-| `publish_accounts` | def | L1713–L1728 |
-| `hide_all_accounts` | def | L1732–L1743 |
-| `pool_accounts` | def | L1747–L1765 |
-| `unlock_account` | def | L1769–L1787 |
-| `_sse_generator` | def | L1790–L1817 |
-| `events` | def | L1821–L1826 |
-| `account_cards_pipe` | def | L1830–L1855 |
-| `account_notes_summary` | def | L1859–L1884 |
-| `account_details` | def | L1888–L2099 |
-| `NoteCreate` | class | L2102–L2103 |
-| `create_note` | def | L2107–L2136 |
-| `CurpUpdate` | class | L2139–L2140 |
-| `update_curp` | def | L2144–L2155 |
-| `delete_note` | def | L2159–L2171 |
-| `CombosRequest` | class | L2174–L2175 |
-| `accounts_combos` | def | L2179–L2192 |
-| `accounts_pass_map` | def | L2196–L2201 |
-| `list_all_cards` | def | L2205–L2280 |
-| `activity_feed` | def | L2284–L2401 |
-| `list_deposits` | def | L2405–L2434 |
-| `deposits_stats` | def | L2438–L2463 |
+| `lock_account` | def | L1676–L1715 |
+| `PublishRequest` | class | L1718–L1720 |
+| `publish_accounts` | def | L1724–L1747 |
+| `hide_all_accounts` | def | L1751–L1763 |
+| `pool_accounts` | def | L1767–L1785 |
+| `unlock_account` | def | L1789–L1807 |
+| `_sse_generator` | def | L1810–L1837 |
+| `events` | def | L1841–L1846 |
+| `account_cards_pipe` | def | L1850–L1875 |
+| `account_notes_summary` | def | L1879–L1904 |
+| `account_details` | def | L1908–L2119 |
+| `NoteCreate` | class | L2122–L2123 |
+| `create_note` | def | L2127–L2156 |
+| `CurpUpdate` | class | L2159–L2160 |
+| `update_curp` | def | L2164–L2175 |
+| `delete_note` | def | L2179–L2191 |
+| `CombosRequest` | class | L2194–L2195 |
+| `accounts_combos` | def | L2199–L2212 |
+| `accounts_pass_map` | def | L2216–L2221 |
+| `list_all_cards` | def | L2225–L2300 |
+| `activity_feed` | def | L2304–L2421 |
+| `list_deposits` | def | L2425–L2454 |
+| `deposits_stats` | def | L2458–L2483 |
 
 ### `auth.py`
 
@@ -280,6 +280,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_window_watcher_notifica_normal_pero_no_a_sa_ni_libera` | def | L136–L160 |
 | `test_release_watchdog_no_autorelease_y_guard_sa` | def | L163–L180 |
 | `test_unlock_manual_republica_via_helper` | def | L183–L206 |
+| `_client` | def | L209–L213 |
+| `test_lock_sa_override_y_perpetuo` | def | L216–L230 |
+| `test_lock_operador_409_si_ocupada_y_temporal_si_libre` | def | L233–L249 |
+| `test_publish_hide_no_oculta_cuentas_en_uso` | def | L252–L268 |
 
 ### `test_a21_visibilidad.py`
 

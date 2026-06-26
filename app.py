@@ -1676,23 +1676,34 @@ class LockRequest(BaseModel):
 def lock_account(account_id: int, req: LockRequest, _user: dict = Depends(require_session)):
     now = datetime.now(timezone.utc)
     locked_at = now.isoformat()
-    locked_until = (now + timedelta(hours=req.hours)).isoformat()
+    is_sa = _user.get("role") == "superadmin"
+    # A1: SA → lock perpetuo (RESERVADA_SA, locked_until NULL) + override de cualquier lock,
+    # igual que _auto_lock_for_deposit. Operador → temporal (Nh) y SIN override (409 si ocupada).
+    locked_until = None if is_sa else (now + timedelta(hours=req.hours)).isoformat()
     with db(write=True) as c:
-        cur = c.execute(
-            "UPDATE accounts SET locked_by=?, locked_at=?, locked_until=?"
-            " WHERE id=? AND locked_by IS NULL",
-            (req.operator, locked_at, locked_until, account_id),
-        )
-        if cur.rowcount == 0:
-            row = c.execute(
-                "SELECT id, locked_by FROM accounts WHERE id=?", (account_id,)
-            ).fetchone()
-            if not row:
-                raise HTTPException(status_code=404, detail="Account not found")
-            raise HTTPException(
-                status_code=409,
-                detail=f"Already locked by {row['locked_by']}",
+        if is_sa:
+            cur = c.execute(
+                "UPDATE accounts SET locked_by=?, locked_at=?, locked_until=? WHERE id=?",
+                (req.operator, locked_at, locked_until, account_id),
             )
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Account not found")
+        else:
+            cur = c.execute(
+                "UPDATE accounts SET locked_by=?, locked_at=?, locked_until=?"
+                " WHERE id=? AND locked_by IS NULL",
+                (req.operator, locked_at, locked_until, account_id),
+            )
+            if cur.rowcount == 0:
+                row = c.execute(
+                    "SELECT id, locked_by FROM accounts WHERE id=?", (account_id,)
+                ).fetchone()
+                if not row:
+                    raise HTTPException(status_code=404, detail="Account not found")
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Already locked by {row['locked_by']}",
+                )
         email = c.execute(
             "SELECT email FROM accounts WHERE id=?", (account_id,)
         ).fetchone()["email"]
@@ -1718,12 +1729,20 @@ def publish_accounts(req: PublishRequest, user: dict = Depends(require_session))
     if not req.ids:
         return {"changed": 0}
     placeholders = ",".join("?" * len(req.ids))
-    val = 1 if req.publish else 0
     with db(write=True) as c:
-        cur = c.execute(
-            f"UPDATE accounts SET published_to_pool=? WHERE id IN ({placeholders})",
-            [val, *req.ids],
-        )
+        if req.publish:
+            cur = c.execute(
+                f"UPDATE accounts SET published_to_pool=1 WHERE id IN ({placeholders})",
+                [*req.ids],
+            )
+        else:
+            # A1 guardrail: NO ocultar cuentas EN_USO (locked_by NOT NULL) — quedarían fantasma
+            # (published=0 + lock) e invisibles para todos al liberarse.
+            cur = c.execute(
+                f"UPDATE accounts SET published_to_pool=0 "
+                f"WHERE id IN ({placeholders}) AND locked_by IS NULL",
+                [*req.ids],
+            )
         changed = cur.rowcount
     return {"changed": changed, "publish": req.publish}
 
@@ -1737,7 +1756,8 @@ def hide_all_accounts(user: dict = Depends(require_session)):
     with db(write=True) as c:
         cur = c.execute(
             "UPDATE accounts SET published_to_pool=0 "
-            "WHERE status='LIVE' AND COALESCE(published_to_pool,1)=1"
+            "WHERE status='LIVE' AND COALESCE(published_to_pool,1)=1 "
+            "AND locked_by IS NULL"   # A1 guardrail: no ocultar cuentas EN_USO/RESERVADA_SA
         )
         changed = cur.rowcount
     return {"hidden": changed}
