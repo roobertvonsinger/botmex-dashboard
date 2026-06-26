@@ -1,6 +1,14 @@
 /* depos.css — estilos del modal v8 (C1). Generado de modal-deposito-unificado-v8.html,
    scoped bajo #depos para no colisionar con style.css. Keyframes globales (nombres únicos lg-/fm-/pr-/rt-/dn-). */
 
+/* Overlay del modal (reemplaza el body{} de la demo del mockup). */
+.depos-root{position:fixed; inset:0; z-index:200; display:grid; place-items:center;
+  background:rgba(4,6,10,.62); backdrop-filter:blur(4px); padding:30px 18px; overflow:auto;
+  animation:depos-fade .2s ease}
+.depos-root.hidden{display:none}
+@keyframes depos-fade{from{opacity:0}to{opacity:1}}
+#depos{width:min(540px,100%)}
+
 #depos{
   --void:#06070a; --void-2:#0a0c11; --panel:rgba(20,24,32,.55); --panel-2:rgba(28,33,44,.5);
   --line:rgba(255,255,255,.06); --line-2:rgba(255,255,255,.10);

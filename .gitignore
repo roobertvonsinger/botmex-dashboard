@@ -35,3 +35,8 @@ Thumbs.db
 
 # Visual companion (brainstorm mockups)
 .superpowers/
+
+# Dev / preview temporales (C1)
+.playwright-mcp/
+.claude/launch.json
+static/_depos_preview.html

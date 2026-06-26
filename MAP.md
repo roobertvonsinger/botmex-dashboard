@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b2a8155` | feat(c1): depos.css — estilos v8 scoped bajo #depos (transformación determinista, 341 llaves balanceadas, 39 keyframes) |
 | `dee5d74` | feat(c1): validatePipe (semántica null|error de app.js) + parseCombo + fmtMoney (TDD 22 verde) |
 | `a3887ba` | feat(c1): mapPhaseToScene + phaseToPct (fase backend -> escena v8, TDD verde) |
 | `c84168b` | feat(c1): deriveMode + presetsForMode (la UI impone las reglas, TDD verde) |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `c04f37a` | feat(a1): T4 guardrail publish/hide vs EN_USO + T5 lock manual override SA (TDD verde) |
 | `f43eb5c` | feat(a1): T3+T6 consolidación watchdogs — janitor único liberador (TDD verde) |
 | `242d1dc` | feat(a1): T2 backfill legacy locked_until en _migrate (TDD verde) |
-| `d5d5f34` | feat(a1): T1 helper canónico _release_account (TDD verde) + plan A1 |
 <!-- GEN:end:recientes -->
 
 ---
