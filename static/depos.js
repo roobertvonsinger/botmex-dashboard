@@ -194,6 +194,170 @@
     } catch (e) { /* degradar */ }
   }
 
+  // ── journey: escenas, %, sub, movimientos ──
+  function setScene(k) {
+    const st = qs('#scene-stage'); if (!st) return;
+    st.querySelectorAll('.scene.on').forEach((e) => e.classList.remove('on'));
+    const n = el.querySelector('#scene-' + k);
+    if (n) { void n.offsetWidth; n.classList.add('on'); }
+  }
+  function setPct(v) { const p = qs('#pct'); if (p) p.textContent = Math.round(v) + '%'; }
+  function setSub(t, good) { const s = qs('#sub'); if (s) { s.className = 'j-sub' + (good ? ' good' : ''); s.textContent = t; } }
+
+  // labels humanos de fase — NUNCA result_codes crudos al operador (L3)
+  const PHASE_LABEL = {
+    login_start: 'Iniciando sesión', login_done: 'Sesión lista', login_reused: 'Sesión lista',
+    gateway_begin: 'Preparando', gateway_begin_done: 'Orden creada',
+    gateway_submit: 'Pagando', gateway_submit_done: 'Enviado',
+    gateway_check: 'Confirmando', gateway_check_done: 'Confirmado',
+    implicit_3ds_detected: 'Verificación 3DS', done: 'Resultado',
+  };
+  function phaseLabel(name) {
+    if (typeof name === 'string' && name.endsWith('_retry')) return 'Reintentando';
+    return PHASE_LABEL[name] || 'Procesando';
+  }
+  // clasificación real-vs-nuestro + humanización viven en DeposLogic (puras, testeadas)
+  const isRealRejection = D.isRealRejection;
+  const humanError = D.humanError;
+
+  let _lastMov = null;
+  function movRow(who, amt, state) {
+    const mov = qs('#mov'); if (!mov) return;
+    const r = document.createElement('div');
+    r.className = 'mov-row';
+    r.innerHTML = '<span class="mov-dot ' + state + '"></span>' +
+      '<span class="mov-who" data-copy="' + who + '">' + who + '</span>' +
+      '<span class="mov-amt">+$' + amt + '</span>' +
+      '<span class="mov-tag ' + state + '">' + (state === 'ok' ? 'real' : 'en curso') + '</span>';
+    mov.prepend(r);
+    _lastMov = r;
+  }
+  function movSetState(state, label) {
+    if (!_lastMov) return;
+    const dot = _lastMov.querySelector('.mov-dot'); if (dot) dot.className = 'mov-dot ' + state;
+    const tag = _lastMov.querySelector('.mov-tag'); if (tag) { tag.className = 'mov-tag ' + state; tag.textContent = label || (state === 'ok' ? 'real' : 'en curso'); }
+  }
+  function movRemoveLast() { if (_lastMov) { _lastMov.remove(); _lastMov = null; } }
+
+  function journeyStart() {
+    const g = qs('#guide'); if (g) g.classList.add('hide');
+    const jb = qs('#jbal'); if (jb) jb.style.visibility = 'visible';
+    const js = qs('#jstatus'); if (js) js.style.visibility = 'visible';
+    const dep = qs('#dep'); if (dep) dep.style.display = 'none';
+    const rr = qs('#runrow'); if (rr) rr.classList.add('on');
+  }
+  function journeyEnd() {
+    const dep = qs('#dep'); if (dep) dep.style.display = '';
+    const rr = qs('#runrow'); if (rr) rr.classList.remove('on');
+  }
+
+  // lee un stream SSE-NL (data: {json}\n\n) y llama onEvent por cada evento
+  async function consumeStream(resp, onEvent) {
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let idx;
+        while ((idx = buf.indexOf('\n\n')) >= 0) {
+          const chunk = buf.slice(0, idx);
+          buf = buf.slice(idx + 2);
+          const line = chunk.split('\n').find((l) => l.startsWith('data: '));
+          if (!line) continue; // heartbeat :ping u otra cosa
+          try { onEvent(JSON.parse(line.slice(6))); } catch (_) { /* malformado: ignorar */ }
+        }
+      }
+    } finally {
+      try { await reader.cancel(); } catch (_) {}
+    }
+  }
+
+  // ── bus global (/api/events): balance fresco (account_refreshed) + scheduled (Task 8) ──
+  let _bus = null;
+  function busOpen() {
+    if (_bus) return;
+    try {
+      _bus = new EventSource('/api/events');
+      _bus.onmessage = (e) => { try { onBusEvent(JSON.parse(e.data)); } catch (_) {} };
+      _bus.onerror = () => { /* sin sesión/backend: degradar en silencio */ };
+    } catch (_) { _bus = null; }
+  }
+  function busClose() { if (_bus) { try { _bus.close(); } catch (_) {} _bus = null; } }
+  function onBusEvent(ev) {
+    if (!ev) return;
+    // balance fresco tras depósito (single/multi) — L2: jala el real de BetMexico
+    if (ev.kind === 'account_refreshed' && _dx.running) {
+      const target = ev.email || ev.target;
+      if (_dx.accounts.some((a) => a.email === target) && ev.balance_total != null) {
+        const balTo = qs('#balTo'); if (balTo) balTo.textContent = D.fmtMoney(ev.balance_total);
+      }
+    }
+    if (_dx.sched && typeof _schedOnBus === 'function') _schedOnBus(ev); // Task 8
+  }
+
+  // ── SINGLE: /execute-stream ──
+  async function runSingle() {
+    const acc = _dx.accounts[0];
+    const pipe = _dx.cards[0];
+    if (!acc) { showToast('Selecciona 1 cuenta'); return; }
+    if (!pipe) { showToast('Agrega una tarjeta'); return; }
+    const err = D.validatePipe(pipe); if (err) { showToast(err); return; }
+    const amount = _dx.amount;
+
+    _dx.running = true; journeyStart(); busOpen();
+    const fromBal = Number(acc.balance || 0);
+    const balNow = qs('#balNow'), balTo = qs('#balTo');
+    if (balNow) balNow.textContent = D.fmtMoney(fromBal);
+    if (balTo) balTo.textContent = D.fmtMoney(fromBal);
+    setScene('login'); setSub('Iniciando sesión'); setPct(14);
+    movRow(acc.email, amount, 'wait');
+
+    let gotDone = false;
+    try {
+      const r = await fetch('/api/deposits/execute-stream', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account_id: acc.id, card_pipe: pipe, amount }),
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      await consumeStream(r, (ev) => {
+        if (ev.type === 'phase') {
+          setScene(D.mapPhaseToScene(ev.name));
+          const pct = D.phaseToPct(ev.name); if (pct != null) setPct(pct);
+          setSub(phaseLabel(ev.name));
+        } else if (ev.type === 'done') {
+          gotDone = true;
+          if (ev.success) {
+            setScene('done'); setPct(100); setSub('Acreditado ✓', true);
+            if (balTo) balTo.textContent = D.fmtMoney(fromBal + amount); // provisional; bus reconcilia
+            movSetState('ok');
+          } else {
+            setScene('login');
+            if (isRealRejection(ev.result_code)) { setSub(humanError(ev.result_code)); movSetState('wait', 'no aplicado'); }
+            else { setSub('No se pudo, reintenta'); movRemoveLast(); } // error nuestro: invisible
+          }
+        } else if (ev.type === 'fatal') {
+          gotDone = true; setSub('Algo falló, reintenta'); movRemoveLast();
+        }
+      });
+      if (!gotDone) { setSub('Conexión interrumpida'); movRemoveLast(); }
+    } catch (e) {
+      setSub('Algo falló, reintenta'); movRemoveLast();
+    } finally {
+      _dx.running = false; journeyEnd();
+      setTimeout(busClose, 4000); // deja llegar account_refreshed antes de cerrar
+    }
+  }
+
+  function onDeposit() {
+    if (_dx.running) return;
+    if (_dx.mode === 'single') return runSingle();
+    if (_dx.mode === 'scheduled') return showToast('Programado — Task 8');
+    if (_dx.mode === 'multi') return showToast('Multi — Task 9');
+  }
+
   // ── montaje ──
   function mount() {
     if (_mounted) return;
@@ -265,9 +429,11 @@
       }, 6000);
     }
 
-    // botón depositar — cableado real en Fase 3
+    // botón depositar — router por modo (single ya cableado; scheduled/multi en Tasks 8/9)
     const dep = qs('#dep');
-    if (dep) dep.onclick = () => showToast('Depositar — cableado en Fase 3');
+    if (dep) dep.onclick = onDeposit;
+    // controles de run (pause/abort cableados por flujo en Tasks 8-10)
+    const ab = qs('#abort'); if (ab) ab.onclick = () => { _dx.cancelled = true; showToast('Cancelando…'); };
     // "Otro depósito" — B4, stub en Task 10
     const np = qs('.newproc');
     if (np) np.onclick = () => showToast('Otro depósito (B4) — pendiente');

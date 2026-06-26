@@ -89,3 +89,21 @@ test('fmtMoney', () => {
   assert.equal(D.fmtMoney(512), '$512.00');
   assert.equal(D.fmtMoney(1234.5), '$1,234.50');
 });
+
+// ── Task 7: clasificación de resultado (real vs nuestro) + humanización (L3) ──
+test('isRealRejection: estados reales de BetMexico', () => {
+  ['BANK_REJECTED', '3DS_REQUIRED', 'INSUFFICIENT_FUNDS', 'CARD_EXPIRED', 'AUTOEXCLUSION', 'KYC_PENDING', 'LOGIN_DENIED'].forEach(c =>
+    assert.equal(D.isRealRejection(c), true, c));
+});
+test('isRealRejection: errores nuestros NO son reales', () => {
+  ['LOGIN_FAILED', 'RETRY_CAPTCHA', 'BEGIN_ERROR', 'PROXY_ERROR', '', undefined].forEach(c =>
+    assert.equal(D.isRealRejection(c), false, String(c)));
+});
+test('humanError: nunca expone el código crudo', () => {
+  assert.equal(D.humanError('BANK_REJECTED'), 'Tarjeta rechazada por el banco');
+  assert.equal(D.humanError('3DS_REQUIRED'), 'Requiere verificación 3DS');
+  assert.equal(D.humanError('LOGIN_DENIED'), 'Credenciales inválidas');
+  // error nuestro: humanizado genérico, sin tripas
+  assert.equal(D.humanError('RETRY_CAPTCHA'), 'No se pudo completar, intenta de nuevo');
+  assert.equal(D.humanError('PROXY_504'), 'No se pudo completar, intenta de nuevo');
+});

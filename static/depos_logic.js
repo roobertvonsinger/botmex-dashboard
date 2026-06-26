@@ -90,5 +90,23 @@
     return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
-  return { deriveMode, presetsForMode, mapPhaseToScene, phaseToPct, validatePipe, parseCombo, fmtMoney };
+  // ¿el resultado es un rechazo REAL de BetMexico (visible al operador, L2) o un error
+  // NUESTRO de infraestructura (invisible/humanizado, L3)?
+  function isRealRejection(code) {
+    return /BANK_REJECTED|3DS|INSUF|EXPIRED|AUTOEXCLUS|KYC|LOGIN_DENIED|PENDING_NOT_APPLIED/.test((code || '').toUpperCase());
+  }
+  // Mensaje humano para el operador — NUNCA expone el result_code crudo (L3).
+  function humanError(code) {
+    const c = (code || '').toUpperCase();
+    if (c.indexOf('BANK_REJECTED') >= 0) return 'Tarjeta rechazada por el banco';
+    if (c.indexOf('3DS') >= 0) return 'Requiere verificación 3DS';
+    if (c.indexOf('INSUF') >= 0) return 'Fondos insuficientes';
+    if (c.indexOf('EXPIRED') >= 0) return 'Tarjeta vencida';
+    if (c.indexOf('AUTOEXCLUS') >= 0) return 'Cuenta autoexcluida';
+    if (c.indexOf('KYC') >= 0) return 'Cuenta requiere KYC';
+    if (c.indexOf('LOGIN_DENIED') >= 0) return 'Credenciales inválidas';
+    return 'No se pudo completar, intenta de nuevo'; // error nuestro: humanizado, sin tripas
+  }
+
+  return { deriveMode, presetsForMode, mapPhaseToScene, phaseToPct, validatePipe, parseCombo, fmtMoney, isRealRejection, humanError };
 });
