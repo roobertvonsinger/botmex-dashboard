@@ -27,5 +27,32 @@
     };
   }
 
-  return { deriveMode, presetsForMode };
+  // Mapeo fase backend -> escena v8. Un *_retry SIEMPRE muestra la escena retry.
+  const _SCENE = {
+    login_start: 'login', login_done: 'login', login_reused: 'login',
+    gateway_begin: 'form', gateway_begin_done: 'form',
+    gateway_submit: 'processing', gateway_submit_done: 'processing',
+    gateway_check: 'processing', gateway_check_done: 'processing',
+    implicit_3ds_detected: 'processing',
+    done: 'done',
+  };
+  function mapPhaseToScene(name) {
+    if (typeof name === 'string' && name.endsWith('_retry')) return 'retry';
+    return _SCENE[name] || 'login';
+  }
+
+  const _PCT = {
+    login_start: 14, login_done: 14, login_reused: 14,
+    gateway_begin: 40, gateway_begin_done: 40,
+    gateway_submit: 70, gateway_submit_done: 70,
+    gateway_check: 82, gateway_check_done: 82, implicit_3ds_detected: 82,
+    done: 100,
+  };
+  // null = la fase no mueve el % (ej. un retry mantiene el progreso actual).
+  function phaseToPct(name) {
+    if (typeof name === 'string' && name.endsWith('_retry')) return null;
+    return name in _PCT ? _PCT[name] : null;
+  }
+
+  return { deriveMode, presetsForMode, mapPhaseToScene, phaseToPct };
 });

@@ -32,3 +32,33 @@ test('presetsForMode scheduled: como single (reps visible)', () => {
   assert.equal(p.repsVisible, true);
   assert.equal(p.manual, true);
 });
+
+// ── Task 2: mapPhaseToScene + phaseToPct ──
+test('mapPhaseToScene: login family', () => {
+  ['login_start', 'login_done', 'login_reused'].forEach(n =>
+    assert.equal(D.mapPhaseToScene(n), 'login'));
+});
+test('mapPhaseToScene: begin family -> form (pero *_retry gana)', () => {
+  assert.equal(D.mapPhaseToScene('gateway_begin'), 'form');
+  assert.equal(D.mapPhaseToScene('gateway_begin_done'), 'form');
+  assert.equal(D.mapPhaseToScene('gateway_begin_retry'), 'retry'); // un retry siempre muestra escena retry
+});
+test('mapPhaseToScene: submit/check -> processing', () => {
+  ['gateway_submit', 'gateway_submit_done', 'gateway_check', 'gateway_check_done', 'implicit_3ds_detected'].forEach(n =>
+    assert.equal(D.mapPhaseToScene(n), 'processing'));
+});
+test('mapPhaseToScene: retry transitorio -> retry', () => {
+  ['login_retry', 'gateway_check_retry'].forEach(n =>
+    assert.equal(D.mapPhaseToScene(n), 'retry'));
+});
+test('mapPhaseToScene: done', () => {
+  assert.equal(D.mapPhaseToScene('done'), 'done');
+});
+test('phaseToPct monotonic', () => {
+  assert.equal(D.phaseToPct('login_start'), 14);
+  assert.equal(D.phaseToPct('gateway_begin'), 40);
+  assert.equal(D.phaseToPct('gateway_submit'), 70);
+  assert.equal(D.phaseToPct('gateway_check'), 82);
+  assert.equal(D.phaseToPct('done'), 100);
+  assert.equal(D.phaseToPct('login_retry'), null); // retry no mueve %
+});
