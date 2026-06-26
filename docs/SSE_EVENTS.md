@@ -19,7 +19,9 @@
 | `activity` | `scheduled` | `scheduled_create.loop()` en `deposits.py` (summary por iter) | `{sched_id, iter, total, email, amount, success, code, ts, who}` | `pushActivityEvent()` |
 | `activity` | `scheduled_phase` | `scheduled_create.loop()` via `phase_cb` → `_run_deposit_with_phases` (1 por sub-fase) | `{sched_id, iter, total, name, data, email, ts, who}`. `name` ∈ {login_start, login_done, **login_reused**, gateway_begin, gateway_begin_done, gateway_submit, gateway_submit_done, gateway_check, gateway_check_done, done}. `data` igual al de execute-stream. **iter 0** emite `login_start`/`login_done` (login real); **iter 1..N** emite `login_reused` (sesión reutilizada, sin captcha). | `pushActivityEvent()` (`_schedPhaseLabel()` formatea) |
 | `activity` | `scheduled_aborted` | `scheduled_create.loop()` (al primer fail) | `{sched_id, email, code, iter, total, ts}` | `pushActivityEvent()` (chip "abortado") |
-| `activity` | `scheduled_cancelled` | Cancel manual | `{sched_id, email, ts}` | `pushActivityEvent()` |
+| `activity` | `scheduled_cancelled` | Cancel manual | `{sched_id, email, ts}` | `pushActivityEvent()` · modal v8 `_schedOnBus` |
+| `activity` | `scheduled_retry` | `scheduled_create.loop()` ante fallo TRANSITORIO (406/captcha/proxy/504) — reintenta la misma rep, NO aborta | `{sched_id, email, iter, total, attempt, max, code, reason, ts, who}` | `pushActivityEvent()` · modal v8 `_schedOnBus` (escena retry) |
+| `activity` | `account_refreshed` | `_refresh_account_after_deposit()` en `deposits.py` (single/multi, tras el intento) | `{ts, email, target, balance_real, balance_total, who}` | repinta fila/detalle · modal v8 `onBusEvent` (balance fresco before→after, L2) |
 | `activity` | `lock` | `lock_account()` en `app.py` | `{ts, who, target, until}` | `pushActivityEvent()` |
 | `activity` | `unlock` | `unlock_account()` | `{ts, who, target}` | `pushActivityEvent()` |
 | `activity` | `unlock_auto` | Window watcher (24h auto-release) | `{ts, target}` | `pushActivityEvent()` |

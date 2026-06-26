@@ -182,18 +182,18 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
-| `b033647` | docs(session): A1 deployado+mergeado + logo global; siguiente A2 (capas/visibilidad) |
-| `17d1226` | docs(a1): modelo de 5 estados + consolidación watchdogs en ARCHITECTURE/AUDIT (bitácora) |
-| `0ad99ad` | test(a1): refuerzo backfill con locked_at formato real isoformat+tz (review adversarial) |
-| `6290611` | feat(a1): T7 _auto_lock_for_deposit SA perpetuo (locked_until NULL) — A1 completo (TDD verde) |
-| `c04f37a` | feat(a1): T4 guardrail publish/hide vs EN_USO + T5 lock manual override SA (TDD verde) |
-| `f43eb5c` | feat(a1): T3+T6 consolidación watchdogs — janitor único liberador (TDD verde) |
-| `242d1dc` | feat(a1): T2 backfill legacy locked_until en _migrate (TDD verde) |
-| `d5d5f34` | feat(a1): T1 helper canónico _release_account (TDD verde) + plan A1 |
-| `ebf63d9` | chore(mockup): ositos reacciones limpios (scipy, sin sombreros sueltos) — reserva para cablear |
-| `0e19165` | feat(frontend): logo global del dashboard = osito Depp-oso transparente (190px) |
-| `ba5f8c6` | docs(SP-3): mockup v8 panel Depos (escenas+branding osito+greetings) + spec paraguas + revision flujo + NORTE + NEXT-SESSION |
-| `662a0cc` | feat(a2.1): acotar info por rol — _visible_emails + cards/all/pass-map/combos/deposits (TDD 22 verde, sin deploy) |
+| `c082657` | fix(c1): hardening post-review adversarial — 5 bugs de estado/leaks entre misiones |
+| `fd9ae30` | feat(c1): suplencia controlada — openDepositModal branch a openDepos v8 bajo flag deposV8 |
+| `49955df` | feat(c1): run controls + pill — pause oculto (sin soporte backend, honesto), abort cancela, pill al cerrar con misión activa, Otro depósito=toast (B4) |
+| `966d8b8` | feat(c1): SCHEDULED (/scheduled/create + bus) y MULTI (/multi/stream) cableados |
+| `e63f450` | feat(c1): SINGLE cableado a /execute-stream — fase->escena, balance before/after, movimiento, E-RED |
+| `ccecc82` | feat(c1): cuentas (combos email:password+grado), tarjetas (guardadas+agregar), cap 24h en nota — verificado con shapes reales |
+| `ed7bc41` | docs(c1): plan bite-sized del modal v8 (13 tasks, 4 fases) |
+| `f73f851` | feat(c1): depos.js esqueleto — modal v8 monta, open/close, modo emerge, greetings, reps 7-seg (verificado en navegador via eval) |
+| `b2a8155` | feat(c1): depos.css — estilos v8 scoped bajo #depos (transformación determinista, 341 llaves balanceadas, 39 keyframes) |
+| `dee5d74` | feat(c1): validatePipe (semántica null|error de app.js) + parseCombo + fmtMoney (TDD 22 verde) |
+| `a3887ba` | feat(c1): mapPhaseToScene + phaseToPct (fase backend -> escena v8, TDD verde) |
+| `c84168b` | feat(c1): deriveMode + presetsForMode (la UI impone las reglas, TDD verde) |
 <!-- GEN:end:recientes -->
 
 ---

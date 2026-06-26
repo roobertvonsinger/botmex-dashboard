@@ -3713,16 +3713,37 @@ async function openDepositModal(accountId, opts = {}) {
   // Determina cuentas iniciales:
   // - openDepositModal(id) → single, esa cuenta
   // - openDepositModal(null, {ids: [...]}) → multi por default si >1
+  let _ids;
   if (opts.ids && opts.ids.length > 0) {
-    _depAccountIds = [...opts.ids].slice(0, 5);
+    _ids = [...opts.ids].slice(0, 5);
   } else if (accountId) {
-    _depAccountIds = [accountId];
+    _ids = [accountId];
   } else if (selectedIds.size > 0) {
-    _depAccountIds = [...selectedIds].slice(0, 5);
+    _ids = [...selectedIds].slice(0, 5);
   } else {
     toast('Sin cuenta seleccionada', 'error');
     return;
   }
+
+  // ── C1: suplencia controlada del modal v8 bajo flag `deposV8` ──
+  // Default OFF = operación intacta (drawer viejo). SA prende localStorage.deposV8='1' para probar.
+  // Pasamos las cuentas completas (email/password/grade/balance) desde state.rows → el v8
+  // evita un fetch extra y pinta grado + balance reales.
+  if (localStorage.getItem('deposV8') === '1' && window.openDepos) {
+    const accounts = _ids.map((id) => {
+      const r = (state.rows || []).find((x) => x.id === id) || {};
+      return {
+        id,
+        email: r.email || '',
+        password: r.password || '',
+        grade: (r.grade || '').toLowerCase(),
+        balance: r.balance_total || 0,
+      };
+    });
+    return window.openDepos({ accounts });
+  }
+
+  _depAccountIds = _ids;
 
   _depAmount = 50;
   _depReps = 5;

@@ -5,21 +5,21 @@
 
 ## 🎯 Objetivo en curso
 
-**SP-3 · C1 — IMPLEMENTAR el módulo de depósitos REAL en `static/`, supliendo el actual.** Instrucción explícita de Robert (2026-06-26): *"atacar directo ya la implementación del módulo de depósitos supliendo el actual… no puedo seguir esperando tanto para operar depósitos, móntalo bien montado y bien hecho hasta donde hemos planeado. Lo de los ositos NO es bloqueante."* El contrato visual = `docs/mockups/modal-deposito-unificado-v8.html` (aprobado). Base backend ya lista: **A1 estados DEPLOYADO** + los 3 flujos (`/execute-stream`, `/multi/stream`, `/scheduled/create`) **ya operan en prod**.
+**SP-3 · C1 — modal de depósitos v8 IMPLEMENTADO en `static/` (frontend completo, SIN deploy).** Módulo nuevo autocontenido (`static/depos.js` + `depos_logic.js` + `depos.css`) que convive con el drawer viejo `#depDrawer`; **suplencia por flag `localStorage.deposV8='1'`** en `openDepositModal` (default OFF = operación intacta). 12 de 13 tasks del plan hechas; falta **deploy + validación e2e con backend real**. Plan: `docs/superpowers/plans/2026-06-26-c1-modal-depositos-plan.md`. Contrato visual: `docs/mockups/modal-deposito-unificado-v8.html`.
 
 ## ▶ Con qué arrancas (1ra acción concreta)
 
-1. **Mapear el modal de depósito ACTUAL** en `static/` (`index.html` + `app.js`: handlers del modal, `_handleExecStreamEvent`, `_mmRender`, `_schedShow`, etc.) — qué se va a suplir. Insumo clave: `docs/superpowers/specs/2026-06-25-revision-flujo-deposito-actual.md` (qué conservar + gaps vs v7/v8 + catálogo SSE real + discrepancias doc↔código). **Con ultracode ON: fan-out de readers** para mapear modal viejo + endpoints + eventos SSE que YA emite cada flujo.
-2. **Escribir el plan bite-sized de C1** (no existe; el spec NO es el plan) — qué cablea contra endpoints/SSE existentes vs qué necesita backend nuevo. Marcar lo degradable con gracia.
-3. **Implementar incrementalmente en `static/`** (index.html/app.js/style.css) cableado a los 3 flujos reales, **verificando en navegador (preview)** y SIN romper la operación actual. Suplir el modal viejo solo al llegar a paridad funcional mínima (lanzar single/multi/programado + ver progreso + resultado real + feed persistente).
+1. **🟡 DEPLOY a KVM4 con flag OFF** (no cambia nada para los operadores — el código v8 está dormido). Subir `static/depos.js`, `depos_logic.js`, `depos.css`, `index.html`, `app.js` + restart `betmexico-web`. Smoke funcional (no solo /health).
+2. **Prender `localStorage.deposV8='1'`** (consola del navegador, cuenta SA) y **validar e2e con datos reales** lo que NO se pudo verificar sin backend: (a) los 3 flujos desde el flujo real (seleccionar cuentas → Depositar); (b) **scheduled** (usa el bus `/api/events` — solo verificado por primitivas, no e2e); (c) el branch del flag (ON→v8, OFF→viejo); (d) rehidratación de misión activa. Es **juicio cualitativo de Robert** (¿se ve/siente como el v8?).
+3. **Solo al confirmar paridad** → considerar retirar el drawer viejo (no antes).
 
 ## 🧭 Recomendación de approach
 
-Cablear C1 sobre **lo que YA opera** (los 3 flujos funcionan + A1 estados deployado): single/multi/programado emergiendo de los controles (1 cuenta=single, varias=matchmaker, reps>1=goteo). Lo que el backend **aún no emite** (fases del matchmaker por `_broadcast`=B3, balance before/after FRESCO, badge A+ del analyzer=B2) → **degradar con gracia** en la UI (placeholder/estado neutro) y levantar esa pieza de backend SOLO donde bloquee la operación, no antes. No retirar el modal viejo hasta paridad. TDD donde haya lógica; verificación en navegador para lo visual.
+Lo verde está hecho y verificado (lógica con 25 tests node; single/multi e2e con mocks de shapes reales; review adversarial L1/L2/L3 CUMPLEN + 5 bugs de estado corregidos). Lo que falta es **el amarillo**: deploy (toca el stack vivo) + validación con datos reales (streams/bus del backend) + el juicio visual de Robert. Deploy con flag OFF primero (riesgo ~0, solo el restart), luego prender el flag para probar. Degradado con gracia y nombrado: balance-before (usa row), badge A+ (B2), pause vivo (oculto, B3), "Otro depósito" paralelo (B4).
 
 ## ⏳ Pendientes próximos
 
-- [ ] **C1 — módulo depósitos real en `static/`** (PRIORIDAD, objetivo del próximo turno): mapear actual → plan bite-sized → implementar v8 cableado a los 3 flujos reales, verificado en navegador, sin romper operación.
+- [x] **C1 — módulo depósitos v8 en `static/`** — IMPLEMENTADO (12/13 tasks, frontend). Falta: 🟡 deploy con flag OFF + validar e2e con backend real (scheduled/bus, flag, rehidratación) + juicio visual de Robert. Luego retirar drawer viejo al confirmar paridad.
 - [ ] **B3 matchmaker rework** (probable bloqueante de C1): re-emitir las 5 fases del par por `_broadcast` (hoy viven solo en el stream privado; el ring/lanes del v8 las necesitan) + pause/resume vivo (`asyncio.Event`). Conservar SP-2 (1 sesión/cuenta) + strikes/cooldowns.
 - [ ] **B2 analyzer A+** (badge de calidad pasarela/tarjeta que el v8 muestra) — extender V10 en `shared/betmexico_payment_analyzer.py`.
 - [ ] **B1 3DS desdoblado** — separar detección/manejo 3DS en sus 3 niveles como paso propio (conservar la detección robusta actual).

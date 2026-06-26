@@ -3,6 +3,30 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-06-26 (C1 — modal de depósitos unificado v8, frontend)
+
+### C1 — modal v8 (`static/depos.js` + `depos_logic.js` + `depos.css`)
+
+> Módulo NUEVO autocontenido, convive con el drawer viejo `#depDrawer`. Suplencia por flag `localStorage.deposV8='1'` en `openDepositModal` (app.js). Default OFF = operación intacta. NO toca backend.
+
+| Función | Esperado | Actual | Estado |
+|---|---|---|---|
+| Lógica de modo (`deriveMode`) | 1 cuenta+reps=1→single · 1+reps>1→programado · varias→multi; la UI impone las reglas | ✅ `depos_logic.deriveMode`/`presetsForMode` (7 tests node) | ✅ verificado navegador |
+| Fase backend→escena (`mapPhaseToScene`/`phaseToPct`) | 13 fases → login/form/processing/retry/done + % | ✅ `depos_logic` (6 tests); `*_retry`→escena retry | ✅ |
+| Cuentas chip combo+grado | `email:password` completo (sin máscara, L2) + hdot grado | ✅ `renderAccounts` + `/api/accounts/combos` | ✅ verificado (shapes reales) |
+| Tarjetas (guardadas + agregar) | pre-cargar `/cards-pipe` (single) + pegar pipe validado | ✅ `loadSavedCards`/`renderCards` + `validatePipe` | ✅ verificado |
+| Cap 24h | advertencia en nota de monto (v8 no tiene barra) | ✅ `refreshCap` + `/cap-status` | ✅ verificado |
+| SINGLE `/execute-stream` | fase→escena, balance before/after, movimiento, E-RED | ✅ `runSingle` + `consumeStream` | ✅ éxito verificado e2e (mock); clasificación real/nuestro (25 tests) |
+| SCHEDULED `/scheduled/create` + bus | reps, countdown 7-seg, retry, abort, rehidratación | ✅ `runScheduled`/`_schedOnBus` | ⚠️ implementado + primitivas verificadas; e2e con bus real PENDIENTE de deploy |
+| MULTI `/multi/stream` | animación del par activo + bitácora por par (v8 no tiene lanes) | ✅ `runMulti` | ✅ verificado e2e (mock): match→real, rechazo real→no aplicado, nuestro→invisible |
+| Run controls + pill | abort cancela; **pause oculto** (sin soporte backend); pill al cerrar con misión activa | ✅ `onAbort`/`pillShow` | ✅ verificado |
+| Errores humanizados (L3) | nunca result_code crudo al operador | ✅ `humanError`/`isRealRejection` (review adversarial: L1/L2/L3 CUMPLEN) | ✅ |
+| Suplencia por flag | flag OFF = drawer viejo intacto; ON = v8 | ✅ branch en `openDepositModal` | ⚠️ e2e del flag PENDIENTE de deploy/dashboard real |
+
+**Degradado con gracia (backend aún no emite):** balance-before (usa el del row), badge A+/grade live (neutro — B2), pause/resume vivo (oculto — B3), "Otro depósito" paralelo (toast — B4). Fases multi por bus (B3) innecesarias: el modal lee el stream privado del POST.
+
+---
+
 ## Captura: 2026-06-25 (SP-1: eliminación /execute + archivado 7 módulos)
 
 ### SP-1 — Unificación login/depósito
