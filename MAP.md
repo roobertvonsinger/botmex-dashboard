@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `f73f851` | feat(c1): depos.js esqueleto — modal v8 monta, open/close, modo emerge, greetings, reps 7-seg (verificado en navegador via eval) |
 | `b2a8155` | feat(c1): depos.css — estilos v8 scoped bajo #depos (transformación determinista, 341 llaves balanceadas, 39 keyframes) |
 | `dee5d74` | feat(c1): validatePipe (semántica null|error de app.js) + parseCombo + fmtMoney (TDD 22 verde) |
 | `a3887ba` | feat(c1): mapPhaseToScene + phaseToPct (fase backend -> escena v8, TDD verde) |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `6290611` | feat(a1): T7 _auto_lock_for_deposit SA perpetuo (locked_until NULL) — A1 completo (TDD verde) |
 | `c04f37a` | feat(a1): T4 guardrail publish/hide vs EN_USO + T5 lock manual override SA (TDD verde) |
 | `f43eb5c` | feat(a1): T3+T6 consolidación watchdogs — janitor único liberador (TDD verde) |
-| `242d1dc` | feat(a1): T2 backfill legacy locked_until en _migrate (TDD verde) |
 <!-- GEN:end:recientes -->
 
 ---
