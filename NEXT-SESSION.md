@@ -5,30 +5,28 @@
 
 ## 🎯 Objetivo en curso
 
-**SP-3 — Panel "Depos" (modal de depósitos unificado).** Diseño visual MUY avanzado en mockup (`docs/mockups/modal-deposito-unificado-v8.html`, corre en navegador). Falta: cerrar 3 detalles del mockup → **implementarlo en el dashboard real** (`static/`) → backend de soporte. En paralelo, **A2.1** (acotar info por rol) está **codeado y verde local, SIN deployar**.
+**SP-3 · C1 — IMPLEMENTAR el módulo de depósitos REAL en `static/`, supliendo el actual.** Instrucción explícita de Robert (2026-06-26): *"atacar directo ya la implementación del módulo de depósitos supliendo el actual… no puedo seguir esperando tanto para operar depósitos, móntalo bien montado y bien hecho hasta donde hemos planeado. Lo de los ositos NO es bloqueante."* El contrato visual = `docs/mockups/modal-deposito-unificado-v8.html` (aprobado). Base backend ya lista: **A1 estados DEPLOYADO** + los 3 flujos (`/execute-stream`, `/multi/stream`, `/scheduled/create`) **ya operan en prod**.
 
 ## ▶ Con qué arrancas (1ra acción concreta)
 
-**Cerrar los 3 pendientes del mockup v8** (todos acordados con Robert, ver abajo), en este orden:
-1. **Cablear las 6 reacciones del osito** — aparecen **deslizándose desde un ladito (slide-in)**, de sorpresa, **SOLO al terminar cada depósito** (resultado): acreditado=celebra, rechazado=triste. NO por fase. El logo del modal queda **neutral (busto) siempre**. Recortes en `docs/mockups/oso_{acreditado,aprobado,error,espera,rechazado,reintento}.png` — **afinar el centrado primero** (salieron con overlap entre ositos).
-2. **Logo principal del dashboard** — decisión de Robert pendiente: **(A)** lo armo con osito-mascota limpio + "botmexico.com.mx" en tipografía, o **(B)** él pasa el PNG con **fondo transparente real** (los Gemini traen fondo ajedrez rasterizado pegado → no se recortan limpio). Candidatos en `docs/mockups/assets-depos/`.
-3. **Tabs de misiones paralelas** (panel ensancha a la izquierda) + **timer real** (programado, 60s) vs **ETA** (otros) — el ETA ya está en 7-seg verde.
+1. **Mapear el modal de depósito ACTUAL** en `static/` (`index.html` + `app.js`: handlers del modal, `_handleExecStreamEvent`, `_mmRender`, `_schedShow`, etc.) — qué se va a suplir. Insumo clave: `docs/superpowers/specs/2026-06-25-revision-flujo-deposito-actual.md` (qué conservar + gaps vs v7/v8 + catálogo SSE real + discrepancias doc↔código). **Con ultracode ON: fan-out de readers** para mapear modal viejo + endpoints + eventos SSE que YA emite cada flujo.
+2. **Escribir el plan bite-sized de C1** (no existe; el spec NO es el plan) — qué cablea contra endpoints/SSE existentes vs qué necesita backend nuevo. Marcar lo degradable con gracia.
+3. **Implementar incrementalmente en `static/`** (index.html/app.js/style.css) cableado a los 3 flujos reales, **verificando en navegador (preview)** y SIN romper la operación actual. Suplir el modal viejo solo al llegar a paridad funcional mínima (lanzar single/multi/programado + ver progreso + resultado real + feed persistente).
 
 ## 🧭 Recomendación de approach
 
-El mockup v8 ya es el contrato visual casi-completo y aprobado iterativamente. Próximo turno: **terminar el mockup** (1-2-3 arriba) → luego **implementarlo en `static/` (index.html/app.js/style.css)** cableado a los endpoints reales. El backend pesado (A1 estados, B 3DS/analyzer/matchmaker/paralelismo) va después. **A2.1 puede deployarse en cualquier momento** con OK de Robert (es aditivo, bajo riesgo) — buen "quick win" desplegable.
+Cablear C1 sobre **lo que YA opera** (los 3 flujos funcionan + A1 estados deployado): single/multi/programado emergiendo de los controles (1 cuenta=single, varias=matchmaker, reps>1=goteo). Lo que el backend **aún no emite** (fases del matchmaker por `_broadcast`=B3, balance before/after FRESCO, badge A+ del analyzer=B2) → **degradar con gracia** en la UI (placeholder/estado neutro) y levantar esa pieza de backend SOLO donde bloquee la operación, no antes. No retirar el modal viejo hasta paridad. TDD donde haya lógica; verificación en navegador para lo visual.
 
 ## ⏳ Pendientes próximos
 
-- [ ] **Cablear reacciones osito** (slide-in lateral, solo en resultado). Afinar recortes (overlap).
-- [ ] **Robert decide:** logo principal **(A)** osito+tipografía o **(B)** me pasa PNG transparente real.
-- [ ] Tabs misiones paralelas + timer(programado)/ETA(otros).
-- [ ] **Implementar el v8 en el dashboard real** (`static/`) — hasta ahora es mockup.
-- [ ] **A2.1 deploy:** con OK de Robert. Código en `app.py` (`_visible_emails` + 4 endpoints acotados) + `test_a21_visibilidad.py` (22 verde). Plan: `docs/superpowers/plans/2026-06-26-a2.1-acotar-info-por-rol.md`. Confirmar **regla de universo** (operador ve credenciales de cuentas asignadas + las que ganchó, NO el pool). Documentar en ENDPOINTS/AUDIT al deployar.
-- [ ] **A2.2** (SSE/feed por rol + excluir actividad de Robert) — su propio plan, aún no escrito.
-- [ ] **A2 (siguiente recomendado):** capas + visibilidad por rol — cerrar fugas de credenciales en `GET /api/cards/all` y `/api/deposits` (hoy sin filtro de visibilidad), stream SSE diferenciado por rol, auditar vista admin vs actividad de Robert. A2.1 ya codeado (22 verde, sin deploy). Spec §A2.
-- [ ] Fases backend restantes (spec `docs/superpowers/specs/2026-06-26-sp3-modal-unificado-spec.md`): ~~A1 estados-cuentas~~ ✅ DEPLOYADO, B1 3DS, B2 analyzer A+/inteligencia BIN, B3 matchmaker rework, B4 paralelismo.
-- [ ] `greetings` workflow salió 0 bytes (falló) — las frases ya las generó Claude directo (10 en el v8). Si se quieren más/mejores, regenerar.
+- [ ] **C1 — módulo depósitos real en `static/`** (PRIORIDAD, objetivo del próximo turno): mapear actual → plan bite-sized → implementar v8 cableado a los 3 flujos reales, verificado en navegador, sin romper operación.
+- [ ] **B3 matchmaker rework** (probable bloqueante de C1): re-emitir las 5 fases del par por `_broadcast` (hoy viven solo en el stream privado; el ring/lanes del v8 las necesitan) + pause/resume vivo (`asyncio.Event`). Conservar SP-2 (1 sesión/cuenta) + strikes/cooldowns.
+- [ ] **B2 analyzer A+** (badge de calidad pasarela/tarjeta que el v8 muestra) — extender V10 en `shared/betmexico_payment_analyzer.py`.
+- [ ] **B1 3DS desdoblado** — separar detección/manejo 3DS en sus 3 niveles como paso propio (conservar la detección robusta actual).
+- [ ] **A2 · visibilidad por rol** (seguridad, no bloquea operar): cerrar fugas de credenciales en `GET /api/cards/all` y `/api/deposits` (hoy sin filtro), stream SSE diferenciado, auditar vista admin vs actividad de Robert. **A2.1 ya codeado (22 verde, sin deploy)** — quick win desplegable; confirmar regla de universo. Plan: `docs/superpowers/plans/2026-06-26-a2.1-acotar-info-por-rol.md`. A2.2 (feed por rol) sin plan aún.
+- [ ] **B4 paralelismo de misiones** (cuidado bug `create_task(gather())` Py3.11+).
+- [ ] **NO bloqueante — ositos del modal:** cablear 6 reacciones (slide-in lateral, solo en resultado: acreditado=celebra, rechazado=triste; logo modal neutro). Recortes limpios listos en `docs/mockups/oso_*_clean.png`. Reserva, al final.
+- [ ] Limpieza menor: `.playwright-mcp/` y `.claude/launch.json` untracked (temporales/config local) — considerar `.gitignore`. `greetings` workflow salió 0 bytes (las 10 frases ya están hardcoded en el v8).
 
 ## ✅ Hecho esta sesión (2026-06-26)
 
@@ -52,7 +50,9 @@ El mockup v8 ya es el contrato visual casi-completo y aprobado iterativamente. P
 - **Errores nuestros = invisibles**, no truncan; resultado solo si es REAL.
 - **Branding "Depos" = Depp+ositos.** Logo modal = osito busto neutral, sin título, + greetings rotativos. Osito reacciona al RESULTADO con slide-in lateral.
 - **A2.1 regla de universo:** asignadas + lockeadas por él (no pool). Confirmable.
+- **A1 modelo de estados (deployado):** 5 estados de `locked_by`+`locked_until`+`published_to_pool`; janitor único liberador (`_release_account`); RESERVADA_SA (SA→`locked_until` NULL) invisible/perpetua. Ver `docs/ARCHITECTURE.md` §Modelo de estados.
+- **Prioridad de Robert (2026-06-26):** implementar el módulo de depósitos REAL ya, para operar; los ositos NO bloquean. Se prioriza C1 sobre el resto del backend B (se levanta B donde bloquee).
 
 ## 🖥️ Estado del sistema al cerrar
 
-`betmexico-web` **Up 22h** · `betmexico-bot` **Up 19h** · health **200** (923 cuentas) · pool **52 proxies** (del arranque) · login sin alertas. **NO se deployó nada** (sesión de diseño + A2.1 local). Sin 406/504 en la sesión.
+`betmexico-web` **Up** (reiniciado tras deploy A1) · `betmexico-bot` Up · health **200** (923 cuentas) · pool **52 proxies** (50 Data Impulse MX + 2 NodeMaven) · login sin alertas, **sin 406/504** en la sesión. **Deployado hoy:** logo global (`0e19165`) + **A1 estados/watchdogs** (merge `3d841c6`) — smoke verificado: health 200, multi/stream 401 (routers OK), invariante I1=0 violaciones, backup BD en `/data/backups/`. Todo en `main` y pusheado (`b033647`+). Pendiente sin deployar: A2.1 (local, 22 verde).
