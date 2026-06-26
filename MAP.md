@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `dee5d74` | feat(c1): validatePipe (semántica null|error de app.js) + parseCombo + fmtMoney (TDD 22 verde) |
 | `a3887ba` | feat(c1): mapPhaseToScene + phaseToPct (fase backend -> escena v8, TDD verde) |
 | `c84168b` | feat(c1): deriveMode + presetsForMode (la UI impone las reglas, TDD verde) |
 | `c11bc8e` | docs(session): cierre — próximo objetivo C1 (módulo depósitos real en static/), ositos no-bloqueante |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `f43eb5c` | feat(a1): T3+T6 consolidación watchdogs — janitor único liberador (TDD verde) |
 | `242d1dc` | feat(a1): T2 backfill legacy locked_until en _migrate (TDD verde) |
 | `d5d5f34` | feat(a1): T1 helper canónico _release_account (TDD verde) + plan A1 |
-| `ebf63d9` | chore(mockup): ositos reacciones limpios (scipy, sin sombreros sueltos) — reserva para cablear |
 <!-- GEN:end:recientes -->
 
 ---
