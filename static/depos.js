@@ -348,6 +348,7 @@
       setSub('Algo falló, reintenta'); movRemoveLast();
     } finally {
       _dx.running = false; journeyEnd();
+      if (!_dx.open) pillHide();
       setTimeout(busClose, 4000); // deja llegar account_refreshed antes de cerrar
     }
   }
@@ -430,6 +431,7 @@
   function schedFinish() {
     clearSchedCountdown();
     _dx.running = false; journeyEnd();
+    if (!_dx.open) pillHide();
     setTimeout(() => { _dx.sched = null; busClose(); }, 4000);
   }
 
@@ -518,7 +520,9 @@
     } catch (e) {
       if (e.name !== 'AbortError') setSub('Algo falló, reintenta');
     } finally {
-      _dx.running = false; journeyEnd(); setTimeout(() => { _dx.mm = null; busClose(); }, 4000);
+      _dx.running = false; journeyEnd();
+      if (!_dx.open) pillHide();
+      setTimeout(() => { _dx.mm = null; busClose(); }, 4000);
     }
   }
 
@@ -603,11 +607,14 @@
     // botón depositar — router por modo (single ya cableado; scheduled/multi en Tasks 8/9)
     const dep = qs('#dep');
     if (dep) dep.onclick = onDeposit;
-    // controles de run: abort (cancela scheduled/multi); pause se decide en Task 10
+    // controles de run: abort cancela scheduled/multi
     const ab = qs('#abort'); if (ab) ab.onclick = onAbort;
-    // "Otro depósito" — B4, stub en Task 10
+    // pause: el backend NO tiene pause vivo (solo cancel) -> ocultamos el botón (honesto, L3).
+    // Reaparecerá cuando B3 agregue pause/resume real.
+    const pz = qs('#pause'); if (pz) pz.style.display = 'none';
+    // "Otro depósito" en paralelo = B4 (aún no existe). No fingir la capacidad.
     const np = qs('.newproc');
-    if (np) np.onclick = () => showToast('Otro depósito (B4) — pendiente');
+    if (np) np.onclick = () => showToast('Pronto: varios depósitos en paralelo');
   }
 
   // ── open/close ──
@@ -631,12 +638,40 @@
   };
 
   window.closeDepos = function () {
-    if (_dx.running) { showToast('Hay una misión en curso'); return; } // pill viene en Task 10
     root.classList.add('hidden');
     root.setAttribute('aria-hidden', 'true');
     _dx.open = false;
     document.removeEventListener('keydown', onEsc);
+    // si hay misión activa, la dejamos correr en background y mostramos la pill
+    if (_dx.running) pillShow(); else pillHide();
   };
+
+  // ── pill flotante: misión activa con el modal cerrado (sigue por stream/bus) ──
+  let _pillEl = null;
+  function pillShow() {
+    if (!_pillEl) {
+      _pillEl = document.createElement('div');
+      _pillEl.id = 'deposPill';
+      _pillEl.className = 'depos-pill';
+      _pillEl.innerHTML = '<span class="dp-ic">⏳</span><span class="dp-tx mono">Misión activa</span><span class="dp-go">↗</span>';
+      _pillEl.title = 'Misión activa — click para reabrir';
+      _pillEl.onclick = pillReopen;
+      document.body.appendChild(_pillEl);
+    }
+    _pillEl.querySelector('.dp-ic').textContent = _dx.sched ? '⏰' : '🎯';
+    _pillEl.querySelector('.dp-tx').textContent = _dx.sched
+      ? ('Programado ' + _dx.sched.done + '/' + _dx.sched.total)
+      : 'Matchmaker en curso';
+    _pillEl.style.display = 'flex';
+  }
+  function pillHide() { if (_pillEl) _pillEl.style.display = 'none'; }
+  function pillReopen() {
+    root.classList.remove('hidden');
+    root.setAttribute('aria-hidden', 'false');
+    _dx.open = true;
+    document.addEventListener('keydown', onEsc);
+    pillHide();
+  }
 
   // click fuera del panel cierra
   root.addEventListener('click', (e) => { if (e.target === root) window.closeDepos(); });

@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `966d8b8` | feat(c1): SCHEDULED (/scheduled/create + bus) y MULTI (/multi/stream) cableados |
 | `e63f450` | feat(c1): SINGLE cableado a /execute-stream — fase->escena, balance before/after, movimiento, E-RED |
 | `ccecc82` | feat(c1): cuentas (combos email:password+grado), tarjetas (guardadas+agregar), cap 24h en nota — verificado con shapes reales |
 | `ed7bc41` | docs(c1): plan bite-sized del modal v8 (13 tasks, 4 fases) |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `c11bc8e` | docs(session): cierre — próximo objetivo C1 (módulo depósitos real en static/), ositos no-bloqueante |
 | `b033647` | docs(session): A1 deployado+mergeado + logo global; siguiente A2 (capas/visibilidad) |
 | `17d1226` | docs(a1): modelo de 5 estados + consolidación watchdogs en ARCHITECTURE/AUDIT (bitácora) |
-| `0ad99ad` | test(a1): refuerzo backfill con locked_at formato real isoformat+tz (review adversarial) |
 <!-- GEN:end:recientes -->
 
 ---

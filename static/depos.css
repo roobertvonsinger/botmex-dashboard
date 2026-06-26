@@ -9,6 +9,15 @@
 @keyframes depos-fade{from{opacity:0}to{opacity:1}}
 #depos{width:min(540px,100%)}
 
+/* pill flotante (misión activa, modal cerrado) */
+.depos-pill{position:fixed; right:18px; bottom:18px; z-index:190; display:none; align-items:center; gap:9px;
+  padding:9px 14px; border-radius:99px; cursor:pointer; color:#3ce0c0;
+  background:rgba(16,19,26,.92); border:1px solid rgba(60,224,192,.45);
+  font-family:'JetBrains Mono',monospace; font-size:12px;
+  box-shadow:0 16px 40px -12px #000, 0 0 18px -6px rgba(60,224,192,.5); transition:transform .18s, box-shadow .18s}
+.depos-pill:hover{transform:translateY(-2px); box-shadow:0 18px 44px -10px #000, 0 0 26px -4px rgba(60,224,192,.7)}
+.depos-pill .dp-go{opacity:.7}
+
 #depos{
   --void:#06070a; --void-2:#0a0c11; --panel:rgba(20,24,32,.55); --panel-2:rgba(28,33,44,.5);
   --line:rgba(255,255,255,.06); --line-2:rgba(255,255,255,.10);
