@@ -50,7 +50,7 @@
 
 #depos .head{display:block; padding:0; border-bottom:1px solid var(--line); position:relative}
 /* banner centrado, un poco más chico, fundido al fondo por abajo Y por los lados (mask) */
-#depos .depos-banner{display:block; width:86%; height:auto; margin:6px auto 0;
+#depos .depos-banner{display:block; width:76%; height:auto; margin:8px auto 0;
   -webkit-mask-image:linear-gradient(180deg,#000 58%,transparent 100%), linear-gradient(90deg,transparent,#000 9%,#000 91%,transparent);
   -webkit-mask-composite:source-in;
   mask-image:linear-gradient(180deg,#000 58%,transparent 100%), linear-gradient(90deg,transparent,#000 9%,#000 91%,transparent);
@@ -68,12 +68,12 @@
 #depos .head-div{width:1px; height:26px; background:var(--line-2)}
 /* greeting = bocadillo de diálogo de TAMAÑO FIJO (no se descuadra al rotar la frase).
    Tipografía folklor (Ranchers) con contorno; el personaje del banner "lo dice". */
-#depos .title{position:relative; flex:0 0 auto; width:290px; min-height:46px; align-self:flex-start; margin-left:6px;
-  display:flex; align-items:center; justify-content:center; text-align:center;
-  font-family:'Ranchers','Bricolage Grotesque',cursive; font-weight:400; font-size:12.5px; letter-spacing:.5px; line-height:1.18;
+#depos .title{position:relative; flex:0 0 auto; width:268px; height:38px; align-self:flex-start; margin-left:6px;
+  display:block; text-align:center; white-space:nowrap; overflow:hidden;
+  font-family:'Ranchers','Bricolage Grotesque',cursive; font-weight:400; font-size:12px; letter-spacing:.4px; line-height:26px;
   color:#f3c77a; -webkit-text-stroke:.5px rgba(0,0,0,.55); paint-order:stroke fill;
   background:rgba(18,22,30,.9); border:1px solid var(--line-2); border-radius:13px;
-  padding:6px 14px; box-shadow:0 7px 18px -9px rgba(0,0,0,.7); transition:opacity .25s}
+  padding:6px 14px; box-shadow:0 7px 18px -9px rgba(0,0,0,.7); transition:opacity .45s ease}
 /* colita del bocadillo apuntando hacia arriba (al personaje del banner) */
 #depos .title::after{content:''; position:absolute; top:-7px; left:22px; width:0; height:0;
   border-left:7px solid transparent; border-right:7px solid transparent; border-bottom:7px solid rgba(18,22,30,.9)}

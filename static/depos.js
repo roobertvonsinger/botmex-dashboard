@@ -287,15 +287,22 @@
     }
   }
 
-  // greetings rotativos: timer gestionado por apertura/cierre (no leak en background)
+  // auto-fit: el recuadro es FIJO; el texto se escala para caber siempre en 1 línea
+  function fitGreet(g) {
+    let fs = 12; const min = 8;
+    g.style.fontSize = fs + 'px';
+    let guard = 40;
+    while (g.scrollWidth > g.clientWidth && fs > min && guard-- > 0) { fs -= 0.5; g.style.fontSize = fs + 'px'; }
+  }
+  // greetings rotativos: 1 vez por minuto, fade out→in (premium); timer por apertura/cierre
   function startGreet() {
     stopGreet();
     const g = qs('#greet'); if (!g) return;
-    let gi = 0; g.textContent = GREETS[0];
+    let gi = 0; g.textContent = GREETS[0]; fitGreet(g);
     _greetTimer = setInterval(() => {
       g.style.opacity = 0;
-      setTimeout(() => { gi = (gi + 1) % GREETS.length; g.textContent = GREETS[gi]; g.style.opacity = 1; }, 320);
-    }, 14000);
+      setTimeout(() => { gi = (gi + 1) % GREETS.length; g.textContent = GREETS[gi]; fitGreet(g); g.style.opacity = 1; }, 450);
+    }, 60000);
   }
   function stopGreet() { if (_greetTimer) { clearInterval(_greetTimer); _greetTimer = null; } }
 
