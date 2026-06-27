@@ -1,16 +1,21 @@
 // Botmexico v2 — vanilla, sin frameworks.
 
 const FRASES = [
-  "¿Ya desayunaste o puro café y ansiedad?",
-  "Échale ganas, mi rey — la chamba no se hace sola.",
-  "Hoy es buen día pa' tirar pa'rriba 🇲🇽",
-  "Si no puedes con el enemigo, hackéalo.",
-  "El que madruga, encuentra cuentas LIVE.",
-  "Calladito te ves más bonito… y vendes más.",
-  "No es magia, es disciplina. Bueno, y un poquito de magia.",
-  "Trabaja en silencio, deja que tu saldo haga el ruido.",
-  "Hoy se chambea con todo, mañana descansamos (mentira).",
-  "El éxito sabe a tacos al pastor.",
+  "El saldo habla; los demás, que murmuren.",
+  "Calladito, cargadito, y a la siguiente cuenta.",
+  "Que sude el banco — nosotros a cuadrar. 🇲🇽",
+  "Hoy el panel se ve verde, y no es de envidia.",
+  "El que madruga agarra las LIVE.",
+  "Menos ansiedad, más actividad.",
+  "Disciplina de monje, hambre de tianguis.",
+  "Cada cuenta cuenta y cada peso pesa.",
+  "Si el proxy aguanta, aquí aguantamos todos.",
+  "No es suerte, mi rey: es que le sabemos.",
+  "Trabaja en silencio y deja que el saldo grite.",
+  "Las cuentas no se cuadran solas, éntrale.",
+  "Respira hondo: hay LIVE pa' rato.",
+  "El billete es penoso; invítalo con confianza.",
+  "Aquí se chambea bonito, no se sufre feo.",
 ];
 
 const esc = s => s == null ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

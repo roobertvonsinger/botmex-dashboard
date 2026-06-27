@@ -90,6 +90,15 @@ test('fmtMoney', () => {
   assert.equal(D.fmtMoney(1234.5), '$1,234.50');
 });
 
+// ── canonicalPipe: formato único NNNN|MM|YYYY|CVV (Robert 2026-06-27) ──
+test('canonicalPipe normaliza todos los formatos a NNNN|MM|YYYY|CVV', () => {
+  assert.equal(D.canonicalPipe('4111411141114111|12|2030|123'), '4111411141114111|12|2030|123'); // ya canónico
+  assert.equal(D.canonicalPipe('4111411141114111|12|30|123'), '4111411141114111|12|2030|123');   // año 2 díg
+  assert.equal(D.canonicalPipe('4111411141114111|1230|123'), '4111411141114111|12|2030|123');     // MMYY junto (3 partes)
+  assert.equal(D.canonicalPipe('4111411141114111|12/30|123'), '4111411141114111|12|2030|123');    // con diagonal
+  assert.equal(D.canonicalPipe('5119164448115445|06|26|910'), '5119164448115445|06|2026|910');
+});
+
 // ── Task 7: clasificación de resultado (real vs nuestro) + humanización (L3) ──
 test('isRealRejection: estados reales de BetMexico', () => {
   ['BANK_REJECTED', '3DS_REQUIRED', 'INSUFFICIENT_FUNDS', 'CARD_EXPIRED', 'AUTOEXCLUSION', 'KYC_PENDING', 'LOGIN_DENIED'].forEach(c =>

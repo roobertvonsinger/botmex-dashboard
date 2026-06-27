@@ -1862,13 +1862,14 @@ def account_cards_pipe(account_id: int, _user: dict = Depends(require_session)):
             ).fetchall()
         except sqlite3.OperationalError:
             return {"cards": []}
+    from web_utils import canonical_card_pipe
     out = []
     for r in rows:
         if not (r["card_number"] and r["card_expiry"] and r["card_cvv"]):
             continue
-        exp = str(r["card_expiry"]).replace("/", "")
         out.append({
-            "pipe": f'{r["card_number"]}|{exp}|{r["card_cvv"]}',
+            # pipe CANÓNICO único: NNNN|MM|YY|CVV (web_utils.canonical_card_pipe)
+            "pipe": canonical_card_pipe(r["card_number"], r["card_expiry"], r["card_cvv"]),
             "approved": r["total_approved"] or 0,
             "deposits": r["total_deposits"] or 0,
         })
@@ -2247,7 +2248,7 @@ def list_all_cards(user: dict = Depends(require_session)):
                 seen.add(key)
                 out.append({
                     "source": "card",
-                    "card_pipe": f"{r['card_number']}|{r['card_expiry'] or ''}|{r['card_cvv'] or ''}",
+                    "card_pipe": canonical_card_pipe(r["card_number"], r["card_expiry"], r["card_cvv"]),
                     "card_number": r["card_number"],
                     "card_expiry": r["card_expiry"],
                     "card_cvv": r["card_cvv"],

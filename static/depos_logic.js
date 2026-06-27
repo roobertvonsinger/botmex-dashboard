@@ -108,5 +108,21 @@
     return 'No se pudo completar, intenta de nuevo'; // error nuestro: humanizado, sin tripas
   }
 
-  return { deriveMode, presetsForMode, mapPhaseToScene, phaseToPct, validatePipe, parseCombo, fmtMoney, isRealRejection, humanError };
+  // Formato CANÓNICO ÚNICO de la UI: NNNN|MM|YYYY|CVV (año 4 dígitos, sin /).
+  // Normaliza cualquier pipe (3 o 4 partes, año 2 o 4 díg) a ese formato.
+  function canonicalPipe(s) {
+    const parts = String(s || '').replace(/\s/g, '').split('|').filter(Boolean);
+    if (parts.length < 3) return s; // no es un pipe; devolver tal cual
+    let num, exp, cvv;
+    if (parts.length >= 4) { num = parts[0]; exp = parts[1] + parts[2]; cvv = parts[3]; }
+    else { num = parts[0]; exp = parts[1]; cvv = parts[2]; }
+    const nd = num.replace(/\D/g, ''), ed = exp.replace(/\D/g, ''), cd = cvv.replace(/\D/g, '');
+    let mm, yyyy;
+    if (ed.length >= 6) { mm = ed.slice(0, 2); yyyy = ed.slice(2, 6); }
+    else if (ed.length >= 4) { mm = ed.slice(0, 2); yyyy = '20' + ed.slice(2, 4); }
+    else { mm = ed.slice(0, 2).padStart(2, '0'); yyyy = '????'; }
+    return nd + '|' + mm + '|' + yyyy + '|' + cd;
+  }
+
+  return { deriveMode, presetsForMode, mapPhaseToScene, phaseToPct, validatePipe, parseCombo, fmtMoney, isRealRejection, humanError, canonicalPipe };
 });

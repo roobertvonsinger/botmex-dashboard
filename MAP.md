@@ -92,7 +92,7 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2490 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2491 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -109,7 +109,7 @@ prewarm.py (router)
 | `test_unificacion_sp2.py` | 55 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
 | `web_grading.py` | 113 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
-| `web_utils.py` | 243 | `betmexico.web.utils` | Helpers compartidos: _friendly_error, _normalize_ccexp, _build_proxy_url |
+| `web_utils.py` | 265 | `betmexico.web.utils` | Helpers compartidos: _friendly_error, _normalize_ccexp, _build_proxy_url |
 <!-- GEN:end:modulos -->
 
 ---
@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `6c3ff56` | feat(c1): ajustes visuales modal — verde mexicano vibrante, avatar DEPP+OSITOS, greeting Bricolage, reps compacto |
 | `848a266` | feat(c1): greeting con fuente mexicana (Ranchers) + amarillo suave #ffe08a, contorno blanco, sombra negra |
 | `ad3c3b8` | docs(c1): registrar avatar nuevo pendiente + reorg UI como próximo objetivo urgente |
 | `deb4f6f` | fix(c1): verde alineado al dashboard (hue 160 #68d7a1, era turquesa #3ce0c0) + avatar 56px + cache-bust v20260627a |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `966d8b8` | feat(c1): SCHEDULED (/scheduled/create + bus) y MULTI (/multi/stream) cableados |
 | `e63f450` | feat(c1): SINGLE cableado a /execute-stream — fase->escena, balance before/after, movimiento, E-RED |
 | `ccecc82` | feat(c1): cuentas (combos email:password+grado), tarjetas (guardadas+agregar), cap 24h en nota — verificado con shapes reales |
-| `ed7bc41` | docs(c1): plan bite-sized del modal v8 (13 tasks, 4 fases) |
 <!-- GEN:end:recientes -->
 
 ---

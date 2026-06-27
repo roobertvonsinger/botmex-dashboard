@@ -147,6 +147,28 @@ def _normalize_ccexp(raw: str) -> str:
     return digits[:4]
 
 
+def canonical_card_pipe(num, exp, cvv) -> str:
+    """Formato CANÓNICO ÚNICO de tarjeta para mostrar/copiar en la UI:
+    `NNNN|MM|YYYY|CVV` — 4 campos, mes 2 dígitos, AÑO 4 dígitos, SIN diagonal.
+    Es el ÚNICO formato que el operador ve (instrucción de Robert 2026-06-27).
+    Normaliza el exp venga como venga (MM/YY, MM|YY, MMYY, MMYYYY, MM/YYYY).
+    Si falta el año (dato corrupto), usa `????` para que el hueco sea VISIBLE."""
+    n = "".join(c for c in str(num or "") if c.isdigit())
+    d = "".join(c for c in str(exp or "") if c.isdigit())
+    if len(d) >= 6:      # MMYYYY
+        mm, yyyy = d[:2], d[2:6]
+    elif len(d) >= 4:    # MMYY → MM + 20YY
+        mm, yyyy = d[:2], "20" + d[2:4]
+    elif len(d) == 3:    # MYY raro
+        mm, yyyy = d[:1].zfill(2), "20" + d[1:3]
+    elif len(d) == 2:    # solo MM, año perdido
+        mm, yyyy = d, "????"
+    else:
+        mm, yyyy = (d.zfill(2) if d else "??"), "????"
+    c = "".join(ch for ch in str(cvv or "") if ch.isdigit())
+    return f"{n}|{mm}|{yyyy}|{c}"
+
+
 def _build_proxy_url(proxy: dict) -> str:
     """Construye URL de proxy para httpx/checker."""
     if not proxy:

@@ -53,13 +53,14 @@
 #depos .head-l > div:last-child{flex:1; min-width:0}
 #depos .newproc{flex:none}
 #depos .logo-slot{flex:none}
-#depos .depos-av{width:56px; height:56px; border-radius:50%; object-fit:cover; display:block;
-  box-shadow:0 0 0 1px var(--line-2), 0 0 18px -5px var(--aqua-line); background:#0d1117; transition:var(--t)}
-#depos .depos-av:hover{box-shadow:0 0 0 1px var(--aqua-line), 0 0 22px -4px var(--aqua-line)}
+/* avatar fuera del círculo: busto completo, prominente, con sombra (flota "encima") */
+#depos .depos-av{height:78px; width:auto; max-width:88px; object-fit:contain; display:block;
+  filter:drop-shadow(0 5px 9px rgba(0,0,0,.6)); transition:var(--t); margin:-6px 0 -10px}
+#depos .depos-av:hover{filter:drop-shadow(0 6px 12px rgba(0,0,0,.7)) drop-shadow(0 0 10px var(--aqua-line))}
 #depos .head-div{width:1px; height:26px; background:var(--line-2)}
 #depos .title{font-family:'Bricolage Grotesque','Space Grotesk',sans-serif; font-weight:700; font-size:25px; letter-spacing:.2px; line-height:1.05;
   color:#ffe08a; -webkit-text-stroke:0.6px #ffffff; paint-order:stroke fill;
-  text-shadow:0 2px 3px rgba(0,0,0,.8), 0 1px 1px rgba(0,0,0,.55); transition:opacity .3s; white-space:nowrap}
+  text-shadow:0 2px 3px rgba(0,0,0,.8), 0 1px 1px rgba(0,0,0,.55); transition:opacity .3s; line-height:1.1}
 #depos .sub{display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--ink-dim); margin-top:2px}
 #depos .sub-dot{width:6px;height:6px;border-radius:50%; background:var(--aqua); box-shadow:0 0 10px var(--aqua); animation:breathe 2.6s ease-in-out infinite}
 @keyframes breathe{0%,100%{opacity:.5;transform:scale(.85)}50%{opacity:1;transform:scale(1.15)}}

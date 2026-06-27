@@ -36,8 +36,11 @@
   }
 
   // ── greetings rotativos (voz MX) ──
-  const GREETS = ['A depositar bonito','Que caiga el billete','Manos a la lana','Vamos por la feria',
-    'Aquí se deposita fino','A llenar cuentas','Suelta el depósito','Hora de la feria','Dale al depo','A mover lana'];
+  const GREETS = [
+    'A que llueva verde 🇲🇽', 'Suéltalo, banco — por las buenas', 'Hora de cargar cuentas',
+    'Que caiga la feria', 'Calladito y cargadito', 'Dale, que la lana no espera',
+    "Pa'l banco con cariño", 'Verde es vida (y saldo)', 'Acredítese, mi buen', 'A engordar la cuenta',
+  ];
 
   // ── toast propio (vive dentro de #depos, sobre el overlay) ──
   let _toastEl = null, _toastT = null;
@@ -149,7 +152,8 @@
       if (!v) { renderCards(); return; }
       const err = D.validatePipe(v);
       if (err) { showToast(err); done = false; inp.focus(); return; }
-      if (_dx.cards.indexOf(v) < 0) _dx.cards.push(v);
+      const canon = D.canonicalPipe(v); // formato único NNNN|MM|YYYY|CVV
+      if (_dx.cards.indexOf(canon) < 0) _dx.cards.push(canon);
       renderCards();
     };
     inp.addEventListener('keydown', (e) => {
@@ -284,7 +288,7 @@
     _greetTimer = setInterval(() => {
       g.style.opacity = 0;
       setTimeout(() => { gi = (gi + 1) % GREETS.length; g.textContent = GREETS[gi]; g.style.opacity = 1; }, 320);
-    }, 6000);
+    }, 14000);
   }
   function stopGreet() { if (_greetTimer) { clearInterval(_greetTimer); _greetTimer = null; } }
 

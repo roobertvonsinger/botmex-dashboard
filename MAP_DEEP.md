@@ -84,21 +84,21 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `unlock_account` | def | L1789–L1807 |
 | `_sse_generator` | def | L1810–L1837 |
 | `events` | def | L1841–L1846 |
-| `account_cards_pipe` | def | L1850–L1875 |
-| `account_notes_summary` | def | L1879–L1904 |
-| `account_details` | def | L1908–L2119 |
-| `NoteCreate` | class | L2122–L2123 |
-| `create_note` | def | L2127–L2156 |
-| `CurpUpdate` | class | L2159–L2160 |
-| `update_curp` | def | L2164–L2175 |
-| `delete_note` | def | L2179–L2191 |
-| `CombosRequest` | class | L2194–L2195 |
-| `accounts_combos` | def | L2199–L2212 |
-| `accounts_pass_map` | def | L2216–L2221 |
-| `list_all_cards` | def | L2225–L2300 |
-| `activity_feed` | def | L2304–L2421 |
-| `list_deposits` | def | L2425–L2454 |
-| `deposits_stats` | def | L2458–L2483 |
+| `account_cards_pipe` | def | L1850–L1876 |
+| `account_notes_summary` | def | L1880–L1905 |
+| `account_details` | def | L1909–L2120 |
+| `NoteCreate` | class | L2123–L2124 |
+| `create_note` | def | L2128–L2157 |
+| `CurpUpdate` | class | L2160–L2161 |
+| `update_curp` | def | L2165–L2176 |
+| `delete_note` | def | L2180–L2192 |
+| `CombosRequest` | class | L2195–L2196 |
+| `accounts_combos` | def | L2200–L2213 |
+| `accounts_pass_map` | def | L2217–L2222 |
+| `list_all_cards` | def | L2226–L2301 |
+| `activity_feed` | def | L2305–L2422 |
+| `list_deposits` | def | L2426–L2455 |
+| `deposits_stats` | def | L2459–L2484 |
 
 ### `auth.py`
 
@@ -352,10 +352,11 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `parse_pipe_card` | def | L44–L120 |
 | `_friendly_error` | def | L123–L138 |
 | `_normalize_ccexp` | def | L141–L147 |
-| `_build_proxy_url` | def | L150–L154 |
-| `_extract_user_from_message` | def | L157–L176 |
-| `_categorize_event` | def | L179–L199 |
-| `_parse_log_entry` | def | L202–L243 |
+| `canonical_card_pipe` | def | L150–L169 |
+| `_build_proxy_url` | def | L172–L176 |
+| `_extract_user_from_message` | def | L179–L198 |
+| `_categorize_event` | def | L201–L221 |
+| `_parse_log_entry` | def | L224–L265 |
 <!-- GEN:end:simbolos -->
 
 ---
