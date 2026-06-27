@@ -19,7 +19,9 @@ Lo verde está hecho y verificado (lógica con 25 tests node; single/multi e2e c
 
 ## ⏳ Pendientes próximos
 
-- [x] **C1 — módulo depósitos v8 en `static/`** — IMPLEMENTADO (12/13 tasks, frontend). Falta: 🟡 deploy con flag OFF + validar e2e con backend real (scheduled/bus, flag, rehidratación) + juicio visual de Robert. Luego retirar drawer viejo al confirmar paridad.
+- [x] **C1 — módulo depósitos v8 en `static/`** — IMPLEMENTADO + DEPLOYADO a prod (flag `localStorage.deposV8='1'`). Validando con Robert en prod. Ajustes hechos 2026-06-27: verde alineado al dashboard (hue 160 `#68d7a1`), avatar 56px, fix carga `depos_logic.js`.
+- [ ] **C1 fino (mientras Robert valida):** (a) **imagen NUEVA del avatar del modal** — osito distinto del logo principal y de las expresiones `oso_*`; **la genera Robert** (Antigravity/Gemini), hoy hay un placeholder (= Depp-oso del logo). (b) otros ajustes visuales que pida al probar. (c) al confirmar "funciona bien" → v8 por default + retirar drawer viejo.
+- [ ] 🔴 **PRÓXIMO OBJETIVO URGENTE (Robert 2026-06-27):** reorganizar TODA la UI del dashboard. El modal por ahora se sobrepone (era drawer desde la izquierda); se decidirá su lugar dentro de la reorg. Arrancar este frente al cerrar C1.
 - [ ] **B3 matchmaker rework** (probable bloqueante de C1): re-emitir las 5 fases del par por `_broadcast` (hoy viven solo en el stream privado; el ring/lanes del v8 las necesitan) + pause/resume vivo (`asyncio.Event`). Conservar SP-2 (1 sesión/cuenta) + strikes/cooldowns.
 - [ ] **B2 analyzer A+** (badge de calidad pasarela/tarjeta que el v8 muestra) — extender V10 en `shared/betmexico_payment_analyzer.py`.
 - [ ] **B1 3DS desdoblado** — separar detección/manejo 3DS en sus 3 niveles como paso propio (conservar la detección robusta actual).

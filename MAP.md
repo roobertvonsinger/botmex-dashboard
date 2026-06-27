@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `deb4f6f` | fix(c1): verde alineado al dashboard (hue 160 #68d7a1, era turquesa #3ce0c0) + avatar 56px + cache-bust v20260627a |
 | `9d05c33` | fix(c1): cargar depos_logic.js en index.html (faltaba) — sin el, depos.js retornaba temprano y openDepos no se definia; el flag deposV8 caia al modal viejo |
 | `22c8d9b` | docs(c1): SSE_EVENTS (account_refreshed/scheduled_retry) + AUDIT (modal v8) + NEXT-SESSION (deploy/validación pendiente) |
 | `c082657` | fix(c1): hardening post-review adversarial — 5 bugs de estado/leaks entre misiones |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `ed7bc41` | docs(c1): plan bite-sized del modal v8 (13 tasks, 4 fases) |
 | `f73f851` | feat(c1): depos.js esqueleto — modal v8 monta, open/close, modo emerge, greetings, reps 7-seg (verificado en navegador via eval) |
 | `b2a8155` | feat(c1): depos.css — estilos v8 scoped bajo #depos (transformación determinista, 341 llaves balanceadas, 39 keyframes) |
-| `dee5d74` | feat(c1): validatePipe (semántica null|error de app.js) + parseCombo + fmtMoney (TDD 22 verde) |
 <!-- GEN:end:recientes -->
 
 ---
