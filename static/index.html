@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<!-- Modal Depósitos v8: Ranchers (greeting mexicano) + Clash Display (títulos/botón) -->
-<link href="https://fonts.googleapis.com/css2?family=Ranchers&display=swap" rel="stylesheet">
+<!-- Modal Depósitos v8: Bricolage Grotesque (greeting, ad hoc) + Clash Display (títulos/botón) -->
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&display=swap">
 <!-- Detalle de cuenta v14: tipografía Satoshi + iconos Phosphor (duotone/bold/fill) -->
 <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap">
@@ -17,7 +17,7 @@
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
 <link rel="stylesheet" href="/static/style.css?v=20260528p">
-<link rel="stylesheet" href="/static/depos.css?v=20260627b">
+<link rel="stylesheet" href="/static/depos.css?v=20260627c">
 </head>
 <body>
 <div class="shell">
@@ -637,7 +637,7 @@
 
     <header class="head">
       <div class="head-l">
-        <div class="logo-slot" title="Depp + ositos = Depositos"><img class="depos-av" src="/static/assets/depos_avatar.png" alt="Depositos" /></div>
+        <div class="logo-slot" title="Depp + ositos = Depositos"><img class="depos-av" src="/static/assets/depos_avatar.png?v=20260627c" alt="Depositos" /></div>
         <div>
           <div class="title" id="greet">A depositar bonito</div>
           <div class="sub"><span class="sub-dot"></span><span id="modeText">Varias cuentas  una tarjeta a cada una</span></div>
@@ -682,7 +682,7 @@
               <button class="seg-btn" id="repDn" aria-label="Bajar">&#9660;</button>
             </div>
           </div>
-          <div class="reps-x" id="repsNote">cada 60s  max 15</div>
+          <div class="reps-x" id="repsNote">máx 15</div>
         </div>
       </div>
 
@@ -717,11 +717,11 @@
     <defs>
       <radialGradient id="lg-core" cx="50%" cy="50%" r="50%">
         <stop offset="0%" stop-color="#9ff5e4"/>
-        <stop offset="100%" stop-color="#68d7a1"/>
+        <stop offset="100%" stop-color="#00bd72"/>
       </radialGradient>
       <linearGradient id="lg-key-grad" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stop-color="#68d7a1" stop-opacity=".45"/>
-        <stop offset="100%" stop-color="#9becc1"/>
+        <stop offset="0%" stop-color="#00bd72" stop-opacity=".45"/>
+        <stop offset="100%" stop-color="#7fe8b5"/>
       </linearGradient>
       <filter id="lg-glow" x="-60%" y="-60%" width="220%" height="220%">
         <feGaussianBlur stdDeviation="2.2" result="b"/>
@@ -738,30 +738,30 @@
     </defs>
 
     <!-- halo respirando -->
-    <g class="lg-haze"><circle cx="190" cy="100" r="56" fill="#68d7a1" opacity=".10" filter="url(#lg-soft)"/></g>
+    <g class="lg-haze"><circle cx="190" cy="100" r="56" fill="#00bd72" opacity=".10" filter="url(#lg-soft)"/></g>
 
     <!-- cerradura: anillos finos -->
     <g class="lg-lock" fill="none" stroke-linecap="round">
       <circle cx="190" cy="100" r="46" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
-      <circle cx="190" cy="100" r="46" class="lg-arc" stroke="#68d7a1" stroke-width="1.4" stroke-dasharray="36 253" filter="url(#lg-glow)"/>
+      <circle cx="190" cy="100" r="46" class="lg-arc" stroke="#00bd72" stroke-width="1.4" stroke-dasharray="36 253" filter="url(#lg-glow)"/>
       <circle cx="190" cy="100" r="18" stroke="rgba(255,255,255,.12)" stroke-width="1"/>
     </g>
 
     <!-- ojo de cerradura -->
-    <g class="lg-hole" fill="none" stroke="#68d7a1" stroke-width="1.4" stroke-linecap="round" filter="url(#lg-glow)">
+    <g class="lg-hole" fill="none" stroke="#00bd72" stroke-width="1.4" stroke-linecap="round" filter="url(#lg-glow)">
       <circle cx="190" cy="95" r="5.5"/>
       <path d="M187 99 L186 111 M193 99 L194 111"/>
     </g>
 
     <!-- pulso de apertura -->
-    <g class="lg-pulse"><circle cx="190" cy="100" r="20" fill="none" stroke="#9becc1" stroke-width="1.3"/></g>
+    <g class="lg-pulse"><circle cx="190" cy="100" r="20" fill="none" stroke="#7fe8b5" stroke-width="1.3"/></g>
 
     <!-- llave: blob de mercurio que se traza y gira -->
     <g class="lg-key">
       <g class="lg-key-inner">
         <g class="lg-key-line" filter="url(#lg-glow)">
           <circle class="lg-draw lg-bow" style="--len:69" cx="112" cy="100" r="11" fill="none" stroke="url(#lg-key-grad)" stroke-width="1.8"/>
-          <circle cx="112" cy="100" r="4" fill="none" stroke="#68d7a1" stroke-width="1.3"/>
+          <circle cx="112" cy="100" r="4" fill="none" stroke="#00bd72" stroke-width="1.3"/>
           <path class="lg-draw lg-stem" style="--len:96" d="M123 100 H188 M178 100 V109 M186 100 V106" fill="none" stroke="url(#lg-key-grad)" stroke-width="1.8" stroke-linecap="round"/>
         </g>
       </g>
@@ -781,9 +781,9 @@
         <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
       </filter>
       <linearGradient id="fm-sweep" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stop-color="#68d7a1" stop-opacity="0"/>
-        <stop offset="50%" stop-color="#9becc1" stop-opacity=".9"/>
-        <stop offset="100%" stop-color="#68d7a1" stop-opacity="0"/>
+        <stop offset="0%" stop-color="#00bd72" stop-opacity="0"/>
+        <stop offset="50%" stop-color="#7fe8b5" stop-opacity=".9"/>
+        <stop offset="100%" stop-color="#00bd72" stop-opacity="0"/>
       </linearGradient>
       <clipPath id="fm-cardclip"><rect x="136" y="67" width="108" height="66" rx="9"/></clipPath>
     </defs>
@@ -796,15 +796,15 @@
     <g class="fm-slot" fill="none">
       <rect class="fm-frame" x="92" y="58" width="196" height="84" rx="13" stroke="rgba(255,255,255,.10)" stroke-width="1"/>
       <rect class="fm-mouth" x="102" y="94" width="176" height="12" rx="6" fill="#06070a" stroke="rgba(255,255,255,.12)" stroke-width="1"/>
-      <line class="fm-lip" x1="110" y1="100" x2="270" y2="100" stroke="#68d7a1" stroke-width="1" stroke-linecap="round" opacity=".35"/>
+      <line class="fm-lip" x1="110" y1="100" x2="270" y2="100" stroke="#00bd72" stroke-width="1" stroke-linecap="round" opacity=".35"/>
     </g>
 
     <g class="fm-card">
       <g class="fm-card-inner">
-        <rect x="136" y="67" width="108" height="66" rx="9" fill="none" stroke="#68d7a1" stroke-width="1.4" filter="url(#fm-glow)"/>
-        <rect x="148" y="80" width="18" height="13" rx="3" fill="none" stroke="#68d7a1" stroke-width="1" opacity=".9"/>
-        <path d="M150 83 q5 3.5 0 7 M156 81.5 q8 5 0 10" fill="none" stroke="#68d7a1" stroke-width=".9" opacity=".55"/>
-        <line x1="148" y1="112" x2="214" y2="112" stroke="#68d7a1" stroke-width="1.2" stroke-linecap="round" opacity=".7"/>
+        <rect x="136" y="67" width="108" height="66" rx="9" fill="none" stroke="#00bd72" stroke-width="1.4" filter="url(#fm-glow)"/>
+        <rect x="148" y="80" width="18" height="13" rx="3" fill="none" stroke="#00bd72" stroke-width="1" opacity=".9"/>
+        <path d="M150 83 q5 3.5 0 7 M156 81.5 q8 5 0 10" fill="none" stroke="#00bd72" stroke-width=".9" opacity=".55"/>
+        <line x1="148" y1="112" x2="214" y2="112" stroke="#00bd72" stroke-width="1.2" stroke-linecap="round" opacity=".7"/>
         <line x1="148" y1="120" x2="190" y2="120" stroke="rgba(255,255,255,.20)" stroke-width="1" stroke-linecap="round"/>
       </g>
     </g>
@@ -819,13 +819,13 @@
     <defs>
       <radialGradient id="pr-core-grad" cx="50%" cy="50%" r="50%">
         <stop offset="0%" stop-color="#bffaee"/>
-        <stop offset="48%" stop-color="#68d7a1"/>
-        <stop offset="100%" stop-color="#68d7a1" stop-opacity="0"/>
+        <stop offset="48%" stop-color="#00bd72"/>
+        <stop offset="100%" stop-color="#00bd72" stop-opacity="0"/>
       </radialGradient>
       <radialGradient id="pr-halo-grad" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#68d7a1" stop-opacity=".30"/>
-        <stop offset="60%" stop-color="#68d7a1" stop-opacity=".06"/>
-        <stop offset="100%" stop-color="#68d7a1" stop-opacity="0"/>
+        <stop offset="0%" stop-color="#00bd72" stop-opacity=".30"/>
+        <stop offset="60%" stop-color="#00bd72" stop-opacity=".06"/>
+        <stop offset="100%" stop-color="#00bd72" stop-opacity="0"/>
       </radialGradient>
       <filter id="pr-goo" x="-60%" y="-60%" width="220%" height="220%">
         <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b"/>
@@ -844,7 +844,7 @@
       <ellipse cx="190" cy="100" rx="78" ry="30" transform="rotate(120 190 100)"/>
     </g>
 
-    <g class="pr-waves" fill="none" stroke="#68d7a1" stroke-linecap="round">
+    <g class="pr-waves" fill="none" stroke="#00bd72" stroke-linecap="round">
       <circle class="pr-w pr-w1" cx="190" cy="100" r="22" stroke-width="1.4"/>
       <circle class="pr-w pr-w2" cx="190" cy="100" r="22" stroke-width="1.1"/>
       <circle class="pr-w pr-w3" cx="190" cy="100" r="22" stroke-width=".9"/>
@@ -996,7 +996,7 @@
 <div id="toast" class="toast hidden"></div>
 
 <script src="/static/app.js?v=20260528p"></script>
-<script src="/static/depos_logic.js?v=20260627b"></script>
-<script src="/static/depos.js?v=20260627b"></script>
+<script src="/static/depos_logic.js?v=20260627c"></script>
+<script src="/static/depos.js?v=20260627c"></script>
 </body>
 </html>

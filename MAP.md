@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `848a266` | feat(c1): greeting con fuente mexicana (Ranchers) + amarillo suave #ffe08a, contorno blanco, sombra negra |
 | `ad3c3b8` | docs(c1): registrar avatar nuevo pendiente + reorg UI como próximo objetivo urgente |
 | `deb4f6f` | fix(c1): verde alineado al dashboard (hue 160 #68d7a1, era turquesa #3ce0c0) + avatar 56px + cache-bust v20260627a |
 | `9d05c33` | fix(c1): cargar depos_logic.js en index.html (faltaba) — sin el, depos.js retornaba temprano y openDepos no se definia; el flag deposV8 caia al modal viejo |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `e63f450` | feat(c1): SINGLE cableado a /execute-stream — fase->escena, balance before/after, movimiento, E-RED |
 | `ccecc82` | feat(c1): cuentas (combos email:password+grado), tarjetas (guardadas+agregar), cap 24h en nota — verificado con shapes reales |
 | `ed7bc41` | docs(c1): plan bite-sized del modal v8 (13 tasks, 4 fases) |
-| `f73f851` | feat(c1): depos.js esqueleto — modal v8 monta, open/close, modo emerge, greetings, reps 7-seg (verificado en navegador via eval) |
 <!-- GEN:end:recientes -->
 
 ---
