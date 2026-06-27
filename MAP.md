@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `22c8d9b` | docs(c1): SSE_EVENTS (account_refreshed/scheduled_retry) + AUDIT (modal v8) + NEXT-SESSION (deploy/validación pendiente) |
 | `c082657` | fix(c1): hardening post-review adversarial — 5 bugs de estado/leaks entre misiones |
 | `fd9ae30` | feat(c1): suplencia controlada — openDepositModal branch a openDepos v8 bajo flag deposV8 |
 | `49955df` | feat(c1): run controls + pill — pause oculto (sin soporte backend, honesto), abort cancela, pill al cerrar con misión activa, Otro depósito=toast (B4) |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `b2a8155` | feat(c1): depos.css — estilos v8 scoped bajo #depos (transformación determinista, 341 llaves balanceadas, 39 keyframes) |
 | `dee5d74` | feat(c1): validatePipe (semántica null|error de app.js) + parseCombo + fmtMoney (TDD 22 verde) |
 | `a3887ba` | feat(c1): mapPhaseToScene + phaseToPct (fase backend -> escena v8, TDD verde) |
-| `c84168b` | feat(c1): deriveMode + presetsForMode (la UI impone las reglas, TDD verde) |
 <!-- GEN:end:recientes -->
 
 ---
