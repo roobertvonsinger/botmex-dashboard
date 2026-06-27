@@ -11,20 +11,20 @@
 
 /* pill flotante (misión activa, modal cerrado) */
 .depos-pill{position:fixed; right:18px; bottom:18px; z-index:190; display:none; align-items:center; gap:9px;
-  padding:9px 14px; border-radius:99px; cursor:pointer; color:#3ce0c0;
-  background:rgba(16,19,26,.92); border:1px solid rgba(60,224,192,.45);
+  padding:9px 14px; border-radius:99px; cursor:pointer; color:#68d7a1;
+  background:rgba(16,19,26,.92); border:1px solid rgba(104,215,161,.45);
   font-family:'JetBrains Mono',monospace; font-size:12px;
-  box-shadow:0 16px 40px -12px #000, 0 0 18px -6px rgba(60,224,192,.5); transition:transform .18s, box-shadow .18s}
-.depos-pill:hover{transform:translateY(-2px); box-shadow:0 18px 44px -10px #000, 0 0 26px -4px rgba(60,224,192,.7)}
+  box-shadow:0 16px 40px -12px #000, 0 0 18px -6px rgba(104,215,161,.5); transition:transform .18s, box-shadow .18s}
+.depos-pill:hover{transform:translateY(-2px); box-shadow:0 18px 44px -10px #000, 0 0 26px -4px rgba(104,215,161,.7)}
 .depos-pill .dp-go{opacity:.7}
 
 #depos{
   --void:#06070a; --void-2:#0a0c11; --panel:rgba(20,24,32,.55); --panel-2:rgba(28,33,44,.5);
   --line:rgba(255,255,255,.06); --line-2:rgba(255,255,255,.10);
   --ink:#eef2f6; --ink-dim:#9aa6b4; --ink-faint:#5b6675;
-  --aqua:#3ce0c0; --aqua-soft:rgba(60,224,192,.16); --aqua-line:rgba(60,224,192,.45);
+  --aqua:#68d7a1; --aqua-soft:rgba(104,215,161,.16); --aqua-line:rgba(104,215,161,.45);
   --gold:#f3c77a; --gold-soft:rgba(243,199,122,.14); --amber:#f2b25a;
-  --grade-a:#3ce0c0; --grade-b:#7cc4ff; --grade-c:#f3c77a; --grade-d:#ff7a6b; --red:#ff6b5e;
+  --grade-a:#68d7a1; --grade-b:#7cc4ff; --grade-c:#f3c77a; --grade-d:#ff7a6b; --red:#ff6b5e;
   --r:18px; --r-sm:12px; --t-fast:.18s cubic-bezier(.4,0,.2,1); --t:.42s cubic-bezier(.22,.61,.36,1);
 }
 #depos *{box-sizing:border-box;margin:0;padding:0}
@@ -32,7 +32,7 @@
 #depos html,
 #depos body{height:100%}
 #depos body{background:
-   radial-gradient(1100px 700px at 78% -10%, rgba(60,224,192,.07), transparent 60%),
+   radial-gradient(1100px 700px at 78% -10%, rgba(104,215,161,.07), transparent 60%),
    radial-gradient(900px 600px at 12% 110%, rgba(124,196,255,.05), transparent 55%), var(--void);
   color:var(--ink); font-family:'Satoshi',system-ui,sans-serif; min-height:100vh;
   display:grid; place-items:center; padding:30px 18px; -webkit-font-smoothing:antialiased}
@@ -51,7 +51,7 @@
 #depos .head{display:flex; align-items:center; justify-content:space-between; padding:15px 18px 13px; border-bottom:1px solid var(--line)}
 #depos .head-l{display:flex; align-items:center; gap:12px}
 #depos .logo-slot{flex:none}
-#depos .depos-av{width:42px; height:42px; border-radius:50%; object-fit:cover; display:block;
+#depos .depos-av{width:56px; height:56px; border-radius:50%; object-fit:cover; display:block;
   box-shadow:0 0 0 1px var(--line-2), 0 0 18px -5px var(--aqua-line); background:#0d1117; transition:var(--t)}
 #depos .depos-av:hover{box-shadow:0 0 0 1px var(--aqua-line), 0 0 22px -4px var(--aqua-line)}
 #depos .head-div{width:1px; height:26px; background:var(--line-2)}
@@ -131,10 +131,10 @@
 #depos .deposit{width:100%; padding:14px; border-radius:var(--r-sm); cursor:pointer;
   background:
     linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0) 38%),
-    linear-gradient(180deg, rgba(60,224,192,.22), rgba(60,224,192,.05));
+    linear-gradient(180deg, rgba(104,215,161,.22), rgba(104,215,161,.05));
   border:1px solid var(--aqua-line); color:#d6fff5; font-family:'Clash Display',sans-serif;
   font-weight:600; font-size:14px; letter-spacing:.5px; position:relative; overflow:hidden;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.22), inset 0 -2px 6px rgba(0,0,0,.4), 0 6px 18px -10px rgba(60,224,192,.5);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22), inset 0 -2px 6px rgba(0,0,0,.4), 0 6px 18px -10px rgba(104,215,161,.5);
   transition:var(--t)}
 #depos .deposit::before{content:""; position:absolute; top:0; left:-60%; width:50%; height:100%;
   background:linear-gradient(100deg, transparent, rgba(255,255,255,.18), transparent); transform:skewX(-18deg); transition:left .6s}
@@ -154,14 +154,14 @@
 
 
 #depos .journey{position:relative; margin:8px 14px 4px; padding:14px; border-radius:var(--r);
-  background:radial-gradient(120% 90% at 50% 0%, rgba(60,224,192,.05), transparent 60%), var(--void-2);
+  background:radial-gradient(120% 90% at 50% 0%, rgba(104,215,161,.05), transparent 60%), var(--void-2);
   border:1px solid var(--line); overflow:hidden}
 
 #depos .jglass{position:absolute; inset:0; pointer-events:none; z-index:8; border-radius:var(--r); overflow:hidden}
 #depos .jglass::before{content:""; position:absolute; inset:0;
   background:linear-gradient(135deg, rgba(255,255,255,.05), transparent 30%, transparent 70%, rgba(255,255,255,.025))}
 #depos .jglass::after{content:""; position:absolute; inset:-25%;
-  background:radial-gradient(55% 42% at 28% 22%, rgba(60,224,192,.07), transparent 60%), radial-gradient(48% 46% at 76% 80%, rgba(124,196,255,.05), transparent 60%);
+  background:radial-gradient(55% 42% at 28% 22%, rgba(104,215,161,.07), transparent 60%), radial-gradient(48% 46% at 76% 80%, rgba(124,196,255,.05), transparent 60%);
   filter:blur(11px); opacity:.12; animation:pecera 17s ease-in-out infinite}
 @keyframes pecera{0%,100%{opacity:.08; transform:translate(0,0)} 40%{opacity:.42; transform:translate(2.5%,-2%)} 66%{opacity:.14; transform:translate(-1.5%,1.5%)}}
 #depos .j-balance{display:flex; align-items:baseline; justify-content:center; gap:10px; margin-bottom:2px; min-height:26px}
@@ -224,7 +224,7 @@
 #depos #scene-login.on .lg-hole{animation:lg-hole 4.4s ease-in-out infinite;}
 @keyframes lg-hole{
   0%,58% {opacity:.55;}
-  78%    {opacity:1;filter:drop-shadow(0 0 5px #3ce0c0);}
+  78%    {opacity:1;filter:drop-shadow(0 0 5px #68d7a1);}
   100%   {opacity:.5;}
 }
 
@@ -424,7 +424,7 @@
 
 
 
-#depos #scene-done .dn-cv{stroke:#3ce0c0;stroke-width:1.3;opacity:0;}
+#depos #scene-done .dn-cv{stroke:#68d7a1;stroke-width:1.3;opacity:0;}
 #depos #scene-done .dn-converge{transform-origin:190px 100px;}
 
 #depos #scene-done.on .dn-converge{

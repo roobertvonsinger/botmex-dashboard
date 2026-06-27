@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `9d05c33` | fix(c1): cargar depos_logic.js en index.html (faltaba) — sin el, depos.js retornaba temprano y openDepos no se definia; el flag deposV8 caia al modal viejo |
 | `22c8d9b` | docs(c1): SSE_EVENTS (account_refreshed/scheduled_retry) + AUDIT (modal v8) + NEXT-SESSION (deploy/validación pendiente) |
 | `c082657` | fix(c1): hardening post-review adversarial — 5 bugs de estado/leaks entre misiones |
 | `fd9ae30` | feat(c1): suplencia controlada — openDepositModal branch a openDepos v8 bajo flag deposV8 |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `f73f851` | feat(c1): depos.js esqueleto — modal v8 monta, open/close, modo emerge, greetings, reps 7-seg (verificado en navegador via eval) |
 | `b2a8155` | feat(c1): depos.css — estilos v8 scoped bajo #depos (transformación determinista, 341 llaves balanceadas, 39 keyframes) |
 | `dee5d74` | feat(c1): validatePipe (semántica null|error de app.js) + parseCombo + fmtMoney (TDD 22 verde) |
-| `a3887ba` | feat(c1): mapPhaseToScene + phaseToPct (fase backend -> escena v8, TDD verde) |
 <!-- GEN:end:recientes -->
 
 ---
