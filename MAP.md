@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `fdca1d5` | feat(c1): banner en el header (depositos-banner) fundido al fondo + greeting pequeño integrado + montos alineados al input |
 | `9884b06` | fix(c1): alinear monto/reps (input arriba alineado con 7-seg, presets abajo) + 5 montos sugeridos |
 | `4974cd8` | feat(c1): formato único de tarjeta + frases con ingenio + avatar fuera del círculo + quitar leyenda |
 | `6c3ff56` | feat(c1): ajustes visuales modal — verde mexicano vibrante, avatar DEPP+OSITOS, greeting Bricolage, reps compacto |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `c082657` | fix(c1): hardening post-review adversarial — 5 bugs de estado/leaks entre misiones |
 | `fd9ae30` | feat(c1): suplencia controlada — openDepositModal branch a openDepos v8 bajo flag deposV8 |
 | `49955df` | feat(c1): run controls + pill — pause oculto (sin soporte backend, honesto), abort cancela, pill al cerrar con misión activa, Otro depósito=toast (B4) |
-| `966d8b8` | feat(c1): SCHEDULED (/scheduled/create + bus) y MULTI (/multi/stream) cableados |
 <!-- GEN:end:recientes -->
 
 ---
