@@ -37,9 +37,16 @@
 
   // ── greetings rotativos (voz MX) ──
   const GREETS = [
-    'A que llueva verde 🇲🇽', 'Suéltalo, banco — por las buenas', 'Hora de cargar cuentas',
-    'Que caiga la feria', 'Calladito y cargadito', 'Dale, que la lana no espera',
-    "Pa'l banco con cariño", 'Verde es vida (y saldo)', 'Acredítese, mi buen', 'A engordar la cuenta',
+    'Que el banco afloje — por las buenas',
+    'Hoy se siembra verde, se cosecha saldo',
+    'Calladito, el depósito se ve más bonito',
+    'Tú deposita; el susto es del banco',
+    'Caiga la feria, que la noche es joven',
+    'Menos fe, más tarjeta 🇲🇽',
+    'El billete entra mejor con confianza',
+    'Aquí no se pide permiso, se deposita',
+    'Verdecito y al pendiente, mi rey',
+    'Deposita bonito, que el saldo es testigo',
   ];
 
   // ── toast propio (vive dentro de #depos, sobre el overlay) ──

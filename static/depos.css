@@ -48,7 +48,15 @@
 #depos .bmx::after{content:""; position:absolute; left:0; top:0; bottom:0; width:2px;
   background:linear-gradient(180deg, transparent, var(--aqua-line), transparent); opacity:.6}
 
-#depos .head{display:flex; align-items:center; justify-content:space-between; padding:15px 18px 13px; border-bottom:1px solid var(--line)}
+#depos .head{display:block; padding:0; border-bottom:1px solid var(--line); position:relative}
+/* banner centrado, un poco más chico, fundido al fondo por abajo Y por los lados (mask) */
+#depos .depos-banner{display:block; width:86%; height:auto; margin:6px auto 0;
+  -webkit-mask-image:linear-gradient(180deg,#000 58%,transparent 100%), linear-gradient(90deg,transparent,#000 9%,#000 91%,transparent);
+  -webkit-mask-composite:source-in;
+  mask-image:linear-gradient(180deg,#000 58%,transparent 100%), linear-gradient(90deg,transparent,#000 9%,#000 91%,transparent);
+  mask-composite:intersect}
+#depos .head-row{display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:0 18px 13px; margin-top:-22px; position:relative; z-index:1}
 #depos .head-l{display:flex; align-items:center; gap:12px; flex:1; min-width:0}
 #depos .head-l > div:last-child{flex:1; min-width:0}
 #depos .newproc{flex:none}
@@ -58,9 +66,8 @@
   filter:drop-shadow(0 5px 9px rgba(0,0,0,.6)); transition:var(--t); margin:-6px 0 -10px}
 #depos .depos-av:hover{filter:drop-shadow(0 6px 12px rgba(0,0,0,.7)) drop-shadow(0 0 10px var(--aqua-line))}
 #depos .head-div{width:1px; height:26px; background:var(--line-2)}
-#depos .title{font-family:'Bricolage Grotesque','Space Grotesk',sans-serif; font-weight:700; font-size:25px; letter-spacing:.2px; line-height:1.05;
-  color:#ffe08a; -webkit-text-stroke:0.6px #ffffff; paint-order:stroke fill;
-  text-shadow:0 2px 3px rgba(0,0,0,.8), 0 1px 1px rgba(0,0,0,.55); transition:opacity .3s; line-height:1.1}
+#depos .title{flex:1; min-width:0; font-family:'Bricolage Grotesque','Space Grotesk',sans-serif; font-weight:600; font-size:14.5px; letter-spacing:.2px; line-height:1.2;
+  color:#f3c77a; text-shadow:0 1px 3px rgba(0,0,0,.5); transition:opacity .3s}
 #depos .sub{display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--ink-dim); margin-top:2px}
 #depos .sub-dot{width:6px;height:6px;border-radius:50%; background:var(--aqua); box-shadow:0 0 10px var(--aqua); animation:breathe 2.6s ease-in-out infinite}
 @keyframes breathe{0%,100%{opacity:.5;transform:scale(.85)}50%{opacity:1;transform:scale(1.15)}}
@@ -99,7 +106,7 @@
 
 #depos .row2{display:flex; gap:14px; align-items:flex-start}
 #depos .amt-wrap{flex:1; min-width:0}
-#depos .amt-presets{display:flex; gap:6px; margin-top:8px; flex-wrap:wrap}
+#depos .amt-presets{display:flex; gap:6px; margin-top:8px; justify-content:space-between}
 #depos .amt-preset{padding:6px 12px; border-radius:9px; cursor:pointer; font-family:'JetBrains Mono',monospace; font-size:12px;
   background:var(--panel); border:1px solid var(--line-2); color:var(--ink-dim); transition:var(--t-fast)}
 #depos .amt-preset:hover{border-color:var(--aqua-line); color:var(--ink)}
