@@ -66,11 +66,14 @@
   filter:drop-shadow(0 5px 9px rgba(0,0,0,.6)); transition:var(--t); margin:-6px 0 -10px}
 #depos .depos-av:hover{filter:drop-shadow(0 6px 12px rgba(0,0,0,.7)) drop-shadow(0 0 10px var(--aqua-line))}
 #depos .head-div{width:1px; height:26px; background:var(--line-2)}
-/* greeting = bocadillo de diálogo: parece que el personaje del banner lo dice */
-#depos .title{position:relative; flex:0 1 auto; max-width:64%; align-self:flex-start; margin-left:6px;
-  font-family:'Bricolage Grotesque','Space Grotesk',sans-serif; font-weight:600; font-size:13.5px; letter-spacing:.1px; line-height:1.25;
-  color:#f3c77a; background:rgba(18,22,30,.9); border:1px solid var(--line-2); border-radius:13px;
-  padding:7px 13px; box-shadow:0 7px 18px -9px rgba(0,0,0,.7); transition:opacity .3s}
+/* greeting = bocadillo de diálogo de TAMAÑO FIJO (no se descuadra al rotar la frase).
+   Tipografía folklor (Ranchers) con contorno; el personaje del banner "lo dice". */
+#depos .title{position:relative; flex:0 0 auto; width:290px; min-height:46px; align-self:flex-start; margin-left:6px;
+  display:flex; align-items:center; justify-content:center; text-align:center;
+  font-family:'Ranchers','Bricolage Grotesque',cursive; font-weight:400; font-size:12.5px; letter-spacing:.5px; line-height:1.18;
+  color:#f3c77a; -webkit-text-stroke:.5px rgba(0,0,0,.55); paint-order:stroke fill;
+  background:rgba(18,22,30,.9); border:1px solid var(--line-2); border-radius:13px;
+  padding:6px 14px; box-shadow:0 7px 18px -9px rgba(0,0,0,.7); transition:opacity .25s}
 /* colita del bocadillo apuntando hacia arriba (al personaje del banner) */
 #depos .title::after{content:''; position:absolute; top:-7px; left:22px; width:0; height:0;
   border-left:7px solid transparent; border-right:7px solid transparent; border-bottom:7px solid rgba(18,22,30,.9)}
