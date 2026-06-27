@@ -99,7 +99,7 @@
 
 #depos .row2{display:flex; gap:14px; align-items:flex-start}
 #depos .amt-wrap{flex:1; min-width:0}
-#depos .amt-presets{display:flex; gap:6px; margin-bottom:7px; flex-wrap:wrap}
+#depos .amt-presets{display:flex; gap:6px; margin-top:8px; flex-wrap:wrap}
 #depos .amt-preset{padding:6px 12px; border-radius:9px; cursor:pointer; font-family:'JetBrains Mono',monospace; font-size:12px;
   background:var(--panel); border:1px solid var(--line-2); color:var(--ink-dim); transition:var(--t-fast)}
 #depos .amt-preset:hover{border-color:var(--aqua-line); color:var(--ink)}
@@ -114,7 +114,7 @@
 #depos .amt-note{font-size:10px; color:var(--ink-faint); margin-top:5px}
 
 
-#depos .reps{width:104px; flex:none; margin-top:37px}
+#depos .reps{width:104px; flex:none}
 #depos .reps.hide{display:none}
 #depos .seg-wrap{display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:var(--r-sm);
   background:var(--void-2); border:1px solid var(--line-2)}

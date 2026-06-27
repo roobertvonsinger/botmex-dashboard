@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `4974cd8` | feat(c1): formato único de tarjeta + frases con ingenio + avatar fuera del círculo + quitar leyenda |
 | `6c3ff56` | feat(c1): ajustes visuales modal — verde mexicano vibrante, avatar DEPP+OSITOS, greeting Bricolage, reps compacto |
 | `848a266` | feat(c1): greeting con fuente mexicana (Ranchers) + amarillo suave #ffe08a, contorno blanco, sombra negra |
 | `ad3c3b8` | docs(c1): registrar avatar nuevo pendiente + reorg UI como próximo objetivo urgente |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `49955df` | feat(c1): run controls + pill — pause oculto (sin soporte backend, honesto), abort cancela, pill al cerrar con misión activa, Otro depósito=toast (B4) |
 | `966d8b8` | feat(c1): SCHEDULED (/scheduled/create + bus) y MULTI (/multi/stream) cableados |
 | `e63f450` | feat(c1): SINGLE cableado a /execute-stream — fase->escena, balance before/after, movimiento, E-RED |
-| `ccecc82` | feat(c1): cuentas (combos email:password+grado), tarjetas (guardadas+agregar), cap 24h en nota — verificado con shapes reales |
 <!-- GEN:end:recientes -->
 
 ---

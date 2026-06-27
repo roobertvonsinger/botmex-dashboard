@@ -15,9 +15,9 @@ test('deriveMode: 0 cuentas (vacío) -> single', () => {
 test('deriveMode: varias cuentas -> multi (ignora reps)', () => {
   assert.equal(D.deriveMode(3, 9), 'multi');
 });
-test('presetsForMode single: [100] manual, reps visible', () => {
+test('presetsForMode single: valores sugeridos manual, reps visible', () => {
   const p = D.presetsForMode('single');
-  assert.deepEqual(p.presets, [100]);
+  assert.deepEqual(p.presets, [10, 50, 150, 300, 490]);
   assert.equal(p.manual, true);
   assert.equal(p.repsVisible, true);
 });

@@ -22,8 +22,8 @@
     }
     // single + scheduled comparten controles (1 cuenta)
     return {
-      presets: [100], manual: true, repsVisible: true,
-      note: '$100 o escribe el monto · ($10 a $499)',
+      presets: [10, 50, 150, 300, 490], manual: true, repsVisible: true,
+      note: 'Toca un monto o escríbelo · ($10 a $499)',
     };
   }
 
