@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `ad3c3b8` | docs(c1): registrar avatar nuevo pendiente + reorg UI como próximo objetivo urgente |
 | `deb4f6f` | fix(c1): verde alineado al dashboard (hue 160 #68d7a1, era turquesa #3ce0c0) + avatar 56px + cache-bust v20260627a |
 | `9d05c33` | fix(c1): cargar depos_logic.js en index.html (faltaba) — sin el, depos.js retornaba temprano y openDepos no se definia; el flag deposV8 caia al modal viejo |
 | `22c8d9b` | docs(c1): SSE_EVENTS (account_refreshed/scheduled_retry) + AUDIT (modal v8) + NEXT-SESSION (deploy/validación pendiente) |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `ccecc82` | feat(c1): cuentas (combos email:password+grado), tarjetas (guardadas+agregar), cap 24h en nota — verificado con shapes reales |
 | `ed7bc41` | docs(c1): plan bite-sized del modal v8 (13 tasks, 4 fases) |
 | `f73f851` | feat(c1): depos.js esqueleto — modal v8 monta, open/close, modo emerge, greetings, reps 7-seg (verificado en navegador via eval) |
-| `b2a8155` | feat(c1): depos.css — estilos v8 scoped bajo #depos (transformación determinista, 341 llaves balanceadas, 39 keyframes) |
 <!-- GEN:end:recientes -->
 
 ---
