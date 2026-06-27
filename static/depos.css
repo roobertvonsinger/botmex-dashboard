@@ -138,8 +138,8 @@
   background:var(--void-2); border:1px solid var(--line-2)}
 #depos .seg-disp{display:flex; gap:4px}
 #depos .seg-d{width:26px; height:40px}
-#depos .seg{fill:#13312c; transition:fill .15s}
-#depos .seg.on{fill:var(--aqua); filter:drop-shadow(0 0 4px var(--aqua-line))}
+#depos .seg{fill:#13312c; opacity:.28; transition:fill .15s, opacity .15s}
+#depos .seg.on{fill:var(--aqua); opacity:1; filter:drop-shadow(0 0 4px var(--aqua-line))}
 #depos .seg-btns{display:flex; flex-direction:column; gap:4px; margin-left:auto}
 #depos .seg-btn{width:22px;height:18px; border-radius:6px; cursor:pointer; display:grid; place-items:center;
   border:1px solid var(--line-2); background:var(--panel); color:var(--ink-dim); font-size:9px; transition:var(--t-fast)}

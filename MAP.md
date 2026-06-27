@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `0767dec` | feat(c1): greeting recuadro FIJO + texto auto-fit + rota 1/min + fade premium + banner 76% |
 | `f29f398` | feat(c1): greeting bocadillo tamaño FIJO (no se descuadra) + tipografía folklor (Ranchers) + contorno, más pequeña |
 | `ca0218f` | feat(c1): greeting como bocadillo de diálogo (parece que el personaje del banner lo dice) |
 | `fdca1d5` | feat(c1): banner en el header (depositos-banner) fundido al fondo + greeting pequeño integrado + montos alineados al input |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `deb4f6f` | fix(c1): verde alineado al dashboard (hue 160 #68d7a1, era turquesa #3ce0c0) + avatar 56px + cache-bust v20260627a |
 | `9d05c33` | fix(c1): cargar depos_logic.js en index.html (faltaba) — sin el, depos.js retornaba temprano y openDepos no se definia; el flag deposV8 caia al modal viejo |
 | `22c8d9b` | docs(c1): SSE_EVENTS (account_refreshed/scheduled_retry) + AUDIT (modal v8) + NEXT-SESSION (deploy/validación pendiente) |
-| `c082657` | fix(c1): hardening post-review adversarial — 5 bugs de estado/leaks entre misiones |
 <!-- GEN:end:recientes -->
 
 ---
