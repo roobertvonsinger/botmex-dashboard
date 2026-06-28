@@ -119,11 +119,21 @@
     _dx.accounts.forEach((a) => {
       const combo = a.email + (a.password ? (':' + a.password) : '');
       const grade = (a.grade || '').toLowerCase();
+      // SOLO el texto copia (no toda la cápsula): así la tachita queda libre y usable.
+      // createElement/textContent → seguro aunque el password traiga comillas o <>.
       const chip = document.createElement('span');
-      chip.className = 'chip copyable';
-      chip.setAttribute('data-copy', combo);
-      chip.innerHTML = '<span class="hdot ' + (['a','b','c','d'].indexOf(grade) >= 0 ? grade : '') + '"></span>' +
-        '<span class="txt">' + combo + '</span><span class="chip-x">x</span>';
+      chip.className = 'chip';
+      const hdot = document.createElement('span');
+      hdot.className = 'hdot ' + (['a', 'b', 'c', 'd'].indexOf(grade) >= 0 ? grade : '');
+      const txt = document.createElement('span');
+      txt.className = 'txt copyable';
+      txt.setAttribute('data-copy', combo);
+      txt.textContent = combo;
+      const x = document.createElement('span');
+      x.className = 'chip-x';
+      x.title = 'Quitar de esta misión (no se borra de la cuenta)';
+      x.textContent = '×';
+      chip.append(hdot, txt, x);
       box.appendChild(chip);
     });
   }
@@ -133,10 +143,19 @@
     const box = qs('#cardChips'); if (!box) return;
     box.innerHTML = '';
     _dx.cards.forEach((pipe, idx) => {
+      // SOLO el texto copia (no toda la cápsula): la tachita queda libre y usable.
       const chip = document.createElement('span');
-      chip.className = 'chip copyable';
-      chip.setAttribute('data-copy', pipe);
-      chip.innerHTML = '<span class="txt">' + pipe + '</span><span class="chip-x" data-idx="' + idx + '">x</span>';
+      chip.className = 'chip';
+      const txt = document.createElement('span');
+      txt.className = 'txt copyable';
+      txt.setAttribute('data-copy', pipe);
+      txt.textContent = pipe;
+      const x = document.createElement('span');
+      x.className = 'chip-x';
+      x.setAttribute('data-idx', idx);
+      x.title = 'Quitar de esta misión (no se borra de la cuenta)';
+      x.textContent = '×';
+      chip.append(txt, x);
       box.appendChild(chip);
     });
     const add = document.createElement('span');
@@ -596,8 +615,10 @@
     const accBox = qs('#accChips');
     if (accBox) accBox.addEventListener('click', (e) => {
       if (e.target.classList.contains('chip-x')) {
+        // el data-copy vive ahora en el .txt (no en la cápsula) — leerlo de ahí
         const chip = e.target.closest('.chip');
-        const combo = (chip && chip.getAttribute('data-copy')) || '';
+        const txt = chip && chip.querySelector('.txt[data-copy]');
+        const combo = (txt && txt.getAttribute('data-copy')) || '';
         const email = combo.split(':')[0];
         _dx.accounts = _dx.accounts.filter((a) => a.email !== email);
         renderAccounts(); refreshMode();

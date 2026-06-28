@@ -104,14 +104,17 @@
   background:var(--panel); border:1px solid var(--line-2); font-family:'JetBrains Mono',monospace; font-size:11px;
   color:var(--ink); transition:var(--t-fast); min-width:0}
 #depos .chip .txt{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1}
-#depos .copyable{cursor:pointer}
-#depos .copyable:hover{border-color:var(--aqua-line); background:var(--panel-2)}
-#depos .copyable:active{transform:scale(.99)}
+/* copyable = SOLO el texto del combo/tarjeta (no la cápsula). Hover verde = "click para copiar". */
+#depos .copyable{cursor:pointer; border-radius:6px; transition:color var(--t-fast)}
+#depos .copyable:hover{color:var(--aqua)}
+#depos .copyable:active{opacity:.7}
 #depos .hdot{width:7px;height:7px;border-radius:50%; flex:none; box-shadow:0 0 8px currentColor}
 #depos .hdot.a{color:var(--grade-a);background:var(--grade-a)} #depos .hdot.b{color:var(--grade-b);background:var(--grade-b)}
 #depos .hdot.c{color:var(--grade-c);background:var(--grade-c)} #depos .hdot.d{color:var(--grade-d);background:var(--grade-d)}
-#depos .chip-x{margin-left:2px; color:var(--ink-faint); cursor:pointer; font-size:13px; line-height:1; transition:var(--t-fast)}
-#depos .chip-x:hover{color:var(--red)}
+/* tachita = zona propia, separada del texto. Hit-area cómoda para que se pueda atinar. */
+#depos .chip-x{margin-left:auto; flex:none; color:var(--ink-faint); cursor:pointer; font-size:14px; line-height:1;
+  padding:4px 6px; border-radius:7px; transition:var(--t-fast)}
+#depos .chip-x:hover{color:var(--red); background:rgba(255,107,94,.14)}
 #depos .chip-add{border-style:dashed; color:var(--ink-dim); cursor:text; justify-content:center}
 
 

@@ -182,6 +182,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `da86df8` | docs(session): cierre — C1 modal v8 deployado en prod (flag deposV8), afinación visual + formato tarjeta único; próximo: reorg UI |
 | `87afb29` | fix(c1): segmentos 7-seg inactivos más tenues (opacity .28) + mensaje de formato canónico |
 | `0767dec` | feat(c1): greeting recuadro FIJO + texto auto-fit + rota 1/min + fade premium + banner 76% |
 | `f29f398` | feat(c1): greeting bocadillo tamaño FIJO (no se descuadra) + tipografía folklor (Ranchers) + contorno, más pequeña |
@@ -193,7 +194,6 @@ prewarm.py (router)
 | `848a266` | feat(c1): greeting con fuente mexicana (Ranchers) + amarillo suave #ffe08a, contorno blanco, sombra negra |
 | `ad3c3b8` | docs(c1): registrar avatar nuevo pendiente + reorg UI como próximo objetivo urgente |
 | `deb4f6f` | fix(c1): verde alineado al dashboard (hue 160 #68d7a1, era turquesa #3ce0c0) + avatar 56px + cache-bust v20260627a |
-| `9d05c33` | fix(c1): cargar depos_logic.js en index.html (faltaba) — sin el, depos.js retornaba temprano y openDepos no se definia; el flag deposV8 caia al modal viejo |
 <!-- GEN:end:recientes -->
 
 ---
