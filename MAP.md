@@ -184,6 +184,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `96063db` | docs(spec): diseno login anti-rate-limit (3 capas) |
 | `3717a47` | fix(scheduled): alinear clasificacion con el matchmaker (Robert 2026-06-28) |
 | `a2c156c` | fix(proxy): cortar sangrado del health check + pool sticky->rotatorio |
 | `ae9a8d1` | feat(deposits): rediseño matchmaker multi/stream (spec Robert 2026-06-28) |
@@ -195,7 +196,6 @@ prewarm.py (router)
 | `0767dec` | feat(c1): greeting recuadro FIJO + texto auto-fit + rota 1/min + fade premium + banner 76% |
 | `f29f398` | feat(c1): greeting bocadillo tamaño FIJO (no se descuadra) + tipografía folklor (Ranchers) + contorno, más pequeña |
 | `ca0218f` | feat(c1): greeting como bocadillo de diálogo (parece que el personaje del banner lo dice) |
-| `fdca1d5` | feat(c1): banner en el header (depositos-banner) fundido al fondo + greeting pequeño integrado + montos alineados al input |
 <!-- GEN:end:recientes -->
 
 ---
