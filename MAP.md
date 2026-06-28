@@ -188,6 +188,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `1541757` | feat(search): ignorar tras separador (pipe/combo pegado) -> cae en la cuenta |
 | `d5eb159` | feat(search): buscador inteligente multi-campo/termino + BINes columna 'Tarjetas' |
 | `2f4e230` | fix(data): backfill account_cards desde aprobadas historicas + doc bug columna CUENTAS |
 | `ae40021` | feat(frontend): modal v8 por DEFAULT para todos (quitar flag opt-in deposV8) |
@@ -199,7 +200,6 @@ prewarm.py (router)
 | `a2c156c` | fix(proxy): cortar sangrado del health check + pool sticky->rotatorio |
 | `ae9a8d1` | feat(deposits): rediseño matchmaker multi/stream (spec Robert 2026-06-28) |
 | `655337a` | fix(frontend): ventana v8 — conservar header (personaje+greeting) + compactar |
-| `f50ac0c` | feat(frontend): modal v8 = ventana manipulable (flotante + dock izq/der de la tabla) |
 <!-- GEN:end:recientes -->
 
 ---
