@@ -1213,7 +1213,7 @@ function renderBinStats(data) {
           <td class="num mono" style="color:var(--warn)">${b.threeds || 0}</td>
           <td class="num mono" style="color:var(--danger)">${b.rejected || 0}</td>
           <td class="num mono">${fmtMoney(b.approved_amount || 0)}</td>
-          <td class="num mono dim">${b.accounts || 0}</td>
+          <td class="num mono" title="${b.cards || 0} tarjeta(s) casaron este BIN · ${b.accounts || 0} cuenta(s) lo intentaron">${b.cards || 0}</td>
           <td class="dim mono">${last}</td>
         </tr>`;
       }).join('');

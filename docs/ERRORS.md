@@ -10,7 +10,7 @@
 
 **Causa raíz (DOS cosas, verificadas en BD prod, NO supuestas)**:
 
-1. **Columna "CUENTAS" engaña** — `bin_stats_overview` ([deposits.py:281](../deposits.py)) usa `COUNT(DISTINCT account_email)` sobre TODOS los `deposit_attempts` del BIN (approved + rejected). O sea "CUENTAS 17" = 17 cuentas que **intentaron** con ese BIN, NO cuentas con la tarjeta **casada** (guardada). Para 418928: 44 intentos de 17 cuentas, pero solo **2 aprobaron** → solo 2 tarjetas en `account_cards`. Las 18 aprobadas son de 2 tarjetas REPETIDAS (una cuenta depositó la misma 18 veces), no 18 tarjetas. **Pendiente**: renombrar/cambiar la columna a "tarjetas casadas" o mostrar `casaron/intentaron` (ej. `2/17`).
+1. **Columna "CUENTAS" engaña** — `bin_stats_overview` ([deposits.py](../deposits.py)) usaba `COUNT(DISTINCT account_email)` sobre TODOS los `deposit_attempts` del BIN (approved + rejected). O sea "CUENTAS 17" = 17 cuentas que **intentaron** con ese BIN, NO cuentas con la tarjeta **casada** (guardada). Para 418928: 44 intentos de 17 cuentas, pero solo **2 aprobaron** → solo 2 tarjetas en `account_cards`. Las 18 aprobadas son de 2 tarjetas REPETIDAS. **RESUELTO 2026-06-28**: la columna se renombró a **"Tarjetas"** = `COUNT(DISTINCT CASE WHEN status='approved' THEN card_pipe END)` (tarjetas que casaron = lo accionable, cuadra con el buscador). Tooltip muestra ambos (`cards` casaron · `accounts` intentaron). El backend conserva los dos conteos (no se pierde info).
 
 2. **Tarjetas históricas sin backfillear** — el fix de persistencia en `account_cards` (2026-05-25, ver abajo "Tarjetas no se guardan…") solo aplicó **hacia adelante**. Las aprobadas ANTES del fix quedaron solo en `deposit_attempts.card_pipe`, no en `account_cards` → el buscador (que mira `account_cards`) no las encontraba.
 
@@ -25,6 +25,12 @@ print("GAP:", c.execute("""SELECT COUNT(*) FROM (SELECT DISTINCT da.account_emai
  AND NOT EXISTS(SELECT 1 FROM account_cards ac WHERE ac.account_email=da.account_email AND ac.card_number=substr(da.card_pipe,1,instr(da.card_pipe,'|')-1)))""").fetchone()[0])
 PY
 ```
+
+### Buscador de cuentas no encontraba por nombre/CURP/teléfono/combo (2026-06-28)
+
+**Síntoma (Robert)**: el buscador (`#searchInput` → `GET /api/accounts?q=`) "no busca, parece perdedor". Solo hallaba por email, `account_cards.card_number` y `account_notes.note_text`. No encontraba una cuenta por el **nombre del titular** (visible en el detalle), ni por CURP, teléfono, password (combo), ni una tarjeta pegada **con espacios/guiones**, ni con **varios términos**.
+
+**Fix (`app.py` `_build_search_clause`)**: buscador multi-campo + multi-término. Cada palabra de `q` debe matchear en ALGÚN campo (OR) y TODAS las palabras deben matchear (AND) → "Andrea García" cae en `fullname`. Términos numéricos se normalizan (sin `espacios/-//`) para matchear `card_number` por número completo / BIN / terminación. Campos: email, `fullname`, `curp`, `phone`, `password`, `address`, `account_cards.card_number`, `account_notes.note_text`+`card_number`. `base_cols` ahora devuelve `fullname/curp/phone`. Tests: `test_search.py` (5). Verificado en prod: busca por nombre, nombre+apellido, combo, BIN, terminación, tarjeta-con-espacios. **Criterio de dominio**: un operador busca una cuenta por lo que sea que recuerde de ella.
 
 ## Proxies / login
 

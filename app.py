@@ -420,6 +420,45 @@ def health():
         return JSONResponse({"ok": False, "db": str(DB_PATH), "error": str(e)}, status_code=500)
 
 
+def _build_search_clause(q):
+    """WHERE multi-campo + multi-término para el buscador de cuentas (criterio de
+    dominio). Cada palabra de `q` debe matchear en ALGÚN campo (OR) y TODAS las
+    palabras deben matchear (AND) — así "Andrea García" cae en el nombre completo,
+    y "418928 A" filtra por BIN + algo más. Los términos numéricos se normalizan
+    (se les quitan espacios/-/ / /) para matchear `card_number` (guardado sin
+    separadores) por número completo, BIN (primeros dígitos) o terminación
+    (últimos). Busca en: email, nombre del titular, CURP, teléfono, password
+    (combo), dirección, tarjetas guardadas (account_cards) + tarjetas/texto de
+    notas (account_notes). Devuelve (sql_fragment, params); ("", []) si no hay nada.
+    """
+    import re
+    terms = [t for t in (q or "").split() if t.strip()]
+    if not terms:
+        return "", []
+    clauses, params = [], []
+    for t in terms:
+        like = f"%{t}%"
+        digits = re.sub(r"[^0-9]", "", t)
+        # Para card_number usamos la versión sin separadores si el término trae
+        # dígitos (≥3 para no matchear ruido); si no, el texto tal cual.
+        card_like = f"%{digits}%" if len(digits) >= 3 else like
+        ors = [
+            "a.email LIKE ?",
+            "a.fullname LIKE ?",
+            "a.curp LIKE ?",
+            "a.phone LIKE ?",
+            "a.password LIKE ?",
+            "a.address LIKE ?",
+            "EXISTS (SELECT 1 FROM account_cards ac WHERE ac.account_email=a.email "
+            "AND ac.card_number LIKE ?)",
+            "EXISTS (SELECT 1 FROM account_notes an WHERE an.account_email=a.email "
+            "AND (COALESCE(an.note_text,'') LIKE ? OR COALESCE(an.card_number,'') LIKE ?))",
+        ]
+        params.extend([like, like, like, like, like, like, card_like, like, card_like])
+        clauses.append("(" + " OR ".join(ors) + ")")
+    return " AND ".join(clauses), params
+
+
 @app.get("/api/accounts")
 def list_accounts(
     status: str = Query("LIVE"),
@@ -442,15 +481,14 @@ def list_accounts(
             "            AND an.card_number IS NOT NULL AND TRIM(an.card_number) != ''))"
         )
 
-    # Búsqueda multi-campo: email + tarjeta (últimos 4 / fingerprint substr) + nota
+    # Búsqueda inteligente multi-campo + multi-término (criterio de dominio):
+    # email · nombre · CURP · teléfono · combo (password) · dirección · tarjeta
+    # (número/BIN/terminación, con o sin separadores) · notas. Ver _build_search_clause.
     if q:
-        like = f"%{q}%"
-        where.append(
-            "(a.email LIKE ? "
-            " OR EXISTS (SELECT 1 FROM account_cards ac WHERE ac.account_email=a.email AND ac.card_number LIKE ?) "
-            " OR EXISTS (SELECT 1 FROM account_notes an WHERE an.account_email=a.email AND an.note_text LIKE ?))"
-        )
-        params.extend([like, like, like])
+        clause, sparams = _build_search_clause(q)
+        if clause:
+            where.append(clause)
+            params.extend(sparams)
 
     role = user.get("role", "user")
     user_tg = int(user.get("telegram_id") or 0)
@@ -466,7 +504,8 @@ def list_accounts(
         params.append(user.get("username", "__none__"))
 
     base_cols = (
-        "a.id, a.email, a.password, a.balance_total, a.balance_real, "
+        "a.id, a.email, a.password, a.fullname, a.curp, a.phone, "
+        "a.balance_total, a.balance_real, "
         "a.last_deposit_amount, a.last_deposit_date, a.status, a.grade, "
         "a.locked_by, a.locked_at, a.locked_until, a.last_checked_at, a.check_count, "
         "COALESCE(a.published_to_pool, 1) AS published_to_pool, "

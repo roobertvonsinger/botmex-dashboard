@@ -278,6 +278,13 @@ def bin_stats_overview(user: dict = Depends(require_session)):
                 "  SUM(CASE WHEN status!='approved' AND LOWER(COALESCE(rejection_reason,'')) LIKE '%3ds%' THEN 1 ELSE 0 END) AS threeds, "
                 "  SUM(CASE WHEN status!='approved' AND LOWER(COALESCE(rejection_reason,'')) NOT LIKE '%3ds%' THEN 1 ELSE 0 END) AS rejected, "
                 "  COALESCE(SUM(CASE WHEN status='approved' THEN amount ELSE 0 END),0) AS approved_amount, "
+                # `cards` = tarjetas DISTINTAS que CASARON (aprobaron) este BIN — lo
+                # accionable/reusable, y lo que el buscador encuentra. `accounts` =
+                # cuentas que INTENTARON (approved o no) — se conserva para no perder
+                # info, pero NO es lo mismo (antes la columna "CUENTAS" usaba este y
+                # confundía: 17 intentaron vs 2 casaron). Ver docs/ERRORS.md 2026-06-28.
+                "  COUNT(DISTINCT CASE WHEN status='approved' THEN card_pipe END) AS cards, "
+                "  COUNT(DISTINCT CASE WHEN status='approved' THEN account_email END) AS accounts_matched, "
                 "  COUNT(DISTINCT account_email) AS accounts, "
                 "  MAX(created_at) AS last_seen "
                 "FROM deposit_attempts "

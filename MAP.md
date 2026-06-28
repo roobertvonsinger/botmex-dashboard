@@ -92,11 +92,11 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2503 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2542 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2485 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2492 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `login_orchestrator.py` | 392 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 692 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 333 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
@@ -107,6 +107,7 @@ prewarm.py (router)
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
 | `test_anti_rate_limit.py` | 271 | `—` | _[completar]_ |
+| `test_search.py` | 52 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 55 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
@@ -187,6 +188,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `2f4e230` | fix(data): backfill account_cards desde aprobadas historicas + doc bug columna CUENTAS |
 | `ae40021` | feat(frontend): modal v8 por DEFAULT para todos (quitar flag opt-in deposV8) |
 | `2589a1e` | docs(session): NEXT-SESSION — anti-rate-limit Capa 1+3 deployadas, e2e pendiente |
 | `6eb1700` | feat(anti-rate-limit): JWT cache en depositos (Capa 1) + 429 enfriar-y-saltar (Capa 3) |
@@ -198,7 +200,6 @@ prewarm.py (router)
 | `655337a` | fix(frontend): ventana v8 — conservar header (personaje+greeting) + compactar |
 | `f50ac0c` | feat(frontend): modal v8 = ventana manipulable (flotante + dock izq/der de la tabla) |
 | `d05b3f5` | fix(frontend): tachita (x) usable en chips del modal v8 — copiar solo el texto, no la capsula |
-| `da86df8` | docs(session): cierre — C1 modal v8 deployado en prod (flag deposV8), afinación visual + formato tarjeta único; próximo: reorg UI |
 <!-- GEN:end:recientes -->
 
 ---
