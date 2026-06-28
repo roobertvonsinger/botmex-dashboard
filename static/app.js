@@ -4913,6 +4913,22 @@ function handleMmEvent(ev) {
       break;
     }
 
+    case 'account_cooling': {
+      // RATE_LIMITED (429): la cuenta entró en enfriamiento persistente y sale del
+      // run (spec anti-rate-limit Capa 3). Sin este handler, su row (y la tarjeta
+      // del par) quedan con spinner permanente — mismo bug que velocity_skip.
+      const tail = (ev.tail || '').replace('···', '');
+      const card = tail ? _mm.cards.get(tail) : null;
+      const acc = _mm.accounts.get(ev.email);
+      if (card) { card.status = 'idle'; card.busyEmail = null; card.currentPhase = ''; }
+      if (acc)  { acc.status = 'idle'; acc.busyTail = null; acc.currentPhase = ''; acc.lastCode = 'RATE_LIMITED'; }
+      _mmRender();
+      const mins = ev.cooldown_min || 45;
+      _mmFeedAdd('mm-cooldown',
+        `🧊 <b>${esc(ev.email)}</b> · enfriando ${mins} min (rate-limit 429) — saltada`);
+      break;
+    }
+
     case 'cooldown':
       _mmFeedAdd('mm-cooldown', `⏳ Cooldown ${ev.wait}s…`);
       break;

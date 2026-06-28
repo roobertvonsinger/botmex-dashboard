@@ -129,12 +129,17 @@ class StickySessionManager:
 class LoginResult:
     ok: bool
     jwt: Optional[str] = None
-    # LIVE | LOGIN_RETRY_LATER | LOGIN_DENIED | KYC_PENDING | AUTOEXCLUSION | DEPS_MISSING
+    # LIVE | LOGIN_RETRY_LATER | LOGIN_DENIED | KYC_PENDING | AUTOEXCLUSION |
+    # DEPS_MISSING | RATE_LIMITED
     code: str = ""
     account_dead: bool = False
     sticky_session: Optional[StickySession] = None
     error: Optional[str] = None
     attempts: int = 0
+    # True si el JWT salió del cache de BD (fast-path, sin captcha ni /login).
+    # El caller lo usa para decidir re-login si el JWT cacheado da 401 en el
+    # depósito (JWT muerto server-side) — ver spec anti-rate-limit Capa 1.
+    from_cache: bool = False
 
     @property
     def used_proxy(self) -> Optional[str]:
@@ -245,7 +250,8 @@ async def gentle_login(
             if cached and cached.get("expires_at", 0) > (time.time() + 60):
                 logger.info(f"[gentle_login] {email} JWT cache HIT (sin captcha)")
                 return LoginResult(ok=True, jwt=cached["token"], code="LIVE",
-                                   sticky_session=sticky_session, attempts=0)
+                                   sticky_session=sticky_session, attempts=0,
+                                   from_cache=True)
         except Exception as e:
             logger.debug(f"[gentle_login] {email} cache lookup err: {e}")
 
@@ -360,11 +366,18 @@ async def gentle_login(
                                error=str(login_result)[:200], attempts=attempts_done + 1)
 
         if status == "BAN":
-            # 403/429 rate-limit → backoff extra (portado: sleep(jitter*2)). NO mata.
-            if throttle:
-                await asyncio.sleep(random.uniform(0.1, base) * 2)
+            # 403/429 = rate-limit POR CUENTA (medido 2026-06-28: 16-20 logins/día
+            # → 429). Martillar la MISMA cuenta tras un BAN la hunde más. Capa 3 del
+            # spec anti-rate-limit (decisión Robert): ENFRIAR Y SALTAR — retornar
+            # RATE_LIMITED de inmediato para que el caller marque cooldown_until y
+            # pase a otra cuenta, en vez de agotar reintentos en ráfaga.
+            logger.warning(f"[gentle_login] {email} RATE_LIMITED (BAN) en intento "
+                           f"{attempts_done + 1} → enfriar y saltar")
+            return LoginResult(ok=False, code="RATE_LIMITED",
+                               error="BetMexico rate-limit (403/429) — enfriar y saltar",
+                               attempts=attempts_done + 1)
 
-        # RETRY_CAPTCHA(406) / BAN / ERROR / desconocido → reintentar.
+        # RETRY_CAPTCHA(406) / ERROR / desconocido → reintentar.
         # 406: el token SOBREVIVE → lo REUSAMOS (solo rotamos IP). token_reuses++
         # fuerza un token fresco tras _TOKEN_MAX_REUSES (auto-cura defensiva).
         streak += 1

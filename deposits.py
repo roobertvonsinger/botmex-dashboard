@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -39,6 +40,48 @@ AUTOLOCK_HOURS_SCHEDULED = 4  # más amplio porque corre N reps cada 1 min
 # misión programada entera (Robert 2026-05-29). Reintentamos in-situ.
 BEGIN_MAX_ATTEMPTS = 3
 BEGIN_RETRY_BACKOFF_SEC = 6
+
+
+# ── Anti-rate-limit Capa 3 (spec 2026-06-28) — enfriar y saltar ──────────────
+# Tras un 429/BAN de BetMexico (rate-limit POR CUENTA, medido) la cuenta entra en
+# "enfriamiento" persistente: los 3 flujos de depósito la saltan hasta que pase.
+# 45 min = punto medio del rango 30-60 que decidió Robert. NO reintentar la cuenta
+# caliente: martillarla la hunde más (cada login fallido la quema).
+RATE_LIMIT_COOLDOWN_MIN = 45
+
+
+def _cooldown_active(cooldown_until, now=None) -> bool:
+    """True si la cuenta está enfriando (cooldown_until = epoch en el futuro)."""
+    if not cooldown_until:
+        return False
+    if now is None:
+        now = int(time.time())
+    try:
+        return int(cooldown_until) > int(now)
+    except (TypeError, ValueError):
+        return False
+
+
+def _set_account_cooldown(email: str, minutes: int = RATE_LIMIT_COOLDOWN_MIN) -> int:
+    """Marca la cuenta enfriando hasta now+minutes (persistente en BD). Devuelve
+    el epoch de fin. No-throws (best-effort)."""
+    until = int(time.time()) + int(minutes) * 60
+    try:
+        from app import db as _appdb
+        with _appdb(write=True) as c:
+            c.execute("UPDATE accounts SET cooldown_until=? WHERE email=?", (until, email))
+    except Exception as e:
+        logger.warning(f"[cooldown] no pude setear cooldown {email}: {e}")
+    return until
+
+
+def _cooldown_remaining_min(cooldown_until, now=None) -> int:
+    """Minutos restantes de enfriamiento (0 si no aplica)."""
+    if not _cooldown_active(cooldown_until, now):
+        return 0
+    if now is None:
+        now = int(time.time())
+    return max(0, round((int(cooldown_until) - int(now)) / 60))
 
 
 def _is_transient_gateway_error(err: str) -> bool:
@@ -669,6 +712,264 @@ async def _refresh_account_after_deposit(
         logger.warning(f"[Deposits/phases] refresh post-depósito {email}: {str(e)[:160]}")
 
 
+def _should_relogin_after_401(from_cache: bool, already_relogged: bool) -> bool:
+    """True si un 401/redirectLogin en begin_deposit debe disparar re-login fresco:
+    solo cuando el JWT vino del cache de BD (puede estar muerto server-side) y aún
+    no relogueamos (1 sola vez). Capa 1 del spec anti-rate-limit (2026-06-28)."""
+    return bool(from_cache) and not already_relogged
+
+
+async def _acquire_session_and_begin(
+    email: str,
+    password: str,
+    amount: float,
+    *,
+    pool,
+    proxy: Optional[str],
+    phase_cb,
+    user: dict,
+    session_jwt: Optional[str],
+    session_proxy: Optional[str],
+    persist_login_data: bool,
+    use_jwt_cache: bool,
+    begin_deposit_fn,
+    t_total: Optional[float] = None,
+) -> dict:
+    """Adquiere una sesión válida y ejecuta begin_deposit. Orden de obtención del
+    JWT: reuso del run (session_jwt) > JWT cache de BD (Capa 1, evita /login) >
+    login fresco. Si el JWT de cache da 401 en begin (muerto server-side) lo
+    invalida y reloguea fresco UNA vez. NUNCA corre proxyless contra BetMexico:
+    si la sesión no trae proxio, toma uno del pool.
+
+    Devuelve dict:
+      éxito → {"client","jwt","used_proxy","step1","begin_ms","from_cache","login_result"}
+      fallo → {"fail": <retorno final para _run_deposit_with_phases>}
+    """
+    if t_total is None:
+        t_total = time.time()
+    _relogged = False
+    jwt: Optional[str] = None
+    used_proxy: Optional[str] = None
+    from_cache = False
+    login_result: dict = {}
+
+    while True:
+        # ── Adquirir JWT: reuso de run > cache de BD > login fresco ──
+        if session_jwt and not _relogged:
+            # Reuso de sesión (matchmaker/scheduled iter>0): JWT recién validado en
+            # ESTE run. used_proxy se hereda (afinidad de IP).
+            jwt = session_jwt
+            used_proxy = session_proxy
+            from_cache = False
+            login_result = {}
+            await _safe_phase(phase_cb, "login_reused", {
+                "ok": True, "duration_ms": 0, "reused": True,
+            })
+        else:
+            await _safe_phase(phase_cb, "login_start", {"relogin": True} if _relogged else {})
+            t0 = time.time()
+            from login_orchestrator import gentle_login, StickySession
+            forced = StickySession(proxy_url=proxy, label="forced", expires_at=0.0) if proxy else None
+            # use_cache=True (Capa 1): el intento 0 prueba el JWT cacheado vigente
+            # (0 captcha, 0 golpe a /login). Tras un re-login NO se reusa cache.
+            login_res = await gentle_login(
+                email, password, max_login_retries=4, throttle=True,
+                pool=pool, sticky_session=forced,
+                use_cache=(use_jwt_cache and not _relogged),
+            )
+            jwt = login_res.jwt
+            used_proxy = login_res.used_proxy
+            from_cache = login_res.from_cache
+            login_result = {"status": login_res.code, "error": login_res.error}
+            login_ms = int((time.time() - t0) * 1000)
+
+            if not jwt:
+                await _safe_phase(phase_cb, "login_done", {
+                    "ok": False, "duration_ms": login_ms, "from_cache": False,
+                })
+                # RATE_LIMITED (429/BAN, Capa 3): enfriar la cuenta y NO reintentar
+                # la caliente — el caller la salta hasta que pase el cooldown.
+                if login_res.code == "RATE_LIMITED":
+                    until = _set_account_cooldown(email)
+                    msg = (f"BetMexico rate-limit (429) — cuenta enfriando "
+                           f"{RATE_LIMIT_COOLDOWN_MIN} min. No reintentar hasta entonces.")
+                    await _safe_phase(phase_cb, "done", {
+                        "success": False, "result_code": "RATE_LIMITED", "error": msg,
+                    })
+                    return {"fail": {
+                        "success": False, "result_code": "RATE_LIMITED", "error": msg,
+                        "cooldown_until": until,
+                        "duration_ms": int((time.time() - t_total) * 1000),
+                    }}
+                # LOGIN_RETRY_LATER (agotó reintentos, nuestro lado) → LOGIN_FAILED:
+                # el matchmaker lo trata como login_retry → NUNCA DEAD.
+                rc = "LOGIN_FAILED" if login_res.code in ("LOGIN_RETRY_LATER", "", None) else login_res.code
+                err = login_res.error or login_res.code or "Login falló"
+                await _safe_phase(phase_cb, "done", {
+                    "success": False, "result_code": rc, "error": err,
+                })
+                return {"fail": {
+                    "success": False, "result_code": rc, "error": err,
+                    "duration_ms": int((time.time() - t_total) * 1000),
+                }}
+
+            await _safe_phase(phase_cb, "login_done", {
+                "ok": True, "duration_ms": login_ms, "from_cache": from_cache,
+            })
+
+        # ── NUNCA proxyless contra BetMexico (regla Robert): si la sesión no trae
+        # proxio (cache-hit / reuso sin proxy), tomar uno del pool para begin/submit/
+        # check. Pool vacío + cache-hit → invalidar cache y forzar login fresco
+        # (que consigue proxy). Reuso de run sin proxy: seguimos (la iter 0 ya validó IP).
+        if not used_proxy:
+            try:
+                from proxy_pool import shuffled_proxy_urls
+                _urls = shuffled_proxy_urls()
+            except Exception:
+                _urls = []
+            if _urls:
+                used_proxy = random.choice(_urls)
+            elif _should_relogin_after_401(from_cache, _relogged):
+                from prewarm import _db_invalidate_jwt
+                _db_invalidate_jwt(email)
+                _relogged = True
+                await _safe_phase(phase_cb, "login_cache_invalid", {
+                    "email": email, "reason": "sin proxy para depósito",
+                })
+                continue
+
+        # ── Persistir detalles del login en BD (solo login fresco real) ──
+        if persist_login_data:
+            try:
+                from betmexico_db import db as _bot_db
+                from web_grading import recalc_grade_from_db
+                if login_result and not from_cache:
+                    await asyncio.to_thread(
+                        _bot_db.upsert_account, login_result, user.get("telegram_id", 0)
+                    )
+                    txns_data = (login_result.get("account_details") or {}).get("transactions", {}) or {}
+                    txn_items = txns_data.get("items") or []
+                    if txn_items:
+                        await asyncio.to_thread(
+                            _bot_db.save_account_transactions,
+                            email, txn_items, user.get("telegram_id", 0),
+                        )
+                    await asyncio.to_thread(recalc_grade_from_db, email)
+            except Exception as e:
+                logger.warning(f"[Deposits/phases] persist login details failed: {e}")
+
+        # ── Gate de autoexclusión (solo login fresco real, no cache/reuso) ──
+        if not session_jwt and not from_cache and jwt:
+            try:
+                from autoexclusion import check_autoexclusion, mark_account_autoexcluded
+                ax_info = await check_autoexclusion(jwt, proxy=used_proxy)
+            except Exception as _axe:
+                logger.warning(f"[Deposits/phases] check_autoexclusion err {email}: {_axe}")
+                ax_info = None
+            if ax_info:
+                reason = mark_account_autoexcluded(
+                    email, ax_info, operator_id=user.get("telegram_id"))
+                msg = (f"Cuenta autoexcluida en BetMexico — se reactiva el "
+                       f"{ax_info['resume_human']}. Marcada DEAD, no reintentar.")
+                logger.warning(f"[Deposits/phases] {email} AUTOEXCLUSION ({reason}) — abortando depósito")
+                await _safe_phase(phase_cb, "done", {
+                    "success": False, "result_code": "AUTOEXCLUSION", "error": msg,
+                })
+                return {"fail": {
+                    "success": False, "result_code": "AUTOEXCLUSION", "error": msg,
+                    "duration_ms": int((time.time() - t_total) * 1000),
+                }}
+
+        # ── Abrir client + begin_deposit (retry ante 50x/timeout transitorios) ──
+        # Pre-cobro → reintentar es seguro (no duplica cargos).
+        client_kwargs = {"timeout": 30.0, "verify": False}
+        if used_proxy:
+            client_kwargs["proxy"] = used_proxy
+        client = httpx.AsyncClient(**client_kwargs)
+        await _safe_phase(phase_cb, "gateway_begin", {})
+        t0 = time.time()
+        step1 = {"error": "begin_deposit no ejecutado"}
+        for _battempt in range(BEGIN_MAX_ATTEMPTS):
+            try:
+                step1 = await begin_deposit_fn(client, jwt, amount)
+            except Exception as e:
+                step1 = {"error": f"begin_deposit: {e}"}
+            if "error" not in step1:
+                break
+            _berr = step1.get("error", "")
+            if _is_transient_gateway_error(_berr) and _battempt < BEGIN_MAX_ATTEMPTS - 1:
+                logger.warning(f"[Deposits/phases] begin_deposit transitorio {email} "
+                               f"(intento {_battempt + 1}/{BEGIN_MAX_ATTEMPTS}): {_berr} — reintentando")
+                await _safe_phase(phase_cb, "gateway_begin_retry", {
+                    "attempt": _battempt + 1, "max": BEGIN_MAX_ATTEMPTS, "error": _berr,
+                })
+                await asyncio.sleep(BEGIN_RETRY_BACKOFF_SEC)
+                continue
+            break
+        begin_ms = int((time.time() - t0) * 1000)
+
+        if "error" not in step1:
+            # Sesión válida → devolver con el client abierto (caller hace submit/check).
+            return {
+                "client": client, "jwt": jwt, "used_proxy": used_proxy,
+                "step1": step1, "begin_ms": begin_ms, "from_cache": from_cache,
+                "login_result": login_result,
+            }
+
+        # ── begin falló ──
+        await _safe_phase(phase_cb, "gateway_begin_done", {
+            "order_id": None, "ok": False, "duration_ms": begin_ms,
+        })
+        err = step1.get("error") or "begin_deposit falló"
+        logger.warning(f"[Deposits/phases] begin_deposit FALLÓ {email}: {err}")
+        low = str(err).lower()
+        if "redirectlogin" in low or "401" in low:
+            # Confirmar autoexclusión sobre el JWT (reusado/cache) antes de concluir.
+            try:
+                from autoexclusion import check_autoexclusion, mark_account_autoexcluded
+                ax_info = await check_autoexclusion(jwt, proxy=used_proxy)
+            except Exception:
+                ax_info = None
+            if ax_info:
+                reason = mark_account_autoexcluded(
+                    email, ax_info, operator_id=user.get("telegram_id"))
+                msg = (f"Cuenta autoexcluida en BetMexico — se reactiva el "
+                       f"{ax_info['resume_human']}. Marcada DEAD, no reintentar.")
+                await client.aclose()
+                await _safe_phase(phase_cb, "done", {
+                    "success": False, "result_code": "AUTOEXCLUSION", "error": msg,
+                })
+                return {"fail": {
+                    "success": False, "result_code": "AUTOEXCLUSION", "error": msg,
+                    "duration_ms": int((time.time() - t_total) * 1000),
+                }}
+            # JWT de cache muerto (401 sin autoexclusión) → invalidar + re-login UNA
+            # vez (Capa 1). Fast-path optimista: si el cache da 401, no se pierde nada.
+            if _should_relogin_after_401(from_cache, _relogged):
+                await client.aclose()
+                from prewarm import _db_invalidate_jwt
+                _db_invalidate_jwt(email)
+                _relogged = True
+                logger.info(f"[Deposits/phases] {email} JWT de cache rechazado (401) → "
+                            f"invalidado, re-login fresco")
+                await _safe_phase(phase_cb, "login_cache_invalid", {
+                    "email": email, "reason": "401 en begin",
+                })
+                continue
+            err = f"Sesión rechazada por BetMexico (begin_deposit 401). Detalle: {err}"
+        elif _is_transient_gateway_error(err):
+            err = (f"Gateway de pagos de BetMexico no responde tras "
+                   f"{BEGIN_MAX_ATTEMPTS} intentos ({err}). Transitorio — reintenta en unos minutos.")
+        await client.aclose()
+        await _safe_phase(phase_cb, "done", {
+            "success": False, "result_code": "BEGIN_ERROR", "error": err,
+        })
+        return {"fail": {
+            "success": False, "result_code": "BEGIN_ERROR", "error": err,
+            "duration_ms": int((time.time() - t_total) * 1000),
+        }}
+
+
 async def _run_deposit_with_phases(
     email: str,
     password: str,
@@ -683,6 +984,7 @@ async def _run_deposit_with_phases(
     persist_login_data: bool = True,
     session_jwt: Optional[str] = None,
     session_proxy: Optional[str] = None,
+    use_jwt_cache: bool = True,
 ) -> dict:
     """Orquesta deposit emitiendo fases. Mismo shape que _run_deposit.
 
@@ -714,199 +1016,32 @@ async def _run_deposit_with_phases(
     # para forzar uno; si None, el failover rota por el pool.
     used_proxy: Optional[str] = None
 
-    # ── PASO 1: Login (o reuso de sesión) ─────────────────────────────────
-    jwt = None
-    login_result: dict = {}
-    from_cache = False
+    # ── PASO 1+2: sesión válida + begin_deposit ───────────────────────────
+    # Helper unificado (spec anti-rate-limit 2026-06-28): reuso de run > JWT cache
+    # de BD (Capa 1, evita golpear /login) > login fresco. Si el JWT de cache da
+    # 401 en begin (muerto server-side) lo invalida y reloguea UNA vez. Nunca corre
+    # proxyless contra BetMexico. Devuelve el client abierto con begin OK, o un
+    # {"fail": ...} con el retorno final (login falló / RATE_LIMITED / AUTOEXCLUSION
+    # / BEGIN_ERROR).
+    res = await _acquire_session_and_begin(
+        email, password, amount, pool=pool, proxy=proxy, phase_cb=phase_cb,
+        user=user, session_jwt=session_jwt, session_proxy=session_proxy,
+        persist_login_data=persist_login_data, use_jwt_cache=use_jwt_cache,
+        begin_deposit_fn=_begin_deposit, t_total=t_total,
+    )
+    if "fail" in res:
+        return res["fail"]
+    client = res["client"]
+    jwt = res["jwt"]
+    used_proxy = res["used_proxy"]
+    step1 = res["step1"]
+    begin_ms = res["begin_ms"]
+    order_id = step1.get("orderId", "")
+    txn_id = step1.get("transactionId", "")
 
-    if session_jwt:
-        # Reuso de sesión (scheduled iter>0): el JWT de BetMexico vive ~7 días
-        # (medido en prod) y se obtuvo hace ~1 min en la iter 0 de este run —
-        # saltamos login + captcha por completo. used_proxy se hereda para
-        # mantener afinidad de IP durante todo el run (misma IP = más natural
-        # para el antifraude). Esto NO es el JWT-cache de BD de hace días (que
-        # da 401 silencioso); es el token recién validado de ESTE run.
-        jwt = session_jwt
-        used_proxy = session_proxy
-        await _safe_phase(phase_cb, "login_reused", {
-            "ok": True, "duration_ms": 0, "reused": True,
-        })
-    else:
-        await _safe_phase(phase_cb, "login_start", {})
-        t0 = time.time()
-        # gentle_login (rework 2026-05-28): login gentil con jitter anti-ráfaga +
-        # reintentos espaciados rotando IP + timeout POR INTENTO. Reemplaza
-        # call_with_proxy_failover (cuya rotación interna era ráfaga sin throttle
-        # → quemaba IPs y disparaba el antifraude). Devuelve taxonomía estricta
-        # (REGLA DE ROBERT): solo LOGIN_DENIED/KYC_PENDING/AUTOEXCLUSION matan.
-        from login_orchestrator import gentle_login, StickySession
-        forced = StickySession(proxy_url=proxy, label="forced", expires_at=0.0) if proxy else None
-        login_res = await gentle_login(
-            email, password, max_login_retries=4, throttle=True,
-            pool=pool, sticky_session=forced,
-        )
-        jwt = login_res.jwt
-        used_proxy = login_res.used_proxy
-        login_result = {"status": login_res.code, "error": login_res.error}
-        login_ms = int((time.time() - t0) * 1000)
-        from_cache = False
-
-        if not jwt:
-            await _safe_phase(phase_cb, "login_done", {
-                "ok": False, "duration_ms": login_ms, "from_cache": from_cache,
-            })
-            # Mapeo a result_code:
-            #  LOGIN_RETRY_LATER (nuestro lado, agotó reintentos) → LOGIN_FAILED:
-            #    el matchmaker lo trata como `login_retry` → NUNCA DEAD; single y
-            #    scheduled devuelven error claro al operador.
-            #  LOGIN_DENIED/KYC_PENDING/AUTOEXCLUSION → muerte real (3 razones de Robert).
-            rc = "LOGIN_FAILED" if login_res.code in ("LOGIN_RETRY_LATER", "", None) else login_res.code
-            err = login_res.error or login_res.code or "Login falló"
-            await _safe_phase(phase_cb, "done", {
-                "success": False, "result_code": rc, "error": err,
-            })
-            return {
-                "success": False, "result_code": rc,
-                "error": err, "duration_ms": int((time.time() - t_total) * 1000),
-            }
-
-        await _safe_phase(phase_cb, "login_done", {
-            "ok": True, "duration_ms": login_ms, "from_cache": from_cache,
-        })
-
-    # ── Persistir detalles del login en BD ───────────────────────────────
-    # persist_login_data=False (scheduled iter>0): skip — _record_attempt
-    # ya recalcula grade; upsert/txns solo aportan en la primera iteración
-    # de una secuencia sobre la misma cuenta.
-    if persist_login_data:
-        try:
-            from betmexico_db import db as _bot_db
-            from web_grading import recalc_grade_from_db
-            if login_result and not from_cache:
-                await asyncio.to_thread(
-                    _bot_db.upsert_account, login_result, user.get("telegram_id", 0)
-                )
-                txns_data = (login_result.get("account_details") or {}).get("transactions", {}) or {}
-                txn_items = txns_data.get("items") or []
-                if txn_items:
-                    await asyncio.to_thread(
-                        _bot_db.save_account_transactions,
-                        email, txn_items, user.get("telegram_id", 0),
-                    )
-                await asyncio.to_thread(recalc_grade_from_db, email)
-        except Exception as e:
-            logger.warning(f"[Deposits/phases] persist login details failed: {e}")
-
-    # ── Gate de autoexclusión ─────────────────────────────────────────────
-    # BetMexico entrega JWT válido a cuentas autoexcluidas (login isSuccess=True
-    # → gentle_login las marca LIVE), pero begin_deposit las rechaza con un 401
-    # `redirectLogin:true` que el dashboard mostraba como críptico "BEGIN_ERROR".
-    # Detectamos la autoexclusión ANTES de gastar el begin (leyendo el perfil con
-    # el JWT que ya tenemos), marcamos la cuenta DEAD (autoexclusión = estado REAL
-    # de BetMexico, una de las 3 razones de muerte) y devolvemos mensaje explícito.
-    # Solo en login fresco: si la iter 0 del scheduled pasó limpia, las iters que
-    # reusan sesión no la re-checan (la autoexclusión no cambia a mitad de un run).
-    if not session_jwt and jwt:
-        try:
-            from autoexclusion import check_autoexclusion, mark_account_autoexcluded
-            ax_info = await check_autoexclusion(jwt, proxy=used_proxy)
-        except Exception as _axe:
-            logger.warning(f"[Deposits/phases] check_autoexclusion err {email}: {_axe}")
-            ax_info = None
-        if ax_info:
-            reason = mark_account_autoexcluded(
-                email, ax_info, operator_id=user.get("telegram_id"))
-            msg = (f"Cuenta autoexcluida en BetMexico — se reactiva el "
-                   f"{ax_info['resume_human']}. Marcada DEAD, no reintentar.")
-            logger.warning(f"[Deposits/phases] {email} AUTOEXCLUSION ({reason}) — abortando depósito")
-            await _safe_phase(phase_cb, "done", {
-                "success": False, "result_code": "AUTOEXCLUSION", "error": msg,
-            })
-            return {
-                "success": False, "result_code": "AUTOEXCLUSION",
-                "error": msg, "duration_ms": int((time.time() - t_total) * 1000),
-            }
-
-    # ── HTTPX client compartido para pasos 2/3/4 ──────────────────────────
-    # Reusa el proxy que validó el login (afinidad — evita rotar a un proxy
-    # potencialmente caído a mitad del flujo).
-    client_kwargs = {"timeout": 30.0, "verify": False}
-    if used_proxy:
-        client_kwargs["proxy"] = used_proxy
-
-    async with httpx.AsyncClient(**client_kwargs) as client:
-        # ── PASO 2: begin_deposit (retry ante 50x/timeout transitorios) ──
-        # Pre-cobro → reintentar es seguro (no duplica cargos). Un 504/502/503/
-        # timeout del gateway de BetMexico es transitorio; antes mataba la misión.
-        await _safe_phase(phase_cb, "gateway_begin", {})
-        t0 = time.time()
-        step1 = {"error": "begin_deposit no ejecutado"}
-        for _battempt in range(BEGIN_MAX_ATTEMPTS):
-            try:
-                step1 = await _begin_deposit(client, jwt, amount)
-            except Exception as e:
-                step1 = {"error": f"begin_deposit: {e}"}
-            if "error" not in step1:
-                break
-            _berr = step1.get("error", "")
-            if _is_transient_gateway_error(_berr) and _battempt < BEGIN_MAX_ATTEMPTS - 1:
-                logger.warning(f"[Deposits/phases] begin_deposit transitorio {email} "
-                               f"(intento {_battempt + 1}/{BEGIN_MAX_ATTEMPTS}): {_berr} — reintentando")
-                await _safe_phase(phase_cb, "gateway_begin_retry", {
-                    "attempt": _battempt + 1, "max": BEGIN_MAX_ATTEMPTS, "error": _berr,
-                })
-                await asyncio.sleep(BEGIN_RETRY_BACKOFF_SEC)
-                continue
-            break
-        begin_ms = int((time.time() - t0) * 1000)
-
-        if "error" in step1:
-            await _safe_phase(phase_cb, "gateway_begin_done", {
-                "order_id": None, "ok": False, "duration_ms": begin_ms,
-            })
-            err = step1.get("error") or "begin_deposit falló"
-            # Log SIEMPRE el body crudo (antes se perdía — solo viajaba al SSE).
-            logger.warning(f"[Deposits/phases] begin_deposit FALLÓ {email}: {err}")
-            # Fallback de autoexclusión: un 401 `redirectLogin:true` en begin
-            # suele ser sesión inválida — y la causa más común sin diagnóstico es
-            # autoexclusión sobre un JWT reusado (el gate previo solo corre en
-            # login fresco). Confirmamos antes de dar el mensaje al operador.
-            low = str(err).lower()
-            if "redirectlogin" in low or "401" in low:
-                try:
-                    from autoexclusion import check_autoexclusion, mark_account_autoexcluded
-                    ax_info = await check_autoexclusion(jwt, proxy=used_proxy)
-                except Exception:
-                    ax_info = None
-                if ax_info:
-                    reason = mark_account_autoexcluded(
-                        email, ax_info, operator_id=user.get("telegram_id"))
-                    msg = (f"Cuenta autoexcluida en BetMexico — se reactiva el "
-                           f"{ax_info['resume_human']}. Marcada DEAD, no reintentar.")
-                    await _safe_phase(phase_cb, "done", {
-                        "success": False, "result_code": "AUTOEXCLUSION", "error": msg,
-                    })
-                    return {
-                        "success": False, "result_code": "AUTOEXCLUSION",
-                        "error": msg, "duration_ms": int((time.time() - t_total) * 1000),
-                    }
-                # 401 sin autoexclusión confirmada → sesión rechazada (JWT muerto)
-                err = f"Sesión rechazada por BetMexico (begin_deposit 401). Detalle: {err}"
-            elif _is_transient_gateway_error(err):
-                # Gateway de pagos no respondió tras todos los reintentos →
-                # mensaje explícito (no genérico). No es la cuenta ni la tarjeta.
-                err = (f"Gateway de pagos de BetMexico no responde tras "
-                       f"{BEGIN_MAX_ATTEMPTS} intentos ({err}). Transitorio — reintenta en unos minutos.")
-            await _safe_phase(phase_cb, "done", {
-                "success": False, "result_code": "BEGIN_ERROR", "error": err,
-            })
-            return {
-                "success": False, "result_code": "BEGIN_ERROR",
-                "error": err, "duration_ms": int((time.time() - t_total) * 1000),
-            }
-
-        order_id = step1.get("orderId", "")
-        txn_id = step1.get("transactionId", "")
+    # client abierto + begin OK. try/finally garantiza el aclose() pase lo que pase
+    # en submit/check (antes lo daba el `async with`).
+    try:
         await _safe_phase(phase_cb, "gateway_begin_done", {
             "order_id": order_id, "ok": True, "duration_ms": begin_ms,
         })
@@ -1043,6 +1178,9 @@ async def _run_deposit_with_phases(
             check_done_payload["check_error"] = check_exc
 
         await _safe_phase(phase_cb, "gateway_check_done", check_done_payload)
+    finally:
+        if client is not None:
+            await client.aclose()
 
     # ── Resultado final ──────────────────────────────────────────────────
     # Para considerar APPROVED REAL requerimos:
@@ -1446,7 +1584,14 @@ MM_MAX_PAIR_TRANSIENT = 4
 # rotativo, cada reintento sale por IP fresca → más chance contra el 406.
 # OJO: los reintentos de login NO cuentan como "intentos de depósito" (no llegan
 # al gateway), por eso son aparte del tope de 2 fallos de cuenta.
-MM_MAX_LOGIN_RETRIES = 3
+#
+# APLANADO 2026-06-28 (anti-rate-limit Capa 3): 3→2. `gentle_login` YA reintenta
+# 4× internamente (rotando IP + jitter); este multiplicador externo re-disparaba
+# el login completo otras 3 veces → hasta 4×3=12 POST /login por cuenta = la
+# ráfaga "medio criminal" que dispara el 429. Con el JWT cache (Capa 1) la mayoría
+# de cuentas ni llegan aquí, y el BAN/429 ahora corta de inmediato (RATE_LIMITED).
+# 2 = 1 reintento externo de gracia (peor caso 4×2=8). Tunable tras medir.
+MM_MAX_LOGIN_RETRIES = 2
 
 # Runs activos del matchmaker — para soporte de cancelación
 _active_mm_runs: dict[str, asyncio.Event] = {}
@@ -1514,13 +1659,16 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
     placeholders = ",".join("?" * len(account_ids))
     with db() as c:
         rows = c.execute(
-            f"SELECT id, email, password FROM accounts WHERE id IN ({placeholders})",
+            f"SELECT id, email, password, cooldown_until FROM accounts WHERE id IN ({placeholders})",
             account_ids,
         ).fetchall()
     accounts = [{
         "id": r["id"], "email": r["email"], "password": r["password"],
         "fail_count": 0, "last_used": 0.0, "done": False,
         "declined_cards": set(),   # card nums que la declinaron REAL (tarjetas distintas)
+        # Anti-rate-limit: epoch hasta el que la cuenta enfría (429 previo). Se
+        # respeta al armar el batch — no se martillea una cuenta rate-limiteada.
+        "cooldown_until": r["cooldown_until"] if "cooldown_until" in r.keys() else None,
     } for r in rows]
 
     if not accounts:
@@ -1557,6 +1705,7 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
         account_sessions: dict[str, tuple[str, str]] = {}
 
         tried: set[tuple[str, int]] = set()  # (card_num, account_id)
+        cooling_notified: set[str] = set()   # emails ya avisados como "enfriando"
         matches: list[dict] = []
         attempts = 0
         # Tracking de attempt() tasks vivas — para cancelarlas en finally si
@@ -1650,7 +1799,21 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                         yield f"data: {json.dumps({'type':'card_retired','tail':c['tail'],'assigned':len(c['assigned']),'reason':'tope 3 cuentas'})}\n\n"
 
                 live_cards = [c for c in cards if not c["retired"]]
-                live_accs  = [a for a in accounts if not a["done"] and a["fail_count"] < MM_MAX_ACCOUNT_FAILS]
+                # Anti-rate-limit (Capa 3): excluye cuentas enfriando (429 previo,
+                # cooldown_until futuro). Se avisa una vez por cuenta y sale del run
+                # — no se martillea una cuenta rate-limiteada (spec 2026-06-28).
+                live_accs = []
+                for a in accounts:
+                    if a["done"] or a["fail_count"] >= MM_MAX_ACCOUNT_FAILS:
+                        continue
+                    if _cooldown_active(a.get("cooldown_until")):
+                        if a["email"] not in cooling_notified:
+                            cooling_notified.add(a["email"])
+                            rem = _cooldown_remaining_min(a.get("cooldown_until"))
+                            yield f"data: {json.dumps({'type':'account_cooling','email':a['email'],'cooldown_min':rem,'preexisting':True})}\n\n"
+                        a["done"] = True
+                        continue
+                    live_accs.append(a)
                 if not live_cards or not live_accs:
                     break
 
@@ -1761,6 +1924,18 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                     if code == "VELOCITY_SKIP":
                         vel = r.get("velocity", {})
                         yield f"data: {json.dumps({'type':'velocity_skip','email':acc['email'],'tail':card['tail'],'wait_sec':vel.get('wait_sec'),'distinct_count':vel.get('distinct_count'),'message':vel.get('message','')})}\n\n"
+                        continue
+                    # RATE_LIMITED (429/BAN): la cuenta entró en enfriamiento persistente
+                    # (cooldown_until ya seteado por el motor). Sale del run — NO se
+                    # reintenta la cuenta caliente (spec Capa 3, decisión Robert). La
+                    # tarjeta NO se "consumió" (login falló antes del gateway): no marca
+                    # tried ni strike, y se libera del cupo de la tarjeta.
+                    if code == "RATE_LIMITED":
+                        acc["done"] = True
+                        card["assigned"].discard(acc["id"])
+                        cu = r.get("cooldown_until")
+                        rem = _cooldown_remaining_min(cu) if cu else RATE_LIMIT_COOLDOWN_MIN
+                        yield f"data: {json.dumps({'type':'account_cooling','email':acc['email'],'tail':card['tail'],'attempt':n,'cooldown_min':rem})}\n\n"
                         continue
                     now2 = asyncio.get_event_loop().time()
                     card["last_used"] = now2
@@ -2105,6 +2280,31 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                 # timeout, pool de captcha seco=DEPS_MISSING) = nuestro lado → reintento.
                 # Antes SCHED_TERMINAL_RC metía DEPS_MISSING en PARO → el scheduled se
                 # detenía "de volada" cuando el captcha no resolvía. Ya no.
+                # RATE_LIMITED (429/BAN): la cuenta enfría (cooldown_until seteado por
+                # el motor). El programado opera UNA cuenta → no puede continuar:
+                # aborta con mensaje claro. NO es la tarjeta; no reintentar la cuenta
+                # caliente (spec Capa 3, decisión Robert).
+                if code == "RATE_LIMITED":
+                    cu = r.get("cooldown_until")
+                    rem = _cooldown_remaining_min(cu) if cu else RATE_LIMIT_COOLDOWN_MIN
+                    cool_reason = (f"Cuenta enfriando {rem} min por rate-limit (429) — "
+                                   f"misión detenida.")
+                    _broadcast({
+                        "type": "activity", "kind": "scheduled",
+                        "sched_id": sched_id, "iter": iter_num, "total": repetitions,
+                        "email": email, "amount": amount,
+                        "success": False, "code": code, "reason": cool_reason,
+                        "ts": datetime.now(timezone.utc).isoformat(),
+                        **_resolve_who(operator_id),
+                    })
+                    _broadcast({
+                        "type": "activity", "kind": "scheduled_aborted",
+                        "sched_id": sched_id, "email": email, "code": code,
+                        "reason": cool_reason, "iter": iter_num, "total": repetitions,
+                        "ts": datetime.now(timezone.utc).isoformat(),
+                        **_resolve_who(operator_id),
+                    })
+                    break
                 if code in MM_THREEDS_RC:
                     # 3DS → la cuenta es premium (pasarela robusta): grade 'A+' y para
                     # la misión (no es decline; misma lógica del matchmaker).

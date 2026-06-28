@@ -1,7 +1,7 @@
 # Diseño: Login anti-rate-limit (3 capas)
 
 > Fecha: 2026-06-28 · Autor: Robert (visión) + Claude (ensamblaje)
-> Estado: **diseño aprobado en decisiones clave, pendiente review del spec**
+> Estado: **Fase 1 (Capa 1) + Fase 2 (Capa 3) IMPLEMENTADAS y deployadas 2026-06-28** (e2e con depósito real pendiente de Robert). **Fase 3 (Capa 2 — token reciclado) NO implementada.** Ver `docs/ERRORS.md` §"Rate-limit 429" + `docs/AUDIT.md` §2026-06-28.
 
 ## Problema
 
@@ -100,9 +100,9 @@ proceso de login (single/scheduled/matchmaker)
 - Verificar que el JWT cache fast-path no rompe el flujo de depósito (401 → re-login).
 
 ## Fases de implementación
-1. **Fase 1 — Capa 1 (JWT cache en depósitos):** encender `use_cache=True` + manejo 401. Medir reducción de golpes.
-2. **Fase 2 — Capa 3 (aplanar + desrafaguear + 429 enfriar-y-saltar):** separar login/gateway retries, `cooldown_until`, code `RATE_LIMITED`.
-3. **Fase 3 — Capa 2 (token reciclado entre cuentas):** rediseño del matchmaker con token de run circulante.
+1. ✅ **Fase 1 — Capa 1 (JWT cache en depósitos):** `use_cache=True` + manejo 401 (invalidar + re-login). Hecho 2026-06-28 (`_acquire_session_and_begin`). Medir reducción de golpes con cuentas frescas.
+2. ✅ **Fase 2 — Capa 3 (aplanar + 429 enfriar-y-saltar):** code `RATE_LIMITED`, `cooldown_until` (migración aditiva), respeto del cooldown en los 3 flujos, `MM_MAX_LOGIN_RETRIES` 3→2. Hecho 2026-06-28.
+3. 🔵 **Fase 3 — Capa 2 (token reciclado entre cuentas):** rediseño del matchmaker con token de run circulante. **PENDIENTE** — no implementada (riesgo de tocar el matchmaker recién alineado; requiere validación de Robert).
 
 ## Decisiones tomadas
 - Atacar las 3 capas por fases, orden 1→3→2 (Robert).

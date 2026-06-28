@@ -156,6 +156,10 @@ def _migrate():
         # last_3ds_at. Frontend consulta `/api/deposits/bin-check` antes del intento.
         ("total_3ds", "ALTER TABLE bin_stats ADD COLUMN total_3ds INTEGER DEFAULT 0"),
         ("last_3ds_at", "ALTER TABLE bin_stats ADD COLUMN last_3ds_at TEXT"),
+        # Anti-rate-limit Capa 3 (spec 2026-06-28): tras un 429/BAN la cuenta
+        # entra en "enfriamiento" hasta este epoch (segundos). Los flujos de
+        # depósito la saltan mientras `cooldown_until > now`. Migración aditiva.
+        ("cooldown_until", "ALTER TABLE accounts ADD COLUMN cooldown_until INTEGER"),
     ]:
         try:
             with db(write=True) as c:

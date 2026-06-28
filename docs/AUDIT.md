@@ -3,6 +3,20 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-06-28 (login anti-rate-limit — Capa 1 + Capa 3)
+
+### Anti-rate-limit (`deposits.py` + `login_orchestrator.py` + `app.py`)
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **JWT cache en depósitos (Capa 1)** | Login de depósito prueba JWT cacheado vigente primero (0 captcha, 0 `/login`). `_run_deposit_with_phases` → `_acquire_session_and_begin(use_jwt_cache=True)` | ✅ helper nuevo, `gentle_login(use_cache=True)` | ⚠️ unit (24 tests); e2e con depósito real PENDIENTE (Robert) |
+| **Re-login al 401 de JWT muerto** | Si el JWT de cache da 401/redirectLogin en `begin_deposit` → invalidar cache + 1 re-login fresco (`_should_relogin_after_401`) | ✅ | ⚠️ unit `test_acquire_cache_401_invalidates_and_relogins` |
+| **NUNCA proxyless en depósito** | Cache-hit sin proxio → asignar uno del pool antes de `begin/submit/check` | ✅ | ⚠️ unit `test_acquire_cache_hit_assigns_pool_proxy_not_proxyless` |
+| **429/BAN → RATE_LIMITED (Capa 3)** | `gentle_login` retorna `RATE_LIMITED` al primer BAN (no agota ráfaga) | ✅ | ⚠️ unit `test_ban_returns_rate_limited_immediately` |
+| **Enfriar y saltar (cooldown_until)** | 429 → `accounts.cooldown_until = now+45min`. Matchmaker salta cuentas enfriando + saca del run (`account_cooling`); scheduled aborta; single avisa | ✅ migración aditiva + helpers `_cooldown_*` | ⚠️ unit cooldown; e2e con 429 real PENDIENTE |
+| **Aplanar anidamiento** | `MM_MAX_LOGIN_RETRIES` 3→2 (peor caso 4×2=8 vs 12) | ✅ | tunable tras medir |
+| **Token reciclado entre cuentas (Capa 2)** | Rediseño matchmaker con token de run circulante | 🔵 NO implementada (Fase 3) | — |
+
 ## Captura: 2026-06-26 (C1 — modal de depósitos unificado v8, frontend)
 
 ### C1 — modal v8 (`static/depos.js` + `depos_logic.js` + `depos.css`)

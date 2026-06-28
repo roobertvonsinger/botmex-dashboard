@@ -92,12 +92,12 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2499 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2503 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2285 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
-| `login_orchestrator.py` | 379 | `betmexico.dashboard.login_orch` | _[completar]_ |
+| `deposits.py` | 2485 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `login_orchestrator.py` | 392 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 692 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 333 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
@@ -105,6 +105,7 @@ prewarm.py (router)
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
+| `test_anti_rate_limit.py` | 271 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 55 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
@@ -129,6 +130,7 @@ prewarm.py (router)
 | `AUTOLOCK_HOURS_SCHEDULED` | `4` | `deposits.py` |
 | `BEGIN_MAX_ATTEMPTS` | `3` | `deposits.py` |
 | `BEGIN_RETRY_BACKOFF_SEC` | `6` | `deposits.py` |
+| `RATE_LIMIT_COOLDOWN_MIN` | `45` | `deposits.py` |
 | `SCHED_MAX_TRANSIENT_RETRIES` | `4` | `deposits.py` |
 | `SCHED_RETRY_BACKOFF_SEC` | `25` | `deposits.py` |
 | `CARD_VELOCITY_MEMORY_MIN` | `30` | `deposits.py` |
@@ -139,7 +141,7 @@ prewarm.py (router)
 | `MM_MAX_CARD_FAILS` | `3` | `deposits.py` |
 | `MM_MAX_ACCOUNTS_PER_CARD` | `3` | `deposits.py` |
 | `MM_MAX_PAIR_TRANSIENT` | `4` | `deposits.py` |
-| `MM_MAX_LOGIN_RETRIES` | `3` | `deposits.py` |
+| `MM_MAX_LOGIN_RETRIES` | `2` | `deposits.py` |
 | `CAP_PER_OPERATOR_10MIN` | `9999` | `prewarm.py` |
 | `ACCOUNT_FRESH_MINUTES` | `30` | `prewarm.py` |
 | `ACCOUNT_DAILY_LIMIT` | `3` | `prewarm.py` |
@@ -184,6 +186,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `711d75d` | docs(session): cierre 2026-06-28 — matchmaker+programado rediseñados, proxy rotatorio, spec anti-rate-limit. Proximo: writing-plans Fase 1 (JWT cache). |
 | `96063db` | docs(spec): diseno login anti-rate-limit (3 capas) |
 | `3717a47` | fix(scheduled): alinear clasificacion con el matchmaker (Robert 2026-06-28) |
 | `a2c156c` | fix(proxy): cortar sangrado del health check + pool sticky->rotatorio |
@@ -195,7 +198,6 @@ prewarm.py (router)
 | `87afb29` | fix(c1): segmentos 7-seg inactivos más tenues (opacity .28) + mensaje de formato canónico |
 | `0767dec` | feat(c1): greeting recuadro FIJO + texto auto-fit + rota 1/min + fade premium + banner 76% |
 | `f29f398` | feat(c1): greeting bocadillo tamaño FIJO (no se descuadra) + tipografía folklor (Ranchers) + contorno, más pequeña |
-| `ca0218f` | feat(c1): greeting como bocadillo de diálogo (parece que el personaje del banner lo dice) |
 <!-- GEN:end:recientes -->
 
 ---

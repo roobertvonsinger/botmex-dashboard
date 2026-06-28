@@ -4,6 +4,21 @@
 
 ## Proxies / login
 
+### Rate-limit 429 por golpear `/login` de más por cuenta — anti-rate-limit 3 capas (2026-06-28)
+
+**Síntoma**: cuentas con muchos logins/día caían en `429 Rate limit` (status `BAN`). Medido: 16-20 intentos/día → 429; 1-2 → 200. Raíz: el dashboard golpeaba `POST /api/Session/login` de más por cuenta (no reusaba JWT en depósitos + doble reintento anidado `gentle_login(4)`×`MM_MAX_LOGIN_RETRIES(3)` = hasta 12 logins/cuenta en ráfaga) y, ante un 429, seguía martillando la misma cuenta.
+
+**Fix (spec `docs/superpowers/specs/2026-06-28-login-anti-rate-limit-design.md`)** — 3 mecanismos:
+
+- **Capa 1 — JWT cache en depósitos** (`deposits._acquire_session_and_begin`, helper nuevo extraído de `_run_deposit_with_phases`): el login de depósito ahora llama `gentle_login(use_cache=True)`. Si hay JWT vigente en BD (`accounts.jwt_token`, TTL real ~7 días = claim `exp`), salta captcha + `/login` (0 golpes). Si el JWT de cache da **401/redirectLogin** en `begin_deposit` (muerto server-side), lo **invalida** (`prewarm._db_invalidate_jwt`) y **reloguea fresco UNA vez** (`_should_relogin_after_401`). Fast-path optimista: si el cache falla, no se pierde nada. `LoginResult.from_cache` nuevo distingue cache-hit de login real. Medido al implementar: 79 cuentas LIVE ya tenían JWT vigente → saltan `/login` de inmediato.
+  - **OJO proxyless**: un cache-hit no trae proxy del login → el helper asigna uno del pool para `begin/submit/check` (NUNCA proxyless contra BetMexico, regla Robert). Pool vacío + cache-hit → invalida y reloguea.
+- **Capa 3 — 429 → enfriar y saltar** (`login_orchestrator.gentle_login`): `status=="BAN"` (403/429) ahora retorna code **`RATE_LIMITED`** de inmediato (antes lo agrupaba en reintentos y agotaba la ráfaga). El motor marca `accounts.cooldown_until = now + RATE_LIMIT_COOLDOWN_MIN(45)` (columna nueva, migración aditiva) y devuelve `RATE_LIMITED`. Los flujos **respetan el cooldown**: matchmaker salta cuentas enfriando al armar el batch (`_cooldown_active`) y saca del run la que se rate-limitea (evento `account_cooling`); scheduled aborta la misión con mensaje claro; single devuelve el mensaje. **Aplanado**: `MM_MAX_LOGIN_RETRIES` 3→2 (peor caso 4×2=8 en vez de 12).
+
+**Verificación**: `test_anti_rate_limit.py` (24 tests) — fast-path `from_cache`, `BAN→RATE_LIMITED`, re-login al 401 que invalida cache, cache-hit asigna proxy del pool (no proxyless), `cooldown` set/active/remaining. Smoke prod: migración `cooldown_until` aplicada, health 200.
+
+**Pendiente (Fase 3, NO implementada)**: token de captcha reciclado entre cuentas (rediseño del matchmaker con token de run circulante) — ver §"Capa 2" del spec.
+
+
 ### Health check quemaba el plan de proxy (1 GB/semana en ipinfo.io)
 
 **Síntoma**: el plan residencial de DataImpulse se agotó (quedaban 43 MB). El CSV de uso mostró **150,910 requests a ipinfo.io = 1 GB/semana (99.3% del tráfico)**; solo 0.7% era tráfico real a BetMexico.
