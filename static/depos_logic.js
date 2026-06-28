@@ -15,9 +15,12 @@
 
   function presetsForMode(mode) {
     if (mode === 'multi') {
+      // Tope real del backend = DEP_MAX_PER_TXN $499 (deposits.py:1641). $1000
+      // daba HTTP 400 SIEMPRE (preset roto). 490 = monto alto dentro del cap.
+      // Forzar 3DS de verdad (>499) requiere subir el cap = decisión operacional de Robert.
       return {
-        presets: [10, 50, 1000], manual: false, repsVisible: false,
-        note: 'Montos fijos para varias cuentas · $1000 fuerza 3DS',
+        presets: [10, 50, 490], manual: false, repsVisible: false,
+        note: 'Montos fijos para varias cuentas · $490 = monto alto (tope $499)',
       };
     }
     // single + scheduled comparten controles (1 cuenta)

@@ -188,6 +188,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `2df39d2` | docs(session): cierre 2026-06-28 — anti-rate-limit + v8 default + backfill + buscador inteligente |
 | `1541757` | feat(search): ignorar tras separador (pipe/combo pegado) -> cae en la cuenta |
 | `d5eb159` | feat(search): buscador inteligente multi-campo/termino + BINes columna 'Tarjetas' |
 | `2f4e230` | fix(data): backfill account_cards desde aprobadas historicas + doc bug columna CUENTAS |
@@ -199,7 +200,6 @@ prewarm.py (router)
 | `3717a47` | fix(scheduled): alinear clasificacion con el matchmaker (Robert 2026-06-28) |
 | `a2c156c` | fix(proxy): cortar sangrado del health check + pool sticky->rotatorio |
 | `ae9a8d1` | feat(deposits): rediseño matchmaker multi/stream (spec Robert 2026-06-28) |
-| `655337a` | fix(frontend): ventana v8 — conservar header (personaje+greeting) + compactar |
 <!-- GEN:end:recientes -->
 
 ---

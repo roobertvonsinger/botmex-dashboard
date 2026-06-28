@@ -512,6 +512,18 @@ docker exec -i betmexico-web python3 -c "import httpx;print(httpx.get('https://a
 
 ## Frontend
 
+### Panel de depósitos v8 — 5 bugs de cableado de eventos (code review 2026-06-28)
+
+**Contexto**: tras hacer v8 el modal DEFAULT (commit `ae40021`), un code review por dominio del cableado `depos.js`↔`deposits.py` halló 5 bugs que NO estaban en el motor sino en cómo el frontend consume los eventos. La lógica pura (`depos_logic.js`) estaba sana (tests verde); los bugs vivían en los handlers DOM (sin cobertura por el DOM). Fix en `depos.js`/`depos_logic.js`/`depos.css` + cache-bust `?v=20260628e`.
+
+1. **Programado: off-by-one — terminaba una rep ANTES y ocultaba la última.** El backend emite `iter` 1-indexed (`iter_num = completed+1`, deposits.py:2186/2266); `_schedOnBus` lo trataba como 0-indexed y volvía a sumar 1 (`s.iter+1`, `s.done = ev.iter+1`). Con `if (s.done >= s.total) schedFinish()` → reps=2 terminaba el panel en 1/2; reps=5 en 4/5; la última rep corría invisible (el bus ya cerró por el `interval` 60s). Conteo siempre +1. **Simulado** antes/después. **Fix**: tratar `ev.iter` como 1-indexed (`s.iter`/`s.done = ev.iter`).
+2. **Matchmaker: `account_cooling` sin handler → fila colgada.** El anti-rate-limit Capa 3 emite `account_cooling` tras un `trying` (deposits.py:1938). El switch de `runMulti` no tenía ese case → la fila `_mmRows[email]` (creada por `trying`) nunca se resolvía (dot dorado "en curso" permanente) Y el operador no veía el enfriamiento. Es exactamente el punto (b) del e2e anti-rate-limit ("la fila no se queda colgada") → el e2e habría "fallado" por el frontend, no por el motor. **Fix**: `case 'account_cooling'` → estado `skip` "en pausa ~Nm".
+3. **Matchmaker: `velocity_skip` (y `error`) dejaban fila colgada.** Mismo patrón (regresión del gotcha histórico ya resuelto en el matchmaker viejo): hacían `break` sin limpiar `_mmRows`. **Fix**: `velocity_skip`→`skip` "saltada"; `error`→borra la fila.
+4. **Single: el balance "después" mostraba provisional, pisaba el fresco.** Orden real: `account_refreshed` (bus, deposits.py:1272) llega ANTES del `done` del stream (deposits.py:1420, el wrapper espera `await deposit_task` que incluye el refresh) → el frontend pintaba el balance real y luego el `done` lo pisaba con `fromBal+amount` (L2 quiere fresco). **Fix**: flag `_dx.balRefreshed` — el provisional no pisa si ya llegó el real.
+5. **Multi: el preset $1000 SIEMPRE fallaba.** `multi_stream` valida `amount > DEP_MAX_PER_TXN($499)` → HTTP 400 (deposits.py:1641), pero el preset multi ofrecía `1000`. **Fix**: preset `490` (alineado al cap), quitado el tip "3DS" (ningún preset ≤499 garantiza 3DS sin medir). **Pendiente decisión Robert**: si se quiere un preset que fuerce 3DS de verdad (>499) hay que subir `DEP_MAX_PER_TXN` (valor operacional anti-detección).
+
+**Menor no tocado**: `#modeText` lo busca `refreshMode()` (depos.js) pero NO existe en `#deposTpl` → el label de modo ("Programado · N · cada 60s") no se muestra. Agregar el elemento toca layout sensible (Robert lo cuida al pixel) → pendiente de decidir DÓNDE va, no se metió a ciegas.
+
 ### El feed de actividad muestra 2 entradas por 1 mismo depósito fallido
 
 **Causa**: scheduled aborted dispara 2 broadcasts (`kind:scheduled` + `kind:scheduled_aborted`).

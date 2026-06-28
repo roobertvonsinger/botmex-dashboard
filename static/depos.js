@@ -76,7 +76,7 @@
     presets.forEach((v) => {
       const b = document.createElement('div');
       b.className = 'amt-preset' + (v === _dx.amount ? ' on' : '');
-      b.innerHTML = '$' + v + (v === 1000 ? '<span class="tip">3DS</span>' : '');
+      b.innerHTML = '$' + v; // ningún preset ≤$499 garantiza 3DS (cap del backend); sin tip sin medir
       b.onclick = () => {
         _dx.amount = v;
         const inp = qs('#amtInput'); if (inp) inp.value = v;
@@ -352,6 +352,7 @@
       const target = ev.email || ev.target;
       if (_dx.accounts.some((a) => a.email === target) && ev.balance_total != null) {
         const balTo = qs('#balTo'); if (balTo) balTo.textContent = D.fmtMoney(ev.balance_total);
+        _dx.balRefreshed = true; // el bus trajo el balance REAL → el provisional no debe pisarlo (L2)
       }
     }
     if (_dx.sched && typeof _schedOnBus === 'function') _schedOnBus(ev); // Task 8
@@ -366,7 +367,7 @@
     const err = D.validatePipe(pipe); if (err) { showToast(err); return; }
     const amount = _dx.amount;
 
-    _dx.running = true; journeyStart(); busOpen();
+    _dx.running = true; _dx.balRefreshed = false; journeyStart(); busOpen();
     const fromBal = Number(acc.balance || 0);
     const balNow = qs('#balNow'), balTo = qs('#balTo');
     if (balNow) balNow.textContent = D.fmtMoney(fromBal);
@@ -390,7 +391,10 @@
           gotDone = true;
           if (ev.success) {
             setScene('done'); setPct(100); setSub('Acreditado ✓', true);
-            if (balTo) balTo.textContent = D.fmtMoney(fromBal + amount); // provisional; bus reconcilia
+            // provisional SOLO si el bus aún no trajo el balance real — account_refreshed
+            // llega ANTES del done por el orden del backend (await deposit_task espera el
+            // refresh), así que no pisar el fresco si ya entró. (deposits.py:1272 vs 1420)
+            if (balTo && !_dx.balRefreshed) balTo.textContent = D.fmtMoney(fromBal + amount);
             movSetState('ok');
           } else {
             setScene('login');
@@ -464,24 +468,42 @@
     if (!s.sched_id) { s.pending.push(ev); return; }
     if (ev.sched_id && ev.sched_id !== s.sched_id) return;
     const acc = _dx.accounts[0], amount = _dx.amount;
+    // El backend manda `iter` 1-indexed (iter_num = completed+1) = la rep en curso /
+    // recién completada. NO volver a sumar 1: hacerlo adelantaba el progreso y
+    // disparaba schedFinish una rep ANTES (s.done>=total), dejando la última rep
+    // corriendo invisible. (deposits.py:2186/2266)
     if (ev.kind === 'scheduled_started') {
       setSub('Preparando…');
     } else if (ev.kind === 'scheduled_phase') {
       if (ev.iter != null) s.iter = ev.iter;
       setScene(D.mapPhaseToScene(ev.name));
       const pct = D.phaseToPct(ev.name); if (pct != null) setPct(pct);
-      setSub(phaseLabel(ev.name) + ' · ' + (s.iter + 1) + '/' + s.total);
+      setSub(phaseLabel(ev.name) + ' · ' + s.iter + '/' + s.total);
       clearSchedCountdown();
     } else if (ev.kind === 'scheduled') {
-      s.done = (ev.iter != null ? ev.iter + 1 : s.done + 1);
-      if (ev.success) { movRow(acc.email, amount, 'ok'); setSub('Acreditado ✓ · ' + s.done + '/' + s.total, true); }
-      else if (D.isRealRejection(ev.code)) { movRow(acc.email, amount, 'wait'); movSetState('wait', 'no aplicado'); }
-      if (s.done >= s.total) { schedFinish(); }
-      else if (ev.success) { startSchedCountdown(60); }
+      if (ev.success) {
+        s.done = (ev.iter != null ? ev.iter : s.done + 1); // # reps EXITOSAS (1-indexed)
+        movRow(acc.email, amount, 'ok');
+        setSub('Acreditado ✓ · ' + s.done + '/' + s.total, true);
+        if (s.done >= s.total) schedFinish();
+        else startSchedCountdown(60);
+      } else if (/3DS/i.test(ev.code || '')) {
+        // 3DS = cuenta premium A+ (pasarela robusta), NO un fallo (igual que el matchmaker)
+        movRow(acc.email, amount, 'ok'); movSetState('ok', 'A+ · 3DS');
+      } else if (ev.code === 'RATE_LIMITED') {
+        movRow(acc.email, amount, 'skip'); movSetState('skip', 'en pausa');
+      } else if (D.isRealRejection(ev.code)) {
+        movRow(acc.email, amount, 'wait'); movSetState('wait', 'no aplicado');
+      }
     } else if (ev.kind === 'scheduled_retry') {
       setScene('retry'); setSub('Reintentando · intento ' + (ev.attempt || '') + '/' + (ev.max || ''));
     } else if (ev.kind === 'scheduled_aborted') {
-      setSub(D.isRealRejection(ev.code) ? humanError(ev.code) : 'Misión detenida'); schedFinish();
+      // Mensaje específico: enfriamiento y 3DS NO son "fallo" — comunican estado real.
+      let msg = 'Misión detenida';
+      if (ev.code === 'RATE_LIMITED') msg = 'Cuenta en pausa por seguridad · reintenta luego';
+      else if (/3DS/i.test(ev.code || '')) msg = 'Cuenta premium A+ ✓';
+      else if (D.isRealRejection(ev.code)) msg = humanError(ev.code);
+      setSub(msg); schedFinish();
     } else if (ev.kind === 'scheduled_cancelled') {
       setSub('Misión cancelada'); schedFinish();
     }
@@ -558,7 +580,15 @@
       await consumeStream(r, (ev) => {
         switch (ev.type) {
           case 'start': _dx.mm.run_id = ev.run_id; break;
-          case 'trying': setSub('Probando · ' + shortEmail(ev.email)); _mmRows[ev.email] = movRow(ev.email, amount, 'wait'); break;
+          case 'trying':
+            setSub('Probando · ' + shortEmail(ev.email));
+            // reusa la fila del par si ya existe (un reintento re-emite `trying`):
+            // así NO se acumulan filas huérfanas "en curso" en Movimientos.
+            if (_mmRows[ev.email]) {
+              const d = _mmRows[ev.email].querySelector('.mov-dot'); if (d) d.className = 'mov-dot wait';
+              const t = _mmRows[ev.email].querySelector('.mov-tag'); if (t) { t.className = 'mov-tag wait'; t.textContent = 'en curso'; }
+            } else { _mmRows[ev.email] = movRow(ev.email, amount, 'wait'); }
+            break;
           case 'phase': {
             setScene(D.mapPhaseToScene(ev.name));
             const pct = D.phaseToPct(ev.name); if (pct != null) setPct(pct);
@@ -567,13 +597,24 @@
           case 'match': setScene('done'); setPct(100); _dx.mm.matches += 1; mmUpdate(ev.email, 'ok'); setSub('Acreditado ✓ · ' + shortEmail(ev.email), true); break;
           case 'account_aplus': setScene('done'); mmUpdate(ev.email, 'ok', 'A+ · 3DS'); setSub('Cuenta premium A+ · ' + shortEmail(ev.email), true); break;
           case 'rejected': if (D.isRealRejection(ev.code)) mmUpdate(ev.email, 'wait', 'no aplicado'); else mmUpdate(ev.email, null); break;
+          case 'account_cooling': {
+            // anti-rate-limit (Capa 3): la cuenta entró en enfriamiento (429). Estado
+            // operativo REAL y útil (no tripa) → terminal visible, NO se deja "en curso".
+            // Sin este case la fila del `trying` previo quedaba colgada para siempre.
+            const lbl = 'en pausa' + (ev.cooldown_min ? ' ~' + ev.cooldown_min + 'm' : '');
+            if (_mmRows[ev.email]) { mmUpdate(ev.email, 'skip', lbl); }
+            else { const rr = movRow(ev.email, amount, 'skip'); const tg = rr.querySelector('.mov-tag'); if (tg) { tg.className = 'mov-tag skip'; tg.textContent = lbl; } }
+            break;
+          }
           case 'login_retry': setScene('retry'); setSub('Reintentando · ' + shortEmail(ev.email)); break;
           case 'retry': // transitorio (nuestro lado): se reintenta tras cooldown
             if (ev.exhausted) { mmUpdate(ev.email, null); } // agotado: invisible (L3)
             else { setScene('retry'); setSub('Reintentando · ' + shortEmail(ev.email)); }
             break;
           case 'account_dead': mmUpdate(ev.email, 'wait', humanError(ev.code)); break;
-          case 'velocity_skip': case 'card_retired': case 'cooldown': case 'error': break; // invisible (L3)
+          case 'velocity_skip': mmUpdate(ev.email, 'skip', 'saltada'); break; // tarjeta muy seguida: terminal, no se queda en curso
+          case 'error': mmUpdate(ev.email, null); break;                      // error nuestro: invisible (L3) + limpia la fila del trying
+          case 'card_retired': case 'cooldown': break;                        // sin fila por cuenta: nada que limpiar
           case 'done': gotDone = true; setSub('Listo · ' + _dx.mm.matches + ' acreditada(s)', _dx.mm.matches > 0); break;
           case 'fatal': gotDone = true; setSub('Algo falló, reintenta'); break;
           case 'cancelled': gotDone = true; setSub('Misión cancelada'); break;
@@ -714,7 +755,7 @@
     // reset COMPLETO de estado entre aperturas (evita movimientos/misiones stale)
     _dx.accounts = opts.accounts || (opts.ids || []).map((id) => ({ id, email: 'cuenta#' + id, password: '', grade: '' }));
     _dx.cards = []; _dx.reps = 1; _dx.amount = 50; _dx.running = false; _dx.cap = null;
-    _dx.sched = null; _dx.mm = null; _dx.cancelled = false;
+    _dx.sched = null; _dx.mm = null; _dx.cancelled = false; _dx.balRefreshed = false;
     _lastMov = null; _mmRows = {};
     const movEl = qs('#mov'); if (movEl) movEl.innerHTML = '';
     setSub('Listo'); setPct(0);

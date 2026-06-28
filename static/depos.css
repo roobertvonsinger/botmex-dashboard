@@ -576,10 +576,12 @@
 #depos .mov-dot{width:7px;height:7px;border-radius:50%;flex:none}
 #depos .mov-dot.ok{background:var(--grade-a);box-shadow:0 0 8px var(--aqua-line)}
 #depos .mov-dot.wait{background:var(--gold);box-shadow:0 0 8px var(--gold-soft)}
+#depos .mov-dot.skip{background:var(--ink-dim);box-shadow:none}
 #depos .mov-who{font-family:'JetBrains Mono',monospace; color:var(--ink); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer}
 #depos .mov-tag{font-size:10px; padding:1px 7px; border-radius:20px; font-family:'JetBrains Mono',monospace}
 #depos .mov-tag.ok{color:var(--grade-a); background:var(--aqua-soft)}
 #depos .mov-tag.wait{color:var(--gold); background:var(--gold-soft)}
+#depos .mov-tag.skip{color:var(--ink-dim); background:var(--line-2)}
 #depos .mov-amt{font-family:'JetBrains Mono',monospace; color:var(--ink-dim); font-size:11px}
 #depos ::-webkit-scrollbar{width:6px}#depos ::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:6px}
 

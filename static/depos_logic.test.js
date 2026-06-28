@@ -21,9 +21,9 @@ test('presetsForMode single: valores sugeridos manual, reps visible', () => {
   assert.equal(p.manual, true);
   assert.equal(p.repsVisible, true);
 });
-test('presetsForMode multi: [10,50,1000] sin manual, reps oculto', () => {
+test('presetsForMode multi: [10,50,490] (alineado al cap $499) sin manual, reps oculto', () => {
   const p = D.presetsForMode('multi');
-  assert.deepEqual(p.presets, [10, 50, 1000]);
+  assert.deepEqual(p.presets, [10, 50, 490]); // $1000 daba HTTP 400 (cap DEP_MAX_PER_TXN)
   assert.equal(p.manual, false);
   assert.equal(p.repsVisible, false);
 });
