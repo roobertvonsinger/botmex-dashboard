@@ -92,7 +92,7 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2542 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2550 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -107,7 +107,7 @@ prewarm.py (router)
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
 | `test_anti_rate_limit.py` | 271 | `—` | _[completar]_ |
-| `test_search.py` | 52 | `—` | _[completar]_ |
+| `test_search.py` | 70 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 55 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
@@ -188,6 +188,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d5eb159` | feat(search): buscador inteligente multi-campo/termino + BINes columna 'Tarjetas' |
 | `2f4e230` | fix(data): backfill account_cards desde aprobadas historicas + doc bug columna CUENTAS |
 | `ae40021` | feat(frontend): modal v8 por DEFAULT para todos (quitar flag opt-in deposV8) |
 | `2589a1e` | docs(session): NEXT-SESSION — anti-rate-limit Capa 1+3 deployadas, e2e pendiente |
@@ -199,7 +200,6 @@ prewarm.py (router)
 | `ae9a8d1` | feat(deposits): rediseño matchmaker multi/stream (spec Robert 2026-06-28) |
 | `655337a` | fix(frontend): ventana v8 — conservar header (personaje+greeting) + compactar |
 | `f50ac0c` | feat(frontend): modal v8 = ventana manipulable (flotante + dock izq/der de la tabla) |
-| `d05b3f5` | fix(frontend): tachita (x) usable en chips del modal v8 — copiar solo el texto, no la capsula |
 <!-- GEN:end:recientes -->
 
 ---

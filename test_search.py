@@ -50,3 +50,21 @@ def test_search_bin_matches_card(seed_db):
     sql, params = app._build_search_clause("418928")
     assert "%418928%" in params
     assert "account_cards" in sql
+
+
+def test_search_pipe_uses_first_segment_only(seed_db):
+    app = _app(seed_db)
+    # pegar el pipe COMPLETO (NUM|EXP|CVV) → ignorar tras el separador, buscar
+    # por el número. Robert: "a partir de un separador ignore".
+    _, params = app._build_search_clause("4189281000868613|07/29|150")
+    assert "%4189281000868613%" in params
+    assert "%150%" not in params       # el CVV no se busca
+    assert "%07/29%" not in params     # el expiry no se busca
+
+
+def test_search_combo_uses_email_only(seed_db):
+    app = _app(seed_db)
+    # pegar el combo email:password → buscar por email, ignorar el password
+    _, params = app._build_search_clause("correo@x.com:secreta123")
+    assert "%correo@x.com%" in params
+    assert "%secreta123%" not in params

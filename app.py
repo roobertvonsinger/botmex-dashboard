@@ -437,6 +437,14 @@ def _build_search_clause(q):
         return "", []
     clauses, params = [], []
     for t in terms:
+        # "a partir de un separador, ignorar lo demás" (Robert): si el término es
+        # un dato pegado con separadores de estructura — pipe NUM|EXP|CVV o combo
+        # email:password — usar SOLO el 1er segmento identificante (número/email),
+        # ignorando expiry/cvv/password. Así un copy-paste de pipe o combo completo
+        # cae en la cuenta correcta. El resultado SIEMPRE es la cuenta completa.
+        t = re.split(r"[|:]", t, 1)[0].strip() or t
+        if not t:
+            continue
         like = f"%{t}%"
         digits = re.sub(r"[^0-9]", "", t)
         # Para card_number usamos la versión sin separadores si el término trae
