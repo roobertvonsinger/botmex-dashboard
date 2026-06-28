@@ -3730,11 +3730,16 @@ async function openDepositModal(accountId, opts = {}) {
     return;
   }
 
-  // ── C1: suplencia controlada del modal v8 bajo flag `deposV8` ──
-  // Default OFF = operación intacta (drawer viejo). SA prende localStorage.deposV8='1' para probar.
+  // ── C1: modal v8 por DEFAULT (2026-06-28) ──
+  // Antes era opt-IN por flag (`localStorage.deposV8==='1'`). Como el flag es
+  // POR NAVEGADOR, los demás operadores (y cualquier otro navegador) caían al
+  // drawer viejo aunque el v8 ya estuviera deployado → "ven interfaz vieja".
+  // Ahora v8 es el DEFAULT; opt-OUT explícito con `localStorage.deposV8='0'`
+  // (escape hatch si algo truena). Fallback seguro al drawer viejo si por lo que
+  // sea `openDepos` no cargó.
   // Pasamos las cuentas completas (email/password/grade/balance) desde state.rows → el v8
   // evita un fetch extra y pinta grado + balance reales.
-  if (localStorage.getItem('deposV8') === '1' && window.openDepos) {
+  if (localStorage.getItem('deposV8') !== '0' && window.openDepos) {
     const accounts = _ids.map((id) => {
       const r = (state.rows || []).find((x) => x.id === id) || {};
       return {
