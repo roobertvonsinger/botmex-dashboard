@@ -61,8 +61,11 @@ def _is_transient_gateway_error(err: str) -> bool:
 # Mismo principio que gentle_login y el matchmaker: nuestro lado = reintentos.
 SCHED_MAX_TRANSIENT_RETRIES = 4   # reintentos por rep ante fallo transitorio
 SCHED_RETRY_BACKOFF_SEC = 25      # espera entre reintentos (enfría IP en 406)
-# Códigos que SÍ detienen la misión. TODO lo demás (LOGIN_FAILED, BEGIN_ERROR,
-# TIMEOUT, ERROR, etc.) = transitorio → reintentar.
+# DEPRECADO 2026-06-28 — el loop del scheduled YA NO usa este set. Tenía `DEPS_MISSING`
+# (pool de captcha seco = NUESTRO lado) en PARO → el scheduled se detenía "de volada"
+# cuando el captcha no resolvía. Ahora el scheduled clasifica como el matchmaker:
+# 3DS→A+, _mm_is_real_decline / MM_DEAD_RC / PENDING_NOT_APPLIED → para; TODO lo demás
+# (incl. DEPS_MISSING) → reintento. Se conserva solo como referencia histórica.
 SCHED_TERMINAL_RC = frozenset({
     "BANK_REJECTED", "BANK_REJECTED_AFTER_APPROVE", "3DS_REQUIRED",
     "AUTOEXCLUSION", "KYC_PENDING", "LOGIN_DENIED",
@@ -2096,9 +2099,40 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                         await asyncio.sleep(interval)
                     continue
 
-                # ── FALLA ────────────────────────────────────────────────────
-                # Razón REAL (rechazo de tarjeta, autoexclusión, KYC…) → detener.
-                if code in SCHED_TERMINAL_RC:
+                # ── FALLA — misma lógica que el matchmaker (Robert 2026-06-28) ──
+                # PARA solo en: 3DS (→A+), rechazo REAL, o muerte real, o pendiente
+                # no aplicado. TODO lo demás (captcha/LOGIN_FAILED, gateway 50x,
+                # timeout, pool de captcha seco=DEPS_MISSING) = nuestro lado → reintento.
+                # Antes SCHED_TERMINAL_RC metía DEPS_MISSING en PARO → el scheduled se
+                # detenía "de volada" cuando el captcha no resolvía. Ya no.
+                if code in MM_THREEDS_RC:
+                    # 3DS → la cuenta es premium (pasarela robusta): grade 'A+' y para
+                    # la misión (no es decline; misma lógica del matchmaker).
+                    try:
+                        from app import db as _appdb
+                        with _appdb(write=True) as cdb:
+                            cdb.execute("UPDATE accounts SET grade='A+' WHERE email=?", (email,))
+                    except Exception as ex:
+                        logger.error(f"[Scheduled {sched_id}] no pude marcar A+ {email}: {ex}")
+                    _broadcast({
+                        "type": "activity", "kind": "scheduled",
+                        "sched_id": sched_id, "iter": iter_num, "total": repetitions,
+                        "email": email, "amount": amount,
+                        "success": False, "code": code, "reason": "3DS — cuenta premium A+",
+                        "ts": datetime.now(timezone.utc).isoformat(),
+                        **_resolve_who(operator_id),
+                    })
+                    _broadcast({
+                        "type": "activity", "kind": "scheduled_aborted",
+                        "sched_id": sched_id, "email": email, "code": code,
+                        "reason": "cuenta premium A+ (3DS)", "iter": iter_num, "total": repetitions,
+                        "ts": datetime.now(timezone.utc).isoformat(),
+                        **_resolve_who(operator_id),
+                    })
+                    break
+                # Rechazo REAL (banco/tarjeta), muerte real, o pendiente-no-aplicado
+                # (este último: NO reintentar para evitar doble cargo) → detener.
+                if _mm_is_real_decline(code) or code in MM_DEAD_RC or code == "PENDING_NOT_APPLIED":
                     _broadcast({
                         "type": "activity", "kind": "scheduled",
                         "sched_id": sched_id, "iter": iter_num, "total": repetitions,

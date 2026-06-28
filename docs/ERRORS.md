@@ -22,6 +22,14 @@
 
 ## Backend
 
+### Scheduled se paraba "de volada" cuando el captcha no resolvía
+
+**Síntoma**: el depósito programado abortaba sin reintentar apenas el login no resolvía el captcha — debería reintentar (es nuestro lado), parando solo en rechazo real.
+
+**Causa**: `SCHED_TERMINAL_RC` (lista de códigos que abortan la misión) incluía `DEPS_MISSING`. Cuando el pool de captcha se secaba/fallaba, `gentle_login` devolvía `DEPS_MISSING` → caía en PARO → abort inmediato. También el `3DS_REQUIRED` paraba pero **no marcaba la cuenta `A+`** como sí hace el matchmaker.
+
+**Fix** (2026-06-28, [deposits.py](../deposits.py) loop del scheduled): clasificación alineada con el matchmaker — `3DS`→`grade='A+'`+para; `_mm_is_real_decline`/`MM_DEAD_RC`/`PENDING_NOT_APPLIED`→para; **todo lo demás (incl. `DEPS_MISSING`)→reintento** (tope 4). `SCHED_TERMINAL_RC` quedó deprecado (solo referencia). Reciclaje de captchas intacto: 0 captcha en reps>0 (reuso sesión) + reuso token v2.
+
 ### `[deps] bot init failed: No module named 'X'` al arrancar
 
 **Síntoma**: container `betmexico-web` no arranca. Endpoints como `/api/deposits/multi/stream` devuelven **503 Service Unavailable**.
