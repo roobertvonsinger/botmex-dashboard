@@ -2,6 +2,30 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## Datos / integridad
+
+### "18 aprobadas en BINes pero 0 cuentas con esa tarjeta" — 2 problemas distintos (2026-06-28)
+
+**Síntoma (Robert)**: la vista de BINes muestra el BIN 418928 con 18 aprobadas / "CUENTAS 17", pero al buscar 418928 en el buscador aparecen pocas/ninguna cuenta con esa tarjeta guardada → "el dashboard es basura, no cuadra".
+
+**Causa raíz (DOS cosas, verificadas en BD prod, NO supuestas)**:
+
+1. **Columna "CUENTAS" engaña** — `bin_stats_overview` ([deposits.py:281](../deposits.py)) usa `COUNT(DISTINCT account_email)` sobre TODOS los `deposit_attempts` del BIN (approved + rejected). O sea "CUENTAS 17" = 17 cuentas que **intentaron** con ese BIN, NO cuentas con la tarjeta **casada** (guardada). Para 418928: 44 intentos de 17 cuentas, pero solo **2 aprobaron** → solo 2 tarjetas en `account_cards`. Las 18 aprobadas son de 2 tarjetas REPETIDAS (una cuenta depositó la misma 18 veces), no 18 tarjetas. **Pendiente**: renombrar/cambiar la columna a "tarjetas casadas" o mostrar `casaron/intentaron` (ej. `2/17`).
+
+2. **Tarjetas históricas sin backfillear** — el fix de persistencia en `account_cards` (2026-05-25, ver abajo "Tarjetas no se guardan…") solo aplicó **hacia adelante**. Las aprobadas ANTES del fix quedaron solo en `deposit_attempts.card_pipe`, no en `account_cards` → el buscador (que mira `account_cards`) no las encontraba.
+
+**Fix del #2 (backfill, ejecutado en prod 2026-06-28)**: `scripts/backfill_account_cards.py` recorre todas las `deposit_attempts` approved, parsea la tarjeta (`_parse_pipe` verbatim) y la registra en `account_cards` (idempotente, UNIQUE card_number). Backup previo a `/data/backups/`. **Resultado medido**: gap 3→0 (3 tarjetas recuperadas: adalesquivel/4915…, espinoza.alberto/5127…, marckovzz40/4210…), 0 inventadas (cada una con ≥1 approved real), 0 duplicados. Marcadas `registered_by_name="<op> (backfill)"` con la fecha real de aprobación. **El buscador del backend SIEMPRE estuvo bien** (simulado con 418928 → devolvía las 2 que ya existían); el problema era el gap de datos, no la búsqueda.
+
+**Diagnóstico (cuántas faltan)**:
+```bash
+docker exec -i betmexico-web python3 - <<'PY'
+import sqlite3; c=sqlite3.connect("/data/betmexico_accounts.db")
+print("GAP:", c.execute("""SELECT COUNT(*) FROM (SELECT DISTINCT da.account_email, substr(da.card_pipe,1,instr(da.card_pipe,'|')-1) cn
+ FROM deposit_attempts da WHERE lower(da.status)='approved' AND da.card_pipe LIKE '%|%'
+ AND NOT EXISTS(SELECT 1 FROM account_cards ac WHERE ac.account_email=da.account_email AND ac.card_number=substr(da.card_pipe,1,instr(da.card_pipe,'|')-1)))""").fetchone()[0])
+PY
+```
+
 ## Proxies / login
 
 ### Rate-limit 429 por golpear `/login` de más por cuenta — anti-rate-limit 3 capas (2026-06-28)

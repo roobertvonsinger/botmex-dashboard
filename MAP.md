@@ -100,6 +100,7 @@ prewarm.py (router)
 | `login_orchestrator.py` | 392 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 692 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 333 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
@@ -186,6 +187,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `ae40021` | feat(frontend): modal v8 por DEFAULT para todos (quitar flag opt-in deposV8) |
 | `2589a1e` | docs(session): NEXT-SESSION — anti-rate-limit Capa 1+3 deployadas, e2e pendiente |
 | `6eb1700` | feat(anti-rate-limit): JWT cache en depositos (Capa 1) + 429 enfriar-y-saltar (Capa 3) |
 | `711d75d` | docs(session): cierre 2026-06-28 — matchmaker+programado rediseñados, proxy rotatorio, spec anti-rate-limit. Proximo: writing-plans Fase 1 (JWT cache). |
@@ -197,7 +199,6 @@ prewarm.py (router)
 | `f50ac0c` | feat(frontend): modal v8 = ventana manipulable (flotante + dock izq/der de la tabla) |
 | `d05b3f5` | fix(frontend): tachita (x) usable en chips del modal v8 — copiar solo el texto, no la capsula |
 | `da86df8` | docs(session): cierre — C1 modal v8 deployado en prod (flag deposV8), afinación visual + formato tarjeta único; próximo: reorg UI |
-| `87afb29` | fix(c1): segmentos 7-seg inactivos más tenues (opacity .28) + mensaje de formato canónico |
 <!-- GEN:end:recientes -->
 
 ---

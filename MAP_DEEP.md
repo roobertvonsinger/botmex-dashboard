@@ -227,6 +227,14 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_looks_like_proxy_failure_result` | def | L296–L315 |
 | `_looks_like_captcha_failure_result` | def | L318–L333 |
 
+### `scripts/backfill_account_cards.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `_parse_pipe` | def | L34–L49 |
+| `_roster` | def | L52–L63 |
+| `main` | def | L66–L119 |
+
 ### `scripts/gen_map.py`
 
 | Símbolo | Tipo | Líneas |
