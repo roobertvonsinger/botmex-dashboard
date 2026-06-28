@@ -186,6 +186,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `6eb1700` | feat(anti-rate-limit): JWT cache en depositos (Capa 1) + 429 enfriar-y-saltar (Capa 3) |
 | `711d75d` | docs(session): cierre 2026-06-28 — matchmaker+programado rediseñados, proxy rotatorio, spec anti-rate-limit. Proximo: writing-plans Fase 1 (JWT cache). |
 | `96063db` | docs(spec): diseno login anti-rate-limit (3 capas) |
 | `3717a47` | fix(scheduled): alinear clasificacion con el matchmaker (Robert 2026-06-28) |
@@ -197,7 +198,6 @@ prewarm.py (router)
 | `da86df8` | docs(session): cierre — C1 modal v8 deployado en prod (flag deposV8), afinación visual + formato tarjeta único; próximo: reorg UI |
 | `87afb29` | fix(c1): segmentos 7-seg inactivos más tenues (opacity .28) + mensaje de formato canónico |
 | `0767dec` | feat(c1): greeting recuadro FIJO + texto auto-fit + rota 1/min + fade premium + banner 76% |
-| `f29f398` | feat(c1): greeting bocadillo tamaño FIJO (no se descuadra) + tipografía folklor (Ranchers) + contorno, más pequeña |
 <!-- GEN:end:recientes -->
 
 ---
