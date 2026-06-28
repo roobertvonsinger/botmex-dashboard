@@ -184,6 +184,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `3717a47` | fix(scheduled): alinear clasificacion con el matchmaker (Robert 2026-06-28) |
 | `a2c156c` | fix(proxy): cortar sangrado del health check + pool sticky->rotatorio |
 | `ae9a8d1` | feat(deposits): rediseño matchmaker multi/stream (spec Robert 2026-06-28) |
 | `655337a` | fix(frontend): ventana v8 — conservar header (personaje+greeting) + compactar |
@@ -195,7 +196,6 @@ prewarm.py (router)
 | `f29f398` | feat(c1): greeting bocadillo tamaño FIJO (no se descuadra) + tipografía folklor (Ranchers) + contorno, más pequeña |
 | `ca0218f` | feat(c1): greeting como bocadillo de diálogo (parece que el personaje del banner lo dice) |
 | `fdca1d5` | feat(c1): banner en el header (depositos-banner) fundido al fondo + greeting pequeño integrado + montos alineados al input |
-| `9884b06` | fix(c1): alinear monto/reps (input arriba alineado con 7-seg, presets abajo) + 5 montos sugeridos |
 <!-- GEN:end:recientes -->
 
 ---
