@@ -49,29 +49,30 @@ EXTRA_ADMIN_PROXIES: List[Dict[str, str]] = [
     },
 ]
 
-# Data Impulse (Premium MX residencial, STICKY por puerto ~2 min) — PRIMARIO desde
-# 2026-06-24. Robert contrató 50 sticky MX. Mecanismo: host/user/pass FIJOS; el
-# PUERTO define la sticky session (cada puerto = 1 IP que se mantiene ~2 min).
-# Puerto base 10000, +1 por sesión → 10000..10049 = 50 IPs MX distintas. El sufijo
-# `__cr.mx` en el username fuerza país México.
-# Probado en vivo 2026-06-24 (6 puertos desde betmexico-web): 12/12 requests → 200,
-# 0% 504, IPs MX reales y distintas por puerto (177.225.x, 187.190.x, 201.141.x,
-# 45.177.x), latencia 620-1150ms, betmexico.mx/login alcanzable. Rompe el pool
-# monoproxy que causaba el LOGIN_RETRY_LATER (NodeMaven único + 504). Ver
-# docs/ERRORS.md §"504 / pool monoproxy".
+# Data Impulse (Premium MX residencial) — PRIMARIO. Host/user/pass FIJOS; el PUERTO
+# define el modo:
+#   - 10000..10049 = 50 sesiones STICKY (IP pegada ~2 min cada puerto). Config previa
+#     (2026-06-24). Esas 50 IPs se QUEMARON con el uso (logins + un health check que
+#     las machacaba 150k veces/sem contra ipinfo) → 406/429 masivo desde ~26-jun.
+#   - 823 = ROTATORIO nacional MX: IP FRESCA en cada request. Robert lo dio 2026-06-28;
+#     probado en vivo (login directo, cuenta real) → LIVE al 1er intento. Se adopta como
+#     pool primario porque no se queda pegado a IPs quemadas.
+# El sufijo `__cr.mx` en el username fuerza país México. COUNT = nº de copias del
+# rotatorio = PESO del pool (DataImpulse domina vs NodeMaven degradado). Cada copia es
+# el MISMO endpoint rotatorio; el rotador asigna IP distinta por request/conexión.
 _DATAIMPULSE_HOST = "gw.dataimpulse.com"
 _DATAIMPULSE_USER = "edb0501e430b94a664c0__cr.mx"
 _DATAIMPULSE_PASS = "e689a5016d540f47"
-_DATAIMPULSE_PORT_BASE = 10000
-_DATAIMPULSE_COUNT = 50  # puertos 10000..10000+COUNT-1 (una IP sticky por puerto)
+_DATAIMPULSE_ROTATING_PORT = 823
+_DATAIMPULSE_COUNT = 50  # copias del rotatorio (peso en el pool, no IPs distintas fijas)
 
 DATAIMPULSE_PROXIES: List[Dict[str, str]] = [
     {
-        "server": f"{_DATAIMPULSE_HOST}:{_DATAIMPULSE_PORT_BASE + i}",
+        "server": f"{_DATAIMPULSE_HOST}:{_DATAIMPULSE_ROTATING_PORT}",
         "username": _DATAIMPULSE_USER,
         "password": _DATAIMPULSE_PASS,
     }
-    for i in range(_DATAIMPULSE_COUNT)
+    for _ in range(_DATAIMPULSE_COUNT)
 ]
 
 # Hosts excluidos del pool — proxies con reputación quemada para el reCAPTCHA

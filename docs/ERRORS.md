@@ -2,6 +2,24 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## Proxies / login
+
+### Health check quemaba el plan de proxy (1 GB/semana en ipinfo.io)
+
+**Síntoma**: el plan residencial de DataImpulse se agotó (quedaban 43 MB). El CSV de uso mostró **150,910 requests a ipinfo.io = 1 GB/semana (99.3% del tráfico)**; solo 0.7% era tráfico real a BetMexico.
+
+**Causa**: `_proxy_health()` ([app.py](../app.py)) barría **los 52 proxies** del pool con un GET a `ipinfo.io/json` (~6.6 KB c/u), cache de solo **30s**. Disparado por el polling del frontend (`/api/health`, `kpis`) → miles de hits/hora 24/7. Lo introdujo Claude (commits `479f8d0` 6-may + `7b8a195` 29-may); nunca se instrumentó ni se avisó del consumo.
+
+**Fix** (2026-06-28): muestra de **3 proxies** (no 52) + endpoint `api.ipify.org` (≈50 bytes, no ipinfo 6.6 KB) + cache **30 min** (`_PROXY_TTL=1800`). Baja de ~1 GB/sem a ~50 KB/sem. NO afecta login/depósito (usan los proxies directo). Verificado: `chequeados=3, pool_size=52, ttl=1800`.
+
+### Login 406/429 masivo: pool DataImpulse STICKY quemado → cambiar a ROTATORIO
+
+**Síntoma**: login daba **406 FAILURE_IN_CAPTCHA + 429 Rate limit** en todas las cuentas desde ~26-jun (último 200 OK el 26-jun). CapMonster resolvía los tokens (3/3); BetMexico los rechazaba = reputación de IP.
+
+**Causa**: el pool usaba 50 sesiones **sticky** de DataImpulse (puertos `10000-10049`, cada puerto = 1 IP pegada ~2 min). Esas 50 IPs fijas se **quemaron** con el uso + el health check machacándolas. El proxy conectaba (transporte "success" en el CSV) pero BetMexico rechazaba la IP a nivel app.
+
+**Fix** (2026-06-28): mismo DataImpulse, **puerto rotatorio `823`** (IP fresca por request) en vez de las 50 sticky ([proxy_pool.py](../proxy_pool.py) `_DATAIMPULSE_ROTATING_PORT`). Probado en vivo: `LIVE` al 1er intento (aislado). **OJO cadencia**: BetMexico rate-limita **ráfagas** aunque la IP rote (4 logins en 20s → 429). El matchmaker con cooldown 60s espacia y opera bien con 1 tarjeta; con muchas tarjetas en paralelo, vigilar el 429 de ráfaga.
+
 ## Backend
 
 ### `[deps] bot init failed: No module named 'X'` al arrancar

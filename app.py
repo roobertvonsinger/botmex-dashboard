@@ -604,8 +604,11 @@ def stats(_user: dict = Depends(require_session)):
 
 # ── Proxy pool health (cache 30s) — pool activo IPRoyal/NodeMaven ───────────────
 _proxy_cache: dict = {"ts": 0.0, "data": None}
-_PROXY_TTL = 30.0       # cache si OK
-_PROXY_TTL_FAIL = 5.0   # cache corto si falló — re-intenta rápido
+_PROXY_TTL = 1800.0     # cache si OK (30 min). NO bajar: el health NO debe quemar
+                        # el plan de proxy. A 30s barría los 52 contra ipinfo cada
+                        # 30s = ~1 GB/semana del plan residencial (Claude 2026-06-28,
+                        # responsabilidad: lo metí yo, lo reparo).
+_PROXY_TTL_FAIL = 120.0 # cache si falló (2 min — antes 5s = ráfaga que quemaba más)
 
 _wsai_cache: dict = {"ts": 0.0, "data": None}
 _WSAI_TTL = 120.0       # 2 min — el balance no cambia tan seguido
@@ -671,9 +674,10 @@ def _check_one_proxy(proxy_url: str, timeout: float = 6.0) -> dict:
     handler = urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
     opener = urllib.request.build_opener(handler)
     last_err = "sin respuesta"
+    # SOLO api.ipify (≈50 bytes). ipinfo.io/json pesa ~6.6 KB y quemaba el plan
+    # residencial (1 GB/sem en health checks). El país se asume MX (el pool es MX).
     for endpoint, parse in [
-        ("https://ipinfo.io/json", lambda b: (b.get("ip"), b.get("country"))),
-        ("https://api.ipify.org?format=json", lambda b: (b.get("ip"), None)),
+        ("https://api.ipify.org?format=json", lambda b: (b.get("ip"), "MX")),
     ]:
         t0 = _time.time()
         try:
@@ -718,13 +722,17 @@ def _proxy_health() -> dict:
         _proxy_cache.update({"ts": now, "data": out})
         return out
 
-    results = [_check_one_proxy(u) for u in urls]
+    # Muestra de máx 3 (no los 52). Barrer todo el pool cada ciclo quemaba el plan.
+    import random as _rnd
+    sample = urls if len(urls) <= 3 else _rnd.sample(urls, 3)
+    results = [_check_one_proxy(u) for u in sample]
     alive = [r for r in results if r.get("ok")]
     best = min(alive, key=lambda r: r["latency_ms"]) if alive else None
     out = {
         "ok": len(alive) > 0,
         "alive": len(alive),
         "total": len(results),
+        "pool_size": len(urls),   # tamaño real del pool (la muestra es de 3)
         "country": (best or {}).get("country"),
         "latency_ms": (best or {}).get("latency_ms"),
         "ip": (best or {}).get("ip"),

@@ -92,14 +92,14 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2491 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2499 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `deposits.py` | 2251 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `login_orchestrator.py` | 379 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 692 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
-| `proxy_pool.py` | 332 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `proxy_pool.py` | 333 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
@@ -184,6 +184,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `ae9a8d1` | feat(deposits): rediseño matchmaker multi/stream (spec Robert 2026-06-28) |
 | `655337a` | fix(frontend): ventana v8 — conservar header (personaje+greeting) + compactar |
 | `f50ac0c` | feat(frontend): modal v8 = ventana manipulable (flotante + dock izq/der de la tabla) |
 | `d05b3f5` | fix(frontend): tachita (x) usable en chips del modal v8 — copiar solo el texto, no la capsula |
@@ -195,7 +196,6 @@ prewarm.py (router)
 | `fdca1d5` | feat(c1): banner en el header (depositos-banner) fundido al fondo + greeting pequeño integrado + montos alineados al input |
 | `9884b06` | fix(c1): alinear monto/reps (input arriba alineado con 7-seg, presets abajo) + 5 montos sugeridos |
 | `4974cd8` | feat(c1): formato único de tarjeta + frases con ingenio + avatar fuera del círculo + quitar leyenda |
-| `6c3ff56` | feat(c1): ajustes visuales modal — verde mexicano vibrante, avatar DEPP+OSITOS, greeting Bricolage, reps compacto |
 <!-- GEN:end:recientes -->
 
 ---
