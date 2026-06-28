@@ -565,8 +565,13 @@
             setSub(phaseLabel(ev.name) + ' · ' + shortEmail(ev.email)); break;
           }
           case 'match': setScene('done'); setPct(100); _dx.mm.matches += 1; mmUpdate(ev.email, 'ok'); setSub('Acreditado ✓ · ' + shortEmail(ev.email), true); break;
+          case 'account_aplus': setScene('done'); mmUpdate(ev.email, 'ok', 'A+ · 3DS'); setSub('Cuenta premium A+ · ' + shortEmail(ev.email), true); break;
           case 'rejected': if (D.isRealRejection(ev.code)) mmUpdate(ev.email, 'wait', 'no aplicado'); else mmUpdate(ev.email, null); break;
           case 'login_retry': setScene('retry'); setSub('Reintentando · ' + shortEmail(ev.email)); break;
+          case 'retry': // transitorio (nuestro lado): se reintenta tras cooldown
+            if (ev.exhausted) { mmUpdate(ev.email, null); } // agotado: invisible (L3)
+            else { setScene('retry'); setSub('Reintentando · ' + shortEmail(ev.email)); }
+            break;
           case 'account_dead': mmUpdate(ev.email, 'wait', humanError(ev.code)); break;
           case 'velocity_skip': case 'card_retired': case 'cooldown': case 'error': break; // invisible (L3)
           case 'done': gotDone = true; setSub('Listo · ' + _dx.mm.matches + ' acreditada(s)', _dx.mm.matches > 0); break;

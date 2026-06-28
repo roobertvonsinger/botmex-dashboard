@@ -633,6 +633,18 @@ except Exception:
 
 **Fix** (2026-05-21, [deposits.py:1001](deposits.py#L1001)): `await asyncio.sleep(min(vel["wait_sec"] or 60, 30))` antes de retornar. Cap a 30s para no bloquear otros pares en el batch.
 
+> **Actualización 2026-06-28**: `MM_COOLDOWN` subió de 5s → 60s (ver entrada de abajo). Ahora `MM_COOLDOWN (60s) == velocity wait (60s)`, así que el tight-loop ya no puede ocurrir desde la construcción del batch (la tarjeta no reentra antes de 60s). El throttle de 30s queda como segunda red.
+
+---
+
+### `MM_COOLDOWN=5s` quemaba la pasarela (matchmaker reusaba la misma tarjeta cada 5s)
+
+**Síntoma**: con pool chico (ej. 1 tarjeta · N cuentas), el matchmaker disparaba depósitos de la **misma tarjeta** contra cuentas distintas cada ~5 segundos. Patrón de alta velocidad evidente para el antifraude de la pasarela → la tarjeta/pasarela se quema.
+
+**Causa**: `MM_COOLDOWN = 5` (segundos) era el piso entre reusos de una misma tarjeta/cuenta al armar el batch ([deposits.py:1604](deposits.py#L1604), [deposits.py:1611](deposits.py#L1611)). 5s no es un espaciado anti-detección — es lo contrario. El `CARD_VELOCITY_COOLDOWN_SEC=60` solo entraba **a partir del 3er aprobado** (`CARD_VELOCITY_FREE_PAIR=2` deja 2 usos libres), así que los primeros usos iban back-to-back a 5s.
+
+**Fix** (2026-06-28, [deposits.py:1387](deposits.py#L1387)): `MM_COOLDOWN = 5` → `60`. Una misma tarjeta (o cuenta) no se reusa antes de 60s = máx 1 depósito/minuto por tarjeta, garantizado desde la construcción del batch. Decisión de Robert: el espaciado correcto siempre fue 60s. El velocity-check (free-pair + 60s) queda dominado, como red redundante.
+
 ---
 
 ### `pool.start_factory()` failure dejaba cuentas lockeadas + state inconsistente

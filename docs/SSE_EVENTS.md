@@ -49,12 +49,14 @@ Endpoint `/api/deposits/multi/stream` devuelve eventos SSE específicos del run 
 | `start` | `{run_id, accounts, cards, amount}` | Match iniciado |
 | `trying` | `{email, tail, attempt}` | Lanzando intento (par activo) |
 | `phase` | `{email, tail, name, data}` | Sub-fase del intento activo. `name`/`data` idénticos a execute-stream (login_start, login_done, gateway_begin, etc.). Permite mostrar progreso vivo por par. |
-| `match` | `{email, tail, pipe, amount, duration_ms, attempt}` | Aprobado — par casado |
-| `rejected` | `{email, tail, code, card_fails, acct_fails?, attempt, card_only?}` | Rechazado por gateway. `card_only:true` cuando el strike es solo a la tarjeta (3DS/BANK_REJECTED). |
-| `account_dead` | `{email, code, tail, attempt, persisted}` | Cuenta DEAD persistente. `code` ∈ `{AUTOEXCLUSION, KYC_PENDING}` — SOLO estos dos matan la cuenta. `persisted:true` indica que se escribió en BD. |
-| `login_retry` | `{email, code, tail, attempt}` | Login falló por causa de NUESTRA infraestructura (406/captcha/proxy). La cuenta **NO muere** ni se penaliza en BD. Sale del run actual en memoria (`fail_count=MM_MAX_FAILS`) para no martillar IPs. `code` siempre `LOGIN_FAILED`. Frontend pinta la cuenta como no-muerta/reintentable. Emitido desde `deposits.py` L1558 (matchmaker). |
-| `velocity_skip` | `{email, tail, wait_sec, distinct_count, message}` | Tarjeta ya usada en N cuentas recientes — skip sin penalizar |
-| `card_retired` | `{tail, fails}` | Tarjeta retirada por max fails |
+| `match` | `{email, tail, pipe, amount, duration_ms, attempt}` | **APROBADO** — par casado (vincula tarjeta↔cuenta). La cuenta sale; la tarjeta NO se retira (sigue con otras cuentas hasta su tope de 3). |
+| `account_aplus` | `{email, tail, attempt, persisted}` | **3DS** → la cuenta es premium: `grade='A+'` (pasarela robusta) y sale del run. NO penaliza tarjeta ni cuenta. `persisted:true` = escrito en BD. (Robert 2026-06-28) |
+| `rejected` | `{email, tail, code, card_fails, acct_fails, attempt, card_out, acct_out}` | **DECLINE REAL** (banco/tarjeta). Strike a tarjeta Y cuenta. `card_out:true` = tarjeta retirada (3 declines reales de 3 cuentas distintas); `acct_out:true` = cuenta fuera (2 declines reales de 2 tarjetas distintas). |
+| `retry` | `{email, tail, code, attempt, retrying?, exhausted?, tries, max?}` | **TRANSITORIO** (gateway 50x/timeout/ERROR = nuestro lado). El par se reintenta tras cumplir su cooldown (60s, "al final de la cola"). `exhausted:true` tras `MM_MAX_PAIR_TRANSIENT` reintentos → abandona el par SIN penalizar tarjeta ni cuenta. (Robert 2026-06-28) |
+| `account_dead` | `{email, code, tail, attempt, persisted}` | Cuenta DEAD persistente. `code` ∈ `{AUTOEXCLUSION, KYC_PENDING, LOGIN_DENIED}` — SOLO estos tres matan la cuenta. `persisted:true` indica que se escribió en BD. |
+| `login_retry` | `{email, code, tail, attempt, retrying?, exhausted?, tries, max?}` | Login falló por NUESTRA infraestructura (406/captcha/proxy). La cuenta **NO muere** ni se penaliza en BD. Reintenta el par hasta `MM_MAX_LOGIN_RETRIES`; al agotar sale del run en memoria. `code` siempre `LOGIN_FAILED`. |
+| `velocity_skip` | `{email, tail, wait_sec, distinct_count, message}` | Tarjeta ya usada en N cuentas recientes — skip sin penalizar. (Red redundante: `MM_COOLDOWN=60s` ya domina.) |
+| `card_retired` | `{tail, fails?, assigned?, reason}` | Tarjeta retirada. `reason`: "3 rechazos reales" (`fails`) o "tope 3 cuentas" (`assigned`). |
 | `cooldown` | `{wait}` | Esperando cooldown mínimo entre intentos |
 | `error` | `{email, tail, message}` | Excepción en `attempt()` |
 | `cancelled` | `{run_id}` | Cancelado por usuario |

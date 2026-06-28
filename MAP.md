@@ -96,7 +96,7 @@ prewarm.py (router)
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2155 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2251 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `login_orchestrator.py` | 379 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 692 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 332 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
@@ -134,9 +134,11 @@ prewarm.py (router)
 | `CARD_VELOCITY_MEMORY_MIN` | `30` | `deposits.py` |
 | `CARD_VELOCITY_FREE_PAIR` | `2` | `deposits.py` |
 | `CARD_VELOCITY_COOLDOWN_SEC` | `60` | `deposits.py` |
-| `MM_COOLDOWN` | `5` | `deposits.py` |
+| `MM_COOLDOWN` | `60` | `deposits.py` |
 | `MM_MAX_ACCOUNT_FAILS` | `2` | `deposits.py` |
 | `MM_MAX_CARD_FAILS` | `3` | `deposits.py` |
+| `MM_MAX_ACCOUNTS_PER_CARD` | `3` | `deposits.py` |
+| `MM_MAX_PAIR_TRANSIENT` | `4` | `deposits.py` |
 | `MM_MAX_LOGIN_RETRIES` | `3` | `deposits.py` |
 | `CAP_PER_OPERATOR_10MIN` | `9999` | `prewarm.py` |
 | `ACCOUNT_FRESH_MINUTES` | `30` | `prewarm.py` |
@@ -182,6 +184,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `655337a` | fix(frontend): ventana v8 — conservar header (personaje+greeting) + compactar |
 | `f50ac0c` | feat(frontend): modal v8 = ventana manipulable (flotante + dock izq/der de la tabla) |
 | `d05b3f5` | fix(frontend): tachita (x) usable en chips del modal v8 — copiar solo el texto, no la capsula |
 | `da86df8` | docs(session): cierre — C1 modal v8 deployado en prod (flag deposV8), afinación visual + formato tarjeta único; próximo: reorg UI |
@@ -193,7 +196,6 @@ prewarm.py (router)
 | `9884b06` | fix(c1): alinear monto/reps (input arriba alineado con 7-seg, presets abajo) + 5 montos sugeridos |
 | `4974cd8` | feat(c1): formato único de tarjeta + frases con ingenio + avatar fuera del círculo + quitar leyenda |
 | `6c3ff56` | feat(c1): ajustes visuales modal — verde mexicano vibrante, avatar DEPP+OSITOS, greeting Bricolage, reps compacto |
-| `848a266` | feat(c1): greeting con fuente mexicana (Ranchers) + amarillo suave #ffe08a, contorno blanco, sombra negra |
 <!-- GEN:end:recientes -->
 
 ---

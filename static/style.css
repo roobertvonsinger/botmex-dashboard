@@ -365,6 +365,7 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
   display: inline-flex; align-items: center; justify-content: center;
   width: 22px; height: 22px; border-radius: 6px; font-weight: 700; font-size: 11px; font-family: var(--font-display);
 }
+.grade.Aplus { background: oklch(0.72 0.19 152 / 0.20); color: oklch(0.80 0.18 152); border: 1px solid oklch(0.72 0.19 152 / 0.45); box-shadow: 0 0 8px oklch(0.72 0.19 152 / 0.35); }
 .grade.A { background: oklch(0.58 0.13 160 / 0.16); color: var(--grade-a); border: 1px solid oklch(0.58 0.13 160 / 0.30); }
 .grade.B { background: rgba(238,240,243,0.06); color: var(--grade-b); border: 1px solid rgba(238,240,243,0.14); }
 .grade.C { background: oklch(0.66 0.21 24 / 0.12); color: var(--grade-c); border: 1px solid oklch(0.66 0.21 24 / 0.28); }
@@ -1123,6 +1124,7 @@ tr.row-trastienda td.combo b::before {
 }
 
 /* Color sólido de la barrita por grade — V8 (A/B/C/D) */
+tr.r-grade-Aplus .grade-bar-cell { background: oklch(0.75 0.20 152); box-shadow: 0 0 11px oklch(0.75 0.20 152 / 0.8); }
 tr.r-grade-A .grade-bar-cell { background: var(--grade-a); box-shadow: 0 0 8px var(--grade-a); }
 tr.r-grade-B .grade-bar-cell { background: oklch(0.70 0.16 235); box-shadow: 0 0 8px oklch(0.70 0.16 235 / 0.5); }
 tr.r-grade-C .grade-bar-cell { background: var(--warn);    box-shadow: 0 0 8px var(--warn); }
@@ -1131,6 +1133,9 @@ tr.r-grade-U .grade-bar-cell { background: rgba(255,255,255,0.10); }
 
 /* Glassy gradient: difumina del grade hacia la derecha, se desvanece ANTES de
    llegar al saldo. */
+tbody tr.r-grade-Aplus {
+  background-image: linear-gradient(to right, oklch(0.72 0.19 152 / 0.22) 0%, oklch(0.72 0.19 152 / 0.05) 4%, transparent 9%);
+}
 tbody tr.r-grade-A {
   background-image: linear-gradient(to right, oklch(0.58 0.13 160 / 0.18) 0%, oklch(0.58 0.13 160 / 0.04) 4%, transparent 9%);
 }

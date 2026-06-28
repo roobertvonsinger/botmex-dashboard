@@ -153,7 +153,7 @@ const fmtAbsYear = ts => {
     : { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false };
   return d.toLocaleString('es-MX', opts).replace(/\./g, '');
 };
-const gradeClass = g => ({ A: 'A', B: 'B', C: 'C', D: 'D' })[g] || 'U';
+const gradeClass = g => ({ 'A+': 'Aplus', A: 'A', B: 'B', C: 'C', D: 'D' })[g] || 'U';
 
 // ─── CURP calculator (estimado, no oficial — homoclave queda como X+verif) ───
 const _CURP_STATES = {

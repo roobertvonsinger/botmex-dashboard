@@ -1375,21 +1375,68 @@ def cap_status(account_id: int, _user: dict = Depends(require_session)):
 
 
 # ── Multicuenta (Matchmaker) ─────────────────────────────────────────────────
-# Pool de tarjetas vs N cuentas (max 5). Algoritmo:
-#  - 5s cooldown por tarjeta y por cuenta
-#  - 2 fails por tarjeta → retirada; 2 fails por cuenta → retirada
-#  - 3DS_REQUIRED solo strike a tarjeta, NO a cuenta
-#  - AUTOEXCLUSION/KYC_PENDING → cuenta DEAD (estado real de la API)
-#  - LOGIN_FAILED (406/captcha/proxy) → login_retry, NUNCA DEAD (nuestro lado)
-#  - Tarjeta éxitosa NO se retira (sigue probando otras cuentas)
-#  - Par (card, account) sólo se intenta una vez
+# Orquestación (spec Robert 2026-06-28). Pool de hasta 10 tarjetas × N cuentas
+# (max 5). Empareja cuenta↔tarjeta probando combinaciones; casa las que aprueban.
+#
+#  PARALELISMO: varios pares a la vez, PERO nunca la misma tarjeta ni la misma
+#    cuenta simultáneamente (cada batch usa cada tarjeta/cuenta una sola vez).
+#  COOLDOWN: 60s entre CUALQUIER reuso de la misma tarjeta o cuenta (MM_COOLDOWN).
+#  TOPE POR TARJETA: una tarjeta toca MÁXIMO 3 cuentas distintas (1 intento c/u,
+#    espaciado 60s). Al tocar 3 cuentas en resultado terminal → retirada.
+#
+#  RESULTADO de cada intento (terminal salvo el último caso):
+#   - APROBADO        → se casa (vincula tarjeta↔cuenta). La cuenta sale. La
+#                       tarjeta NO se retira: sigue con otras cuentas hasta su tope.
+#   - DECLINE REAL    → strike a la tarjeta Y a la cuenta. Cuenta fuera a los 2
+#                       declines reales (2 tarjetas distintas); tarjeta retirada a
+#                       los 3 declines reales (3 cuentas distintas).
+#   - 3DS_REQUIRED    → la CUENTA pasa a grade 'A+' (pasarela robusta) y sale del
+#                       run. NO es decline: no penaliza tarjeta ni cuenta.
+#   - DEAD (AUTOEXCLUSION/KYC_PENDING/LOGIN_DENIED) → cuenta DEAD persistente.
+#   - TODO LO DEMÁS (login 406/captcha/proxy, gateway 50x/timeout = nuestro lado)
+#                     → REINTENTO: el par se va al final de la cola, cumple su
+#                       cooldown (60s) y regresa, hasta aprobar o declinar real.
+#
+#  PARADA: el run no se detiene hasta agotar tarjetas O cuentas (lo que ocurra
+#          primero). Par (card, account) terminal sólo se intenta una vez.
 
-MM_COOLDOWN = 5
-# Límites separados (Robert 2026-05-29): máx 2 intentos por CUENTA, 3 por TARJETA.
-# Una cuenta sale del run a los 2 fallos (su pasarela rechaza); una tarjeta se
-# retira a los 3 (el banco la declina). Antes ambos compartían MM_MAX_FAILS=2.
+# Clasificación de result_code (criterio Robert, espejo de SCHED_TERMINAL_RC).
+MM_DEAD_RC = frozenset({"AUTOEXCLUSION", "KYC_PENDING", "LOGIN_DENIED"})
+MM_THREEDS_RC = frozenset({"3DS_REQUIRED"})
+MM_REAL_DECLINE_RC = frozenset({
+    "BANK_REJECTED", "BANK_REJECTED_AFTER_APPROVE", "PENDING_NOT_APPLIED",
+})
+
+
+def _mm_is_real_decline(code: str) -> bool:
+    """True si el code es un rechazo REAL de la tarjeta/banco (suma strikes).
+    Todo lo que NO sea aprobado, decline real, 3DS o DEAD = transitorio (reintento)."""
+    if code in MM_REAL_DECLINE_RC:
+        return True
+    u = (code or "").upper()
+    return any(k in u for k in ("BANK_REJECT", "INSUF", "EXPIRED", "DECLINE"))
+
+MM_COOLDOWN = 60
+# Segundos. Piso entre reusos de la MISMA tarjeta o cuenta (se evalúa al armar el
+# batch: una tarjeta/cuenta no vuelve a entrar antes de MM_COOLDOWN desde su último
+# uso). NO BAJAR: a 5s el matchmaker reusaba la misma tarjeta cada 5s → el velocity
+# check de la pasarela la quemaba. 60s = máx 1 depósito/minuto por tarjeta (Robert
+# 2026-06-28). Domina al velocity-check de 60s (CARD_VELOCITY_*), que queda de red.
+# Límites separados (Robert 2026-05-29): máx 2 DECLINES REALES por CUENTA, 3 por
+# TARJETA. Una cuenta sale del run a los 2 declines reales (su pasarela rechaza 2
+# tarjetas distintas); una tarjeta se retira a los 3 declines reales (3 cuentas
+# distintas la declinan). SOLO declines reales cuentan — los errores nuestros
+# (login/captcha/proxy/gateway) NO suman: se reintentan.
 MM_MAX_ACCOUNT_FAILS = 2
 MM_MAX_CARD_FAILS = 3
+# Tope de cuentas DISTINTAS que una tarjeta puede tocar en el run (Robert 2026-06-28).
+# Al alcanzar resultado terminal (aprobado/decline/3ds) en 3 cuentas, la tarjeta se
+# retira aunque no haya juntado 3 declines (p.ej. casó en 2 y declinó en 1).
+MM_MAX_ACCOUNTS_PER_CARD = 3
+# Reintentos transitorios (gateway 50x/timeout/error = nuestro lado) por PAR antes
+# de abandonar ese par. NO descarta tarjeta ni cuenta — sólo deja de insistir en
+# esa combinación. (LOGIN_FAILED tiene su propio tope: MM_MAX_LOGIN_RETRIES.)
+MM_MAX_PAIR_TRANSIENT = 4
 # Reintentos de LOGIN (406/captcha/proxy = nuestro lado) por cuenta dentro del run.
 # Antes el matchmaker descartaba la cuenta al PRIMER LOGIN_FAILED; ahora reintenta
 # el par (sin marcarlo `tried`) hasta este tope (Robert 2026-05-29). Con IPRoyal
@@ -1448,6 +1495,11 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                 "num": num, "exp": exp, "cvv": cvv,
                 "tail": f"···{num[-4:]}", "pipe": cp,
                 "fail_count": 0, "last_used": 0.0, "retired": False,
+                # account_ids EMPAREJADOS con esta tarjeta (terminal o en reintento) —
+                # tope MM_MAX_ACCOUNTS_PER_CARD. Limita la exposición real de la
+                # tarjeta, no solo los veredictos cerrados.
+                "assigned": set(),
+                "transient": {},   # account_id -> # reintentos transitorios del par
             })
         except ValueError:
             pass
@@ -1465,6 +1517,7 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
     accounts = [{
         "id": r["id"], "email": r["email"], "password": r["password"],
         "fail_count": 0, "last_used": 0.0, "done": False,
+        "declined_cards": set(),   # card nums que la declinaron REAL (tarjetas distintas)
     } for r in rows]
 
     if not accounts:
@@ -1580,11 +1633,18 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                 if cancel_event.is_set():
                     yield f"data: {json.dumps({'type':'cancelled','run_id':run_id})}\n\n"
                     break
-                # Retira tarjetas con max fails
+                # Retira tarjetas: 3 declines reales, O ya tocó sus 3 cuentas y todas
+                # cerraron (ningún par de esa tarjeta sigue pendiente de veredicto).
                 for c in cards:
-                    if not c["retired"] and c["fail_count"] >= MM_MAX_CARD_FAILS:
+                    if c["retired"]:
+                        continue
+                    if c["fail_count"] >= MM_MAX_CARD_FAILS:
                         c["retired"] = True
-                        yield f"data: {json.dumps({'type':'card_retired','tail':c['tail'],'fails':c['fail_count']})}\n\n"
+                        yield f"data: {json.dumps({'type':'card_retired','tail':c['tail'],'fails':c['fail_count'],'reason':'3 rechazos reales'})}\n\n"
+                    elif (len(c["assigned"]) >= MM_MAX_ACCOUNTS_PER_CARD
+                          and all((c["num"], aid) in tried for aid in c["assigned"])):
+                        c["retired"] = True
+                        yield f"data: {json.dumps({'type':'card_retired','tail':c['tail'],'assigned':len(c['assigned']),'reason':'tope 3 cuentas'})}\n\n"
 
                 live_cards = [c for c in cards if not c["retired"]]
                 live_accs  = [a for a in accounts if not a["done"] and a["fail_count"] < MM_MAX_ACCOUNT_FAILS]
@@ -1608,18 +1668,28 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                             continue
                         if (card["num"], acc["id"]) in tried:
                             continue
+                        # Tope de exposición: no emparejar con una cuenta NUEVA si la
+                        # tarjeta ya tiene 3 cuentas asignadas (reintento de una ya
+                        # asignada sí pasa — no agrega exposición).
+                        if (acc["id"] not in card["assigned"]
+                                and len(card["assigned"]) >= MM_MAX_ACCOUNTS_PER_CARD):
+                            continue
                         if now - card["last_used"] < MM_COOLDOWN and card["last_used"] > 0:
                             continue
                         attempts += 1
                         batch.append((acc, card, attempts))
                         used_cards.add(card["num"])
                         used_accs.add(acc["email"])
+                        card["assigned"].add(acc["id"])
                         break
 
                 if not batch:
-                    # Verifica si hay pares posibles aún
+                    # ¿Quedan pares EMPAREJABLES? No basta `not in tried`: la tarjeta
+                    # debe tener cupo (cuenta ya asignada = reintento, o < tope).
                     pairs_left = any(
                         (c["num"], a["id"]) not in tried
+                        and (a["id"] in c["assigned"]
+                             or len(c["assigned"]) < MM_MAX_ACCOUNTS_PER_CARD)
                         for c in live_cards for a in live_accs
                     )
                     if not pairs_left:
@@ -1710,19 +1780,22 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                             yield f"data: {json.dumps({'type':'login_retry','email':acc['email'],'code':code,'tail':card['tail'],'attempt':n,'retrying':True,'tries':acc['login_retries'],'max':MM_MAX_LOGIN_RETRIES})}\n\n"
                         continue
 
-                    # Intento REAL (llegó al gateway) → marca el par como probado.
-                    tried.add((card["num"], acc["id"]))
-
+                    # ── Clasificación del resultado (spec Robert 2026-06-28) ──
                     if ok:
+                        # APROBADO → se casa. Cuenta sale. La tarjeta NO se retira al
+                        # casar: sigue con otras cuentas hasta agotar su tope de 3
+                        # (lo evalúa el bloque de retiro al inicio de la vuelta).
+                        tried.add((card["num"], acc["id"]))
                         acc["done"] = True
-                        card["retired"] = True  # tarjeta se casa con la cuenta — nunca más se prueba en otras
                         matches.append({"email": acc["email"], "tail": card["tail"], "pipe": card["pipe"]})
                         yield f"data: {json.dumps({'type':'match','email':acc['email'],'tail':card['tail'],'pipe':card['pipe'],'amount':amount,'duration_ms':duration,'attempt':n})}\n\n"
-                    elif code in ("AUTOEXCLUSION", "KYC_PENDING", "LOGIN_DENIED"):
+                    elif code in MM_DEAD_RC:
                         # Las 3 ÚNICAS razones de muerte (REGLA DE ROBERT):
-                        # LOGIN_DENIED = 401 credenciales/lock (login denegado
-                        # DEFINITIVAMENTE, NO un 406); AUTOEXCLUSION; KYC_PENDING.
-                        # Estado REAL → DEAD persistente.
+                        # AUTOEXCLUSION, KYC_PENDING, LOGIN_DENIED (401 creds/lock
+                        # definitivo, NO un 406). La cuenta murió por sí misma → la
+                        # tarjeta NO se "consumió" (no cuenta para su tope de 3).
+                        tried.add((card["num"], acc["id"]))
+                        acc["done"] = True
                         acc["fail_count"] = MM_MAX_ACCOUNT_FAILS
                         try:
                             from app import db as _appdb
@@ -1735,27 +1808,50 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                         except Exception as ex:
                             logger.error(f"[Matchmaker] no pude marcar DEAD {acc['email']}: {ex}")
                         yield f"data: {json.dumps({'type':'account_dead','email':acc['email'],'code':code,'tail':card['tail'],'attempt':n,'persisted':True})}\n\n"
-                    elif code == "3DS_REQUIRED":
-                        # 3DS es de la tarjeta/BIN → solo strike a tarjeta.
+                    elif code in MM_THREEDS_RC:
+                        # 3DS → la CUENTA es premium (pasarela robusta): grade 'A+' y
+                        # sale del run. NO penaliza tarjeta ni cuenta (no es decline).
+                        # La tarjeta ya cuenta esta cuenta en `assigned` (tope de 3).
+                        tried.add((card["num"], acc["id"]))
+                        acc["done"] = True
+                        try:
+                            from app import db as _appdb
+                            with _appdb(write=True) as cdb:
+                                cdb.execute(
+                                    "UPDATE accounts SET grade='A+' WHERE email=?",
+                                    (acc["email"],),
+                                )
+                        except Exception as ex:
+                            logger.error(f"[Matchmaker] no pude marcar A+ {acc['email']}: {ex}")
+                        yield f"data: {json.dumps({'type':'account_aplus','email':acc['email'],'tail':card['tail'],'attempt':n,'persisted':True})}\n\n"
+                    elif _mm_is_real_decline(code):
+                        # DECLINE REAL (banco/tarjeta) → strike a tarjeta Y cuenta.
+                        # Tarjeta fuera a 3 declines reales (3 cuentas distintas);
+                        # cuenta fuera a 2 declines reales (2 tarjetas distintas).
+                        tried.add((card["num"], acc["id"]))
                         card["fail_count"] += 1
-                        yield f"data: {json.dumps({'type':'rejected','email':acc['email'],'tail':card['tail'],'code':code,'card_fails':card['fail_count'],'attempt':n,'card_only':True})}\n\n"
-                    elif code == "BANK_REJECTED":
-                        # BANK_REJECTED es del banco de la TARJETA → strike a tarjeta
-                        # (tope MM_MAX_CARD_FAILS=3). PERO cuenta TAMBIÉN contra la
-                        # CUENTA: si su pasarela rechaza 2 tarjetas distintas
-                        # (MM_MAX_ACCOUNT_FAILS), sale del run (NO DEAD) para no
-                        # martillarla con login+captcha por cada tarjeta. Evita la
-                        # "masacre de intentos" (Robert 2026-05-29).
-                        card["fail_count"] += 1
-                        acc["fail_count"] += 1
-                        if acc["fail_count"] >= MM_MAX_ACCOUNT_FAILS:
-                            yield f"data: {json.dumps({'type':'account_paused','email':acc['email'],'code':'BANK_REJECTED','tail':card['tail'],'rejects':acc['fail_count'],'attempt':n,'reason':'pasarela rechaza esta cuenta (2 tarjetas)'})}\n\n"
-                        else:
-                            yield f"data: {json.dumps({'type':'rejected','email':acc['email'],'tail':card['tail'],'code':code,'card_fails':card['fail_count'],'acct_fails':acc['fail_count'],'attempt':n,'card_only':True})}\n\n"
+                        if card["num"] not in acc["declined_cards"]:
+                            acc["declined_cards"].add(card["num"])
+                            acc["fail_count"] += 1
+                        card_out = card["fail_count"] >= MM_MAX_CARD_FAILS
+                        acct_out = acc["fail_count"] >= MM_MAX_ACCOUNT_FAILS
+                        if card_out:
+                            card["retired"] = True
+                        if acct_out:
+                            acc["done"] = True
+                        yield f"data: {json.dumps({'type':'rejected','email':acc['email'],'tail':card['tail'],'code':code,'card_fails':card['fail_count'],'acct_fails':acc['fail_count'],'attempt':n,'card_out':card_out,'acct_out':acct_out})}\n\n"
                     else:
-                        card["fail_count"] += 1
-                        acc["fail_count"] += 1
-                        yield f"data: {json.dumps({'type':'rejected','email':acc['email'],'tail':card['tail'],'code':code,'card_fails':card['fail_count'],'acct_fails':acc['fail_count'],'attempt':n})}\n\n"
+                        # TRANSITORIO (gateway 50x/timeout/ERROR/SUBMIT/BEGIN = nuestro
+                        # lado) → NO se marca tried: el par se reintenta tras cumplir su
+                        # cooldown (last_used ya aplicó 60s = "al final de la cola").
+                        # Tope por par para no loopear si algo está roto de raíz.
+                        cnt = card["transient"].get(acc["id"], 0) + 1
+                        card["transient"][acc["id"]] = cnt
+                        if cnt >= MM_MAX_PAIR_TRANSIENT:
+                            tried.add((card["num"], acc["id"]))  # abandona el par (sin strike)
+                            yield f"data: {json.dumps({'type':'retry','email':acc['email'],'tail':card['tail'],'code':code,'attempt':n,'exhausted':True,'tries':cnt})}\n\n"
+                        else:
+                            yield f"data: {json.dumps({'type':'retry','email':acc['email'],'tail':card['tail'],'code':code,'attempt':n,'retrying':True,'tries':cnt,'max':MM_MAX_PAIR_TRANSIENT})}\n\n"
 
                 # Notifica al SSE global del activity feed
                 for m in matches[-len(batch):]:

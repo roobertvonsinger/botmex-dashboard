@@ -159,13 +159,14 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_run_deposit_with_phases` | def | L669–L1146 |
 | `deposit_execute_stream` | def | L1150–L1358 |
 | `cap_status` | def | L1362–L1374 |
-| `_mm_session_get` | def | L1405–L1409 |
-| `_mm_session_update` | def | L1412–L1421 |
-| `multi_stream` | def | L1425–L1803 |
-| `multi_cancel` | def | L1807–L1812 |
-| `scheduled_create` | def | L1825–L2117 |
-| `scheduled_list` | def | L2121–L2143 |
-| `scheduled_cancel` | def | L2147–L2155 |
+| `_mm_is_real_decline` | def | L1411–L1417 |
+| `_mm_session_get` | def | L1452–L1456 |
+| `_mm_session_update` | def | L1459–L1468 |
+| `multi_stream` | def | L1472–L1899 |
+| `multi_cancel` | def | L1903–L1908 |
+| `scheduled_create` | def | L1921–L2213 |
+| `scheduled_list` | def | L2217–L2239 |
+| `scheduled_cancel` | def | L2243–L2251 |
 
 ### `login_orchestrator.py`
 
