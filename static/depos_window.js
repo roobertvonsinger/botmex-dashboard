@@ -297,7 +297,8 @@
         var ed = Geo.edgesAt(rectOf(win), e.clientX, e.clientY, 8);
         if (ed.l || ed.r || ed.t || ed.b) { startResize(e, ed); return; }
       }
-      if (e.target.closest(titlebarSel)) startDrag(e);
+      // arrastra por el header, salvo controles interactivos (botones/inputs)
+      if (e.target.closest(titlebarSel) && !e.target.closest('button,a,input,select,textarea')) startDrag(e);
     });
     document.addEventListener('mousemove', function (e) { onDragMove(e); onResizeMove(e); onDividerMove(e); });
     document.addEventListener('mouseup', function () { onDragUp(); onResizeUp(); onDividerUp(); });

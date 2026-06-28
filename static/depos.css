@@ -601,32 +601,29 @@
 #depos.dw-on.dw-docked .bmx{border-radius:12px}
 #depos.dw-on.dw-resizing{transition:none !important}
 
-/* barra de título = zona de arrastre (la inyecta depos.js) */
-#depos .depos-titlebar{flex:none; display:flex; align-items:center; gap:9px; height:34px; padding:0 7px 0 12px;
-  background:#141a23; border-bottom:1px solid var(--line); cursor:grab; user-select:none; position:relative; z-index:6}
-#depos.dw-grabbing,#depos.dw-grabbing .depos-titlebar{cursor:grabbing}
-#depos .dw-brand{flex:none; font-size:9px; letter-spacing:.14em; font-weight:700; color:var(--aqua); text-transform:uppercase}
-#depos .dw-greet{flex:1; min-width:0; font-family:'Ranchers','Bricolage Grotesque',cursive; font-size:12px; color:#f3c77a;
-  letter-spacing:.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  -webkit-text-stroke:.4px rgba(0,0,0,.5); paint-order:stroke fill; transition:opacity .45s ease}
-#depos .dw-ctl{flex:none; display:flex; align-items:center; gap:2px}
-#depos .dw-btn{background:none; border:none; color:var(--ink-faint); cursor:pointer; width:25px; height:25px;
+/* el header (banner/personaje + greeting) ES la zona de arrastre; los controles flotan en la esquina */
+#depos.dw-on .head{cursor:grab; user-select:none; position:relative; flex:none}
+#depos.dw-grabbing,#depos.dw-grabbing .head{cursor:grabbing}
+#depos .dw-ctl{position:absolute; top:7px; right:8px; z-index:8; display:flex; align-items:center; gap:2px;
+  background:rgba(10,13,18,.5); border-radius:9px; padding:2px; backdrop-filter:blur(6px)}
+#depos .dw-btn{background:none; border:none; color:var(--ink-dim); cursor:pointer; width:25px; height:25px;
   border-radius:7px; display:inline-flex; align-items:center; justify-content:center; padding:0; transition:var(--t-fast)}
 #depos .dw-btn svg{width:15px; height:15px; display:block}
-#depos .dw-btn:hover{color:var(--ink); background:rgba(255,255,255,.08)}
+#depos .dw-btn:hover{color:var(--ink); background:rgba(255,255,255,.10)}
 #depos .dw-btn.on{color:var(--aqua); background:var(--aqua-soft)}
-#depos .dw-close:hover{color:var(--red); background:rgba(255,107,94,.14)}
+#depos .dw-close:hover{color:var(--red); background:rgba(255,107,94,.16)}
 
-/* modo ventana: banner grande fuera, header compacto (greeting vive en la titlebar) */
-#depos.dw-on .depos-banner{display:none}
-#depos.dw-on .head{flex:none; border-bottom:none; padding:0}
-#depos.dw-on .head-row{display:none}
-
-/* cuerpo flex que se re-fluye SIN scroll */
-#depos.dw-on .controls{flex:none}
-#depos.dw-on .journey{flex:1 1 auto; min-height:0; display:flex; flex-direction:column; margin-top:6px; overflow:hidden}
-#depos.dw-on .scene-stage{flex:1 1 auto; min-height:118px; height:auto}
-#depos.dw-on .mov{flex:none; max-height:38%; display:flex; flex-direction:column; min-height:0; overflow:hidden}
+/* modo ventana: header VISIBLE (personaje + greeting) pero compacto; todo cabe SIN scroll */
+#depos.dw-on .depos-banner{width:52%; margin-top:3px}
+#depos.dw-on .head-row{padding:0 16px 6px; margin-top:-12px}
+#depos.dw-on .newproc{display:none}   /* "Otro depósito" (toast) fuera en ventana → gana espacio */
+#depos.dw-on .controls{flex:none; padding:8px 16px 2px; gap:9px}
+#depos.dw-on .field-head{margin-bottom:5px}
+#depos.dw-on .duo .col:first-child{padding-right:12px}
+#depos.dw-on .duo .col:last-child{padding-left:12px}
+#depos.dw-on .journey{flex:1 1 auto; min-height:0; display:flex; flex-direction:column; margin:5px 12px 4px; padding:10px; overflow:hidden}
+#depos.dw-on .scene-stage{flex:1 1 auto; min-height:100px; height:auto}
+#depos.dw-on .mov{flex:none; max-height:32%; display:flex; flex-direction:column; min-height:0; overflow:hidden; padding:2px 16px 12px}
 
 /* divisor del dock — recorrer el ancho del split */
 #depos .dw-divider{display:none; position:absolute; top:0; bottom:0; width:11px; z-index:7; cursor:ew-resize}
