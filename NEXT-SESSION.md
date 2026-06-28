@@ -7,6 +7,8 @@
 
 **Sesión cerró LIMPIA — 6 commits, todo deployado + verificado en prod.** No hay nada a medias. Lo grande de la sesión: anti-rate-limit (Capa 1+3), modal v8 por DEFAULT, backfill de tarjetas históricas, y **buscador inteligente** reescrito. El único pendiente **medible** es el e2e del anti-rate-limit con depósitos reales (lo prueba Robert).
 
+**Update (noche 2026-06-28, commit `8ce54f7`, deployado + smoke verde end-to-end):** code review por dominio del panel v8 → **5 bugs de cableado de eventos arreglados** (NO eran del motor, sino de cómo el frontend consume los eventos). El más importante: **`account_cooling` no tenía handler → la fila se quedaba colgada** = era el **bloqueador del punto (b) del e2e** (ahora la fila sí se resuelve "en pausa"). También: programado off-by-one (terminaba una rep antes + ocultaba la última), `velocity_skip` colgaba fila, balance "después" provisional pisaba el fresco, y preset multi $1000 daba HTTP 400 siempre (→490). Detalle completo en `docs/ERRORS.md` §"Panel de depósitos v8 — 5 bugs". **Pendiente decisión Robert**: subir `DEP_MAX_PER_TXN` (>499) si se quiere un preset que fuerce 3DS de verdad.
+
 ## ▶ Con qué arrancas (1ra acción concreta)
 
 1. **PROBAR e2e anti-rate-limit (Robert)**: con **cuentas FRESCAS** (recargar DataImpulse primero), lanzar matchmaker/scheduled y verificar en logs: (a) `JWT cache HIT` (salta login sin captcha); (b) un 429 → evento `account_cooling`, cuenta enfría y el matchmaker SALTA a otra (fila no se queda en spinner); (c) `JWT de cache rechazado (401)` → invalida + reloguea. Medir cuánto bajan los golpes a `/login`.
