@@ -12,6 +12,7 @@
   let el = null;          // #depos montado
   let _mounted = false;
   let _greetTimer = null;
+  let _win = null;        // controlador de ventana (depos_window.js): float / dock-izq / dock-der
   const qs = (s) => (el ? el.querySelector(s) : null);
 
   let _dx = { open: false, accounts: [], cards: [], reps: 1, amount: 50, mode: 'single', running: false };
@@ -316,11 +317,11 @@
   // greetings rotativos: 1 vez por minuto, fade out→in (premium); timer por apertura/cierre
   function startGreet() {
     stopGreet();
-    const g = qs('#greet'); if (!g) return;
-    let gi = 0; g.textContent = GREETS[0]; fitGreet(g);
+    const g = qs('.dw-greet') || qs('#greet'); if (!g) return; // greeting vive en la barra de título
+    let gi = 0; g.textContent = GREETS[0];
     _greetTimer = setInterval(() => {
       g.style.opacity = 0;
-      setTimeout(() => { gi = (gi + 1) % GREETS.length; g.textContent = GREETS[gi]; fitGreet(g); g.style.opacity = 1; }, 450);
+      setTimeout(() => { gi = (gi + 1) % GREETS.length; g.textContent = GREETS[gi]; g.style.opacity = 1; }, 450);
     }, 60000);
   }
   function stopGreet() { if (_greetTimer) { clearInterval(_greetTimer); _greetTimer = null; } }
@@ -601,8 +602,43 @@
       const chips = cols[1].querySelector('.chips'); if (chips) chips.id = 'cardChips';
       const cnt = cols[1].querySelector('.count'); if (cnt) cnt.id = 'cardCount';
     }
+    injectWindow();
     wireStatic();
     _mounted = true;
+  }
+
+  // Barra de título (drag) + controles (dock izq/der, cerrar) + divisor del dock.
+  // El banner grande se oculta por CSS en modo ventana; el greeting vive en la barra.
+  function injectWindow() {
+    const bmx = el.querySelector('.bmx');
+    if (bmx && !bmx.querySelector('.depos-titlebar')) {
+      const tb = document.createElement('div');
+      tb.className = 'depos-titlebar';
+      tb.innerHTML =
+        '<span class="dw-brand">Depósitos</span>' +
+        '<span class="dw-greet"></span>' +
+        '<span class="dw-ctl">' +
+          '<button class="dw-btn dw-dock-l" title="Acoplar a la izquierda de la tabla" aria-label="Acoplar a la izquierda">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="3" y="5" width="8" height="14" rx="1.5" fill="currentColor" stroke="none"/></svg></button>' +
+          '<button class="dw-btn dw-dock-r" title="Acoplar a la derecha de la tabla" aria-label="Acoplar a la derecha">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="13" y="5" width="8" height="14" rx="1.5" fill="currentColor" stroke="none"/></svg></button>' +
+          '<button class="dw-btn dw-close" title="Cerrar (Esc)" aria-label="Cerrar">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
+        '</span>';
+      bmx.insertBefore(tb, bmx.firstChild);
+    }
+    if (el && !el.querySelector('.dw-divider')) {
+      const dv = document.createElement('div');
+      dv.className = 'dw-divider';
+      el.appendChild(dv);
+    }
+    if (window.DeposWindow && !_win) {
+      _win = window.DeposWindow.init(el, {
+        storageKey: 'deposWin',
+        dockZoneId: 'accDockZone',
+        onClose: () => window.closeDepos(),
+      });
+    }
   }
 
   function wireStatic() {
@@ -687,6 +723,7 @@
     renderAccounts(); renderCards(); refreshMode();
     root.classList.remove('hidden');
     root.setAttribute('aria-hidden', 'false');
+    if (_win) _win.show();   // aplica estado/posición/tamaño guardados (float o dock)
     _dx.open = true;
     document.removeEventListener('keydown', onEsc); // evita listener duplicado si ya estaba abierto
     document.addEventListener('keydown', onEsc);
@@ -700,6 +737,7 @@
   window.closeDepos = function () {
     root.classList.add('hidden');
     root.setAttribute('aria-hidden', 'true');
+    if (_win) _win.hide();   // suelta la compresión del dashboard (conserva el estado)
     _dx.open = false;
     document.removeEventListener('keydown', onEsc);
     stopGreet(); // no rotar greetings con el modal cerrado (evita trabajo en background)
@@ -734,6 +772,6 @@
     pillHide();
   }
 
-  // click fuera del panel cierra
-  root.addEventListener('click', (e) => { if (e.target === root) window.closeDepos(); });
+  // Ventana flotante libre: el click-fuera ya NO cierra (es ventana, no modal).
+  // Cierra por la tachita de la barra (.dw-close) o Esc.
 })();

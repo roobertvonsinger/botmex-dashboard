@@ -76,6 +76,13 @@ body.dep-drawer-pushing { padding-right: 420px; }
   body.dep-drawer-pushing { padding-right: 0; }
 }
 
+/* Zona de acople del panel de depósitos v8 (depos_window.js): envuelve filterbar+tabla+paginador.
+   El dock izq/der comprime SOLO esta zona (cards de arriba y menú quedan intactos). */
+#accDockZone { display: flex; flex-direction: column; flex: 1; min-height: 0; position: relative;
+  transition: padding 420ms cubic-bezier(0.22, 0.61, 0.36, 1); }
+#accDockZone.dock-r { padding-right: var(--dock-w, 0); }
+#accDockZone.dock-l { padding-left: var(--dock-w, 0); }
+
 .mono { font-family: var(--font-mono); font-size: 11px; }
 .dim { color: var(--text-muted); }
 .grow { flex: 1; }

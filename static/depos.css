@@ -2,12 +2,12 @@
    scoped bajo #depos para no colisionar con style.css. Keyframes globales (nombres únicos lg-/fm-/pr-/rt-/dn-). */
 
 /* Overlay del modal (reemplaza el body{} de la demo del mockup). */
-.depos-root{position:fixed; inset:0; z-index:200; display:grid; place-items:center;
-  background:rgba(4,6,10,.62); backdrop-filter:blur(4px); padding:30px 18px; overflow:auto;
-  animation:depos-fade .2s ease}
+/* Ventana flotante libre: el overlay NO bloquea — deja usar el dashboard detrás.
+   El #depos se posiciona fixed por depos_window.js (left/top/width/height). */
+.depos-root{position:fixed; inset:0; z-index:200; pointer-events:none}
 .depos-root.hidden{display:none}
-@keyframes depos-fade{from{opacity:0}to{opacity:1}}
-#depos{width:min(540px,100%)}
+@keyframes depos-fade{from{opacity:0; transform:scale(.97) translateY(8px)}to{opacity:1; transform:none}}
+#depos{position:fixed; pointer-events:auto; width:min(440px,calc(100vw - 40px))}
 
 /* pill flotante (misión activa, modal cerrado) */
 .depos-pill{position:fixed; right:18px; bottom:18px; z-index:190; display:none; align-items:center; gap:9px;
@@ -569,7 +569,7 @@
 #depos .mov{padding:4px 18px 16px}
 #depos .mov-head{display:flex; align-items:center; gap:8px; margin:6px 0 8px}
 #depos .mov-line{flex:1; height:1px; background:var(--line)}
-#depos .mov-list{display:flex; flex-direction:column; gap:5px; max-height:104px; overflow:auto}
+#depos .mov-list{display:flex; flex-direction:column; gap:5px; min-height:0; overflow:hidden}
 #depos .mov-row{display:flex; align-items:center; gap:9px; padding:7px 10px; border-radius:10px;
   background:var(--panel); border:1px solid var(--line); font-size:11px; animation:slidein .4s cubic-bezier(.22,.61,.36,1)}
 @keyframes slidein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -588,3 +588,55 @@
   font-size:12px; padding:8px 14px; border-radius:10px; box-shadow:0 16px 40px -10px #000; pointer-events:none;
   transition:opacity .25s, transform .25s; z-index:50}
 #depos .toast.on{opacity:1; transform:translate(-50%,0)}
+
+/* ═══════════ VENTANA MANIPULABLE (depos_window.js) ═══════════
+   3 estados: flotante (float) · acoplada izq (dock-left) · acoplada der (dock-right).
+   Sin scroll: el cuerpo se reparte por flex; el banner sale para ganar alto. */
+
+#depos.dw-on{transition:left .42s cubic-bezier(.22,.61,.36,1),top .42s cubic-bezier(.22,.61,.36,1),width .42s cubic-bezier(.22,.61,.36,1),height .42s cubic-bezier(.22,.61,.36,1)}
+#depos.dw-on .bmx{display:flex; flex-direction:column; height:100%; overflow:hidden; animation:depos-fade .26s cubic-bezier(.22,.61,.36,1)}
+#depos.dw-on:not(.dw-docked){border-radius:16px; box-shadow:0 36px 90px -24px rgba(0,0,0,.85)}
+#depos.dw-on:not(.dw-docked) .bmx{border-radius:16px}
+#depos.dw-on.dw-docked{border-radius:12px; box-shadow:0 18px 60px -30px rgba(0,0,0,.8)}
+#depos.dw-on.dw-docked .bmx{border-radius:12px}
+#depos.dw-on.dw-resizing{transition:none !important}
+
+/* barra de título = zona de arrastre (la inyecta depos.js) */
+#depos .depos-titlebar{flex:none; display:flex; align-items:center; gap:9px; height:34px; padding:0 7px 0 12px;
+  background:#141a23; border-bottom:1px solid var(--line); cursor:grab; user-select:none; position:relative; z-index:6}
+#depos.dw-grabbing,#depos.dw-grabbing .depos-titlebar{cursor:grabbing}
+#depos .dw-brand{flex:none; font-size:9px; letter-spacing:.14em; font-weight:700; color:var(--aqua); text-transform:uppercase}
+#depos .dw-greet{flex:1; min-width:0; font-family:'Ranchers','Bricolage Grotesque',cursive; font-size:12px; color:#f3c77a;
+  letter-spacing:.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  -webkit-text-stroke:.4px rgba(0,0,0,.5); paint-order:stroke fill; transition:opacity .45s ease}
+#depos .dw-ctl{flex:none; display:flex; align-items:center; gap:2px}
+#depos .dw-btn{background:none; border:none; color:var(--ink-faint); cursor:pointer; width:25px; height:25px;
+  border-radius:7px; display:inline-flex; align-items:center; justify-content:center; padding:0; transition:var(--t-fast)}
+#depos .dw-btn svg{width:15px; height:15px; display:block}
+#depos .dw-btn:hover{color:var(--ink); background:rgba(255,255,255,.08)}
+#depos .dw-btn.on{color:var(--aqua); background:var(--aqua-soft)}
+#depos .dw-close:hover{color:var(--red); background:rgba(255,107,94,.14)}
+
+/* modo ventana: banner grande fuera, header compacto (greeting vive en la titlebar) */
+#depos.dw-on .depos-banner{display:none}
+#depos.dw-on .head{flex:none; border-bottom:none; padding:0}
+#depos.dw-on .head-row{display:none}
+
+/* cuerpo flex que se re-fluye SIN scroll */
+#depos.dw-on .controls{flex:none}
+#depos.dw-on .journey{flex:1 1 auto; min-height:0; display:flex; flex-direction:column; margin-top:6px; overflow:hidden}
+#depos.dw-on .scene-stage{flex:1 1 auto; min-height:118px; height:auto}
+#depos.dw-on .mov{flex:none; max-height:38%; display:flex; flex-direction:column; min-height:0; overflow:hidden}
+
+/* divisor del dock — recorrer el ancho del split */
+#depos .dw-divider{display:none; position:absolute; top:0; bottom:0; width:11px; z-index:7; cursor:ew-resize}
+#depos.dw-dock-right .dw-divider{display:block; left:-1px}
+#depos.dw-dock-left .dw-divider{display:block; right:-1px}
+#depos .dw-divider::before{content:""; position:absolute; top:50%; transform:translateY(-50%); left:4px;
+  width:3px; height:42px; border-radius:3px; background:var(--line-2); transition:background .16s,height .16s}
+#depos .dw-divider:hover::before,#depos .dw-divider.on::before{background:var(--aqua); height:66px}
+
+/* snap-hint al arrastrar cerca de un lado (vive en body → colores literales) */
+.dw-hint{position:fixed; z-index:198; pointer-events:none; border:2px dashed rgba(0,189,114,.5);
+  background:rgba(0,189,114,.10); border-radius:12px; opacity:0; transition:opacity .16s ease}
+.dw-hint.on{opacity:1}
