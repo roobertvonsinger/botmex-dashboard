@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b0d76db` | style(ui): grid 3 cards (Actividad -15-20%), marquesina ticker sin overflow, Online sidebar, Recientes; un-hide strip a operadores |
 | `f3c860b` | feat(ui): strip a 3 cards (Actividad/Recientes/Pool); Online reubicado al sidebar; cache bump |
 | `58aab08` | feat(activity): logica pura dedupe + copy humano (TDD node) |
 | `69e8307` | feat(pool): GET /api/pool/split + POST /api/pool/publish bulk (SA-only) + broadcast pool_move |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `8e7c00e` | fix(sse): _resolve_who .get guard, who_id en _release_account, all_ids en disconnect log, test simetrico |
 | `06468a4` | feat(sse): filtrado server-side por usuario en _broadcast + ctx en /api/events |
 | `a70f04e` | fix(sse): guard display None en fallback de _event_visible_to + test |
-| `0269674` | feat(sse): predicado de visibilidad por rol _event_visible_to (TDD) |
 <!-- GEN:end:recientes -->
 
 ---

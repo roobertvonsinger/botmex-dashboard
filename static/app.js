@@ -414,7 +414,6 @@ async function loadMe() {
   // L invertida (control multiusuario) SOLO superadmin — admin no debe ver indicios de SA
   if (!isSuper) {
     $('#adminPanel').style.display = 'none';
-    document.body.classList.add('no-kpis');
   }
   // Vista Detallada solo superadmin (admin/user usan Simple)
   if (!isSuper) {
@@ -1013,6 +1012,69 @@ function pushActivityEvent(ev) {
   // Marca como "nuevo" para animación highlight si la fila aparece en pantalla
   _actNewIds.add(_actEventKey(row));
   if (state.section === 'activity') renderActivity();
+  renderActivityMarquee();
+}
+
+// ─── Marquesina Actividad Live ───
+const _MARQUEE_KINDS = new Set([
+  'deposit','lock','unlock','unlock_auto','account_cooling','mark','pool_move','critical_error',
+]);
+
+async function loadActivityMarquee() {
+  try {
+    const r = await fetch('/api/activity');
+    const data = await r.json();
+    activityRows = data.feed || [];
+    renderActivityMarquee();
+  } catch {}
+}
+
+function renderActivityMarquee() {
+  const host = document.getElementById('lpActivity');
+  if (!host) return;
+  const isSA = state.user?.role === 'superadmin';
+  const deduped = ActivityLogic.dedupeActivity(activityRows)
+    .filter(ev => _MARQUEE_KINDS.has(ev.kind))
+    .slice(0, 30);
+
+  const counter = document.getElementById('lpFeedCount');
+  if (counter) counter.textContent = deduped.length ? `${deduped.length} eventos` : '—';
+
+  if (deduped.length === 0) {
+    host.innerHTML = '<div class="lp-empty dim mono">esperando actividad…</div>';
+    return;
+  }
+
+  const makeRow = ev => {
+    const c = ActivityLogic.formatActivityCopy(ev, isSA);
+    const email = String(ev.target || ev.email || '').split(':')[0];
+    return `<div class="lp-feed-row lp-feed-${esc(c.cls)} lp-feed-clickable" data-open-email="${esc(email)}" title="Abrir cuenta"><span class="lp-feed-ic">${c.icon}</span><span class="lp-feed-txt">${esc(c.text)}</span><span class="lp-feed-time mono dim">${fmtAgo(ev.ts)}</span></div>`;
+  };
+  const rowsHtml = deduped.map(makeRow).join('');
+  // Duplicar para el loop sin costura (-50% keyframe)
+  host.innerHTML = `<div class="lp-ticker-track">${rowsHtml}${rowsHtml}</div>`;
+}
+
+async function openAccountByEmail(email) {
+  try {
+    const r = await fetch('/api/accounts?q=' + encodeURIComponent(email));
+    const rows = await r.json();
+    const hit = (rows || []).find(x => (x.email || '').toLowerCase() === email.toLowerCase()) || (rows || [])[0];
+    if (hit && hit.id != null) { openDetailModal(hit.id); return; }
+  } catch {}
+  // Fallback: poner el email en el buscador
+  const s = document.getElementById('searchInput');
+  if (s) { s.value = email; searchQuery = email; reload(); }
+}
+
+function _humanizeCritical(ev) {
+  if (ev.kind === 'capmonster_low' || (ev.type === 'alert' && (ev.msg || '').toLowerCase().includes('capmonster')))
+    return 'Servicio de verificación sin saldo';
+  if (ev.kind === 'proxy_down' || (ev.type === 'alert' && (ev.msg || '').toLowerCase().includes('proxy')))
+    return 'Problema de conexión con la pasarela';
+  if (ev.type === 'health_warning')
+    return 'Servicio degradado, reintentando';
+  return ev.msg || 'Problema de conexión';
 }
 
 // ─── notifications ───
@@ -1085,6 +1147,15 @@ document.body.addEventListener('click', e => {
   if (target && typeof showSection === 'function') {
     showSection(target);
   }
+});
+
+// Marquesina: click en fila → abrir detalle de cuenta (resuelve email→id)
+document.getElementById('lpActivity')?.addEventListener('click', e => {
+  const row = e.target.closest('.lp-feed-clickable[data-open-email]');
+  if (!row) return;
+  e.stopPropagation(); // no burbujear al data-nav del header
+  const email = row.dataset.openEmail;
+  if (email) openAccountByEmail(email);
 });
 
 // Handler de acciones en notifs (botones Depositar / Liberar)
@@ -1381,10 +1452,14 @@ function connectSSE() {
         // prewarm_*: silencioso — auditoría interna, sin notif ruidosa
       } else if (ev.type === 'health_warning') {
         pushNotif({ icon: '⚠️', msg: `Salud: ${(ev.issues || []).join(' · ')}` });
+        activityRows.unshift({ kind: 'critical_error', ts: new Date().toISOString(), msg: _humanizeCritical(ev) });
+        renderActivityMarquee();
       } else if (ev.type === 'alert') {
         // Alertas críticas (capmonster_low, proxy_down) — push notif + toast
         pushNotif({ icon: ev.icon || '⚠️', msg: ev.msg });
         toast(`${ev.icon || '⚠️'} ${ev.msg}`, ev.severity === 'danger' ? 'error' : 'warn');
+        activityRows.unshift({ kind: 'critical_error', ts: new Date().toISOString(), msg: _humanizeCritical(ev) });
+        renderActivityMarquee();
       } else if (ev.type === 'window_warning') {
         // Window 24h por cerrar (~30 min)
         const myTg = state.user?.telegram_id;
@@ -1505,42 +1580,6 @@ async function refreshKpis() {
         ${o.in_use ? `<span class="lp-op-n mono">${o.in_use}</span>` : ''}
       </div>`;
     }).join('');
-
-    // ── Bloque 2: Feed live ──
-    const feed = k.feed || [];
-    $('#lpFeedCount').textContent = feed.length ? `${feed.length} eventos` : '—';
-    $('#lpFeed').innerHTML = feed.length === 0
-      ? '<div class="lp-empty dim mono">esperando actividad…</div>'
-      : feed.map(e => {
-          const isDepOk   = e.kind === 'deposit' && e.status === 'approved';
-          const isDepFail = e.kind === 'deposit' && e.status !== 'approved';
-          const ic = e.kind === 'deposit' ? (isDepOk ? '💰' : '✗')
-                   : e.kind === 'lock' ? '🔒' : '·';
-          const col = e.who_color || 'accent';
-          const rowCls = isDepOk ? 'lp-feed-ok' : isDepFail ? 'lp-feed-fail' : 'lp-feed-neutral';
-          const combo = _resolveComboFromEmail(e.target || '');
-          // Toda la fila navega al panel de Actividad. El combo (target) tiene data-copy
-          // para 1-click izquierdo copiar (el handler global stopPropagation evita
-          // que dispare también la navegación).
-          return `<div class="lp-feed-row ${rowCls} lp-feed-clickable" data-nav="activity" title="Click para ir al panel de Actividad">
-            <span class="lp-feed-ic">${ic}</span>
-            <span class="lp-feed-who lp-color-${esc(col)}">${esc(e.who || '—')}</span>
-            <span class="lp-feed-target dim mono d-copy" data-email="${esc(e.target || '')}" data-copy="${esc(combo)}" title="Click para copiar combo">${esc(combo || e.target || '')}</span>
-            ${e.amount != null ? `<span class="lp-feed-amt mono">${fmtMoney(e.amount)}</span>` : ''}
-            <span class="lp-feed-time mono dim">${fmtAgo(e.ts)}</span>
-          </div>`;
-        }).join('');
-
-    // ── Bloque 3: Alertas ──
-    const alerts = k.alerts || [];
-    $('#lpAlertCount').textContent = alerts.length;
-    $('#lpAlertCount').classList.toggle('warn', alerts.length > 0);
-    $('#lpAlerts').innerHTML = alerts.length === 0
-      ? '<div class="lp-empty dim mono">sin alertas</div>'
-      : alerts.map(a => `<div class="lp-alert-row sev-${esc(a.severity)}">
-          <span class="lp-alert-msg">${esc(a.msg)}</span>
-          <span class="lp-alert-time mono dim">${fmtAgo(a.ts)}</span>
-        </div>`).join('');
 
     // ── Bloque 4: Pool ──
     const p = k.pool || {};
@@ -5254,6 +5293,7 @@ async function rehydrateActiveScheduled() {
   _loadPassMap();
   refreshKpis();
   setInterval(refreshKpis, 30_000);
+  loadActivityMarquee();
   loadHealth(false);
   connectSSE();
   // Reanclar misiones programadas activas DESPUÉS de reload() (necesitamos
