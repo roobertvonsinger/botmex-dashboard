@@ -3754,3 +3754,40 @@ body.dep-drawer-pushing.dep-drawer-collapsed { padding-right: 36px; }
 .pool-chip:active {
   cursor: grabbing;
 }
+
+/* ── Activity panel: líneas humanizadas agrupadas por día ── */
+.act-day-head-row td { padding: 0; border: none; background: transparent; }
+.act-day-head {
+  display: block;
+  padding: 10px 14px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: 2px;
+  user-select: none;
+}
+.act-line-row td { padding: 0 0 1px; border: none; }
+.act-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 100ms;
+  line-height: 1.35;
+  font-size: 12px;
+}
+.act-line:hover { background: rgba(255,255,255,0.04); }
+.act-ic { font-size: 13px; flex-shrink: 0; width: 18px; text-align: center; }
+.act-txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-time { font-size: 10px; flex-shrink: 0; opacity: 0.55; }
+/* Color accents per result — consistent with lp-feed-* */
+.act-line.act-ok   .act-ic { color: var(--accent); }
+.act-line.act-ok   .act-txt { color: var(--text); }
+.act-line.act-fail .act-ic  { color: var(--danger); opacity: 0.8; }
+.act-line.act-fail           { opacity: 0.78; }
+.act-line.act-neutral .act-ic { color: var(--text-dim); }

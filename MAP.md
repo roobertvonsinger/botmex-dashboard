@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `cfef649` | feat(pool-manager): reloadPool split + drag-drop bidireccional + multi-select + bulk; confirm al exponer, directo al sacar |
 | `23bad44` | feat(pool-manager): markup vista partida Fuera|Dentro con search + bulk (CSS layout) |
 | `02a3a24` | style(table): filas mas bajas (td 8->4px) + menos desperdicio a la derecha (compactar, sin quitar columnas) |
 | `b1cacb3` | feat(ui): Online roster solo-SA en sidebar (gate D7 — pares no se ven entre si) |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `b0d76db` | style(ui): grid 3 cards (Actividad -15-20%), marquesina ticker sin overflow, Online sidebar, Recientes; un-hide strip a operadores |
 | `f3c860b` | feat(ui): strip a 3 cards (Actividad/Recientes/Pool); Online reubicado al sidebar; cache bump |
 | `58aab08` | feat(activity): logica pura dedupe + copy humano (TDD node) |
-| `69e8307` | feat(pool): GET /api/pool/split + POST /api/pool/publish bulk (SA-only) + broadcast pool_move |
 <!-- GEN:end:recientes -->
 
 ---

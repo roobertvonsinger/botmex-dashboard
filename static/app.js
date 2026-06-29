@@ -771,7 +771,8 @@ async function fetchActivity() {
   if (activityFilter.who != null) url.searchParams.set('operator_id', activityFilter.who);
   const r = await fetch(url);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.json();
+  const j = await r.json();
+  return Array.isArray(j) ? j : (j.feed || []);
 }
 
 function actionLabel(kind) {
@@ -908,6 +909,10 @@ function _renderActPagination(total) {
 function _renderActOpsChips() {
   const wrap = $('#actOpsChips');
   if (!wrap) return;
+  // Solo SA ve el filtro por operador; un operador solo ve sus propios eventos
+  const isSA = state.user?.role === 'superadmin';
+  if (!isSA) { wrap.innerHTML = ''; wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
   // Operadores únicos del feed actual con su color (best-effort)
   const seen = new Map();   // who → color
   for (const e of activityRows) {
@@ -940,14 +945,36 @@ function _resolveComboFromEmail(email) {
   return pwd ? `${email}:${pwd}` : email;
 }
 
+// Hora exacta HH:MM a partir de un timestamp (para el feed agrupado)
+function _exactHora(ts) {
+  const d = parseTs(ts);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+// Etiqueta de día para cabeceras de grupo: "Hoy", "Ayer", "28 jun"
+function _dayLabel(ts) {
+  const d = parseTs(ts);
+  if (isNaN(d.getTime())) return '?';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const yday  = new Date(today); yday.setDate(today.getDate() - 1);
+  const check = new Date(d); check.setHours(0,0,0,0);
+  if (check.getTime() === today.getTime()) return 'Hoy';
+  if (check.getTime() === yday.getTime())  return 'Ayer';
+  return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }).replace('.', '');
+}
+// Clave de día (YYYY-MM-DD) para agrupar
+function _dayKey(ts) {
+  const d = parseTs(ts);
+  if (isNaN(d.getTime())) return 'unknown';
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
 function renderActivity() {
   const t = $('#actTable');
-  t.querySelector('thead').innerHTML = `
-    <tr>
-      <th>Cuándo</th><th>Quién</th><th>Acción</th><th>Cuenta</th>
-      <th>Tarjeta</th>
-      <th class="num">Monto</th><th>Estado</th>
-    </tr>`;
+  // Resetear thead — solo necesitamos espacio para una columna (feed de líneas)
+  t.querySelector('thead').innerHTML = '';
+
+  const isSA = state.user?.role === 'superadmin';
   const filtered = getFilteredActivity();
   const total = filtered.length;
   const pages = Math.max(1, Math.ceil(total / activityPageSize));
@@ -957,30 +984,46 @@ function renderActivity() {
 
   $('#actCountLabel').textContent = `${total} evento${total === 1 ? '' : 's'}`;
 
-  t.querySelector('tbody').innerHTML = slice.map(e => {
-    const key = _actEventKey(e);
-    const newCls = _actNewIds.has(key) ? ' act-row-new' : '';
-    return `<tr class="act-${esc(e.kind)}${newCls}" data-evkey="${esc(key)}">
-      <td class="dim mono act-when" title="${esc(e.ts || '')}">
-        <span class="act-abs">${fmtAbs(e.ts)}</span>
-        <span class="act-rel dim">${fmtAgo(e.ts)}</span>
-      </td>
-      <td><span class="act-who" data-who="${esc(e.who ?? '')}">${esc(e.who ?? '—')}</span></td>
-      <td>${actionLabel(e.kind)}</td>
-      <td class="combo"><b class="act-target d-copy" data-email="${esc(e.target || '')}" data-copy="${esc(_resolveComboFromEmail(e.target))}" title="Click para copiar combo">${esc(_resolveComboFromEmail(e.target) || '—')}</b></td>
-      <td class="combo">${e.card_pipe ? `<b class="d-copy mono" data-copy="${esc(e.card_pipe)}" title="Click para copiar tarjeta">${esc(e.card_pipe)}</b>` : '<span class="dim">—</span>'}</td>
-      <td class="num">${e.amount != null ? fmtMoney(e.amount) : ''}</td>
-      <td>${statusPill(e)}</td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="7" class="loading">Sin actividad que coincida con los filtros</td></tr>';
+  if (slice.length === 0) {
+    t.querySelector('tbody').innerHTML = '<tr><td colspan="1" class="loading">Sin actividad que coincida con los filtros</td></tr>';
+  } else {
+    // Agrupar por día (manteniendo orden: newest first)
+    const groups = []; // [{label, dayKey, rows:[]}]
+    const dayMap  = new Map();
+    for (const ev of slice) {
+      const dk = _dayKey(ev.ts);
+      if (!dayMap.has(dk)) {
+        const g = { label: _dayLabel(ev.ts), dayKey: dk, rows: [] };
+        groups.push(g);
+        dayMap.set(dk, g);
+      }
+      dayMap.get(dk).rows.push(ev);
+    }
 
-  // Limpieza: las claves que ya pintamos como "nuevas" se consumen
-  for (const ev of slice) _actNewIds.delete(_actEventKey(ev));
+    let html = '';
+    for (const g of groups) {
+      html += `<tr class="act-day-head-row"><td class="act-day-head">${esc(g.label)}</td></tr>`;
+      for (const ev of g.rows) {
+        const key    = _actEventKey(ev);
+        const newCls = _actNewIds.has(key) ? ' act-row-new' : '';
+        const c      = ActivityLogic.formatActivityCopy(ev, isSA);
+        const email  = String(ev.target || ev.email || '').split(':')[0];
+        // Nota: renderizamos c.text con esc() para seguridad
+        const noteExtra = (ev.kind === 'note' && !email && isSA && ev.who)
+          ? `📝 ${esc(ev.who)} anotó`
+          : '';
+        const displayText = noteExtra || esc(c.text);
+        html += `<tr class="act-line-row act-${esc(ev.kind)}${newCls}" data-evkey="${esc(key)}"><td><div class="act-line act-${esc(c.cls)}" data-open-email="${esc(email)}"><span class="act-ic">${c.icon}</span><span class="act-txt">${displayText}</span><span class="act-time mono dim">${_exactHora(ev.ts)}</span></div></td></tr>`;
+        _actNewIds.delete(key);
+      }
+    }
+    t.querySelector('tbody').innerHTML = html;
+  }
 
   // Visible count + pagination
   const from = total === 0 ? 0 : start + 1;
-  const to = Math.min(start + activityPageSize, total);
-  const vc = $('#actVisibleCount');
+  const to   = Math.min(start + activityPageSize, total);
+  const vc   = $('#actVisibleCount');
   if (vc) vc.textContent = total === 0 ? 'sin eventos' : `${from}–${to} de ${total}`;
   _renderActPagination(total);
   _renderActOpsChips();
@@ -1000,7 +1043,7 @@ async function reloadActivity() {
     renderActivity();
   } catch (e) {
     $('#actTable').querySelector('tbody').innerHTML =
-      `<tr><td colspan="7" class="loading" style="color:var(--danger)">Error: ${esc(e.message)}</td></tr>`;
+      `<tr><td colspan="1" class="loading" style="color:var(--danger)">Error: ${esc(e.message)}</td></tr>`;
   }
 }
 function pushActivityEvent(ev) {
@@ -2348,6 +2391,13 @@ $$('.seg').forEach(seg => {
 
 // Activity table — clicks interactivos
 $('#actTable').addEventListener('click', e => {
+  // Línea humanizada → abre detalle de cuenta
+  const line = e.target.closest('.act-line[data-open-email]');
+  if (line && line.dataset.openEmail) {
+    e.stopPropagation();
+    openAccountByEmail(line.dataset.openEmail);
+    return;
+  }
   const tgt = e.target.closest('.act-target');
   if (tgt && tgt.dataset.email) {
     // Lleva a Cuentas con esa cuenta filtrada en search
