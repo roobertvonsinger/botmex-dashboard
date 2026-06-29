@@ -1485,6 +1485,76 @@ def api_marks_toggle(payload: dict, user: dict = Depends(require_session)):
     return {"marked": True}
 
 
+@app.get("/api/recent")
+def api_recent(user: dict = Depends(require_session)):
+    is_sa = user.get("role") == "superadmin"
+    my = user.get("telegram_id")
+    uk = str(my)
+    recent: dict = {}  # email -> {email, combo, last_ts, reason}
+    with db() as c:
+        def _combo(email):
+            row = c.execute("SELECT password FROM accounts WHERE email=? LIMIT 1", (email,)).fetchone()
+            pw = (row["password"] if row else "") or ""
+            return f"{email}:{pw}" if pw else email
+
+        def _add(email, ts, reason):
+            if not email:
+                return
+            cur = recent.get(email)
+            if cur is None or str(ts or "") > str(cur["last_ts"] or ""):
+                recent[email] = {"email": email, "combo": _combo(email),
+                                 "last_ts": ts, "reason": reason}
+
+        # depósitos propios (o los de SA = también los suyos; vista global = /api/activity)
+        dsql = "SELECT account_email, created_at FROM deposit_attempts "
+        dargs: tuple = ()
+        if not is_sa:
+            dsql += "WHERE operator_id=? "
+            dargs = (my,)
+        else:
+            dsql += "WHERE operator_id=? "
+            dargs = (my,)
+        dsql += "ORDER BY id DESC LIMIT 50"
+        try:
+            for r in c.execute(dsql, dargs).fetchall():
+                _add(r["account_email"], r["created_at"], "deposit")
+        except sqlite3.OperationalError:
+            pass
+
+        # locks propios (en uso)
+        for r in c.execute(
+            "SELECT email, locked_at FROM accounts WHERE locked_by=? ORDER BY locked_at DESC LIMIT 50",
+            (str(my),),
+        ).fetchall():
+            _add(r["email"], r["locked_at"], "lock")
+
+        # marcadas
+        for r in c.execute(
+            "SELECT account_email, created_at FROM account_marks WHERE user_key=? ORDER BY id DESC LIMIT 50",
+            (uk,),
+        ).fetchall():
+            _add(r["account_email"], r["created_at"], "mark")
+
+        # stats del día (por operador)
+        try:
+            st = c.execute(
+                "SELECT COUNT(*) n, "
+                "SUM(CASE WHEN lower(status)='approved' THEN 1 ELSE 0 END) ok, "
+                "SUM(CASE WHEN lower(status)='approved' THEN amount ELSE 0 END) amt "
+                "FROM deposit_attempts WHERE operator_id=? AND created_at >= date('now')",
+                (my,),
+            ).fetchone()
+            attempts = st["n"] or 0
+            approved = st["ok"] or 0
+            amount = float(st["amt"] or 0)
+        except sqlite3.OperationalError:
+            attempts = approved = 0
+            amount = 0.0
+    rec = sorted(recent.values(), key=lambda x: str(x["last_ts"] or ""), reverse=True)[:20]
+    rate = round(100.0 * approved / attempts, 1) if attempts else 0.0
+    return {"recent": rec, "stats": {"attempts": attempts, "approved": approved, "amount": amount, "rate": rate}}
+
+
 async def _health_loop():
     """Cada 6 horas corre el check. Si falla, broadcast SSE."""
     await asyncio.sleep(60)  # primer check al minuto del start
