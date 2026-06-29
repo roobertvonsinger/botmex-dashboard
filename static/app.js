@@ -500,8 +500,8 @@ function renderTable() {
   const t = $('#accTable');
   // Calcula ancho del combo más largo (en chars) — fija la columna
   const maxComboLen = visible.reduce((m, r) => Math.max(m, (r.email||'').length + 1 + (r.password||'').length), 28);
-  // +15ch de margen a la derecha — más cómodo visualmente
-  t.style.setProperty('--combo-width', `${Math.min(maxComboLen + 15, 75)}ch`);
+  // +4ch de margen — justo para no truncar, menos desperdicio horizontal
+  t.style.setProperty('--combo-width', `${Math.min(maxComboLen + 4, 60)}ch`);
   const _th = (col, label, cls = '') => {
     const on = _sortCol === col;
     const ic = on ? (_sortDir === 1 ? ' ↑' : ' ↓') : '';

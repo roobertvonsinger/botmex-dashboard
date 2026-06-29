@@ -382,7 +382,7 @@ thead th {
   position: sticky; top: 0; z-index: 1;
   background: var(--surface-solid);
   border-bottom: 1px solid var(--hairline);
-  text-align: left; padding: 9px 14px;
+  text-align: left; padding: 5px 10px;
   color: var(--text-muted); font-weight: 600;
   text-transform: uppercase; font-size: 9.5px; letter-spacing: 0.6px;
   font-family: var(--font-mono);
@@ -390,7 +390,7 @@ thead th {
 thead th.num { text-align: right; }
 tbody tr { border-bottom: 1px solid var(--hairline); }
 tbody tr:hover { background: rgba(255,255,255,0.02); }
-tbody td { padding: 8px 14px; vertical-align: middle; }
+tbody td { padding: 4px 10px; vertical-align: middle; }
 tbody td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
 tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); }
 
@@ -1237,7 +1237,7 @@ tr.row-sel { background: var(--accent-soft) !important; }
 /* Saldo: ancho fijo, font mono para que cuadre.
    Debe caber `$X,XXX.XX` + botón ↻ (22px + 6px margen) sin wrap.
    nowrap evita que el botón salte de línea cuando el monto crece. */
-#accTable th.num, #accTable td.num { width: 128px; min-width: 128px; white-space: nowrap; }
+#accTable th.num, #accTable td.num { width: 100px; min-width: 100px; white-space: nowrap; }
 
 /* Pill clase .grade ya no se usa en filas — se conserva por si se reusa */
 
