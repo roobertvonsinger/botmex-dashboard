@@ -434,6 +434,10 @@ async function loadMe() {
   if (!isSuper) {
     const nb = $('#navBinStats'); if (nb) nb.style.display = 'none';
   }
+  // Online (roster de operadores) solo superadmin — los pares NO se ven entre sí (D7)
+  if (!isSuper) {
+    const so = document.querySelector('.sb-online'); if (so) so.style.display = 'none';
+  }
   // Pool solo superadmin
   if (!isSuper) {
     const np = $('#navPool'); if (np) np.style.display = 'none';
