@@ -188,6 +188,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `68cbe28` | docs(session): registrar fixes panel v8 (commit 8ce54f7) — e2e (b) desbloqueado |
 | `8ce54f7` | fix(depos-v8): 5 bugs de cableado de eventos del panel (code review dominio) |
 | `2df39d2` | docs(session): cierre 2026-06-28 — anti-rate-limit + v8 default + backfill + buscador inteligente |
 | `1541757` | feat(search): ignorar tras separador (pipe/combo pegado) -> cae en la cuenta |
@@ -199,7 +200,6 @@ prewarm.py (router)
 | `711d75d` | docs(session): cierre 2026-06-28 — matchmaker+programado rediseñados, proxy rotatorio, spec anti-rate-limit. Proximo: writing-plans Fase 1 (JWT cache). |
 | `96063db` | docs(spec): diseno login anti-rate-limit (3 capas) |
 | `3717a47` | fix(scheduled): alinear clasificacion con el matchmaker (Robert 2026-06-28) |
-| `a2c156c` | fix(proxy): cortar sangrado del health check + pool sticky->rotatorio |
 <!-- GEN:end:recientes -->
 
 ---
