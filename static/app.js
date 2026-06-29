@@ -1662,11 +1662,20 @@ async function refreshKpis() {
 
     // ── Bloque 4: Pool ──
     const p = k.pool || {};
-    $('#lpPool').textContent = (p.pool ?? 0).toLocaleString();
-    $('#lpInUse').textContent = (p.in_use ?? 0).toLocaleString();
+    const poolN = p.pool ?? 0, useN = p.in_use ?? 0, liveN = poolN + useN;
+    $('#lpPool').textContent = poolN.toLocaleString();
+    $('#lpInUse').textContent = useN.toLocaleString();
     $('#lpTras').textContent = p.trastienda ?? 0;
     $('#lpReb').textContent = (p.rebotadas ?? 0).toLocaleString();
-    $('#lpPoolSub').textContent = `${(p.pool ?? 0) + (p.in_use ?? 0)} LIVE`;
+    $('#lpPoolSub').textContent = `${liveN} LIVE`;
+    // Hero (número grande) + barra de salud free/used — salud de un vistazo
+    const heroNum = $('#lpPoolHeroNum'); if (heroNum) heroNum.textContent = poolN.toLocaleString();
+    const barFree = $('#lpPoolBarFree'), barUsed = $('#lpPoolBarUsed');
+    if (barFree && barUsed) {
+      const pct = liveN > 0 ? (100 * poolN / liveN) : 0;
+      barFree.style.width = pct + '%';
+      barUsed.style.width = (100 - pct) + '%';
+    }
     renderPoolCard();
   } catch (e) {
     console.error('KPI error:', e);
@@ -5543,7 +5552,10 @@ function renderPoolCard() {
   if (!card) return;
 
   if (isSA) {
-    // SA: mantener la grid 4-stat (la llena refreshKpis); solo añadir Gestionar una vez
+    // SA: hero + barra de salud visibles; grid 4-stat (la llena refreshKpis)
+    const hero = document.getElementById('lpPoolHero'); if (hero) hero.style.display = '';
+    const bar = document.getElementById('lpPoolBar'); if (bar) bar.style.display = '';
+    // solo añadir Gestionar una vez
     if (!card.querySelector('.lp-pool-manage')) {
       const btn = document.createElement('button');
       btn.className = 'lp-pool-manage';
@@ -5555,7 +5567,9 @@ function renderPoolCard() {
     return;
   }
 
-  // Operador: reemplazar el cuerpo con "Mis stats del día"
+  // Operador: "Mis stats del día" — hero/barra del pool NO aplican (se ocultan)
+  const hero = document.getElementById('lpPoolHero'); if (hero) hero.style.display = 'none';
+  const bar = document.getElementById('lpPoolBar'); if (bar) bar.style.display = 'none';
   const s = window._recentStats || { attempts: 0, approved: 0, amount: 0, rate: 0 };
   const body = document.getElementById('lpPoolCard');
   if (!body) return;
@@ -5583,14 +5597,21 @@ function renderRecientes(items) {
   if (!host) return;
   const cnt = $('#lpRecientesCount');
   if (cnt) cnt.textContent = items.length;
-  const reasonLabel = r => r === 'deposit' ? 'depositaste' : r === 'lock' ? 'en uso' : r === 'mark' ? 'fijada' : r;
+  // Estado a color (escaneable): en uso=verde · depósito=oro · fijada=púrpura
+  const meta = r => r === 'deposit' ? { cls: 'rec-dep',  lbl: 'depósito' }
+                  : r === 'lock'    ? { cls: 'rec-use',  lbl: 'en uso'   }
+                  : r === 'mark'    ? { cls: 'rec-mark', lbl: 'fijada'   }
+                  : { cls: '', lbl: r };
   host.innerHTML = items.length === 0
     ? '<div class="lp-empty dim mono">sin recientes</div>'
-    : items.map(it => `<div class="lp-recent-row d-copy" data-email="${esc(it.email)}" data-copy="${esc(it.combo)}" title="Click para copiar combo">
+    : items.map(it => {
+        const m = meta(it.reason);
+        return `<div class="lp-recent-row ${m.cls} d-copy" data-email="${esc(it.email)}" data-copy="${esc(it.combo)}" title="Click para copiar combo">
         <span class="lp-recent-combo mono">${esc(it.combo)}</span>
-        <span class="lp-recent-reason dim">${reasonLabel(it.reason)}</span>
-        <span class="lp-recent-time mono dim">${fmtAgo(it.last_ts)}</span>
-      </div>`).join('');
+        <span class="lp-recent-st">${m.lbl}</span>
+        <span class="lp-recent-time">${fmtAgo(it.last_ts)}</span>
+      </div>`;
+      }).join('');
 }
 
 // ─── init ───

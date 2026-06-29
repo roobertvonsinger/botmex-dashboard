@@ -35,6 +35,9 @@
   --warn: oklch(0.80 0.16 75);
   --warn-soft: oklch(0.80 0.16 75 / 0.12);
   --purple: oklch(0.74 0.17 295);
+  /* Oro — semántica de DINERO (coherente con el panel de depósitos #f3c77a) */
+  --gold: oklch(0.82 0.14 85);
+  --gold-soft: oklch(0.82 0.14 85 / 0.14);
 
   --grade-a: oklch(0.58 0.13 160);
   --grade-b: oklch(0.86 0.02 95);
@@ -687,6 +690,31 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 }
 .lp-pool-manage:hover {
   color: var(--accent); border-color: var(--accent);
+}
+
+/* Pool — hero (número grande, salud de un vistazo) + barra free/used.
+   Solo-SA: el operador (Mis stats) los oculta vía renderPoolCard. */
+.lp-pool-hero { display: flex; align-items: baseline; gap: 7px; margin-bottom: 7px; }
+.lp-pool-hero-num {
+  font-family: var(--font-display); font-size: 28px; font-weight: 700;
+  line-height: 1; color: var(--accent); text-shadow: 0 0 14px var(--accent-glow);
+}
+.lp-pool-hero-unit {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.lp-pool-healthbar {
+  height: 5px; border-radius: 99px; overflow: hidden; margin-bottom: 8px;
+  background: rgba(255,255,255,0.06); display: flex;
+}
+.lp-pool-healthbar i { height: 100%; transition: width var(--ease); }
+.lp-pool-bar-free { background: var(--accent); }
+.lp-pool-bar-used { background: var(--warn); }
+
+/* Calma de motion — respeta prefers-reduced-motion (anti-burnout TDAH) */
+@media (prefers-reduced-motion: reduce) {
+  .lp-ticker-track { animation: none !important; }
+  .lp-dot.live, .lp-pulse { animation: none !important; }
 }
 
 /* ─── Selection checkbox (entre grade-bar y saldo, comprimido) ─── */
@@ -2227,19 +2255,31 @@ td.row-icons, th.row-icons-th {
 /* Tamaño mayor en el panel de detalle */
 .row-ic.ic-mark.det-mark { font-size: 15px; padding: 3px 5px; }
 
-/* ── Recientes: filas una línea, sin overflow:auto ── */
+/* ── Recientes: filas escaneables, estado a color (riel izq + chip) ── */
 .lp-recent-row {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 10.5px; padding: 3px 0;
-  border-bottom: 1px solid var(--hairline);
+  display: flex; align-items: center; gap: 7px;
+  font-size: 10.5px; padding: 3px 6px;
+  border-left: 2px solid var(--text-faint);
+  border-radius: 0 4px 4px 0;
   cursor: pointer;
   white-space: nowrap; overflow: hidden;
+  transition: background var(--ease-fast);
 }
-.lp-recent-row:last-child { border-bottom: none; }
 .lp-recent-row:hover { background: rgba(255,255,255,0.03); }
 .lp-recent-combo { flex: 1; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
-.lp-recent-reason { font-size: 9.5px; flex-shrink: 0; }
-.lp-recent-time { font-size: 9px; flex-shrink: 0; }
+.lp-recent-st {
+  font-size: 8.5px; font-family: var(--font-mono); flex-shrink: 0;
+  padding: 1px 6px; border-radius: 99px; letter-spacing: 0.3px;
+  background: rgba(255,255,255,0.05); color: var(--text-muted);
+}
+.lp-recent-time { font-size: 9px; flex-shrink: 0; color: var(--text-muted); min-width: 26px; text-align: right; font-family: var(--font-mono); }
+/* Estado por reason: en uso (verde) · depósito (oro) · fijada (púrpura) */
+.lp-recent-row.rec-use  { border-left-color: var(--accent); }
+.lp-recent-row.rec-use  .lp-recent-st { color: var(--accent); background: var(--accent-soft); }
+.lp-recent-row.rec-dep  { border-left-color: var(--gold); }
+.lp-recent-row.rec-dep  .lp-recent-st { color: var(--gold); background: var(--gold-soft); }
+.lp-recent-row.rec-mark { border-left-color: var(--purple); }
+.lp-recent-row.rec-mark .lp-recent-st { color: var(--purple); background: oklch(0.74 0.17 295 / 0.14); }
 
 /* Tooltip ── */
 .row-tip {

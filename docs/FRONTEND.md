@@ -222,6 +222,19 @@ Reemplazó el sistema viejo (`zero`/`dim-amount`/`glow` con cortes en $5/$10). S
 - **Divisores arrastrables del strip** (`.lp-gutter` ×2, patrón Claude Desktop). Entre Actividad↔Recientes y Recientes↔Pool. Arrastra para repartir el ancho de los cards adyacentes (min 150px c/u); **doble-click restaura**. `initLpResize()` (app.js) persiste proporciones en `localStorage['bmx.lpCols.v1']` (resiliente a resize de ventana). Grid del `.lpanel` = 5 tracks (`var(--lpc0/1/2)` con fallback fr + `--lp-gw`).
 - **Fluidez estándar.** Tokens `--ease-fast`/`--ease`/`--ease-curve` en `:root` (mismo curvado que depos.css `--t-fast`/`--t`). Aplicados con feedback táctil (`:active` scale/translate) a `.nav`, `.seg button`, `.seg-btn`, `.ico-btn`.
 
+### Ajustes 2026-06-29 (3) — refinamiento de diseño (auditoría → prod)
+
+Derivado de la auditoría doble (anti-burnout TDAH + diseñador senior premium; mockup en `docs/mockups/2026-06-29-main-view-refined.html`). Piezas de mayor impacto / menor riesgo, **aditivas y reversibles** (puro CSS/markup/render, cero backend):
+
+- **RECIENTES escaneable por estado.** `renderRecientes()` ahora pone clase por `reason`: `rec-use` (lock → "en uso", riel+chip verde), `rec-dep` (deposit → "depósito", oro), `rec-mark` (mark → "fijada", púrpura). Riel izquierdo de color + chip de estado + edad alineada a la derecha. Antes: 20 combos en mono, mismo peso → muro ilegible.
+- **POOL con peso ("salud de un vistazo").** Card SA gana hero (número grande `#lpPoolHeroNum` = pool disponible) + barra de salud `#lpPoolBar` (free verde / used ámbar, poblada en `refreshKpis`). El 4-stat grid se conserva. Operador (Mis stats del día): hero+barra se ocultan en `renderPoolCard`.
+- **Token `--gold`** (`oklch(0.82 0.14 85)`) — semántica de DINERO, coherente con el oro del panel de depósitos. Usado en RECIENTES depósito.
+- **Calma de motion.** `@media (prefers-reduced-motion: reduce)` desactiva ticker de marquesina + pulsos (`.lp-dot.live`, `.lp-pulse`).
+
+Cache-bust `20260629d`. Deploy KVM4 (static hot-mount) + md5 servido==repo + health 200 + marcadores verificados.
+
+**Pendiente como propuesta (necesita ojo al pixel de Robert, NO deployado):** unificación tipográfica (reducir roles), reestilizado global de acabados. Ver el mockup.
+
 ## Actividad Live — marquesina (`#lpActivity`)
 
 **Render**: `renderActivityMarquee()` (app.js). **Source**: `activityRows[]` (carga inicial `/api/activity` + push via SSE).

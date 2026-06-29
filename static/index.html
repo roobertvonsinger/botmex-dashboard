@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/duotone/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
-<link rel="stylesheet" href="/static/style.css?v=20260629c">
+<link rel="stylesheet" href="/static/style.css?v=20260629d">
 <link rel="stylesheet" href="/static/depos.css?v=20260628e">
 </head>
 <body>
@@ -107,6 +107,14 @@
           <div class="lp-head">
             <span class="lp-label">Pool</span>
             <span class="lp-counter mono dim" id="lpPoolSub">—</span>
+          </div>
+          <div class="lp-pool-hero" id="lpPoolHero">
+            <span class="lp-pool-hero-num" id="lpPoolHeroNum">—</span>
+            <span class="lp-pool-hero-unit">en pool</span>
+          </div>
+          <div class="lp-pool-healthbar" id="lpPoolBar" title="Disponibles en pool vs en uso">
+            <i class="lp-pool-bar-free" id="lpPoolBarFree" style="width:0"></i>
+            <i class="lp-pool-bar-used" id="lpPoolBarUsed" style="width:0"></i>
           </div>
           <div class="lp-pool-grid" id="lpPoolCard">
             <div class="lp-stat"><span class="lp-stat-label">Pool</span><b id="lpPool" class="lp-stat-val">—</b></div>
@@ -995,7 +1003,7 @@
 <div id="toast" class="toast hidden"></div>
 
 <script src="/static/activity_logic.js?v=20260629b"></script>
-<script src="/static/app.js?v=20260629c"></script>
+<script src="/static/app.js?v=20260629d"></script>
 <script src="/static/depos_logic.js?v=20260628e"></script>
 <script src="/static/depos_window.js?v=20260627n"></script>
 <script src="/static/depos.js?v=20260628e"></script>

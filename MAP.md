@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `90a9032` | docs(mockup): vista principal refinada — propuesta re-estilizado (auditoria anti-burnout TDAH + senior premium) |
 | `faea768` | fix(ui): buscador a filterbar + vista unica detallada + cajas sidebar encajadas + divisores arrastrables del strip + fluidez estandar |
 | `75fb195` | docs(session): cierre 2026-06-29 (2) — fix topbar/sidebar + bug logout sidebar (ERRORS) + NEXT-SESSION |
 | `bff8657` | fix(ui): quitar 🔔/⏻ huerfanos de topbar + colapsar topbar (cards suben) + compactar sidebar sin scroll + recablear logout al sidebar |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `cfef649` | feat(pool-manager): reloadPool split + drag-drop bidireccional + multi-select + bulk; confirm al exponer, directo al sacar |
 | `23bad44` | feat(pool-manager): markup vista partida Fuera|Dentro con search + bulk (CSS layout) |
 | `02a3a24` | style(table): filas mas bajas (td 8->4px) + menos desperdicio a la derecha (compactar, sin quitar columnas) |
-| `b1cacb3` | feat(ui): Online roster solo-SA en sidebar (gate D7 — pares no se ven entre si) |
 <!-- GEN:end:recientes -->
 
 ---
