@@ -1441,21 +1441,6 @@ async function hideAllPool() {
   }
 }
 
-async function removeFromPool(id) {
-  // legacy single-id path — kept for any stray callers
-  try {
-    const r = await fetch('/api/accounts/publish', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ ids: [id], publish: false }),
-    });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    toast('✓ Quitada de pool', 'success');
-    reloadPool();
-  } catch (e) {
-    toast(`Error: ${e.message}`, 'error');
-  }
-}
-
 // ─── reload ───
 async function reload() {
   try {

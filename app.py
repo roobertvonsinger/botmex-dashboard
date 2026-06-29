@@ -1918,7 +1918,7 @@ def lock_account(account_id: int, req: LockRequest, _user: dict = Depends(requir
         ).fetchone()["email"]
     _broadcast({
         "type": "activity", "kind": "lock",
-        "ts": locked_at, "who": req.operator, "target": email,
+        "ts": locked_at, **_resolve_who(req.operator), "target": email,
         "id": account_id, "locked_until": locked_until,
     })
     return {"id": account_id, "locked_by": req.operator, "locked_until": locked_until}

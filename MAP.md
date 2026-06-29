@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `0ea3c10` | docs(bitacora): reorg UI — SSE scoped por rol, endpoints marks/recent/pool, strip 3 cards, marquesina, pool manager, panel persistente |
 | `a264a39` | fix(depos): panel persiste cross-pagina (reanchorForSection: fallback flotante fuera de Cuentas, re-acopla al volver) |
 | `b29a899` | feat(activity-panel): fetchActivity .feed + render agrupado por dia + titulares humanos + operator-filter SA-only |
 | `cfef649` | feat(pool-manager): reloadPool split + drag-drop bidireccional + multi-select + bulk; confirm al exponer, directo al sacar |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `63dff06` | feat(recientes): card Recientes desde /api/recent + boton marcador 📌 (toggle privado sin recargar tabla) |
 | `c57d1ed` | fix(ui): strip visible a operadores (quitar hide inline) + restaurar no-kpis (filtros grade/status siguen SA-only) |
 | `d04a42c` | feat(activity): marquesina render (dedupe+filtro+ticker), click->detalle por email, criticos humanizados, limpiar refreshKpis |
-| `b0d76db` | style(ui): grid 3 cards (Actividad -15-20%), marquesina ticker sin overflow, Online sidebar, Recientes; un-hide strip a operadores |
 <!-- GEN:end:recientes -->
 
 ---
