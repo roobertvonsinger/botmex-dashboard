@@ -103,6 +103,17 @@ Fuente única de verdad = **3 campos** (`locked_by` + `locked_until` + `publishe
 
 > Plan + diseño: `docs/superpowers/plans/2026-06-26-a1-estados-cuentas-plan.md`, `docs/superpowers/specs/2026-06-25-optimizacion-estado-cuentas-design.md`. Tests: `test_a1_estados.py` (11 verde).
 
+## SSE — filtrado por rol (reorg UI 2026-06-29)
+
+`_sse_queues` guarda `(queue, ctx)` en vez de solo `queue`. Al conectar `/api/events`, el backend captura `ctx = {role, telegram_id, display}` de la sesión del cliente. `_broadcast(event)` evalúa `_event_visible_to(event, ctx)` por cada cola y solo entrega si retorna `True`.
+
+- SA recibe todo.
+- admin/user reciben solo sus propias acciones (`event.who_id == su telegram_id`).
+- Eventos de servicio sin actor (`capmonster_low`, `proxy_down`) solo al SA.
+- Las acciones del SA no llegan al feed de ningún admin/operador.
+
+Ver `docs/SSE_EVENTS.md` §Filtrado server-side para las reglas completas.
+
 ## Flujo de un depósito (single, dashboard)
 
 1. **Frontend**: usuario abre drawer → tab "Una" → `executeSingleAccount(pipe, amount)`
@@ -146,3 +157,4 @@ Similar pero:
 | `users` | Operadores del dashboard |
 | `assignments` | Cuenta ↔ operador |
 | `process_phases` | Telemetría por fase de cada proceso |
+| `account_marks` | Marcador privado por operador (`user_key TEXT, account_email TEXT, UNIQUE(user_key,account_email)`). Migración aditiva 2026-06-29. No toca `locked_by` ni `published_to_pool`. |

@@ -1,6 +1,6 @@
 # Frontend — mapa operativo
 
-> Vanilla JS (sin framework), 1 archivo grande: `static/app.js` (~3,500 líneas, ~109 funciones).
+> Vanilla JS (sin framework). Archivos principales: `static/app.js` (~3,500+ líneas), `static/depos.js` + `depos_logic.js` + `depos.css` (modal v8), `static/depos_window.js` (ventana flotante), `static/activity_logic.js` (lógica pura de actividad — testeable con `node`).
 > Mantener este mapa vivo cuando se agreguen/quiten secciones o handlers.
 
 ## Layout general
@@ -201,19 +201,81 @@ Visible cuando `selectedIds.size > 0`. Actualizado por `updateCmdBar()` (app.js:
 
 Reemplazó el sistema viejo (`zero`/`dim-amount`/`glow` con cortes en $5/$10). Si cambian los umbrales, actualizar ambos puntos a la vez (JS + CSS docstring).
 
-## Feed de Actividad (`#actTable`)
+## Strip superior (`#adminPanel`) — reorg 2026-06-29
 
-**Render**: `renderActivity()` (app.js:809).
-**Source**: `activityRows[]` (cache local + push via SSE).
-**Filtros**: `activityFilter = {kind, who, time, q}` — filtros aplicados en `getFilteredActivity()`.
+`#adminPanel` (`.lpanel`) pasó de **4 cards** (Online | Feed | Alertas | Pool) a **3 cards** y de ser solo-SA a **visible para todos** (contenido filtrado por rol server-side).
 
-**Columnas**: `Cuándo | Quién | Acción | Cuenta | Tarjeta | Monto | Estado` (7 cols desde 2026-05-11).
+| Card | ID | Contenido SA | Contenido Operador | Endpoint |
+|---|---|---|---|---|
+| **Actividad Live** | `#lpActivity` | Todo el feed humanizado (marquesina) | Solo sus propias acciones | `GET /api/activity` |
+| **Recientes** | `#lpRecientes` | Cuentas de Robert con las que interactuó | Cuentas propias (depósitos + locks + marcadas) | `GET /api/recent` |
+| **Pool** | `#lpPoolCard` | Salud del pool (grid 4-stat) + botón "Gestionar pool" → `#poolMain` | "Mis stats del día" (intentos/aprobados/monto/tasa) | `GET /api/recent` stats / kpis.pool |
+
+**Online** salió del strip → sidebar (`.sb-online`), solo-SA. **Buscador** salió del topbar → sidebar (arriba de "Principal"), conserva `id="searchInput"` y cableado backend `q=`.
+
+## Actividad Live — marquesina (`#lpActivity`)
+
+**Render**: `renderActivityMarquee()` (app.js). **Source**: `activityRows[]` (carga inicial `/api/activity` + push via SSE).
+
+- **Dedup**: `ActivityLogic.dedupeActivity()` — key `sched_id+iter` para scheduled (colapsa el doble-evento `scheduled`/`scheduled_aborted`); key `kind+target+amount+ts_minuto` para el resto.
+- **Buffer**: 30 eventos; desfilan 10 en pantalla. Animación (desfile CSS), **sin `overflow:auto`**.
+- **Copy humano**: `ActivityLogic.formatActivityCopy(ev, viewerIsSA)` — títulares sin jerga (ver spec §9). No-SA ve "Tú" en lugar del nombre del operador.
+- **Errores críticos**: SSE `capmonster_low`/`proxy_down`/`health_warning` se convierten en `{kind:'critical_error', msg}` humanizados y se insertan en el feed.
+- **Click en fila** → `openDetailModal(email)` (abre detalle de la cuenta en `#accountsMain`). **Click en header** → `showSection('activity')` (panel completo).
+- Archivo de lógica pura: `static/activity_logic.js` (IIFE/UMD, testeable con `node`).
+
+## Recientes + Marcador (`#lpRecientes`)
+
+**Render**: `renderRecientes()`. **Source**: `GET /api/recent`.
+
+- Lista las cuentas con las que el usuario interactuó: depositó, tiene en uso (lock activo), o **fijó** (marcó).
+- **Botón 📌 (marcador)** (`.ic-mark`): en cada fila de tabla y en el panel de detalle. Estado activo si `markedSet.has(email)`. Click → `POST /api/marks/toggle` → actualiza `markedSet` + repinta el botón + `renderRecientes()`. NO recarga la tabla (marcar no cambia visibilidad — frictionless).
+- Marcar NO bloquea ni cambia `published_to_pool`. Es puro recordatorio privado.
+- Sin `overflow:auto` (cabe/cicla).
+
+## Gestor de Pool (`#poolMain`) — solo-SA
+
+Vista partida **Fuera del pool** (`#poolOutside`) | **En el pool** (`#poolInside`). Carga via `GET /api/pool/split`.
+
+- Cada columna: buscador propio, chips de combo `email:password` seleccionables (multi-select), barra de acción bulk.
+- **Exponer** (Fuera→Dentro): pide confirmación (`confirm()`) antes de `POST /api/pool/publish {publish:true}`.
+- **Sacar** (Dentro→Fuera): sin confirmación, directo.
+- **"Ocultar todas"**: pide confirmación (acción masiva).
+- **Drag-drop bidireccional** (HTML5 `draggable`): soltar en columna destino dispara el mismo flujo que el bulk.
+- Scroll permitido aquí (sección de gestión, no card compacta).
+
+## Feed de Actividad — panel completo (`#activityMain`)
+
+**Render**: `renderActivity()` (app.js). **Source**: `GET /api/activity` (scoped por rol, retorna `{"feed":[...]}`).
+
+- **Organización**: agrupado por día (Hoy / Ayer / fechas).
+- **Un registro por línea**, copy humano via `ActivityLogic.formatActivityCopy`.
+- **Filtros**: por tipo (depósito/lock/marca/enfriamiento/error), por operador (solo-SA — el backend ya no manda ajenos al operador), búsqueda por email.
+- **Click en fila** → `openDetailModal(email)`.
+- Scroll vertical permitido aquí.
+
+**Columnas (vista tabla histórica)**: `Cuándo | Quién | Acción | Cuenta | Tarjeta | Monto | Estado` (7 cols desde 2026-05-11).
 
 **Inputs**:
 - `#actSearch` — búsqueda en email/operador/monto
-- `#actOpsChips` — chips operadores activos
+- `#actOpsChips` — chips operadores activos (solo-SA)
 - `#actBtnReset`, `#actBtnRefresh`
 - `#actPageSize` — paginación
+
+## Panel de depósitos persistente cross-página (reorg 2026-06-29)
+
+`#deposRoot` ya era hijo directo de `<body>` (no dentro de `#accountsMain`). El problema era que el **dock** comprime `#accDockZone` (dentro de `#accountsMain`); al salir de la vista de Cuentas, esa zona queda `display:none` y la geometría se rompía.
+
+**Fix (`DeposWindow.reanchorForSection(isAccountsActive)` en `depos_window.js`):**
+- Si el panel está **acoplado** y se sale de la vista Cuentas (`isAccountsActive=false`) → fallback a **flotante** (el dock guardado se preserva en `localStorage` para volver).
+- Al volver a Cuentas → re-acopla automáticamente.
+- El panel **no se cierra** al cambiar de sección. Solo cierra con X o Esc.
+
+Hook en `showSection(name)` (app.js): al final llama `window.DeposWindow.reanchorForSection(name === 'accounts')` si el panel está abierto.
+
+## Tabla principal — compactación (reorg 2026-06-29)
+
+`tbody td` padding reducido de `8px 14px` → `4px 12px` (`style.css`). Resultado: filas más bajas, más cuentas visibles en el mismo viewport (verificado con `getBoundingClientRect`). No se eliminaron columnas.
 
 ## Conexión SSE (`connectSSE()` — app.js:1032)
 
@@ -247,6 +309,7 @@ Ver `docs/SSE_EVENTS.md` para tabla maestra de `kind` y su handler.
 | `_schedPendingEvents` | array | Buffer de `scheduled_*` que llegan antes de `_schedShow` (race fix) |
 | `_schedHintTimer` | interval | Rotador de hints durante pool warm-up del scheduled |
 | `_schedWatchdogTimer` | timeout | Watchdog 30s — alerta si no llega ningún `scheduled_phase` |
+| `markedSet` | `Set<string>` | Emails marcados por el usuario (cargado desde `GET /api/marks` al init) |
 
 ## Helpers principales
 
@@ -261,6 +324,8 @@ Ver `docs/SSE_EVENTS.md` para tabla maestra de `kind` y su handler.
 | `pushNotif({icon,msg})` | Agrega al bell | app.js:887 |
 | `pushActivityEvent(ev)` | Inserta en feed con animación. Soporta scheduled/scheduled_phase/scheduled_aborted/scheduled_cancelled (mapea email→target) | app.js |
 | `_schedPhaseLabel(name, data)` | Formatea fase del scheduled (login/begin/submit/check/done) con emoji + ✓/✗ + duración_ms | app.js |
+| `ActivityLogic.dedupeActivity(events)` | Colapsa eventos duplicados; key `sched_id+iter` para scheduled / `kind+target+amount+ts_minuto` para el resto | `static/activity_logic.js` |
+| `ActivityLogic.formatActivityCopy(ev, viewerIsSA)` | Genera `{icon, cls, text}` humanizado para cada evento; no-SA ve "Tú" en lugar del nombre del operador | `static/activity_logic.js` |
 | `computeCurp(name, bdate, addr)` | Calcula CURP estimado (4 letras + fecha + sex + estado + verifier) | app.js:277 |
 | `_splitFullname(s)` | Separa nombre/apellidos para CURP | app.js:160 |
 

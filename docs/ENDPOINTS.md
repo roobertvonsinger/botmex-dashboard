@@ -57,6 +57,8 @@
 | Método | Path | Función | Auth | Body / Query | Respuesta | File:line |
 |---|---|---|---|---|---|---|
 | GET | `/api/pool/accounts` | Cuentas publicadas en pool (no-SA) | require_session | — | `{rows}` | `app.py:1436` |
+| GET | `/api/pool/split` | Vista partida del pool: dentro y fuera (SA-only, 403 para otros) | superadmin | — | `{"inside":[{email,combo}], "outside":[{email,combo}]}` | `app.py` |
+| POST | `/api/pool/publish` | Bulk publish/unpublish (SA-only). Hace SET `published_to_pool`. Emite SSE `pool_move`. | superadmin | `{emails:[...], publish:bool}` | `{"moved": int}` | `app.py` |
 
 ## Usuarios / Asignaciones
 
@@ -66,6 +68,15 @@
 | GET | `/api/assignments` | Listar asignaciones cuenta↔operador | superadmin | — | `{assignments}` | `app.py:384` |
 | POST | `/api/assignments/assign` | Asignar cuenta a operador | superadmin | `{account_id, telegram_id}` | `{ok}` | `app.py:414` |
 | POST | `/api/assignments/unassign` | Desasignar | superadmin | `{account_id, telegram_id}` | `{ok}` | `app.py:437` |
+
+## Marcador (privado por usuario)
+
+| Método | Path | Función | Auth | Body / Query | Respuesta | File:line |
+|---|---|---|---|---|---|---|
+| GET | `/api/marks` | Lista de emails marcados por el usuario logueado (privado — nadie más los ve) | require_session | — | `{"marks":[email,...]}` | `app.py` |
+| POST | `/api/marks/toggle` | Marcar/desmarcar una cuenta (idempotente: inserta si no existe, borra si existe). NO toca `locked_by`, `published_to_pool` ni visibilidad. | require_session | `{email: str}` | `{"marked": bool}` | `app.py` |
+
+> `user_key = str(telegram_id)`. Las marcas son exclusivamente un recordatorio personal del operador. No bloquean ni exponen la cuenta a nadie.
 
 ## Stats / KPIs
 
@@ -99,13 +110,14 @@
 
 | Método | Path | Función | Auth | Respuesta | File:line |
 |---|---|---|---|---|---|
-| GET | `/api/events` | Stream SSE de actividad/notificaciones | require_session | `text/event-stream` | `app.py:1504` |
+| GET | `/api/events` | Stream SSE de actividad/notificaciones — **filtrado server-side por rol** (cada cliente recibe solo lo visible para él; ver `docs/SSE_EVENTS.md` §Filtrado) | require_session | `text/event-stream` | `app.py` |
 
 ## Actividad
 
 | Método | Path | Función | Auth | Body / Query | Respuesta | File:line |
 |---|---|---|---|---|---|---|
-| GET | `/api/activity` | Feed paginado de actividad | require_session | query: `limit, offset, kind, who, q` | `{rows, total}` | `app.py:1742` |
+| GET | `/api/activity` | Feed de actividad **scoped por rol**: SA ve todo; operador solo sus propios depósitos y locks. Retorna `{"feed":[...]}` (era lista bare). | require_session | query: `limit, offset, kind, who, q` | `{"feed":[evento,...]}` | `app.py` |
+| GET | `/api/recent` | Cuentas con las que el usuario interactuó recientemente (depósitos propios + locks propios + marcadas). Scoped por operador. `reason ∈ {deposit, lock, mark}`. Incluye stats del día. | require_session | — | `{"recent":[{email,combo,last_ts,reason}], "stats":{attempts,approved,amount,rate}}` | `app.py` |
 
 ## Depósitos (router `/api/deposits/*`)
 

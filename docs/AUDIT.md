@@ -3,6 +3,56 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-06-29 (reorg UI — SSE scoped, strip 3 cards, marcador, pool manager, panel persistente)
+
+### SSE filtrado server-side (`app.py`)
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **`_event_visible_to(event, ctx)`** | Predicado de whitelisting: SA ve todo; admin/user solo lo suyo por `who_id`; fallback por `who` display; eventos de servicio dirigidos al destinatario; actorless-service solo SA | ✅ implementado + `test_sse_visibility.py` (6 tests) | ✅ pytest |
+| **`_broadcast` filtra por ctx** | Entrega a cada cola solo si `_event_visible_to` retorna True | ✅ + `test_broadcast_only_enqueues_visible` | ✅ pytest |
+| **`_resolve_who` retorna `who_id`** | Agrega `who_id: telegram_id` al dict además de `who`/`who_color` | ✅ + `test_resolve_who_carries_who_id` | ✅ pytest |
+| **`/api/events` captura `ctx` del usuario** | `ctx = {role, telegram_id, display}` al conectar; `_sse_generator(ctx)` lleva el ctx | ✅ | ✅ pytest |
+| **Fix: admin NO ve actividad de Robert** | `event.who_id == SA_ID` → `_event_visible_to` retorna False para operador | ✅ `test_operator_hidden_from_robert_actions` | ✅ pytest |
+
+### Marcador privado (`app.py`, tabla `account_marks`)
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Migración `account_marks`** | `CREATE TABLE IF NOT EXISTS account_marks(id, user_key, account_email, created_at, UNIQUE(user_key,account_email))` en `_migrate()` | ✅ + `test_account_marks_table_exists` | ✅ pytest |
+| **`GET /api/marks`** | Lista emails marcados por el usuario logueado (privado por `user_key`) | ✅ + `test_toggle_is_idempotent_and_private` | ✅ pytest |
+| **`POST /api/marks/toggle`** | Inserta si no existe; borra si existe (idempotente). NO toca `locked_by`/`published_to_pool` | ✅ + `test_mark_does_not_lock_or_change_visibility` | ✅ pytest |
+| **Marcas privadas entre usuarios** | Usuario A no ve marcas de usuario B | ✅ + `test_marks_are_private_per_user` | ✅ pytest |
+
+### Endpoints scoped (`app.py`)
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **`GET /api/activity` scoped** | Retorna `{"feed":[...]}` (era lista bare). SA ve todo; operador solo sus depósitos y locks propios | ✅ + `test_activity_operator_only_own` / `test_activity_sa_sees_all` | ✅ pytest |
+| **`GET /api/recent`** | Cuentas recientes del usuario (depósitos+locks+marcadas), `reason ∈ {deposit,lock,mark}`. Stats del día scoped por operador. Filtrado via `_visible_emails` | ✅ + `test_recent_*` | ✅ pytest |
+| **`GET /api/pool/split`** | SA-only (403 para otros). `{inside:[{email,combo}], outside:[{email,combo}]}` por `published_to_pool` | ✅ + `test_split_sa_only` | ✅ pytest |
+| **`POST /api/pool/publish`** | SA-only. Bulk set `published_to_pool`. Emite SSE `pool_move` (solo SA lo recibe). | ✅ + `test_publish_moves_accounts`, `test_publish_forbidden_for_operator` | ✅ pytest |
+
+### Frontend (reorg UI) — runtime-pending (Robert verifica en prod)
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Strip 3 cards visible a todos** | `#adminPanel` grid 3 cols; quita `lp-online`; contenido filtrado por rol | ✅ implementado | ⚠️ runtime-pending |
+| **Marquesina Actividad Live** | `renderActivityMarquee()`, dedup `ActivityLogic`, buffer 30/desfila 10, sin overflow:auto, copy humano, click→detalle | ✅ implementado + `node static/activity_logic.test.js` (lógica pura) | ⚠️ runtime-pending |
+| **`activity_logic.js` — dedup + copy humano** | `dedupeActivity` colapsa doble-evento scheduled; `formatActivityCopy` genera titulares sin jerga | ✅ TDD node (3 tests OK) | ✅ node |
+| **Recientes card (`#lpRecientes`)** | Carga `/api/recent`; sin overflow:auto | ✅ implementado | ⚠️ runtime-pending |
+| **Botón 📌 marcador en tabla y detalle** | Toggle `POST /api/marks/toggle`; actualiza `markedSet`; no recarga tabla | ✅ implementado | ⚠️ runtime-pending |
+| **Pool card por rol** | SA: salud 4-stat + botón gestor; Operador: Mis stats del día | ✅ implementado | ⚠️ runtime-pending |
+| **Gestor de Pool (`#poolMain`)** | Vista partida Fuera\|Dentro, search por columna, multi-select, bulk publish, drag-drop bidireccional | ✅ implementado | ⚠️ runtime-pending |
+| **Confirmación al exponer, directo al sacar** | `confirm()` antes de Fuera→Dentro; "Ocultar todas" también confirma; Dentro→Fuera directo | ✅ implementado | ⚠️ runtime-pending |
+| **Buscador en sidebar (arriba de "Principal")** | Conserva `id="searchInput"` + `q=` backend; Ctrl+K funcional | ✅ implementado | ⚠️ runtime-pending |
+| **Online en sidebar (bajo BINes, solo-SA)** | `.sb-online` compacto, oculto para no-SA | ✅ implementado | ⚠️ runtime-pending |
+| **Tabla compacta** | `tbody td` padding reducido (8px→4px); más filas visibles (medición `getBoundingClientRect`) | ✅ implementado | ⚠️ runtime-pending |
+| **Panel depósitos persistente cross-página** | `DeposWindow.reanchorForSection(isAccountsActive)`: fallback flotante al salir de Cuentas, re-acopla al volver | ✅ implementado | ⚠️ runtime-pending |
+| **Errores críticos en marquesina** | SSE `capmonster_low`/`proxy_down`/`health_warning` → `kind:'critical_error'` humanizado en feed | ✅ implementado | ⚠️ runtime-pending |
+
+---
+
 ## Captura: 2026-06-28 (login anti-rate-limit — Capa 1 + Capa 3)
 
 ### Anti-rate-limit (`deposits.py` + `login_orchestrator.py` + `app.py`)

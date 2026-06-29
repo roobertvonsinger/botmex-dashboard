@@ -3,12 +3,13 @@
 > Cada evento broadcast por el backend al frontend vía `text/event-stream`.
 > Mantener vivo al agregar/quitar un broadcast kind.
 
-> **Convención `who` / `who_color`** (desde 2026-05-26): los broadcasts de
+> **Convención `who` / `who_color` / `who_id`** (desde 2026-05-26; `who_id` desde 2026-06-29): los broadcasts de
 > tipo `activity` que llevan `who` lo envían **ya resuelto** al display name
 > (`"RobertVS"`, `"Luisito"`, etc.) y acompañado de `who_color` (slug del color
-> del operador). Usar siempre `**_resolve_who(operator_id)` en `deposits.py`
+> del operador) **y `who_id`** (telegram_id numérico del actor). Usar siempre `_resolve_who(operator_id)` en `deposits.py`
 > en lugar de pasar el `telegram_id` crudo — si no, el feed muestra el chat_id
-> numérico (ver `docs/ERRORS.md`).
+> numérico (ver `docs/ERRORS.md`). `who_id` es necesario para el filtrado
+> server-side de SSE (`_event_visible_to`).
 
 ## Tabla de eventos
 
@@ -116,6 +117,27 @@ Pendiente: consolidar en 1 evento o agrupar visualmente.
 
 - Auth: `require_session` (cookie `bmx_auth`)
 - Cada cliente subscribe vía `EventSource('/api/events')`
-- Backend mantiene un set de clients en `app.py` (variable `_event_subscribers`)
-- `_broadcast(payload)` itera y hace `yield` a cada cliente conectado
+- Backend mantiene un set de clients en `app.py` (variable `_sse_queues`: lista de `(queue, ctx)`)
+- `_broadcast(event)` evalúa visibilidad por cola antes de encolar: **solo entrega si `_event_visible_to(event, ctx)` es `True`**
 - Reconnect automático del navegador (~3-5s)
+
+### Filtrado server-side por rol (reorg UI 2026-06-29)
+
+**Antes:** `_broadcast` enviaba a TODOS los clientes sin discriminar. Un admin podía recibir actividad del SA.
+
+**Ahora:** whitelisting estricto. Reglas:
+- SA (`role == "superadmin"`) siempre recibe todos los eventos.
+- admin/user recibe solo eventos donde `event.who_id == su telegram_id` (o `event.who == su display` como fallback).
+- Eventos de servicio dirigidos (`operator_id` / `target_user` en el payload) llegan SOLO al destinatario.
+- Eventos de servicio sin actor ni destinatario (`capmonster_low`, `proxy_down`, etc.) solo al SA.
+- Las acciones del SA **no aparecen** en el feed de ningún admin/operador (fix del bug "admin ve actividad de Robert").
+
+`_sse_queues` guarda `(queue, ctx)` donde `ctx = {role, telegram_id, display}` capturado al conectar `/api/events`. `_resolve_who(val)` ahora retorna `{who, who_color, who_id}` — `who_id` es el telegram_id del actor para que `_event_visible_to` pueda filtrar por ID numérico.
+
+### Nuevo kind: `pool_move`
+
+| `type` | `kind` | Disparado por | Payload | Handler frontend |
+|---|---|---|---|---|
+| `activity` | `pool_move` | `POST /api/pool/publish` en `app.py` | `{publish: bool, count: int, who, who_id, who_color, ts}` | marquesina Actividad Live (solo SA recibe, por filtro server-side) |
+
+`publish: true` = cuentas expuestas al pool; `false` = retiradas. Copy humano: `↘ {who} expuso N cuenta(s) al pool` / `↗ retiró N del pool`.
