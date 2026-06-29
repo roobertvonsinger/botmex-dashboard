@@ -512,6 +512,20 @@ docker exec -i betmexico-web python3 -c "import httpx;print(httpx.get('https://a
 
 ## Frontend
 
+### Logout del sidebar nunca estuvo cableado + topbar huérfana tras mover el buscador (2026-06-29)
+
+**Síntoma (Robert)**: tras el reorg, al mover el buscador al sidebar, la topbar quedó casi vacía con la 🔔 (notificaciones) y el ⏻ (cerrar sesión) huérfanos arriba-derecha empujando las cards hacia abajo. Además el sidebar se salía de la pantalla (status + usuario/logout cortados abajo, exigiendo scroll).
+
+**Causa raíz (verificada en código)**: el handler de logout (`app.js`) estaba cableado a `$$('.ico-btn[title="Salir"], .power')` — pero el botón de cerrar sesión del SIDEBAR (`.sb-user .ico-btn`) tiene `title="Cerrar sesión y salir"` (NO matchea `[title="Salir"]`), así que **el único logout funcional era el `.power` de la topbar**. El botón del sidebar nunca cerró sesión. Y `--topbar-h: 56px` reservaba una barra que, tras mover el buscador, quedó vacía en desktop empujando las cards.
+
+**Fix (commit `bff8657`, deployado + md5 verificado)**:
+- Quitados `.bell` (`#bellBtn`/`#bellBadge`) + `.power` de la topbar (redundantes: Notificaciones en el nav izq; logout en el sidebar). `renderNotifBadge` guarda `#bellBadge`; `#bellBtn?.addEventListener` con optional chaining.
+- **Logout RECABLEADO** a `.sb-user .ico-btn` (selector `$$('.sb-user .ico-btn, .ico-btn[title="Salir"], .power')`).
+- `.topbar` colapsada en desktop (`height:0`), restaurada en el `@media` mobile (para el hamburger).
+- Sidebar compactado ~120px (brand/greet/sections/nav/online/status), logo 190→158px, para entrar sin scroll. Cache-bust `20260629b`.
+
+**Pendiente**: confirmar en la pantalla de Robert (sesión limpia) que el sidebar entra completo sin scroll; si aún se sale, compactar más (logo / bloque Online).
+
 ### Panel de depósitos v8 — 5 bugs de cableado de eventos (code review 2026-06-28)
 
 **Contexto**: tras hacer v8 el modal DEFAULT (commit `ae40021`), un code review por dominio del cableado `depos.js`↔`deposits.py` halló 5 bugs que NO estaban en el motor sino en cómo el frontend consume los eventos. La lógica pura (`depos_logic.js`) estaba sana (tests verde); los bugs vivían en los handlers DOM (sin cobertura por el DOM). Fix en `depos.js`/`depos_logic.js`/`depos.css` + cache-bust `?v=20260628e`.

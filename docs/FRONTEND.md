@@ -7,7 +7,7 @@
 
 ```
 +------------------------------------------------------------+
-| topbar: greeting + servicios (xCAPTCHA, Proxies, WSai) + 🔔|
+| topbar: COLAPSADA en desktop (2026-06-29) · hamburger en mobile |
 +----+--------------------------------------------------------+
 | s  |  main section (cambia según nav):                      |
 | i  |   - accounts                                           |
@@ -26,7 +26,7 @@
 - **Logo del dashboard** (sidebar `.sb-brand` + favicon): `static/assets/botmexico_logo.png`.
   - Desde 2026-06-26: osito-mascota "Depp-oso" con jersey de la selección + "botmexico.com.mx" tricolor, fondo transparente real (476×218). Reemplazó el emblema hacker previo (respaldo en `static/assets/botmexico_logo_hacker_prev.png`).
   - Fuente/recortes en `docs/mockups/assets-depos/` (`logo_principal.png` = recortado sin marca de agua Gemini; `logo_principal_v2_transparent.png` = ancho original con alfa).
-  - Tamaño en sidebar: `.sb-brand img { width: 190px }` (`static/style.css`). El glow verde lo da un `drop-shadow` CSS.
+  - Tamaño en sidebar: `.sb-brand img { width: 158px }` (`static/style.css`; reducido de 190px el 2026-06-29 al compactar el sidebar para que entre sin scroll). El glow verde lo da un `drop-shadow` CSS.
   - **Distinto** del avatar del panel de depósitos (`depos_avatar.png` / osito busto del modal) — ese es branding "Depos", no el logo global.
 
 ## Secciones (vías `showSection(name)` — app.js:926)
@@ -38,14 +38,15 @@
 | `pool` | `#poolMain` | `reloadPool()` (app.js:948) | `GET /api/pool/accounts` |
 | `notifications` | `#notificationsMain` | `renderNotifs()` (app.js:906) | (estado in-memory `notifications[]`) |
 
-## Topbar — status pills
+## Sidebar — status pills (`.sb-status`)
+
+> Viven en el SIDEBAR (`.sb-status`), no en la topbar. La 🔔 de la topbar se eliminó 2026-06-29 (Notificaciones está en el nav izq; el badge sigue en `#navNotifBadge`).
 
 | Pill | ID | Endpoint | Actualizado en | Significado |
 |---|---|---|---|---|
 | xCAPTCHA | `#stCap` | `/api/health/full` (cada N min) | `loadHealthFull()` | Saldo CapMonsterCloud (USD) |
 | Proxies | `#stProxy` | `/api/health/full` | `loadHealthFull()` | Estado proxy MX |
 | WSai | `#stWsai` | `/api/superadmin/kpis` | dentro de KPIs | Calls disponibles WebScraping.ai |
-| 🔔 (bell) | `#notifBell` | n/a | `renderNotifBadge()` (app.js:893) | Notificaciones no leídas |
 
 ## Detalle de cuenta — panel INLINE (acordeón) — 2026-05-28
 

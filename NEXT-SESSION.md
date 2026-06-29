@@ -17,7 +17,7 @@ El **backend (leyes de dominio)** está test-cubierto (39 tests) y verificado en
 
 ## ⏳ Pendientes próximos
 
-- [ ] **Feedback de Robert del reorg en sesión limpia → afinar** (lo visual/interactivo). PRIORIDAD.
+- [ ] **Feedback de Robert (sesión limpia) → afinar** (lo visual/interactivo del reorg + el ajuste topbar/sidebar). PRIORIDAD. Confirmar específicamente: ¿el **sidebar entra completo SIN scroll** en su pantalla (se ve abajo status + usuario/logout)? Si aún se sale → compactar más (achicar logo / bloque Online).
 - [ ] **Minors diferidos del review final** (no bloquean, hacer si Robert no reporta otra cosa):
   - `account_cooling` NO llega a la marquesina: se emite inline en el stream de depósito, no vía `_broadcast`→`/api/events`. Para que desfile habría que emitirlo por `_broadcast` desde `deposits.py` (motor — fuera del scope UI; el copy de la marquesina ya está listo).
   - Tabla: combos >56ch se truncan con ellipsis (valor completo en el detalle). Si Robert quiere ver el combo completo en la fila → subir `--combo-width`.
@@ -34,6 +34,7 @@ Rama `feat/reorg-ui-dashboard` → merge FF a `main` (`93ef443`), pusheada a For
 - **Backend (Parte 1, 7 tasks TDD):** `0269674`/`a70f04e` predicado `_event_visible_to`; `06468a4`/`8e7c00e` **SSE filtrado server-side por usuario** en `_broadcast` + ctx en `/api/events` + `who_id` en `_resolve_who`; `76a63b3`/`288f48b` tabla `account_marks` + endpoints marcador; `efe8c31` `/api/activity` scoped (shape `{"feed":[...]}`); `8ba0e50`/`cc105dc` `/api/recent` + **fix leak ley-del-pool** (`_visible_emails`); `69e8307` `/api/pool/split`+`/api/pool/publish` (SA-only) + kind `pool_move`.
 - **Frontend (Parte 2, 13 tasks):** `58aab08` `activity_logic.js` (dedupe+copy humano); `f3c860b` strip 3 cards + Online→sidebar; `b0d76db` CSS grid 3-col + marquesina ticker; `d04a42c`/`c57d1ed` render marquesina + fix strip-visible-a-operadores; `63dff06` Recientes+marcador 📌; `9b530c4` pool card por rol; `0e5cf4d` buscador→sidebar; `b1cacb3` Online solo-SA; `02a3a24` tabla compacta; `23bad44`/`cfef649` pool manager (split+drag-drop+bulk); `b29a899` panel Actividad agrupado; `a264a39` panel depósitos persistente cross-página.
 - **Docs + review:** `0ea3c10` bitácora (5 docs); `93ef443` fixes del review final (who_id en lock broadcast + cleanup).
+- **Post-cierre (feedback Robert 2026-06-29):** `bff8657` fix UI — quitar 🔔/⏻ huérfanos de la topbar + colapsar topbar (las cards suben) + compactar sidebar ~120px sin scroll + **recablear logout al botón del sidebar** (bug latente: solo el ⏻ de la topbar cerraba sesión; el del sidebar nunca estuvo cableado — ver `docs/ERRORS.md`). Deployado (static hot-mount) + md5 verificado. Cache-bust `20260629b`.
 - **Deploy KVM4 (2026-06-29):** `app.py` + 5 static → `/docker/betmexico/code/web/`, restart web (SIGKILL/SSE). **Verificado:** migración `account_marks` aplicada, health 200 (923 cuentas), md5 servido==repo (app.py/app.js/index.html exactos), endpoints nuevos registrados (401 no 404), health público Traefik 200.
 
 ## 🔧 Decisiones tomadas (esta sesión)

@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `bff8657` | fix(ui): quitar 🔔/⏻ huerfanos de topbar + colapsar topbar (cards suben) + compactar sidebar sin scroll + recablear logout al sidebar |
 | `605d0aa` | docs(session): cierre 2026-06-29 — reorg UI completo (22 tasks) deployado + verificado en prod |
 | `93ef443` | fix(review): who_id en lock broadcast (consistencia visibilidad) + limpiar removeFromPool muerto + poolCountLabel |
 | `0ea3c10` | docs(bitacora): reorg UI — SSE scoped por rol, endpoints marks/recent/pool, strip 3 cards, marquesina, pool manager, panel persistente |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `b1cacb3` | feat(ui): Online roster solo-SA en sidebar (gate D7 — pares no se ven entre si) |
 | `0e5cf4d` | feat(ui): buscador incrustado en sidebar (arriba de Principal); conserva #searchInput + cableado backend |
 | `9b530c4` | feat(pool-card): salud+boton Gestionar para SA, Mis stats del dia para operador |
-| `63dff06` | feat(recientes): card Recientes desde /api/recent + boton marcador 📌 (toggle privado sin recargar tabla) |
 <!-- GEN:end:recientes -->
 
 ---
