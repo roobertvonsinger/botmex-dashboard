@@ -1303,60 +1303,99 @@ function renderBinStats(data) {
 }
 
 // ─── Pool view (SA only) ───
-async function reloadPool() {
-  const t = $('#poolTable');
-  if (!t) return;
-  try {
-    const r = await fetch('/api/pool/accounts');
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const rows = await r.json();
-    $('#poolCountLabel').textContent = `${rows.length} cuenta${rows.length !== 1 ? 's' : ''} visibles a operadores`;
-    $('#navPoolCount').textContent = rows.length;
-    t.querySelector('thead').innerHTML = `<tr>
-      <th class="grade-bar-th"></th>
-      <th class="num">Saldo</th>
-      <th>Cuenta</th>
-      <th>Asignada a</th>
-      <th>Lock</th>
-      <th class="num"></th>
-    </tr>`;
-    t.querySelector('tbody').innerHTML = rows.map(r => {
-      const g = gradeClass(r.grade);
-      const until = r.locked_by ? fmtUntil(r.locked_until) : null;
-      const lockChip = r.locked_by
-        ? `<span class="lock-chip op-accent">🔒 ${esc(r.locked_by)}${until && !until.expired ? ` <span class="dim mono">${until.text}</span>` : ''}</span>`
-        : '<span class="dim">libre</span>';
-      const assigned = r.assigned_to > 0 ? `<span class="dim mono">${r.assigned_to} usuario(s)</span>` : '<span class="dim">—</span>';
-      const combo = `${r.email}:${r.password || ''}`;
-      return `<tr class="r-grade-${g}" data-id="${r.id}">
-        <td class="grade-bar-cell"></td>
-        <td class="num"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span></td>
-        <td class="combo"><b data-combo="${esc(combo)}">${esc(combo)}</b></td>
-        <td>${assigned}</td>
-        <td>${lockChip}</td>
-        <td class="num"><button class="seg-btn pool-hide-btn" data-id="${r.id}" title="Quitar de la vista de operadores">×</button></td>
-      </tr>`;
-    }).join('') || '<tr><td colspan="6" class="loading">Pool vacía — pica "Liberar" desde Cuentas para empezar a publicar</td></tr>';
-  } catch (e) {
-    t.querySelector('tbody').innerHTML = `<tr><td colspan="6" class="loading" style="color:var(--danger)">Error: ${esc(e.message)}</td></tr>`;
+function renderPoolCol(hostId, items, side) {
+  const host = $(hostId);
+  if (!host) return;
+  const searchId = side === 'outside' ? '#poolSearchOut' : '#poolSearchIn';
+  const q = ($(searchId)?.value || '').toLowerCase();
+  const filtered = q
+    ? items.filter(it => it.combo.toLowerCase().includes(q) || it.email.toLowerCase().includes(q))
+    : items;
+  const countId = side === 'outside' ? '#poolOutCount' : '#poolInCount';
+  const countEl = $(countId);
+  if (countEl) countEl.textContent = filtered.length;
+  host.innerHTML = filtered.length
+    ? filtered.map(it => `<div class="pool-chip" draggable="true" data-email="${esc(it.email)}" data-side="${side}" title="${esc(it.combo)}"><span class="pool-chip-combo mono">${esc(it.combo)}</span></div>`).join('')
+    : `<div class="pool-empty dim">Sin cuentas</div>`;
+  // re-attach drag listeners to newly rendered chips
+  host.querySelectorAll('.pool-chip').forEach(chip => {
+    chip.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', JSON.stringify({ email: chip.dataset.email, side: chip.dataset.side }));
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    chip.addEventListener('click', () => {
+      chip.classList.toggle('selected');
+      _updatePoolBulkBtn(side);
+    });
+  });
+}
+
+function _updatePoolBulkBtn(side) {
+  if (side === 'outside') {
+    const btn = $('#poolBtnExpose');
+    if (!btn) return;
+    const n = ($('#poolOutside')?.querySelectorAll('.pool-chip.selected') || []).length;
+    btn.disabled = n === 0;
+    btn.textContent = n > 0 ? `Mandar al pool → (${n})` : 'Mandar al pool →';
+  } else {
+    const btn = $('#poolBtnHide');
+    if (!btn) return;
+    const n = ($('#poolInside')?.querySelectorAll('.pool-chip.selected') || []).length;
+    btn.disabled = n === 0;
+    btn.textContent = n > 0 ? `← Sacar del pool (${n})` : '← Sacar del pool';
   }
 }
 
-async function hideAllPool() {
-  if (!confirm('¿Quitar TODAS las cuentas de la vista de los operadores?\n\nLos operadores dejarán de verlas hasta que las publiques de nuevo desde Cuentas → Liberar.')) return;
+async function reloadPool() {
+  const outside = $('#poolOutside');
+  const inside = $('#poolInside');
+  if (!outside && !inside) return;
   try {
-    const r = await fetch('/api/accounts/hide-all', { method: 'POST' });
+    const r = await fetch('/api/pool/split');
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const data = await r.json();
-    toast(`📤 ${data.hidden} ocultas`, 'success');
+    const d = await r.json();
+    window._poolData = d;
+    renderPoolCol('#poolOutside', d.outside || [], 'outside');
+    renderPoolCol('#poolInside', d.inside || [], 'inside');
+    // reset bulk buttons
+    const btnExp = $('#poolBtnExpose');
+    const btnHide = $('#poolBtnHide');
+    if (btnExp) { btnExp.disabled = true; btnExp.textContent = 'Mandar al pool →'; }
+    if (btnHide) { btnHide.disabled = true; btnHide.textContent = '← Sacar del pool'; }
+    // update nav badge with inside count
+    const insideCount = (d.inside || []).length;
+    const navBadge = $('#navPoolCount');
+    if (navBadge) navBadge.textContent = insideCount;
+  } catch (e) {
+    if (outside) outside.innerHTML = `<div class="pool-empty" style="color:var(--danger)">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+async function _poolPublish(emails, publish) {
+  const r = await fetch('/api/pool/publish', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ emails, publish }),
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return await r.json();
+}
+
+async function hideAllPool() {
+  const allInside = (window._poolData?.inside || []).map(it => it.email);
+  const n = allInside.length;
+  if (!n) { toast('Pool ya vacía', 'info'); return; }
+  if (!confirm(`¿Ocultar TODAS (${n}) las cuentas del pool? Los operadores se quedan sin cuentas.`)) return;
+  try {
+    const data = await _poolPublish(allInside, false);
+    toast(`✓ ${data.moved} ocultas`, 'success');
     reloadPool();
-    reload();
   } catch (e) {
     toast(`Error: ${e.message}`, 'error');
   }
 }
 
 async function removeFromPool(id) {
+  // legacy single-id path — kept for any stray callers
   try {
     const r = await fetch('/api/accounts/publish', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -2073,15 +2112,68 @@ document.addEventListener('click', e => {
 // Pool view handlers
 $('#btnPoolRefresh')?.addEventListener('click', reloadPool);
 $('#btnPoolHideAll')?.addEventListener('click', hideAllPool);
-$('#poolTable')?.addEventListener('click', e => {
-  const btn = e.target.closest('.pool-hide-btn');
-  if (btn) { e.stopPropagation(); removeFromPool(parseInt(btn.dataset.id)); return; }
-  const combo = e.target.closest('td.combo b');
-  if (combo?.dataset.combo) {
-    e.stopPropagation();
-    navigator.clipboard.writeText(combo.dataset.combo).then(() => toast(`✓ ${combo.dataset.combo}`, 'success'));
-  }
+
+// Search — re-render from cached data, no refetch
+$('#poolSearchOut')?.addEventListener('input', () => {
+  if (!window._poolData) return;
+  renderPoolCol('#poolOutside', window._poolData.outside || [], 'outside');
+  _updatePoolBulkBtn('outside');
 });
+$('#poolSearchIn')?.addEventListener('input', () => {
+  if (!window._poolData) return;
+  renderPoolCol('#poolInside', window._poolData.inside || [], 'inside');
+  _updatePoolBulkBtn('inside');
+});
+
+// Bulk — expose (outside → inside, SENSITIVE: requires confirm)
+$('#poolBtnExpose')?.addEventListener('click', async () => {
+  const emails = [...($('#poolOutside')?.querySelectorAll('.pool-chip.selected') || [])]
+    .map(c => c.dataset.email);
+  if (!emails.length) return;
+  if (!confirm(`Exponer ${emails.length} cuenta(s) al pool (visibles a operadores)?`)) return;
+  try {
+    const data = await _poolPublish(emails, true);
+    toast(`✓ ${data.moved} expuesta(s) al pool`, 'success');
+    reloadPool();
+  } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+});
+
+// Bulk — hide (inside → outside, safe: no confirm)
+$('#poolBtnHide')?.addEventListener('click', async () => {
+  const emails = [...($('#poolInside')?.querySelectorAll('.pool-chip.selected') || [])]
+    .map(c => c.dataset.email);
+  if (!emails.length) return;
+  try {
+    const data = await _poolPublish(emails, false);
+    toast(`✓ ${data.moved} sacada(s) del pool`, 'success');
+    reloadPool();
+  } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+});
+
+// Drag-drop — drop zones
+function _setupPoolDropZone(hostId, targetSide) {
+  const el = $(hostId);
+  if (!el) return;
+  el.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+  el.addEventListener('drop', async e => {
+    e.preventDefault();
+    let payload;
+    try { payload = JSON.parse(e.dataTransfer.getData('text/plain')); } catch { return; }
+    const { email, side: srcSide } = payload;
+    if (!email || srcSide === targetSide) return; // same column = no-op
+    const publish = targetSide === 'inside'; // dropping INTO inside = expose
+    if (publish) {
+      if (!confirm(`Exponer 1 cuenta al pool (visible a operadores)?`)) return;
+    }
+    try {
+      const data = await _poolPublish([email], publish);
+      toast(`✓ ${data.moved} ${publish ? 'expuesta' : 'sacada'} del pool`, 'success');
+      reloadPool();
+    } catch (e2) { toast(`Error: ${e2.message}`, 'error'); }
+  });
+}
+_setupPoolDropZone('#poolOutside', 'outside');
+_setupPoolDropZone('#poolInside', 'inside');
 
 // ─── Admin / Controles backend ───
 async function loadAdminState() {
