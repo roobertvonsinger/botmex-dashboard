@@ -113,8 +113,9 @@ Regla de implementación: el filtro NO es "todo excepto otros operadores"; es **
 ## 8. Zona D — Panel de depósitos persistente cross-página
 
 - La ventana flotante/acoplable **ya existe** (spec `2026-06-27-ventana-flotante-depositos-design.md`: 3 estados float/dock-izq/dock-der + persistencia `localStorage`).
-- **Problema:** `#deposRoot` vive dentro del DOM de la vista de cuentas → al cambiar de sección (`showSection()`) se desmonta/oculta.
-- **Fix:** montar `#deposRoot` como **elemento global** (hijo de `body`/contenedor raíz, fuera de `#accountsMain`). Sobrevive `showSection()`. El **dock** se reancla a `#accDockZone` solo cuando la vista de cuentas está activa; en otras vistas el panel queda **flotante**. Cierra solo manual (X/Esc). Estado ya persistido en `localStorage`.
+- **Hallazgo (verificado en código):** `#deposRoot` **ya es hijo directo de `<body>`** (`index.html:993`), hermano de `.shell` — NO vive dentro de `#accountsMain`. `showSection()` solo togglea `display` de los `#*Main`, así que el panel (overlay `position:fixed`) **ya sobrevive** el cambio de sección. La premisa "montar global" era falsa.
+- **Problema real:** el **dock** se ancla y comprime `#accDockZone` (dentro de `#accountsMain`). Al salir de la vista de cuentas, esa zona queda `display:none` → la geometría del dock se mide contra un rect 0/oculto y el panel acoplado se rompe (salta, queda mal, o tapa la nueva vista). Por eso "solo funciona en el dashboard principal".
+- **Fix:** en el cambio de sección, si el panel está **acoplado** y la vista de cuentas NO está activa → **fallback a flotante** (el panel sigue visible y usable, sin depender de `#accDockZone`). Al volver a la vista de cuentas, re-anclar al dock guardado. Cierra solo manual (X/Esc). Estado/geometría ya en `localStorage`. Toca `depos_window.js` (re-anclaje) + un hook en `showSection()`.
 
 ## 9. Mapeo evento → copy humano (catálogo)
 
@@ -179,7 +180,7 @@ Titulares, sin jerga técnica. `{who}` = nombre del operador; oculto/normalizado
 | `static/index.html` | Mover Online + buscador al sidebar; strip a 3 cards; `#deposRoot` global; sección `#poolMain` gestor partido; bump cache |
 | `static/app.js` | `refreshKpis`/render de cards por rol; marquesina (dedup + desfile + copy); Recientes + marcador; pool manager (drag-drop + bulk + search); persistencia panel cross-section; quitar gate que oculta strip a no-SA |
 | `static/style.css` | Grid strip 3 cards; Online/buscador sidebar; tabla compacta (padding filas, anchos); sin overflow:auto en cards |
-| `static/depos.js` / `depos_window.js` | Montaje global de `#deposRoot`; re-anclaje de dock por sección |
+| `static/depos.js` / `depos_window.js` | `#deposRoot` ya es global (`<body>`); fix = re-anclaje de dock por sección (fallback flotante si la vista de cuentas no está activa) + hook en `showSection()` |
 | `app.py` | SSE per-user (`_sse_queues` con ctx + filtro en `_broadcast`); `_migrate()` `account_marks`; endpoints `/api/activity`, `/api/recent`, `/api/marks/*`, `/api/pool/publish` |
 | `docs/SSE_EVENTS.md` | Nuevos kinds (`pool_move`, marca) + filtrado por rol |
 | `docs/ENDPOINTS.md` | Nuevos endpoints |
