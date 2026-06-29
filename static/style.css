@@ -287,6 +287,13 @@ body.no-kpis .topbar > .grow { display: none; }
 body.no-kpis .seg[data-seg="status"],
 body.no-kpis .seg[data-seg="grade"],
 body.no-kpis .seg[data-seg="view"] { display: none !important; }
+/* Buscador incrustado en sidebar */
+.sidebar .search {
+  width: calc(100% - 24px); max-width: none; flex-shrink: 0;
+  margin: 4px 12px 8px;
+  padding: 7px 12px;
+}
+.sidebar .search kbd { display: none; }
 .search .ico { color: var(--text-muted); font-size: 14px; }
 .search input { background: transparent; border: none; outline: none; color: var(--text); font-size: 12.5px; flex: 1; font-family: inherit; }
 .search input::placeholder { color: var(--text-muted); }

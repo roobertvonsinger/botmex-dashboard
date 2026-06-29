@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `9b530c4` | feat(pool-card): salud+boton Gestionar para SA, Mis stats del dia para operador |
 | `63dff06` | feat(recientes): card Recientes desde /api/recent + boton marcador 📌 (toggle privado sin recargar tabla) |
 | `c57d1ed` | fix(ui): strip visible a operadores (quitar hide inline) + restaurar no-kpis (filtros grade/status siguen SA-only) |
 | `d04a42c` | feat(activity): marquesina render (dedupe+filtro+ticker), click->detalle por email, criticos humanizados, limpiar refreshKpis |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `8ba0e50` | feat(recent): GET /api/recent cuentas recientes + stats del dia (scoped por operador) |
 | `efe8c31` | feat(activity): GET /api/activity feed scoped por rol (operador solo lo suyo) |
 | `288f48b` | feat(marks): endpoints GET /api/marks + POST /api/marks/toggle (idempotente, privado) |
-| `76a63b3` | feat(marks): migracion account_marks (marcador privado por usuario) |
 <!-- GEN:end:recientes -->
 
 ---
