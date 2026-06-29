@@ -1535,6 +1535,12 @@ def api_recent(user: dict = Depends(require_session)):
         ).fetchall():
             _add(r["account_email"], r["created_at"], "mark")
 
+        # Ley del pool: el operador NO ve combos de cuentas fuera de su universo.
+        # (marcar una cuenta no la expone; SA sin restricción.)
+        vis = _visible_emails(user, c)
+        if vis is not None:
+            recent = {e: v for e, v in recent.items() if e in vis}
+
         # stats del día (por operador)
         try:
             st = c.execute(
