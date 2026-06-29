@@ -834,7 +834,7 @@ def _resolve_who(val):
         wid = int(val)
     except (TypeError, ValueError):
         u = _auth.USERS.get(str(val).lower()) if val is not None else None
-        wid = u["telegram_id"] if u else None
+        wid = u.get("telegram_id") if u else None
     return {
         "who": _resolve_operator(val),
         "who_color": _operator_color(val),
@@ -1471,7 +1471,8 @@ def _release_account(c, account_id, email, reason, prev_locked_by,
     _broadcast({
         "type": "activity", "kind": kind,
         "ts": datetime.now(timezone.utc).isoformat(),
-        "who": who, "target": email, "id": account_id,
+        "who": who, "who_id": _resolve_who(prev_locked_by)["who_id"],
+        "target": email, "id": account_id,
         "prev_locked_by": prev_locked_by, "reason": reason,
     })
 
@@ -1919,7 +1920,8 @@ async def _sse_generator(ctx: dict):
             before = len(_sse_queues)
             _sse_queues[:] = [(qq, cc) for (qq, cc) in _sse_queues if qq is not q]
             n_after_leave = len(_sse_queues)
-        _sse_log.info(f"[SSE] cliente desconectado q_id={q_id} removed={before - n_after_leave} total={n_after_leave}")
+            all_ids = [id(x) for (x, _c) in _sse_queues]
+        _sse_log.info(f"[SSE] cliente desconectado q_id={q_id} removed={before - n_after_leave} total={n_after_leave} all_ids={all_ids}")
 
 
 @app.get("/api/events")

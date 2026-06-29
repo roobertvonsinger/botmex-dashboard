@@ -74,3 +74,15 @@ def test_resolve_who_carries_who_id(seed_db):
     out = app._resolve_who(1341812706)
     assert out["who_id"] == 1341812706
     assert "who" in out and "who_color" in out
+
+
+def test_broadcast_operator_receives_own(seed_db):
+    import app, queue as _q
+    sa_q, op_q = _q.SimpleQueue(), _q.SimpleQueue()
+    app._sse_queues[:] = [(sa_q, SA), (op_q, OP)]
+    try:
+        app._broadcast({"type": "activity", "kind": "deposit", "who_id": 555, "amount": 50})
+        assert not sa_q.empty()   # SA recibe todo
+        assert not op_q.empty()   # el operador recibe SU propia accion
+    finally:
+        app._sse_queues.clear()

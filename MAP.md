@@ -92,7 +92,7 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2581 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2583 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -108,7 +108,7 @@ prewarm.py (router)
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
 | `test_anti_rate_limit.py` | 271 | `—` | _[completar]_ |
 | `test_search.py` | 70 | `—` | _[completar]_ |
-| `test_sse_visibility.py` | 76 | `—` | _[completar]_ |
+| `test_sse_visibility.py` | 88 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 55 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
@@ -189,6 +189,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `06468a4` | feat(sse): filtrado server-side por usuario en _broadcast + ctx en /api/events |
 | `a70f04e` | fix(sse): guard display None en fallback de _event_visible_to + test |
 | `0269674` | feat(sse): predicado de visibilidad por rol _event_visible_to (TDD) |
 | `1e25e94` | docs(plan): plan TDD reorg UI (22 tasks, backend scoped primero) + fix spec Zona D |
@@ -200,7 +201,6 @@ prewarm.py (router)
 | `d5eb159` | feat(search): buscador inteligente multi-campo/termino + BINes columna 'Tarjetas' |
 | `2f4e230` | fix(data): backfill account_cards desde aprobadas historicas + doc bug columna CUENTAS |
 | `ae40021` | feat(frontend): modal v8 por DEFAULT para todos (quitar flag opt-in deposV8) |
-| `2589a1e` | docs(session): NEXT-SESSION — anti-rate-limit Capa 1+3 deployadas, e2e pendiente |
 <!-- GEN:end:recientes -->
 
 ---

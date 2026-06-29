@@ -69,38 +69,38 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `health_last` | def | L1432–L1433 |
 | `health_dismiss` | def | L1437–L1440 |
 | `_health_loop` | def | L1443–L1453 |
-| `_release_account` | def | L1456–L1476 |
-| `_run_lock_janitor` | def | L1479–L1527 |
-| `_janitor_loop` | def | L1530–L1540 |
-| `_run_window_watcher` | def | L1549–L1621 |
-| `_window_watcher_loop` | def | L1624–L1633 |
-| `_release_watchdog_tick` | def | L1636–L1735 |
-| `_release_watchdog_loop` | def | L1738–L1746 |
-| `_start_bg_tasks` | def | L1750–L1754 |
-| `LockRequest` | class | L1757–L1759 |
-| `lock_account` | def | L1763–L1802 |
-| `PublishRequest` | class | L1805–L1807 |
-| `publish_accounts` | def | L1811–L1834 |
-| `hide_all_accounts` | def | L1838–L1850 |
-| `pool_accounts` | def | L1854–L1872 |
-| `unlock_account` | def | L1876–L1894 |
-| `_sse_generator` | def | L1897–L1922 |
-| `events` | def | L1926–L1936 |
-| `account_cards_pipe` | def | L1940–L1966 |
-| `account_notes_summary` | def | L1970–L1995 |
-| `account_details` | def | L1999–L2210 |
-| `NoteCreate` | class | L2213–L2214 |
-| `create_note` | def | L2218–L2247 |
-| `CurpUpdate` | class | L2250–L2251 |
-| `update_curp` | def | L2255–L2266 |
-| `delete_note` | def | L2270–L2282 |
-| `CombosRequest` | class | L2285–L2286 |
-| `accounts_combos` | def | L2290–L2303 |
-| `accounts_pass_map` | def | L2307–L2312 |
-| `list_all_cards` | def | L2316–L2391 |
-| `activity_feed` | def | L2395–L2512 |
-| `list_deposits` | def | L2516–L2545 |
-| `deposits_stats` | def | L2549–L2574 |
+| `_release_account` | def | L1456–L1477 |
+| `_run_lock_janitor` | def | L1480–L1528 |
+| `_janitor_loop` | def | L1531–L1541 |
+| `_run_window_watcher` | def | L1550–L1622 |
+| `_window_watcher_loop` | def | L1625–L1634 |
+| `_release_watchdog_tick` | def | L1637–L1736 |
+| `_release_watchdog_loop` | def | L1739–L1747 |
+| `_start_bg_tasks` | def | L1751–L1755 |
+| `LockRequest` | class | L1758–L1760 |
+| `lock_account` | def | L1764–L1803 |
+| `PublishRequest` | class | L1806–L1808 |
+| `publish_accounts` | def | L1812–L1835 |
+| `hide_all_accounts` | def | L1839–L1851 |
+| `pool_accounts` | def | L1855–L1873 |
+| `unlock_account` | def | L1877–L1895 |
+| `_sse_generator` | def | L1898–L1924 |
+| `events` | def | L1928–L1938 |
+| `account_cards_pipe` | def | L1942–L1968 |
+| `account_notes_summary` | def | L1972–L1997 |
+| `account_details` | def | L2001–L2212 |
+| `NoteCreate` | class | L2215–L2216 |
+| `create_note` | def | L2220–L2249 |
+| `CurpUpdate` | class | L2252–L2253 |
+| `update_curp` | def | L2257–L2268 |
+| `delete_note` | def | L2272–L2284 |
+| `CombosRequest` | class | L2287–L2288 |
+| `accounts_combos` | def | L2292–L2305 |
+| `accounts_pass_map` | def | L2309–L2314 |
+| `list_all_cards` | def | L2318–L2393 |
+| `activity_feed` | def | L2397–L2514 |
+| `list_deposits` | def | L2518–L2547 |
+| `deposits_stats` | def | L2551–L2576 |
 
 ### `auth.py`
 
@@ -374,6 +374,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_who_fallback_requires_display` | def | L47–L51 |
 | `test_broadcast_only_enqueues_visible` | def | L59–L69 |
 | `test_resolve_who_carries_who_id` | def | L72–L76 |
+| `test_broadcast_operator_receives_own` | def | L79–L88 |
 
 ### `test_unificacion_sp1.py`
 
