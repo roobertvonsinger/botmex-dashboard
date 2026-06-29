@@ -411,9 +411,12 @@ async function loadMe() {
   const isAdmin = me.role === 'admin' || isSuper;
   const isUser  = !isAdmin;
 
-  // L invertida (control multiusuario) SOLO superadmin — admin no debe ver indicios de SA
+  // El strip (#adminPanel) ahora es VISIBLE a operadores con contenido por rol.
+  // `no-kpis` se mantiene SOLO para ocultar los filtros SA-only del topbar
+  // (status/grade/view) — ver style.css §no-kpis. La regla que ocultaba el strip
+  // (body.no-kpis #adminPanel) se eliminó en el CSS, así que el strip ya se muestra.
   if (!isSuper) {
-    $('#adminPanel').style.display = 'none';
+    document.body.classList.add('no-kpis');
   }
   // Vista Detallada solo superadmin (admin/user usan Simple)
   if (!isSuper) {

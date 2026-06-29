@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d04a42c` | feat(activity): marquesina render (dedupe+filtro+ticker), click->detalle por email, criticos humanizados, limpiar refreshKpis |
 | `b0d76db` | style(ui): grid 3 cards (Actividad -15-20%), marquesina ticker sin overflow, Online sidebar, Recientes; un-hide strip a operadores |
 | `f3c860b` | feat(ui): strip a 3 cards (Actividad/Recientes/Pool); Online reubicado al sidebar; cache bump |
 | `58aab08` | feat(activity): logica pura dedupe + copy humano (TDD node) |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `76a63b3` | feat(marks): migracion account_marks (marcador privado por usuario) |
 | `8e7c00e` | fix(sse): _resolve_who .get guard, who_id en _release_account, all_ids en disconnect log, test simetrico |
 | `06468a4` | feat(sse): filtrado server-side por usuario en _broadcast + ctx en /api/events |
-| `a70f04e` | fix(sse): guard display None en fallback de _event_visible_to + test |
 <!-- GEN:end:recientes -->
 
 ---
