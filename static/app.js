@@ -1267,6 +1267,10 @@ function showSection(name) {
   if (name === 'health') loadHealth(false);
   if (name === 'admin') loadAdminState();
   if (name === 'bin-stats') reloadBinStats();
+  try {
+    var dw = window.DeposWindow && window.DeposWindow._instance;
+    if (dw && typeof dw.reanchorForSection === 'function') dw.reanchorForSection(name === 'accounts');
+  } catch (e) {}
 }
 
 // ─── BIN intelligence (SA only) ───

@@ -321,8 +321,18 @@
       relayout: function () { apply(false); },
       isDocked: function () { return ST.mode !== 'float'; },
       mode: function () { return ST.mode; },
+      reanchorForSection: function (isAccountsActive) {
+        if (!isAccountsActive) {
+          // saliendo de la vista de cuentas: si está acoplada, recordar lado y pasar a flotante
+          if (ST.mode !== 'float') { ST._savedDock = ST.mode; setMode('float'); }
+        } else {
+          // volviendo a cuentas: re-acoplar si había dock guardado
+          if (ST._savedDock) { var d = ST._savedDock; ST._savedDock = null; setMode(d); }
+        }
+      },
     };
     win.__deposWin = api;
+    DeposWindow._instance = api;
     return api;
   };
 
