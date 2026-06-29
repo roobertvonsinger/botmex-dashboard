@@ -106,6 +106,7 @@ prewarm.py (router)
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
+| `test_activity_scoped.py` | 14 | `—` | _[completar]_ |
 | `test_anti_rate_limit.py` | 271 | `—` | _[completar]_ |
 | `test_marks.py` | 32 | `—` | _[completar]_ |
 | `test_search.py` | 70 | `—` | _[completar]_ |
@@ -190,6 +191,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `288f48b` | feat(marks): endpoints GET /api/marks + POST /api/marks/toggle (idempotente, privado) |
 | `76a63b3` | feat(marks): migracion account_marks (marcador privado por usuario) |
 | `8e7c00e` | fix(sse): _resolve_who .get guard, who_id en _release_account, all_ids en disconnect log, test simetrico |
 | `06468a4` | feat(sse): filtrado server-side por usuario en _broadcast + ctx en /api/events |
@@ -201,7 +203,6 @@ prewarm.py (router)
 | `8ce54f7` | fix(depos-v8): 5 bugs de cableado de eventos del panel (code review dominio) |
 | `2df39d2` | docs(session): cierre 2026-06-28 — anti-rate-limit + v8 default + backfill + buscador inteligente |
 | `1541757` | feat(search): ignorar tras separador (pipe/combo pegado) -> cae en la cuenta |
-| `d5eb159` | feat(search): buscador inteligente multi-campo/termino + BINes columna 'Tarjetas' |
 <!-- GEN:end:recientes -->
 
 ---

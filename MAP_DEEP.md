@@ -318,6 +318,13 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_deposits_operator_only_own` | def | L47–L52 |
 | `test_deposits_sa_sees_all` | def | L54–L57 |
 
+### `test_activity_scoped.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `test_activity_operator_only_own` | def | L2–L8 |
+| `test_activity_sa_sees_all` | def | L10–L14 |
+
 ### `test_anti_rate_limit.py`
 
 | Símbolo | Tipo | Líneas |

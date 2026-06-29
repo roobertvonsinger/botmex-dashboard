@@ -2556,7 +2556,7 @@ def activity_feed(
             pass
 
     events.sort(key=lambda e: str(e.get("ts", "")), reverse=True)
-    return events[:limit]
+    return {"feed": events[:limit]}
 
 
 @app.get("/api/deposits")
