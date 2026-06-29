@@ -42,3 +42,10 @@ def test_actorless_service_event_hidden_from_operator(seed_db):
     import app
     assert app._event_visible_to({"type": "alert", "kind": "capmonster_low"}, OP) is False
     assert app._event_visible_to({"type": "alert", "kind": "capmonster_low"}, SA) is True
+
+
+def test_who_fallback_requires_display(seed_db):
+    # operador con display None y sin who_id: NO debe ver el evento (no se puede igualar)
+    import app
+    op_no_disp = {"role": "user", "telegram_id": 555, "display": None}
+    assert app._event_visible_to({"kind": "lock", "who": "Lau"}, op_no_disp) is False

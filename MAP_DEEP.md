@@ -371,6 +371,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_operator_hidden_from_robert_actions` | def | L28–L31 |
 | `test_service_event_addressed_to_operator` | def | L34–L37 |
 | `test_actorless_service_event_hidden_from_operator` | def | L40–L44 |
+| `test_who_fallback_requires_display` | def | L47–L51 |
 
 ### `test_unificacion_sp1.py`
 

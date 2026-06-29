@@ -851,7 +851,7 @@ def _event_visible_to(event: dict, ctx: dict) -> bool:
         return str(who_id) == str(my)
     # 2) Fallback por display name resuelto.
     who = event.get("who")
-    if who is not None:
+    if who is not None and ctx.get("display") is not None:
         return who == ctx.get("display")
     # 3) Eventos de servicio dirigidos (window_*, release_*): solo al destinatario.
     for k in ("operator_id", "target_user"):
