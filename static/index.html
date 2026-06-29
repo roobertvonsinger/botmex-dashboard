@@ -183,11 +183,19 @@
         <button class="seg-btn" id="btnPoolRefresh" title="Recargar la lista de pool">↻</button>
         <button class="seg-btn danger" id="btnPoolHideAll" title="Esconde TODAS de los operadores — el botón rojo del pánico">📤 Ocultar todas</button>
       </section>
-      <section class="tablewrap">
-        <table id="poolTable">
-          <thead></thead>
-          <tbody><tr><td class="loading" colspan="6">Cargando…</td></tr></tbody>
-        </table>
+      <section class="pool-split">
+        <div class="pool-col" id="poolColOutside">
+          <div class="pool-col-head"><span class="pool-col-title">Fuera del pool</span><span class="dim mono" id="poolOutCount">—</span></div>
+          <input class="pool-search" id="poolSearchOut" placeholder="Buscar email/combo…" autocomplete="off">
+          <div class="pool-col-actions"><button class="seg-btn pool-bulk-expose" id="poolBtnExpose" disabled>Mandar al pool →</button></div>
+          <div class="pool-list" id="poolOutside"></div>
+        </div>
+        <div class="pool-col" id="poolColInside">
+          <div class="pool-col-head"><span class="pool-col-title">En el pool</span><span class="dim mono" id="poolInCount">—</span></div>
+          <input class="pool-search" id="poolSearchIn" placeholder="Buscar email/combo…" autocomplete="off">
+          <div class="pool-col-actions"><button class="seg-btn pool-bulk-hide" id="poolBtnHide" disabled>← Sacar del pool</button></div>
+          <div class="pool-list" id="poolInside"></div>
+        </div>
       </section>
       <div class="pagebar">
         <div class="pb-left">

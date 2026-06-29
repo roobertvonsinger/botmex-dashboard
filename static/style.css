@@ -3666,3 +3666,91 @@ body.dep-drawer-pushing.dep-drawer-collapsed { padding-right: 36px; }
 .bin-table th { font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--dim); font-weight:700; }
 .bin-table th.num, .bin-table td.num { text-align:right; }
 .bin-table tbody tr:hover { background:rgba(255,255,255,0.03); }
+
+/* ── Pool manager — vista partida Fuera|Dentro ── */
+.pool-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  flex: 1;
+  min-height: 0;
+  padding: 0 22px 14px;
+}
+.pool-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border: 1px solid var(--border, #2a3a4a);
+  border-radius: 8px;
+  padding: 10px;
+}
+.pool-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.pool-col-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  color: var(--fg);
+}
+.pool-col-head .dim.mono {
+  font-size: 11px;
+}
+.pool-search {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface-elev);
+  border: 1px solid var(--border, #2a3a4a);
+  border-radius: 5px;
+  color: var(--fg);
+  font-size: 12px;
+  padding: 5px 9px;
+  margin-bottom: 7px;
+  outline: none;
+  transition: border-color .15s;
+}
+.pool-search:focus {
+  border-color: var(--accent, #4a8cff);
+}
+.pool-col-actions {
+  margin-bottom: 7px;
+}
+.pool-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* Account chip inside pool columns */
+.pool-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  border-radius: 5px;
+  background: var(--surface-elev);
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-family: var(--mono, monospace);
+  color: var(--fg);
+  cursor: grab;
+  user-select: none;
+  transition: background .12s, border-color .12s;
+}
+.pool-chip:hover {
+  background: rgba(255,255,255,0.06);
+}
+.pool-chip.selected {
+  background: rgba(74, 140, 255, 0.15);
+  border-color: var(--accent, #4a8cff);
+  color: #fff;
+}
+.pool-chip:active {
+  cursor: grabbing;
+}

@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `02a3a24` | style(table): filas mas bajas (td 8->4px) + menos desperdicio a la derecha (compactar, sin quitar columnas) |
 | `b1cacb3` | feat(ui): Online roster solo-SA en sidebar (gate D7 — pares no se ven entre si) |
 | `0e5cf4d` | feat(ui): buscador incrustado en sidebar (arriba de Principal); conserva #searchInput + cableado backend |
 | `9b530c4` | feat(pool-card): salud+boton Gestionar para SA, Mis stats del dia para operador |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `58aab08` | feat(activity): logica pura dedupe + copy humano (TDD node) |
 | `69e8307` | feat(pool): GET /api/pool/split + POST /api/pool/publish bulk (SA-only) + broadcast pool_move |
 | `cc105dc` | fix(recent): filtrar por _visible_emails (ley del pool) — no fugar combos ajenos via marcador |
-| `8ba0e50` | feat(recent): GET /api/recent cuentas recientes + stats del dia (scoped por operador) |
 <!-- GEN:end:recientes -->
 
 ---
