@@ -92,7 +92,7 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2550 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2574 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -108,6 +108,7 @@ prewarm.py (router)
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
 | `test_anti_rate_limit.py` | 271 | `—` | _[completar]_ |
 | `test_search.py` | 70 | `—` | _[completar]_ |
+| `test_sse_visibility.py` | 44 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 55 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
@@ -188,6 +189,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `1e25e94` | docs(plan): plan TDD reorg UI (22 tasks, backend scoped primero) + fix spec Zona D |
 | `9dc7ca9` | docs(spec): reorg UI dashboard — strip 3 cards, actividad por rol, marcador, pool manager, panel persistente |
 | `68cbe28` | docs(session): registrar fixes panel v8 (commit 8ce54f7) — e2e (b) desbloqueado |
 | `8ce54f7` | fix(depos-v8): 5 bugs de cableado de eventos del panel (code review dominio) |
@@ -199,7 +201,6 @@ prewarm.py (router)
 | `2589a1e` | docs(session): NEXT-SESSION — anti-rate-limit Capa 1+3 deployadas, e2e pendiente |
 | `6eb1700` | feat(anti-rate-limit): JWT cache en depositos (Capa 1) + 429 enfriar-y-saltar (Capa 3) |
 | `711d75d` | docs(session): cierre 2026-06-28 — matchmaker+programado rediseñados, proxy rotatorio, spec anti-rate-limit. Proximo: writing-plans Fase 1 (JWT cache). |
-| `96063db` | docs(spec): diseno login anti-rate-limit (3 capas) |
 <!-- GEN:end:recientes -->
 
 ---

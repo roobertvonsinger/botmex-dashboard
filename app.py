@@ -838,6 +838,30 @@ def _resolve_who(val):
     }
 
 
+def _event_visible_to(event: dict, ctx: dict) -> bool:
+    """Whitelisting de visibilidad para SSE/feeds. SA ve todo; admin/user ven
+    SOLO lo suyo. Las acciones del SA no aparecen para nadie más (fix bug
+    'admin ve actividad de Robert')."""
+    if ctx.get("role") == "superadmin":
+        return True
+    my = ctx.get("telegram_id")
+    # 1) Eventos con actor (who_id telegram_id) -> solo los propios.
+    who_id = event.get("who_id")
+    if who_id is not None and my is not None:
+        return str(who_id) == str(my)
+    # 2) Fallback por display name resuelto.
+    who = event.get("who")
+    if who is not None:
+        return who == ctx.get("display")
+    # 3) Eventos de servicio dirigidos (window_*, release_*): solo al destinatario.
+    for k in ("operator_id", "target_user"):
+        v = event.get(k)
+        if v is not None and my is not None and str(v) == str(my):
+            return True
+    # 4) Eventos sin actor ni destinatario (alertas globales) -> solo SA (ya retornó arriba).
+    return False
+
+
 @app.get("/api/superadmin/kpis")
 def superadmin_kpis(user: dict = Depends(require_session)):
     """L invertida del SuperAdmin (spec chat2):
