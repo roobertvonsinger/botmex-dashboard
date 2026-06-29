@@ -54,6 +54,13 @@
 
   --sidebar-w: 216px;
   --topbar-h: 56px;
+
+  /* Easing compartido — mismo curvado que el panel de depósitos v8 (depos.css
+     §--t-fast/--t). Estándar mínimo de fluidez para TODOS los controles UI. */
+  --ease-fast: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  --ease: 0.42s cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-curve: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --lp-gw: 7px;   /* ancho del divisor arrastrable entre cards del strip */
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -160,9 +167,10 @@ body.dep-drawer-pushing { padding-right: 420px; }
   padding: 5px 16px; margin: 0 8px; border-radius: 8px;
   display: flex; align-items: center; gap: 11px;
   text-align: left; cursor: pointer; position: relative;
-  transition: background 120ms, color 120ms;
+  transition: background var(--ease-fast), color var(--ease-fast), transform var(--ease-fast);
 }
-.nav:hover { background: rgba(255,255,255,0.03); color: var(--text); }
+.nav:hover { background: rgba(255,255,255,0.03); color: var(--text); transform: translateX(2px); }
+.nav:active { transform: translateX(1px) scale(0.99); }
 .nav.on { background: linear-gradient(90deg, var(--accent-soft), transparent 75%); color: var(--text); font-weight: 500; }
 .nav.on::before {
   content: ""; position: absolute; left: -8px; top: 7px; bottom: 7px; width: 2px;
@@ -177,10 +185,16 @@ body.dep-drawer-pushing { padding-right: 420px; }
 }
 .nav .b.warn { background: var(--danger-soft); color: var(--danger); border-color: oklch(0.66 0.21 24 / 0.22); }
 
+/* Bloque de fondo: Online + status encajados como un par cohesivo, empujado
+   al fondo por el .grow de arriba (Robert: "que encajen, baja el Online"). */
+.sb-bottom {
+  display: flex; flex-direction: column; gap: 6px;
+  margin: 0 14px 8px;
+}
 .sb-status {
-  margin: 8px 14px 8px;
+  margin: 0;
   padding: 6px 10px;
-  background: rgba(0,0,0,0.30);
+  background: rgba(0,0,0,0.28);
   border: 1px solid var(--hairline);
   border-radius: 8px;
   display: flex; flex-direction: column; gap: 6px;
@@ -193,9 +207,9 @@ body.dep-drawer-pushing { padding-right: 420px; }
 
 /* ── Online block en sidebar ── */
 .sb-online {
-  margin: 4px 14px 6px;
+  margin: 0;
   padding: 6px 10px;
-  background: rgba(0,0,0,0.22);
+  background: rgba(0,0,0,0.28);
   border: 1px solid var(--hairline);
   border-radius: 8px;
   display: flex; flex-direction: column; gap: 3px;
@@ -242,9 +256,10 @@ body.dep-drawer-pushing { padding-right: 420px; }
   display: inline-flex; align-items: center; justify-content: center;
   background: transparent; border: 1px solid var(--hairline);
   border-radius: 6px; color: var(--text-dim); cursor: pointer;
-  transition: background 120ms, color 120ms, border-color 120ms;
+  transition: background var(--ease-fast), color var(--ease-fast), border-color var(--ease-fast), transform var(--ease-fast);
 }
 .ico-btn:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+.ico-btn:active { transform: scale(0.92); }
 
 /* ─── Main ─── */
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -283,17 +298,16 @@ body.dep-drawer-pushing { padding-right: 420px; }
 /* Usuarios sin KPIs: search ocupa casi toda la topbar (la tabla gana altura) */
 body.no-kpis .search { width: auto; flex: 1; max-width: none; }
 body.no-kpis .topbar > .grow { display: none; }
-/* Controles premium (LIVE/DEAD, grade A/B/C/D, vista Simple/Detallada) — solo SA */
+/* Controles premium (LIVE/DEAD, grade A/B/C/D) — solo SA */
 body.no-kpis .seg[data-seg="status"],
-body.no-kpis .seg[data-seg="grade"],
-body.no-kpis .seg[data-seg="view"] { display: none !important; }
-/* Buscador incrustado en sidebar */
-.sidebar .search {
-  width: calc(100% - 24px); max-width: none; flex-shrink: 0;
-  margin: 4px 12px 8px;
-  padding: 7px 12px;
+body.no-kpis .seg[data-seg="grade"] { display: none !important; }
+/* Buscador incrustado en la filterbar de Cuentas (junto al título, antes de los
+   filtros). Robert: "ponlo al mismo nivel que el título de Cuentas". */
+.filterbar .search {
+  width: 340px; max-width: 38vw; min-width: 170px; flex-shrink: 1;
+  margin: 0; padding: 7px 13px;
 }
-.sidebar .search kbd { display: none; }
+body.no-kpis .filterbar .search { width: auto; flex: 1; max-width: none; }
 .search .ico { color: var(--text-muted); font-size: 14px; }
 .search input { background: transparent; border: none; outline: none; color: var(--text); font-size: 12.5px; flex: 1; font-family: inherit; }
 .search input::placeholder { color: var(--text-muted); }
@@ -362,9 +376,10 @@ body.no-kpis .seg[data-seg="view"] { display: none !important; }
   appearance: none; border: none; background: transparent;
   color: var(--text-dim); font: inherit; font-size: 11px; font-weight: 500;
   padding: 5px 10px; border-radius: 6px; cursor: pointer;
-  transition: background 120ms, color 120ms;
+  transition: background var(--ease-fast), color var(--ease-fast), box-shadow var(--ease-fast), transform var(--ease-fast);
 }
 .seg button:hover { color: var(--text); }
+.seg button:active { transform: scale(0.94); }
 .seg button.on {
   background: var(--accent-soft-2); color: var(--accent);
   box-shadow: inset 0 0 0 1px oklch(0.58 0.13 160 / 0.25);
@@ -432,9 +447,37 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
   padding: 10px 22px 10px;
   border-bottom: 1px solid var(--hairline);
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.1fr) 210px;
-  gap: 10px;
+  /* 3 cards + 2 divisores arrastrables. Anchos por defecto en fr; al arrastrar,
+     el JS sobreescribe --lpc0/1/2 con px (initLpResize en app.js). */
+  grid-template-columns:
+    var(--lpc0, minmax(0, 1.7fr)) var(--lp-gw)
+    var(--lpc1, minmax(0, 1.1fr)) var(--lp-gw)
+    var(--lpc2, 210px);
+  gap: 0;
   min-height: 132px;
+}
+
+/* Divisor arrastrable entre cards — patrón Claude Desktop: barra fina que se
+   ilumina en verde al hover/drag. */
+.lp-gutter {
+  align-self: stretch;
+  position: relative;
+  cursor: col-resize;
+  touch-action: none;
+  border-radius: 4px;
+}
+.lp-gutter::before {
+  content: ""; position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px; height: 32px; border-radius: 3px;
+  background: var(--hairline-h);
+  transition: background var(--ease-fast), height var(--ease-fast), box-shadow var(--ease-fast), width var(--ease-fast);
+}
+.lp-gutter:hover::before,
+.lp-gutter.dragging::before {
+  background: var(--accent);
+  width: 4px; height: 58px;
+  box-shadow: 0 0 8px var(--accent-glow), 0 0 2px var(--accent);
 }
 .lp-card {
   background: var(--surface);
@@ -840,8 +883,10 @@ td.combo b:hover + .copyhint { color: var(--accent); }
   color: var(--text-dim);
   padding: 6px 12px; border-radius: 6px; font: inherit; font-size: 11px;
   cursor: pointer; font-family: var(--font-mono);
+  transition: background var(--ease-fast), color var(--ease-fast), border-color var(--ease-fast), transform var(--ease-fast), box-shadow var(--ease-fast);
 }
-.seg-btn:hover { color: var(--text); border-color: var(--accent-soft-2); }
+.seg-btn:hover { color: var(--text); border-color: var(--accent-soft-2); transform: translateY(-1px); }
+.seg-btn:active { transform: translateY(0) scale(0.97); }
 
 /* Select nativo (page size) — fuerza colores legibles en options */
 select.seg-btn {
@@ -2262,11 +2307,10 @@ td.row-icons, th.row-icons-th {
    RESPONSIVE / MOBILE
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* Tablet horizontal (≤ 1100px): KPI panel se compacta */
+/* Tablet horizontal (≤ 1100px): KPI panel se compacta. El template de 5 tracks
+   (3 cards + 2 gutters) del .lpanel base sigue aplicando — solo afina el padding. */
 @media (max-width: 1100px) {
-  .lpanel { gap: 8px; padding: 8px; }
-  .lpanel { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.1fr) 210px; }
-  .search { width: 360px; }
+  .lpanel { padding: 8px; }
 }
 
 /* Mobile / tablet vertical (≤ 768px) */
@@ -2338,6 +2382,10 @@ td.row-icons, th.row-icons-th {
   }
   .dep-mm-col { min-height: 120px; max-height: 180px; }
   .dep-mm-col-feed { max-height: 220px; }
+
+  /* Strip: en móvil los 3 cards se apilan y los divisores se ocultan */
+  .lpanel { grid-template-columns: 1fr !important; gap: 8px; }
+  .lp-gutter { display: none; }
 
   /* Pagebar compacta */
   .pagebar { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }

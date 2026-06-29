@@ -24,7 +24,7 @@ const state = {
   section: 'accounts',
   status: 'LIVE',
   grade: '',
-  view: 'simple',
+  view: 'detail',   // vista única (Robert mató el toggle Simple/Detallada)
   rows: [],
   user: null,
   page: 1,
@@ -419,12 +419,8 @@ async function loadMe() {
   if (!isSuper) {
     document.body.classList.add('no-kpis');
   }
-  // Vista Detallada solo superadmin (admin/user usan Simple)
-  if (!isSuper) {
-    const viewSeg = document.querySelector('.seg[data-seg="view"]');
-    if (viewSeg) viewSeg.style.display = 'none';
-    state.view = 'simple';
-  }
+  // Vista única Detallada para todos — el toggle Simple/Detallada se eliminó.
+  state.view = 'detail';
   // Logs y Health solo superadmin
   if (!isSuper) {
     $('#navLogs').style.display = 'none';
@@ -2058,11 +2054,8 @@ $('#pbPages').addEventListener('click', e => {
 });
 $('#btnRefreshVisible').addEventListener('click', refreshVisible);
 function _isFiltersDefault() {
-  const isSuper = state.user?.role === 'superadmin';
-  const defaultView = isSuper ? state.view : 'simple';
   return state.status === 'LIVE'
       && state.grade === ''
-      && (state.view === defaultView)
       && !searchQuery
       && !state.filterInUse
       && _sortCol === null;
@@ -2343,12 +2336,14 @@ document.addEventListener('click', e => {
   }
 });
 
-// Ctrl+K → focus search
+// Ctrl+K → focus search (el buscador vive en la vista Cuentas; saltamos allí
+// primero para que funcione estés donde estés).
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
     e.preventDefault();
-    $('#searchInput').focus();
-    $('#searchInput').select();
+    if (state.section !== 'accounts') showSection('accounts');
+    const si = $('#searchInput');
+    if (si) { si.focus(); si.select(); }
   }
   if (e.key === 'Escape' && selectedIds.size > 0) deselectAll();
 });
@@ -2371,11 +2366,94 @@ $$('.seg').forEach(seg => {
       }
       state[key] = btn.dataset.v;
       state.page = 1;
-      if (key === 'view') return renderTable();
       await reload();
     });
   });
 });
+
+// ─── Divisores arrastrables del strip (Actividad | Recientes | Pool) ───
+// Patrón Claude Desktop: arrastra el divisor para repartir el ancho entre los
+// dos cards adyacentes. Doble-click restaura. Persiste en localStorage como
+// proporciones (resiliente a cambios de ancho de ventana). Frictionless: se
+// ajusta una vez y queda.
+(function initLpResize() {
+  const panel = document.getElementById('adminPanel');
+  if (!panel) return;
+  const KEY = 'bmx.lpCols.v1';
+  const GW = 7;          // ancho del gutter (coincide con --lp-gw)
+  const MIN = 150;       // ancho mínimo por card (px)
+  let ratios = null;     // [r0, r1, r2] (suman 1) o null = usar defaults CSS (fr)
+
+  const cards = () => [...panel.querySelectorAll('.lp-card')];
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (Array.isArray(s) && s.length === 3) ratios = s;
+  } catch (_) {}
+
+  function availW() { return panel.clientWidth - 2 * GW; }
+  function applyRatios() {
+    if (!ratios) return;
+    const avail = availW();
+    if (avail <= 0) return;
+    panel.style.setProperty('--lpc0', (avail * ratios[0]) + 'px');
+    panel.style.setProperty('--lpc1', (avail * ratios[1]) + 'px');
+    panel.style.setProperty('--lpc2', (avail * ratios[2]) + 'px');
+  }
+  function clearRatios() {
+    ratios = null;
+    panel.style.removeProperty('--lpc0');
+    panel.style.removeProperty('--lpc1');
+    panel.style.removeProperty('--lpc2');
+    try { localStorage.removeItem(KEY); } catch (_) {}
+  }
+  applyRatios();
+  window.addEventListener('resize', applyRatios);
+
+  panel.querySelectorAll('.lp-gutter').forEach(g => {
+    g.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      const gi = +g.dataset.g;          // 0 = Act|Rec · 1 = Rec|Pool
+      const a = gi, b = gi + 1;          // cards adyacentes
+      const cs = cards();
+      const w = cs.map(c => c.getBoundingClientRect().width);
+      const startX = e.clientX;
+      g.classList.add('dragging');
+      g.setPointerCapture?.(e.pointerId);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+
+      const move = ev => {
+        let dx = ev.clientX - startX;
+        dx = Math.max(dx, MIN - w[a]);   // a no baja de MIN
+        dx = Math.min(dx, w[b] - MIN);   // b no baja de MIN
+        const cur = w.slice();
+        cur[a] = w[a] + dx;
+        cur[b] = w[b] - dx;
+        panel.style.setProperty('--lpc0', cur[0] + 'px');
+        panel.style.setProperty('--lpc1', cur[1] + 'px');
+        panel.style.setProperty('--lpc2', cur[2] + 'px');
+      };
+      const up = () => {
+        g.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        // Congela como proporciones para resistir cambios de ancho de ventana
+        const fin = cards().map(c => c.getBoundingClientRect().width);
+        const sum = fin.reduce((s, v) => s + v, 0) || 1;
+        ratios = fin.map(v => v / sum);
+        try { localStorage.setItem(KEY, JSON.stringify(ratios)); } catch (_) {}
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    });
+    g.addEventListener('dblclick', () => {
+      clearRatios();
+      toast('↺ Anchos del strip restaurados', 'success');
+    });
+  });
+})();
 
 // Activity table — clicks interactivos
 $('#actTable').addEventListener('click', e => {
@@ -3356,7 +3434,7 @@ function _expandedDetailCell() {
 function _detailColspan() {
   const anyRow = document.querySelector('#accTable tbody tr[data-id]');
   if (anyRow) return anyRow.querySelectorAll('td').length;
-  return state.view === 'simple' ? 7 : 9;
+  return 9;   // vista única detallada
 }
 
 // Formatea un pipe de tarjeta a "num|MM|YY|cvv" (pipe entre mes y año, sin "/").

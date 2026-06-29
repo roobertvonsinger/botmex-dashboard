@@ -212,7 +212,15 @@ Reemplazó el sistema viejo (`zero`/`dim-amount`/`glow` con cortes en $5/$10). S
 | **Recientes** | `#lpRecientes` | Cuentas de Robert con las que interactuó | Cuentas propias (depósitos + locks + marcadas) | `GET /api/recent` |
 | **Pool** | `#lpPoolCard` | Salud del pool (grid 4-stat) + botón "Gestionar pool" → `#poolMain` | "Mis stats del día" (intentos/aprobados/monto/tasa) | `GET /api/recent` stats / kpis.pool |
 
-**Online** salió del strip → sidebar (`.sb-online`), solo-SA. **Buscador** salió del topbar → sidebar (arriba de "Principal"), conserva `id="searchInput"` y cableado backend `q=`.
+**Online** salió del strip → sidebar (`.sb-online`), solo-SA.
+
+### Ajustes 2026-06-29 (2) — feedback Robert sesión limpia
+
+- **Buscador → filterbar de Cuentas.** Salió del sidebar y se incrustó en `.filterbar` junto al `<h2>Cuentas</h2>`, antes de los filtros (`.filterbar .search.filterbar-search`). Conserva `id="searchInput"` + cableado `q=`. **Ctrl+K** ahora salta a la vista Cuentas antes de enfocar (app.js).
+- **Vista única.** El toggle Simple/Detallada (`.seg[data-seg="view"]`) se **eliminó** del DOM. `state.view` queda fijo en `'detail'` para todos (antes operadores forzados a `'simple'`). La tabla siempre muestra 9 columnas (incluye `Últ. check` + `Checks`). `_detailColspan()` fallback → 9.
+- **Sidebar — cajas de fondo encajadas.** Online + status se agruparon en `.sb-bottom` (margin único, gap 6px) y el `.grow` se movió ARRIBA del grupo → Online baja y queda pegado al status como un par cohesivo (antes el `.grow` los separaba con un hueco grande).
+- **Divisores arrastrables del strip** (`.lp-gutter` ×2, patrón Claude Desktop). Entre Actividad↔Recientes y Recientes↔Pool. Arrastra para repartir el ancho de los cards adyacentes (min 150px c/u); **doble-click restaura**. `initLpResize()` (app.js) persiste proporciones en `localStorage['bmx.lpCols.v1']` (resiliente a resize de ventana). Grid del `.lpanel` = 5 tracks (`var(--lpc0/1/2)` con fallback fr + `--lp-gw`).
+- **Fluidez estándar.** Tokens `--ease-fast`/`--ease`/`--ease-curve` en `:root` (mismo curvado que depos.css `--t-fast`/`--t`). Aplicados con feedback táctil (`:active` scale/translate) a `.nav`, `.seg button`, `.seg-btn`, `.ico-btn`.
 
 ## Actividad Live — marquesina (`#lpActivity`)
 

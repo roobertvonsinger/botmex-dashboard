@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/duotone/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
-<link rel="stylesheet" href="/static/style.css?v=20260629b">
+<link rel="stylesheet" href="/static/style.css?v=20260629c">
 <link rel="stylesheet" href="/static/depos.css?v=20260628e">
 </head>
 <body>
@@ -28,11 +28,6 @@
       <div>Hola, <b id="sbGreetName">…</b> <span class="mono dim">· <span id="sbDate"></span> · <span id="sbTime"></span></span></div>
       <div class="sb-frase"><span class="emoji">💛</span><span id="fraseTxt">…</span></div>
     </div>
-    <div class="search" title="Busca lo que sea: email, tarjeta, nombre, nota… (Ctrl+K)">
-      <span class="ico">⌕</span>
-      <input id="searchInput" placeholder="Buscar email, tarjeta, nombre, notas…">
-      <kbd>Ctrl K</kbd>
-    </div>
     <div class="sb-section">Principal</div>
     <button class="nav on" data-section="accounts" title="Tu chamba diaria — todas las cuentas vivas"><span class="i">▦</span>Cuentas<span class="b" id="navCount">…</span></button>
     <button class="nav" data-section="pool" id="navPool" title="Las que ven los operadores ahorita"><span class="i">◈</span>Pool<span class="b" id="navPoolCount">…</span></button>
@@ -43,20 +38,22 @@
     <button class="nav" data-section="health" id="navHealth" title="¿Está vivo todo? Aquí lo dice"><span class="i">◉</span>Salud<span class="b ok hidden" id="navHealthBadge">✓</span></button>
     <button class="nav" data-section="admin" id="navAdmin" title="Botones rojos peligrosos — usa con criterio"><span class="i">⚙</span>Controles</button>
     <button class="nav" data-section="bin-stats" id="navBinStats" title="Inteligencia de BINes — tasa de aprobación por tarjeta sobre todos los intentos"><span class="i">▣</span>BINes</button>
-    <div class="sb-online">
-      <div class="sb-online-head">
-        <span class="lp-dot live"></span>
-        <span class="sb-online-label">Online</span>
-        <span class="sb-online-counter mono"><b id="lpOnlineActive">0</b>/<span id="lpOnlineTotal">0</span></span>
-      </div>
-      <div id="lpOps"></div>
-    </div>
     <div class="grow"></div>
-    <div class="sb-status mono">
-      <div><span>xCAPTCHA</span><b class="ok" id="stCap" title="Saldo CapMonster — cuando esté en rojo, recarga">—</b></div>
-      <div><span>Proxies</span><b id="stProxy" title="Estado del proxy MX — verde es bueno, rojo es ojo">—</b></div>
-      <div><span>WSai</span><b id="stWsai" title="Calls disponibles de WebScraping.ai (fallback de scrape)">—</b></div>
-      <div><span>En uso</span><b class="warn" id="stInUse" title="Cuántas cuentas están bloqueadas ahora — click para filtrar">—</b></div>
+    <div class="sb-bottom">
+      <div class="sb-online">
+        <div class="sb-online-head">
+          <span class="lp-dot live"></span>
+          <span class="sb-online-label">Online</span>
+          <span class="sb-online-counter mono"><b id="lpOnlineActive">0</b>/<span id="lpOnlineTotal">0</span></span>
+        </div>
+        <div id="lpOps"></div>
+      </div>
+      <div class="sb-status mono">
+        <div><span>xCAPTCHA</span><b class="ok" id="stCap" title="Saldo CapMonster — cuando esté en rojo, recarga">—</b></div>
+        <div><span>Proxies</span><b id="stProxy" title="Estado del proxy MX — verde es bueno, rojo es ojo">—</b></div>
+        <div><span>WSai</span><b id="stWsai" title="Calls disponibles de WebScraping.ai (fallback de scrape)">—</b></div>
+        <div><span>En uso</span><b class="warn" id="stInUse" title="Cuántas cuentas están bloqueadas ahora — click para filtrar">—</b></div>
+      </div>
     </div>
     <div class="sb-user">
       <div class="av" id="sbUserAv" title="Eres tú">··</div>
@@ -88,6 +85,9 @@
           <div class="lp-feed-rows" id="lpActivity"></div>
         </div>
 
+        <!-- Divisor arrastrable (Actividad ↔ Recientes) · doble-click restaura -->
+        <div class="lp-gutter" data-g="0" title="Arrastra para ajustar el ancho · doble-click restaura" role="separator" aria-orientation="vertical"></div>
+
         <!-- Bloque 2: Recientes (ex-Alertas) -->
         <div class="lp-card lp-recientes">
           <div class="lp-head">
@@ -98,6 +98,9 @@
             <div class="lp-empty dim mono">sin recientes</div>
           </div>
         </div>
+
+        <!-- Divisor arrastrable (Recientes ↔ Pool) · doble-click restaura -->
+        <div class="lp-gutter" data-g="1" title="Arrastra para ajustar el ancho · doble-click restaura" role="separator" aria-orientation="vertical"></div>
 
         <!-- Bloque 3: Pool stats 2×2 -->
         <div class="lp-card lp-pool">
@@ -118,6 +121,11 @@
       <div id="accDockZone">
       <section class="filterbar">
         <h2>Cuentas <span class="dim mono" id="countLabel">— / —</span></h2>
+        <div class="search filterbar-search" title="Busca lo que sea: email, tarjeta, nombre, nota… (Ctrl+K)">
+          <span class="ico">⌕</span>
+          <input id="searchInput" placeholder="Buscar email, tarjeta, nombre, notas…">
+          <kbd>Ctrl K</kbd>
+        </div>
         <div class="grow"></div>
         <div class="seg" data-seg="status" title="Vivas, todas, o muertitas">
           <button data-v="LIVE" class="on" title="Solo cuentas que jalan">LIVE</button>
@@ -130,10 +138,6 @@
           <button data-v="B" title="🔵 Buena — alta prob. de éxito">B</button>
           <button data-v="C" title="🟡 Cuidado — señales raras">C</button>
           <button data-v="D" title="🔴 Pasarela quemada, no pierdas tiempo">D</button>
-        </div>
-        <div class="seg" data-seg="view" title="Cambia cuántas columnas ves">
-          <button data-v="simple" class="on" title="Lo esencial — saldo, cuenta, depósito">Simple</button>
-          <button data-v="detail" title="Todo, incluso métricas raras">Detallada</button>
         </div>
       </section>
 
@@ -991,7 +995,7 @@
 <div id="toast" class="toast hidden"></div>
 
 <script src="/static/activity_logic.js?v=20260629b"></script>
-<script src="/static/app.js?v=20260629b"></script>
+<script src="/static/app.js?v=20260629c"></script>
 <script src="/static/depos_logic.js?v=20260628e"></script>
 <script src="/static/depos_window.js?v=20260627n"></script>
 <script src="/static/depos.js?v=20260628e"></script>
