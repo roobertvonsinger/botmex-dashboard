@@ -1150,12 +1150,11 @@ function renderNotifBadge() {
   const badge = $('#bellBadge');
   const navBadge = $('#navNotifBadge');
   if (unread > 0) {
-    badge.textContent = unread;
-    badge.classList.remove('hidden');
-    navBadge.classList.remove('hidden');
+    if (badge) { badge.textContent = unread; badge.classList.remove('hidden'); }
+    if (navBadge) navBadge.classList.remove('hidden');
   } else {
-    badge.classList.add('hidden');
-    navBadge.classList.add('hidden');
+    if (badge) badge.classList.add('hidden');
+    if (navBadge) navBadge.classList.add('hidden');
   }
 }
 function renderNotifs() {
@@ -5355,7 +5354,7 @@ document.addEventListener('click', e => {
   if (!e.target.closest('.cmd-lock-wrap')) $('#lockHoursPopup')?.classList.add('hidden');
 });
 
-$('#bellBtn').addEventListener('click', () => {
+$('#bellBtn')?.addEventListener('click', () => {
   if (state.section === 'notifications') {
     showSection(_lastNonNotifSection || 'accounts');
   } else {
@@ -5394,7 +5393,7 @@ $('#lpOps')?.addEventListener('click', e => {
 });
 $('#btnClearNotif').addEventListener('click', () => { notifications = []; renderNotifs(); renderNotifBadge(); });
 
-$$('.ico-btn[title="Salir"], .power').forEach(btn => {
+$$('.sb-user .ico-btn, .ico-btn[title="Salir"], .power').forEach(btn => {
   btn.addEventListener('click', async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     window.location.href = '/login';
