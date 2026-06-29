@@ -243,20 +243,19 @@ def _visible_emails(user: dict, c) -> "set[str] | None":
 
 
 _sse_lock = threading.Lock()
-_sse_queues: list = []  # list[queue.SimpleQueue]
+_sse_queues: list = []  # list[tuple[queue.SimpleQueue, dict]]  (queue, user_ctx)
 
 
 def _broadcast(event: dict) -> None:
-    """Push event a todos los SSE clients. Thread-safe."""
+    """Push event a los SSE clients VISIBLES para cada uno (whitelisting por rol)."""
     msg = f"data: {_json.dumps(event)}\n\n"
     with _sse_lock:
-        n_clients = len(_sse_queues)
-        q_ids = [id(q) for q in _sse_queues]  # snapshot para diagnóstico
-        for q in _sse_queues:
+        targets = list(_sse_queues)            # snapshot de (q, ctx)
+        n_clients = len(targets)
+        q_ids = [id(q) for (q, _ctx) in targets]
+    for q, ctx in targets:
+        if _event_visible_to(event, ctx):
             q.put(msg)
-    # Log eventos del schedule para diagnosticar cuando no llegan al frontend
-    # (race, proxy buffering, cliente desconectado). Incluye n_clients y los
-    # IDs de las queues para detectar drift entre append y remove.
     kind = event.get("kind") or event.get("type", "?")
     if kind in ("scheduled_started", "scheduled_phase", "scheduled",
                 "scheduled_aborted", "scheduled_cancelled"):
@@ -828,13 +827,18 @@ def _operator_color(tg_id):
 
 
 def _resolve_who(val):
-    """Para broadcasts SSE: pareja {who, who_color} con display name resuelto.
-    Usar con spread: `_broadcast({"type":..., **_resolve_who(operator_id), ...})`.
-    Sin esto los broadcasts de deposits.py enviaban el telegram_id crudo y el
-    feed de Actividad lo mostraba como '1341812706' en vez de 'RobertVS'."""
+    """Para broadcasts SSE: {who, who_color, who_id}. who_id = telegram_id del
+    actor (para filtrado server-side por rol)."""
+    wid = None
+    try:
+        wid = int(val)
+    except (TypeError, ValueError):
+        u = _auth.USERS.get(str(val).lower()) if val is not None else None
+        wid = u["telegram_id"] if u else None
     return {
         "who": _resolve_operator(val),
         "who_color": _operator_color(val),
+        "who_id": wid,
     }
 
 
@@ -1890,16 +1894,16 @@ def unlock_account(account_id: int, user: dict = Depends(require_session)):
     return {"id": account_id, "locked_by": None, "locked_until": None}
 
 
-async def _sse_generator():
+async def _sse_generator(ctx: dict):
     q = _stdlib_queue.SimpleQueue()
     q_id = id(q)
     import logging as _lg
     _sse_log = _lg.getLogger("betmexico.dashboard.sse")
     with _sse_lock:
-        _sse_queues.append(q)
+        _sse_queues.append((q, ctx))
         n_after_join = len(_sse_queues)
-        all_ids = [id(x) for x in _sse_queues]
-    _sse_log.info(f"[SSE] cliente conectado q_id={q_id} total={n_after_join} all_ids={all_ids}")
+        all_ids = [id(x) for (x, _c) in _sse_queues]
+    _sse_log.info(f"[SSE] cliente conectado q_id={q_id} role={ctx.get('role')} total={n_after_join} all_ids={all_ids}")
     try:
         yield ": heartbeat\n\n"
         while True:
@@ -1912,18 +1916,21 @@ async def _sse_generator():
         raise
     finally:
         with _sse_lock:
-            was_in = q in _sse_queues
-            if was_in:
-                _sse_queues.remove(q)
+            before = len(_sse_queues)
+            _sse_queues[:] = [(qq, cc) for (qq, cc) in _sse_queues if qq is not q]
             n_after_leave = len(_sse_queues)
-            all_ids = [id(x) for x in _sse_queues]
-        _sse_log.info(f"[SSE] cliente desconectado q_id={q_id} was_in_list={was_in} total={n_after_leave} all_ids={all_ids}")
+        _sse_log.info(f"[SSE] cliente desconectado q_id={q_id} removed={before - n_after_leave} total={n_after_leave}")
 
 
 @app.get("/api/events")
-async def events(_user: dict = Depends(require_session)):
+async def events(user: dict = Depends(require_session)):
+    ctx = {
+        "role": user.get("role"),
+        "telegram_id": user.get("telegram_id"),
+        "display": user.get("display") or user.get("username"),
+    }
     return StreamingResponse(
-        _sse_generator(),
+        _sse_generator(ctx),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

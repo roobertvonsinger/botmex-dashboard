@@ -177,11 +177,14 @@ import asyncio
 import pytest
 
 
+_SA_CTX = {"role": "superadmin", "telegram_id": 1341812706, "display": "RobertVS"}
+
+
 @pytest.mark.asyncio
 async def test_sse_immediate_heartbeat():
     """El generator emite heartbeat inmediato al conectar."""
     from app import _sse_generator
-    gen = _sse_generator()
+    gen = _sse_generator(_SA_CTX)
     try:
         first = await gen.__anext__()
         assert first == ": heartbeat\n\n"
@@ -191,9 +194,9 @@ async def test_sse_immediate_heartbeat():
 
 @pytest.mark.asyncio
 async def test_sse_broadcast_delivery():
-    """Un evento _broadcast llega al cliente conectado."""
+    """Un evento _broadcast llega al cliente SA conectado."""
     from app import _sse_generator, _broadcast, _sse_queues
-    gen = _sse_generator()
+    gen = _sse_generator(_SA_CTX)
     try:
         await gen.__anext__()  # heartbeat inicial — registra el queue
         assert len(_sse_queues) == 1

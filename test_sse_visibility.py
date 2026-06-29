@@ -49,3 +49,28 @@ def test_who_fallback_requires_display(seed_db):
     import app
     op_no_disp = {"role": "user", "telegram_id": 555, "display": None}
     assert app._event_visible_to({"kind": "lock", "who": "Lau"}, op_no_disp) is False
+
+
+# ── Task 2: _broadcast filtrado + _resolve_who con who_id ──────────────────────
+
+import queue as _q
+
+
+def test_broadcast_only_enqueues_visible(seed_db):
+    # Inyecta 2 colas con ctx distintos y verifica filtrado.
+    import app
+    sa_q, op_q = _q.SimpleQueue(), _q.SimpleQueue()
+    app._sse_queues[:] = [(sa_q, SA), (op_q, OP)]
+    try:
+        app._broadcast({"type": "activity", "kind": "deposit", "who_id": 1341812706, "amount": 50})
+        assert not sa_q.empty()      # SA recibe
+        assert op_q.empty()          # operador NO recibe acción ajena (de Robert)
+    finally:
+        app._sse_queues.clear()
+
+
+def test_resolve_who_carries_who_id(seed_db):
+    import app
+    out = app._resolve_who(1341812706)
+    assert out["who_id"] == 1341812706
+    assert "who" in out and "who_color" in out
