@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `58aab08` | feat(activity): logica pura dedupe + copy humano (TDD node) |
 | `69e8307` | feat(pool): GET /api/pool/split + POST /api/pool/publish bulk (SA-only) + broadcast pool_move |
 | `cc105dc` | fix(recent): filtrar por _visible_emails (ley del pool) — no fugar combos ajenos via marcador |
 | `8ba0e50` | feat(recent): GET /api/recent cuentas recientes + stats del dia (scoped por operador) |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `a70f04e` | fix(sse): guard display None en fallback de _event_visible_to + test |
 | `0269674` | feat(sse): predicado de visibilidad por rol _event_visible_to (TDD) |
 | `1e25e94` | docs(plan): plan TDD reorg UI (22 tasks, backend scoped primero) + fix spec Zona D |
-| `9dc7ca9` | docs(spec): reorg UI dashboard — strip 3 cards, actividad por rol, marcador, pool manager, panel persistente |
 <!-- GEN:end:recientes -->
 
 ---

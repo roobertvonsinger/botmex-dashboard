@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/duotone/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
-<link rel="stylesheet" href="/static/style.css?v=20260628a">
+<link rel="stylesheet" href="/static/style.css?v=20260629a">
 <link rel="stylesheet" href="/static/depos.css?v=20260628e">
 </head>
 <body>
@@ -38,6 +38,14 @@
     <button class="nav" data-section="health" id="navHealth" title="¿Está vivo todo? Aquí lo dice"><span class="i">◉</span>Salud<span class="b ok hidden" id="navHealthBadge">✓</span></button>
     <button class="nav" data-section="admin" id="navAdmin" title="Botones rojos peligrosos — usa con criterio"><span class="i">⚙</span>Controles</button>
     <button class="nav" data-section="bin-stats" id="navBinStats" title="Inteligencia de BINes — tasa de aprobación por tarjeta sobre todos los intentos"><span class="i">▣</span>BINes</button>
+    <div class="sb-online">
+      <div class="sb-online-head">
+        <span class="lp-dot live"></span>
+        <span class="sb-online-label">Online</span>
+        <span class="sb-online-counter mono"><b id="lpOnlineActive">0</b>/<span id="lpOnlineTotal">0</span></span>
+      </div>
+      <div id="lpOps"></div>
+    </div>
     <div class="grow"></div>
     <div class="sb-status mono">
       <div><span>xCAPTCHA</span><b class="ok" id="stCap" title="Saldo CapMonster — cuando esté en rojo, recarga">—</b></div>
@@ -80,45 +88,34 @@
     <!-- Vista: Cuentas -->
     <div id="accountsMain" style="display:flex;flex-direction:column;flex:1;min-height:0">
       <section class="lpanel" id="adminPanel">
-        <!-- Bloque 1: Online ahora -->
-        <div class="lp-card lp-online">
-          <div class="lp-head">
-            <span class="lp-dot live"></span>
-            <span class="lp-label">Online</span>
-            <span class="lp-counter mono"><b id="lpOnlineActive">0</b>/<span id="lpOnlineTotal">0</span></span>
-          </div>
-          <div class="lp-ops" id="lpOps"></div>
-        </div>
-
-        <!-- Bloque 2: Feed actividad LIVE -->
-        <div class="lp-card lp-feed">
+        <!-- Bloque 1: Actividad LIVE (ex-Feed) -->
+        <div class="lp-card lp-feed lp-activity">
           <div class="lp-head lp-head-clickable" data-nav="activity" title="Ir al panel de Actividad">
             <span class="lp-pulse"></span>
             <span class="lp-label">Actividad LIVE</span>
             <span class="lp-counter mono dim" id="lpFeedCount">—</span>
           </div>
-          <div class="lp-feed-rows" id="lpFeed"></div>
+          <div class="lp-feed-rows" id="lpActivity"></div>
         </div>
 
-        <!-- Bloque 3: Alertas -->
-        <div class="lp-card lp-alerts">
+        <!-- Bloque 2: Recientes (ex-Alertas) -->
+        <div class="lp-card lp-recientes">
           <div class="lp-head">
-            <span class="lp-warn-ic">⚠</span>
-            <span class="lp-label">Alertas</span>
-            <span class="lp-counter mono" id="lpAlertCount">0</span>
+            <span class="lp-label">Recientes</span>
+            <span class="lp-counter mono" id="lpRecientesCount">0</span>
           </div>
-          <div class="lp-alert-rows" id="lpAlerts">
-            <div class="lp-empty dim mono">sin alertas</div>
+          <div class="lp-alert-rows" id="lpRecientes">
+            <div class="lp-empty dim mono">sin recientes</div>
           </div>
         </div>
 
-        <!-- Bloque 4: Pool stats 2×2 -->
+        <!-- Bloque 3: Pool stats 2×2 -->
         <div class="lp-card lp-pool">
           <div class="lp-head">
             <span class="lp-label">Pool</span>
             <span class="lp-counter mono dim" id="lpPoolSub">—</span>
           </div>
-          <div class="lp-pool-grid">
+          <div class="lp-pool-grid" id="lpPoolCard">
             <div class="lp-stat"><span class="lp-stat-label">Pool</span><b id="lpPool" class="lp-stat-val">—</b></div>
             <div class="lp-stat"><span class="lp-stat-label">En uso</span><b id="lpInUse" class="lp-stat-val warn">—</b></div>
             <div class="lp-stat"><span class="lp-stat-label">Trastienda</span><b id="lpTras" class="lp-stat-val dim">—</b></div>
@@ -995,7 +992,8 @@
 <!-- Toast -->
 <div id="toast" class="toast hidden"></div>
 
-<script src="/static/app.js?v=20260628d"></script>
+<script src="/static/activity_logic.js?v=20260629a"></script>
+<script src="/static/app.js?v=20260629a"></script>
 <script src="/static/depos_logic.js?v=20260628e"></script>
 <script src="/static/depos_window.js?v=20260627n"></script>
 <script src="/static/depos.js?v=20260628e"></script>
