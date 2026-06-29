@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `63dff06` | feat(recientes): card Recientes desde /api/recent + boton marcador 📌 (toggle privado sin recargar tabla) |
 | `c57d1ed` | fix(ui): strip visible a operadores (quitar hide inline) + restaurar no-kpis (filtros grade/status siguen SA-only) |
 | `d04a42c` | feat(activity): marquesina render (dedupe+filtro+ticker), click->detalle por email, criticos humanizados, limpiar refreshKpis |
 | `b0d76db` | style(ui): grid 3 cards (Actividad -15-20%), marquesina ticker sin overflow, Online sidebar, Recientes; un-hide strip a operadores |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `efe8c31` | feat(activity): GET /api/activity feed scoped por rol (operador solo lo suyo) |
 | `288f48b` | feat(marks): endpoints GET /api/marks + POST /api/marks/toggle (idempotente, privado) |
 | `76a63b3` | feat(marks): migracion account_marks (marcador privado por usuario) |
-| `8e7c00e` | fix(sse): _resolve_who .get guard, who_id en _release_account, all_ids en disconnect log, test simetrico |
 <!-- GEN:end:recientes -->
 
 ---

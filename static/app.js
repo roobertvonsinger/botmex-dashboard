@@ -1597,6 +1597,7 @@ async function refreshKpis() {
     $('#lpTras').textContent = p.trastienda ?? 0;
     $('#lpReb').textContent = (p.rebotadas ?? 0).toLocaleString();
     $('#lpPoolSub').textContent = `${(p.pool ?? 0) + (p.in_use ?? 0)} LIVE`;
+    renderPoolCard();
   } catch (e) {
     console.error('KPI error:', e);
   } finally {
@@ -5323,12 +5324,46 @@ async function rehydrateActiveScheduled() {
   }
 }
 
+// ─── Pool card — role-aware render ───
+function renderPoolCard() {
+  const isSA = state.user?.role === 'superadmin';
+  const card = document.querySelector('.lp-card.lp-pool');
+  if (!card) return;
+
+  if (isSA) {
+    // SA: mantener la grid 4-stat (la llena refreshKpis); solo añadir Gestionar una vez
+    if (!card.querySelector('.lp-pool-manage')) {
+      const btn = document.createElement('button');
+      btn.className = 'lp-pool-manage';
+      btn.type = 'button';
+      btn.textContent = 'Gestionar pool';
+      btn.addEventListener('click', () => showSection('pool'));
+      card.appendChild(btn);
+    }
+    return;
+  }
+
+  // Operador: reemplazar el cuerpo con "Mis stats del día"
+  const s = window._recentStats || { attempts: 0, approved: 0, amount: 0, rate: 0 };
+  const body = document.getElementById('lpPoolCard');
+  if (!body) return;
+  // Cambiar sub-header de "Pool" → "hoy"
+  const sub = document.getElementById('lpPoolSub');
+  if (sub) sub.textContent = 'hoy';
+  body.innerHTML = `
+    <div class="lp-stat"><span class="lp-stat-label">Intentos</span><b class="lp-stat-val">${s.attempts}</b></div>
+    <div class="lp-stat"><span class="lp-stat-label">Aprobados</span><b class="lp-stat-val">${s.approved}</b></div>
+    <div class="lp-stat"><span class="lp-stat-label">Monto</span><b class="lp-stat-val">$${(s.amount || 0).toLocaleString()}</b></div>
+    <div class="lp-stat"><span class="lp-stat-label">Tasa</span><b class="lp-stat-val">${s.rate}%</b></div>`;
+}
+
 // ─── Recientes (card lateral) ───
 async function loadRecientes() {
   try {
     const d = await (await fetch('/api/recent')).json();
     renderRecientes(d.recent || []);
     window._recentStats = d.stats || null;
+    renderPoolCard();
   } catch {}
 }
 function renderRecientes(items) {
@@ -5360,6 +5395,7 @@ function renderRecientes(items) {
   setInterval(tickFrase, 9_000);
   await reload();
   _loadPassMap();
+  renderPoolCard();
   refreshKpis();
   setInterval(refreshKpis, 30_000);
   loadActivityMarquee();
