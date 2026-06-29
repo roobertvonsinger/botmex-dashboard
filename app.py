@@ -1994,6 +1994,49 @@ def pool_accounts(user: dict = Depends(require_session)):
         return out
 
 
+@app.get("/api/pool/split")
+def api_pool_split(user: dict = Depends(require_session)):
+    """SA: split LIVE accounts into inside (published) vs outside (trastienda)."""
+    if not _is_sa(user):
+        raise HTTPException(status_code=403, detail="solo superadmin")
+    def _combo(email, pw):
+        return f"{email}:{pw}" if pw else email
+    inside, outside = [], []
+    with db() as c:
+        for r in c.execute(
+            "SELECT email, password, COALESCE(published_to_pool,1) p FROM accounts "
+            "WHERE status='LIVE' ORDER BY email"
+        ).fetchall():
+            item = {"email": r["email"], "combo": _combo(r["email"], r["password"])}
+            (inside if r["p"] == 1 else outside).append(item)
+    return {"inside": inside, "outside": outside}
+
+
+@app.post("/api/pool/publish")
+def api_pool_publish(payload: dict, user: dict = Depends(require_session)):
+    """SA: bulk set published_to_pool by email list. publish=True → 1, False → 0."""
+    if not _is_sa(user):
+        raise HTTPException(status_code=403, detail="solo superadmin")
+    emails = (payload or {}).get("emails") or []
+    publish = 1 if (payload or {}).get("publish") else 0
+    if not emails:
+        return {"moved": 0}
+    with db(write=True) as c:
+        qmarks = ",".join("?" for _ in emails)
+        c.execute(
+            f"UPDATE accounts SET published_to_pool=? WHERE email IN ({qmarks})",
+            (publish, *emails),
+        )
+        moved = c.execute("SELECT changes()").fetchone()[0]
+    _broadcast({
+        "type": "activity", "kind": "pool_move",
+        "publish": bool(publish), "count": len(emails),
+        "ts": datetime.now(timezone.utc).isoformat(),
+        **_resolve_who(user.get("telegram_id")),
+    })
+    return {"moved": moved}
+
+
 @app.post("/api/accounts/{account_id}/unlock")
 def unlock_account(account_id: int, user: dict = Depends(require_session)):
     with db(write=True) as c:

@@ -86,24 +86,26 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `publish_accounts` | def | L1933–L1956 |
 | `hide_all_accounts` | def | L1960–L1972 |
 | `pool_accounts` | def | L1976–L1994 |
-| `unlock_account` | def | L1998–L2016 |
-| `_sse_generator` | def | L2019–L2045 |
-| `events` | def | L2049–L2059 |
-| `account_cards_pipe` | def | L2063–L2089 |
-| `account_notes_summary` | def | L2093–L2118 |
-| `account_details` | def | L2122–L2333 |
-| `NoteCreate` | class | L2336–L2337 |
-| `create_note` | def | L2341–L2370 |
-| `CurpUpdate` | class | L2373–L2374 |
-| `update_curp` | def | L2378–L2389 |
-| `delete_note` | def | L2393–L2405 |
-| `CombosRequest` | class | L2408–L2409 |
-| `accounts_combos` | def | L2413–L2426 |
-| `accounts_pass_map` | def | L2430–L2435 |
-| `list_all_cards` | def | L2439–L2514 |
-| `activity_feed` | def | L2518–L2635 |
-| `list_deposits` | def | L2639–L2668 |
-| `deposits_stats` | def | L2672–L2697 |
+| `api_pool_split` | def | L1998–L2012 |
+| `api_pool_publish` | def | L2016–L2037 |
+| `unlock_account` | def | L2041–L2059 |
+| `_sse_generator` | def | L2062–L2088 |
+| `events` | def | L2092–L2102 |
+| `account_cards_pipe` | def | L2106–L2132 |
+| `account_notes_summary` | def | L2136–L2161 |
+| `account_details` | def | L2165–L2376 |
+| `NoteCreate` | class | L2379–L2380 |
+| `create_note` | def | L2384–L2413 |
+| `CurpUpdate` | class | L2416–L2417 |
+| `update_curp` | def | L2421–L2432 |
+| `delete_note` | def | L2436–L2448 |
+| `CombosRequest` | class | L2451–L2452 |
+| `accounts_combos` | def | L2456–L2469 |
+| `accounts_pass_map` | def | L2473–L2478 |
+| `list_all_cards` | def | L2482–L2557 |
+| `activity_feed` | def | L2561–L2678 |
+| `list_deposits` | def | L2682–L2711 |
+| `deposits_stats` | def | L2715–L2740 |
 
 ### `auth.py`
 
@@ -369,6 +371,14 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_marks_are_private_per_user` | def | L18–L22 |
 | `test_mark_does_not_lock_or_change_visibility` | def | L25–L32 |
 
+### `test_pool_manage.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `test_split_sa_only` | def | L2–L7 |
+| `test_publish_moves_accounts` | def | L9–L22 |
+| `test_publish_forbidden_for_operator` | def | L24–L26 |
+
 ### `test_search.py`
 
 | Símbolo | Tipo | Líneas |
@@ -500,6 +510,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `POST` | `/api/accounts/publish` | `app.py` |
 | `POST` | `/api/accounts/hide-all` | `app.py` |
 | `GET` | `/api/pool/accounts` | `app.py` |
+| `GET` | `/api/pool/split` | `app.py` |
+| `POST` | `/api/pool/publish` | `app.py` |
 | `POST` | `/api/accounts/{account_id}/unlock` | `app.py` |
 | `GET` | `/api/events` | `app.py` |
 | `GET` | `/api/accounts/{account_id}/cards-pipe` | `app.py` |
