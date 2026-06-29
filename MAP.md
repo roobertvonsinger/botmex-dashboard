@@ -92,7 +92,7 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2583 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2595 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -107,6 +107,7 @@ prewarm.py (router)
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
 | `test_anti_rate_limit.py` | 271 | `—` | _[completar]_ |
+| `test_marks.py` | 5 | `—` | _[completar]_ |
 | `test_search.py` | 70 | `—` | _[completar]_ |
 | `test_sse_visibility.py` | 88 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
@@ -189,6 +190,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `8e7c00e` | fix(sse): _resolve_who .get guard, who_id en _release_account, all_ids en disconnect log, test simetrico |
 | `06468a4` | feat(sse): filtrado server-side por usuario en _broadcast + ctx en /api/events |
 | `a70f04e` | fix(sse): guard display None en fallback de _event_visible_to + test |
 | `0269674` | feat(sse): predicado de visibilidad por rol _event_visible_to (TDD) |
@@ -200,7 +202,6 @@ prewarm.py (router)
 | `1541757` | feat(search): ignorar tras separador (pipe/combo pegado) -> cae en la cuenta |
 | `d5eb159` | feat(search): buscador inteligente multi-campo/termino + BINes columna 'Tarjetas' |
 | `2f4e230` | fix(data): backfill account_cards desde aprobadas historicas + doc bug columna CUENTAS |
-| `ae40021` | feat(frontend): modal v8 por DEFAULT para todos (quitar flag opt-in deposV8) |
 <!-- GEN:end:recientes -->
 
 ---

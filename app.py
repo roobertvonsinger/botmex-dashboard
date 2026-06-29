@@ -167,6 +167,18 @@ def _migrate():
         except sqlite3.OperationalError as e:
             if "duplicate column name" not in str(e) and "no such table" not in str(e):
                 raise
+    # Marcador privado por usuario (spec 2026-06-29): apartar una cuenta para
+    # trabajarla luego. NO bloquea, NO cambia visibilidad. Privado por user_key.
+    try:
+        with db(write=True) as c:
+            c.execute(
+                "CREATE TABLE IF NOT EXISTS account_marks ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "user_key TEXT NOT NULL, account_email TEXT NOT NULL, "
+                "created_at TEXT, UNIQUE(user_key, account_email))"
+            )
+    except sqlite3.OperationalError:
+        pass
     # Backfill A1 (defensivo, idempotente): locks legacy sin locked_until quedan
     # eternos porque el janitor exige locked_until IS NOT NULL. Re-temporiza a
     # locked_at+24h. NO toca al SA (locked_until NULL = RESERVADA_SA perpetua).
