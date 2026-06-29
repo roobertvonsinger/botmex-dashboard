@@ -1452,6 +1452,39 @@ def health_dismiss(_user: dict = Depends(require_session)):
     return _run_health_checks()
 
 
+@app.get("/api/marks")
+def api_marks_list(user: dict = Depends(require_session)):
+    uk = str(user.get("telegram_id"))
+    with db() as c:
+        rows = c.execute(
+            "SELECT account_email FROM account_marks WHERE user_key=? ORDER BY id DESC",
+            (uk,),
+        ).fetchall()
+    return {"marks": [r["account_email"] for r in rows]}
+
+
+@app.post("/api/marks/toggle")
+def api_marks_toggle(payload: dict, user: dict = Depends(require_session)):
+    email = (payload or {}).get("email")
+    if not email:
+        raise HTTPException(status_code=400, detail="email requerido")
+    uk = str(user.get("telegram_id"))
+    with db(write=True) as c:
+        existing = c.execute(
+            "SELECT id FROM account_marks WHERE user_key=? AND account_email=?",
+            (uk, email),
+        ).fetchone()
+        if existing:
+            c.execute("DELETE FROM account_marks WHERE id=?", (existing["id"],))
+            return {"marked": False}
+        c.execute(
+            "INSERT INTO account_marks (user_key, account_email, created_at) "
+            "VALUES (?,?,datetime('now'))",
+            (uk, email),
+        )
+    return {"marked": True}
+
+
 async def _health_loop():
     """Cada 6 horas corre el check. Si falla, broadcast SSE."""
     await asyncio.sleep(60)  # primer check al minuto del start

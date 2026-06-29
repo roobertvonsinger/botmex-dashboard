@@ -78,7 +78,7 @@ def seed_db(tmp_path, monkeypatch):
         # Seed A2.1: a@ asignada al operador 555; c@ lockeada por 555; b@ ajena (del SA)
         con.execute("INSERT INTO account_assignments (email,user_id,assigned_by,assigned_at) VALUES (?,?,?,?)",
                     ("a@test.com", 555, 1341812706, "2026-06-01 00:00:00"))
-        con.execute("UPDATE accounts SET locked_by='555' WHERE email='c@test.com'")
+        con.execute("UPDATE accounts SET locked_by='555' WHERE email='a@test.com' OR email='c@test.com'")
         con.execute("INSERT INTO account_cards (card_number,card_expiry,card_cvv,account_email,account_password,registered_by,registered_at) VALUES (?,?,?,?,?,?,?)",
                     ("4111111111111111","1230","123","a@test.com","x",555,"2026-06-01"))
         con.execute("INSERT INTO account_cards (card_number,card_expiry,card_cvv,account_email,account_password,registered_by,registered_at) VALUES (?,?,?,?,?,?,?)",

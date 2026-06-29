@@ -68,39 +68,41 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `admin_vps_reboot` | def | L1428–L1440 |
 | `health_last` | def | L1444–L1445 |
 | `health_dismiss` | def | L1449–L1452 |
-| `_health_loop` | def | L1455–L1465 |
-| `_release_account` | def | L1468–L1489 |
-| `_run_lock_janitor` | def | L1492–L1540 |
-| `_janitor_loop` | def | L1543–L1553 |
-| `_run_window_watcher` | def | L1562–L1634 |
-| `_window_watcher_loop` | def | L1637–L1646 |
-| `_release_watchdog_tick` | def | L1649–L1748 |
-| `_release_watchdog_loop` | def | L1751–L1759 |
-| `_start_bg_tasks` | def | L1763–L1767 |
-| `LockRequest` | class | L1770–L1772 |
-| `lock_account` | def | L1776–L1815 |
-| `PublishRequest` | class | L1818–L1820 |
-| `publish_accounts` | def | L1824–L1847 |
-| `hide_all_accounts` | def | L1851–L1863 |
-| `pool_accounts` | def | L1867–L1885 |
-| `unlock_account` | def | L1889–L1907 |
-| `_sse_generator` | def | L1910–L1936 |
-| `events` | def | L1940–L1950 |
-| `account_cards_pipe` | def | L1954–L1980 |
-| `account_notes_summary` | def | L1984–L2009 |
-| `account_details` | def | L2013–L2224 |
-| `NoteCreate` | class | L2227–L2228 |
-| `create_note` | def | L2232–L2261 |
-| `CurpUpdate` | class | L2264–L2265 |
-| `update_curp` | def | L2269–L2280 |
-| `delete_note` | def | L2284–L2296 |
-| `CombosRequest` | class | L2299–L2300 |
-| `accounts_combos` | def | L2304–L2317 |
-| `accounts_pass_map` | def | L2321–L2326 |
-| `list_all_cards` | def | L2330–L2405 |
-| `activity_feed` | def | L2409–L2526 |
-| `list_deposits` | def | L2530–L2559 |
-| `deposits_stats` | def | L2563–L2588 |
+| `api_marks_list` | def | L1456–L1463 |
+| `api_marks_toggle` | def | L1467–L1485 |
+| `_health_loop` | def | L1488–L1498 |
+| `_release_account` | def | L1501–L1522 |
+| `_run_lock_janitor` | def | L1525–L1573 |
+| `_janitor_loop` | def | L1576–L1586 |
+| `_run_window_watcher` | def | L1595–L1667 |
+| `_window_watcher_loop` | def | L1670–L1679 |
+| `_release_watchdog_tick` | def | L1682–L1781 |
+| `_release_watchdog_loop` | def | L1784–L1792 |
+| `_start_bg_tasks` | def | L1796–L1800 |
+| `LockRequest` | class | L1803–L1805 |
+| `lock_account` | def | L1809–L1848 |
+| `PublishRequest` | class | L1851–L1853 |
+| `publish_accounts` | def | L1857–L1880 |
+| `hide_all_accounts` | def | L1884–L1896 |
+| `pool_accounts` | def | L1900–L1918 |
+| `unlock_account` | def | L1922–L1940 |
+| `_sse_generator` | def | L1943–L1969 |
+| `events` | def | L1973–L1983 |
+| `account_cards_pipe` | def | L1987–L2013 |
+| `account_notes_summary` | def | L2017–L2042 |
+| `account_details` | def | L2046–L2257 |
+| `NoteCreate` | class | L2260–L2261 |
+| `create_note` | def | L2265–L2294 |
+| `CurpUpdate` | class | L2297–L2298 |
+| `update_curp` | def | L2302–L2313 |
+| `delete_note` | def | L2317–L2329 |
+| `CombosRequest` | class | L2332–L2333 |
+| `accounts_combos` | def | L2337–L2350 |
+| `accounts_pass_map` | def | L2354–L2359 |
+| `list_all_cards` | def | L2363–L2438 |
+| `activity_feed` | def | L2442–L2559 |
+| `list_deposits` | def | L2563–L2592 |
+| `deposits_stats` | def | L2596–L2621 |
 
 ### `auth.py`
 
@@ -353,6 +355,9 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
 | `test_account_marks_table_exists` | def | L1–L5 |
+| `test_toggle_is_idempotent_and_private` | def | L8–L15 |
+| `test_marks_are_private_per_user` | def | L18–L22 |
+| `test_mark_does_not_lock_or_change_visibility` | def | L25–L32 |
 
 ### `test_search.py`
 
@@ -478,6 +483,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `POST` | `/api/admin/vps-reboot` | `app.py` |
 | `GET` | `/api/health/last` | `app.py` |
 | `POST` | `/api/health/dismiss` | `app.py` |
+| `GET` | `/api/marks` | `app.py` |
+| `POST` | `/api/marks/toggle` | `app.py` |
 | `POST` | `/api/accounts/{account_id}/lock` | `app.py` |
 | `POST` | `/api/accounts/publish` | `app.py` |
 | `POST` | `/api/accounts/hide-all` | `app.py` |
