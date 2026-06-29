@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Botmexico — Vista principal refinada (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ───────────────────────────────────────────────────────────────
+   MOCKUP — propuesta de re-estilizado de la vista principal.
+   Conserva: obsidiana + verde hue 160, semántica rojo/ámbar/púrpura,
+   logo, fuentes. Refina: escala de espaciado, jerarquía, contención
+   del glow, ritmo, RECIENTES escaneable, POOL con peso, calma de motion.
+   NO es código de producción — es un render para que Robert lo revise.
+   ─────────────────────────────────────────────────────────────── */
+:root{
+  --hue:160;
+  --bg:#07080b;
+  --bg-grad:radial-gradient(ellipse 1200px 760px at 10% -10%, oklch(0.30 0.11 160 / 0.08), transparent 56%), #07080b;
+  --surface:rgba(19,21,26,0.66);
+  --surface-2:rgba(24,27,33,0.72);
+  --solid:#0e1014;
+  --hair:rgba(255,255,255,0.055);
+  --hair-2:rgba(255,255,255,0.10);
+  --text:#eef1f4;
+  --dim:rgba(238,241,244,0.60);
+  --muted:rgba(238,241,244,0.34);
+  --faint:rgba(238,241,244,0.16);
+  --accent:oklch(0.62 0.13 160);
+  --accent-deep:oklch(0.42 0.10 160);
+  --accent-soft:oklch(0.62 0.13 160 / 0.13);
+  --accent-soft-2:oklch(0.62 0.13 160 / 0.24);
+  --accent-glow:oklch(0.66 0.13 160 / 0.30);
+  --gold:oklch(0.82 0.14 85);
+  --gold-soft:oklch(0.82 0.14 85 / 0.14);
+  --danger:oklch(0.66 0.21 24);
+  --danger-soft:oklch(0.66 0.21 24 / 0.12);
+  --warn:oklch(0.80 0.16 75);
+  --warn-soft:oklch(0.80 0.16 75 / 0.12);
+  --purple:oklch(0.74 0.17 295);
+  --azure:oklch(0.70 0.14 245);
+  --font:'Inter',system-ui,sans-serif;
+  --display:'Space Grotesk','Inter',sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  /* Escala de espaciado estricta 4/8/12/16/24 */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s6:24px;
+  --r:10px;
+  --ease:0.42s cubic-bezier(0.22,0.61,0.36,1);
+  --ease-fast:0.18s cubic-bezier(0.4,0,0.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--font); background:var(--bg-grad); color:var(--text);
+  font-size:13px; -webkit-font-smoothing:antialiased; overflow:hidden;
+  letter-spacing:-0.05px;
+}
+.mock-note{
+  position:fixed; top:10px; right:14px; z-index:50;
+  font-family:var(--mono); font-size:10px; color:var(--muted);
+  background:rgba(0,0,0,0.45); border:1px solid var(--hair); border-radius:7px;
+  padding:5px 9px; letter-spacing:0.4px;
+}
+.shell{display:flex; height:100vh}
+
+/* ─── Sidebar ─── */
+.sidebar{
+  width:228px; flex-shrink:0; background:var(--surface);
+  backdrop-filter:blur(8px); border-right:1px solid var(--hair);
+  display:flex; flex-direction:column; padding:14px 0 12px; position:relative;
+}
+.sb-brand{padding:0 20px 10px}
+.sb-brand img{width:160px; height:auto; filter:drop-shadow(0 0 10px oklch(0.62 0.13 160 / 0.22))}
+.tristrip{display:flex; height:1.5px; opacity:0.5; margin:0 20px 10px}
+.tristrip i{flex:1}
+.tristrip i:nth-child(1){background:linear-gradient(90deg,transparent,var(--accent))}
+.tristrip i:nth-child(2){background:rgba(238,241,244,0.6)}
+.tristrip i:nth-child(3){background:linear-gradient(90deg,var(--danger),transparent)}
+.sb-greet{
+  margin:0 14px 12px; padding:9px 12px; border-radius:var(--r);
+  background:rgba(255,255,255,0.022); border:1px solid var(--hair);
+  display:flex; flex-direction:column; gap:6px;
+}
+.sb-greet .hi{font-size:12.5px; color:var(--dim)}
+.sb-greet .hi b{color:var(--text); font-weight:600}
+.sb-greet .when{font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:0.3px}
+.sb-greet .frase{
+  font-family:var(--display); font-size:11.5px; font-style:italic; font-weight:500;
+  color:var(--warn); display:flex; gap:6px; align-items:center; line-height:1.3;
+}
+.sb-section{
+  padding:6px 22px 4px; font-size:9px; font-weight:700; color:var(--muted);
+  letter-spacing:1.8px; text-transform:uppercase; font-family:var(--mono);
+}
+.nav{
+  border:none; background:transparent; color:var(--dim); font:inherit; font-size:13px;
+  padding:6px 16px; margin:1px 8px; border-radius:8px; display:flex; align-items:center;
+  gap:11px; cursor:pointer; position:relative; transition:background var(--ease-fast),color var(--ease-fast),transform var(--ease-fast);
+}
+.nav:hover{background:rgba(255,255,255,0.03); color:var(--text); transform:translateX(2px)}
+.nav.on{background:linear-gradient(90deg,var(--accent-soft),transparent 78%); color:var(--text); font-weight:500}
+.nav.on::before{content:""; position:absolute; left:-8px; top:8px; bottom:8px; width:2px; border-radius:2px; background:var(--accent); box-shadow:0 0 8px var(--accent-glow)}
+.nav.on .i{color:var(--accent)}
+.nav .i{font-size:14px; width:15px; text-align:center; color:var(--dim)}
+.nav .b{margin-left:auto; font-size:10px; font-weight:600; padding:1px 7px; border-radius:99px; background:rgba(255,255,255,0.04); color:var(--dim); border:1px solid var(--hair); font-family:var(--mono)}
+.grow{flex:1}
+/* Bloque de fondo encajado */
+.sb-bottom{display:flex; flex-direction:column; gap:6px; margin:0 14px 10px}
+.sb-online,.sb-status{
+  padding:7px 11px; border-radius:var(--r);
+  background:rgba(0,0,0,0.26); border:1px solid var(--hair);
+}
+.sb-online{display:flex; flex-direction:column; gap:5px}
+.sb-online-head{display:flex; align-items:center; gap:7px; font-family:var(--mono); font-size:9px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; color:var(--muted)}
+.dot{width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 6px var(--accent-glow)}
+.sb-online-head .lbl{flex:1}
+.sb-online-head .cnt{font-family:var(--mono); font-size:9.5px; font-weight:700; color:var(--accent); background:var(--accent-soft); padding:1px 6px; border-radius:99px}
+.op{display:flex; align-items:center; gap:8px; padding:2px 3px}
+.op .av{width:18px; height:18px; border-radius:5px; font-family:var(--display); font-weight:700; font-size:9px; color:#000; display:flex; align-items:center; justify-content:center}
+.op .nm{font-size:11.5px; flex:1; color:var(--text)}
+.op.idle{opacity:0.7} .op.off{opacity:0.4}
+.op .n{font-family:var(--mono); font-size:9px; color:var(--accent); background:var(--accent-soft); padding:0 5px; border-radius:99px}
+.op .sdot{width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 4px var(--accent-glow)}
+.op.idle .sdot{background:var(--warn); box-shadow:none}
+.op.off .sdot{background:var(--faint); box-shadow:none}
+.av.warn{background:linear-gradient(135deg,oklch(0.86 0.16 75),var(--warn))}
+.av.purple{background:linear-gradient(135deg,oklch(0.82 0.17 295),var(--purple))}
+.av.accent{background:linear-gradient(135deg,oklch(0.70 0.13 160),var(--accent))}
+.av.azure{background:linear-gradient(135deg,oklch(0.78 0.14 245),var(--azure)); color:#fff}
+.sb-status{display:flex; flex-direction:column; gap:6px}
+.sb-status .row{display:flex; justify-content:space-between; align-items:center; font-family:var(--mono); font-size:11px}
+.sb-status .row span{color:var(--muted)}
+.sb-status .row b{font-weight:600}
+.sb-status b.ok{color:var(--accent)} .sb-status b.warn{color:var(--warn)} .sb-status b.gold{color:var(--gold)}
+.sb-user{margin:0 14px; padding:9px 11px; border-radius:12px; background:linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.005)); border:1px solid var(--hair); display:flex; align-items:center; gap:10px}
+.sb-user .av{width:30px; height:30px; border-radius:8px; background:linear-gradient(135deg,var(--accent),var(--accent-deep)); color:#000; font-family:var(--display); font-weight:700; font-size:11px; display:flex; align-items:center; justify-content:center}
+.sb-user .info{flex:1}
+.sb-user .info .u{font-size:12.5px; font-weight:500}
+.sb-user .info .r{font-family:var(--mono); font-size:9.5px; color:var(--muted); letter-spacing:0.3px}
+.sb-user .out{width:26px; height:26px; border-radius:7px; border:1px solid var(--hair); background:transparent; color:var(--dim); display:flex; align-items:center; justify-content:center; cursor:pointer}
+
+/* ─── Main ─── */
+.main{flex:1; display:flex; flex-direction:column; min-width:0}
+
+/* ─── Strip (3 cards + gutters) ─── */
+.lpanel{
+  display:grid;
+  grid-template-columns:minmax(0,1.7fr) 7px minmax(0,1.05fr) 7px 240px;
+  padding:14px 22px 12px; border-bottom:1px solid var(--hair); min-height:150px;
+}
+.lp-card{background:var(--surface); border:1px solid var(--hair); border-radius:12px; padding:11px 13px; display:flex; flex-direction:column; min-width:0}
+.lp-head{display:flex; align-items:center; gap:8px; margin-bottom:9px}
+.lp-head .ttl{font-family:var(--display); font-size:12px; font-weight:600; letter-spacing:0.2px; color:var(--text)}
+.lp-head .sub{margin-left:auto; font-family:var(--mono); font-size:10px; color:var(--muted)}
+.lp-head .sub b{color:var(--accent)}
+.pulse{width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 6px var(--accent-glow)}
+.gutter{align-self:stretch; position:relative; cursor:col-resize}
+.gutter::before{content:""; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:3px; height:34px; border-radius:3px; background:var(--hair-2)}
+.gutter:hover::before{background:var(--accent); width:4px; height:56px; box-shadow:0 0 8px var(--accent-glow)}
+
+/* Actividad LIVE — filas limpias, una sola fuente mono, montos a la derecha */
+.feed{display:flex; flex-direction:column; gap:2px; overflow:hidden}
+.feed .r{display:flex; align-items:center; gap:9px; padding:3px 5px; border-radius:6px; font-family:var(--mono); font-size:11px; white-space:nowrap}
+.feed .r:first-child{background:rgba(255,255,255,0.028)}
+.feed .ic{width:14px; text-align:center; flex-shrink:0}
+.feed .who{font-weight:600; flex-shrink:0}
+.feed .tg{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; color:var(--dim)}
+.feed .amt{font-weight:600; color:var(--accent)}
+.feed .r.fail .amt{color:var(--muted); text-decoration:line-through}
+.feed .r.fail .ic{color:var(--danger)}
+.feed .tm{font-size:9.5px; color:var(--muted); flex-shrink:0; min-width:30px; text-align:right}
+.who.w-accent{color:var(--accent)} .who.w-warn{color:var(--warn)} .who.w-purple{color:var(--purple)} .who.w-azure{color:var(--azure)}
+
+/* RECIENTES — escaneable: estado a color, combo legible, edad alineada */
+.recents{display:flex; flex-direction:column; gap:3px; overflow:hidden}
+.rec{display:flex; align-items:center; gap:8px; padding:3px 6px; border-radius:6px; border-left:2px solid var(--faint)}
+.rec.use{border-left-color:var(--accent)}
+.rec.dep{border-left-color:var(--gold)}
+.rec .combo{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; font-family:var(--mono); font-size:10.5px; color:var(--text)}
+.rec .st{font-family:var(--mono); font-size:9px; padding:1px 6px; border-radius:99px; flex-shrink:0}
+.rec.use .st{color:var(--accent); background:var(--accent-soft)}
+.rec.dep .st{color:var(--gold); background:var(--gold-soft)}
+.rec .age{font-family:var(--mono); font-size:9px; color:var(--muted); min-width:26px; text-align:right; flex-shrink:0}
+
+/* POOL — bloque con peso: 1 número grande + 4 stats + barra de salud */
+.pool-hero{display:flex; align-items:baseline; gap:8px; margin-bottom:8px}
+.pool-hero .big{font-family:var(--display); font-size:30px; font-weight:700; color:var(--accent); line-height:1; text-shadow:0 0 16px var(--accent-glow)}
+.pool-hero .unit{font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:1px; text-transform:uppercase}
+.pool-bar{height:5px; border-radius:99px; background:rgba(255,255,255,0.06); overflow:hidden; margin-bottom:9px; display:flex}
+.pool-bar i{height:100%}
+.pool-bar .free{background:var(--accent)} .pool-bar .used{background:var(--warn)}
+.pool-grid{display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-bottom:9px}
+.pstat .pl{font-family:var(--mono); font-size:9px; text-transform:uppercase; letter-spacing:0.5px; color:var(--muted)}
+.pstat .pv{font-family:var(--display); font-size:16px; font-weight:700; line-height:1.15}
+.pstat .pv.warn{color:var(--warn)} .pstat .pv.dim{color:var(--muted)} .pstat .pv.danger{color:var(--danger)}
+.pool-btn{width:100%; padding:6px 0; border:1px solid var(--hair-2); border-radius:8px; background:transparent; color:var(--dim); font-family:var(--mono); font-size:9.5px; font-weight:700; letter-spacing:0.6px; text-transform:uppercase; cursor:pointer; transition:color var(--ease-fast),border-color var(--ease-fast)}
+.pool-btn:hover{color:var(--accent); border-color:var(--accent)}
+
+/* ─── Filterbar: título + buscador inline + filtros ─── */
+.filterbar{display:flex; align-items:center; gap:10px; padding:12px 22px; border-bottom:1px solid var(--hair)}
+.filterbar h2{font-family:var(--display); font-size:17px; font-weight:600; letter-spacing:-0.3px; display:flex; align-items:baseline; gap:8px}
+.filterbar h2 .c{font-family:var(--mono); font-size:11px; color:var(--muted); font-weight:400}
+.search{display:flex; align-items:center; gap:9px; width:330px; padding:7px 13px; background:rgba(0,0,0,0.32); border:1px solid var(--hair-2); border-radius:var(--r)}
+.search .ic{color:var(--muted); font-size:13px}
+.search input{flex:1; background:transparent; border:none; outline:none; color:var(--text); font-family:inherit; font-size:12.5px}
+.search input::placeholder{color:var(--muted)}
+.search kbd{font-family:var(--mono); font-size:9px; padding:2px 6px; border-radius:4px; background:rgba(255,255,255,0.04); border:1px solid var(--hair); color:var(--muted)}
+.seg{display:inline-flex; align-items:center; background:rgba(0,0,0,0.30); border:1px solid var(--hair); border-radius:8px; padding:2px}
+.seg button{border:none; background:transparent; color:var(--dim); font:inherit; font-size:11px; font-weight:500; padding:5px 11px; border-radius:6px; cursor:pointer}
+.seg button.on{background:var(--accent-soft-2); color:var(--accent); box-shadow:inset 0 0 0 1px oklch(0.58 0.13 160 / 0.25)}
+.seg.grade button{font-family:var(--mono); font-weight:600; width:26px; padding:5px 0; text-align:center}
+
+/* ─── Tabla ─── */
+.tablewrap{flex:1; overflow:auto; background:rgba(16,18,22,0.4)}
+table{width:100%; border-collapse:collapse; font-size:12.5px}
+thead th{position:sticky; top:0; background:var(--solid); border-bottom:1px solid var(--hair); text-align:left; padding:7px 12px; color:var(--muted); font-weight:600; text-transform:uppercase; font-size:9.5px; letter-spacing:0.7px; font-family:var(--mono)}
+thead th.num{text-align:right}
+tbody tr{border-bottom:1px solid var(--hair)}
+tbody tr:hover{background:rgba(255,255,255,0.018)}
+tbody td{padding:7px 12px; vertical-align:middle}
+td.num{text-align:right; font-family:var(--mono); font-variant-numeric:tabular-nums}
+.grail{width:3px; padding:0!important}
+.grail i{display:block; width:3px; height:24px; border-radius:2px}
+.gA{background:var(--accent)} .gB{background:rgba(238,241,244,0.4)} .gC{background:var(--warn)} .gD{background:var(--danger)}
+.bal{font-family:var(--mono); font-weight:600}
+.bal.hot{color:var(--gold); text-shadow:0 0 10px var(--gold-soft)}
+.bal.mid{color:var(--text)} .bal.low{color:var(--muted)}
+.combo{font-family:var(--mono); font-size:12px}
+.combo b{font-weight:500}
+.lockchip{font-family:var(--mono); font-size:9.5px; padding:1px 7px; border-radius:99px; margin-left:8px; background:var(--accent-soft); color:var(--accent)}
+.lockchip.purple{background:oklch(0.74 0.17 295 / 0.14); color:var(--purple)}
+.dep b{font-family:var(--mono); color:var(--text)}
+.dep .ago{font-family:var(--mono); font-size:10px; color:var(--muted); margin-left:6px}
+.dep .none{color:var(--muted); font-style:italic}
+.rowic{display:inline-flex; gap:4px}
+.rowic button{border:1px solid var(--hair); background:rgba(255,255,255,0.02); color:var(--dim); border-radius:6px; padding:3px 8px; font-family:var(--mono); font-size:10px; cursor:pointer}
+.det{display:inline-flex; align-items:center; gap:4px; border:1px solid var(--hair); background:transparent; color:var(--dim); border-radius:6px; padding:3px 9px; font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:0.4px; cursor:pointer}
+.checks{font-family:var(--mono); color:var(--dim)}
+.refresh{margin-left:6px; border:none; background:transparent; color:var(--muted); cursor:pointer; font-size:11px}
+
+/* Pagebar */
+.pagebar{display:flex; align-items:center; gap:10px; padding:9px 22px; border-top:1px solid var(--hair)}
+.pagebar .l{font-family:var(--mono); font-size:11px; color:var(--muted)}
+.pg{display:flex; gap:3px; margin:0 auto}
+.pg button{min-width:26px; height:26px; border:1px solid var(--hair); background:rgba(255,255,255,0.02); color:var(--dim); border-radius:6px; font-family:var(--mono); font-size:11px; cursor:pointer}
+.pg button.on{background:var(--accent-soft-2); color:var(--accent); border-color:var(--accent-soft-2)}
+.btn{border:1px solid var(--hair-2); background:rgba(255,255,255,0.03); color:var(--dim); border-radius:6px; padding:6px 11px; font-family:var(--mono); font-size:11px; cursor:pointer}
+.btn.accent{color:var(--accent); border-color:var(--accent-soft-2)}
+</style>
+</head>
+<body>
+<div class="mock-note">MOCKUP — propuesta de re-estilizado · no es producción</div>
+<div class="shell">
+
+  <!-- ─── SIDEBAR ─── -->
+  <aside class="sidebar">
+    <div class="sb-brand"><img src="../../static/assets/botmexico_logo.png" alt="Botmexico"></div>
+    <div class="tristrip"><i></i><i></i><i></i></div>
+    <div class="sb-greet">
+      <div class="hi">Hola, <b>RobertVS</b></div>
+      <div class="when">Lun 29 de jun · 10:45</div>
+      <div class="frase">💛 El billete es penoso; invítalo con confianza.</div>
+    </div>
+
+    <div class="sb-section">Principal</div>
+    <button class="nav on"><span class="i">▦</span>Cuentas<span class="b">845</span></button>
+    <button class="nav"><span class="i">◈</span>Pool<span class="b">134</span></button>
+    <button class="nav"><span class="i">⚡</span>Actividad</button>
+    <div class="sb-section">Sistema</div>
+    <button class="nav"><span class="i">◔</span>Notificaciones</button>
+    <button class="nav"><span class="i">▤</span>Logs</button>
+    <button class="nav"><span class="i">◉</span>Salud<span class="b">1</span></button>
+    <button class="nav"><span class="i">⚙</span>Controles</button>
+    <button class="nav"><span class="i">▣</span>BINes</button>
+
+    <div class="grow"></div>
+
+    <div class="sb-bottom">
+      <div class="sb-online">
+        <div class="sb-online-head"><span class="dot"></span><span class="lbl">Online</span><span class="cnt">2/4</span></div>
+        <div class="op"><span class="av accent">RO</span><span class="nm">RobertVS</span><span class="n">19</span><span class="sdot"></span></div>
+        <div class="op"><span class="av purple">LA</span><span class="nm">Lau</span><span class="sdot"></span></div>
+        <div class="op idle"><span class="av azure">LU</span><span class="nm">Luisito</span><span class="n">2</span><span class="sdot"></span></div>
+        <div class="op off"><span class="av warn">MA</span><span class="nm">Magdiel</span><span class="sdot"></span></div>
+      </div>
+      <div class="sb-status">
+        <div class="row"><span>xCAPTCHA</span><b class="gold">$1.46</b></div>
+        <div class="row"><span>Proxies</span><b class="ok">3/3 · MX 579ms</b></div>
+        <div class="row"><span>WSai</span><b>2000</b></div>
+        <div class="row"><span>En uso</span><b class="warn">21</b></div>
+      </div>
+    </div>
+
+    <div class="sb-user">
+      <div class="av">RO</div>
+      <div class="info"><div class="u">RobertVS</div><div class="r">superadmin</div></div>
+      <button class="out">⏻</button>
+    </div>
+  </aside>
+
+  <!-- ─── MAIN ─── -->
+  <main class="main">
+
+    <!-- Strip -->
+    <section class="lpanel">
+      <div class="lp-card">
+        <div class="lp-head"><span class="pulse"></span><span class="ttl">Actividad LIVE</span><span class="sub"><b>30</b> eventos</span></div>
+        <div class="feed">
+          <div class="r"><span class="ic">🔒</span><span class="who w-accent">RobertVS</span><span class="tg">tomó raymundo-morales@outlook.com</span><span class="amt">—</span><span class="tm">22h</span></div>
+          <div class="r"><span class="ic">💳</span><span class="who w-purple">Lau</span><span class="tg">depósito · hera.lux@betmex.mx</span><span class="amt">$200</span><span class="tm">2m</span></div>
+          <div class="r fail"><span class="ic">✕</span><span class="who w-azure">Luisito</span><span class="tg">rechazo · zeus.mara@betmex.mx</span><span class="amt">$300</span><span class="tm">5m</span></div>
+          <div class="r"><span class="ic">🔒</span><span class="who w-accent">RobertVS</span><span class="tg">tomó mendezisai21@gmail.com</span><span class="amt">—</span><span class="tm">22h</span></div>
+          <div class="r"><span class="ic">💳</span><span class="who w-accent">RobertVS</span><span class="tg">depósito · iavalos2525@gmail.com</span><span class="amt">$100</span><span class="tm">23h</span></div>
+          <div class="r"><span class="ic">📝</span><span class="who w-purple">Lau</span><span class="tg">nota · rhm6181@gmail.com</span><span class="amt">—</span><span class="tm">1d</span></div>
+        </div>
+      </div>
+
+      <div class="gutter"></div>
+
+      <div class="lp-card">
+        <div class="lp-head"><span class="ttl">Recientes</span><span class="sub"><b>20</b></span></div>
+        <div class="recents">
+          <div class="rec use"><span class="combo">rhm6181@gmail.com:RaulElPol11</span><span class="st">en uso</span><span class="age">5h</span></div>
+          <div class="rec use"><span class="combo">jairomttz1311@gmail.com:Halo13579011</span><span class="st">en uso</span><span class="age">14h</span></div>
+          <div class="rec dep"><span class="combo">richarcris206@gmail.com:657911Riki.</span><span class="st">depósito</span><span class="age">4d</span></div>
+          <div class="rec use"><span class="combo">edgarsaguirre007@gmail.com:Panzon07</span><span class="st">en uso</span><span class="age">5h</span></div>
+          <div class="rec dep"><span class="combo">acecaser@gmail.com:Metallica636</span><span class="st">depósito</span><span class="age">14h</span></div>
+          <div class="rec use"><span class="combo">pfedeka@gmail.com:Chivas12</span><span class="st">en uso</span><span class="age">22h</span></div>
+          <div class="rec use"><span class="combo">btefac@gmail.com:Dnois.25</span><span class="st">en uso</span><span class="age">1d</span></div>
+        </div>
+      </div>
+
+      <div class="gutter"></div>
+
+      <div class="lp-card">
+        <div class="lp-head"><span class="ttl">Pool</span><span class="sub"><b>155</b> live</span></div>
+        <div class="pool-hero"><span class="big">134</span><span class="unit">en pool</span></div>
+        <div class="pool-bar"><i class="free" style="width:84%"></i><i class="used" style="width:16%"></i></div>
+        <div class="pool-grid">
+          <div class="pstat"><div class="pl">En uso</div><div class="pv warn">21</div></div>
+          <div class="pstat"><div class="pl">Trastienda</div><div class="pv dim">705</div></div>
+          <div class="pstat"><div class="pl">Rebotadas</div><div class="pv danger">0</div></div>
+          <div class="pstat"><div class="pl">Disponibles</div><div class="pv">113</div></div>
+        </div>
+        <button class="pool-btn">Gestionar pool →</button>
+      </div>
+    </section>
+
+    <!-- Filterbar -->
+    <section class="filterbar">
+      <h2>Cuentas <span class="c">500 / 845</span></h2>
+      <div class="search">
+        <span class="ic">⌕</span>
+        <input placeholder="Buscar email, tarjeta, nombre, notas…">
+        <kbd>Ctrl K</kbd>
+      </div>
+      <div class="grow"></div>
+      <div class="seg"><button class="on">LIVE</button><button>Todos</button><button>DEAD</button></div>
+      <div class="seg grade"><button class="on" style="width:auto;padding:5px 11px">Todos</button><button>A</button><button>B</button><button>C</button><button>D</button></div>
+    </section>
+
+    <!-- Tabla (vista única detallada) -->
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th class="grail"></th>
+          <th class="num">Saldo</th>
+          <th>Cuenta</th>
+          <th></th>
+          <th>Últ. depósito</th>
+          <th>Últ. check</th>
+          <th class="num">Checks</th>
+          <th></th>
+        </tr></thead>
+        <tbody>
+          <tr><td class="grail"><i class="gA"></i></td><td class="num"><span class="bal hot">$512.00</span><button class="refresh">↻</button></td><td class="combo"><b>olimpo.flor@betmex.mx:Zp9flor!</b><span class="lockchip">🔒 RobertVS 1h</span></td><td><button class="det">detalles ▾</button></td><td class="dep"><b>$200.00</b><span class="ago">2h</span></td><td class="dep"><span class="ago">12m</span></td><td class="num checks">9</td><td><span class="rowic"><button>💳²</button><button>+ Nota</button><button>📌</button></span></td></tr>
+          <tr><td class="grail"><i class="gA"></i></td><td class="num"><span class="bal mid">$38.89</span><button class="refresh">↻</button></td><td class="combo"><b>zackalcon100@gmail.com:Teamo3312</b></td><td><button class="det">detalles ▾</button></td><td class="dep"><b>$300.00</b><span class="ago">9d</span></td><td class="dep"><span class="ago">1h</span></td><td class="num checks">4</td><td><span class="rowic"><button>+ Nota</button><button>📌</button></span></td></tr>
+          <tr><td class="grail"><i class="gB"></i></td><td class="num"><span class="bal low">$3.00</span><button class="refresh">↻</button></td><td class="combo"><b>youcal.trc@gmail.com:AReyes61</b><span class="lockchip purple">🔒 Lau 2h</span></td><td><button class="det">detalles ▾</button></td><td class="dep"><b>$50.00</b><span class="ago">84d</span></td><td class="dep"><span class="ago">3h</span></td><td class="num checks">12</td><td><span class="rowic"><button>📝¹</button><button>+ Nota</button><button>📌</button></span></td></tr>
+          <tr><td class="grail"><i class="gC"></i></td><td class="num"><span class="bal low">$0.08</span><button class="refresh">↻</button></td><td class="combo"><b>zaulvrobledo8@gmail.com:Prueba#1</b></td><td><button class="det">detalles ▾</button></td><td class="dep"><b>$300.00</b><span class="ago">187d</span></td><td class="dep"><span class="ago">6h</span></td><td class="num checks">3</td><td><span class="rowic"><button>+ Nota</button><button>📌</button></span></td></tr>
+          <tr><td class="grail"><i class="gA"></i></td><td class="num"><span class="bal hot">$1,240.00</span><button class="refresh">↻</button></td><td class="combo"><b>kevinsoporte4@gmail.com:KevCast2</b></td><td><button class="det">detalles ▾</button></td><td class="dep"><b>$400.00</b><span class="ago">14h</span></td><td class="dep"><span class="ago">22m</span></td><td class="num checks">7</td><td><span class="rowic"><button>💳¹</button><button>+ Nota</button><button>📌</button></span></td></tr>
+          <tr><td class="grail"><i class="gD"></i></td><td class="num"><span class="bal low">$0.00</span><button class="refresh">↻</button></td><td class="combo"><b>zandreslopez99@hotmail.com:Shadow99</b></td><td><button class="det">detalles ▾</button></td><td class="dep"><span class="none">sin dep.</span></td><td class="dep"><span class="ago">1d</span></td><td class="num checks">1</td><td><span class="rowic"><button>+ Nota</button><button>📌</button></span></td></tr>
+          <tr><td class="grail"><i class="gB"></i></td><td class="num"><span class="bal mid">$45.00</span><button class="refresh">↻</button></td><td class="combo"><b>franckkgp@gmail.com:Deathnote85</b></td><td><button class="det">detalles ▾</button></td><td class="dep"><b>$100.00</b><span class="ago">14h</span></td><td class="dep"><span class="ago">2h</span></td><td class="num checks">5</td><td><span class="rowic"><button>📝²</button><button>+ Nota</button><button>📌</button></span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagebar -->
+    <div class="pagebar">
+      <span class="l">20 de 500</span>
+      <div class="pg"><button>‹</button><button class="on">1</button><button>2</button><button>3</button><button>4</button><button>5</button><button>…</button><button>25</button><button>›</button></div>
+      <button class="btn">💳 Con tarjeta</button>
+      <button class="btn">↺ Restaurar</button>
+      <button class="btn accent">↻ Actualizar visibles</button>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

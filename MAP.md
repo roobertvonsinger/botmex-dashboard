@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `faea768` | fix(ui): buscador a filterbar + vista unica detallada + cajas sidebar encajadas + divisores arrastrables del strip + fluidez estandar |
 | `75fb195` | docs(session): cierre 2026-06-29 (2) — fix topbar/sidebar + bug logout sidebar (ERRORS) + NEXT-SESSION |
 | `bff8657` | fix(ui): quitar 🔔/⏻ huerfanos de topbar + colapsar topbar (cards suben) + compactar sidebar sin scroll + recablear logout al sidebar |
 | `605d0aa` | docs(session): cierre 2026-06-29 — reorg UI completo (22 tasks) deployado + verificado en prod |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `23bad44` | feat(pool-manager): markup vista partida Fuera|Dentro con search + bulk (CSS layout) |
 | `02a3a24` | style(table): filas mas bajas (td 8->4px) + menos desperdicio a la derecha (compactar, sin quitar columnas) |
 | `b1cacb3` | feat(ui): Online roster solo-SA en sidebar (gate D7 — pares no se ven entre si) |
-| `0e5cf4d` | feat(ui): buscador incrustado en sidebar (arriba de Principal); conserva #searchInput + cableado backend |
 <!-- GEN:end:recientes -->
 
 ---
