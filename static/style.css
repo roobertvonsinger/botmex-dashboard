@@ -2151,6 +2151,30 @@ td.row-icons, th.row-icons-th {
   border-color: var(--accent-soft-2);
   border-style: solid;
 }
+/* 📌 Marcador — ámbar cuando activo */
+.row-ic.ic-mark { opacity: 0.45; }
+.row-ic.ic-mark:hover { opacity: 1; }
+.row-ic.ic-mark.on {
+  opacity: 1;
+  color: #f5a623;
+  filter: drop-shadow(0 0 4px rgba(245,166,35,0.45));
+}
+/* Tamaño mayor en el panel de detalle */
+.row-ic.ic-mark.det-mark { font-size: 15px; padding: 3px 5px; }
+
+/* ── Recientes: filas una línea, sin overflow:auto ── */
+.lp-recent-row {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 10.5px; padding: 3px 0;
+  border-bottom: 1px solid var(--hairline);
+  cursor: pointer;
+  white-space: nowrap; overflow: hidden;
+}
+.lp-recent-row:last-child { border-bottom: none; }
+.lp-recent-row:hover { background: rgba(255,255,255,0.03); }
+.lp-recent-combo { flex: 1; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.lp-recent-reason { font-size: 9.5px; flex-shrink: 0; }
+.lp-recent-time { font-size: 9px; flex-shrink: 0; }
 
 /* Tooltip ── */
 .row-tip {

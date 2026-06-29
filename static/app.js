@@ -36,6 +36,7 @@ const state = {
 
 
 const selectedIds = new Set();
+let markedSet = new Set();   // emails marcados con 📌 (privado por usuario)
 let searchQuery = '';
 let activityRows = [];
 let activityFilter = { kind: '', who: null, time: 'all', q: '' };
@@ -550,9 +551,10 @@ function renderTable() {
       : '';
     const isSA = state.user?.role === 'superadmin';
     const trTitle = isSA ? `Grade ${esc(r.grade) || '?'}` : '';
-    // Iconos de fila: 💳 (tarjetas), 📝 (notas), siempre + (quick add) + botón Detalles
+    // Iconos de fila: 💳 (tarjetas), 📝 (notas), siempre + (quick add), 📌 (marcador) + botón Detalles
     const hasCards = (r.cards_count || 0) > 0;
     const hasNotes = (r.notes_count || 0) > 0;
+    const isMarked = markedSet.has(r.email);
     let iconsHtml = '';
     if (hasCards) {
       iconsHtml += `<button class="row-ic ic-cards" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.cards_count} tarjeta${r.cards_count>1?'s':''}">💳<sup>${r.cards_count}</sup></button>`;
@@ -561,6 +563,7 @@ function renderTable() {
       iconsHtml += `<button class="row-ic ic-notes" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.notes_count} nota${r.notes_count>1?'s':''}">📝<sup>${r.notes_count}</sup></button>`;
     }
     iconsHtml += `<button class="row-ic ic-add" data-id="${r.id}" data-email="${esc(r.email)}" title="Añadir nota rápida">+ Nota</button>`;
+    iconsHtml += `<button class="row-ic ic-mark${isMarked?' on':''}" data-mark-email="${esc(r.email)}" title="${isMarked?'Quitar marca':'Fijar para después'}">📌</button>`;
 
     // Botón "Detalles" premium — único acceso al modal
     const detailsBtn = `<button class="row-details" data-id="${r.id}" title="Ver detalles completos de la cuenta">
@@ -1417,9 +1420,11 @@ function connectSSE() {
         if (ev.kind === 'lock') {
           pushNotif({ icon: '🔒', msg: `${ev.who} bloqueó ${ev.target}` });
           _liveReload();
+          loadRecientes();
         } else if (ev.kind === 'unlock') {
           pushNotif({ icon: '🔓', msg: `${ev.who} liberó ${ev.target}` });
           _liveReload();
+          loadRecientes();
         } else if (ev.kind === 'deposit') {
           const ok = ev.status === 'approved';
           pushNotif({
@@ -1427,6 +1432,7 @@ function connectSSE() {
             msg: `${ev.who} depositó ${fmtMoney(ev.amount)} en ${ev.target} → ${ev.status}`,
           });
           if (ok) _liveReload();
+          loadRecientes();
         } else if (ev.kind === 'scheduled_started') {
           // Heartbeat de arranque — confirma backend vivo antes del pool warm-up.
           // Si _schedActive aún no existe (race con HTTP response), el watchdog
@@ -2326,6 +2332,23 @@ $('#actPbPages')?.addEventListener('click', e => {
   }
 });
 
+// ─── Marcador 📌 (toggle privado — NO recarga tabla) ───
+async function toggleMark(email, btn) {
+  try {
+    const res = await (await fetch('/api/marks/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })).json();
+    if (res.marked) markedSet.add(email); else markedSet.delete(email);
+    if (btn) {
+      btn.classList.toggle('on', !!res.marked);
+      btn.title = res.marked ? 'Quitar marca' : 'Fijar para después';
+    }
+    loadRecientes();
+  } catch {}
+}
+
 // ─── Tooltip hover para iconos 💳/📝 + click para nota rápida ───
 let _rowTipEl = null;
 let _rowTipTimer = null;
@@ -2418,6 +2441,11 @@ $('#accTable').addEventListener('click', e => {
   const ic = e.target.closest('.row-ic');
   if (ic) {
     e.stopPropagation();
+    if (ic.classList.contains('ic-mark')) {
+      // 📌 — toggle marcador; NO abre detalle, NO recarga tabla
+      toggleMark(ic.dataset.markEmail, ic);
+      return;
+    }
     const accId = parseInt(ic.dataset.id);
     const email = ic.dataset.email;
     if (ic.classList.contains('ic-add')) {
@@ -2612,6 +2640,14 @@ $('#accTable').addEventListener('click', async e => {
   // No interceptar si el click fue dentro de la tabla normal (no del panel).
   const panel = e.target.closest('.acc-detail');
   if (!panel) return;
+
+  // --- Marcador 📌 en el panel de detalle ---
+  const markBtnDetail = e.target.closest('.ic-mark[data-mark-email]');
+  if (markBtnDetail) {
+    e.preventDefault(); e.stopPropagation();
+    toggleMark(markBtnDetail.dataset.markEmail, markBtnDetail);
+    return;
+  }
 
   // --- Depositar (toggle: mismo botón abre/cierra el panel de depósito) ---
   const depBtn = e.target.closest('.d-deposit-btn');
@@ -3487,10 +3523,12 @@ function renderDetail(d) {
       <div class="addform-host" data-acc-id="${d.id}"></div>
     </details>`;
 
-  // ── EN USO toggle (lock) + Depositar — arriba a la derecha ─────────
+  // ── EN USO toggle (lock) + Depositar + 📌 marcador — arriba a la derecha ──
   const isLocked = !!d.locked_by;
   const inuse = `<button type="button" class="inuse${isLocked ? ' on' : ''}" data-inuse="${d.id}" title="${isLocked ? `En uso por ${esc(d.locked_by)}` : 'Marcar en uso (lock 2h)'}"><i class="ph-fill ph-bookmark-simple"></i> En uso</button>`;
   const depBtn = `<button class="b pri d-deposit-btn" data-acc-id="${d.id}"><i class="ph-duotone ph-credit-card"></i><span>Depositar</span></button>`;
+  const detailMarked = markedSet.has(d.email);
+  const markBtn = `<button type="button" class="row-ic ic-mark det-mark${detailMarked ? ' on' : ''}" data-mark-email="${esc(d.email)}" title="${detailMarked ? 'Quitar marca' : 'Fijar para después'}">📌</button>`;
 
   // datos ocupa el ancho de la columna izquierda (flex:5); el cluster derecho
   // (En uso + Depositar) ocupa el ancho de la columna derecha (flex:3). Así el
@@ -3498,7 +3536,7 @@ function renderDetail(d) {
   return `<div class="acc-detail">
     <div class="acc-top">
       ${datos}
-      <div class="acc-top-right">${depBtn}${inuse}</div>
+      <div class="acc-top-right">${depBtn}${inuse}${markBtn}</div>
     </div>
     <div class="acc-cols">
       <div class="acc-col acc-col-mv">${movimientos}</div>
@@ -5285,9 +5323,37 @@ async function rehydrateActiveScheduled() {
   }
 }
 
+// ─── Recientes (card lateral) ───
+async function loadRecientes() {
+  try {
+    const d = await (await fetch('/api/recent')).json();
+    renderRecientes(d.recent || []);
+    window._recentStats = d.stats || null;
+  } catch {}
+}
+function renderRecientes(items) {
+  const host = $('#lpRecientes');
+  if (!host) return;
+  const cnt = $('#lpRecientesCount');
+  if (cnt) cnt.textContent = items.length;
+  const reasonLabel = r => r === 'deposit' ? 'depositaste' : r === 'lock' ? 'en uso' : r === 'mark' ? 'fijada' : r;
+  host.innerHTML = items.length === 0
+    ? '<div class="lp-empty dim mono">sin recientes</div>'
+    : items.map(it => `<div class="lp-recent-row d-copy" data-email="${esc(it.email)}" data-copy="${esc(it.combo)}" title="Click para copiar combo">
+        <span class="lp-recent-combo mono">${esc(it.combo)}</span>
+        <span class="lp-recent-reason dim">${reasonLabel(it.reason)}</span>
+        <span class="lp-recent-time mono dim">${fmtAgo(it.last_ts)}</span>
+      </div>`).join('');
+}
+
 // ─── init ───
 (async () => {
   await loadMe();
+  // Cargar marcas privadas antes del primer render (para que 📌 aparezca activo)
+  try {
+    const m = await (await fetch('/api/marks')).json();
+    markedSet = new Set(m.marks || []);
+  } catch {}
   tickGreeting();
   setInterval(tickGreeting, 30_000);
   tickFrase();
@@ -5297,6 +5363,7 @@ async function rehydrateActiveScheduled() {
   refreshKpis();
   setInterval(refreshKpis, 30_000);
   loadActivityMarquee();
+  loadRecientes();
   loadHealth(false);
   connectSSE();
   // Reanclar misiones programadas activas DESPUÉS de reload() (necesitamos
