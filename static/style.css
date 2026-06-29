@@ -191,6 +191,33 @@ body.dep-drawer-pushing { padding-right: 420px; }
 .sb-status b.ok { color: var(--accent); }
 .sb-status b.warn { color: var(--warn); }
 
+/* ── Online block en sidebar ── */
+.sb-online {
+  margin: 6px 14px 10px;
+  padding: 8px 10px;
+  background: rgba(0,0,0,0.22);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.sb-online-head {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 9px; font-weight: 700; letter-spacing: 1.4px;
+  text-transform: uppercase; color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+.sb-online-label { flex: 1; }
+.sb-online-counter {
+  font-size: 9.5px; padding: 1px 5px; border-radius: 99px;
+  background: var(--accent-soft); color: var(--accent);
+  font-weight: 700; font-family: var(--font-mono);
+}
+/* #lpOps inside .sb-online inherits .lp-ops layout; avatar size stays compact */
+.sb-online .lp-op { padding: 2px 3px; }
+.sb-online .lp-av { width: 16px; height: 16px; font-size: 8.5px; border-radius: 4px; }
+.sb-online .lp-op-name { font-size: 11px; }
+.sb-online .lp-op-n { font-size: 9px; }
+
 .sb-user {
   margin: 0 14px;
   padding: 9px 10px;
@@ -256,7 +283,6 @@ body.dep-drawer-pushing { padding-right: 420px; }
 /* Usuarios sin KPIs: search ocupa casi toda la topbar (la tabla gana altura) */
 body.no-kpis .search { width: auto; flex: 1; max-width: none; }
 body.no-kpis .topbar > .grow { display: none; }
-body.no-kpis #adminPanel { display: none !important; }
 /* Controles premium (LIVE/DEAD, grade A/B/C/D, vista Simple/Detallada) — solo SA */
 body.no-kpis .seg[data-seg="status"],
 body.no-kpis .seg[data-seg="grade"],
@@ -399,7 +425,7 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
   padding: 10px 22px 10px;
   border-bottom: 1px solid var(--hairline);
   display: grid;
-  grid-template-columns: 220px 1fr 220px 200px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.1fr) 210px;
   gap: 10px;
   min-height: 132px;
 }
@@ -444,10 +470,11 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 }
 .lp-warn-ic { color: var(--warn); font-size: 12px; }
 
-/* Bloque 1: Online — avatares apilados verticalmente */
+/* Bloque 1: Online — avatares apilados verticalmente (en sidebar: .sb-online) */
 .lp-ops {
   display: flex; flex-direction: column; gap: 4px;
-  overflow-y: auto;
+  /* NO overflow:auto — el sidebar contiene; JS cicla si hay más ops */
+  overflow: hidden;
 }
 .lp-op {
   display: flex; align-items: center; gap: 7px;
@@ -489,19 +516,34 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 .lp-op.lp-op-online::after { background: var(--accent); box-shadow: 0 0 4px var(--accent-glow); }
 .lp-op.lp-op-idle::after { background: var(--warn); }
 
-/* Bloque 2: Feed actividad LIVE */
+/* Bloque 2: Feed actividad LIVE — marquesina ticker */
 .lp-feed-rows {
   display: flex; flex-direction: column;
   gap: 3px;
-  overflow-y: auto;
-  max-height: 110px;
+  /* NO overflow:auto — marquesina via ticker track */
+  height: 110px;   /* ~10 filas × 11px line-height ≈ 110px */
+  overflow: hidden;
   font-size: 11px;
   font-family: var(--font-mono);
+}
+
+/* Track interior que el JS duplica para loop sin salto */
+.lp-ticker-track {
+  display: flex; flex-direction: column; gap: 3px;
+  animation: lpTicker 20s linear infinite;
+}
+#lpActivity:hover .lp-ticker-track { animation-play-state: paused; }
+
+@keyframes lpTicker {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-50%); }
 }
 .lp-feed-row {
   display: flex; align-items: center; gap: 7px;
   padding: 2px 4px;
   border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .lp-feed-row:first-child {
   animation: lpFeedIn 380ms ease-out;
@@ -526,10 +568,11 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 .lp-color-accent { color: var(--accent); }
 .lp-color-azure  { color: oklch(0.78 0.16 250); }
 
-/* Bloque 3: Alertas */
+/* Bloque 3: Recientes — sin overflow:auto, filas caben en el card */
 .lp-alert-rows {
   display: flex; flex-direction: column; gap: 4px;
-  overflow-y: auto; max-height: 110px;
+  /* NO overflow:auto — el card limita naturalmente; JS debe ciclar si excede */
+  overflow: hidden;
 }
 .lp-alert-row {
   font-size: 10.5px; padding: 4px 7px;
@@ -2178,7 +2221,7 @@ td.row-icons, th.row-icons-th {
 /* Tablet horizontal (≤ 1100px): KPI panel se compacta */
 @media (max-width: 1100px) {
   .lpanel { gap: 8px; padding: 8px; }
-  .lpanel { grid-template-columns: 1fr 1.4fr 1fr 1fr; }
+  .lpanel { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.1fr) 210px; }
   .search { width: 360px; }
 }
 
