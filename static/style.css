@@ -559,23 +559,30 @@ thead th.num { text-align: right; }
    Cuenta se ajusta al combo (--combo-width); la de iconos (c-ic) absorbe el
    sobrante a la derecha → contenido AGRUPADO a la izquierda. Medido en _harness. */
 #accTable { width: 100%; table-layout: auto; border-collapse: collapse; }
-/* Las columnas toman su contenido; la de iconos (c-ic) absorbe el sobrante como
-   MARGEN a la derecha → todo el contenido queda agrupado a la izquierda (sin el
-   hueco que dispersaba). c-cuenta se ajusta al combo (--combo-width). */
+/* Layout (Robert): izquierda = Saldo + Cuenta pegados a la izquierda; la columna
+   CUENTA absorbe el sobrante (width 100%) → el HUECO flexible queda entre Cuenta y
+   Últ.depósito y se contrae cuando el dock de depósitos se incrusta al lado. Todo
+   desde Últ.depósito (dep/check/checks/Nota/tarjetas/pin) va con ancho fijo,
+   AGRUPADO a la derecha. Iconos en 3 columnas: Nota | tarjetas | pin. */
 #accTable col.c-grade  { width: 3px; }
 #accTable col.c-sel    { width: 34px; }
 #accTable col.c-saldo  { width: 108px; }
-#accTable col.c-cuenta { width: var(--combo-width, 440px); }
+#accTable col.c-cuenta { width: 100%; }
 #accTable col.c-dep    { width: 150px; }
 #accTable col.c-check  { width: 96px; }
 #accTable col.c-checks { width: 80px; }
-#accTable col.c-ic     { width: 100%; }
+#accTable col.c-nota   { width: 84px; }
+#accTable col.c-cards  { width: 46px; }
+#accTable col.c-pin    { width: 40px; }
 tbody tr { border-bottom: 1px solid var(--hairline); transition: background var(--ease-fast); }
 tbody tr:hover { background: rgba(255,255,255,0.025); }
 tbody td { height: 30px; padding: 0 10px; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 tbody td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
 tbody td.combo { overflow: visible; }      /* el lock-chip nunca se corta */
-tbody td.row-icons { overflow: visible; text-align: left; white-space: nowrap; }
+/* iconos en 3 columnas (Nota | tarjetas | pin) — agrupadas a la derecha */
+tbody td.ic-col { overflow: visible; white-space: nowrap; padding: 0 2px; text-align: center; }
+tbody td.ic-nota-col { text-align: right; padding-right: 4px; }
+thead th.ic-col-th { padding: 0; }
 tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); }
 
 .grade {

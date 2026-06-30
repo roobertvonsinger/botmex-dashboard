@@ -534,8 +534,8 @@ function renderTable() {
   let colg = t.querySelector('colgroup');
   if (!colg) { colg = document.createElement('colgroup'); t.insertBefore(colg, t.querySelector('thead')); }
   colg.innerHTML = state.view === 'simple'
-    ? '<col class="c-grade"><col class="c-sel"><col class="c-saldo"><col class="c-cuenta"><col class="c-dep"><col class="c-ic">'
-    : '<col class="c-grade"><col class="c-sel"><col class="c-saldo"><col class="c-cuenta"><col class="c-dep"><col class="c-check"><col class="c-checks"><col class="c-ic">';
+    ? '<col class="c-grade"><col class="c-sel"><col class="c-saldo"><col class="c-cuenta"><col class="c-dep"><col class="c-nota"><col class="c-cards"><col class="c-pin">'
+    : '<col class="c-grade"><col class="c-sel"><col class="c-saldo"><col class="c-cuenta"><col class="c-dep"><col class="c-check"><col class="c-checks"><col class="c-nota"><col class="c-cards"><col class="c-pin">';
   const _th = (col, label, cls = '') => {
     const on = _sortCol === col;
     const ic = on ? (_sortDir === 1 ? ' ↑' : ' ↓') : '';
@@ -547,7 +547,7 @@ function renderTable() {
         <th class="sel-cell"><input type="checkbox" id="selAll"></th>
         ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
         ${_th('last_deposit_date','Últ. depósito')}
-        <th class="row-icons-th"></th>
+        <th class="ic-col-th"></th><th class="ic-col-th"></th><th class="ic-col-th"></th>
       </tr>`
     : `<tr>
         <th class="grade-bar-th"></th>
@@ -555,7 +555,7 @@ function renderTable() {
         ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
         ${_th('last_deposit_date','Últ. depósito')}
         ${_th('last_checked_at','Últ. check')}${_th('check_count','Checks','num')}
-        <th class="row-icons-th"></th>
+        <th class="ic-col-th"></th><th class="ic-col-th"></th><th class="ic-col-th"></th>
       </tr>`;
   const thead = t.querySelector('thead');
   thead.innerHTML = cols;
@@ -591,15 +591,15 @@ function renderTable() {
     const hasCards = (r.cards_count || 0) > 0;
     const hasNotes = (r.notes_count || 0) > 0;
     const isMarked = markedSet.has(r.email);
-    let iconsHtml = '';
-    if (hasCards) {
-      iconsHtml += `<button class="row-ic ic-cards" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.cards_count} tarjeta${r.cards_count>1?'s':''}">💳<sup>${r.cards_count}</sup></button>`;
-    }
-    if (hasNotes) {
-      iconsHtml += `<button class="row-ic ic-notes" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.notes_count} nota${r.notes_count>1?'s':''}">📝<sup>${r.notes_count}</sup></button>`;
-    }
-    iconsHtml += `<button class="row-ic ic-add" data-id="${r.id}" data-email="${esc(r.email)}" title="Añadir nota rápida">+ Nota</button>`;
-    iconsHtml += `<button class="row-ic ic-mark${isMarked?' on':''}" data-mark-email="${esc(r.email)}" title="${isMarked?'Quitar marca':'Fijar para después'}">📌</button>`;
+    // Iconos en 3 columnas separadas — orden Robert: Nota | tarjetas | pin
+    // (alineadas a la derecha; tarjetas/pin quedan vacíos si no aplican).
+    const cellNota =
+      `<button class="row-ic ic-add" data-id="${r.id}" data-email="${esc(r.email)}" title="Añadir nota rápida">+ Nota</button>` +
+      (hasNotes ? `<button class="row-ic ic-notes" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.notes_count} nota${r.notes_count>1?'s':''}">📝<sup>${r.notes_count}</sup></button>` : '');
+    const cellCards = hasCards
+      ? `<button class="row-ic ic-cards" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.cards_count} tarjeta${r.cards_count>1?'s':''}">💳<sup>${r.cards_count}</sup></button>`
+      : '';
+    const cellPin = `<button class="row-ic ic-mark${isMarked?' on':''}" data-mark-email="${esc(r.email)}" title="${isMarked?'Quitar marca':'Fijar para después'}">📌</button>`;
 
     // Detalle (acordeón) ahora se abre/cierra con CLICK DERECHO en la fila (P7).
     // Se eliminó la columna "Detalles"; los iconos 💳/📝 también abren el detalle.
@@ -613,7 +613,9 @@ function renderTable() {
         <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
         <td class="combo d-copy" data-combo="${esc(combo)}" title="Click izquierdo: copiar combo · Click derecho en la fila: ver/ocultar detalle"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b>${lockChip}</td>
         <td class="dep" title="Último depósito hecho">${dep}</td>
-        <td class="row-icons">${iconsHtml}</td>
+        <td class="ic-col ic-nota-col">${cellNota}</td>
+        <td class="ic-col ic-cards-col">${cellCards}</td>
+        <td class="ic-col ic-pin-col">${cellPin}</td>
       </tr>`;
     }
     return `<tr class="${trClasses}" data-id="${r.id}" title="${trTitle || ''}">
@@ -624,7 +626,9 @@ function renderTable() {
       <td class="dep" title="Último depósito hecho">${dep}</td>
       <td class="dep dim" title="Cuándo se actualizó por última vez">${fmtAgo(r.last_checked_at)}</td>
       <td class="num" title="Total de veces actualizada">${r.check_count || 0}</td>
-      <td class="row-icons">${iconsHtml}</td>
+      <td class="ic-col ic-nota-col">${cellNota}</td>
+      <td class="ic-col ic-cards-col">${cellCards}</td>
+      <td class="ic-col ic-pin-col">${cellPin}</td>
     </tr>`;
   }).join('');
 
