@@ -54,6 +54,9 @@ const _actNewIds = new Set();   // ids/keys de eventos llegados via SSE — para
 let notifications = [];
 let _evtSrc = null;
 let _sortCol = null, _sortDir = -1;
+// P7 — drag-select de filas (arrastrar el mouse para seleccionar/deseleccionar varias)
+let _dragSel = null;              // { mode:'select'|'deselect', startId, moved }
+let _suppressNextRowClick = false; // tras un drag, evita que el click re-togglee la fila inicial
 
 // ─── Detalle de cuenta inline (acordeón) ───
 // expandedAccountId: id de la cuenta cuyo panel de detalle está desplegado
@@ -532,7 +535,6 @@ function renderTable() {
         <th class="grade-bar-th"></th>
         <th class="sel-cell"><input type="checkbox" id="selAll"></th>
         ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
-        <th class="row-details-th"></th>
         ${_th('last_deposit_date','Últ. depósito')}
         <th class="row-icons-th"></th>
       </tr>`
@@ -540,7 +542,6 @@ function renderTable() {
         <th class="grade-bar-th"></th>
         <th class="sel-cell"><input type="checkbox" id="selAll"></th>
         ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
-        <th class="row-details-th"></th>
         ${_th('last_deposit_date','Últ. depósito')}
         ${_th('last_checked_at','Últ. check')}${_th('check_count','Checks','num')}
         <th class="row-icons-th"></th>
@@ -555,7 +556,7 @@ function renderTable() {
     });
   });
 
-  const colspan = state.view === 'simple' ? 7 : 9;
+  const colspan = state.view === 'simple' ? 6 : 8;
   const rowsHtml = visible.map(r => {
     const g = gradeClass(r.grade);
     const until = r.locked_by ? fmtUntil(r.locked_until) : null;
@@ -589,13 +590,8 @@ function renderTable() {
     iconsHtml += `<button class="row-ic ic-add" data-id="${r.id}" data-email="${esc(r.email)}" title="Añadir nota rápida">+ Nota</button>`;
     iconsHtml += `<button class="row-ic ic-mark${isMarked?' on':''}" data-mark-email="${esc(r.email)}" title="${isMarked?'Quitar marca':'Fijar para después'}">📌</button>`;
 
-    // Botón "Detalles" premium — único acceso al modal
-    const detailsBtn = `<button class="row-details" data-id="${r.id}" title="Ver detalles completos de la cuenta">
-      <span class="row-details-text">detalles</span>
-      <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/>
-      </svg>
-    </button>`;
+    // Detalle (acordeón) ahora se abre/cierra con CLICK DERECHO en la fila (P7).
+    // Se eliminó la columna "Detalles"; los iconos 💳/📝 también abren el detalle.
 
     // Botón ↻ por fila — actualiza SOLO esta cuenta al instante
     const refreshOneBtn = `<button class="row-refresh-one" data-id="${r.id}" title="Actualizar SOLO esta cuenta (login fresh + fetch live)">↻</button>`;
@@ -604,8 +600,7 @@ function renderTable() {
         <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
         <td class="sel-cell" title="Click selecciona la fila"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
         <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-        <td class="combo d-copy" data-combo="${esc(combo)}" title="Click para copiar combo"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b>${lockChip}</td>
-        <td class="row-details-cell">${detailsBtn}</td>
+        <td class="combo d-copy" data-combo="${esc(combo)}" title="Click izquierdo: copiar combo · Click derecho en la fila: ver/ocultar detalle"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b>${lockChip}</td>
         <td class="dep" title="Último depósito hecho">${dep}</td>
         <td class="row-icons">${iconsHtml}</td>
       </tr>`;
@@ -614,8 +609,7 @@ function renderTable() {
       <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
       <td class="sel-cell" title="Click selecciona la fila"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
       <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-      <td class="combo d-copy" data-combo="${esc(combo)}" title="Click para copiar combo"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b></td>
-      <td class="row-details-cell">${detailsBtn}</td>
+      <td class="combo d-copy" data-combo="${esc(combo)}" title="Click izquierdo: copiar combo · Click derecho en la fila: ver/ocultar detalle"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b></td>
       <td class="dep" title="Último depósito hecho">${dep}</td>
       <td class="dep dim" title="Cuándo se actualizó por última vez">${fmtAgo(r.last_checked_at)}</td>
       <td class="num" title="Total de veces actualizada">${r.check_count || 0}</td>
@@ -2949,13 +2943,14 @@ $('#accTable').addEventListener('click', e => {
     updateCmdBar();
     return;
   }
-  // Click izquierdo sobre el combo (email:password) en la tabla principal → copiar
-  // Va ANTES del row-toggle para no marcar la cuenta cuando solo querés copiar.
-  const comboB = e.target.closest('td.combo b');
-  if (comboB && comboB.dataset.combo) {
+  // P7 — Click IZQUIERDO sobre el combo (email:password) → copiar. Copia TODA el
+  // área de la celda (no solo el <b>) para atinarle fácil. Va ANTES del row-toggle
+  // para no marcar la cuenta cuando solo querés copiar el combo.
+  const comboCell = e.target.closest('td.combo');
+  if (comboCell && comboCell.dataset.combo) {
     e.stopPropagation();
-    navigator.clipboard.writeText(comboB.dataset.combo)
-      .then(() => toast(`✓ ${comboB.dataset.combo}`, 'success'))
+    navigator.clipboard.writeText(comboCell.dataset.combo)
+      .then(() => toast(`✓ ${comboCell.dataset.combo}`, 'success'))
       .catch(err => toast(`Error: ${err.message}`, 'error'));
     return;
   }
@@ -2966,20 +2961,13 @@ $('#accTable').addEventListener('click', e => {
     renderTable();
     return;
   }
-  // Botón "Detalles" — único acceso al modal completo
-  const detBtn = e.target.closest('.row-details');
-  if (detBtn?.dataset.id) {
-    e.stopPropagation();
-    openDetailModal(parseInt(detBtn.dataset.id));
-    return;
-  }
-  // Click derecho sobre el combo → copiar (preserva selección sobre click izq)
-  // (el handler normal de copiar [data-combo] se atiende vía contextmenu abajo)
-
-  // Click en cualquier parte de la fila (excepto los handlers ya atendidos arriba)
-  // → toggle selección. NO abre modal.
+  // P7 — Click IZQUIERDO en cualquier parte de la fila (de la columna Cuenta a la
+  // derecha, salvo el combo y los controles atendidos arriba) → toggle selección.
+  // El detalle ya NO se abre con click izq (ahora es click derecho).
   const tr = e.target.closest('tr');
   if (tr && tr.dataset.id) {
+    // Si veníamos de un arrastre (drag-select), el toggle lo hizo el drag → suprimir.
+    if (_suppressNextRowClick) { _suppressNextRowClick = false; return; }
     const id = parseInt(tr.dataset.id);
     const wasSelected = selectedIds.has(id);
     if (wasSelected) selectedIds.delete(id);
@@ -2991,15 +2979,56 @@ $('#accTable').addEventListener('click', e => {
   }
 });
 
-// Click derecho sobre combo → copiar
+// P7 — Click DERECHO en cualquier parte de la fila → abrir/cerrar el detalle
+// (acordeón inline). Reemplaza la columna "Detalles" eliminada. No aplica dentro
+// del panel de detalle ya abierto.
 $('#accTable').addEventListener('contextmenu', e => {
-  const comboB = e.target.closest('td.combo b');
-  if (comboB && comboB.dataset.combo) {
-    e.preventDefault();
-    navigator.clipboard.writeText(comboB.dataset.combo)
-      .then(() => toast(`✓ ${comboB.dataset.combo}`, 'success'))
-      .catch(err => toast(`Error: ${err.message}`, 'error'));
+  if (e.target.closest('.acc-detail')) return;
+  const tr = e.target.closest('tr[data-id]');
+  if (!tr) return;
+  e.preventDefault();
+  openDetailModal(parseInt(tr.dataset.id));   // toggle: abre si está cerrado, cierra si abierto
+});
+
+// P7 — Drag-select: arrastrá el mouse sobre las filas para seleccionar/deseleccionar
+// varias de un jalón. El modo (marcar o desmarcar) lo fija el estado de la fila donde
+// empezás el arrastre. No arranca sobre el combo (copia) ni sobre controles.
+function _applyDragSel(id) {
+  if (id == null || Number.isNaN(id) || !_dragSel) return;
+  const sel = _dragSel.mode === 'select';
+  if (sel) selectedIds.add(id); else selectedIds.delete(id);
+  const tr = document.querySelector(`#accTable tbody tr[data-id="${id}"]`);
+  if (tr) {
+    tr.classList.toggle('row-sel', sel);
+    const cb = tr.querySelector('.rowsel'); if (cb) cb.checked = sel;
   }
+}
+$('#accTable').addEventListener('mousedown', e => {
+  if (e.button !== 0) return;  // solo botón izquierdo
+  if (e.target.closest('td.combo, .row-ic, .row-refresh-one, .rowsel, .acc-detail, th, button, input, a, select')) return;
+  const tr = e.target.closest('tr[data-id]');
+  if (!tr) return;
+  e.preventDefault();  // evita que el arrastre seleccione texto de las celdas
+  const id = parseInt(tr.dataset.id);
+  _dragSel = { mode: selectedIds.has(id) ? 'deselect' : 'select', startId: id, moved: false };
+});
+$('#accTable').addEventListener('mousemove', e => {
+  if (!_dragSel) return;
+  const tr = e.target.closest('tr[data-id]');
+  if (!tr) return;
+  if (!_dragSel.moved) {
+    _dragSel.moved = true;
+    document.body.classList.add('dragging-sel');  // bloquea selección de texto al arrastrar
+    _applyDragSel(_dragSel.startId);              // incluir la fila inicial
+  }
+  _applyDragSel(parseInt(tr.dataset.id));
+  updateCmdBar();
+});
+document.addEventListener('mouseup', () => {
+  if (!_dragSel) return;
+  if (_dragSel.moved) _suppressNextRowClick = true;  // el click posterior NO debe re-togglear
+  _dragSel = null;
+  document.body.classList.remove('dragging-sel');
 });
 
 // Modal de detalle: botón "Validar CURP en gob.mx"

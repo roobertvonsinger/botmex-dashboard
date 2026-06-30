@@ -332,6 +332,15 @@ Feedback de Robert (AFK). Spec: `docs/superpowers/specs/2026-06-29-ui-tanda4-mod
 
 ## Tanda 5 — vista de Cuentas (2026-06-30)
 
+- **P7 — Interacción de la tabla rediseñada (selección/copy/detalle).** Modelo nuevo pedido por Robert:
+  - **Easy-copy del combo** ahora con **click IZQUIERDO** (antes copiaba por contextmenu/click derecho = "mal configurado"). Copia **toda la celda** `td.combo` (no solo el `<b>`) → fácil de atinar. Cursor `copy`.
+  - **Selección** = **click izquierdo en cualquier parte de la fila** (de la columna Cuenta a la derecha, salvo el combo y controles ↻/iconos/checkbox). Togglea `row-sel`.
+  - **Detalle** = **click DERECHO** en cualquier parte de la fila → `openDetailModal()` (que es un **toggle** de acordeón inline: abre/cierra). Se **eliminó la columna "Detalles"** (th + td + botón `detailsBtn`); colspan 7/9 → 6/8 (`_detailColspan()` cuenta `<td>` del DOM, se autoajusta). Los iconos 💳/📝 siguen abriendo el detalle con click izq.
+  - **Drag-select**: arrastrar el mouse sobre las filas selecciona/deselecciona varias. El modo (`select`/`deselect`) lo fija el estado de la fila donde empieza el arrastre (`_dragSel`); el primer `mousemove` incluye la fila inicial; `mouseup` con movimiento setea `_suppressNextRowClick` para que el click posterior no re-togglee. `body.dragging-sel` aplica `user-select:none`. No arranca sobre el combo/controles. + el botón "Borrar selección" de la banda.
+  - **Feedback premium**: barra `accent` (`box-shadow inset 3px`) a la izquierda de la fila seleccionada; cursor `copy` en combo, `cell` durante el drag.
+
+
+
 Feedback de Robert tras probar la tanda 4 logueado. Spec: `docs/superpowers/specs/2026-06-30-tanda5-vista-cuentas.md`. Cache-bust `20260630b`.
 
 - **P2 — Paginación real (no esconder cuentas).** Síntoma: el contador decía "500 / 845" pero la tabla solo traía 500 → 345 LIVE escondidas. Causa raíz (medida en prod, no asumida): `fetchAccounts()` pedía `/api/accounts?limit=500` hardcoded; la paginación es **client-side** (`getPaged()` → `slice` sobre `getVisible()`), así que solo paginaba lo que llegó. Fix: constante `ACCOUNTS_FETCH_LIMIT = 2000` (el backend ya permite `le=2000`; traer 845 LIVE = ~370 KB / 8 ms, medido). El universo filtrado se trae completo y se pagina en cliente (sort/búsqueda/selección ya eran client-side). El contador `#countLabel` (`visible.length / s.live`) y la pagebar cuadran solos. **Guardarriel anti-silencio**: `state.truncated = rows.length >= ACCOUNTS_FETCH_LIMIT`; si se toca el tope, `renderPagination` añade `⚠️ tope N` con tooltip al `#pbVisibleCount` (nunca esconder en silencio — `feedback_frictionless_norte`). Hoy 845 < 2000 → no se enciende. Server-side pagination se **descartó** (rompería búsqueda dominante/sort/selección multi-página, todos client-side).

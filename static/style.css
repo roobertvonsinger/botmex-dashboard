@@ -961,9 +961,15 @@ th.sel-cell input[type="checkbox"]:checked {
 }
 tr.row-sel { background: var(--accent-soft) !important; }
 tr.row-sel td { border-color: var(--accent-soft-2) !important; }
+/* P7 — barra accent a la izquierda de la fila seleccionada (feedback premium claro) */
+tr.row-sel td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+/* P7 — drag-select: sin selección de texto + cursor de "celda" mientras arrastrás */
+body.dragging-sel { -webkit-user-select: none; user-select: none; cursor: cell; }
+body.dragging-sel #accTable tbody tr[data-id] { cursor: cell; }
 
 /* combo cell — clickable email */
-td.combo b { cursor: pointer; transition: color 120ms; }
+/* P7 — toda la celda del combo copia con click izquierdo → cursor "copy" */
+td.combo, td.combo b { cursor: copy; transition: color 120ms; }
 td.combo b:hover { color: var(--accent); }
 td.combo .copyhint { font-size: 9.5px; color: var(--text-faint); margin-left: 6px; font-family: var(--font-mono); }
 td.combo b:hover + .copyhint { color: var(--accent); }
