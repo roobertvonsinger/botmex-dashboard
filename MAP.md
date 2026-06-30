@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `3d26e73` | feat(frontend): tanda 5 P1 (buscador premium + X) + P8 (memoria de vista por usuario) |
 | `b3bf565` | feat(frontend): tanda 5 — layout de columnas 2-bloques + iconos Nota|tarjetas|pin |
 | `3cdfe06` | feat(frontend): rework premium tanda 5 — barra fusionada + tabla densa/agrupada (P4/P6) |
 | `79fa001` | feat(frontend): tanda 5 P7 — interaccion de tabla (copy izq / seleccion / detalle der / drag) |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `2ca34d4` | docs(session): cierre 2026-06-29 (tanda 3 UI) — cenefa + marquesina/click + combos + busqueda dominante + fix card; pendiente feedback Robert sesion nueva |
 | `b2f56e7` | feat(ui): cenefa superior + marquesina lenta/click + combos copia+detalle + busqueda dominante + fix card desbordado |
 | `145d918` | fix(ui): strip default compacto (212px) + sin distorsion de texto + limites + micro-animacion |
-| `afd0e48` | feat(ui): divisor horizontal del strip (altura ajustable arrastrando arriba-abajo) |
 <!-- GEN:end:recientes -->
 
 ---

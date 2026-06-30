@@ -4161,3 +4161,34 @@ body::after {
     50%      { filter: drop-shadow(0 0 11px var(--accent-glow)); }
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   P10 (tanda 5) — vidrio semitranslúcido + glow "CASINO" SUTIL en la vista de
+   Cuentas. Verde (marca) con corazón dorado tenue (dinero/premio). Construye
+   sobre los acabados de tanda 4 SIN saturar. Solo vidrio/brillos (cero layout).
+   Reversible borrando este bloque.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Barra inferior: vidrio real + filo de luz verde-oro arriba (toque casino). */
+.pagebar {
+  background: linear-gradient(180deg, rgba(20,23,27,0.78), rgba(14,16,19,0.90));
+  backdrop-filter: blur(10px) saturate(1.08); -webkit-backdrop-filter: blur(10px) saturate(1.08);
+  position: relative;
+}
+.pagebar::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-soft-2) 35%, var(--gold-soft) 50%, var(--accent-soft-2) 65%, transparent);
+  opacity: 0.85; pointer-events: none;
+}
+/* Buscador activo: aro de vidrio con glow verde y corazón dorado muy tenue. */
+.search.has-query {
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.4), 0 0 0 3px var(--accent-soft), 0 0 22px var(--accent-soft), 0 0 42px rgba(243,199,122,0.06);
+}
+/* Saldo "caliente" (≥$50): destello verde sutil — se siente premio. */
+td.num .balance.hot { text-shadow: 0 0 10px var(--accent-glow); }
+/* Depositar: corazón dorado al hover sobre el neón verde (casino). */
+.act-primary:hover {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), var(--neon-md), 0 0 18px rgba(243,199,122,0.10);
+}
+/* Vidrio coherente en la barra de filtros. */
+.filterbar { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
