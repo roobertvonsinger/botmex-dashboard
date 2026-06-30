@@ -401,9 +401,12 @@ body.no-kpis .seg[data-seg="status"],
 body.no-kpis .seg[data-seg="grade"] { display: none !important; }
 /* Buscador incrustado en la filterbar de Cuentas (junto al título, antes de los
    filtros). Robert: "ponlo al mismo nivel que el título de Cuentas". */
+/* P1 (tanda 5): buscador más largo y con más presencia ("se sentía escondido"). */
 .filterbar .search {
-  flex: 0 1 320px; width: auto; max-width: 36vw; min-width: 188px;
-  margin: 0; padding: 7px 13px;
+  flex: 0 1 400px; width: auto; max-width: 42vw; min-width: 240px;
+  margin: 0; padding: 8px 15px;
+  background: rgba(0,0,0,0.42);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.025);
 }
 /* Filterbar de Cuentas: el buscador a la izquierda, el grupo de filtros empujado a
    la derecha con margin-auto (sin un .grow que forzaría el wrap). Cuando el ancho
@@ -412,8 +415,9 @@ body.no-kpis .seg[data-seg="grade"] { display: none !important; }
 .filterbar-accounts { flex-wrap: wrap; row-gap: 8px; }
 .filterbar-accounts .seg[data-seg="status"] { margin-left: auto; }
 body.no-kpis .filterbar .search { width: auto; flex: 1; max-width: none; }
-.search .ico { color: var(--text-muted); font-size: 14px; }
-.search input { background: transparent; border: none; outline: none; color: var(--text); font-size: 12.5px; flex: 1; font-family: inherit; }
+.search .ico { color: var(--text-dim); font-size: 15px; }
+.search:focus-within .ico, .search.has-query .ico { color: var(--accent); }
+.search input { background: transparent; border: none; outline: none; color: var(--text); font-size: 13px; flex: 1; font-family: inherit; }
 .search input::placeholder { color: var(--text-muted); }
 .search kbd {
   font-size: 9px; font-family: var(--font-mono);
@@ -423,16 +427,18 @@ body.no-kpis .filterbar .search { width: auto; flex: 1; max-width: none; }
 }
 
 /* Botón X para limpiar la búsqueda y restaurar la vista (dentro del buscador) */
+/* P1: tachita DENTRO del recuadro, más visible (fondo permanente sutil) y clara. */
 .search-clear {
-  appearance: none; border: none; background: transparent; cursor: pointer;
-  width: 18px; height: 18px; flex-shrink: 0;
+  appearance: none; border: none; cursor: pointer;
+  width: 20px; height: 20px; flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: 50%; padding: 0; line-height: 1;
-  font-size: 15px; color: var(--text-muted);
+  font-size: 14px; font-weight: 600;
+  background: rgba(255,255,255,0.09); color: var(--text-dim);
   transition: background var(--ease-fast), color var(--ease-fast), transform var(--ease-fast);
 }
-.search-clear:hover { background: var(--accent-soft); color: var(--accent); }
-.search-clear:active { transform: scale(0.9); }
+.search-clear:hover { background: var(--accent-soft-2); color: var(--accent); transform: scale(1.06); }
+.search-clear:active { transform: scale(0.88); }
 
 /* Búsqueda DOMINANTE: cuando hay query activa, el buscador se ilumina (mantiene
    el foco en la interacción) y los filtros que ya NO aplican se atenúan, porque

@@ -2122,6 +2122,7 @@ $('#pageSize').addEventListener('change', e => {
   state.pageSize = parseInt(e.target.value);
   state.page = 1;
   renderTable();
+  _saveAcctState();   // P8
 });
 $('#pbPages').addEventListener('click', e => {
   const btn = e.target.closest('.pg-btn');
@@ -2132,6 +2133,7 @@ $('#pbPages').addEventListener('click', e => {
   else if (v === 'next') state.page = Math.min(paged.totalPages, state.page + 1);
   else state.page = parseInt(v);
   renderTable();
+  _saveAcctState();   // P8
 });
 $('#btnRefreshVisible').addEventListener('click', refreshVisible);
 function _isFiltersDefault() {
@@ -5924,9 +5926,42 @@ function renderRecientes(items) {
       }).join('');
 }
 
+// ─── P8 (tanda 5): memoria de la vista de Cuentas POR USUARIO ───
+// Conserva página, tamaño de página y posición de scroll entre sesiones (local
+// storage, key por usuario). "El scroll no es solo arriba/abajo: vuelve donde
+// estabas." No se comparte entre operadores (cada quien su estado).
+function _acctStateKey() { return `bmx.acctView.${state.user?.username || 'anon'}`; }
+function _acctWrap() { return $('#accTable')?.closest('.tablewrap'); }
+function _saveAcctState() {
+  try {
+    localStorage.setItem(_acctStateKey(), JSON.stringify({
+      page: state.page, pageSize: state.pageSize, scrollTop: Math.round(_acctWrap()?.scrollTop || 0),
+    }));
+  } catch {}
+}
+let _saveAcctTimer = null;
+function _saveAcctStateSoon() { clearTimeout(_saveAcctTimer); _saveAcctTimer = setTimeout(_saveAcctState, 350); }
+function _restoreAcctState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(_acctStateKey()) || 'null');
+    if (!s) return;
+    if (s.pageSize) { state.pageSize = s.pageSize; const sel = $('#pageSize'); if (sel) sel.value = String(s.pageSize); }
+    if (s.page) state.page = s.page;
+  } catch {}
+}
+function _restoreAcctScroll() {
+  try {
+    const s = JSON.parse(localStorage.getItem(_acctStateKey()) || 'null');
+    const wrap = _acctWrap();
+    if (s?.scrollTop && wrap) requestAnimationFrame(() => { wrap.scrollTop = s.scrollTop; });
+  } catch {}
+}
+_acctWrap()?.addEventListener('scroll', _saveAcctStateSoon, { passive: true });
+
 // ─── init ───
 (async () => {
   await loadMe();
+  _restoreAcctState();   // P8: aplica página/tamaño guardados antes del primer render
   // Cargar marcas privadas antes del primer render (para que 📌 aparezca activo)
   try {
     const m = await (await fetch('/api/marks')).json();
@@ -5937,6 +5972,7 @@ function renderRecientes(items) {
   tickFrase();
   setInterval(tickFrase, 9_000);
   await reload();
+  _restoreAcctScroll();   // P8: restaura el scroll de la tabla tras el render inicial
   _loadPassMap();
   renderPoolCard();
   refreshKpis();
