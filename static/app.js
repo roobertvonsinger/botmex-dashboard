@@ -32,7 +32,15 @@ const state = {
   lockHours: 2,
   filterInUse: false,
   cardsOnly: false,  // filter: solo cuentas con al menos 1 tarjeta
+  truncated: false,  // P2: true si el fetch tocó ACCOUNTS_FETCH_LIMIT (hay más cuentas que las traídas)
 };
+
+// P2 (paginación real): el universo filtrado se trae COMPLETO y se pagina en
+// cliente (sort/búsqueda/selección ya son client-side). El backend permite
+// le=2000; con ~845 LIVE traer todo = ~370 KB / 8 ms (medido en prod) = trivial.
+// Si algún día el universo supera este tope, NO se esconde en silencio:
+// `state.truncated` enciende un aviso en la pagebar (guardarriel, no secreto).
+const ACCOUNTS_FETCH_LIMIT = 2000;
 
 
 const selectedIds = new Set();
@@ -448,6 +456,14 @@ async function loadMe() {
   if (!isSuper) {
     $('#cmdTrastienda').style.display = 'none';
   }
+  // P3: "Actualizar visibles" (refresh masivo de la página entera) solo SA.
+  // Operadores refrescan individual (↻ por fila) o por selección. El endpoint
+  // /api/prewarm/refresh-stream NO se gatea por rol: es COMPARTIDO con el ↻
+  // individual del operador — gatearlo rompería su flujo legítimo. El control
+  // correcto es la visibilidad del botón (capa operador/SA), no el endpoint.
+  if (!isSuper) {
+    const brv = $('#btnRefreshVisible'); if (brv) brv.style.display = 'none';
+  }
   // Vista premium del sidebar: admin solo ve xCAPTCHA + Proxies (oculta WSai y En uso)
   if (!isSuper) {
     const wsaiRow = $('#stWsai')?.closest('div');
@@ -477,7 +493,7 @@ async function fetchAccounts() {
     if (state.grade) url.searchParams.set('grade', state.grade);
     if (state.cardsOnly) url.searchParams.set('cards_only', 'true');
   }
-  url.searchParams.set('limit', '500');
+  url.searchParams.set('limit', String(ACCOUNTS_FETCH_LIMIT));
   const r = await fetch(url);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
@@ -625,7 +641,15 @@ function renderTable() {
 }
 
 function renderPagination(paged) {
-  $('#pbVisibleCount').textContent = `${paged.rows.length} de ${paged.total}`;
+  const pbc = $('#pbVisibleCount');
+  pbc.textContent = `${paged.rows.length} de ${paged.total}`;
+  // P2 guardarriel: si el fetch tocó el tope, hay cuentas no traídas → avisar (nunca esconder en silencio)
+  if (state.truncated) {
+    pbc.textContent += ` ⚠️ tope ${ACCOUNTS_FETCH_LIMIT}`;
+    pbc.title = `Se alcanzó el límite de carga (${ACCOUNTS_FETCH_LIMIT}). Hay más cuentas de las que caben en una sola carga — filtra para verlas. No se esconde nada en silencio.`;
+  } else {
+    pbc.title = '';
+  }
   const c = $('#pbPages');
   if (paged.totalPages <= 1) { c.innerHTML = ''; return; }
   const cur = state.page, last = paged.totalPages;
@@ -1456,6 +1480,8 @@ async function reload() {
   try {
     const [rows, stats] = await Promise.all([fetchAccounts(), fetchStats()]);
     state.rows = rows;
+    // P2: si llegamos justo al tope, casi seguro hay más → guardarriel (no esconder en silencio)
+    state.truncated = rows.length >= ACCOUNTS_FETCH_LIMIT;
     // limpia selección de cuentas que ya no están visibles
     const valid = new Set(rows.map(r => r.id));
     for (const id of selectedIds) if (!valid.has(id)) selectedIds.delete(id);
