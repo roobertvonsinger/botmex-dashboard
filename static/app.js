@@ -1278,7 +1278,8 @@ function showSection(name) {
   if (name === 'bin-stats') reloadBinStats();
   try {
     var dw = window.DeposWindow && window.DeposWindow._instance;
-    if (dw && typeof dw.reanchorForSection === 'function') dw.reanchorForSection(name === 'accounts');
+    var _isSA = !!(state.user && state.user.role === 'superadmin');
+    if (dw && typeof dw.reanchorForSection === 'function') dw.reanchorForSection(name, _isSA);
   } catch (e) {}
 }
 
@@ -2564,6 +2565,134 @@ $$('.seg').forEach(seg => {
     panel.style.removeProperty('min-height');
     try { localStorage.removeItem(KEY); } catch (_) {}
     toast('↕ Altura del panel restaurada', 'success');
+  });
+})();
+
+// ── Colapso del sidebar a rail (tanda 4 — feedback Robert) ──────────────────
+// Botón #sidebarToggle alterna body.sidebar-collapsed; el CSS hace el rail de
+// iconos. Persistente por navegador. Frictionless: la navegación nunca se pierde.
+(function initSidebarCollapse() {
+  const KEY = 'bmx.sidebarCollapsed';
+  const btn = document.getElementById('sidebarToggle');
+  const relayoutDepos = () => { try { window.DeposWindow?._instance?.relayout?.(); } catch (_) {} };
+  const apply = (on) => {
+    document.body.classList.toggle('sidebar-collapsed', on);
+    if (btn) btn.title = on ? 'Expandir el menú' : 'Colapsar el menú (rail)';
+    // el panel de depósitos acoplado depende del ancho de la columna principal:
+    // recalcular al inicio y al terminar la transición de ancho del sidebar (0.42s).
+    relayoutDepos();
+    setTimeout(relayoutDepos, 460);
+  };
+  let on = false;
+  try { on = localStorage.getItem(KEY) === '1'; } catch (_) {}
+  apply(on);
+  if (btn) btn.addEventListener('click', () => {
+    on = !document.body.classList.contains('sidebar-collapsed');
+    apply(on);
+    try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (_) {}
+  });
+})();
+
+// ── Strip: módulos intercambiables de lugar (tanda 4 — feedback Robert) ──────
+// Las 3 cards del strip (Actividad/Recientes/Pool) son módulos: se arrastran por
+// el grip (.lp-reorder) y se intercambian de lugar (swap). Orden persistido.
+// Las proporciones de ancho son por SLOT (posición), no por card → al reordenar,
+// cada card toma el ancho del slot destino; se reajusta con los gutters. Lógica
+// pura saneada/probada en StripLogic (strip_logic.js + strip_logic.test.js).
+(function initStripReorder() {
+  const panel = document.getElementById('adminPanel');
+  if (!panel || !window.StripLogic) return;
+  const KEY = 'bmx.lpOrder.v1';
+  const SL = window.StripLogic;
+
+  function cardsByMod() {
+    const m = {};
+    panel.querySelectorAll('.lp-card[data-mod]').forEach(c => { m[c.dataset.mod] = c; });
+    return m;
+  }
+  function applyOrder(order) {
+    const ord = SL.sanitize(order);
+    const cards = cardsByMod();
+    const gutters = [...panel.querySelectorAll('.lp-gutter')];
+    // Reinsertar en el orden: card, gutter, card, gutter, card (gutters SIEMPRE
+    // entre cards, conservan su data-g por posición → el resize sigue intacto).
+    ord.forEach((mod, i) => {
+      if (cards[mod]) panel.appendChild(cards[mod]);
+      if (i < ord.length - 1 && gutters[i]) panel.appendChild(gutters[i]);
+    });
+    return ord;
+  }
+  function loadOrder() {
+    try { return SL.sanitize(JSON.parse(localStorage.getItem(KEY) || 'null')); }
+    catch (_) { return SL.DEFAULT.slice(); }
+  }
+  function saveOrder(order) {
+    try {
+      if (SL.isDefault(order)) localStorage.removeItem(KEY);
+      else localStorage.setItem(KEY, JSON.stringify(order));
+    } catch (_) {}
+  }
+
+  let order = applyOrder(loadOrder());
+  window.dispatchEvent(new Event('resize')); // re-aplica ratios de slot tras reordenar
+
+  let drag = null;
+  const clearMarks = () => {
+    panel.querySelectorAll('.lp-droptarget').forEach(c => c.classList.remove('lp-droptarget'));
+    panel.querySelectorAll('.lp-dragging').forEach(c => c.classList.remove('lp-dragging'));
+  };
+  const cardUnder = (x, y) => {
+    const el = document.elementFromPoint(x, y);
+    return el ? el.closest('.lp-card[data-mod]') : null;
+  };
+
+  panel.querySelectorAll('.lp-reorder').forEach(handle => {
+    // En la card Actividad el head navega; el grip NO debe disparar esa navegación.
+    handle.addEventListener('click', e => { e.stopPropagation(); });
+    handle.addEventListener('pointerdown', e => {
+      e.preventDefault(); e.stopPropagation();
+      const card = handle.closest('.lp-card[data-mod]');
+      if (!card) return;
+      drag = { fromId: card.dataset.mod, moved: false, sx: e.clientX, sy: e.clientY };
+      card.classList.add('lp-dragging');
+      document.body.style.cursor = 'grabbing';
+      document.body.style.userSelect = 'none';
+    });
+  });
+
+  window.addEventListener('pointermove', e => {
+    if (!drag) return;
+    if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 4) drag.moved = true;
+    panel.querySelectorAll('.lp-droptarget').forEach(c => c.classList.remove('lp-droptarget'));
+    const over = cardUnder(e.clientX, e.clientY);
+    if (drag.moved && over && over.dataset.mod !== drag.fromId) over.classList.add('lp-droptarget');
+  });
+  window.addEventListener('pointerup', e => {
+    if (!drag) return;
+    const over = cardUnder(e.clientX, e.clientY);
+    const did = drag.moved && over && over.dataset.mod !== drag.fromId;
+    if (did) {
+      order = SL.reorder(order, drag.fromId, over.dataset.mod);
+      applyOrder(order);
+      saveOrder(order);
+      window.dispatchEvent(new Event('resize'));
+      toast('⇄ Módulos intercambiados', 'success');
+    }
+    clearMarks();
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    drag = null;
+  });
+
+  // Doble-click en un grip restaura el orden default.
+  panel.querySelectorAll('.lp-reorder').forEach(handle => {
+    handle.addEventListener('dblclick', e => {
+      e.stopPropagation();
+      order = applyOrder(SL.DEFAULT.slice());
+      saveOrder(order);
+      window.dispatchEvent(new Event('resize'));
+      toast('↺ Orden de módulos restaurado', 'success');
+    });
   });
 })();
 

@@ -94,6 +94,14 @@ body.dep-drawer-pushing { padding-right: 420px; }
 #accDockZone.dock-r { padding-right: var(--dock-w, 0); }
 #accDockZone.dock-l { padding-left: var(--dock-w, 0); }
 
+/* El panel también se acopla a Logs/Actividad (solo SA — tanda 4). Esas vistas
+   reciben el mismo padding dinámico para no quedar debajo del panel ("sin estorbar").
+   En cualquier otra vista el panel se oculta (no se acopla aquí). */
+#logsMain, #activityMain { position: relative;
+  transition: padding 420ms cubic-bezier(0.22, 0.61, 0.36, 1); }
+#logsMain.dock-l, #activityMain.dock-l { padding-left: var(--dock-w, 0); }
+#logsMain.dock-r, #activityMain.dock-r { padding-right: var(--dock-w, 0); }
+
 .mono { font-family: var(--font-mono); font-size: 11px; }
 .dim { color: var(--text-muted); }
 .grow { flex: 1; }
@@ -152,6 +160,7 @@ body.dep-drawer-pushing { padding-right: 420px; }
   display: flex; flex-direction: column;
   padding: 12px 0 10px;
   position: relative;
+  transition: width var(--ease);
 }
 .sidebar::before {
   content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;
@@ -292,6 +301,54 @@ body.dep-drawer-pushing { padding-right: 420px; }
 .sb-user .info > div:first-child { font-size: 12px; line-height: 1.1; }
 .sb-user .info > div:last-child { font-size: 9.5px; letter-spacing: 0.3px; }
 
+/* ── Sidebar colapsable a rail de iconos (tanda 4 — feedback Robert) ──────────
+   Botón flotante en el borde derecho (estilo Linear/VS Code). El rail conserva
+   la navegación (iconos + tooltips) — guardarriel, no secreto (norte frictionless).
+   Todo bajo body.sidebar-collapsed; aditivo y reversible. */
+.sb-collapse {
+  position: absolute; top: 60px; right: -11px; z-index: 30;
+  width: 22px; height: 22px; border-radius: 50%; padding: 0;
+  background: var(--surface-elev); border: 1px solid var(--hairline-h);
+  color: var(--text-dim); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.45);
+  opacity: 0;
+  transition: opacity var(--ease-fast), background var(--ease-fast),
+              color var(--ease-fast), transform var(--ease-fast), box-shadow var(--ease-fast);
+}
+.sidebar:hover .sb-collapse, .sb-collapse:focus-visible { opacity: 1; }
+.sb-collapse:hover {
+  color: var(--accent); border-color: var(--accent-soft-2);
+  transform: scale(1.12); box-shadow: 0 0 14px var(--accent-soft), 0 2px 10px rgba(0,0,0,0.45);
+}
+.sb-collapse:active { transform: scale(0.96); }
+.sb-collapse svg { width: 12px; height: 12px; transition: transform var(--ease); }
+body.sidebar-collapsed .sb-collapse { opacity: 1; }       /* siempre visible para reexpandir */
+body.sidebar-collapsed .sb-collapse svg { transform: rotate(180deg); }
+
+body.sidebar-collapsed .sidebar { width: 64px; }
+/* Oculta todo lo textual; quedan los iconos del nav + logo mini + avatar. */
+body.sidebar-collapsed .sb-greet,
+body.sidebar-collapsed .sb-section,
+body.sidebar-collapsed .sb-bottom,
+body.sidebar-collapsed .tristrip,
+body.sidebar-collapsed .nav .b,
+body.sidebar-collapsed .sb-user .info { display: none; }
+/* El label de cada nav es un text node suelto: font-size:0 lo colapsa; el icono
+   conserva su tamaño propio (.nav .i tiene font-size explícito). */
+body.sidebar-collapsed .nav {
+  font-size: 0; justify-content: center; gap: 0;
+  margin: 2px 10px; padding: 8px 0;
+}
+body.sidebar-collapsed .nav .i { font-size: 15px; width: auto; }
+body.sidebar-collapsed .nav.on::before { left: -10px; }
+body.sidebar-collapsed .sb-brand { padding: 2px 0 8px; text-align: center; }
+body.sidebar-collapsed .sb-brand img { width: 40px; }
+body.sidebar-collapsed .sb-user {
+  justify-content: center; padding: 8px 0; margin: 0 10px;
+}
+body.sidebar-collapsed .sb-user .ico-btn { display: none; }
+
 .ico-btn {
   appearance: none; width: 24px; height: 24px;
   display: inline-flex; align-items: center; justify-content: center;
@@ -345,9 +402,15 @@ body.no-kpis .seg[data-seg="grade"] { display: none !important; }
 /* Buscador incrustado en la filterbar de Cuentas (junto al título, antes de los
    filtros). Robert: "ponlo al mismo nivel que el título de Cuentas". */
 .filterbar .search {
-  width: 340px; max-width: 38vw; min-width: 170px; flex-shrink: 1;
+  flex: 0 1 320px; width: auto; max-width: 36vw; min-width: 188px;
   margin: 0; padding: 7px 13px;
 }
+/* Filterbar de Cuentas: el buscador a la izquierda, el grupo de filtros empujado a
+   la derecha con margin-auto (sin un .grow que forzaría el wrap). Cuando el ancho
+   no alcanza —p.ej. con el panel de depósitos acoplado a la derecha— los filtros
+   bajan a una 2ª línea SIN cortarse (flex-wrap), preservando la coherencia. */
+.filterbar-accounts { flex-wrap: wrap; row-gap: 8px; }
+.filterbar-accounts .seg[data-seg="status"] { margin-left: auto; }
 body.no-kpis .filterbar .search { width: auto; flex: 1; max-width: none; }
 .search .ico { color: var(--text-muted); font-size: 14px; }
 .search input { background: transparent; border: none; outline: none; color: var(--text); font-size: 12.5px; flex: 1; font-family: inherit; }
@@ -395,6 +458,17 @@ body.searching .filterbar .seg[data-seg="grade"] { opacity: 0.4; filter: saturat
   box-shadow: 0 0 12px var(--accent-soft);
 }
 .reset-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* Acciones reubicadas a la filterbar (tanda 4 — feedback Robert):
+   "💳 Con tarjeta" sube al grupo de filtros; "↻ Actualizar visibles" queda
+   justo a la derecha de Restaurar. No se encogen (flex-shrink:0) para que el
+   buscador ceda primero y no haya deformación al achicar la ventana. */
+.fb-cards, .fb-refresh { flex-shrink: 0; }
+.fb-cards.on {
+  color: var(--accent); border-color: var(--accent-soft-2);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px oklch(0.58 0.13 160 / 0.25);
+}
 
 .frase {
   flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; overflow: hidden;
@@ -605,6 +679,27 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 .lp-counter { font-size: 10px; color: var(--text-dim); }
 .lp-counter b { color: var(--accent); font-size: 11px; }
 .lp-counter.warn { color: var(--warn); }
+
+/* Grip de reordenamiento de módulos (tanda 4): aparece al hover de la card; el
+   drag intercambia los módulos de lugar (swap). La card arrastrada se atenúa, la
+   destino se resalta. */
+.lp-reorder {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 13px; height: 15px; margin-left: -2px; flex-shrink: 0;
+  color: var(--text-faint); cursor: grab;
+  opacity: 0; transition: opacity var(--ease-fast), color var(--ease-fast), transform var(--ease-fast);
+  touch-action: none;
+}
+.lp-reorder svg { fill: currentColor; display: block; }
+.lp-card:hover .lp-reorder { opacity: 1; }
+.lp-reorder:hover { color: var(--accent); transform: scale(1.15); }
+.lp-reorder:active { cursor: grabbing; }
+.lp-card.lp-dragging { opacity: 0.5; outline: 1px dashed var(--accent-soft-2); }
+.lp-card.lp-droptarget {
+  outline: 1.5px solid var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-soft-2), 0 0 16px var(--accent-soft);
+  transition: box-shadow var(--ease-fast);
+}
 
 .lp-dot {
   width: 7px; height: 7px; border-radius: 50%;
@@ -3989,3 +4084,53 @@ body.dep-drawer-pushing.dep-drawer-collapsed { padding-right: 36px; }
 .act-line.act-fail .act-ic  { color: var(--danger); opacity: 0.8; }
 .act-line.act-fail           { opacity: 0.78; }
 .act-line.act-neutral .act-ic { color: var(--text-dim); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ACABADOS PREMIUM (tanda 4 — feedback Robert: "que se vea vivo")
+   Solo brillos / sombras / texturas / transiciones. CERO cambios de layout
+   (nada de width/height/padding/margin/position que mueva el acomodo).
+   Respeta prefers-reduced-motion. Reversible borrando este bloque.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Grano fílmico global ultra-sutil — da textura "viva" al obsidian sin ensuciar.
+   Fixed + pointer-events:none → inofensivo a clicks; opacidad mínima. */
+body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 9998;
+  opacity: 0.025; mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 140px 140px;
+}
+
+/* Glass premium en las cards del strip: velo de luz diagonal + highlight superior
+   (canto de vidrio) + sombra de profundidad. Hover: leve elevación y aro de acento. */
+.lp-card {
+  background-image: linear-gradient(157deg, rgba(255,255,255,0.025), transparent 46%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 2px 12px rgba(0,0,0,0.26);
+  transition: box-shadow var(--ease), border-color var(--ease), transform var(--ease-fast);
+}
+.lp-card:hover {
+  border-color: var(--hairline-h);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.34), 0 0 0 1px var(--accent-soft);
+}
+.lp-card.lp-dragging { box-shadow: 0 14px 34px rgba(0,0,0,0.5); }
+
+/* Profundidad en las cajas del sidebar (status / online / usuario). */
+.sb-status, .sb-online { box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), inset 0 0 16px rgba(0,0,0,0.22); }
+.sb-user { box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 9px rgba(0,0,0,0.26); }
+
+/* Filtros/segmentos: realce vivo del estado activo + sheen al hover. */
+.seg button.on { text-shadow: 0 0 10px var(--accent-glow); }
+.seg-btn:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.28), 0 0 0 1px var(--accent-soft); }
+.fb-refresh:hover { color: var(--accent); border-color: var(--accent-soft-2); }
+
+/* Botón de colapso del sidebar + grip de reorden: brillo de acento al interactuar. */
+.nav.on { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.015); }
+
+/* Cenefa superior: respiración de glow muy lenta (vida), apagada si reduce-motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .cenefa-wm { animation: cenefaBreath 7s ease-in-out infinite; }
+  @keyframes cenefaBreath {
+    0%, 100% { filter: drop-shadow(0 0 5px var(--accent-glow)); }
+    50%      { filter: drop-shadow(0 0 11px var(--accent-glow)); }
+  }
+}

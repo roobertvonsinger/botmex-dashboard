@@ -83,6 +83,20 @@
       if (panelCenterX < zone.left + zone.width * frac) return 'left';
       return null;
     },
+
+    // Política de visibilidad del panel de depósitos por vista y rol (tanda 4).
+    // - accounts: SIEMPRE visible, en la zona de la tabla (donde el usuario lo dejó).
+    // - logs/activity: visible SOLO para SA, acoplado a la IZQUIERDA de esa vista
+    //   ("sin estorbar"); su zona de dock es la sección misma.
+    // - cualquier otra vista: OCULTO (nunca flotando encima — ese era el bug).
+    // 'scope' guía el wiring: 'accounts' usa la preferencia del usuario; 'docked-left'
+    // fuerza izquierda sin pisar esa preferencia; 'hidden' esconde el panel.
+    sectionDock: function (section, isSA) {
+      if (section === 'accounts') return { visible: true, scope: 'accounts', zoneId: 'accDockZone' };
+      if (isSA && (section === 'logs' || section === 'activity'))
+        return { visible: true, scope: 'docked-left', zoneId: section === 'logs' ? 'logsMain' : 'activityMain' };
+      return { visible: false, scope: 'hidden', zoneId: null };
+    },
   };
 
   // node export para tests
@@ -105,7 +119,9 @@
     var dividerSel = opts.divider || '.dw-divider';
     var minW = opts.minW || MINW, minH = opts.minH || MINH;
 
-    var ST = { mode: 'float', float: null, dockW: { left: 400, right: 400 } };
+    // Default 'right': el panel encaja a la derecha de la tabla (el espacio que
+    // Robert reservó en la maqueta). `section` rige el modo efectivo por vista.
+    var ST = { mode: 'right', section: 'accounts', float: null, dockW: { left: 400, right: 400 } };
     load();
 
     var zone = function () { return document.getElementById(zoneId); };
@@ -138,6 +154,24 @@
       if (!side) { z.classList.remove('dock-l', 'dock-r'); z.style.removeProperty('--dock-w'); }
     }
 
+    // Suelta la compresión de TODAS las zonas dockeables (la activa cambia con la
+    // sección). Evita que una zona quede comprimida al cambiar de vista.
+    function clearAllZonePads() {
+      ['accDockZone', 'logsMain', 'activityMain'].forEach(function (id) {
+        var z = document.getElementById(id);
+        if (z) { z.classList.remove('dock-l', 'dock-r'); z.style.removeProperty('--dock-w'); }
+      });
+    }
+
+    // Modo efectivo según la sección: en logs/activity (SA) el panel se ancla a la
+    // izquierda sin sobreescribir la preferencia de accounts (ST.mode).
+    function effectiveMode() {
+      if (ST.section === 'logs' || ST.section === 'activity') return 'left';
+      return ST.mode;
+    }
+    // En esas vistas el panel queda fijo (no se arrastra/redimensiona por el header).
+    function sectionLocked() { return ST.section === 'logs' || ST.section === 'activity'; }
+
     function applyRect(r, anim) {
       win.style.transition = anim
         ? 'left .42s cubic-bezier(.22,.61,.36,1),top .42s cubic-bezier(.22,.61,.36,1),width .42s cubic-bezier(.22,.61,.36,1),height .42s cubic-bezier(.22,.61,.36,1)'
@@ -150,16 +184,22 @@
 
     function apply(anim) {
       win.classList.add('dw-on');
-      var docked = ST.mode !== 'float';
+      var em = effectiveMode();
+      var docked = em !== 'float';
       win.classList.toggle('dw-docked', docked);
-      win.classList.toggle('dw-dock-left', ST.mode === 'left');
-      win.classList.toggle('dw-dock-right', ST.mode === 'right');
+      win.classList.toggle('dw-dock-left', em === 'left');
+      win.classList.toggle('dw-dock-right', em === 'right');
       if (docked) {
         var z = zoneRect();
-        if (!z) { ST.mode = 'float'; return apply(anim); }
-        var w = ST.dockW[ST.mode] = Geo.clamp(ST.dockW[ST.mode], DOCK_MINW, Math.min(DOCK_MAXW, z.width - 240));
-        applyRect(Geo.dockRect(z, ST.mode, w), anim);
-        setZonePad(ST.mode, w);
+        if (!z) {
+          // zona sin geometría (su sección está oculta). En accounts caemos a
+          // flotante; en logs/activity NO flotamos encima de la vista → no-op.
+          if (!sectionLocked()) { ST.mode = 'float'; return apply(anim); }
+          return;
+        }
+        var w = ST.dockW[em] = Geo.clamp(ST.dockW[em], DOCK_MINW, Math.min(DOCK_MAXW, z.width - 240));
+        applyRect(Geo.dockRect(z, em, w), anim);
+        setZonePad(em, w);
       } else {
         if (!ST.float) ST.float = defaultFloat();
         setZonePad(null);
@@ -293,6 +333,7 @@
       if (rz || drag || dv) return;
       if (e.target.closest('.dw-btn')) return;            // controles: su propio handler
       if (e.target.closest(dividerSel)) return;           // divisor: su propio handler
+      if (sectionLocked()) return;                        // logs/activity: panel fijo a la izquierda
       if (ST.mode === 'float') {
         var ed = Geo.edgesAt(rectOf(win), e.clientX, e.clientY, 8);
         if (ed.l || ed.r || ed.t || ed.b) { startResize(e, ed); return; }
@@ -316,19 +357,33 @@
 
     // API pública del controlador
     var api = {
-      show: function () { apply(false); },
-      hide: function () { setZonePad(null); },   // suelta la compresión del dashboard (conserva el estado)
+      show: function () { ST._hiddenBySection = false; apply(false); },
+      hide: function () { clearAllZonePads(); ST._hiddenBySection = false; }, // cierre explícito
       relayout: function () { apply(false); },
-      isDocked: function () { return ST.mode !== 'float'; },
-      mode: function () { return ST.mode; },
-      reanchorForSection: function (isAccountsActive) {
-        if (!isAccountsActive) {
-          // saliendo de la vista de cuentas: si está acoplada, recordar lado y pasar a flotante
-          if (ST.mode !== 'float') { ST._savedDock = ST.mode; setMode('float'); }
-        } else {
-          // volviendo a cuentas: re-acoplar si había dock guardado
-          if (ST._savedDock) { var d = ST._savedDock; ST._savedDock = null; setMode(d); }
+      isDocked: function () { return effectiveMode() !== 'float'; },
+      mode: function () { return effectiveMode(); },
+      // Política por vista/rol (tanda 4). Recibe la sección destino y si el viewer
+      // es SA. Decide: visible+dónde, u oculto (sin flotar encima de otra vista).
+      reanchorForSection: function (section, isSA) {
+        ST.section = section;
+        var rootEl = document.getElementById('deposRoot');
+        var isOpen = rootEl && !rootEl.classList.contains('hidden');
+        // panel cerrado y no oculto-por-sección: no forzar nada (no debe aparecer solo).
+        if (!isOpen && !ST._hiddenBySection) return;
+        var pol = Geo.sectionDock(section, !!isSA);
+        if (!pol.visible) {
+          clearAllZonePads();
+          if (rootEl) { rootEl.classList.add('hidden'); rootEl.setAttribute('aria-hidden', 'true'); }
+          ST._hiddenBySection = true;
+          return;
         }
+        if (ST._hiddenBySection && rootEl) {
+          rootEl.classList.remove('hidden'); rootEl.setAttribute('aria-hidden', 'false');
+        }
+        ST._hiddenBySection = false;
+        clearAllZonePads();
+        zoneId = pol.zoneId || 'accDockZone';
+        apply(true);
       },
     };
     win.__deposWin = api;

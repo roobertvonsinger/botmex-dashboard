@@ -72,5 +72,20 @@ eq(G.snapZone(z, 260, 200, 0.32), 'left', 'snap izquierda');
 eq(G.snapZone(z, 600, 200, 0.32), null, 'snap centro = null');
 eq(G.snapZone(z, 950, 9000, 0.32), null, 'snap nulo si la ventana está muy abajo del área');
 
+// sectionDock — política de visibilidad por vista/rol (tanda 4)
+// accounts: visible para ambos roles, zona de la tabla
+eq(G.sectionDock('accounts', true), { visible: true, scope: 'accounts', zoneId: 'accDockZone' }, 'accounts SA → visible tabla');
+eq(G.sectionDock('accounts', false), { visible: true, scope: 'accounts', zoneId: 'accDockZone' }, 'accounts operador → visible tabla');
+// logs/activity: SOLO SA, acoplado a la izquierda de esa vista
+eq(G.sectionDock('logs', true), { visible: true, scope: 'docked-left', zoneId: 'logsMain' }, 'logs SA → dock izq logsMain');
+eq(G.sectionDock('activity', true), { visible: true, scope: 'docked-left', zoneId: 'activityMain' }, 'activity SA → dock izq activityMain');
+eq(G.sectionDock('logs', false), { visible: false, scope: 'hidden', zoneId: null }, 'logs operador → oculto');
+eq(G.sectionDock('activity', false), { visible: false, scope: 'hidden', zoneId: null }, 'activity operador → oculto');
+// resto de vistas: oculto para ambos
+['pool', 'notifications', 'health', 'admin', 'bin-stats'].forEach(function (s) {
+  eq(G.sectionDock(s, true), { visible: false, scope: 'hidden', zoneId: null }, s + ' SA → oculto');
+  eq(G.sectionDock(s, false), { visible: false, scope: 'hidden', zoneId: null }, s + ' operador → oculto');
+});
+
 console.log((fail ? '✗' : '✓') + ' depos_window.geo: ' + pass + ' pass, ' + fail + ' fail');
 process.exit(fail ? 1 : 0);

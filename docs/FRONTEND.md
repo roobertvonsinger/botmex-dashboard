@@ -302,16 +302,33 @@ Vista partida **Fuera del pool** (`#poolOutside`) | **En el pool** (`#poolInside
 - `#actBtnReset`, `#actBtnRefresh`
 - `#actPageSize` — paginación
 
-## Panel de depósitos persistente cross-página (reorg 2026-06-29)
+## Panel de depósitos — visibilidad por vista y rol (tanda 4, 2026-06-30)
 
-`#deposRoot` ya era hijo directo de `<body>` (no dentro de `#accountsMain`). El problema era que el **dock** comprime `#accDockZone` (dentro de `#accountsMain`); al salir de la vista de Cuentas, esa zona queda `display:none` y la geometría se rompía.
+`#deposRoot` es hijo directo de `<body>`. El **dock** comprime una "zona dockeable" (`#accDockZone` en Cuentas; `#logsMain`/`#activityMain` en esas vistas). **Bug anterior** (reorg 2026-06-29): al salir de Cuentas el panel pasaba a **flotante** y quedaba **encima** de la otra vista (Robert: "se queda encima de todo").
 
-**Fix (`DeposWindow.reanchorForSection(isAccountsActive)` en `depos_window.js`):**
-- Si el panel está **acoplado** y se sale de la vista Cuentas (`isAccountsActive=false`) → fallback a **flotante** (el dock guardado se preserva en `localStorage` para volver).
-- Al volver a Cuentas → re-acopla automáticamente.
-- El panel **no se cierra** al cambiar de sección. Solo cierra con X o Esc.
+**Política nueva** — `DeposWindow.reanchorForSection(section, isSA)` aplica `DeposWindowGeo.sectionDock(section, isSA)` (lógica pura, testeada en `depos_window.test.js`):
 
-Hook en `showSection(name)` (app.js): al final llama `window.DeposWindow.reanchorForSection(name === 'accounts')` si el panel está abierto.
+| Vista | Operador | Superadmin |
+|---|---|---|
+| `accounts` | visible, dock = preferencia (default **right** = encaja en el espacio de la maqueta) | igual |
+| `logs` / `activity` | **oculto** | visible, dock **left** ("sin estorbar"), zona = la vista misma |
+| pool / notifications / health / admin / bin-stats | **oculto** | **oculto** |
+
+- **Oculto = `display:none` REAL** + suelta el dock de TODAS las zonas (`clearAllZonePads`). Nunca flota encima.
+- `effectiveMode()`: en logs/activity el modo efectivo es `left` sin pisar la preferencia de Cuentas (`ST.mode`). Al volver a Cuentas se recupera (default `right`).
+- En logs/activity el panel queda **fijo** (no se arrastra por el header — `sectionLocked()`); el divisor de ancho sí funciona.
+- El panel **no se cierra** al navegar; solo con X o Esc. `hide()` (cierre explícito) suelta todas las zonas.
+- Hook en `showSection(name)` (app.js): `dw.reanchorForSection(name, state.user?.role === 'superadmin')`.
+- CSS dock generalizado: `#logsMain.dock-l`/`#activityMain.dock-l` reciben el mismo `padding-left: var(--dock-w)` que `#accDockZone` (style.css).
+
+## Tanda 4 — módulos, sidebar rail, filterbar, acabados (2026-06-30)
+
+Feedback de Robert (AFK). Spec: `docs/superpowers/specs/2026-06-29-ui-tanda4-modulos-panel-sidebar.md`. 100% frontend, aditivo/reversible, cero backend. Cache-bust `20260630a`.
+
+- **Strip = módulos intercambiables.** Cada `.lp-card` lleva `data-mod` (`activity`/`recientes`/`pool`) + un grip `.lp-reorder` (aparece al hover del head). Drag por el grip **intercambia (swap)** dos cards. Orden persistido en `localStorage['bmx.lpOrder.v1']`; doble-click en un grip restaura. Lógica pura `StripLogic` (`strip_logic.js` + `.test.js`, 16 casos). `initStripReorder()` (app.js) aplica el orden y recoloca los gutters **siempre entre cards** (su `data-g` por posición → el resize de `initLpResize` sigue intacto). Anchos **por slot** (posición), no por card: al reordenar cada card toma el ancho de su slot.
+- **Filterbar de Cuentas reorganizada.** `💳 Con tarjeta` (`#btnCardsOnly`) y `↻ Actualizar visibles` (`#btnRefreshVisible`) subieron de la `.pagebar` a la `.filterbar` (junto a los filtros; "Actualizar visibles" justo a la derecha de Restaurar). La `.filterbar-accounts` usa `flex-wrap` + `margin-left:auto` en el primer seg (en vez de `.grow`): buscador a la izquierda, filtros a la derecha en una línea; si el ancho no alcanza (p.ej. con el panel acoplado en ventana chica) **bajan a 2ª línea sin cortarse**. Buscador `.filterbar .search` → `flex:0 1 320px; min-width:188px` (cede primero). La `.pagebar` queda solo con visibleCount · paginador · "Por página".
+- **Sidebar colapsable a rail.** Botón `#sidebarToggle` (`.sb-collapse`, borde derecho del sidebar, estilo Linear/VS Code). Toggle `body.sidebar-collapsed` → `.sidebar` a **64px**: oculta labels/badges/greet/secciones/online/status; quedan iconos del nav (centrados, `font-size:0` colapsa el text-node del label, `.i` conserva su tamaño) + logo mini (40px) + avatar. Persistente `localStorage['bmx.sidebarCollapsed']`. `initSidebarCollapse()` (app.js) re-llama `DeposWindow.relayout()` al inicio y tras la transición (0.42s) para recalcular el dock.
+- **Acabados premium** (`style.css`, bloque final). Grano fílmico global ultra-sutil (`body::after`, fractalNoise SVG, opacity 0.025, `pointer-events:none`); glass en `.lp-card` (velo diagonal + highlight superior + sombra de profundidad + hover lift); profundidad en cajas del sidebar; sheen en `.seg-btn`/`.seg button.on`; respiración de glow lenta en la cenefa (`@media prefers-reduced-motion: no-preference`). Cero cambios de layout.
 
 ## Tabla principal — compactación (reorg 2026-06-29)
 

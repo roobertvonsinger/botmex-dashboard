@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/duotone/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
-<link rel="stylesheet" href="/static/style.css?v=20260629g">
+<link rel="stylesheet" href="/static/style.css?v=20260630a">
 <link rel="stylesheet" href="/static/depos.css?v=20260628e">
 </head>
 <body>
@@ -33,6 +33,9 @@
 </div>
 <div class="shell">
   <aside class="sidebar">
+    <button class="sb-collapse" id="sidebarToggle" title="Colapsar el menú (rail)" aria-label="Colapsar o expandir el menú lateral">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
     <div class="sb-brand"><a href="/" title="Botmexico — inicio"><img src="/static/assets/botmexico_logo.png" alt="Botmexico"></a></div>
     <div class="tristrip"><i></i><i></i><i></i></div>
     <div class="sb-greet">
@@ -87,8 +90,9 @@
     <div id="accountsMain" style="display:flex;flex-direction:column;flex:1;min-height:0">
       <section class="lpanel" id="adminPanel">
         <!-- Bloque 1: Actividad LIVE (ex-Feed) -->
-        <div class="lp-card lp-feed lp-activity">
+        <div class="lp-card lp-feed lp-activity" data-mod="activity">
           <div class="lp-head lp-head-clickable" data-nav="activity" title="Ir al panel de Actividad">
+            <span class="lp-reorder" title="Arrastra para intercambiar este módulo de lugar" aria-hidden="true"><svg viewBox="0 0 10 16" width="10" height="16"><circle cx="3" cy="3" r="1.1"/><circle cx="7" cy="3" r="1.1"/><circle cx="3" cy="8" r="1.1"/><circle cx="7" cy="8" r="1.1"/><circle cx="3" cy="13" r="1.1"/><circle cx="7" cy="13" r="1.1"/></svg></span>
             <span class="lp-pulse"></span>
             <span class="lp-label">Actividad LIVE</span>
             <span class="lp-counter mono dim" id="lpFeedCount">—</span>
@@ -100,8 +104,9 @@
         <div class="lp-gutter" data-g="0" title="Arrastra para ajustar el ancho · doble-click restaura" role="separator" aria-orientation="vertical"></div>
 
         <!-- Bloque 2: Recientes (ex-Alertas) -->
-        <div class="lp-card lp-recientes">
+        <div class="lp-card lp-recientes" data-mod="recientes">
           <div class="lp-head">
+            <span class="lp-reorder" title="Arrastra para intercambiar este módulo de lugar" aria-hidden="true"><svg viewBox="0 0 10 16" width="10" height="16"><circle cx="3" cy="3" r="1.1"/><circle cx="7" cy="3" r="1.1"/><circle cx="3" cy="8" r="1.1"/><circle cx="7" cy="8" r="1.1"/><circle cx="3" cy="13" r="1.1"/><circle cx="7" cy="13" r="1.1"/></svg></span>
             <span class="lp-label">Recientes</span>
             <span class="lp-counter mono" id="lpRecientesCount">0</span>
           </div>
@@ -114,8 +119,9 @@
         <div class="lp-gutter" data-g="1" title="Arrastra para ajustar el ancho · doble-click restaura" role="separator" aria-orientation="vertical"></div>
 
         <!-- Bloque 3: Pool stats 2×2 -->
-        <div class="lp-card lp-pool">
+        <div class="lp-card lp-pool" data-mod="pool">
           <div class="lp-head">
+            <span class="lp-reorder" title="Arrastra para intercambiar este módulo de lugar" aria-hidden="true"><svg viewBox="0 0 10 16" width="10" height="16"><circle cx="3" cy="3" r="1.1"/><circle cx="7" cy="3" r="1.1"/><circle cx="3" cy="8" r="1.1"/><circle cx="7" cy="8" r="1.1"/><circle cx="3" cy="13" r="1.1"/><circle cx="7" cy="13" r="1.1"/></svg></span>
             <span class="lp-label">Pool</span>
             <span class="lp-counter mono dim" id="lpPoolSub">—</span>
           </div>
@@ -141,7 +147,7 @@
 
       <!-- Zona de acople del panel de depósitos (dock izq/der lo comprime, sin tocar las cards de arriba ni el menú) -->
       <div id="accDockZone">
-      <section class="filterbar">
+      <section class="filterbar filterbar-accounts">
         <h2>Cuentas <span class="dim mono" id="countLabel">— / —</span></h2>
         <div class="search filterbar-search" title="Busca lo que sea: email, tarjeta, nombre, nota… (Ctrl+K) · la búsqueda corre sobre TODOS los registros, ignora los filtros">
           <span class="ico">⌕</span>
@@ -149,7 +155,6 @@
           <button id="searchClear" class="search-clear" type="button" style="display:none" title="Limpiar búsqueda y restaurar la vista (Esc)" aria-label="Limpiar búsqueda">×</button>
           <kbd>Ctrl K</kbd>
         </div>
-        <div class="grow"></div>
         <div class="seg" data-seg="status" title="Vivas, todas, o muertitas">
           <button data-v="LIVE" class="on" title="Solo cuentas que jalan">LIVE</button>
           <button data-v="all" title="Todas, sin filtrar">Todos</button>
@@ -162,7 +167,9 @@
           <button data-v="C" title="🟡 Cuidado — señales raras">C</button>
           <button data-v="D" title="🔴 Pasarela quemada, no pierdas tiempo">D</button>
         </div>
+        <button class="seg-btn fb-cards" id="btnCardsOnly" title="Solo cuentas con al menos 1 tarjeta guardada (en account_cards o notas con card)">💳 Con tarjeta</button>
         <button class="seg-btn reset-btn" id="btnResetFilters" title="Restaurar la vista al default: LIVE, sin grade, sin búsqueda, sin orden">↺ Restaurar</button>
+        <button class="seg-btn fb-refresh" id="btnRefreshVisible" title="Login en vivo de las cuentas visibles — verás el progreso">↻ Actualizar visibles</button>
       </section>
 
       <section class="tablewrap">
@@ -178,8 +185,6 @@
         </div>
         <div class="pb-center" id="pbPages"></div>
         <div class="pb-right">
-          <button class="seg-btn" id="btnCardsOnly" title="Solo cuentas con al menos 1 tarjeta guardada (en account_cards o notas con card)">💳 Con tarjeta</button>
-          <button class="seg-btn" id="btnRefreshVisible" title="Login en vivo de las cuentas visibles — verás el progreso">↻ Actualizar visibles</button>
           <span class="dim mono">Por página</span>
           <select id="pageSize" class="seg-btn" title="Cuántas cuentas ves de un jalón">
             <option value="20">20</option>
@@ -1018,9 +1023,10 @@
 <div id="toast" class="toast hidden"></div>
 
 <script src="/static/activity_logic.js?v=20260629b"></script>
-<script src="/static/app.js?v=20260629g"></script>
+<script src="/static/strip_logic.js?v=20260630a"></script>
+<script src="/static/app.js?v=20260630a"></script>
 <script src="/static/depos_logic.js?v=20260628e"></script>
-<script src="/static/depos_window.js?v=20260627n"></script>
+<script src="/static/depos_window.js?v=20260630a"></script>
 <script src="/static/depos.js?v=20260628e"></script>
 </body>
 </html>
