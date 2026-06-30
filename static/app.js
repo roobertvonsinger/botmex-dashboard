@@ -2464,6 +2464,57 @@ $$('.seg').forEach(seg => {
   });
 })();
 
+// ─── Divisor horizontal del strip (↕ altura) ───
+// Arrastra ↕ para ajustar la altura del strip vs la tabla (reclamar el espacio
+// de las cards para ver más cuentas). Doble-click restaura. Persiste en
+// localStorage. Solo aplica a la vista Cuentas (#accountsMain).
+(function initLpVResize() {
+  const panel = document.getElementById('adminPanel');
+  const gutter = document.getElementById('lpVGutter');
+  const main = document.getElementById('accountsMain');
+  if (!panel || !gutter || !main) return;
+  const KEY = 'bmx.lpHeight.v1';
+  const MIN = 96;
+  const apply = h => { panel.style.height = h + 'px'; panel.style.minHeight = h + 'px'; };
+  function maxH() { const m = main.clientHeight; return m > 300 ? m - 220 : 600; }
+  try {
+    const saved = parseInt(localStorage.getItem(KEY) || '', 10);
+    if (saved > 0) apply(Math.min(Math.max(saved, MIN), 600));
+  } catch (_) {}
+
+  gutter.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = panel.getBoundingClientRect().height;
+    const mx = maxH();
+    gutter.classList.add('dragging');
+    gutter.setPointerCapture?.(e.pointerId);
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    const move = ev => {
+      let h = startH + (ev.clientY - startY);
+      h = Math.max(MIN, Math.min(h, mx));
+      apply(h);
+    };
+    const up = () => {
+      gutter.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      try { localStorage.setItem(KEY, String(Math.round(panel.getBoundingClientRect().height))); } catch (_) {}
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  });
+  gutter.addEventListener('dblclick', () => {
+    panel.style.removeProperty('height');
+    panel.style.removeProperty('min-height');
+    try { localStorage.removeItem(KEY); } catch (_) {}
+    toast('↕ Altura del panel restaurada', 'success');
+  });
+})();
+
 // Activity table — clicks interactivos
 $('#actTable').addEventListener('click', e => {
   // Línea humanizada → abre detalle de cuenta

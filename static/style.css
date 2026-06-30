@@ -448,7 +448,6 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 /* ─── L invertida del SuperAdmin (spec chat2) ─── */
 .lpanel {
   padding: 10px 22px 10px;
-  border-bottom: 1px solid var(--hairline);
   display: grid;
   /* 3 cards + 2 divisores arrastrables. Anchos por defecto en fr; al arrastrar,
      el JS sobreescribe --lpc0/1/2 con px (initLpResize en app.js). */
@@ -458,6 +457,9 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
     var(--lpc2, 210px);
   gap: 0;
   min-height: 132px;
+  /* Altura ajustable vía el divisor horizontal (initLpVResize fija height inline).
+     overflow:hidden para que las cards se recorten al encoger el strip. */
+  overflow: hidden;
 }
 
 /* Divisor arrastrable entre cards — patrón Claude Desktop: barra fina que se
@@ -482,6 +484,25 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
   width: 4px; height: 58px;
   box-shadow: 0 0 8px var(--accent-glow), 0 0 2px var(--accent);
 }
+
+/* Divisor HORIZONTAL (↕) entre el strip y la tabla — ajusta la altura del strip.
+   Mismo patrón Claude Desktop pero en eje vertical. */
+.lp-vgutter {
+  height: 10px; flex-shrink: 0; position: relative;
+  cursor: row-resize; touch-action: none;
+}
+.lp-vgrip {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 38px; height: 3px; border-radius: 3px;
+  background: var(--hairline-h);
+  transition: background var(--ease-fast), width var(--ease-fast), height var(--ease-fast), box-shadow var(--ease-fast);
+}
+.lp-vgutter:hover .lp-vgrip,
+.lp-vgutter.dragging .lp-vgrip {
+  background: var(--accent);
+  width: 64px; height: 4px;
+  box-shadow: 0 0 8px var(--accent-glow), 0 0 2px var(--accent);
+}
 .lp-card {
   background: var(--surface);
   border: 1px solid var(--hairline);
@@ -490,7 +511,8 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
   backdrop-filter: blur(var(--blur));
   -webkit-backdrop-filter: blur(var(--blur));
   display: flex; flex-direction: column;
-  min-width: 0;
+  min-width: 0; min-height: 0;
+  overflow: hidden;
 }
 .lp-head {
   display: flex; align-items: center; gap: 7px;
@@ -573,8 +595,9 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 .lp-feed-rows {
   display: flex; flex-direction: column;
   gap: 3px;
-  /* NO overflow:auto — marquesina via ticker track */
-  height: 110px;   /* ~10 filas × 11px line-height ≈ 110px */
+  /* NO overflow:auto — marquesina via ticker track. flex:1 para llenar la card
+     y adaptarse al divisor horizontal (altura del strip). */
+  flex: 1; min-height: 90px;
   overflow: hidden;
   font-size: 11px;
   font-family: var(--font-mono);
@@ -621,10 +644,10 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 .lp-color-accent { color: var(--accent); }
 .lp-color-azure  { color: oklch(0.78 0.16 250); }
 
-/* Bloque 3: Recientes — sin overflow:auto, filas caben en el card */
+/* Bloque 3: Recientes — llena la card; se recorta al encoger el strip */
 .lp-alert-rows {
   display: flex; flex-direction: column; gap: 4px;
-  /* NO overflow:auto — el card limita naturalmente; JS debe ciclar si excede */
+  flex: 1; min-height: 0;
   overflow: hidden;
 }
 .lp-alert-row {
