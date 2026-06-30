@@ -5,17 +5,19 @@
 
 ## 🎯 Objetivo en curso
 
-**Tanda 4 de UI (feedback Robert AFK) — CERRADA y deployada a prod (2026-06-30).** 5 bloques vivos en `https://botmexico.com.mx` (cache-bust `20260630a`). **Robert estaba AFK; falta que la pruebe logueado y dé feedback de ajustes.**
+**TANDA 5 — vista de Cuentas (feedback Robert tras probar la tanda 4).** 10 puntos apuntados y mejorados en `docs/superpowers/specs/2026-06-30-tanda5-vista-cuentas.md`. **Robert aprobó la tanda 4 ("quedó muy bien").** La tanda 4 está cerrada/deployada (commit `b3056f1`, cache-bust `20260630a`).
 
 ## ▶ Con qué arrancas (1ra acción concreta)
 
-**Recibir el feedback de Robert tras probar la tanda 4 logueado** — en especial lo que SOLO se valida con datos reales + interacción real (drag del strip, panel acoplado a la izquierda en Logs/Actividad como SA, rail del sidebar). Si no trae ajustes, el pendiente más natural es **filtros propios del buscador** (diferido desde la tanda 3).
+**Leer `docs/superpowers/specs/2026-06-30-tanda5-vista-cuentas.md` (los 10 puntos) y atacar el P2 — paginación real.** Es lo que MÁS le preocupa: "500 / 845" muestra solo 500, esconde +300 cuentas (hipótesis: `LIMIT 500` en `GET /api/accounts`). Es BACKEND → investigar el endpoint en `app.py` + el render de pagebar, medir el universo filtrado real, y hacer que la paginación contemple el total filtrado (nunca esconder en silencio). **Antes de la cmdbar (P4), preguntar a Robert dónde reubicar Lock/Publicar a Pool/Liberar** (la banda baja a 2 botones).
 
 ## 🧭 Recomendación de approach
 
-Todo verificado objetivo (getBoundingClientRect a 1280/1536/1600 + policy del panel end-to-end con playwright sobre `static` local) + deploy hot-mount (md5 servido==repo) + smoke público verde. Lo que queda es validación de Robert con sesión real (lo interactivo/visual no se mide a ojo desde aquí sin login). Atacar lo que marque al pixel/comportamiento; el backend sigue intacto (cero cambios esta sesión).
+Orden del spec: P2 paginación (crítico/backend) → P3 permiso refresh (backend) → P4/P5 cmdbar (con la duda resuelta) → P6 densidad/tipografía + P7 selección → P8 scroll → P1/P9/P10 pulido visual. P2 y P3 tocan backend (repo canónico → deploy verificado, no monorepo). El resto es frontend con verificación objetiva (getBoundingClientRect) + deploy hot-mount. Backend de login/proxies/motor NO se toca.
 
 ## ⏳ Pendientes próximos
+
+- [ ] **TANDA 5 (vista de Cuentas) — PRIORIDAD.** 10 puntos en el spec `2026-06-30-tanda5-vista-cuentas.md`. Arrancar por P2 (paginación).
 
 - [ ] **Validación de Robert (tanda 4)** — probar logueado: ① drag de las cards del strip (intercambio); ② como SA, ir a Logs/Actividad y ver el panel de depósitos acoplado a la IZQUIERDA (sin estorbar) y que en Pool/Notif/Salud/Controles/BINes DESAPARECE; ③ rail del sidebar; ④ que la filterbar no se deforme al cambiar tamaño de ventana ni con el panel acoplado.
 - [ ] **Filtros propios del buscador** (diferido de la tanda 3). Hoy la búsqueda es dominante e ignora TODOS los filtros; el siguiente paso es darle filtros simples propios.
