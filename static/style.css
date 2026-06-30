@@ -456,11 +456,15 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
     var(--lpc1, minmax(0, 1.1fr)) var(--lp-gw)
     var(--lpc2, 210px);
   gap: 0;
-  min-height: 132px;
-  /* Altura ajustable vía el divisor horizontal (initLpVResize fija height inline).
-     overflow:hidden para que las cards se recorten al encoger el strip. */
+  /* Default COMPACTO (Robert): el strip arranca a esta altura, la tabla gana el
+     resto. Ajustable con el divisor horizontal (initLpVResize fija height inline).
+     transition para micro-animación suave en reset; se desactiva durante el drag. */
+  height: 212px;
+  min-height: 96px;
   overflow: hidden;
+  transition: height var(--ease);
 }
+.lpanel.lp-resizing { transition: none; }   /* drag = tracking directo, sin lag */
 
 /* Divisor arrastrable entre cards — patrón Claude Desktop: barra fina que se
    ilumina en verde al hover/drag. */
@@ -597,10 +601,13 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
   gap: 3px;
   /* NO overflow:auto — marquesina via ticker track. flex:1 para llenar la card
      y adaptarse al divisor horizontal (altura del strip). */
-  flex: 1; min-height: 90px;
+  flex: 1; min-height: 0;
   overflow: hidden;
   font-size: 11px;
   font-family: var(--font-mono);
+  /* Fade suave abajo: el recorte se ve estético, insinúa que hay más */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
 }
 
 /* Track interior que el JS duplica para loop sin salto */
@@ -649,6 +656,9 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
   display: flex; flex-direction: column; gap: 4px;
   flex: 1; min-height: 0;
   overflow: hidden;
+  /* Fade suave abajo: recorte estético en vez de corte duro */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
 }
 .lp-alert-row {
   font-size: 10.5px; padding: 4px 7px;
@@ -2286,6 +2296,8 @@ td.row-icons, th.row-icons-th {
   border-radius: 0 4px 4px 0;
   cursor: pointer;
   white-space: nowrap; overflow: hidden;
+  flex-shrink: 0;   /* NO aplastar: mantiene altura, el contenedor recorta */
+  min-height: 19px;
   transition: background var(--ease-fast);
 }
 .lp-recent-row:hover { background: rgba(255,255,255,0.03); }

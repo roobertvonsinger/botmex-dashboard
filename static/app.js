@@ -2473,13 +2473,15 @@ $$('.seg').forEach(seg => {
   const gutter = document.getElementById('lpVGutter');
   const main = document.getElementById('accountsMain');
   if (!panel || !gutter || !main) return;
-  const KEY = 'bmx.lpHeight.v1';
+  const KEY = 'bmx.lpHeight.v2';   // v2: ignora alturas guardadas viejas (nuevo default 212px)
   const MIN = 96;
+  const TABLE_RESERVE = 300;   // px que SIEMPRE quedan para filterbar+tabla+pagebar
   const apply = h => { panel.style.height = h + 'px'; panel.style.minHeight = h + 'px'; };
-  function maxH() { const m = main.clientHeight; return m > 300 ? m - 220 : 600; }
+  // Tope máximo: nunca dejar la tabla sin espacio. Cae a 460 si aún no hay layout.
+  function maxH() { const m = main.clientHeight; return m > (TABLE_RESERVE + MIN) ? m - TABLE_RESERVE : 460; }
   try {
     const saved = parseInt(localStorage.getItem(KEY) || '', 10);
-    if (saved > 0) apply(Math.min(Math.max(saved, MIN), 600));
+    if (saved > 0) apply(Math.min(Math.max(saved, MIN), maxH()));
   } catch (_) {}
 
   gutter.addEventListener('pointerdown', e => {
@@ -2488,6 +2490,7 @@ $$('.seg').forEach(seg => {
     const startH = panel.getBoundingClientRect().height;
     const mx = maxH();
     gutter.classList.add('dragging');
+    panel.classList.add('lp-resizing');   // sin transición durante el drag (tracking directo)
     gutter.setPointerCapture?.(e.pointerId);
     document.body.style.cursor = 'row-resize';
     document.body.style.userSelect = 'none';
@@ -2498,6 +2501,7 @@ $$('.seg').forEach(seg => {
     };
     const up = () => {
       gutter.classList.remove('dragging');
+      panel.classList.remove('lp-resizing');
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       window.removeEventListener('pointermove', move);
@@ -2508,6 +2512,7 @@ $$('.seg').forEach(seg => {
     window.addEventListener('pointerup', up);
   });
   gutter.addEventListener('dblclick', () => {
+    // Reset al default CSS (212px) con micro-animación suave (transition activa)
     panel.style.removeProperty('height');
     panel.style.removeProperty('min-height');
     try { localStorage.removeItem(KEY); } catch (_) {}
