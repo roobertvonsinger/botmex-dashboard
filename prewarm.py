@@ -577,6 +577,16 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
     if not ids:
         raise HTTPException(status_code=400, detail="account_ids requerido")
 
+    # P3 (tanda 5): solo SA refresca en bulk. Los operadores actualizan UNA cuenta
+    # a la vez (botón ↻ por fila). El refresh masivo dispara logins en lote
+    # (captcha + proxies + riesgo de rate-limit) que la capa de operador no debe
+    # orquestar. Ver feedback_capas_operador_vs_backend / project_visibilidad_roles.
+    if user.get("role") != "superadmin" and len(ids) > 1:
+        raise HTTPException(
+            status_code=403,
+            detail="Solo puedes actualizar una cuenta a la vez.",
+        )
+
     operator_id = int(user.get("telegram_id") or 0)
     if not operator_id:
         operator_id = abs(hash(user.get("username", "unknown"))) % 10_000_000

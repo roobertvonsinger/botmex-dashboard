@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/duotone/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
-<link rel="stylesheet" href="/static/style.css?v=20260630a">
+<link rel="stylesheet" href="/static/style.css?v=20260630c">
 <link rel="stylesheet" href="/static/depos.css?v=20260628e">
 </head>
 <body>
@@ -178,6 +178,36 @@
           <tbody><tr><td class="loading" colspan="6">Cargando…</td></tr></tbody>
         </table>
       </section>
+
+      <!-- Banda de selección (P4 tanda 5): EN FLUJO, arriba del paginador, ancho
+           completo (ya no flota fixed sobre la tabla). Botones por ROL (loadMe oculta
+           Pool/Asignar a no-SA) y por APLICABILIDAD (updateCmdBar muestra solo lo que
+           aplica al estado de la selección). -->
+      <div id="cmdBar" class="cmdbar hidden" role="toolbar" aria-label="Acciones de la selección">
+        <div class="cmd-left">
+          <span class="cmd-count"><b id="cmdSelCount">0</b> seleccionadas</span>
+          <span class="cmd-stats mono dim" id="cmdStats"></span>
+        </div>
+        <div class="cmd-center">
+          <button class="cmd-btn primary" id="cmdDeposit" title="Abrir / cerrar el panel de depósitos — 1 cuenta o multi (máx 5)">💳 Depositar</button>
+          <div class="cmd-lock-wrap">
+            <button class="cmd-btn" id="cmdLock" title="Aparta las cuentas para ti — nadie más las toca">🔒 Lock <span class="cmd-lock-h" id="cmdLockHours" title="Click para cambiar duración">2h</span></button>
+            <div id="lockHoursPopup" class="lock-hours-popup hidden">
+              <button class="lh-btn" data-h="1" title="1 hora">1h</button>
+              <button class="lh-btn on" data-h="2" title="2 horas (recomendado)">2h</button>
+              <button class="lh-btn" data-h="4" title="4 horas">4h</button>
+              <button class="lh-btn" data-h="8" title="Toda tu jornada">8h</button>
+              <button class="lh-btn" data-h="24" title="Día entero">24h</button>
+            </div>
+          </div>
+          <button class="cmd-btn" id="cmdTrastienda" title="Soltar al pool común — visibles para TODOS los operadores">🌐 Publicar a Pool</button>
+          <div class="cmd-release-wrap">
+            <button class="cmd-btn" id="cmdRelease" title="Asignar las seleccionadas a UN operador específico">🎯 Asignar</button>
+            <div id="releasePopup" class="release-popup hidden"></div>
+          </div>
+          <button class="cmd-btn ghost" id="cmdDeselect" title="Quitar la selección de todas (Esc)">Borrar selección</button>
+        </div>
+      </div>
 
       <div class="pagebar">
         <div class="pb-left">
@@ -423,35 +453,6 @@
           <div class="loading">Sin notificaciones.</div>
         </div>
       </section>
-    </div>
-
-    <!-- Command bar (siempre visible cuando hay selección) -->
-    <div id="cmdBar" class="cmdbar hidden">
-      <div class="cmd-left">
-        <span class="cmd-count"><b id="cmdSelCount">0</b> seleccionadas</span>
-      </div>
-      <div class="cmd-center">
-        <button class="cmd-btn primary" id="cmdDeposit" title="Abre el modal de depósito — 1 cuenta o multi (max 5)">💳 Depositar</button>
-        <div class="cmd-lock-wrap">
-          <button class="cmd-btn" id="cmdLock" title="Aparta las cuentas para ti — nadie más las toca">🔒 Lock <span class="cmd-lock-h" id="cmdLockHours" title="Click para cambiar duración">2h</span></button>
-          <div id="lockHoursPopup" class="lock-hours-popup hidden">
-            <button class="lh-btn" data-h="1" title="1 hora">1h</button>
-            <button class="lh-btn on" data-h="2" title="2 horas (recomendado)">2h</button>
-            <button class="lh-btn" data-h="4" title="4 horas">4h</button>
-            <button class="lh-btn" data-h="8" title="Toda tu jornada">8h</button>
-            <button class="lh-btn" data-h="24" title="Día entero">24h</button>
-          </div>
-        </div>
-        <button class="cmd-btn" id="cmdTrastienda" title="Toggle: visibles a operadores ↔ ocultas">📤 Trastienda</button>
-        <div class="cmd-release-wrap">
-          <button class="cmd-btn" id="cmdRelease" title="Asignar las seleccionadas a un operador específico">🎁 Liberar</button>
-          <div id="releasePopup" class="release-popup hidden"></div>
-        </div>
-        <button class="cmd-btn ghost" id="cmdDeselect" title="Quitar selección de todas (Esc)">Deseleccionar</button>
-      </div>
-      <div class="cmd-right">
-        <span class="cmd-stats mono dim" id="cmdStats"></span>
-      </div>
     </div>
   </main>
 </div>
@@ -1024,7 +1025,7 @@
 
 <script src="/static/activity_logic.js?v=20260629b"></script>
 <script src="/static/strip_logic.js?v=20260630a"></script>
-<script src="/static/app.js?v=20260630b"></script>
+<script src="/static/app.js?v=20260630c"></script>
 <script src="/static/depos_logic.js?v=20260628e"></script>
 <script src="/static/depos_window.js?v=20260630a"></script>
 <script src="/static/depos.js?v=20260628e"></script>

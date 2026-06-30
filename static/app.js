@@ -714,12 +714,12 @@ function updateCmdBar() {
     const allPub = selRowsArr.every(r => r.published_to_pool !== 0);
     const someHidden = selRowsArr.some(r => r.published_to_pool === 0);
     if (someHidden) {
-      tBtn.innerHTML = '🎁 Publicar a Pool';
-      tBtn.title = 'Hacer visibles a los operadores';
+      tBtn.innerHTML = '🌐 Publicar a Pool';
+      tBtn.title = 'Soltar al pool común — visibles para TODOS los operadores';
       tBtn.classList.add('cmd-btn-hl');
     } else {
-      tBtn.innerHTML = '📤 Quitar de Pool';
-      tBtn.title = 'Ocultar de la vista de operadores';
+      tBtn.innerHTML = '📥 Quitar de Pool';
+      tBtn.title = 'Recoger del pool — ocultarlas de la vista de operadores';
       tBtn.classList.remove('cmd-btn-hl');
     }
   }
@@ -5678,6 +5678,8 @@ document.addEventListener('keydown', e => {
 
 // Botón cmdBar — abre el modal con TODAS las seleccionadas
 $('#cmdDeposit').addEventListener('click', () => {
+  // P4: toggle — si el panel de depósitos ya está abierto, el mismo botón lo cierra
+  if (_depDrawerOpen) { closeDepositModal(); return; }
   if (selectedIds.size === 0) { toast('Selecciona al menos 1 cuenta', 'error'); return; }
   if (selectedIds.size > 5) { toast('Máximo 5 cuentas para multi', 'error'); return; }
   openDepositModal(null, { ids: [...selectedIds] });

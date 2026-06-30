@@ -151,7 +151,7 @@
 | POST | `/api/prewarm/select` | Encender prewarm para cuentas (con SSE) | require_session | `{account_ids, force?}` | `text/event-stream` | `prewarm.py:398` |
 | POST | `/api/prewarm/cancel` | Cancelar prewarm | require_session | `{account_ids}` | `{ok}` | `prewarm.py:472` |
 | GET | `/api/prewarm/status` | Estado actual | require_session | — | `{...}` | `prewarm.py:486` |
-| POST | `/api/prewarm/refresh-stream` | Re-check visible accounts (SSE) | require_session | `{account_ids}` | `text/event-stream` | `prewarm.py:507` |
+| POST | `/api/prewarm/refresh-stream` | Re-check accounts (SSE). **P3 (tanda 5): no-SA solo 1 id/request** (>1 → 403); SA puede bulk | require_session | `{account_ids}` | `text/event-stream` | `prewarm.py:569` |
 
 ---
 

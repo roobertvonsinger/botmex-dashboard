@@ -216,7 +216,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `prewarm_select` | def | L461–L531 |
 | `prewarm_cancel` | def | L535–L545 |
 | `prewarm_status` | def | L549–L564 |
-| `prewarm_refresh_stream` | def | L570–L692 |
+| `prewarm_refresh_stream` | def | L570–L702 |
 
 ### `proxy_pool.py`
 

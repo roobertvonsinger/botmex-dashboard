@@ -969,31 +969,39 @@ td.combo .copyhint { font-size: 9.5px; color: var(--text-faint); margin-left: 6p
 td.combo b:hover + .copyhint { color: var(--accent); }
 
 /* ─── Command bar (bottom, fixed) ─── */
+/* P4 (tanda 5): banda EN FLUJO, arriba del paginador, ancho completo de la zona
+   de la tabla. Ya no flota fixed sobre todo (era el "se ve mal por encima").
+   Mitad de alto que la versión vieja (padding 5px vs 10px), animación de entrada
+   suave (slide+fade) y glow más delgado/premium. Vive dentro de #accDockZone, así
+   que se comprime con el dock de depósitos igual que la tabla. */
 .cmdbar {
-  position: fixed;
-  left: calc(var(--sidebar-w) + 16px);
-  right: 16px;
-  bottom: 16px;
-  z-index: 50;
   display: flex; align-items: center; gap: 16px;
-  padding: 10px 14px;
+  width: 100%;
+  margin: 8px 0 6px;
+  padding: 5px 14px;
   background: var(--surface-elev);
   backdrop-filter: blur(var(--blur)); -webkit-backdrop-filter: blur(var(--blur));
   border: 1px solid var(--hairline-h);
-  border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(0,0,0,0.55), 0 0 24px var(--accent-glow);
+  border-radius: 11px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35), 0 0 16px var(--accent-glow);
+  animation: cmdbarIn 240ms cubic-bezier(.2,.7,.2,1);
 }
+@keyframes cmdbarIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) { .cmdbar { animation: none; } }
 .cmdbar.hidden { display: none; }
-.cmd-left { display: flex; align-items: center; gap: 10px; min-width: 140px; }
+.cmd-left { display: flex; align-items: center; gap: 12px; min-width: 150px; }
 .cmd-count { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
 .cmd-count b { color: var(--accent); font-weight: 700; font-size: 14px; margin-right: 4px; }
-.cmd-center { display: flex; gap: 8px; flex: 1; justify-content: center; }
-.cmd-right { min-width: 140px; text-align: right; }
+.cmd-stats { font-size: 12px; }
+.cmd-center { display: flex; gap: 8px; flex: 1; justify-content: center; flex-wrap: wrap; }
 .cmd-btn {
   background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
   border: 1px solid rgba(255,255,255,0.10);
   color: var(--text);
-  padding: 8px 15px;
+  padding: 6px 14px;
   border-radius: 9px;
   font: inherit; font-size: 12px; font-weight: 600;
   letter-spacing: 0.2px;
