@@ -555,10 +555,27 @@ thead th {
   font-family: var(--font-mono);
 }
 thead th.num { text-align: right; }
-tbody tr { border-bottom: 1px solid var(--hairline); }
-tbody tr:hover { background: rgba(255,255,255,0.02); }
-tbody td { padding: 4px 10px; vertical-align: middle; }
+/* Tabla (rework tanda 5): anchos medidos por columna + densidad. La columna
+   Cuenta se ajusta al combo (--combo-width); la de iconos (c-ic) absorbe el
+   sobrante a la derecha → contenido AGRUPADO a la izquierda. Medido en _harness. */
+#accTable { width: 100%; table-layout: auto; border-collapse: collapse; }
+/* Las columnas toman su contenido; la de iconos (c-ic) absorbe el sobrante como
+   MARGEN a la derecha → todo el contenido queda agrupado a la izquierda (sin el
+   hueco que dispersaba). c-cuenta se ajusta al combo (--combo-width). */
+#accTable col.c-grade  { width: 3px; }
+#accTable col.c-sel    { width: 34px; }
+#accTable col.c-saldo  { width: 108px; }
+#accTable col.c-cuenta { width: var(--combo-width, 440px); }
+#accTable col.c-dep    { width: 150px; }
+#accTable col.c-check  { width: 96px; }
+#accTable col.c-checks { width: 80px; }
+#accTable col.c-ic     { width: 100%; }
+tbody tr { border-bottom: 1px solid var(--hairline); transition: background var(--ease-fast); }
+tbody tr:hover { background: rgba(255,255,255,0.025); }
+tbody td { height: 30px; padding: 0 10px; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 tbody td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+tbody td.combo { overflow: visible; }      /* el lock-chip nunca se corta */
+tbody td.row-icons { overflow: visible; text-align: left; white-space: nowrap; }
 tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); }
 
 .grade {
@@ -959,13 +976,13 @@ th.sel-cell input[type="checkbox"] {
 th.sel-cell input[type="checkbox"]:checked {
   background: var(--accent);
 }
+/* Fila seleccionada: fondo accent suave + transición (la suavidad la da
+   `tbody tr { transition: background }`). Sin barra extra que pise la barra de
+   salud (grade) de la 1ª celda. */
 tr.row-sel { background: var(--accent-soft) !important; }
 tr.row-sel td { border-color: var(--accent-soft-2) !important; }
-/* P7 — barra accent a la izquierda de la fila seleccionada (feedback premium claro) */
-tr.row-sel td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
-/* P7 — drag-select: sin selección de texto + cursor de "celda" mientras arrastrás */
-body.dragging-sel { -webkit-user-select: none; user-select: none; cursor: cell; }
-body.dragging-sel #accTable tbody tr[data-id] { cursor: cell; }
+/* drag-select: solo bloquea selección de texto; sin cursor "cell" (se veía feo) */
+body.dragging-sel { -webkit-user-select: none; user-select: none; }
 
 /* combo cell — clickable email */
 /* P7 — toda la celda del combo copia con click izquierdo → cursor "copy" */
@@ -974,81 +991,54 @@ td.combo b:hover { color: var(--accent); }
 td.combo .copyhint { font-size: 9.5px; color: var(--text-faint); margin-left: 6px; font-family: var(--font-mono); }
 td.combo b:hover + .copyhint { color: var(--accent); }
 
-/* ─── Command bar (bottom, fixed) ─── */
-/* P4 (tanda 5): banda EN FLUJO, arriba del paginador, ancho completo de la zona
-   de la tabla. Ya no flota fixed sobre todo (era el "se ve mal por encima").
-   Mitad de alto que la versión vieja (padding 5px vs 10px), animación de entrada
-   suave (slide+fade) y glow más delgado/premium. Vive dentro de #accDockZone, así
-   que se comprime con el dock de depósitos igual que la tabla. */
-.cmdbar {
-  display: flex; align-items: center; gap: 16px;
-  width: 100%;
-  margin: 8px 0 6px;
-  padding: 5px 14px;
-  background: var(--surface-elev);
-  backdrop-filter: blur(var(--blur)); -webkit-backdrop-filter: blur(var(--blur));
+/* ─── Acciones de selección (dentro de la pagebar fusionada — rework tanda 5) ─── */
+/* La banda flotante vieja (.cmdbar) se ELIMINÓ. Las acciones viven ahora dentro
+   de la pagebar (.pb-actions), como botones compactos premium que aparecen con
+   un stagger suave cuando hay selección. Medido en _harness antes de portar. */
+.pb-selinfo { font: 600 11.5px var(--font-mono); color: var(--text-dim); white-space: nowrap; }
+.pb-selinfo b { color: var(--accent); font-weight: 700; margin-right: 2px; }
+.pb-selinfo .sum { color: var(--gold); margin-left: 2px; }
+.act {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.045);
   border: 1px solid var(--hairline-h);
-  border-radius: 11px;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.35), 0 0 16px var(--accent-glow);
-  animation: cmdbarIn 240ms cubic-bezier(.2,.7,.2,1);
-}
-@keyframes cmdbarIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@media (prefers-reduced-motion: reduce) { .cmdbar { animation: none; } }
-.cmdbar.hidden { display: none; }
-.cmd-left { display: flex; align-items: center; gap: 12px; min-width: 150px; }
-.cmd-count { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
-.cmd-count b { color: var(--accent); font-weight: 700; font-size: 14px; margin-right: 4px; }
-.cmd-stats { font-size: 12px; }
-.cmd-center { display: flex; gap: 8px; flex: 1; justify-content: center; flex-wrap: wrap; }
-.cmd-btn {
-  background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
-  border: 1px solid rgba(255,255,255,0.10);
   color: var(--text);
-  padding: 6px 14px;
-  border-radius: 9px;
-  font: inherit; font-size: 12px; font-weight: 600;
-  letter-spacing: 0.2px;
-  cursor: pointer;
-  transition: transform 140ms ease, box-shadow 200ms ease, border-color 140ms ease, background 140ms ease;
-  white-space: nowrap;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.05),
-    0 1px 2px rgba(0,0,0,0.25);
+  padding: 5px 11px; border-radius: 8px;
+  font: 600 11.5px/1 var(--font); letter-spacing: 0.1px;
+  cursor: pointer; white-space: nowrap;
+  transition: transform var(--ease-fast), background var(--ease-fast), border-color var(--ease-fast), box-shadow var(--ease-fast), filter var(--ease-fast);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
 }
-.cmd-btn:hover {
-  background: linear-gradient(180deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.02) 100%);
-  border-color: var(--accent-soft-2);
-  transform: translateY(-1px);
-}
-.cmd-btn:active { transform: translateY(0); }
-.cmd-btn.primary {
+.act .i { font-size: 12.5px; line-height: 1; }
+.act:hover { transform: translateY(-1px); background: rgba(255,255,255,0.08); border-color: var(--accent-soft-2); }
+.act:active { transform: translateY(0); }
+.act:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.act-primary {
   background: linear-gradient(180deg, var(--accent) 0%, var(--accent-mid) 100%);
-  color: #f0fff8;
-  text-shadow: 0 1px 0 rgba(0,0,0,0.40);
-  border-color: transparent;
-  font-weight: 800;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.30),
-    inset 0 -1px 0 rgba(0,0,0,0.15),
-    var(--neon-sm);
+  border-color: transparent; color: #eafff5; font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), var(--neon-sm);
 }
-.cmd-btn.primary:hover {
-  filter: brightness(1.08);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.30),
-    inset 0 -1px 0 rgba(0,0,0,0.15),
-    var(--neon-md);
+.act-primary:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), var(--neon-md); }
+.act-ghost { background: transparent; border-color: transparent; color: var(--text-muted); box-shadow: none; }
+.act-ghost:hover { background: rgba(255,255,255,0.05); color: var(--text); border-color: transparent; }
+.act.cmd-btn-hl { border-color: var(--accent-soft-2); box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 0 0 1px var(--accent-soft); }
+.act .kbd {
+  font: 600 9.5px var(--font-mono); color: rgba(255,255,255,0.55);
+  border: 1px solid rgba(255,255,255,0.18); border-radius: 4px;
+  padding: 1px 4px; margin-left: 2px;
 }
-.cmd-btn.ghost {
-  background: transparent;
-  color: var(--text-muted);
-  box-shadow: none;
+/* microanimación de entrada con stagger por hijo directo (robusto) */
+.pagebar.has-sel .pb-actions > * {
+  opacity: 0; transform: translateY(6px);
+  animation: actIn .26s var(--ease-curve) forwards;
 }
-.cmd-btn.ghost:hover { color: var(--text); }
-.cmd-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.pagebar.has-sel .pb-actions > *:nth-child(2) { animation-delay: .03s; }
+.pagebar.has-sel .pb-actions > *:nth-child(3) { animation-delay: .06s; }
+.pagebar.has-sel .pb-actions > *:nth-child(4) { animation-delay: .09s; }
+.pagebar.has-sel .pb-actions > *:nth-child(5) { animation-delay: .12s; }
+.pagebar.has-sel .pb-actions > *:nth-child(6) { animation-delay: .15s; }
+@keyframes actIn { to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .pagebar.has-sel .pb-actions > * { animation: none; opacity: 1; transform: none; } }
 
 /* ─── Toast ─── */
 .toast {
@@ -1825,27 +1815,37 @@ td.sel-cell, th.sel-cell {
 td.sel-cell:hover { background: rgba(255,255,255,0.04); }
 
 /* ─── Pagination bar ─── */
+/* ─── Barra inferior FUSIONADA (paginador + acciones) — rework tanda 5 ─── */
 .pagebar {
   display: flex; align-items: center; gap: 14px;
-  padding: 10px 18px;
-  border-top: 1px solid var(--hairline);
-  background: var(--surface);
+  padding: 7px 16px; min-height: 46px;
+  border-top: 1px solid var(--hairline-h);
+  background: var(--surface-solid);
 }
-.pb-left, .pb-right { display: flex; gap: 10px; align-items: center; flex: 1; }
-.pb-right { justify-content: flex-end; }
-.pb-center { display: flex; gap: 4px; }
+.pb-lead { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+.pb-count { font: 500 12px var(--font-mono); color: var(--text-dim); white-space: nowrap; }
+.pb-center { display: flex; gap: 3px; align-items: center; transition: opacity var(--ease-fast); }
+.pb-right { display: flex; gap: 8px; align-items: center; justify-content: flex-end; white-space: nowrap; }
+.pb-right .lbl { font: 500 11px var(--font-mono); color: var(--text-muted); }
 .pg-btn {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid var(--hairline);
-  color: var(--text);
-  padding: 5px 10px; border-radius: 6px;
-  font: inherit; font-size: 11.5px; font-family: var(--font-mono);
-  cursor: pointer; min-width: 30px;
+  background: transparent; border: 1px solid transparent; color: var(--text-dim);
+  padding: 4px 8px; border-radius: 7px; min-width: 28px;
+  font: 500 11.5px var(--font-mono); cursor: pointer;
+  transition: background var(--ease-fast), color var(--ease-fast), border-color var(--ease-fast);
 }
-.pg-btn:hover:not(:disabled) { background: rgba(255,255,255,0.08); border-color: var(--accent-soft-2); }
-.pg-btn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.pg-btn:hover:not(:disabled) { background: rgba(255,255,255,0.05); color: var(--text); }
+.pg-btn.on { background: var(--accent-soft); border-color: var(--accent-soft-2); color: var(--text); font-weight: 700; }
 .pg-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-.pg-gap { color: var(--text-muted); padding: 0 4px; }
+.pg-gap { color: var(--text-faint); padding: 0 2px; }
+.pp-sel {
+  background: rgba(255,255,255,0.04); border: 1px solid var(--hairline); color: var(--text-dim);
+  border-radius: 7px; padding: 3px 8px; font: 500 11.5px var(--font-mono); cursor: pointer;
+}
+/* acciones ocultas por default; aparecen al seleccionar */
+.pb-actions { display: none; align-items: center; gap: 7px; min-width: 0; }
+.pagebar.has-sel .pb-count { display: none; }
+.pagebar.has-sel .pb-actions { display: flex; }
+.pagebar.has-sel .pb-center { opacity: 0.45; }
 
 /* Card indicator */
 .card-ind {

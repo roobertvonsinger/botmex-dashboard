@@ -523,8 +523,19 @@ function renderTable() {
   const t = $('#accTable');
   // Calcula ancho del combo más largo (en chars) — fija la columna
   const maxComboLen = visible.reduce((m, r) => Math.max(m, (r.email||'').length + 1 + (r.password||'').length), 28);
-  // +4ch de margen — justo para no truncar, menos desperdicio horizontal
-  t.style.setProperty('--combo-width', `${Math.min(maxComboLen + 4, 60)}ch`);
+  // Ancho de la columna Cuenta = combo más largo + margen. Si alguna fila visible
+  // está lockeada, el lock-chip va en la misma celda → +16ch para que no se corte.
+  const _hasLocks = visible.some(r => r.locked_by);
+  t.style.setProperty('--combo-width', `${Math.min(maxComboLen + (_hasLocks ? 16 : 4), 72)}ch`);
+  // Colgroup (rework tanda 5): anchos medidos por columna. La columna Cuenta se
+  // ajusta al combo más largo (--combo-width); la de iconos (c-ic) absorbe el
+  // sobrante a la derecha → todo el contenido AGRUPADO a la izquierda (sin el
+  // hueco gigante que dispersaba la info). Ver _harness para la medición.
+  let colg = t.querySelector('colgroup');
+  if (!colg) { colg = document.createElement('colgroup'); t.insertBefore(colg, t.querySelector('thead')); }
+  colg.innerHTML = state.view === 'simple'
+    ? '<col class="c-grade"><col class="c-sel"><col class="c-saldo"><col class="c-cuenta"><col class="c-dep"><col class="c-ic">'
+    : '<col class="c-grade"><col class="c-sel"><col class="c-saldo"><col class="c-cuenta"><col class="c-dep"><col class="c-check"><col class="c-checks"><col class="c-ic">';
   const _th = (col, label, cls = '') => {
     const on = _sortCol === col;
     const ic = on ? (_sortDir === 1 ? ' ↑' : ' ↓') : '';
@@ -679,40 +690,38 @@ function renderStats(s) {
 // ─── command bar ───
 function updateCmdBar() {
   const n = selectedIds.size;
-  const bar = $('#cmdBar');
+  // Rework tanda 5: las acciones viven DENTRO de la pagebar (barra fusionada).
+  // `has-sel` muestra las acciones y atenúa la paginación; sin selección, la
+  // pagebar queda con "N de M" + paginador.
+  const bar = $('#pagebar');
   $('#cmdSelCount').textContent = n;
-  // Sync con drawer en modo Multi: cuando el operador tickea/destickea cuentas
-  // en la tabla atrás (drawer empuja, no bloquea), reflejamos en _depAccountIds
-  // para que renderMultiAccounts se actualice live. Solo si NO hay misión multi
-  // corriendo (durante un run, las cuentas están fijas).
   if (_depDrawerOpen && _depMode === 'multi' && !_depMmRunId) {
     _depAccountIds = [...selectedIds].slice(0, 5);
     try { renderMultiAccounts(); } catch {}
   }
-  if (n === 0) { bar.classList.add('hidden'); return; }
-  bar.classList.remove('hidden');
+  if (n === 0) { bar?.classList.remove('has-sel'); return; }
+  bar?.classList.add('has-sel');
 
-  // sumas
+  // suma de saldos de la selección (oro = dinero)
   const selRows = state.rows.filter(r => selectedIds.has(r.id));
   const totalBal = selRows.reduce((s, r) => s + (r.balance_total || 0), 0);
-  $('#cmdStats').textContent = `Σ ${fmtMoney(totalBal)}`;
+  $('#cmdStats').textContent = fmtMoney(totalBal);
 
   // Depositar visible 1-5 cuentas (>5 → tope del matchmaker)
-  $('#cmdDeposit').style.display = (n >= 1 && n <= 5) ? '' : 'none';
-  $('#cmdDeposit').textContent = n === 1 ? '💳 Depositar' : `💳 Depositar (${n})`;
+  const depBtn = $('#cmdDeposit');
+  depBtn.style.display = (n >= 1 && n <= 5) ? '' : 'none';
+  depBtn.innerHTML = `<span class="i">💳</span>Depositar${n > 1 ? ` (${n})` : ''}`;
 
-  // Label dinámico: claro qué hace según estado
+  // Label dinámico Pool: claro qué hace según estado de la selección
   const tBtn = $('#cmdTrastienda');
   if (tBtn && tBtn.style.display !== 'none') {
-    const selRowsArr = state.rows.filter(r => selectedIds.has(r.id));
-    const allPub = selRowsArr.every(r => r.published_to_pool !== 0);
-    const someHidden = selRowsArr.some(r => r.published_to_pool === 0);
+    const someHidden = selRows.some(r => r.published_to_pool === 0);
     if (someHidden) {
-      tBtn.innerHTML = '🌐 Publicar a Pool';
+      tBtn.innerHTML = '<span class="i">🌐</span>Publicar a Pool';
       tBtn.title = 'Soltar al pool común — visibles para TODOS los operadores';
       tBtn.classList.add('cmd-btn-hl');
     } else {
-      tBtn.innerHTML = '📥 Quitar de Pool';
+      tBtn.innerHTML = '<span class="i">📥</span>Quitar de Pool';
       tBtn.title = 'Recoger del pool — ocultarlas de la vista de operadores';
       tBtn.classList.remove('cmd-btn-hl');
     }

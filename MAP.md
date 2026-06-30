@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `79fa001` | feat(frontend): tanda 5 P7 — interaccion de tabla (copy izq / seleccion / detalle der / drag) |
 | `521c31c` | feat(frontend+backend): tanda 5 P4 banda seleccion rediseñada + P3 gate bulk-refresh SA |
 | `1a303e4` | feat(frontend): tanda 5 P2+P3 — paginacion real (no esconder cuentas) + Actualizar visibles solo SA |
 | `ce86801` | docs(session): apuntar TANDA 5 (vista de Cuentas) — 10 puntos de Robert + NEXT-SESSION |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `afd0e48` | feat(ui): divisor horizontal del strip (altura ajustable arrastrando arriba-abajo) |
 | `1729112` | feat(ui): RECIENTES escaneable por estado + POOL hero/barra de salud + calma motion (auditoria -> prod) |
 | `90a9032` | docs(mockup): vista principal refinada — propuesta re-estilizado (auditoria anti-burnout TDAH + senior premium) |
-| `faea768` | fix(ui): buscador a filterbar + vista unica detallada + cajas sidebar encajadas + divisores arrastrables del strip + fluidez estandar |
 <!-- GEN:end:recientes -->
 
 ---
