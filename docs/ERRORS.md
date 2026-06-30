@@ -32,6 +32,16 @@ PY
 
 **Fix (`app.py` `_build_search_clause`)**: buscador multi-campo + multi-término. Cada palabra de `q` debe matchear en ALGÚN campo (OR) y TODAS las palabras deben matchear (AND) → "Andrea García" cae en `fullname`. Términos numéricos se normalizan (sin `espacios/-//`) para matchear `card_number` por número completo / BIN / terminación. Campos: email, `fullname`, `curp`, `phone`, `password`, `address`, `account_cards.card_number`, `account_notes.note_text`+`card_number`. `base_cols` ahora devuelve `fullname/curp/phone`. Tests: `test_search.py` (5). Verificado en prod: busca por nombre, nombre+apellido, combo, BIN, terminación, tarjeta-con-espacios. **Criterio de dominio**: un operador busca una cuenta por lo que sea que recuerde de ella.
 
+## UI / layout
+
+### Pool card (3ª del strip) desbordada / "se sale de la pantalla" (2026-06-29)
+
+**Síntoma (Robert)**: el último card del strip (Pool) aparece recortado en el borde derecho de la ventana ("155 LIV" cortado, GESTIONAR POOL fuera de vista).
+
+**Causa raíz (verificada en el código, NO supuesta)**: `initLpResize()` (`static/app.js`) — cuando hay proporciones de columnas guardadas (`localStorage['bmx.lpCols.v1']`, tras un drag de los divisores), `applyRatios()` fija `--lpc0/1/2` en px a partir de `availW()`. Pero `availW()` hacía `panel.clientWidth - 2*GW` y **`clientWidth` INCLUYE el padding** del `.lpanel` (`10px 22px` → 44px horizontal). Las 3 columnas px + 2 gutters sumaban `clientWidth` (no `clientWidth - 44`) → el grid se desbordaba exactamente 44px y la 3ª card se salía; `overflow:hidden` del `.lpanel` la recortaba. Solo pasaba con ratios guardados (el default en `fr` auto-ajusta al content-box, no se desborda).
+
+**Fix**: `availW()` ahora resta el padding horizontal real (`getComputedStyle(panel).paddingLeft/Right`) además de los gutters. Auto-sana en el próximo load/resize (las ratios suman 1, se reescalan al `avail` correcto). Doble-click en un divisor restaura proporciones.
+
 ## Proxies / login
 
 ### Rate-limit 429 por golpear `/login` de más por cuenta — anti-rate-limit 3 capas (2026-06-28)

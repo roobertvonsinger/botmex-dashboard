@@ -361,6 +361,7 @@ const balanceCls = v => {
 };
 function getVisible() {
   if (state.refreshMode) return state.refreshMode.updatedRows;
+  if (searchQuery) return state.rows;  // búsqueda dominante: sin filtros locales
   return state.filterInUse ? state.rows.filter(r => r.locked_by) : state.rows;
 }
 
@@ -465,10 +466,17 @@ async function loadMe() {
 // ─── data fetchers ───
 async function fetchAccounts() {
   const url = new URL('/api/accounts', location.origin);
-  url.searchParams.set('status', state.status);
-  if (state.grade) url.searchParams.set('grade', state.grade);
-  if (searchQuery) url.searchParams.set('q', searchQuery);
-  if (state.cardsOnly) url.searchParams.set('cards_only', 'true');
+  if (searchQuery) {
+    // Búsqueda DOMINANTE: corre sobre TODOS los registros, ignorando los filtros
+    // (status/grade/con-tarjeta). Robert: "la búsqueda nunca debe entorpecerse
+    // ni por el filtro ni por la vista". Filtros propios de búsqueda = después.
+    url.searchParams.set('status', 'all');
+    url.searchParams.set('q', searchQuery);
+  } else {
+    url.searchParams.set('status', state.status);
+    if (state.grade) url.searchParams.set('grade', state.grade);
+    if (state.cardsOnly) url.searchParams.set('cards_only', 'true');
+  }
   url.searchParams.set('limit', '500');
   const r = await fetch(url);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -1102,18 +1110,24 @@ function renderActivityMarquee() {
   const rowsHtml = deduped.map(makeRow).join('');
   // Duplicar para el loop sin costura (-50% keyframe)
   host.innerHTML = `<div class="lp-ticker-track">${rowsHtml}${rowsHtml}</div>`;
+  // Marquesina lenta y legible: ~2.2s por evento (mín 30s) — adaptativo al # de
+  // eventos para que el ritmo sea constante (antes 20s fijos = veloz con 30
+  // eventos, imposible de clickear). Pausa al hover ya la maneja el CSS.
+  const track = host.querySelector('.lp-ticker-track');
+  if (track) track.style.animationDuration = Math.max(30, deduped.length * 2.2) + 's';
 }
 
+// Abre el DETALLE de una cuenta a partir de su email (marquesina / recientes).
+// Robert: "que muestre la cuenta abierta en detalles, NO buscarla — eso es torpe".
+// Sin fallback a búsqueda: si no resuelve, avisa y no ensucia la vista.
 async function openAccountByEmail(email) {
   try {
-    const r = await fetch('/api/accounts?q=' + encodeURIComponent(email));
+    const r = await fetch('/api/accounts?status=all&limit=5&q=' + encodeURIComponent(email));
     const rows = await r.json();
-    const hit = (rows || []).find(x => (x.email || '').toLowerCase() === email.toLowerCase()) || (rows || [])[0];
+    const hit = (rows || []).find(x => (x.email || '').toLowerCase() === String(email).toLowerCase()) || (rows || [])[0];
     if (hit && hit.id != null) { openDetailModal(hit.id); return; }
   } catch {}
-  // Fallback: poner el email en el buscador
-  const s = document.getElementById('searchInput');
-  if (s) { s.value = email; searchQuery = email; reload(); }
+  toast('No encontré esa cuenta', 'error');
 }
 
 function _humanizeCritical(ev) {
@@ -2038,12 +2052,36 @@ $$('.nav[data-section]').forEach(btn => {
 });
 
 let _searchTimer = null;
+// Refleja en la UI si hay búsqueda activa: la vuelve DOMINANTE (se ilumina, los
+// filtros que ya no aplican se atenúan) y muestra la X para limpiar/restaurar.
+function _reflectSearchUI() {
+  const has = !!searchQuery;
+  document.body.classList.toggle('searching', has);
+  const wrap = $('#searchInput')?.closest('.search');
+  if (wrap) wrap.classList.toggle('has-query', has);
+  const x = $('#searchClear');
+  if (x) x.style.display = has ? '' : 'none';
+}
+function _clearSearch() {
+  const si = $('#searchInput');
+  if (si) si.value = '';
+  searchQuery = '';
+  state.page = 1;
+  _reflectSearchUI();
+  reload();
+  si?.focus();   // el foco se queda en la interacción activa (la búsqueda)
+}
 $('#searchInput').addEventListener('input', e => {
   searchQuery = e.target.value.trim();
   state.page = 1;
+  _reflectSearchUI();
   if (_searchTimer) clearTimeout(_searchTimer);
   _searchTimer = setTimeout(() => reload(), 300);
 });
+$('#searchInput').addEventListener('keydown', e => {
+  if (e.key === 'Escape' && e.target.value) { e.preventDefault(); _clearSearch(); }
+});
+$('#searchClear')?.addEventListener('click', _clearSearch);
 
 // Pagination handlers
 $('#pageSize').addEventListener('change', e => {
@@ -2092,6 +2130,7 @@ $('#btnResetFilters')?.addEventListener('click', () => {
   document.querySelectorAll('.seg[data-seg="status"] button').forEach(b => b.classList.toggle('on', b.dataset.v === 'LIVE'));
   document.querySelectorAll('.seg[data-seg="grade"] button').forEach(b => b.classList.toggle('on', b.dataset.v === ''));
   $('#searchInput').value = '';
+  _reflectSearchUI();
   const lpInUse = $('#lpInUse'); if (lpInUse) lpInUse.classList.remove('lp-stat-active');
   $('#btnCardsOnly')?.classList.remove('on');
   reload();
@@ -2399,7 +2438,15 @@ $$('.seg').forEach(seg => {
     if (Array.isArray(s) && s.length === 3) ratios = s;
   } catch (_) {}
 
-  function availW() { return panel.clientWidth - 2 * GW; }
+  // Ancho disponible para las 3 cards = ancho de contenido del panel − 2 gutters.
+  // clientWidth INCLUYE el padding del .lpanel (10px 22px = 44px horizontal); si
+  // no se resta, las columnas px suman de más y la 3ª card (Pool) se desborda /
+  // se sale de la pantalla (overflow:hidden la recorta). Root cause del bug.
+  function availW() {
+    const cs = getComputedStyle(panel);
+    const pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+    return panel.clientWidth - pad - 2 * GW;
+  }
   function applyRatios() {
     if (!ratios) return;
     const avail = availW();
@@ -2531,11 +2578,13 @@ $('#actTable').addEventListener('click', e => {
   }
   const tgt = e.target.closest('.act-target');
   if (tgt && tgt.dataset.email) {
-    // Lleva a Cuentas con esa cuenta filtrada en search
+    // Lleva a Cuentas con esa cuenta buscada (dominante, ignora filtros)
     searchQuery = tgt.dataset.email.toLowerCase();
     $('#searchInput').value = tgt.dataset.email;
+    state.page = 1;
     showSection('accounts');
-    renderTable();
+    _reflectSearchUI();
+    reload();
     return;
   }
   const who = e.target.closest('.act-who');
@@ -3902,6 +3951,12 @@ document.body.addEventListener('click', e => {
   // stopPropagation suprime el handler de fila/sort de #accTable
   e.stopPropagation();
   _copyText(txt);
+  // Click sobre las LETRAS de un combo de CUENTA → además de copiar, despliega
+  // esa cuenta en detalle (Robert: "autocopia y despliega al mismo tiempo").
+  // Solo combos de cuenta: data-id (combo de la tabla) o data-email (Recientes).
+  // Los d-copy de tarjeta/CURP/pipe NO abren detalle (no tienen id/email).
+  if (t.dataset.id) openDetailModal(parseInt(t.dataset.id));
+  else if (t.dataset.email) openAccountByEmail(t.dataset.email);
 }, true);
 
 // ─── Deposit modal (3 modos: single | multi | schedule) ───

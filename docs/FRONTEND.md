@@ -29,6 +29,8 @@
   - Tamaño en sidebar: `.sb-brand img { width: 158px }` (`static/style.css`; reducido de 190px el 2026-06-29 al compactar el sidebar para que entre sin scroll). El glow verde lo da un `drop-shadow` CSS.
   - **Distinto** del avatar del panel de depósitos (`depos_avatar.png` / osito busto del modal) — ese es branding "Depos", no el logo global.
 
+- **Cenefa superior** (`.cenefa`, `index.html` primer hijo de `<body>`) — 2026-06-29. Banda delgada full-width (`--cenefa-h: 30px`) en el "top del top" con el wordmark `botmexico.com.mx` en colores de la bandera (`.g` verde / `.w` blanco / `.r` rojo) + glow verde, flanqueado por 2 puntos rojos (`.cenefa-dot`). **Recreado en texto/CSS, NO raster** — nítido a cualquier ancho, sin distorsión, theme-aware (Robert pidió "con la segunda imagen": ese PNG no estaba como asset; el wordmark CSS es fiel a la marca y mejor para una banda delgada). `.shell` pasó a `height: calc(100vh - var(--cenefa-h))`; el `.dep-drawer` y el sidebar-drawer mobile arrancan en `top: var(--cenefa-h)`. Si Robert quiere el raster exacto: dejar el PNG en `static/assets/` y cambiar `.cenefa` por un `<img>`.
+
 ## Secciones (vías `showSection(name)` — app.js:926)
 
 | Sección | Container HTML | Render | Endpoint inicial |
@@ -214,6 +216,14 @@ Reemplazó el sistema viejo (`zero`/`dim-amount`/`glow` con cortes en $5/$10). S
 
 **Online** salió del strip → sidebar (`.sb-online`), solo-SA.
 
+### Ajustes 2026-06-29 (3) — feedback Robert (cenefa + interacción cuentas)
+
+- **Cenefa superior** — ver §Branding. Banda de marca delgada en el top del top.
+- **Búsqueda DOMINANTE que ignora filtros** (`fetchAccounts` + `getVisible`). Con `searchQuery` activo, la consulta va con `status=all` y SIN `grade`/`cards_only` → corre sobre TODOS los registros (Robert: "la búsqueda nunca se entorpece ni por el filtro ni por la vista"). `getVisible()` también ignora `filterInUse` mientras hay query. La UI lo refleja (`_reflectSearchUI`): el buscador se ilumina (`.search.has-query`) y los filtros que ya no aplican se atenúan (`body.searching`). Filtros propios de búsqueda = pendiente futuro.
+- **Botón X en el buscador** (`#searchClear`): aparece con query, limpia + `reload()` + devuelve el foco al input (`_clearSearch`, también con `Esc`). Restaura la vista sin tocar los filtros previos.
+- **Botón Restaurar reubicado** (`#btnResetFilters` → dentro de `.filterbar`, junto a los filtros). Antes vivía en la `.pagebar` abajo y "nadie lo clickeaba, no se sabía qué restauraba". Ahora `.reset-btn`: atenuado en default (disabled vía `_updateResetBtn`), verde cuando hay algo que restaurar.
+- **Card del strip que se salía de pantalla** — ver `docs/ERRORS.md` §"Pool card desbordada". Root cause: `availW()` en `initLpResize` no restaba el padding del `.lpanel`.
+
 ### Ajustes 2026-06-29 (2) — feedback Robert sesión limpia
 
 - **Buscador → filterbar de Cuentas.** Salió del sidebar y se incrustó en `.filterbar` junto al `<h2>Cuentas</h2>`, antes de los filtros (`.filterbar .search.filterbar-search`). Conserva `id="searchInput"` + cableado `q=`. **Ctrl+K** ahora salta a la vista Cuentas antes de enfocar (app.js).
@@ -247,9 +257,10 @@ Cache-bust `20260629d`. Deploy KVM4 (static hot-mount) + md5 servido==repo + hea
 
 - **Dedup**: `ActivityLogic.dedupeActivity()` — key `sched_id+iter` para scheduled (colapsa el doble-evento `scheduled`/`scheduled_aborted`); key `kind+target+amount+ts_minuto` para el resto.
 - **Buffer**: 30 eventos; desfilan 10 en pantalla. Animación (desfile CSS), **sin `overflow:auto`**.
+- **Velocidad adaptativa** (2026-06-29): `renderActivityMarquee` fija `animationDuration = max(30, N*2.2)s` inline en `.lp-ticker-track` (antes 20s fijos = veloz con 30 eventos, imposible de clickear). Ritmo constante sin importar el # de eventos; pausa al hover (CSS) para clickear cómodo.
 - **Copy humano**: `ActivityLogic.formatActivityCopy(ev, viewerIsSA)` — títulares sin jerga (ver spec §9). No-SA ve "Tú" en lugar del nombre del operador.
 - **Errores críticos**: SSE `capmonster_low`/`proxy_down`/`health_warning` se convierten en `{kind:'critical_error', msg}` humanizados y se insertan en el feed.
-- **Click en fila** → `openDetailModal(email)` (abre detalle de la cuenta en `#accountsMain`). **Click en header** → `showSection('activity')` (panel completo).
+- **Click en fila** → `openAccountByEmail(email)` → resuelve email→id (`/api/accounts?status=all&q=`) y abre `openDetailModal`. **SIN fallback a búsqueda** (Robert: "no buscarla, eso es torpe"); si no resuelve → toast "No encontré esa cuenta". **Click en header** → `showSection('activity')` (panel completo).
 - Archivo de lógica pura: `static/activity_logic.js` (IIFE/UMD, testeable con `node`).
 
 ## Recientes + Marcador (`#lpRecientes`)
@@ -257,6 +268,7 @@ Cache-bust `20260629d`. Deploy KVM4 (static hot-mount) + md5 servido==repo + hea
 **Render**: `renderRecientes()`. **Source**: `GET /api/recent`.
 
 - Lista las cuentas con las que el usuario interactuó: depositó, tiene en uso (lock activo), o **fijó** (marcó).
+- **Click en la fila → copia el combo Y abre el detalle** (2026-06-29). El renglón es `.lp-recent-row.d-copy[data-email][data-copy=combo]`; el handler global de copia (capture, `app.js`) copia el combo y, al detectar `data-email`/`data-id` de cuenta, llama `openAccountByEmail`/`openDetailModal`. Mismo patrón en el **combo de la tabla** (`td.combo b[data-id]` → copia + `openDetailModal(id)`). Los `d-copy` de tarjeta/CURP/pipe NO abren detalle (no tienen id/email). Robert: "al dar click en las letras del combo, autocopia y despliega la cuenta al mismo tiempo".
 - **Botón 📌 (marcador)** (`.ic-mark`): en cada fila de tabla y en el panel de detalle. Estado activo si `markedSet.has(email)`. Click → `POST /api/marks/toggle` → actualiza `markedSet` + repinta el botón + `renderRecientes()`. NO recarga la tabla (marcar no cambia visibilidad — frictionless).
 - Marcar NO bloquea ni cambia `published_to_pool`. Es puro recordatorio privado.
 - Sin `overflow:auto` (cabe/cicla).

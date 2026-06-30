@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `145d918` | fix(ui): strip default compacto (212px) + sin distorsion de texto + limites + micro-animacion |
 | `afd0e48` | feat(ui): divisor horizontal del strip (altura ajustable arrastrando arriba-abajo) |
 | `1729112` | feat(ui): RECIENTES escaneable por estado + POOL hero/barra de salud + calma motion (auditoria -> prod) |
 | `90a9032` | docs(mockup): vista principal refinada — propuesta re-estilizado (auditoria anti-burnout TDAH + senior premium) |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `0ea3c10` | docs(bitacora): reorg UI — SSE scoped por rol, endpoints marks/recent/pool, strip 3 cards, marquesina, pool manager, panel persistente |
 | `a264a39` | fix(depos): panel persiste cross-pagina (reanchorForSection: fallback flotante fuera de Cuentas, re-acopla al volver) |
 | `b29a899` | feat(activity-panel): fetchActivity .feed + render agrupado por dia + titulares humanos + operator-filter SA-only |
-| `cfef649` | feat(pool-manager): reloadPool split + drag-drop bidireccional + multi-select + bulk; confirm al exponer, directo al sacar |
 <!-- GEN:end:recientes -->
 
 ---

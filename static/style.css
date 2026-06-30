@@ -57,6 +57,7 @@
 
   --sidebar-w: 216px;
   --topbar-h: 56px;
+  --cenefa-h: 30px;   /* banda de marca superior (top del top) */
 
   /* Easing compartido — mismo curvado que el panel de depósitos v8 (depos.css
      §--t-fast/--t). Estándar mínimo de fluidez para TODOS los controles UI. */
@@ -102,8 +103,45 @@ body.dep-drawer-pushing { padding-right: 420px; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); }
 
+/* ─── Cenefa superior (banda de marca, top del top) ───────────────────────────
+   Banda delgada full-width con el wordmark botmexico.com.mx en colores de la
+   bandera (verde/blanco/rojo) + glow verde. Texto (no raster) → nítido a
+   cualquier ancho, sin distorsión, coherente con el tema obsidian. */
+.cenefa {
+  height: var(--cenefa-h); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden; user-select: none;
+  background:
+    radial-gradient(ellipse 55% 150% at 50% 0%, oklch(0.50 0.11 160 / 0.12), transparent 70%),
+    linear-gradient(180deg, #0a0c10, #06070a);
+  border-bottom: 1px solid var(--hairline);
+}
+/* hairline verde inferior — mismo lenguaje que .sidebar::before */
+.cenefa::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-glow), transparent);
+  opacity: 0.55;
+}
+.cenefa a {
+  display: inline-flex; align-items: center; gap: 13px;
+  text-decoration: none; line-height: 1; outline: 0;
+}
+.cenefa-wm {
+  font-family: var(--font-display); font-weight: 700;
+  font-size: 14px; letter-spacing: 0.3px; white-space: nowrap;
+}
+.cenefa-wm .g { color: oklch(0.64 0.13 160); text-shadow: 0 0 6px var(--accent-glow), 0 0 14px oklch(0.50 0.11 160 / 0.30); }
+.cenefa-wm .w { color: #eef0f3; }
+.cenefa-wm .r { color: oklch(0.62 0.20 24); text-shadow: 0 0 7px oklch(0.62 0.20 24 / 0.42); }
+.cenefa-dot {
+  width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
+  background: oklch(0.62 0.20 24);
+  box-shadow: 0 0 6px oklch(0.62 0.20 24 / 0.55), 0 0 0 2px oklch(0.62 0.20 24 / 0.12);
+}
+.cenefa a:hover .cenefa-wm .g { text-shadow: 0 0 9px var(--accent), 0 0 18px var(--accent-glow); }
+
 /* ─── Shell ─── */
-.shell { display: flex; height: 100vh; }
+.shell { display: flex; height: calc(100vh - var(--cenefa-h)); }
 
 /* ─── Sidebar ─── */
 .sidebar {
@@ -320,6 +358,43 @@ body.no-kpis .filterbar .search { width: auto; flex: 1; max-width: none; }
   background: rgba(255,255,255,0.04); border: 1px solid var(--hairline);
   color: var(--text-muted);
 }
+
+/* Botón X para limpiar la búsqueda y restaurar la vista (dentro del buscador) */
+.search-clear {
+  appearance: none; border: none; background: transparent; cursor: pointer;
+  width: 18px; height: 18px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; padding: 0; line-height: 1;
+  font-size: 15px; color: var(--text-muted);
+  transition: background var(--ease-fast), color var(--ease-fast), transform var(--ease-fast);
+}
+.search-clear:hover { background: var(--accent-soft); color: var(--accent); }
+.search-clear:active { transform: scale(0.9); }
+
+/* Búsqueda DOMINANTE: cuando hay query activa, el buscador se ilumina (mantiene
+   el foco en la interacción) y los filtros que ya NO aplican se atenúan, porque
+   la búsqueda corre sobre todos los registros ignorándolos. */
+.search.has-query {
+  border-color: var(--accent);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.4), 0 0 0 3px var(--accent-soft), 0 0 18px var(--accent-soft);
+}
+.search.has-query .ico { color: var(--accent); text-shadow: 0 0 8px var(--accent-glow); }
+.search.has-query kbd { display: none; }
+body.searching .filterbar .seg[data-seg="status"],
+body.searching .filterbar .seg[data-seg="grade"] { opacity: 0.4; filter: saturate(0.5); transition: opacity var(--ease-fast); }
+
+/* Botón Restaurar — junto a los filtros, claro y visible. Atenuado en default;
+   se ilumina en verde cuando hay algo que restaurar (filtros/búsqueda activos). */
+.reset-btn { flex-shrink: 0; }
+.reset-btn:not(:disabled) {
+  color: var(--accent); border-color: var(--accent-soft-2);
+  background: var(--accent-soft);
+}
+.reset-btn:not(:disabled):hover {
+  color: var(--text); border-color: var(--accent);
+  box-shadow: 0 0 12px var(--accent-soft);
+}
+.reset-btn:disabled { opacity: 0.45; cursor: default; }
 
 .frase {
   flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; overflow: hidden;
@@ -2392,7 +2467,7 @@ td.row-icons, th.row-icons-th {
 @media (max-width: 768px) {
   /* Sidebar como drawer */
   .sidebar {
-    position: fixed; left: 0; top: 0; bottom: 0;
+    position: fixed; left: 0; top: var(--cenefa-h); bottom: 0;
     width: 260px;
     transform: translateX(-100%);
     transition: transform 240ms cubic-bezier(.2,.8,.2,1);
@@ -3371,10 +3446,10 @@ td.row-details-cell, th.row-details-th {
    ────────────────────────────────────────────────────────────────────── */
 .dep-drawer {
   position: fixed;
-  top: 0;
+  top: var(--cenefa-h);
   right: 0;
   width: 420px;
-  height: 100vh;
+  height: calc(100vh - var(--cenefa-h));
   z-index: 150;
   background: var(--surface-elev);
   backdrop-filter: blur(var(--blur));

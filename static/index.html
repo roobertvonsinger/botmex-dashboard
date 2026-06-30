@@ -16,10 +16,21 @@
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/duotone/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
-<link rel="stylesheet" href="/static/style.css?v=20260629f">
+<link rel="stylesheet" href="/static/style.css?v=20260629g">
 <link rel="stylesheet" href="/static/depos.css?v=20260628e">
 </head>
 <body>
+<!-- Cenefa superior: banda delgada full-width (top del top) con el wordmark
+     botmexico.com.mx en colores de la bandera (verde/blanco/rojo) + glow verde.
+     Recreado en texto (no raster) para quedar nítido a cualquier ancho y
+     respetar el tema obsidian. -->
+<div class="cenefa">
+  <a href="/" title="botmexico.com.mx — inicio" aria-label="botmexico.com.mx">
+    <span class="cenefa-dot"></span>
+    <span class="cenefa-wm"><span class="g">botm</span><span class="w">exico</span><span class="r">.com.mx</span></span>
+    <span class="cenefa-dot"></span>
+  </a>
+</div>
 <div class="shell">
   <aside class="sidebar">
     <div class="sb-brand"><a href="/" title="Botmexico — inicio"><img src="/static/assets/botmexico_logo.png" alt="Botmexico"></a></div>
@@ -132,9 +143,10 @@
       <div id="accDockZone">
       <section class="filterbar">
         <h2>Cuentas <span class="dim mono" id="countLabel">— / —</span></h2>
-        <div class="search filterbar-search" title="Busca lo que sea: email, tarjeta, nombre, nota… (Ctrl+K)">
+        <div class="search filterbar-search" title="Busca lo que sea: email, tarjeta, nombre, nota… (Ctrl+K) · la búsqueda corre sobre TODOS los registros, ignora los filtros">
           <span class="ico">⌕</span>
-          <input id="searchInput" placeholder="Buscar email, tarjeta, nombre, notas…">
+          <input id="searchInput" placeholder="Buscar email, tarjeta, nombre, notas…" autocomplete="off">
+          <button id="searchClear" class="search-clear" type="button" style="display:none" title="Limpiar búsqueda y restaurar la vista (Esc)" aria-label="Limpiar búsqueda">×</button>
           <kbd>Ctrl K</kbd>
         </div>
         <div class="grow"></div>
@@ -150,6 +162,7 @@
           <button data-v="C" title="🟡 Cuidado — señales raras">C</button>
           <button data-v="D" title="🔴 Pasarela quemada, no pierdas tiempo">D</button>
         </div>
+        <button class="seg-btn reset-btn" id="btnResetFilters" title="Restaurar la vista al default: LIVE, sin grade, sin búsqueda, sin orden">↺ Restaurar</button>
       </section>
 
       <section class="tablewrap">
@@ -166,7 +179,6 @@
         <div class="pb-center" id="pbPages"></div>
         <div class="pb-right">
           <button class="seg-btn" id="btnCardsOnly" title="Solo cuentas con al menos 1 tarjeta guardada (en account_cards o notas con card)">💳 Con tarjeta</button>
-          <button class="seg-btn" id="btnResetFilters" title="Volver al default: LIVE, sin grade, sin búsqueda, sin orden">↺ Restaurar</button>
           <button class="seg-btn" id="btnRefreshVisible" title="Login en vivo de las cuentas visibles — verás el progreso">↻ Actualizar visibles</button>
           <span class="dim mono">Por página</span>
           <select id="pageSize" class="seg-btn" title="Cuántas cuentas ves de un jalón">
@@ -1006,7 +1018,7 @@
 <div id="toast" class="toast hidden"></div>
 
 <script src="/static/activity_logic.js?v=20260629b"></script>
-<script src="/static/app.js?v=20260629f"></script>
+<script src="/static/app.js?v=20260629g"></script>
 <script src="/static/depos_logic.js?v=20260628e"></script>
 <script src="/static/depos_window.js?v=20260627n"></script>
 <script src="/static/depos.js?v=20260628e"></script>
