@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b3056f1` | feat(ui): tanda 4 — strip modulos intercambiables + panel por vista/rol + sidebar rail + filterbar reorg + acabados |
 | `2ca34d4` | docs(session): cierre 2026-06-29 (tanda 3 UI) — cenefa + marquesina/click + combos + busqueda dominante + fix card; pendiente feedback Robert sesion nueva |
 | `b2f56e7` | feat(ui): cenefa superior + marquesina lenta/click + combos copia+detalle + busqueda dominante + fix card desbordado |
 | `145d918` | fix(ui): strip default compacto (212px) + sin distorsion de texto + limites + micro-animacion |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `bff8657` | fix(ui): quitar 🔔/⏻ huerfanos de topbar + colapsar topbar (cards suben) + compactar sidebar sin scroll + recablear logout al sidebar |
 | `605d0aa` | docs(session): cierre 2026-06-29 — reorg UI completo (22 tasks) deployado + verificado en prod |
 | `93ef443` | fix(review): who_id en lock broadcast (consistencia visibilidad) + limpiar removeFromPool muerto + poolCountLabel |
-| `0ea3c10` | docs(bitacora): reorg UI — SSE scoped por rol, endpoints marks/recent/pool, strip 3 cards, marquesina, pool manager, panel persistente |
 <!-- GEN:end:recientes -->
 
 ---
