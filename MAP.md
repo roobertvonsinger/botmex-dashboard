@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `94fd057` | fix(flujos): auditoria 7 flujos — 3 criticos + 5 mayores (proxyless, drenaje captcha, doble cargo, caps, guardrail, auth, indice) |
 | `81ad8b5` | fix(proxy): reemplazar pool DataImpulse rotatorio por lote sticky fresco (100 sesiones) |
 | `c044428` | feat(frontend): tanda 5 P10 — vidrio + glow casino sutil (vista de Cuentas) |
 | `3d26e73` | feat(frontend): tanda 5 P1 (buscador premium + X) + P8 (memoria de vista por usuario) |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `ce86801` | docs(session): apuntar TANDA 5 (vista de Cuentas) — 10 puntos de Robert + NEXT-SESSION |
 | `4a1ab75` | docs(session): cierre 2026-06-30 (tanda 4 UI) — estado + pendientes; falta validacion logueada de Robert |
 | `b3056f1` | feat(ui): tanda 4 — strip modulos intercambiables + panel por vista/rol + sidebar rail + filterbar reorg + acabados |
-| `2ca34d4` | docs(session): cierre 2026-06-29 (tanda 3 UI) — cenefa + marquesina/click + combos + busqueda dominante + fix card; pendiente feedback Robert sesion nueva |
 <!-- GEN:end:recientes -->
 
 ---
