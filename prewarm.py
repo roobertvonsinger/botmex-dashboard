@@ -331,26 +331,34 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
     # el mismo proxy en el ApiChecker post-login (afinidad de proxy validado).
     used_proxy: Optional[str] = None
     try:
-        # Siempre login fresco (use_cache=False) — el JWT de BetMexico puede ser
-        # invalidado server-side antes de su exp local (nueva sesión desde otro IP).
-        # Reusar JWT muerto → 401 silencioso → balance_real=0 → no se actualiza nada.
-        jwt_from_cache = False
-        pool = make_pool(cap_key, size=2, workers=1)
-        await pool.prefetch(1)
-        await pool.start_factory()
-
         # gentle_login (rework 2026-05-28): reemplaza call_with_proxy_failover
         # (cuya rotación interna era ráfaga sin jitter → quemaba IPs). Añade
         # jitter anti-ráfaga + reintentos espaciados + timeout POR INTENTO (no
         # global de 25s que mataba a media-rotación). use_cache=True aprovecha
         # JWT cacheado vigente (sin captcha) en el intento 0 — updates baratos.
         # max_login_retries=5: el update solo trae balance, vale reintentar.
+        #
+        # C2 (fix 2026-07-02): NO gastar captcha si el login será cache-hit.
+        # Pre-chequeamos el JWT cache ANTES de precalentar el pool. Con JWT vigente,
+        # gentle_login reusa (0 captcha) → el prefetch(1)+factory resolvía 1 token
+        # que se tiraba a la basura en CADA cuenta cacheada (regresión de ERRORS.md
+        # "Capsolver gastado en vano"). Creamos el pool igual (defensivo: si por una
+        # carrera el cache expira justo aquí, gentle_login tiene de dónde pedir un
+        # token on-demand), pero solo lo precalentamos en cache-miss real.
+        jwt_from_cache = False
+        cached_jwt = await asyncio.to_thread(_db_get_jwt_cache, email)
+        pool = make_pool(cap_key, size=2, workers=1)
+        if not cached_jwt:
+            await pool.prefetch(1)
+            await pool.start_factory()
+
         from login_orchestrator import gentle_login
         login_res = await gentle_login(
             email, password, max_login_retries=5, throttle=True,
             pool=pool, use_cache=True,
         )
         jwt = login_res.jwt
+        jwt_from_cache = login_res.from_cache  # señal real del orquestador
         used_proxy = login_res.used_proxy
         if not jwt:
             # LOGIN_RETRY_LATER / LOGIN_DENIED / KYC_PENDING / AUTOEXCLUSION.
@@ -367,6 +375,32 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
             await asyncio.to_thread(_db_update_last_checked, email)
             return {"ok": False, "status": login_res.code or "no_jwt",
                     "error": login_res.error or login_res.code or "Login falló"}
+
+        # ── C1 (fix 2026-07-02): NUNCA proxyless contra BetMexico (ley Robert) ──
+        # En cache-hit gentle_login NO trae proxy (used_proxy=None) → tanto
+        # check_autoexclusion como el fetch de balance saldrían con la IP REAL del
+        # server. Tomamos un proxy del pool (mismo patrón que
+        # deposits._acquire_session_and_begin). Pool vacío → abortar el update:
+        # jamás exponer la IP real, mejor no actualizar esta vuelta.
+        if not used_proxy:
+            try:
+                from proxy_pool import shuffled_proxy_urls
+                _urls = shuffled_proxy_urls()
+            except Exception:
+                _urls = []
+            if _urls:
+                import random
+                used_proxy = random.choice(_urls)
+            else:
+                await asyncio.to_thread(_db_update_last_checked, email)
+                _db_log_phase(
+                    process_id, "no_proxy",
+                    {"email": email, "operator_id": operator_id,
+                     "reason": "pool vacio — no se actualiza proxyless"},
+                    int((time.time() - t0) * 1000),
+                )
+                return {"ok": False, "status": "no_proxy",
+                        "error": "Sin proxy disponible — update omitido (no exponer IP)"}
 
         # ── Gate de autoexclusión (update) ────────────────────────────────
         # BetMexico entrega JWT válido a cuentas autoexcluidas, pero son basura
@@ -437,7 +471,7 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
         )
         # Actualizar last_checked_at para que el anti-spam detecte el intento fallido
         await asyncio.to_thread(_db_update_last_checked, email)
-        return {"ok": False, "status": "timeout", "error": "Timeout 25s"}
+        return {"ok": False, "status": "timeout", "error": "Timeout 12s"}
     except Exception as e:
         logger.error(f"[Prewarm] {email}: {e}")
         _db_log_phase(

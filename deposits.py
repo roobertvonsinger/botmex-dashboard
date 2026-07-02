@@ -1564,6 +1564,19 @@ def _mm_is_real_decline(code: str) -> bool:
     u = (code or "").upper()
     return any(k in u for k in ("BANK_REJECT", "INSUF", "EXPIRED", "DECLINE"))
 
+
+def _mm_is_ambiguous_charge(code: str) -> bool:
+    """True si el code refleja un cargo que PUDO aplicarse pero quedó sin confirmar:
+    - SUBMIT_ERROR: submit_card lanzó excepción DESPUÉS de que la tarjeta ya viajó
+      al procesador (blip de red post-envío).
+    - UNKNOWN_TXN_STATUS_n: el procesador aprobó (resultCode=BANK_APPROVED) pero
+      BetMexico devolvió un transactionStatus fuera de {6,0,-4}.
+    Reintentar el par re-ejecutaría submit_card = riesgo de DOBLE CARGO. Se trata
+    como TERMINAL (no reintentar), sin strike a la tarjeta (no es rechazo real).
+    Regla Robert: submit NUNCA se reintenta; begin sí (es pre-cobro)."""
+    u = (code or "").upper()
+    return u == "SUBMIT_ERROR" or u.startswith("UNKNOWN_TXN_STATUS")
+
 MM_COOLDOWN = 60
 # Segundos. Piso entre reusos de la MISMA tarjeta o cuenta (se evalúa al armar el
 # batch: una tarjeta/cuenta no vuelve a entrar antes de MM_COOLDOWN desde su último
@@ -1784,7 +1797,12 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
 
         try:
             # Init pool INSIDE try so auto_lock is released in finally if start_factory fails
-            pool = make_pool(cap_key, size=max(2, len(cards)), workers=1)
+            # M5 (fix 2026-07-02): dimensionar por LOGINS concurrentes (min de cuentas
+            # y tarjetas), no por # de tarjetas. Los tokens los consumen los logins, no
+            # las tarjetas; máx logins frescos simultáneos = min(accounts, cards).
+            # size=len(cards) mantenía decenas de tokens calientes toda la misión (el
+            # factory regenera al expirar) para ~3-5 logins reales = captcha drenado.
+            pool = make_pool(cap_key, size=max(2, min(len(accounts), len(cards))), workers=1)
             await pool.start_factory()
             prefetch = asyncio.create_task(pool.prefetch(min(len(accounts), len(cards))))
 
@@ -2025,8 +2043,18 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                         if acct_out:
                             acc["done"] = True
                         yield f"data: {json.dumps({'type':'rejected','email':acc['email'],'tail':card['tail'],'code':code,'card_fails':card['fail_count'],'acct_fails':acc['fail_count'],'attempt':n,'card_out':card_out,'acct_out':acct_out})}\n\n"
+                    elif _mm_is_ambiguous_charge(code):
+                        # CARGO AMBIGUO (SUBMIT_ERROR / UNKNOWN_TXN_STATUS_n): el
+                        # submit ya viajó o la txn quedó en estado desconocido → el
+                        # cargo PUDO aplicarse. Reintentar re-ejecutaría submit_card
+                        # = DOBLE CARGO. Se abandona el par SIN strike (no es rechazo
+                        # de la tarjeta); el intento queda en deposit_attempts con su
+                        # code para revisión manual. Se emite 'retry' exhausted (el
+                        # frontend ya cierra la fila) con flag 'ambiguous'.
+                        tried.add((card["num"], acc["id"]))
+                        yield f"data: {json.dumps({'type':'retry','email':acc['email'],'tail':card['tail'],'code':code,'attempt':n,'exhausted':True,'ambiguous':True,'reason':'cargo sin confirmar — no se reintenta (evita doble cargo), revisar manual'})}\n\n"
                     else:
-                        # TRANSITORIO (gateway 50x/timeout/ERROR/SUBMIT/BEGIN = nuestro
+                        # TRANSITORIO (gateway 50x/timeout/ERROR/BEGIN = nuestro
                         # lado) → NO se marca tried: el par se reintenta tras cumplir su
                         # cooldown (last_used ya aplicó 60s = "al final de la cola").
                         # Tope por par para no loopear si algo está roto de raíz.
@@ -2137,6 +2165,14 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
     email = row["email"]
     password = row["password"]
     cap_key = os.environ.get("CAPMONSTER_KEY", "") or os.environ.get("BMX_CAPMONSTER_KEY", "")
+
+    # M1 (fix 2026-07-02): el cap agregado 24h (DEP_MAX_24H) NO se validaba en
+    # scheduled — solo el por-txn (arriba). Una misión de N reps × monto podía
+    # exceder el tope diario (ej. 4×$490=$1960 > $1499, o 20 reps ≈ $9980). Se
+    # proyecta el total de la misión (reps-1 extra sobre el intento base).
+    cap_err = _check_caps(email, amount, projected_extra=amount * (repetitions - 1))
+    if cap_err:
+        raise HTTPException(400, cap_err)
 
     # Velocity check al crear el schedule (no en cada iter — misma cuenta+tarjeta
     # no dispara velocity, solo si la tarjeta se usó en OTRA cuenta hace <60s).
@@ -2337,9 +2373,12 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                         **_resolve_who(operator_id),
                     })
                     break
-                # Rechazo REAL (banco/tarjeta), muerte real, o pendiente-no-aplicado
-                # (este último: NO reintentar para evitar doble cargo) → detener.
-                if _mm_is_real_decline(code) or code in MM_DEAD_RC or code == "PENDING_NOT_APPLIED":
+                # Rechazo REAL (banco/tarjeta), muerte real, pendiente-no-aplicado, o
+                # CARGO AMBIGUO (SUBMIT_ERROR / UNKNOWN_TXN_STATUS: el cargo PUDO
+                # aplicarse) → detener SIN reintentar, para no re-ejecutar submit_card
+                # y provocar un doble cargo.
+                if (_mm_is_real_decline(code) or code in MM_DEAD_RC
+                        or code == "PENDING_NOT_APPLIED" or _mm_is_ambiguous_charge(code)):
                     _broadcast({
                         "type": "activity", "kind": "scheduled",
                         "sched_id": sched_id, "iter": iter_num, "total": repetitions,

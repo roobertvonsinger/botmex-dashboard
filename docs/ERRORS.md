@@ -2,6 +2,49 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## Auditoría de flujos BetMexico (2026-07-02) — 3 críticos + 5 mayores
+
+Auditoría estática de los 7 flujos que tocan BetMexico (login, depósito único, matchmaker, scheduled, prewarm, cuentas, grading) + diagnóstico de datos de prod. Contexto medido en BD: aprobación cayó de 26.7% (30d) a 2.2% (7d, casi todo pool viejo degradado); con el pool sticky nuevo (`81ad8b5`) el error dominante pasó de reputación-de-IP a **429 rate-limit por cadencia** (11/15 intentos en 12h) → el cuello ya no es el proveedor, es el pacing del código. `duration_ms` promedio por intento = 22s (máx 86s); `captcha_cost` = 0.0 siempre (nunca se instrumentó — por eso el drenaje pasaba invisible).
+
+### [CRÍTICO] Prewarm hacía fetch PROXYLESS en cache-hit — filtraba la IP real (`prewarm.py`)
+- **Síntoma**: "Actualizar visibles" con JWT cacheado (caso dominante) → `gentle_login(use_cache=True)` retorna sin `sticky_session` → `used_proxy=None` → `check_autoexclusion(proxy=None)` y `BetmexicoApiChecker(proxy=None)` salían **sin proxy = IP real del server expuesta** en cada cuenta cacheada. `deposits._acquire_session_and_begin` sí blindaba esto; prewarm no.
+- **Fix** (`_run_prewarm`): guard tras validar JWT — `if not used_proxy: used_proxy = random.choice(shuffled_proxy_urls())`; pool vacío → abortar el update (status `no_proxy`), jamás proxyless. Viola/cumple la ley Robert "Prod NUNCA proxyless".
+
+### [CRÍTICO] Prewarm quemaba 1 captcha por cuenta cacheada — drenaje invisible (`prewarm.py`)
+- **Síntoma**: `make_pool` + `prefetch(1)` + `start_factory()` se ejecutaban SIEMPRE, antes de que `gentle_login(use_cache=True)` consultara el cache. En cache-hit el login no toca el pool → el token resuelto se tira en `finally: pool.stop()`. Regresión del fix documentado ("Capsolver gastado en vano"). Con N cuentas cacheadas = N solves CapMonster tirados.
+- **Fix**: pre-chequear `_db_get_jwt_cache(email)` antes de precalentar el pool; el `prefetch`+`factory` solo corre en cache-miss real. `jwt_from_cache` ahora refleja `login_res.from_cache` (antes siempre False).
+
+### [CRÍTICO] Doble cargo potencial: `SUBMIT_ERROR`/`UNKNOWN_TXN_STATUS_n` se reintentaban (`deposits.py`)
+- **Síntoma**: en los loops de matchmaker (`multi_stream`) y scheduled, `SUBMIT_ERROR` (submit ya viajó al procesador) y `UNKNOWN_TXN_STATUS_n` (procesador aprobó pero txnStatus fuera de {6,0,-4}) caían al bucket **transitorio** → re-ejecutaban `begin+submit` = re-cargo sobre una tarjeta que **pudo ya haberse cobrado**. Viola "submit NUNCA se reintenta; begin sí (pre-cobro)". Convergencia de 3 auditores.
+- **Fix**: nuevo clasificador `_mm_is_ambiguous_charge(code)` (`SUBMIT_ERROR` | `UNKNOWN_TXN_STATUS*`). Matchmaker: rama terminal que abandona el par SIN strike (no es rechazo real) y emite `retry` exhausted con flag `ambiguous`. Scheduled: añadido a la condición de detención junto a real-decline/DEAD/PENDING. El intento queda en `deposit_attempts` con su code para revisión manual.
+
+### [MAYOR] Scheduled no aplicaba el cap DEP_MAX_24H (`deposits.py` `scheduled_create`)
+- **Síntoma**: solo validaba `amount > DEP_MAX_PER_TXN` (por-txn). Una misión de N reps × monto saltaba el agregado 24h (4×$490=$1960 > $1499; 20 reps ≈ $9980) — abre justo el patrón anti-detección que el cap busca evitar.
+- **Fix**: `_check_caps(email, amount, projected_extra=amount*(repetitions-1))` al crear el schedule (el parámetro `projected_extra` existía documentado justo para esto).
+
+### [MAYOR] Captcha pool del matchmaker dimensionado por # tarjetas, no por logins (`deposits.py:1800`)
+- **Síntoma**: `size=max(2, len(cards))` (hasta 10) mantenía decenas de tokens calientes toda la misión (el factory regenera al expirar cada 55s) para ~3-5 logins reales. Los tokens los consumen los logins, no las tarjetas. Mismo patrón de drenaje que ya se corrigió en scheduled.
+- **Fix**: `size=max(2, min(len(accounts), len(cards)))` (dimensiona por logins concurrentes).
+
+### [MAYOR] `/api/pool/publish` ocultaba cuentas lockeadas → cuenta fantasma (`app.py`)
+- **Síntoma**: "GESTIONAR POOL → ocultar" hacía `published_to_pool=0` incluso a cuentas lockeadas/RESERVADA_SA → quedaban `published=0 + locked_by NOT NULL` = invisibles para todos hasta republicar. Los endpoints gemelos (`/accounts/publish`, `/accounts/hide-all`) sí tenían el guardrail A1.
+- **Fix**: al ocultar (`publish=0`), `AND locked_by IS NULL` en el UPDATE (mismo guardrail A1). `moved` reporta solo las realmente movidas.
+
+### [MAYOR] Login del dashboard: default fail-open con password vacío (`app.py` `/api/auth/login`)
+- **Síntoma**: `if sha256(password) != stored and password != master` con `master=os.environ.get("BMX_MASTER","")`. Con la env var sin definir (default `""`), un `password:""` cumplía `"" == master == ""` → login como cualquier usuario, incl. superadmin. HOY prod tiene `BMX_MASTER` seteado (no explotable), pero el default reabría el agujero en cualquier redeploy sin la var.
+- **Fix**: rechazar password vacío SIEMPRE y aceptar el master solo si está configurado: `pwd_ok = sha256(password)==stored or (bool(master) and password==master); if not password or not pwd_ok: 401`. Verificado con 6 casos.
+
+### [MAYOR] `recalc_grade_from_db` hacía full-scan de `account_transactions` (`web_grading.py`)
+- **Síntoma**: `WHERE LOWER(account_email)=LOWER(?)` sin índice → full-scan O(N) en cada login/check/depósito/watchdog; crece con el historial.
+- **Fix**: índice funcional aditivo en `_migrate` (`app.py`): `CREATE INDEX IF NOT EXISTS idx_acct_txn_email_lower ON account_transactions(LOWER(account_email))`. Verificado con `EXPLAIN QUERY PLAN` → `SEARCH ... USING INDEX idx_acct_txn_email_lower`.
+
+### Pendientes de la misma auditoría (decisión de Robert / siguiente iteración)
+- **M3** `/refresh-stream` sin anti-spam por cuenta — DECISIÓN: ¿"Actualizar visibles" debe respetar un cooldown de 30s o siempre forzar live? (con C1+C2 el costo por click ya bajó mucho).
+- **M4** `REFRESH_PARALLEL=8` sin stagger inter-task — ráfaga en cache-miss masivo; medir 429 real con el pool nuevo antes de tocar.
+- **M7** grade `B` absorbe masacres recientes (15-59 días) etiquetándolas "alta probabilidad de éxito" — rebalanceo de umbrales V10 (criterio de negocio).
+- **M9** `web_auth.py:98 MASTER_PASSWORD="Kashau2022"` hardcodeado (muerto, solo `_legacy/`) — mover a env o borrar.
+- **Menores** (15): `captcha_cost` nunca se escribe (instrumentar para medir el drenaje), `deposit_attempts.source` siempre `manual_single` (analítica ciega por flujo), código muerto (`_drain_stale_tokens`/`_ensure_fresh_captcha`, `_get_grade`, constantes prewarm), `velocity_skip` duerme 30s dentro del `gather` (estanca el batch), balance_before/after siempre NULL, proxy/IP visible al rol admin, etc.
+
 ## Datos / integridad
 
 ### "18 aprobadas en BINes pero 0 cuentas con esa tarjeta" — 2 problemas distintos (2026-06-28)

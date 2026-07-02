@@ -192,6 +192,19 @@ def _migrate():
     except sqlite3.OperationalError as e:
         if "no such" not in str(e):
             raise
+    # M8 (fix 2026-07-02): índice funcional para recalc_grade_from_db, que filtra
+    # WHERE LOWER(account_email)=LOWER(?) sobre account_transactions en cada login/
+    # check/depósito/watchdog. Sin índice = full-scan O(N) que crece con el historial.
+    # El índice sobre LOWER(account_email) es sargable para ese WHERE (aditivo).
+    try:
+        with db(write=True) as c:
+            c.execute(
+                "CREATE INDEX IF NOT EXISTS idx_acct_txn_email_lower "
+                "ON account_transactions(LOWER(account_email))"
+            )
+    except sqlite3.OperationalError as e:
+        if "no such table" not in str(e):
+            raise
 
 
 _migrate()
@@ -360,8 +373,14 @@ async def auth_login(request: Request, response: _Response):
     if stored is None:
         return JSONResponse({"first_time": True, "display": _auth.USERS[username]["display"]})
 
+    # M6 (fix 2026-07-02): rechazar password vacío SIEMPRE y aceptar el master solo
+    # si está configurado. Antes, con BMX_MASTER sin definir (default ""), un
+    # password vacío pasaba ("" == master == "") = login como cualquiera, incl. el
+    # superadmin. Hoy prod tiene BMX_MASTER seteado (no explotable), pero el default
+    # era fail-open: un redeploy sin la env var reabría el agujero.
     master = os.environ.get("BMX_MASTER", "")
-    if _auth.sha256(password) != stored and password != master:
+    pwd_ok = _auth.sha256(password) == stored or (bool(master) and password == master)
+    if not password or not pwd_ok:
         raise HTTPException(status_code=401, detail="Contraseña incorrecta")
 
     token = _auth.create_session(username)
@@ -2023,10 +2042,21 @@ def api_pool_publish(payload: dict, user: dict = Depends(require_session)):
         return {"moved": 0}
     with db(write=True) as c:
         qmarks = ",".join("?" for _ in emails)
-        c.execute(
-            f"UPDATE accounts SET published_to_pool=? WHERE email IN ({qmarks})",
-            (publish, *emails),
-        )
+        if publish:
+            c.execute(
+                f"UPDATE accounts SET published_to_pool=1 WHERE email IN ({qmarks})",
+                (*emails,),
+            )
+        else:
+            # M2 (fix 2026-07-02): al OCULTAR del pool NO tocar cuentas lockeadas /
+            # RESERVADA_SA (locked_by NOT NULL). Sin este guardrail quedaban fantasma
+            # (published=0 + locked) e invisibles para todos hasta republicar —
+            # mismo guardrail A1 que /accounts/publish y /accounts/hide-all.
+            c.execute(
+                f"UPDATE accounts SET published_to_pool=0 "
+                f"WHERE email IN ({qmarks}) AND locked_by IS NULL",
+                (*emails,),
+            )
         moved = c.execute("SELECT changes()").fetchone()[0]
     _broadcast({
         "type": "activity", "kind": "pool_move",
