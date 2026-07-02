@@ -99,7 +99,7 @@ prewarm.py (router)
 | `deposits.py` | 2492 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `login_orchestrator.py` | 392 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 702 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
-| `proxy_pool.py` | 333 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `proxy_pool.py` | 342 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c044428` | feat(frontend): tanda 5 P10 — vidrio + glow casino sutil (vista de Cuentas) |
 | `3d26e73` | feat(frontend): tanda 5 P1 (buscador premium + X) + P8 (memoria de vista por usuario) |
 | `b3bf565` | feat(frontend): tanda 5 — layout de columnas 2-bloques + iconos Nota|tarjetas|pin |
 | `3cdfe06` | feat(frontend): rework premium tanda 5 — barra fusionada + tabla densa/agrupada (P4/P6) |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `b3056f1` | feat(ui): tanda 4 — strip modulos intercambiables + panel por vista/rol + sidebar rail + filterbar reorg + acabados |
 | `2ca34d4` | docs(session): cierre 2026-06-29 (tanda 3 UI) — cenefa + marquesina/click + combos + busqueda dominante + fix card; pendiente feedback Robert sesion nueva |
 | `b2f56e7` | feat(ui): cenefa superior + marquesina lenta/click + combos copia+detalle + busqueda dominante + fix card desbordado |
-| `145d918` | fix(ui): strip default compacto (212px) + sin distorsion de texto + limites + micro-animacion |
 <!-- GEN:end:recientes -->
 
 ---

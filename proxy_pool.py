@@ -51,28 +51,37 @@ EXTRA_ADMIN_PROXIES: List[Dict[str, str]] = [
 
 # Data Impulse (Premium MX residencial) — PRIMARIO. Host/user/pass FIJOS; el PUERTO
 # define el modo:
-#   - 10000..10049 = 50 sesiones STICKY (IP pegada ~2 min cada puerto). Config previa
-#     (2026-06-24). Esas 50 IPs se QUEMARON con el uso (logins + un health check que
-#     las machacaba 150k veces/sem contra ipinfo) → 406/429 masivo desde ~26-jun.
-#   - 823 = ROTATORIO nacional MX: IP FRESCA en cada request. Robert lo dio 2026-06-28;
-#     probado en vivo (login directo, cuenta real) → LIVE al 1er intento. Se adopta como
-#     pool primario porque no se queda pegado a IPs quemadas.
-# El sufijo `__cr.mx` en el username fuerza país México. COUNT = nº de copias del
-# rotatorio = PESO del pool (DataImpulse domina vs NodeMaven degradado). Cada copia es
-# el MISMO endpoint rotatorio; el rotador asigna IP distinta por request/conexión.
+#   - 10000..10049 (lote viejo, credenciales `edb0501e...`) = 50 sesiones STICKY.
+#     Se QUEMARON con el uso (logins + un health check que las machacaba 150k
+#     veces/sem contra ipinfo) → 406/429 masivo desde ~26-jun.
+#   - 823 (mismo lote viejo) = ROTATORIO nacional MX, adoptado 2026-06-28 como fix.
+#     Sano en uptime (12/12→200, 0% 504) pero un benchmark independiente (Proxyway
+#     2026, ver research proveedores 2026-07-01) midió el PEOR fraud/risk score del
+#     mercado (3.9) para el pool base de DataImpulse sin el toggle "IP quality" —
+#     coincide con la degradación medida en prod la semana del 2026-06-24 (tasa de
+#     login exitoso cayendo de ~50%/intento a ~30%/intento).
+#   - 10000..10099 (LOTE NUEVO 2026-07-01, credenciales `506e02a6...`, dado por
+#     Robert) = 100 sesiones STICKY FRESCAS, nunca usadas. Reemplaza el pool 823
+#     como PRIMARIO. Objetivo: recuperar el p≈50%/intento que sí se midió viable en
+#     mayo con sticky fresca (vs. rotativo genérico degradado). Vigilar: si este
+#     lote se empieza a quemar (406/429 subiendo otra vez), la causa mecánica ya
+#     está identificada de antemano — no re-investigar desde cero, ver
+#     docs/plans/login-orchestration-rework.md §6 (StickySessionManager) y pedir
+#     lote nuevo en vez de forzar reuso de sesiones muertas.
+# El sufijo `__cr.mx` en el username fuerza país México.
 _DATAIMPULSE_HOST = "gw.dataimpulse.com"
-_DATAIMPULSE_USER = "edb0501e430b94a664c0__cr.mx"
-_DATAIMPULSE_PASS = "e689a5016d540f47"
-_DATAIMPULSE_ROTATING_PORT = 823
-_DATAIMPULSE_COUNT = 50  # copias del rotatorio (peso en el pool, no IPs distintas fijas)
+_DATAIMPULSE_USER = "506e02a6444effce62de__cr.mx"
+_DATAIMPULSE_PASS = "59bd44415b7b9c7c"
+_DATAIMPULSE_STICKY_PORT_START = 10000
+_DATAIMPULSE_STICKY_PORT_END = 10099  # 100 sesiones sticky (lote fresco 2026-07-01)
 
 DATAIMPULSE_PROXIES: List[Dict[str, str]] = [
     {
-        "server": f"{_DATAIMPULSE_HOST}:{_DATAIMPULSE_ROTATING_PORT}",
+        "server": f"{_DATAIMPULSE_HOST}:{port}",
         "username": _DATAIMPULSE_USER,
         "password": _DATAIMPULSE_PASS,
     }
-    for _ in range(_DATAIMPULSE_COUNT)
+    for port in range(_DATAIMPULSE_STICKY_PORT_START, _DATAIMPULSE_STICKY_PORT_END + 1)
 ]
 
 # Hosts excluidos del pool — proxies con reputación quemada para el reCAPTCHA

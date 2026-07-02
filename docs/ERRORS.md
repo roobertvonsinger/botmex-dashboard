@@ -75,6 +75,18 @@ PY
 
 **Fix** (2026-06-28): mismo DataImpulse, **puerto rotatorio `823`** (IP fresca por request) en vez de las 50 sticky ([proxy_pool.py](../proxy_pool.py) `_DATAIMPULSE_ROTATING_PORT`). Probado en vivo: `LIVE` al 1er intento (aislado). **OJO cadencia**: BetMexico rate-limita **ráfagas** aunque la IP rote (4 logins en 20s → 429). El matchmaker con cooldown 60s espacia y opera bien con 1 tarjeta; con muchas tarjetas en paralelo, vigilar el 429 de ráfaga.
 
+### Pool rotatorio `823` se degradó en silencio — mala reputación estructural, no solo uso (2026-07-01)
+
+**Síntoma**: tasa de login exitoso midió ~26.7% en 30 días pero solo ~2.3% en los últimos 7 días (query directa a `deposit_attempts`, no estimado). Fallos por `RETRY_CAPTCHA` agotado subieron de ~24% del total (30d) a ~41% (7d).
+
+**Causa raíz (deep research de proveedores, 2026-07-01 — no solo el uso propio del pool)**: benchmark independiente (Proxyway, "Proxy Market Research 2026") midió que el pool base de DataImpulse (sin activar su toggle "IP quality", que nunca se activó en este proyecto) tiene el **peor fraud/risk score del mercado comparado (3.9)** — peor que Oxylabs, Decodo, Webshare, IPRoyal — y 49.6% del pool "residencial" es detectado como no-residencial por herramientas externas de reputación. El modo rotatorio puro (puerto `823`) generaba una IP nueva por request, pero del mismo pool con mala reputación de base — "rotar" no arregla una reputación estructuralmente mala, solo la reparte. Además la doc oficial de DataImpulse confirma que bloquean por defecto tráfico hacia "banking and payment websites" (riesgo silencioso adicional, sin confirmar si `betmexico.mx` cae en esa categoría).
+
+**Fix** (2026-07-01): Robert entregó un **lote nuevo de 100 sesiones STICKY frescas** (puertos `10000-10099`, credenciales nuevas — el lote viejo de `10000-10049` sigue muerto/quemado, NO reusar) para reemplazar el pool `823` como primario ([proxy_pool.py](../proxy_pool.py) `_DATAIMPULSE_STICKY_PORT_START/END`). Objetivo: recuperar el p≈50%/intento que sí se midió viable en mayo con sticky fresca (vs. el ~30%/intento medido con el rotativo degradado). Deployado + container reiniciado (`docker compose kill -s SIGKILL web && up -d web`, evita el hang conocido de SSE en restart normal).
+
+**Verificación en vivo** ✅ (15 puertos muestreados del lote nuevo, espaciados cada 7, contra target neutral `api.ipify.org`): 15/15 → 200, 0% error, **15 IPs mexicanas distintas** (rangos Telmex/Izzi/residenciales: 187.x, 189.x, 148.x, 149.x, 177.x), sin repetidos.
+
+**Pendiente / vigilar**: (1) este lote es sticky por diseño (IP pegada por sesión/puerto) — si se empieza a quemar con el uso real (406/429 subiendo otra vez), la causa mecánica ya está identificada de antemano, no re-investigar desde cero: pedir lote nuevo, no forzar reuso. (2) activar el toggle "IP quality" de DataImpulse en el panel del proveedor (no verificable por código, requiere acceso al dashboard de DataImpulse). (3) confirmar con soporte de DataImpulse si `betmexico.mx` cae en su blocklist de payment sites. (4) `StickySessionManager` (`login_orchestrator.py`, ver `docs/plans/login-orchestration-rework.md` §6) sigue sin cablear este lote de forma explícita con expiración/descarte — hoy el pool nuevo entra por `all_proxies()`/`call_with_proxy_failover` genérico, no por el manager dedicado a sticky.
+
 ## Backend
 
 ### Scheduled se paraba "de volada" cuando el captcha no resolvía
