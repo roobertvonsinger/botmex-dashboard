@@ -92,7 +92,7 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2830 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2835 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b1907c3` | fix(frontend): click en combo/celda abre La Pantalla (no copia) + exclusion mutua con acordeon viejo |
 | `d0af096` | docs(session): cierre 2026-07-03 — Fase A+B completas, proxima sesion = AUDITORIA |
 | `5a1acb1` | feat(pantalla): Fase B — click izquierdo abre La Pantalla + seleccion tipo Excel |
 | `ee17523` | feat(pantalla): Fase A — densidad + dedup + acabado perla + controles manita |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `5da9ede` | chore(pantalla): cache-bust app.js (v20260703a) para cargar window.__pat en prod |
 | `c55a1f0` | feat(pantalla): contextmenu → detalle (cabecera + 2 secciones txn botmexico/betmexico) |
 | `c842dc3` | feat(pantalla): lamina ambar + materializacion (despliegue de manta + scanline) |
-| `3bd728e` | feat(pantalla): markup del contenedor #pantalla + carga de assets |
 <!-- GEN:end:recientes -->
 
 ---

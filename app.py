@@ -2384,9 +2384,12 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                 })
                 # Firma para dedup: aprobados y rechazados se reflejan en BetMexico
                 # (status 6 y -4). Los 3DS/pending no generan txn → no se firman.
+                # Guardamos también el ESTADO (ok/fail): el eco debe COINCIDIR en estado.
+                # Sin esto, una firma 'fail' podía consumir un depósito APROBADO real y
+                # ocultarlo de la vista (fix 2026-07-03, auditoría hallazgo #2).
                 if state in ("ok", "fail"):
                     try:
-                        _dash_sigs.append((float(a.get("amount") or 0), _parse_when(when_mx)))
+                        _dash_sigs.append((float(a.get("amount") or 0), _parse_when(when_mx), state))
                     except (TypeError, ValueError):
                         pass
 
@@ -2408,11 +2411,13 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                         state = "fail"
                     else:
                         state = "pending"
-                # DEDUP: si este depósito con tarjeta (aprobado o rechazado) coincide
-                # (mismo monto + hora ±3min) con un intento hecho desde el dashboard, es
-                # el MISMO evento → omitir el eco de BetMexico (ya está como movimiento
-                # nuestro). Empareja con la firma MÁS CERCANA en tiempo y la consume.
-                if (not is_wd and t.get("gateway") == 1 and _dash_sigs):
+                # DEDUP: si este depósito con tarjeta coincide (mismo monto + hora ±3min
+                # + MISMO ESTADO) con un intento hecho desde el dashboard, es el MISMO
+                # evento → omitir el eco de BetMexico (ya está como movimiento nuestro).
+                # La coincidencia de ESTADO es clave: sin ella una firma 'fail' podía
+                # consumir un depósito APROBADO real y ocultarlo (fix 2026-07-03, hallazgo
+                # #2). Empareja con la firma MÁS CERCANA en tiempo del MISMO estado y la consume.
+                if (not is_wd and t.get("gateway") == 1 and state in ("ok", "fail") and _dash_sigs):
                     _tw = _parse_when(t.get("txn_date"))
                     try:
                         _ta = float(t.get("amount") or 0)
@@ -2420,8 +2425,8 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                         _ta = None
                     if _tw is not None and _ta is not None:
                         _best, _best_dt = None, None
-                        for _k, (_da, _ds) in enumerate(_dash_sigs):
-                            if _ds is None or abs(_ta - _da) >= 0.01:
+                        for _k, (_da, _ds, _dst) in enumerate(_dash_sigs):
+                            if _ds is None or _dst != state or abs(_ta - _da) >= 0.01:
                                 continue
                             _dsec = abs((_tw - _ds).total_seconds())
                             if _dsec <= 180 and (_best is None or _dsec < _best_dt):

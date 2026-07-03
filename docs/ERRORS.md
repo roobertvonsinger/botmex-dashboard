@@ -2,6 +2,13 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## [CRÍTICO] Dedup de movimientos ocultaba depósitos APROBADOS reales (2026-07-03)
+
+- **Síntoma**: en el detalle de cuenta (La Pantalla / acordeón), un depósito **aprobado real** de BetMexico podía NO mostrarse si coincidía en monto+tiempo con un intento del dashboard **rechazado**. Robert: "¿habrá pasado que sí depositó y el dashboard no nos dijo?".
+- **Causa raíz** (`app.py` `account_details`, dedup L2348+): la firma de dedup (`_dash_sigs`) incluía intentos `ok` **y** `fail`, y el match (gateway=1, ±0.01 monto, ±180s) NO exigía que el **estado** coincidiera → una firma `fail` consumía (ocultaba) el eco de una txn `status 6` (aprobada) cercana. La dedup es **solo de presentación** (arma `result["movimientos"]`), NO borra de la BD → el dato nunca se perdió, solo se dejaba de mostrar.
+- **Medición en prod (solo lectura, BD real)**: de **4096** depósitos con tarjeta aprobados reales, el bug PUDO ocultar 51 y PROBABLEMENTE ocultó **1** en la vista (`lalo280294@gmail.com`, $150, 2-jun). Los otros 50 tenían una firma `ok` más cercana → dedup correcta. Impacto histórico ínfimo y 100% recuperable.
+- **Fix**: la firma guarda su `state`; el match exige `_dst == state` de la txn (firma `fail` solo tapa txn rechazada; `ok` solo tapa aprobada). También acota el match a txns con `state in ('ok','fail')`. Verificado: `py_compile` OK; con `_dst != state`, una firma fail no puede consumir un aprobado por construcción. Mitiga parcialmente el hallazgo #4 (greedy sin match global).
+
 ## Auditoría de flujos BetMexico (2026-07-02) — 3 críticos + 5 mayores
 
 Auditoría estática de los 7 flujos que tocan BetMexico (login, depósito único, matchmaker, scheduled, prewarm, cuentas, grading) + diagnóstico de datos de prod. Contexto medido en BD: aprobación cayó de 26.7% (30d) a 2.2% (7d, casi todo pool viejo degradado); con el pool sticky nuevo (`81ad8b5`) el error dominante pasó de reputación-de-IP a **429 rate-limit por cadencia** (11/15 intentos en 12h) → el cuello ya no es el proveedor, es el pacing del código. `duration_ms` promedio por intento = 22s (máx 86s); `captcha_cost` = 0.0 siempre (nunca se instrumentó — por eso el drenaje pasaba invisible).
