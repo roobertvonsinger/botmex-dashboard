@@ -186,8 +186,11 @@ Visible cuando `selectedIds.size > 0`. Actualizado por `updateCmdBar()` (app.js:
 | Fila (click simple) | **Abre La Pantalla** (`window.Pantalla.open`) — Fase B |
 | Fila + **Ctrl/Cmd** | Toggle esa fila en la selección múltiple (Excel) |
 | Fila + **Shift** | Rango desde la última clickeada (`_selectRange`, orden visible) |
+| **Arrastrar sobre filas (>6px)** | **Marquee tipo Explorer** (Fase C `initMarquee`): dibuja recuadro `.sel-marquee` y selecciona las filas que toca. `Ctrl`+arrastre = suma a la selección previa. |
 
-**Retirado (Fase B):** contextmenu (click derecho), checkboxes `.rowsel`/`#selAll`, y el drag-select por mouse y por pointer. La selección múltiple es solo Ctrl/Shift+Click.
+**Marquee (Fase C, recuadro tipo Windows Explorer):** reintroduce el drag-select que se había retirado en Fase B, ahora reconciliado con el click→La Pantalla vía **umbral de movimiento (6px)**. Handlers globales (`mousedown`/`mousemove`/`mouseup`) en `initMarquee`: arranca solo sobre una fila de `#accTable` (no sobre `.row-ic`/botones/inputs/`.acc-detail`), ignora `Shift` (=rango). Cruzado el umbral, crea `.sel-marquee` (`position:fixed`, coords de viewport) y llama `applyBand()` que resalta las filas con solape vertical. Al soltar, `_marqueeSuppress=true` evita que el `click` sintético abra La Pantalla de la última fila tocada. Click sin mover = sigue abriendo La Pantalla.
+
+**Retirado (Fase B):** contextmenu (click derecho), checkboxes `.rowsel`/`#selAll`, y el drag-select por **pointer** (el drag-select por mouse volvió en Fase C con umbral, ver arriba). La selección múltiple es Ctrl/Shift+Click **o** marquee.
 
 **Columna Saldo (`td.num` / `th.num`)** — `style.css:1075`:
 - `width: 128px; min-width: 128px; white-space: nowrap;`

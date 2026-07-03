@@ -1023,9 +1023,18 @@ tr.row-sel td { border-color: var(--accent-soft-2) !important; }
 /* drag-select: solo bloquea selección de texto; sin cursor "cell" (se veía feo) */
 body.dragging-sel { -webkit-user-select: none; user-select: none; }
 
-/* combo cell — clickable email */
-/* P7 — toda la celda del combo copia con click izquierdo → cursor "copy" */
-td.combo, td.combo b { cursor: copy; transition: color 120ms; }
+/* Fase C — marquee (recuadro tipo Explorer): rectángulo translúcido de selección.
+   position:fixed porque se dibuja con coords de viewport (clientX/Y). */
+.sel-marquee {
+  position: fixed; z-index: 9998; pointer-events: none;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft, rgba(120,180,255,0.14));
+  box-shadow: 0 0 0 1px var(--accent-glow, rgba(120,180,255,0.25)) inset;
+  border-radius: 2px;
+}
+
+/* combo cell — click abre La Pantalla (ya NO copia el combo → cursor pointer) */
+td.combo, td.combo b { cursor: pointer; transition: color 120ms; }
 td.combo b:hover { color: var(--accent); }
 td.combo .copyhint { font-size: 9.5px; color: var(--text-faint); margin-left: 6px; font-family: var(--font-mono); }
 td.combo b:hover + .copyhint { color: var(--accent); }

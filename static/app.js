@@ -55,8 +55,11 @@ let notifications = [];
 let _evtSrc = null;
 let _sortCol = null, _sortDir = -1;
 // Fase B — selección tipo Excel: id de la última fila clickeada con Ctrl/Shift
-// (ancla para el rango de Shift+Click). El drag-select y los checkboxes se retiraron.
+// (ancla para el rango de Shift+Click). Los checkboxes se retiraron.
 let _lastClickedId = null;
+// Fase C — marquee (recuadro tipo Explorer): cuando un arrastre acaba de seleccionar,
+// suprime el `click` sintético que dispara el mouseup para que NO abra La Pantalla.
+let _marqueeSuppress = false;
 
 // ─── Detalle de cuenta inline (acordeón) ───
 // expandedAccountId: id de la cuenta cuyo panel de detalle está desplegado
@@ -2917,6 +2920,9 @@ async function _quickAddNote(accId, email) {
 
 // ─── Tabla: click en checkbox, click en combo (copia), click en fila (detalle) ───
 $('#accTable').addEventListener('click', e => {
+  // Marquee: si el click viene de soltar un arrastre de selección, ignorarlo
+  // (si no, abriría La Pantalla de la última fila tocada al soltar).
+  if (_marqueeSuppress) { _marqueeSuppress = false; return; }
   // Clicks DENTRO del panel inline de detalle los maneja su propio listener;
   // este handler de tabla los ignora (si no, toggle-aría la selección de la
   // cuenta al clickear cualquier parte del panel).
@@ -3417,9 +3423,83 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// Fase B — el drag-select (pointer/mouse) se retiró: la selección múltiple ahora
-// es Ctrl+Click (toggle) y Shift+Click (rango), manejados en el click handler de
-// #accTable. El click simple abre La Pantalla.
+// ─── Fase C — Marquee (recuadro de selección tipo Windows Explorer) ───
+// Reintroduce el drag-select retirado en Fase B, reconciliado con el click→La Pantalla
+// mediante un UMBRAL DE MOVIMIENTO (6px). Los tres gestos conviven sin pisarse:
+//   · Click simple (sin mover)     → cae al handler de fila → abre La Pantalla
+//   · Arrastrar > 6px sobre filas  → dibuja recuadro y selecciona las filas que toca
+//   · Ctrl mientras arrastras      → suma a la selección previa (no la reemplaza)
+//   · Shift+Click                  → rango (no inicia marquee)
+// Usa coordenadas de viewport (clientX/Y) + getBoundingClientRect por fila, así que el
+// recuadro es position:fixed y no necesita matemática de scroll.
+(function initMarquee() {
+  let box = null, sx = 0, sy = 0, pending = false, active = false, baseSel = null, addMode = false;
+
+  function rowsInBand(top, bottom) {
+    const hits = new Set();
+    document.querySelectorAll('#accTable tbody tr[data-id]').forEach(tr => {
+      const b = tr.getBoundingClientRect();
+      if (b.bottom < top || b.top > bottom) return;   // sin solape vertical → fuera
+      hits.add(parseInt(tr.dataset.id));
+    });
+    return hits;
+  }
+
+  function applyBand(top, bottom) {
+    const hit = rowsInBand(top, bottom);
+    selectedIds.clear();
+    if (addMode && baseSel) baseSel.forEach(id => selectedIds.add(id));
+    hit.forEach(id => selectedIds.add(id));
+    document.querySelectorAll('#accTable tbody tr[data-id]').forEach(tr => {
+      tr.classList.toggle('row-sel', selectedIds.has(parseInt(tr.dataset.id)));
+    });
+    updateCmdBar();
+  }
+
+  document.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;                         // solo botón izquierdo
+    if (!$('#accTable')) return;
+    const tr = e.target.closest('#accTable tbody tr[data-id]');
+    if (!tr) return;                                    // solo arranca sobre una fila
+    // No secuestrar controles interactivos ni el panel inline de detalle
+    if (e.target.closest('.row-ic, .row-refresh-one, a, button, input, textarea, select, .acc-detail')) return;
+    if (e.shiftKey) return;                             // Shift = rango, no marquee
+    sx = e.clientX; sy = e.clientY;
+    pending = true; active = false;
+    addMode = e.ctrlKey || e.metaKey;
+    baseSel = new Set(selectedIds);
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!pending) return;
+    if (!active) {
+      if (Math.hypot(e.clientX - sx, e.clientY - sy) < 6) return;   // umbral
+      active = true;
+      box = document.createElement('div');
+      box.className = 'sel-marquee';
+      document.body.appendChild(box);
+      document.body.classList.add('dragging-sel');      // bloquea selección de texto (CSS existente)
+    }
+    const tblRect = $('#accTable').getBoundingClientRect();
+    const left = Math.min(sx, e.clientX);
+    const right = Math.max(sx, e.clientX);
+    const top = Math.max(Math.min(sy, e.clientY), tblRect.top);      // clampa al área de la tabla
+    const bottom = Math.min(Math.max(sy, e.clientY), tblRect.bottom);
+    box.style.left = left + 'px';
+    box.style.top = top + 'px';
+    box.style.width = Math.max(0, right - left) + 'px';
+    box.style.height = Math.max(0, bottom - top) + 'px';
+    applyBand(top, bottom);
+    e.preventDefault();
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (active) _marqueeSuppress = true;                // el `click` que sigue no debe abrir La Pantalla
+    if (box) { box.remove(); box = null; }
+    document.body.classList.remove('dragging-sel');
+    pending = false; active = false; baseSel = null; sx = 0; sy = 0;
+  });
+})();
 
 // ─── Admin coachmarks (hints contextuales no invasivos solo para rol admin) ───
 const HINTS_KEY = 'admin_hints_v1';

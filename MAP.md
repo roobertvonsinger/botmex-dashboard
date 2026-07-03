@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d55170b` | fix(backend): dedup exige coincidencia de estado — no oculta depositos APROBADOS reales |
 | `b1907c3` | fix(frontend): click en combo/celda abre La Pantalla (no copia) + exclusion mutua con acordeon viejo |
 | `d0af096` | docs(session): cierre 2026-07-03 — Fase A+B completas, proxima sesion = AUDITORIA |
 | `5a1acb1` | feat(pantalla): Fase B — click izquierdo abre La Pantalla + seleccion tipo Excel |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `c9e9903` | fix(pantalla): vidrio semi-translucido real + layout horizontal sin scroll |
 | `5da9ede` | chore(pantalla): cache-bust app.js (v20260703a) para cargar window.__pat en prod |
 | `c55a1f0` | feat(pantalla): contextmenu → detalle (cabecera + 2 secciones txn botmexico/betmexico) |
-| `c842dc3` | feat(pantalla): lamina ambar + materializacion (despliegue de manta + scanline) |
 <!-- GEN:end:recientes -->
 
 ---
