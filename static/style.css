@@ -64,6 +64,7 @@
   --ease-fast: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   --ease: 0.42s cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-curve: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);   /* rebote sutil — controles que "saltan" al agarrar */
   --lp-gw: 7px;   /* ancho del divisor arrastrable entre cards del strip */
 }
 
@@ -650,41 +651,53 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 .lp-gutter {
   align-self: stretch;
   position: relative;
-  cursor: col-resize;
+  cursor: grab;              /* manita — consistente con el grip de La Pantalla */
   touch-action: none;
   border-radius: 4px;
 }
+.lp-gutter:active, .lp-gutter.dragging { cursor: grabbing; }
 .lp-gutter::before {
   content: ""; position: absolute; top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  width: 3px; height: 32px; border-radius: 3px;
+  width: 3px; height: 36px; border-radius: 3px;
   background: var(--hairline-h);
-  transition: background var(--ease-fast), height var(--ease-fast), box-shadow var(--ease-fast), width var(--ease-fast);
+  transition: background 150ms ease-out, transform 220ms var(--ease-spring), box-shadow 150ms ease-out;
 }
-.lp-gutter:hover::before,
+.lp-gutter:hover::before {
+  background: var(--accent);
+  transform: translate(-50%, -50%) scaleY(1.55) scaleX(1.4);
+  box-shadow: 0 0 8px var(--accent-glow), 0 0 2px var(--accent);
+}
 .lp-gutter.dragging::before {
   background: var(--accent);
-  width: 4px; height: 58px;
-  box-shadow: 0 0 8px var(--accent-glow), 0 0 2px var(--accent);
+  transform: translate(-50%, -50%) scaleY(1.55) scaleX(1.8);   /* engorda al jalar (solid drawing) */
+  box-shadow: 0 0 11px var(--accent-glow), 0 0 3px var(--accent);
 }
 
 /* Divisor HORIZONTAL (↕) entre el strip y la tabla — ajusta la altura del strip.
    Mismo patrón Claude Desktop pero en eje vertical. */
 .lp-vgutter {
   height: 10px; flex-shrink: 0; position: relative;
-  cursor: row-resize; touch-action: none;
+  cursor: grab; touch-action: none;              /* manita — consistente con el grip de La Pantalla */
 }
+.lp-vgutter:active, .lp-vgutter.dragging { cursor: grabbing; }
 .lp-vgrip {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  width: 38px; height: 3px; border-radius: 3px;
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px; height: 3px; border-radius: 3px;
   background: var(--hairline-h);
-  transition: background var(--ease-fast), width var(--ease-fast), height var(--ease-fast), box-shadow var(--ease-fast);
+  /* spring al crecer (rebota), color/glow rápidos ease-out — animamos transform, no width (60fps) */
+  transition: background 150ms ease-out, transform 220ms var(--ease-spring), box-shadow 150ms ease-out;
 }
-.lp-vgutter:hover .lp-vgrip,
+.lp-vgutter:hover .lp-vgrip {
+  background: var(--accent);
+  transform: translate(-50%, -50%) scaleX(1.5) scaleY(1.35);
+  box-shadow: 0 0 8px var(--accent-glow), 0 0 2px var(--accent);
+}
 .lp-vgutter.dragging .lp-vgrip {
   background: var(--accent);
-  width: 64px; height: 4px;
-  box-shadow: 0 0 8px var(--accent-glow), 0 0 2px var(--accent);
+  transform: translate(-50%, -50%) scaleX(1.5) scaleY(1.7);   /* engorda al jalar (solid drawing) */
+  box-shadow: 0 0 11px var(--accent-glow), 0 0 3px var(--accent);
 }
 .lp-card {
   background: var(--surface);

@@ -2330,6 +2330,30 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                 except Exception:
                     return ts
 
+            # Parseo laxo de timestamp → datetime (para deduplicar por monto+tiempo).
+            def _parse_when(ts):
+                if not ts:
+                    return None
+                s = _mv_re0.sub("", str(ts).replace("T", " "))   # quita microsegundos
+                try:
+                    return datetime.strptime(s[:19], "%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    try:
+                        return datetime.strptime(s[:16], "%Y-%m-%d %H:%M")
+                    except Exception:
+                        return None
+            import re as _mv_re0_mod
+            _mv_re0 = _mv_re0_mod.compile(r"\.\d+")
+
+            # DEDUP: un depósito con tarjeta hecho DESDE el dashboard (deposit_attempt)
+            # también aparece luego en el historial de BetMexico como txn de tarjeta →
+            # doble registro del mismo evento. Aplica a APROBADOS (status 6) y RECHAZADOS
+            # (status -4) por igual. Guardamos la firma de cada intento nuestro (monto +
+            # hora MX) para omitir su eco de BetMexico más abajo, emparejando por cercanía
+            # y CONSUMIENDO cada firma (montos repetidos no se dedup de más).
+            # "Es uno u otro": conservamos el NUESTRO (tiene operador + tarjeta usada).
+            _dash_sigs = []   # [(amount_float, datetime_mx)]
+
             # deposit_attempts → siempre deposit, source dashboard
             for a in result.get("deposit_attempts", []):
                 st = (a.get("status") or "").lower()
@@ -2346,8 +2370,9 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                     state = "fail"
                 else:
                     state = "pending"
+                when_mx = _utc_to_mx(a.get("created_at"))
                 movimientos.append({
-                    "when": _utc_to_mx(a.get("created_at")),
+                    "when": when_mx,
                     "source": "dashboard",
                     "kind": "deposit",
                     "method": "Pago con tarjeta",
@@ -2357,6 +2382,13 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                     "card_pipe": a.get("card_pipe"),
                     "reason": reason_txt if state in ("fail", "threeds") else None,
                 })
+                # Firma para dedup: aprobados y rechazados se reflejan en BetMexico
+                # (status 6 y -4). Los 3DS/pending no generan txn → no se firman.
+                if state in ("ok", "fail"):
+                    try:
+                        _dash_sigs.append((float(a.get("amount") or 0), _parse_when(when_mx)))
+                    except (TypeError, ValueError):
+                        pass
 
             # account_transactions → betmex. txn_type 1=dep, 2=retiro.
             # gateway 1=tarjeta, 2=SPEI, 3=OXXO. status 6=ok,0=pending,-4/5=fail.
@@ -2376,6 +2408,27 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                         state = "fail"
                     else:
                         state = "pending"
+                # DEDUP: si este depósito con tarjeta (aprobado o rechazado) coincide
+                # (mismo monto + hora ±3min) con un intento hecho desde el dashboard, es
+                # el MISMO evento → omitir el eco de BetMexico (ya está como movimiento
+                # nuestro). Empareja con la firma MÁS CERCANA en tiempo y la consume.
+                if (not is_wd and t.get("gateway") == 1 and _dash_sigs):
+                    _tw = _parse_when(t.get("txn_date"))
+                    try:
+                        _ta = float(t.get("amount") or 0)
+                    except (TypeError, ValueError):
+                        _ta = None
+                    if _tw is not None and _ta is not None:
+                        _best, _best_dt = None, None
+                        for _k, (_da, _ds) in enumerate(_dash_sigs):
+                            if _ds is None or abs(_ta - _da) >= 0.01:
+                                continue
+                            _dsec = abs((_tw - _ds).total_seconds())
+                            if _dsec <= 180 and (_best is None or _dsec < _best_dt):
+                                _best, _best_dt = _k, _dsec
+                        if _best is not None:
+                            _dash_sigs.pop(_best)
+                            continue
                 movimientos.append({
                     "when": t.get("txn_date"),
                     "source": "betmex",

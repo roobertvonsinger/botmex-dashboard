@@ -238,7 +238,7 @@
   // Layout horizontal (identidad+saldo | transacciones en 2 columnas), SIN scroll.
   // Nada de incrustar el renderDetail viejo: esto es contenido nativo de La Pantalla.
 
-  const MV_CAP = 6;   // filas visibles por columna (sin scroll); el resto → "+N más"
+  const MV_CAP = 5;   // filas visibles por columna (sin scroll); el resto → "+N más"
 
   function renderPantallaHead(d) {
     const g = window.esc || (s => s);
@@ -293,9 +293,65 @@
             ${bdate ? `<span class="pat-meta-item dim"><i class="ph-duotone ph-cake"></i> ${g(dmy(bdate) || bdate)}</span>` : ''}
             ${curpShown ? `<span class="pat-meta-item dim"><i class="ph-duotone ph-identification-card"></i> <button type="button" class="pat-curp d-copy" data-copy="${g(curpShown)}" title="Copiar CURP">${g(curpShown)}</button>${curpTag}</span>` : ''}
           </div>
+          ${renderPantallaSaved(d)}
         </div>
         ${renderPantallaTxns(d)}
       </div>`;
+  }
+
+  // ── Guardado: tarjetas + notas en pequeño (columna de datos, bajo la meta) ──
+  // Reusa _pipeDisplay (pipe canónico num|MM|YY|cvv, sin enmascarar) y fmtAbsYear/
+  // fmtAbs (app.js). Capado (2 tarjetas + 2 notas) para no romper el sin-scroll;
+  // el resto → "+N más". El detalle completo/edición vive en el modal viejo.
+  const CARD_CAP = 2, NOTE_CAP = 2;
+
+  function renderPantallaSaved(d) {
+    const g = window.esc || (s => s);
+    const cards = Array.isArray(d.cards) ? d.cards.filter(c => c && c.card_number) : [];
+    const notes = Array.isArray(d.notes) ? d.notes.filter(n => n && (n.note_text || '').trim()) : [];
+    if (!cards.length && !notes.length) return '';
+
+    const pipeOf = (typeof _pipeDisplay === 'function')
+      ? _pipeDisplay
+      : (raw => String(raw || '').replace(/\//g, '|'));
+    const fAbsY = (typeof fmtAbsYear === 'function') ? fmtAbsYear : (s => s || '');
+
+    let cardHtml = '';
+    if (cards.length) {
+      const rows = cards.slice(0, CARD_CAP).map(c => {
+        const pipe = pipeOf(`${c.card_number || ''}|${c.card_expiry || ''}|${c.card_cvv || ''}`);
+        const appr = c.total_approved || 0, tot = c.total_deposits || 0;
+        const stat = tot > 0 ? `${appr}/${tot}` : '';
+        return `<button type="button" class="pat-sv-line pat-sv-card d-copy" data-copy="${g(pipe)}" title="Copiar tarjeta">
+          <span class="pat-sv-pipe">${g(pipe)}</span>
+          ${stat ? `<span class="pat-sv-stat">${g(stat)}</span>` : ''}
+        </button>`;
+      }).join('');
+      const more = cards.length > CARD_CAP ? `<span class="pat-sv-more">+${cards.length - CARD_CAP}</span>` : '';
+      cardHtml = `<div class="pat-sv-group">
+        <span class="pat-sv-h"><span class="pat-sv-emo">💳</span> Tarjetas<span class="pat-sv-cnt">${cards.length}</span>${more}</span>
+        ${rows}
+      </div>`;
+    }
+
+    let noteHtml = '';
+    if (notes.length) {
+      const rows = notes.slice(0, NOTE_CAP).map(n => {
+        const who = g(n.created_by_name || '—');
+        const when = n.created_at ? g(fAbsY(n.created_at)) : '';
+        return `<div class="pat-sv-line pat-sv-note" title="${g(n.note_text)}">
+          <span class="pat-sv-ntext">${g(n.note_text)}</span>
+          <span class="pat-sv-nmeta">${who}${when ? ` · ${when}` : ''}</span>
+        </div>`;
+      }).join('');
+      const more = notes.length > NOTE_CAP ? `<span class="pat-sv-more">+${notes.length - NOTE_CAP}</span>` : '';
+      noteHtml = `<div class="pat-sv-group">
+        <span class="pat-sv-h"><span class="pat-sv-emo">📝</span> Notas<span class="pat-sv-cnt">${notes.length}</span>${more}</span>
+        ${rows}
+      </div>`;
+    }
+
+    return `<div class="pat-saved" style="--i:6">${cardHtml}${noteHtml}</div>`;
   }
 
   // ── Transacciones: 2 columnas compactas, colores intuitivos, sin scroll ──
@@ -312,10 +368,17 @@
     const extra = m.method ? ` · ${g(m.method)}` : (m.who ? ` · ${g(m.who)}` : '');
     return base + extra;
   }
+  // Fecha COMPLETA de la transacción. `when` llega en ISO ("YYYY-MM-DD HH:MM:SS")
+  // desde /details → el regex viejo (esperaba "DD/MM") fallaba y pintaba "2026-".
+  // fmtAbsYear (app.js, scope global compartido) da "03 jul 03:42" (mismo año) o
+  // "03 jul 24, 03:42" (año viejo) — año condicional, corto y legible.
   function _mvTime(m) {
     const w = String(m.when || '');
-    const md = w.match(/^(\d{2}\/\d{2})/);      // "DD/MM/YYYY HH:MM" → "DD/MM"
-    return md ? md[1] : (w.slice(0, 5) || '—');
+    if (!w) return '—';
+    if (typeof fmtAbsYear === 'function') { const f = fmtAbsYear(w); if (f) return f; }
+    const iso = w.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);   // fallback ISO → "DD/MM HH:MM"
+    if (iso) return `${iso[3]}/${iso[2]} ${iso[4]}:${iso[5]}`;
+    return w.slice(0, 10);
   }
   // pos = posición DENTRO de la columna (0-based) → alimenta --j (stagger corto
   // del cuaje entre filas). idx sigue siendo el índice GLOBAL para data-mv-idx.
@@ -342,19 +405,24 @@
     const withIdx = movs.map((m, i) => ({ m, i }));
     const bot = withIdx.filter(x => x.m && x.m.source === 'dashboard');
     const bet = withIdx.filter(x => !(x.m && x.m.source === 'dashboard'));
-    // --i 4/5: las columnas cuajan tras la cabecera. Sus .pat-mv HEREDAN este --i
-    // (custom props heredan) y le suman --j para el stagger fila-a-fila.
-    return `
-      <div class="pat-txns">
-        <div class="pat-txn-col" style="--i:4">
-          <div class="pat-txn-h"><i class="ph-fill ph-lightning"></i> Botmexico <span class="cnt">${bot.length}</span></div>
-          ${_mvColumn(bot)}
-        </div>
-        <div class="pat-txn-col" style="--i:5">
-          <div class="pat-txn-h"><i class="ph-duotone ph-globe-hemisphere-west"></i> BetMexico <span class="cnt">${bet.length}</span></div>
-          ${_mvColumn(bet)}
-        </div>
+
+    // Solo se renderizan las columnas CON movimientos → sin espacio muerto: si una
+    // fuente está vacía, la otra ocupa todo el ancho. --i 4/5: las columnas cuajan
+    // tras la cabecera (sus .pat-mv heredan --i y suman --j para el stagger).
+    const col = (emoji, label, rows, i) =>
+      `<div class="pat-txn-col" style="--i:${i}">
+        <div class="pat-txn-h"><span class="pat-txn-emo">${emoji}</span> ${label} <span class="cnt">${rows.length}</span></div>
+        ${_mvColumn(rows)}
       </div>`;
+
+    const cols = [];
+    if (bot.length) cols.push(col('⚡', 'Botmexico', bot, 4));
+    if (bet.length) cols.push(col('🌐', 'BetMexico', bet, 5));
+    if (!cols.length) {
+      return `<div class="pat-txns pat-solo"><div class="pat-txn-col" style="--i:4"><div class="pat-mv-empty">Sin movimientos todavía.</div></div></div>`;
+    }
+    const solo = cols.length === 1 ? ' pat-solo' : '';
+    return `<div class="pat-txns${solo}">${cols.join('')}</div>`;
   }
 
   // animate: aplica la escritura líquida (.pat-liquid) SOLO cuando corresponde.
@@ -398,7 +466,7 @@
   // Combo copiable tipo liga: el copiado real lo hace el handler global (.d-copy);
   // aquí solo el feedback visual (parpadeo verde "copiado") al click en el texto.
   document.addEventListener('click', e => {
-    const combo = e.target.closest('.pat-combo, .pat-curp');
+    const combo = e.target.closest('.pat-combo, .pat-curp, .pat-sv-card');
     if (!combo) return;
     combo.classList.add('copied');
     setTimeout(() => combo.classList.remove('copied'), 900);
@@ -487,7 +555,7 @@
     if (!sheet || !root) return;
     const grip = document.createElement('div');
     grip.className = 'pantalla-grip';
-    grip.title = 'Arrastra ↕ para extender La Pantalla · doble-click re-adhiere';
+    grip.title = 'Agarra y jala ↕ para extender La Pantalla · doble-click re-adhiere';
     grip.innerHTML = '<span class="pantalla-grip-bar"></span>';
     sheet.appendChild(grip);
 
@@ -498,7 +566,7 @@
       const maxH = _extendedMaxH();
       grip.setPointerCapture?.(e.pointerId);
       root.classList.add('pat-gripping');
-      document.body.style.cursor = 'ns-resize';
+      document.body.style.cursor = 'grabbing';
       document.body.style.userSelect = 'none';
       const move = ev => {
         const sH = _stripH();

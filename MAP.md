@@ -92,7 +92,7 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2777 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2830 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `714718f` | fix(pantalla): persiana — pointercancel (no dejar drag colgado) + tope alto estricto = fija/strip |
 | `ff51ebe` | feat(pantalla): universal parcial — controles Depositar/EnUso/Fijar + Actividad/Recientes abren La Pantalla |
 | `e096e4f` | feat(pantalla): persiana magnetica — grip propio + despegar/re-adherir al strip |
 | `c86f367` | feat(pantalla): acabado premium — glassmorphism vidrio templado + escritura liquida (goo) + sigue vgutter |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `06439df` | feat(pantalla): logica pura — split txn (botmexico/betmexico) + estadoFrom + formatHito |
 | `b36ce32` | docs(session): cierre 2026-07-02 sesion 3 — diseno + plan de La Pantalla listo para /Smartexe |
 | `24a6145` | docs(plan): La Pantalla — plan de implementacion (fase 1 + fase 2) |
-| `8c93d6c` | docs(spec): tanda 6 — La Pantalla integrada a vista principal (sin seguimiento entre vistas) |
 <!-- GEN:end:recientes -->
 
 ---

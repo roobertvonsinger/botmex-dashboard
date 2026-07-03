@@ -908,6 +908,32 @@ docker logs traefik-traefik-1 2>&1 | grep -i 'letsencrypt\|acme' | tail -20
 
 ---
 
+### La Pantalla duplicaba cada depósito del dashboard (uno "Botmexico" + uno "BetMexico")
+
+**Síntoma**: en La Pantalla, un depósito con tarjeta hecho desde el dashboard aparecía DOS veces — una en la columna BOTMEXICO y otra idéntica en BETMEXICO (mismo monto, misma hora, mismo resultado). Afectaba aprobados y rechazados.
+
+**Causa**: `account_details` (app.py) une `deposit_attempts` (nuestros, source=dashboard) con `account_transactions` (de la página, source=betmex). Un depósito con tarjeta genera AMBOS registros: el intento nuestro + el eco que BetMexico lista después (aprobado→status 6, rechazado→status -4). Sin dedup, se mostraban los dos.
+
+**Diagnóstico**: query directa a la BD de una cuenta afectada comparando `deposit_attempts.created_at` (UTC) vs `account_transactions.txn_date` (MX). Tras `_utc_to_mx`, coinciden en monto y caen dentro de segundos (ej. dashboard `00:08:33` MX vs betmex `00:08:24` MX = 9s).
+
+**Fix** (2026-07-03): en el merge de `movimientos`, se firma cada `deposit_attempt` con state `ok`/`fail` como `(monto, datetime_mx)`. Al recorrer `account_transactions` de tarjeta (`gateway==1`), se busca la firma más cercana en tiempo (±180s, mismo monto) y se **omite** ese eco, **consumiendo** la firma (montos repetidos no se dedup de más). Se conserva el registro del dashboard (trae operador + `card_pipe`). Verificado con datos reales: 25 txns betmex → 18 ecos omitidos.
+
+**Histórico**: primera versión solo dedup aprobados; los rechazados (`BANK_REJECTED`) seguían duplicándose hasta ampliar a `state in ("ok","fail")`.
+
+---
+
+### El grip de La Pantalla (borde completo) bloqueaba clics del contenido inferior
+
+**Síntoma**: tras hacer el grip de la persiana de ancho completo, no se podía dar clic en las últimas filas de transacciones ni en "+N más".
+
+**Causa**: `.pantalla-grip` cambió a `left:0;right:0` (todo el borde) con `opacity:0` cuando no está armado, pero SIN `pointer-events:none` → el grip invisible seguía capturando los clics de toda la franja inferior.
+
+**Fix**: `pointer-events:none` por default en `.pantalla-grip`; `pointer-events:auto` solo con `.pat-grip-armed` / `.pat-detached`. Así solo intercepta cuando el grip está activo.
+
+**Histórico**: entró al pasar el grip de 54px centrado a ancho completo (para poder agarrar desde todo el borde, como pidió Robert).
+
+---
+
 ## Plantilla para nuevos errores
 
 Agregar al cierre:

@@ -2517,7 +2517,7 @@ $$('.seg').forEach(seg => {
       const startX = e.clientX;
       g.classList.add('dragging');
       g.setPointerCapture?.(e.pointerId);
-      document.body.style.cursor = 'col-resize';
+      document.body.style.cursor = 'grabbing';
       document.body.style.userSelect = 'none';
 
       const move = ev => {
@@ -2581,7 +2581,7 @@ $$('.seg').forEach(seg => {
     gutter.classList.add('dragging');
     panel.classList.add('lp-resizing');   // sin transición durante el drag (tracking directo)
     gutter.setPointerCapture?.(e.pointerId);
-    document.body.style.cursor = 'row-resize';
+    document.body.style.cursor = 'grabbing';
     document.body.style.userSelect = 'none';
     const move = ev => {
       let h = startH + (ev.clientY - startY);

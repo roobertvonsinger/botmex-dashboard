@@ -411,6 +411,26 @@ Ver `docs/SSE_EVENTS.md` para tabla maestra de `kind` y su handler.
 | `computeCurp(name, bdate, addr)` | Calcula CURP estimado (4 letras + fecha + sex + estado + verifier) | app.js:277 |
 | `_splitFullname(s)` | Separa nombre/apellidos para CURP | app.js:160 |
 
+## La Pantalla (`static/pantalla.js` + `pantalla.css`)
+
+> Panel de detalle de cuenta que se MATERIALIZA como una lámina de vidrio ámbar translúcido sobre el strip de KPIs (`#pantalla` anclado a `#accountsMain`). Reemplaza al detalle inline viejo para ver una cuenta. Rama `feat/la-pantalla`.
+
+**Apertura:** `window.Pantalla.open(id, mode)`. Disparadores: click DERECHO en fila de `#accTable` (capture phase, gana al listener legacy); `openAccountByEmail` desde Actividad/Recientes/combo. El click IZQUIERDO en tabla → La Pantalla es Fase B (pendiente, choca con la selección actual).
+
+**Layout (`renderPantallaHead`, sin scroll, altura mínima `min-height:288px`):**
+- Fila identidad (nombre·edad + grade) + controles **Depositar / En uso / Fijar** (reusan `openDepositModal`/`toggleMark`/lock; "en uso" pide confirmación al liberar).
+- Combo `email:password` copiable tipo liga (color **perla nacarada**, no dorado — el dorado se reserva al saldo).
+- Cuerpo en 2 zonas con **divisor vertical** dorado: datos (saldo 36px + estado/nac/CURP + **tarjetas/notas en pequeño** `renderPantallaSaved`, capado 2+2) | transacciones.
+- **Transacciones** (`renderPantallaTxns`): columnas ⚡ Botmexico / 🌐 BetMexico; si una fuente está vacía la otra ocupa todo el ancho (`.pat-solo`, sin espacio muerto). Cap 5 filas/columna + "+N más". Fecha COMPLETA vía `fmtAbsYear` (el `when` viene ISO). Tinte por resultado (barra lateral + fondo suave): verde ok / rojo fail (`--danger-soft`) / dorado 3DS / tenue pending·wd.
+
+**Dedup de transacciones (backend, `app.py` `account_details`):** un depósito con tarjeta hecho desde el dashboard (`deposit_attempt`) también aparece como eco en `account_transactions` de BetMexico → se omite el eco (aprobados **y** rechazados), emparejando por monto + hora MX (±3 min) y consumiendo cada firma. Se conserva el registro NUESTRO (tiene operador + tarjeta). Ver `docs/ERRORS.md`.
+
+**Acabado:** vidrio templado ámbar + detalles **perla translúcida** (reflejos nácar rosa/cian mate en esquinas + halo interno tenue). El contenido (`.pantalla-view z-index:5`) va ENCIMA del grano/acabado para no opacarse. Contorno (`text-shadow`) en todo el texto para nitidez. Cuaje líquido (`.pat-liquid`, una vez por cuenta; el filtro goo se retiró por distorsión).
+
+**Persiana / control de tamaño:** grip propio en TODO el borde inferior (`.pantalla-grip`, cursor **manita** grab/grabbing; `pointer-events` solo cuando armado/despegado — si no, bloquea clics del contenido). Adherida al strip por defecto (sigue el vgutter via ResizeObserver), se despega al tope, re-adhiere magnética (dbl-click). El asa rebota (spring `--ease-spring`) al hover y se aplasta (squash) al agarrar.
+
+**Controles deslizantes — patrón manita unificado:** grip de La Pantalla + `.lp-vgutter` (altura KPIs) + `.lp-gutter` (ancho cards) usan `grab`/`grabbing` + spring/squash. Los edges de resize de `depos_window` siguen con flechas `ns/ew-resize` (comunican eje). Skills de referencia: `design-engineer` + `micro-100-200ms` + `hover-interactions` (instaladas global).
+
 ## Convenciones
 
 - **`data-copy`** en cualquier elemento → click izquierdo copia el valor. Handler global en app.js:2715.
