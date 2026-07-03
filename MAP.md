@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `4440dfd` | docs(spec): tanda 6 — La Pantalla (superficie ambar de feedback + interaccion) |
 | `5362df2` | docs(spec): tanda 6 — rework strip KPI (detalle + feed + pool/fijadas) |
 | `530bc81` | docs(session): cierre 2026-07-02 sesión 2 — deploy 94fd057 verificado en vivo + higiene KVM4 |
 | `94fd057` | fix(flujos): auditoria 7 flujos — 3 criticos + 5 mayores (proxyless, drenaje captcha, doble cargo, caps, guardrail, auth, indice) |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `79fa001` | feat(frontend): tanda 5 P7 — interaccion de tabla (copy izq / seleccion / detalle der / drag) |
 | `521c31c` | feat(frontend+backend): tanda 5 P4 banda seleccion rediseñada + P3 gate bulk-refresh SA |
 | `1a303e4` | feat(frontend): tanda 5 P2+P3 — paginacion real (no esconder cuentas) + Actualizar visibles solo SA |
-| `ce86801` | docs(session): apuntar TANDA 5 (vista de Cuentas) — 10 puntos de Robert + NEXT-SESSION |
 <!-- GEN:end:recientes -->
 
 ---

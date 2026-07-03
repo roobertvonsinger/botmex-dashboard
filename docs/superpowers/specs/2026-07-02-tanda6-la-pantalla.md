@@ -122,17 +122,16 @@ Objetivo: "la forma más suave y agradable", sin brincos ni cortes. Sugerencia d
 
 ## Carril de resultados en vivo (solo SA) — monitoreo sin cambiar de vista
 
-**Problema real:** el depósito se lanza desde el drawer (que flota sobre todas las vistas), pero La Pantalla (con las escenas) vive en la vista Cuentas. Si el SA se va a otra vista a monitorear, pierde el feedback visual. Descartada la opción de "regresar el render a la pantallita del drawer" (reintroduce lo que quitamos + dos destinos de render frágiles).
+**Problema real:** el SA hoy se va a la vista de Logs a monitorear los depósitos. Descartada la opción de "regresar el render a la pantallita del drawer" (reintroduce lo que quitamos + dos destinos de render frágiles).
 
-**Solución:** La Pantalla incluye, **solo en la vista de superadmin (Robert)**, un **carril de resultados en vivo** — feedback curado que hace innecesario irse a la vista de Logs.
+**Solución:** La Pantalla queda **integrada a la vista principal (Cuentas)** e incluye, **solo en la vista de superadmin (Robert)**, un **carril de resultados en vivo** — feedback curado que trae el monitoreo a la vista principal, haciendo innecesario irse a la vista de Logs. Como el SA ya no cambia de vista para monitorear, **no se requiere ningún mecanismo de continuidad entre vistas** (nada que "lo siga").
 
 - **Qué muestra:** puros hitos, no el log crudo — `login ✓`, `depósito en proceso ⏳`, `completado ✓`, `rechazado`, `3DS`. Con datos técnicos mínimos (email corto, monto, tarjeta •4 últimos, latencia ms) pero **sin el revolvedero** de la vista grande de logs.
 - **Formato:** cada acción destacada por **color** según tipo (verde éxito · rojo rechazo banco · **dorado 3DS** · ámbar en-proceso), con formato tabular limpio.
 - **Microanimaciones:** entrada de cada línea con cuajado líquido (slide+fade+goo), fluida, **sin saturar** — señal, no ruido. Efímero (las líneas viejas se atenúan/salen).
 - **Rol:** exclusivo SA (`project_visibilidad_roles`: el SA ve todo trazable en tiempo real; invisible a operadores). Los operadores ven La Pantalla con detalle + escenas, sin este carril técnico.
 - **Diferencia con la vista Actividad:** Actividad = histórico navegable con todo el texto; este carril = tiempo real, curado, efímero, visual.
-
-**Continuidad entre vistas:** el `depMissionPill` (pill flotante ya existente, `index.html:653`) sigue al SA entre vistas durante una misión activa; un click reabre La Pantalla. No se reintroduce la pantallita del drawer.
+- **Integrada a la vista principal:** La Pantalla y su carril viven en la vista Cuentas. No hay seguimiento entre vistas — el monitoreo sucede aquí. El `depMissionPill` existente se conserva tal cual (no se toca), pero no es parte de este diseño.
 
 ## Archivos a tocar
 
@@ -164,5 +163,5 @@ Objetivo: "la forma más suave y agradable", sin brincos ni cortes. Sugerencia d
 9. `Esc` / click fuera / `×` repliega La Pantalla suavemente.
 10. `prefers-reduced-motion` degrada a fade simple sin efectos de líquido/scanline.
 11. **(Fase 2)** El depósito se sigue lanzando desde el drawer `#depos`; a éste se le **elimina** `.journey`/`.scene-stage` y se **recompacta** con criterio medido; el viaje se proyecta en La Pantalla.
-12. **(Fase 2, solo SA)** La Pantalla muestra un carril de resultados en vivo (hitos curados por color + microanimación, sin saturar) que hace innecesario ir a la vista de Logs; el `depMissionPill` da continuidad entre vistas.
+12. **(Fase 2, solo SA)** La Pantalla, integrada a la vista principal, muestra un carril de resultados en vivo (hitos curados por color + microanimación, sin saturar) que hace innecesario ir a la vista de Logs. Sin mecanismo de continuidad entre vistas.
 13. La fase 1 no rompe el drawer de depósitos ni el panel de detalle inline existentes hasta que se migre (fase 2).
