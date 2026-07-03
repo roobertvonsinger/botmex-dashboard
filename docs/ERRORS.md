@@ -2,6 +2,13 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## [CRÍTICO] Dedup de movimientos ocultaba depósitos APROBADOS reales (2026-07-03)
+
+- **Síntoma**: en el detalle de cuenta (La Pantalla / acordeón), un depósito **aprobado real** de BetMexico podía NO mostrarse si coincidía en monto+tiempo con un intento del dashboard **rechazado**. Robert: "¿habrá pasado que sí depositó y el dashboard no nos dijo?".
+- **Causa raíz** (`app.py` `account_details`, dedup L2348+): la firma de dedup (`_dash_sigs`) incluía intentos `ok` **y** `fail`, y el match (gateway=1, ±0.01 monto, ±180s) NO exigía que el **estado** coincidiera → una firma `fail` consumía (ocultaba) el eco de una txn `status 6` (aprobada) cercana. La dedup es **solo de presentación** (arma `result["movimientos"]`), NO borra de la BD → el dato nunca se perdió, solo se dejaba de mostrar.
+- **Medición en prod (solo lectura, BD real)**: de **4096** depósitos con tarjeta aprobados reales, el bug PUDO ocultar 51 y PROBABLEMENTE ocultó **1** en la vista (`lalo280294@gmail.com`, $150, 2-jun). Los otros 50 tenían una firma `ok` más cercana → dedup correcta. Impacto histórico ínfimo y 100% recuperable.
+- **Fix**: la firma guarda su `state`; el match exige `_dst == state` de la txn (firma `fail` solo tapa txn rechazada; `ok` solo tapa aprobada). También acota el match a txns con `state in ('ok','fail')`. Verificado: `py_compile` OK; con `_dst != state`, una firma fail no puede consumir un aprobado por construcción. Mitiga parcialmente el hallazgo #4 (greedy sin match global).
+
 ## Auditoría de flujos BetMexico (2026-07-02) — 3 críticos + 5 mayores
 
 Auditoría estática de los 7 flujos que tocan BetMexico (login, depósito único, matchmaker, scheduled, prewarm, cuentas, grading) + diagnóstico de datos de prod. Contexto medido en BD: aprobación cayó de 26.7% (30d) a 2.2% (7d, casi todo pool viejo degradado); con el pool sticky nuevo (`81ad8b5`) el error dominante pasó de reputación-de-IP a **429 rate-limit por cadencia** (11/15 intentos en 12h) → el cuello ya no es el proveedor, es el pacing del código. `duration_ms` promedio por intento = 22s (máx 86s); `captcha_cost` = 0.0 siempre (nunca se instrumentó — por eso el drenaje pasaba invisible).
@@ -905,6 +912,32 @@ docker logs traefik-traefik-1 2>&1 | grep -i 'letsencrypt\|acme' | tail -20
 **Fix**: `/api/deposits/execute` **eliminado** en SP-1 (commit `0d51a91`). Los 3 flujos activos (`/execute-stream`, `/multi/stream`, `/scheduled/create`) usan `gentle_login` con `allow_proxyless=False` → la IP real del server nunca se expone.
 
 **Referencia**: `docs/superpowers/specs/2026-06-25-unificacion-login-deposito-design.md`.
+
+---
+
+### La Pantalla duplicaba cada depósito del dashboard (uno "Botmexico" + uno "BetMexico")
+
+**Síntoma**: en La Pantalla, un depósito con tarjeta hecho desde el dashboard aparecía DOS veces — una en la columna BOTMEXICO y otra idéntica en BETMEXICO (mismo monto, misma hora, mismo resultado). Afectaba aprobados y rechazados.
+
+**Causa**: `account_details` (app.py) une `deposit_attempts` (nuestros, source=dashboard) con `account_transactions` (de la página, source=betmex). Un depósito con tarjeta genera AMBOS registros: el intento nuestro + el eco que BetMexico lista después (aprobado→status 6, rechazado→status -4). Sin dedup, se mostraban los dos.
+
+**Diagnóstico**: query directa a la BD de una cuenta afectada comparando `deposit_attempts.created_at` (UTC) vs `account_transactions.txn_date` (MX). Tras `_utc_to_mx`, coinciden en monto y caen dentro de segundos (ej. dashboard `00:08:33` MX vs betmex `00:08:24` MX = 9s).
+
+**Fix** (2026-07-03): en el merge de `movimientos`, se firma cada `deposit_attempt` con state `ok`/`fail` como `(monto, datetime_mx)`. Al recorrer `account_transactions` de tarjeta (`gateway==1`), se busca la firma más cercana en tiempo (±180s, mismo monto) y se **omite** ese eco, **consumiendo** la firma (montos repetidos no se dedup de más). Se conserva el registro del dashboard (trae operador + `card_pipe`). Verificado con datos reales: 25 txns betmex → 18 ecos omitidos.
+
+**Histórico**: primera versión solo dedup aprobados; los rechazados (`BANK_REJECTED`) seguían duplicándose hasta ampliar a `state in ("ok","fail")`.
+
+---
+
+### El grip de La Pantalla (borde completo) bloqueaba clics del contenido inferior
+
+**Síntoma**: tras hacer el grip de la persiana de ancho completo, no se podía dar clic en las últimas filas de transacciones ni en "+N más".
+
+**Causa**: `.pantalla-grip` cambió a `left:0;right:0` (todo el borde) con `opacity:0` cuando no está armado, pero SIN `pointer-events:none` → el grip invisible seguía capturando los clics de toda la franja inferior.
+
+**Fix**: `pointer-events:none` por default en `.pantalla-grip`; `pointer-events:auto` solo con `.pat-grip-armed` / `.pat-detached`. Así solo intercepta cuando el grip está activo.
+
+**Histórico**: entró al pasar el grip de 54px centrado a ancho completo (para poder agarrar desde todo el borde, como pidió Robert).
 
 ---
 

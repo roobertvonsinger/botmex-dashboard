@@ -180,15 +180,17 @@ Visible cuando `selectedIds.size > 0`. Actualizado por `updateCmdBar()` (app.js:
 **Handler global** (app.js:2034 — `#accTable.click`):
 | Target | Acción |
 |---|---|
-| `.row-ic` (iconitos 💳/📝/+) | Abre detalle o quick-add note |
+| `.row-ic` (iconitos 💳/📝/+) | 💳/📝 abren el **acordeón viejo** (`openDetailModal` — acceso a EDICIÓN de tarjetas/notas + validar CURP); `+` = quick-add note |
 | `th.th-sort` | Ordena por columna |
-| `.rowsel` | Toggle individual de selección |
-| `#selAll` | Select all visible |
-| `.row-details` | Abre modal de detalles |
-| `td.combo b` | **Click izquierdo copia combo `email:password`** (desde 2026-05-11) |
-| Resto de la fila | Toggle selección (sin abrir modal) |
+| `td.combo` (celda + `<b>`) | **Click izquierdo abre La Pantalla** (ya NO copia — fix 2026-07-03; el copiado del combo vive DENTRO de La Pantalla). Se le quitó `d-copy`/`data-combo`. |
+| Fila (click simple) | **Abre La Pantalla** (`window.Pantalla.open`) — Fase B |
+| Fila + **Ctrl/Cmd** | Toggle esa fila en la selección múltiple (Excel) |
+| Fila + **Shift** | Rango desde la última clickeada (`_selectRange`, orden visible) |
+| **Arrastrar sobre filas (>6px)** | **Marquee tipo Explorer** (Fase C `initMarquee`): dibuja recuadro `.sel-marquee` y selecciona las filas que toca. `Ctrl`+arrastre = suma a la selección previa. |
 
-**Handler context (click derecho)** (app.js:2092 — `#accTable.contextmenu`): mantiene comportamiento de copia para usuarios habituados.
+**Marquee (Fase C, recuadro tipo Windows Explorer):** reintroduce el drag-select que se había retirado en Fase B, ahora reconciliado con el click→La Pantalla vía **umbral de movimiento (6px)**. Handlers globales (`mousedown`/`mousemove`/`mouseup`) en `initMarquee`: arranca solo sobre una fila de `#accTable` (no sobre `.row-ic`/botones/inputs/`.acc-detail`), ignora `Shift` (=rango). Cruzado el umbral, crea `.sel-marquee` (`position:fixed`, coords de viewport) y llama `applyBand()` que resalta las filas con solape vertical. Al soltar, `_marqueeSuppress=true` evita que el `click` sintético abra La Pantalla de la última fila tocada. Click sin mover = sigue abriendo La Pantalla.
+
+**Retirado (Fase B):** contextmenu (click derecho), checkboxes `.rowsel`/`#selAll`, y el drag-select por **pointer** (el drag-select por mouse volvió en Fase C con umbral, ver arriba). La selección múltiple es Ctrl/Shift+Click **o** marquee.
 
 **Columna Saldo (`td.num` / `th.num`)** — `style.css:1075`:
 - `width: 128px; min-width: 128px; white-space: nowrap;`
@@ -340,12 +342,7 @@ Feedback de Robert (AFK). Spec: `docs/superpowers/specs/2026-06-29-ui-tanda4-mod
 - **P10 — Vidrio + glow casino sutil** (bloque final de `style.css`, reversible). Construye sobre los acabados de tanda 4 sin saturar: pagebar con **vidrio real** (`backdrop-filter blur+saturate`) + **filo de luz verde-oro** arriba (`.pagebar::before`, toque casino); buscador activo con aro de glow verde + corazón dorado tenue; saldo "caliente" (≥$50) con destello verde; Depositar con corazón dorado al hover sobre el neón; filterbar con vidrio. Paleta: verde (marca) + oro (`--gold-soft`, dinero). **P9 (integración del panel de depósitos incrustado) queda pendiente** — requiere ver el dock con datos reales (flujo crítico, no se toca a ciegas).
 - **P1 — Buscador premium + X interna.** `.filterbar .search` más largo (`flex:0 1 400px`, antes 320; `min-width:240`, `max-width:42vw`) con fondo más presente. La X (`#searchClear`) ahora siempre visible dentro del recuadro (fondo circular `rgba(255,255,255,.09)`, 20px, hover accent + scale). Ícono `⌕` más definido (15px) que se tiñe de accent en focus/query.
 - **P8 — Memoria de la vista de Cuentas por usuario.** `bmx.acctView.<username>` (localStorage) conserva **página + tamaño de página + scrollTop** de la tabla entre sesiones. `_restoreAcctState()` aplica página/tamaño antes del primer render; `_restoreAcctScroll()` repone el scroll tras el render; `_saveAcctStateSoon()` (debounce 350ms) en el scroll de `.tablewrap`, y `_saveAcctState()` en cambios de página/tamaño. No se comparte entre operadores.
-- **P7 — Interacción de la tabla rediseñada (selección/copy/detalle).** Modelo nuevo pedido por Robert:
-  - **Easy-copy del combo** ahora con **click IZQUIERDO** (antes copiaba por contextmenu/click derecho = "mal configurado"). Copia **toda la celda** `td.combo` (no solo el `<b>`) → fácil de atinar. Cursor `copy`.
-  - **Selección** = **click izquierdo en cualquier parte de la fila** (de la columna Cuenta a la derecha, salvo el combo y controles ↻/iconos/checkbox). Togglea `row-sel`.
-  - **Detalle** = **click DERECHO** en cualquier parte de la fila → `openDetailModal()` (que es un **toggle** de acordeón inline: abre/cierra). Se **eliminó la columna "Detalles"** (th + td + botón `detailsBtn`); colspan 7/9 → 6/8 (`_detailColspan()` cuenta `<td>` del DOM, se autoajusta). Los iconos 💳/📝 siguen abriendo el detalle con click izq.
-  - **Drag-select**: arrastrar el mouse sobre las filas selecciona/deselecciona varias. El modo (`select`/`deselect`) lo fija el estado de la fila donde empieza el arrastre (`_dragSel`); el primer `mousemove` incluye la fila inicial; `mouseup` con movimiento setea `_suppressNextRowClick` para que el click posterior no re-togglee. `body.dragging-sel` aplica `user-select:none`. No arranca sobre el combo/controles. + el botón "Borrar selección" de la banda.
-  - **Feedback premium**: barra `accent` (`box-shadow inset 3px`) a la izquierda de la fila seleccionada; cursor `copy` en combo, `cell` durante el drag.
+- **P7 — Interacción de la tabla (⚠️ REEMPLAZADO por Fase B 2026-07-03 — ver sección "La Pantalla").** El modelo P7 (click izq = selección, click DERECHO = detalle, drag-select) quedó obsoleto. Modelo actual: **click izq simple = abrir La Pantalla**, **Ctrl/Shift+Click = selección Excel** (sin drag ni checkboxes). Lo que sigue vigente de P7: el combo copia con click izquierdo sobre `td.combo` (copia toda la celda); la barra `accent` de fila seleccionada (`row-sel`). Lo retirado: `openDetailModal` como trigger de fila, contextmenu, `_dragSel`/drag por mouse+pointer, checkboxes `.rowsel`/`#selAll`.
 
 
 
@@ -411,10 +408,34 @@ Ver `docs/SSE_EVENTS.md` para tabla maestra de `kind` y su handler.
 | `computeCurp(name, bdate, addr)` | Calcula CURP estimado (4 letras + fecha + sex + estado + verifier) | app.js:277 |
 | `_splitFullname(s)` | Separa nombre/apellidos para CURP | app.js:160 |
 
+## La Pantalla (`static/pantalla.js` + `pantalla.css`)
+
+> Panel de detalle de cuenta que se MATERIALIZA como una lámina de vidrio ámbar translúcido sobre el strip de KPIs (`#pantalla` anclado a `#accountsMain`). Reemplaza al detalle inline viejo para ver una cuenta. Rama `feat/la-pantalla`.
+
+**Apertura:** `window.Pantalla.open(id, mode)`. Disparador (Fase B): **click IZQUIERDO simple** en la fila de `#accTable` (sin modificadores) — **incluye la celda del combo** (fix 2026-07-03: el combo dejó de copiar; su click abre La Pantalla). También `openAccountByEmail` desde Actividad/Recientes/marquesina. Ya NO se usa contextmenu (click derecho).
+
+**Exclusión mutua con el acordeón viejo (fix 2026-07-03):** La Pantalla y el acordeón inline (`openDetailModal`) NUNCA coexisten (antes se veían dos paneles de detalle a la vez). Abrir La Pantalla llama `closeDetailModal()`; abrir el acordeón llama `window.Pantalla.close()`. El acordeón viejo quedó accesible SOLO por los iconos 💳/📝 (edición de tarjetas/notas + validar CURP, que La Pantalla aún no porta — ver `docs/ERRORS.md` / auditoría 2026-07-03).
+
+**Selección de tabla tipo Excel (Fase B, reemplaza drag-select + checkboxes):** click simple = abrir La Pantalla; **Ctrl/Cmd+Click** = toggle esa fila en la selección múltiple; **Shift+Click** = rango desde la última fila clickeada (`_lastClickedId`, orden visible, helper `_selectRange`). El click simple en `td.combo` abre La Pantalla (ya no copia). Se retiraron: los checkboxes de 1ª columna (la `.sel-cell` quedó como **indicador**: dot accent en `tr.row-sel`), el drag-select por mouse y por pointer, y el `#selAll`.
+
+**Layout (`renderPantallaHead`, sin scroll, altura mínima `min-height:288px`):**
+- Fila identidad (nombre·edad + grade) + controles **Depositar / En uso / Fijar** (reusan `openDepositModal`/`toggleMark`/lock; "en uso" pide confirmación al liberar).
+- Combo `email:password` copiable tipo liga (color **perla nacarada**, no dorado — el dorado se reserva al saldo).
+- Cuerpo en 2 zonas con **divisor vertical** dorado: datos (saldo 36px + estado/nac/CURP + **tarjetas/notas en pequeño** `renderPantallaSaved`, capado 2+2) | transacciones.
+- **Transacciones** (`renderPantallaTxns`): columnas ⚡ Botmexico / 🌐 BetMexico; si una fuente está vacía la otra ocupa todo el ancho (`.pat-solo`, sin espacio muerto). Cap 5 filas/columna + "+N más". Fecha COMPLETA vía `fmtAbsYear` (el `when` viene ISO). Tinte por resultado (barra lateral + fondo suave): verde ok / rojo fail (`--danger-soft`) / dorado 3DS / tenue pending·wd.
+
+**Dedup de transacciones (backend, `app.py` `account_details`):** un depósito con tarjeta hecho desde el dashboard (`deposit_attempt`) también aparece como eco en `account_transactions` de BetMexico → se omite el eco (aprobados **y** rechazados), emparejando por monto + hora MX (±3 min) y consumiendo cada firma. Se conserva el registro NUESTRO (tiene operador + tarjeta). Ver `docs/ERRORS.md`.
+
+**Acabado:** vidrio templado ámbar + detalles **perla translúcida** (reflejos nácar rosa/cian mate en esquinas + halo interno tenue). El contenido (`.pantalla-view z-index:5`) va ENCIMA del grano/acabado para no opacarse. Contorno (`text-shadow`) en todo el texto para nitidez. Cuaje líquido (`.pat-liquid`, una vez por cuenta; el filtro goo se retiró por distorsión).
+
+**Persiana / control de tamaño:** grip propio en TODO el borde inferior (`.pantalla-grip`, cursor **manita** grab/grabbing; `pointer-events` solo cuando armado/despegado — si no, bloquea clics del contenido). Adherida al strip por defecto (sigue el vgutter via ResizeObserver), se despega al tope, re-adhiere magnética (dbl-click). El asa rebota (spring `--ease-spring`) al hover y se aplasta (squash) al agarrar.
+
+**Controles deslizantes — patrón manita unificado:** grip de La Pantalla + `.lp-vgutter` (altura KPIs) + `.lp-gutter` (ancho cards) usan `grab`/`grabbing` + spring/squash. Los edges de resize de `depos_window` siguen con flechas `ns/ew-resize` (comunican eje). Skills de referencia: `design-engineer` + `micro-100-200ms` + `hover-interactions` (instaladas global).
+
 ## Convenciones
 
 - **`data-copy`** en cualquier elemento → click izquierdo copia el valor. Handler global en app.js:2715.
-- **`data-combo`** en `<b>` dentro de `td.combo` → click izquierdo copia. Handler en row click handler (app.js:2034).
+- **Combo de la tabla (`td.combo`)** → click abre La Pantalla (se le quitó `data-combo`/`d-copy` el 2026-07-03; ya no copia en la tabla). El copiado del combo vive en La Pantalla (`.pat-combo`, botón dedicado).
 - **`.d-copy`** clase utilitaria para elementos copiables (estilo + handler).
 - **Cache-bust** en `index.html` con `?v=<timestamp>` para forzar refresh tras deploy (no requiere Ctrl+F5 normalmente).
 
@@ -422,7 +443,7 @@ Ver `docs/SSE_EVENTS.md` para tabla maestra de `kind` y su handler.
 
 (de `AVANCES_SESION.md`)
 - Tabla compacta 24px de fila (hoy 36px)
-- Multi-selección drag por columna de checkboxes
+- ~~Multi-selección drag por columna de checkboxes~~ → **reemplazado por selección Excel (Ctrl/Shift+Click)** 2026-07-03 (Fase B)
 - Detail panel inline `grid-template-rows: 1fr ↔ 0fr` smooth
 - ~~Drawer depósitos lateral 480px~~ ✅ implementado 2026-05-25 (420px, no-bloqueante)
 - ~~Mini-widget PiP para procesos en curso~~ ✅ implementado 2026-05-25 (mini-pill flotante `#depMissionPill`)

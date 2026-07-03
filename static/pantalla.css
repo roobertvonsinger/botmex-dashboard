@@ -1,0 +1,516 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   pantalla.css — "La Pantalla" (Task 3: el MARCO).
+   Superficie ámbar/dorada translúcida que se MATERIALIZA al frente de los KPIs
+   (.lpanel, strip superior de la vista Cuentas), como una manta que un proyector
+   láser escribe. Hereda el vocabulario de depos.css (vidrio/grano/pecera/glow)
+   RECOLOREADO a ámbar (gold hue 85 / warn hue 75 del tema real).
+   Aquí solo: lámina + backdrop + animación de despliegue/repliegue + contenedores
+   listos para contenido (que llega en tasks posteriores). Anclado a static/style.css.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Anclaje: #accountsMain es el contenedor del strip; le damos position para que
+   #pantalla (absolute) se ancle a su caja sin cubrir tabla ni topbar. ── */
+#accountsMain { position: relative; }
+
+/* ═══════════════ LÁMINA — contenedor raíz ═══════════════ */
+.pantalla {
+  /* Vars locales ámbar derivadas del tema (NO se inventa hue nuevo: gold 85 / warn 75). */
+  --pat-gold:      var(--gold);                       /* oklch(0.82 0.14 85) */
+  --pat-gold-soft: var(--gold-soft);                  /* oklch(0.82 0.14 85 / 0.14) */
+  --pat-edge:      oklch(0.82 0.14 85 / 0.28);        /* borde hairline dorado */
+  --pat-edge-h:    oklch(0.82 0.14 85 / 0.45);        /* borde en hover/foco */
+  --pat-warm:      oklch(0.80 0.16 75);               /* --warn, acento cálido */
+  --pat-tint:      oklch(0.82 0.14 85 / 0.10);        /* tinte dorado sobre el vidrio */
+  --pat-tint-2:    oklch(0.80 0.16 75 / 0.06);        /* segunda capa cálida (pecera) */
+  --pat-r: 13px;                                      /* radius de la sheet */
+
+  /* Anclaje al strip. La ALTURA la refina el JS via --pantalla-h (mide .lpanel);
+     default razonable + tope para no desbordar el viewport. */
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: var(--pantalla-h, 300px);
+  min-height: 288px;              /* PISO: altura mínima — no se aplasta. Perilla única para tunear el alto. */
+  max-height: 52vh;
+  z-index: 40;                    /* sobre el strip, bajo modales/drawer (z alto) */
+}
+
+/* El atributo [hidden] gana siempre: sin ver, sin interceptar clics. */
+.pantalla[hidden] { display: none; }
+
+/* Persiana DESPEGADA: puede extenderse más allá del tope del strip (sobre la
+   tabla) hasta el límite bajo. Durante el arrastre, sin animación (tracking directo). */
+.pantalla.pat-detached { max-height: 88vh; }
+.pantalla.pat-gripping .pantalla-sheet { animation: none; }
+
+/* ── Grip de la persiana: TODA la franja inferior es agarrable (no solo la barrita).
+   Cursor manita: `grab` en reposo, `grabbing` al jalar. ── */
+.pantalla-grip {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  z-index: 7; height: 16px; cursor: grab;
+  display: grid; place-items: end center;
+  opacity: 0; transition: opacity var(--ease-fast);
+  touch-action: none;
+  pointer-events: none;      /* oculto NO captura — no bloquea clic en el contenido inferior */
+}
+/* Solo agarra cuando está armado (strip en tope) o ya despegada. */
+.pantalla.pat-grip-armed .pantalla-grip,
+.pantalla.pat-detached .pantalla-grip { pointer-events: auto; }
+.pantalla-grip:active,
+.pantalla.pat-gripping .pantalla-grip { cursor: grabbing; }
+/* Hairline a lo ancho: señala que TODO el borde jala (se ensancha en hover). */
+.pantalla-grip::before {
+  content: ""; position: absolute; left: 16px; right: 16px; bottom: 4px; height: 2px;
+  border-radius: 2px; background: var(--pat-edge);
+  transition: background var(--ease-fast), box-shadow var(--ease-fast),
+              left var(--ease-fast), right var(--ease-fast);
+}
+.pantalla-grip:hover::before {
+  background: var(--pat-edge-h); left: 8px; right: 8px;
+  box-shadow: 0 0 14px -3px var(--pat-gold-soft);
+}
+/* Asa central (indicador de agarre), sobre el hairline. Rebota al hover (spring),
+   se aplasta al agarrar (squash — solid drawing). Animamos transform, no width (60fps). */
+.pantalla-grip-bar {
+  position: relative; margin-bottom: 3px;
+  width: 48px; height: 4px; border-radius: 4px;
+  background: var(--pat-edge-h);
+  box-shadow: 0 0 12px -2px var(--pat-gold-soft);
+  transform-origin: center;
+  transition: background 150ms ease-out, transform 220ms var(--ease-spring), box-shadow 150ms ease-out;
+}
+.pantalla-grip:hover .pantalla-grip-bar {
+  background: var(--pat-gold);
+  transform: scaleX(1.14);
+  box-shadow: 0 0 16px -2px var(--pat-gold-soft);
+}
+.pantalla.pat-gripping .pantalla-grip-bar,
+.pantalla-grip:active .pantalla-grip-bar {
+  background: var(--pat-gold);
+  transform: scaleX(1.14) scaleY(0.62);   /* squash al agarrar */
+}
+.pantalla.pat-grip-armed .pantalla-grip { opacity: .6; }
+.pantalla-grip:hover { opacity: 1; }
+.pantalla.pat-detached .pantalla-grip { opacity: .95; }
+
+/* ═══════════════ BACKDROP — difumina los KPIs detrás ═══════════════ */
+.pantalla-backdrop {
+  position: absolute; inset: 0;
+  z-index: 0;
+  background: rgba(6, 7, 10, 0);        /* oscurece al materializar */
+  backdrop-filter: blur(0) saturate(1);
+  -webkit-backdrop-filter: blur(0) saturate(1);
+  opacity: 0;
+  transition: opacity var(--ease), background var(--ease),
+              backdrop-filter var(--ease), -webkit-backdrop-filter var(--ease);
+  cursor: pointer;                      /* [data-close] → clic fuera cierra */
+}
+
+/* ═══════════════ SHEET — la manta de vidrio ámbar ═══════════════
+   Flota: margen lateral+superior para dejar respiro (criterio ≥85% ancho / ≥80% alto
+   de .lpanel se cumple con márgenes de ~20px sobre un strip de varios cientos de px). */
+.pantalla-sheet {
+  position: absolute;
+  left: 20px; right: 20px; top: 18px; bottom: 14px;
+  z-index: 1;
+  border-radius: var(--pat-r);
+  overflow: hidden;
+
+  /* VIDRIO TEMPLADO SEMI-TRANSLÚCIDO (glassmorphism) — se ven los KPIs difuminados
+     DETRÁS. Un poco más OSCURO que la resina ámbar: base de vidrio oscuro con cuerpo
+     (gradiente 0.17→0.11) + baño ámbar SUTIL arriba + reflejo glass diagonal. El peso
+     lo da el backdrop-filter, no un fondo sólido. */
+  background:
+    linear-gradient(133deg, rgba(255,255,255,.05), transparent 24%, transparent 76%, rgba(255,255,255,.02)),   /* reflejo glass */
+    radial-gradient(70% 52% at 90% -14%, oklch(0.86 0.03 330 / 0.05), transparent 58%),                        /* PERLA (mate): nácar rosa esq. sup-der */
+    radial-gradient(62% 48% at 3% 112%,  oklch(0.85 0.03 200 / 0.04), transparent 58%),                        /* PERLA (mate): nácar cian esq. inf-izq */
+    radial-gradient(120% 80% at 12% 0%, oklch(0.82 0.14 85 / 0.09), transparent 46%),                          /* baño ámbar tenue */
+    linear-gradient(180deg, oklch(0.17 0.020 80 / 0.36), oklch(0.115 0.014 80 / 0.52));                        /* vidrio templado oscuro (un poco más cuerpo) */
+  border: 1px solid var(--pat-edge);
+  box-shadow:
+    0 34px 100px -34px rgba(0,0,0,.70),
+    0 0 64px -24px var(--pat-gold-soft),                          /* halo ámbar flotante */
+    inset 0 1px 0 rgba(255,255,255,.10),                          /* filo superior nacarado (perla) */
+    inset 0 -1px 0 rgba(0,0,0,.25),                               /* filo inferior */
+    inset 0 0 40px -24px oklch(0.86 0.025 320 / 0.05),            /* PERLA (mate): halo nácar interno muy tenue, solo en el borde */
+    inset 0 0 0 1px oklch(0.82 0.14 85 / 0.05);                   /* borde interno cálido */
+  backdrop-filter: blur(34px) saturate(1.45);
+  -webkit-backdrop-filter: blur(34px) saturate(1.45);
+
+  /* Estado replegado por default (la animación de entrada lo despliega). */
+  transform-origin: top center;
+  will-change: transform, clip-path, filter, opacity;
+}
+
+/* ── Grano premium (patrón .bmx::before recoloreado por overlay) ── */
+.pantalla-sheet::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+  opacity: .22; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+}
+
+/* ── Barrido del proyector láser (scanline). Reposa a la izquierda fuera de vista;
+   la animación de entrada lo hace recorrer la sheet UNA sola vez. ── */
+.pantalla-sheet::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -30%; width: 26%;
+  z-index: 4; pointer-events: none; opacity: 0;
+  background: linear-gradient(100deg,
+    transparent,
+    oklch(0.82 0.14 85 / 0.10) 40%,
+    oklch(0.86 0.14 85 / 0.28) 50%,
+    oklch(0.82 0.14 85 / 0.10) 60%,
+    transparent);
+  transform: skewX(-14deg);
+}
+
+/* Hook para la capa de "respiración" (blobs de mercurio dorado, pecera → pat-breathe):
+   se implementa en task posterior. NO redeclarar ::after aquí (rompería el scanline). */
+
+/* ═══════════════ ESTADOS (JS togglea las clases) ═══════════════ */
+
+/* Punto de partida de la animación de entrada: semilla arriba-centro, borrosa. */
+.pantalla-in .pantalla-sheet {
+  clip-path: inset(0 42% 92% 42% round var(--pat-r));   /* semilla estrecha arriba */
+  filter: blur(14px);
+  opacity: 0;
+  transform: scaleY(0.86);
+}
+
+/* Despliegue de la manta: crece hacia sus bordes, enfoca. NO anima height (reflow). */
+.pantalla-on .pantalla-sheet {
+  animation: pat-unfurl 0.40s var(--ease-curve) both;
+}
+.pantalla-on .pantalla-sheet::after {
+  animation: pat-scan 0.62s cubic-bezier(0.4, 0, 0.2, 1) 0.10s both;   /* barrido único */
+}
+.pantalla-on .pantalla-backdrop,
+.pantalla-in .pantalla-backdrop {
+  opacity: 1;
+  background: rgba(6, 7, 10, 0.32);
+  backdrop-filter: blur(10px) saturate(1.05);
+  -webkit-backdrop-filter: blur(10px) saturate(1.05);
+}
+
+@keyframes pat-unfurl {
+  0%   { clip-path: inset(0 42% 92% 42% round var(--pat-r)); filter: blur(14px); opacity: 0;   transform: scaleY(0.86); }
+  55%  { clip-path: inset(0 8% 20% 8% round var(--pat-r));   filter: blur(5px);  opacity: 1;   transform: scaleY(1); }
+  100% { clip-path: inset(0 0 0 0 round var(--pat-r));       filter: blur(0);    opacity: 1;   transform: scaleY(1); }
+}
+
+@keyframes pat-scan {
+  0%   { left: -30%; opacity: 0; }
+  12%  { opacity: 0.9; }
+  88%  { opacity: 0.9; }
+  100% { left: 108%;  opacity: 0; }
+}
+
+/* Estado estable: todo enfocado y quieto (por si el JS deja .pantalla-on sin re-animar). */
+.pantalla-on .pantalla-sheet {
+  clip-path: inset(0 0 0 0 round var(--pat-r));
+}
+
+/* Repliegue — inversa, más rápida (~240ms). */
+.pantalla-out .pantalla-sheet {
+  animation: pat-furl 0.24s cubic-bezier(0.4, 0, 1, 1) both;
+}
+.pantalla-out .pantalla-backdrop {
+  opacity: 0;
+  background: rgba(6, 7, 10, 0);
+  backdrop-filter: blur(0);
+  -webkit-backdrop-filter: blur(0);
+}
+@keyframes pat-furl {
+  0%   { clip-path: inset(0 0 0 0 round var(--pat-r));       filter: blur(0);    opacity: 1; transform: scaleY(1); }
+  100% { clip-path: inset(0 42% 92% 42% round var(--pat-r)); filter: blur(12px); opacity: 0; transform: scaleY(0.9); }
+}
+
+/* ═══════════════ CONTENEDORES DE CONTENIDO (listos, sin llenar) ═══════════════ */
+
+/* Vista de modo (detail / txn / scene). SIN scroll: el contenido se distribuye
+   para caber en el alto del strip (layout horizontal, filas capadas). */
+.pantalla-view {
+  position: relative; z-index: 5;      /* CONTENIDO encima del acabado (grano z3 + scanline z4): el texto no se opaca */
+  height: 100%;
+  padding: 15px 22px 13px;             /* compacto: menos aire perimetral */
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  /* CONTORNO en TODO el texto — lo despega del vidrio y le da nitidez de pantalla.
+     text-shadow se hereda a todos los descendientes (los que definen el suyo lo
+     recomponen con contorno incluido). */
+  text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 0 2px rgba(0,0,0,.45);
+}
+.pantalla-view[hidden] { display: none; }
+
+/* Botón de cierre discreto, arriba-derecha, hairline + glow ámbar sutil en hover. */
+.pantalla-close {
+  position: absolute; top: 12px; right: 12px; z-index: 6;
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border: 1px solid var(--hairline); border-radius: 9px;
+  background: rgba(10, 13, 18, 0.5);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  color: var(--text-dim); cursor: pointer;
+  font-size: 15px; line-height: 1;
+  transition: color var(--ease-fast), border-color var(--ease-fast),
+              background var(--ease-fast), box-shadow var(--ease-fast);
+}
+.pantalla-close:hover {
+  color: var(--pat-gold);
+  border-color: var(--pat-edge-h);
+  background: var(--pat-gold-soft);
+  box-shadow: 0 0 18px -6px var(--pat-gold-soft);
+}
+.pantalla-close i { display: block; }
+
+/* Log (fase 2) — estilo base mínimo, oculto por default. */
+.pantalla-log {
+  position: relative; z-index: 2;
+  padding: 6px 24px 18px;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-dim);
+}
+.pantalla-log[hidden] { display: none; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONTENIDO — Task 4: cabecera + 2 secciones de transacciones.
+   Reusa el sistema .acc-detail/.mitem/.mhead/.grade ya definido en style.css
+   (los envolvemos en esas clases desde pantalla.js) — aquí SOLO lo que no
+   existe en ningún lado: cabecera premium + encabezados de sección.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Raíz del detalle: columna que LLENA el alto del strip sin scroll. */
+.pat-wrap { display: flex; flex-direction: column; height: 100%; gap: 9px; min-height: 0; }
+
+/* Fila 1 — identidad mínima (nombre · edad) + grade, discretos, no dominan. */
+.pat-idrow { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+.pat-name { font-size: 11.5px; color: var(--text-muted); font-weight: 500; letter-spacing: .3px; }
+
+/* Controles principales (Depositar / En uso / Fijar) — ámbar, a la derecha. */
+.pat-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.pat-act {
+  -webkit-appearance: none; appearance: none; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 26px; padding: 0 9px; border-radius: 8px;
+  border: 1px solid var(--hairline); background: rgba(255,255,255,.03);
+  color: var(--text-dim); font-family: var(--font-display); font-size: 11px; font-weight: 600;
+  transition: color var(--ease-fast), border-color var(--ease-fast),
+              background var(--ease-fast), box-shadow var(--ease-fast);
+}
+.pat-act i { font-size: 14px; }
+.pat-act:hover { color: var(--pat-gold); border-color: var(--pat-edge); background: var(--pat-gold-soft); }
+.pat-act.inuse.on { color: var(--pat-gold); border-color: var(--pat-edge-h); background: var(--pat-gold-soft); box-shadow: 0 0 14px -4px var(--pat-gold-soft); }
+.pat-act-dep { color: #08090c; background: var(--pat-gold); border-color: transparent; }
+.pat-act-dep:hover { background: oklch(0.86 0.14 88); color: #08090c; box-shadow: 0 0 18px -4px var(--pat-gold-soft); }
+
+/* Fila 2 — COMBO copiable POR ENCIMA de todo, tipo liga (copia al click en el texto). */
+.pat-combo-line { flex: 0 0 auto; line-height: 1; }
+.pat-combo {
+  -webkit-appearance: none; appearance: none; border: 0; background: transparent;
+  cursor: pointer; text-align: left; padding: 0;
+  font-family: var(--font-mono); font-size: 15px; font-weight: 600;
+  color: oklch(0.93 0.022 90); letter-spacing: .2px; text-decoration: none;   /* perla nacarada (el amarillo se reserva al saldo) */
+  border-bottom: 1px dashed oklch(0.90 0.03 90 / 0.32);
+  transition: color var(--ease-fast), border-color var(--ease-fast);
+}
+.pat-combo:hover { color: oklch(0.98 0.015 90); border-bottom-color: oklch(0.92 0.03 90 / 0.7); }
+.pat-combo:active { color: #fff; }
+.pat-combo.copied { color: oklch(0.80 0.14 155); border-bottom-color: transparent; }   /* verde solo al copiar (feedback) */
+
+/* Cuerpo — 2 zonas lado a lado (datos | transacciones), llenan el resto. Un
+   DIVISOR vertical (border en .pat-txns) separa datos de transacciones. */
+.pat-body { display: flex; gap: 0; flex: 1 1 auto; min-height: 0; }
+
+.pat-ident { flex: 0 0 218px; display: flex; flex-direction: column; gap: 8px; min-width: 0; padding-right: 22px; }
+.pat-balance {
+  font-family: var(--font-display); font-weight: 700;
+  font-size: 36px; line-height: 1; letter-spacing: .2px;
+  color: var(--pat-gold);
+  text-shadow: 0 0 30px var(--pat-gold-soft), 0 1px 2px rgba(0,0,0,.6), 0 0 2px rgba(0,0,0,.5);
+}
+.pat-meta { display: flex; flex-direction: column; gap: 5px; }
+.pat-meta-item { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-dim); min-width: 0; }
+.pat-meta-item.dim { color: var(--text-muted); }
+.pat-meta-item i { font-size: 13px; color: var(--pat-gold); opacity: .8; flex: 0 0 auto; }
+.pat-curp {
+  -webkit-appearance: none; appearance: none; border: 0; background: transparent;
+  cursor: pointer; padding: 0; font: inherit; font-family: var(--font-mono);
+  color: inherit; text-decoration: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pat-curp:hover { color: var(--pat-gold); }
+
+/* Transacciones — 2 columnas compactas, SIN scroll (filas capadas + "+N más").
+   El DIVISOR (border-left dorado hairline + leve glow) marca la frontera con los datos. */
+.pat-txns {
+  flex: 1 1 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 22px;
+  min-width: 0; min-height: 0; padding-left: 22px;
+  border-left: 1px solid var(--pat-edge);
+  box-shadow: -1px 0 16px -12px var(--pat-gold-soft);
+}
+/* Una sola fuente con movimientos → una columna a todo el ancho (sin hueco). */
+.pat-txns.pat-solo { grid-template-columns: 1fr; }
+.pat-txn-emo { font-size: 12px; line-height: 1; filter: saturate(1.1); }
+.pat-txn-col { display: flex; flex-direction: column; gap: 4px; min-height: 0; overflow: hidden; }
+.pat-txn-h {
+  display: flex; align-items: center; gap: 7px; margin-bottom: 3px;
+  font-family: var(--font-display); font-weight: 600; font-size: 10.5px;
+  text-transform: uppercase; letter-spacing: .6px; color: var(--text-dim);
+}
+.pat-txn-h i { font-size: 13px; color: var(--pat-gold); }
+.pat-txn-h .cnt { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); background: oklch(0.82 0.14 85 / 0.10); border-radius: 20px; padding: 1px 7px; }
+
+/* Fila de movimiento compacta (una línea). COLORES INTUITIVOS por resultado —
+   barra lateral + tinte de fondo suave (semántica del historial viejo, más
+   compacto y sin romper la UI: el color es el acento, no el relleno). */
+.pat-mv {
+  display: flex; align-items: center; gap: 8px; font-size: 11.5px;
+  padding: 3px 8px; border-radius: 7px;
+  border-left: 2px solid transparent; cursor: pointer;
+  transition: background var(--ease-fast), border-color var(--ease-fast);
+}
+.pat-mv-t { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); white-space: nowrap; flex: 0 0 auto; }
+.pat-mv-d { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
+.pat-mv-a { font-family: var(--font-mono); font-weight: 700; white-space: nowrap; flex: 0 0 auto; }
+/* Verde = aprobado · rojo nítido = rechazado · dorado = 3DS · tenue = pendiente/retiro */
+.pat-mv.ok      { border-left-color: oklch(0.74 0.16 155 / 0.55); background: oklch(0.74 0.16 155 / 0.045); }
+.pat-mv.ok .pat-mv-a { color: oklch(0.74 0.16 155); }
+.pat-mv.fail    { border-left-color: var(--danger); background: var(--danger-soft); }
+.pat-mv.fail .pat-mv-a { color: oklch(0.68 0.22 24); }
+.pat-mv.fail .pat-mv-d { color: oklch(0.72 0.12 24); }
+.pat-mv.threeds { border-left-color: var(--pat-gold); background: oklch(0.82 0.14 85 / 0.06); }
+.pat-mv.threeds .pat-mv-a { color: var(--pat-gold); }
+.pat-mv.threeds .pat-mv-d { color: oklch(0.82 0.11 85); }
+.pat-mv.pending { border-left-color: oklch(0.82 0.11 85 / 0.30); }
+.pat-mv.pending .pat-mv-a { color: var(--text-muted); }
+.pat-mv.wd      { border-left-color: var(--text-faint); }
+.pat-mv.wd .pat-mv-a { color: var(--text-dim); }
+.pat-mv:hover   { background: oklch(0.82 0.14 85 / 0.09); }
+.pat-mv-more { font-size: 10px; color: var(--text-muted); padding: 4px 0 0 8px; }
+.pat-mv-empty { font-size: 11px; color: var(--text-muted); padding: 6px 8px; }
+
+/* ══════════ GUARDADO — tarjetas + notas en pequeño (columna de datos) ══════════
+   Pegado al fondo de la columna (margin-top:auto) para no dejar espacio muerto
+   entre la meta y el borde inferior. Separado por hairline superior. */
+.pat-saved {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-top: auto; padding-top: 9px;
+  border-top: 1px solid var(--hairline); min-width: 0;
+}
+.pat-sv-group { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pat-sv-h {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-display); font-weight: 600; font-size: 9.5px;
+  text-transform: uppercase; letter-spacing: .6px; color: var(--text-muted);
+}
+.pat-sv-h i { font-size: 12px; color: var(--pat-gold); opacity: .8; }
+.pat-sv-emo { font-size: 11px; line-height: 1; }
+.pat-sv-cnt { font-family: var(--font-mono); font-size: 9px; color: var(--text-dim); }
+.pat-sv-more { margin-left: auto; font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); }
+.pat-sv-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+
+/* Tarjeta: pipe copiable tipo liga (mismo lenguaje que el combo). */
+.pat-sv-card {
+  -webkit-appearance: none; appearance: none; border: 0; background: transparent;
+  cursor: pointer; text-align: left; padding: 1px 0; width: 100%;
+}
+.pat-sv-pipe {
+  flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim);
+  border-bottom: 1px dashed oklch(0.82 0.14 85 / 0.22);
+  transition: color var(--ease-fast), border-color var(--ease-fast);
+}
+.pat-sv-card:hover .pat-sv-pipe { color: var(--pat-gold); border-bottom-color: var(--pat-gold); }
+.pat-sv-card.copied .pat-sv-pipe { color: oklch(0.75 0.16 155); border-bottom-color: transparent; }
+.pat-sv-stat {
+  flex: 0 0 auto; margin-left: auto; font-family: var(--font-mono); font-size: 9.5px;
+  color: var(--text-muted); background: oklch(0.82 0.14 85 / 0.08);
+  border-radius: 10px; padding: 0 6px;
+}
+/* Nota: 2 líneas (texto + meta), truncadas. */
+.pat-sv-note { flex-direction: column; align-items: flex-start; gap: 0; }
+.pat-sv-ntext { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--text-dim); }
+.pat-sv-nmeta { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); }
+
+/* Estados de carga / error. */
+.pat-loading, .pat-error, .pat-stub {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12.5px; color: var(--text-dim); padding: 20px 2px;
+}
+.pat-error { color: var(--danger); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ESCRITURA LÍQUIDA — Task 5: el texto/números CUAJAN de gotas de mercurio
+   dorado. Evoca los blobs viscosos goo de las escenas de #depos (mismo filtro
+   feGaussianBlur+feColorMatrix, ver #pat-goo inyectado por pantalla.js). Cada
+   bloque arranca fundido (goo blur + opacity 0 + micro translateY/scale) y
+   "cristaliza" a nítido. Escalonado por bloque via --i (delay = i · paso).
+   Corre UNA vez al materializar (clase .pat-liquid puesta por JS, bandera
+   anti-re-render); solo anima filter/opacity/transform → CERO reflow. ── */
+
+/* Cada hijo directo animado lleva --i (índice de orden) inyectado inline por JS.
+   NOTA: se QUITÓ `filter: url(#pat-goo)` del padre — quedaba aplicado de forma
+   PERMANENTE (la clase .pat-liquid no se retira) y distorsionaba el texto final
+   (el saldo se veía con doble exposición). El cuaje (blur→nítido) ya materializa
+   sin degradar la nitidez. Prioridad: texto pixel-perfect > efecto goo. */
+
+.pat-wrap.pat-liquid .pat-idrow,
+.pat-wrap.pat-liquid .pat-combo-line,
+.pat-wrap.pat-liquid .pat-balance,
+.pat-wrap.pat-liquid .pat-meta,
+.pat-wrap.pat-liquid .pat-saved,
+.pat-wrap.pat-liquid .pat-txn-col {
+  animation: pat-cuaje 0.42s var(--ease-curve) both;
+  animation-delay: calc(var(--i, 0) * 0.062s);   /* paso corto (7 bloques → ~0.37s de cola) */
+}
+
+/* Las filas de movimiento cuajan con un stagger extra-corto DENTRO de su columna
+   (se suman al delay heredado por la columna via --i). Peor caso: col i=5 + fila
+   j=5 → 0.31s+0.15s = 0.46s de delay + 0.42s dur ≈ 0.88s total (< 900ms). */
+.pat-wrap.pat-liquid .pat-mv {
+  animation: pat-cuaje 0.42s var(--ease-curve) both;
+  animation-delay: calc(var(--i, 0) * 0.062s + var(--j, 0) * 0.030s);
+}
+
+/* El cuaje: de gota borrosa dorada (el goo del padre la vuelve viscosa) a glifo
+   nítido. El leve blur propio refuerza la fusión antes de que el padre suelte el goo. */
+@keyframes pat-cuaje {
+  0%   { opacity: 0; filter: blur(3px); transform: translateY(6px) scale(0.965); }
+  55%  { opacity: 1; filter: blur(1px); transform: translateY(0)    scale(1); }
+  100% { opacity: 1; filter: blur(0);   transform: translateY(0)    scale(1); }
+}
+
+/* ═══════════════ ACCESIBILIDAD — reduce motion ═══════════════
+   Sin scanline, sin blur animado, sin escritura líquida: fade simple de opacity. */
+@media (prefers-reduced-motion: reduce) {
+  .pantalla-sheet,
+  .pantalla-backdrop { transition: opacity var(--ease-fast); }
+  .pantalla-in .pantalla-sheet,
+  .pantalla-on .pantalla-sheet,
+  .pantalla-out .pantalla-sheet {
+    animation: none;
+    clip-path: none;
+    filter: none;
+    transform: none;
+  }
+  .pantalla-in .pantalla-sheet { opacity: 0; }
+  .pantalla-on .pantalla-sheet { opacity: 1; }
+  .pantalla-out .pantalla-sheet { opacity: 0; }
+  .pantalla-sheet::after { display: none; }         /* sin barrido láser */
+
+  /* Escritura líquida: sin goo ni cuaje. Fade simple de opacity, sin blur ni
+     transform, sin stagger (delay 0) — el contenido aparece de una, suave. */
+  .pat-wrap.pat-liquid { filter: none; }
+  .pat-wrap.pat-liquid .pat-idrow,
+  .pat-wrap.pat-liquid .pat-combo-line,
+  .pat-wrap.pat-liquid .pat-balance,
+  .pat-wrap.pat-liquid .pat-meta,
+  .pat-wrap.pat-liquid .pat-saved,
+  .pat-wrap.pat-liquid .pat-txn-col,
+  .pat-wrap.pat-liquid .pat-mv {
+    animation: pat-cuaje-rm 0.2s var(--ease-fast) both;
+    animation-delay: 0s;
+  }
+  @keyframes pat-cuaje-rm {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+}

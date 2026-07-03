@@ -93,19 +93,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `events` | def | L2122–L2132 |
 | `account_cards_pipe` | def | L2136–L2162 |
 | `account_notes_summary` | def | L2166–L2191 |
-| `account_details` | def | L2195–L2406 |
-| `NoteCreate` | class | L2409–L2410 |
-| `create_note` | def | L2414–L2443 |
-| `CurpUpdate` | class | L2446–L2447 |
-| `update_curp` | def | L2451–L2462 |
-| `delete_note` | def | L2466–L2478 |
-| `CombosRequest` | class | L2481–L2482 |
-| `accounts_combos` | def | L2486–L2499 |
-| `accounts_pass_map` | def | L2503–L2508 |
-| `list_all_cards` | def | L2512–L2587 |
-| `activity_feed` | def | L2591–L2708 |
-| `list_deposits` | def | L2712–L2741 |
-| `deposits_stats` | def | L2745–L2770 |
+| `account_details` | def | L2195–L2464 |
+| `NoteCreate` | class | L2467–L2468 |
+| `create_note` | def | L2472–L2501 |
+| `CurpUpdate` | class | L2504–L2505 |
+| `update_curp` | def | L2509–L2520 |
+| `delete_note` | def | L2524–L2536 |
+| `CombosRequest` | class | L2539–L2540 |
+| `accounts_combos` | def | L2544–L2557 |
+| `accounts_pass_map` | def | L2561–L2566 |
+| `list_all_cards` | def | L2570–L2645 |
+| `activity_feed` | def | L2649–L2766 |
+| `list_deposits` | def | L2770–L2799 |
+| `deposits_stats` | def | L2803–L2828 |
 
 ### `auth.py`
 

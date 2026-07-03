@@ -1,0 +1,598 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   pantalla.js — "La Pantalla" (Task 4: click derecho → abre + cabecera + 2
+   secciones de transacciones). El cableado fino de los 9 controles llega en
+   Task 6; la sub-vista de detalle de un movimiento (scene) llega en Task 7.
+
+   Reusa SIEMPRE que puede: window.__pat (helpers privados expuestos por
+   app.js), window.PantallaLogic (pantalla_logic.js) y los globales de app.js
+   (esc, fmtMoney, parseTs, fmtAbs, fmtAbsYear, computeCurp).
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  const $ = sel => document.querySelector(sel);
+
+  // ── Filtro goo "mercurio líquido" para texto HTML (Task 5) ──
+  // index.html ya trae filtros goo SVG (lg-goo/fm-goo/…) pero viven en <svg>
+  // de escenas y no son aplicables a HTML vía CSS. Inyectamos UNA sola vez un
+  // <svg> oculto con #pat-goo (mismo patrón: feGaussianBlur + feColorMatrix con
+  // alpha contrast) para poder hacer filter: url(#pat-goo) sobre el detalle.
+  // NO se tocan los filtros existentes de index.html.
+  function _ensureGooFilter() {
+    if (document.getElementById('pat-goo')) return;      // idempotente
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('width', '0');
+    svg.setAttribute('height', '0');
+    svg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;pointer-events:none';
+    // stdDeviation 3.2 + alpha "0 0 0 20 -9": mismo rango viscoso que rt-goo/pr-goo.
+    svg.innerHTML =
+      '<defs><filter id="pat-goo" x="-30%" y="-30%" width="160%" height="160%">' +
+      '<feGaussianBlur in="SourceGraphic" stdDeviation="3.2" result="b"/>' +
+      '<feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9" result="goo"/>' +
+      '<feBlend in="SourceGraphic" in2="goo"/>' +
+      '</filter></defs>';
+    document.body.appendChild(svg);
+  }
+
+  // Cuentas ya materializadas con el efecto líquido en esta sesión: el cuaje corre
+  // UNA vez por cuenta (la primera apertura). Re-renders por fetch fresco o
+  // re-aperturas cacheadas NO re-animan (evita brincos al refrescar datos).
+  const _liquidDone = new Set();
+
+  // Cache local por si window.__pat.detailDataCache no está disponible por
+  // algún motivo (defensivo; en condiciones normales reusamos el de app.js).
+  const _localCache = {};
+
+  let _closeTimer = null;
+  let _lastMode = 'detail';
+
+  function _pat() { return window.__pat || {}; }
+
+  function _cacheGet(id) {
+    const shared = _pat().detailDataCache;
+    if (shared && shared[id]) return shared[id];
+    return _localCache[id] || null;
+  }
+  function _cacheSet(id, data) {
+    const shared = _pat().detailDataCache;
+    if (shared) shared[id] = data;
+    else _localCache[id] = data;
+  }
+
+  // ── Elementos del marco (ya existen en index.html — Task 3) ──
+  function els() {
+    return {
+      root: $('#pantalla'),
+      detail: $('#pantallaDetail'),
+      txn: $('#pantallaTxn'),
+      scene: $('#pantallaScene'),
+      log: $('#pantallaLog'),
+    };
+  }
+
+  // ── Persiana: control de altura propio de La Pantalla ──
+  // Por defecto La Pantalla va ADHERIDA al strip (sigue el vgutter). Cuando el
+  // strip llega a su tope, el grip propio se "arma" y permite DESPEGARLA para
+  // extenderla más abajo (sobre la tabla) hasta un límite. Al subir el grip y
+  // toparse otra vez con el strip, se re-adhiere (magnético). Modelo de Robert.
+  const TABLE_RESERVE = 300;   // igual que el vgutter (app.js): px reservados a la tabla
+  const GRIP_SNAP = 16;        // umbral magnético para re-adherir al strip
+  let _detached = false;       // true = altura manual (despegada del strip)
+  let _manualH = 0;            // altura manual vigente cuando _detached
+
+  function _stripH() {
+    const lp = $('.lpanel');
+    return lp ? lp.getBoundingClientRect().height : 0;
+  }
+  function _stripMaxH() {       // tope del strip (donde "terminan los KPIs")
+    const main = $('#accountsMain');
+    const m = main ? main.clientHeight : 0;
+    return m > (TABLE_RESERVE + 96) ? m - TABLE_RESERVE : 460;
+  }
+  function _extendedMaxH() {    // límite bajo de la persiana (cubre parte de la tabla)
+    const main = $('#accountsMain');
+    const m = main ? main.clientHeight : 0;
+    return m > 160 ? m - 90 : 560;
+  }
+  function _armGrip(root, sH) {
+    // El grip aparece cuando el strip está en su tope o cuando ya está despegada.
+    root.classList.toggle('pat-grip-armed', _detached || sH >= _stripMaxH() - 4);
+  }
+
+  // ── Medir .lpanel y setear --pantalla-h ──
+  // Adherida: sigue el strip. Despegada: respeta la altura manual y sólo re-adhiere
+  // cuando el strip crece y la alcanza (se "topan" → se pegan).
+  function _sizeToStrip() {
+    const root = $('#pantalla');
+    if (!root) return;
+    const sH = _stripH();
+    if (sH <= 0) return;
+    if (_detached) {
+      if (sH >= _manualH - GRIP_SNAP) {           // el strip alcanzó a La Pantalla → re-adherir
+        _detached = false;
+        root.classList.remove('pat-detached');
+      } else {
+        root.style.setProperty('--pantalla-h', _manualH + 'px');
+        _armGrip(root, sH);
+        return;
+      }
+    }
+    root.style.setProperty('--pantalla-h', sH + 'px');
+    _armGrip(root, sH);
+  }
+
+  // ─────────────────────────── open / close ───────────────────────────
+
+  let _currentId = null;
+
+  function open(id, mode) {
+    mode = mode || 'detail';
+    id = parseInt(id);
+    if (!id) return;
+    const { root } = els();
+    if (!root) return;
+
+    _currentId = id;
+    clearTimeout(_closeTimer);
+
+    _ensureGooFilter();     // idempotente: el filtro #pat-goo debe existir antes de animar
+    _sizeToStrip();
+
+    // ¿Corre el cuaje líquido en esta apertura? Solo la PRIMERA vez que se
+    // materializa esta cuenta (aditivo al despliegue del marco pat-unfurl).
+    const firstReveal = !_liquidDone.has(id);
+
+    // Pinta de inmediato si hay cache; si no, estado de carga mínimo.
+    // Si animamos aquí (cache-hit + primera vez), marcamos ya la bandera para que
+    // el re-render del fetch fresco no vuelva a cuajar.
+    const cached = _cacheGet(id);
+    if (cached) {
+      _renderDetailView(cached, firstReveal);
+      if (firstReveal) _liquidDone.add(id);
+    } else {
+      const { detail } = els();
+      if (detail) detail.innerHTML = `<div class="pat-loading"><span class="dep-spinner"></span> Cargando…</div>`;
+    }
+
+    setMode(mode);
+
+    root.hidden = false;
+    root.setAttribute('aria-hidden', 'false');
+    root.classList.remove('pantalla-out');
+    root.classList.add('pantalla-in');
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        root.classList.add('pantalla-on');
+        root.classList.remove('pantalla-in');
+      });
+    });
+
+    // Fetch fresco (siempre, para no mostrar datos viejos por mucho rato) —
+    // solo re-renderiza si seguimos mostrando la misma cuenta.
+    fetch(`/api/accounts/${id}/details`)
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(data => {
+        _cacheSet(id, data);
+        if (_currentId === id && !root.hidden) {
+          // Anima solo si aún no se cuajó esta cuenta (caso sin cache: el spinner
+          // estuvo en pantalla y este es el primer render real → cuaja aquí).
+          const doAnim = !_liquidDone.has(id);
+          _renderDetailView(data, doAnim);
+          if (doAnim) _liquidDone.add(id);
+        }
+      })
+      .catch(err => {
+        if (_currentId !== id || root.hidden) return;
+        if (!cached) {
+          const { detail } = els();
+          if (detail) detail.innerHTML = `<div class="pat-error">Error: ${window.esc ? esc(err.message) : err.message}</div>`;
+        }
+      });
+  }
+
+  function close() {
+    const { root } = els();
+    if (!root || root.hidden) return;
+    root.classList.remove('pantalla-on');
+    root.classList.add('pantalla-out');
+    clearTimeout(_closeTimer);
+    _closeTimer = setTimeout(_finishClose, 260);
+    root.addEventListener('animationend', _finishClose, { once: true });
+  }
+
+  function _finishClose() {
+    clearTimeout(_closeTimer);
+    const { root } = els();
+    if (!root) return;
+    root.hidden = true;
+    root.setAttribute('aria-hidden', 'true');
+    root.classList.remove('pantalla-out');
+    _currentId = null;
+  }
+
+  function setMode(mode) {
+    const { root, detail, txn, scene } = els();
+    if (!root) return;
+    _lastMode = mode;
+    root.dataset.mode = mode;
+    if (detail) detail.hidden = mode !== 'detail';
+    if (txn) txn.hidden = mode !== 'txn';
+    if (scene) scene.hidden = mode !== 'scene';
+  }
+
+  // Task 7 rellena el contenido rico; aquí solo el esqueleto de transición
+  // para no romper nada si algo dispara showTxn/back antes de tiempo.
+  function showTxn(mv) {
+    const { txn } = els();
+    if (txn && !txn.dataset.patFilled) {
+      txn.innerHTML = `<div class="pat-stub">Detalle de movimiento — Task 7</div>`;
+    }
+    setMode('txn');
+  }
+  function back() {
+    setMode('detail');
+  }
+
+  // ─────────────────────────── render: detalle premium ───────────────────────────
+  // Layout horizontal (identidad+saldo | transacciones en 2 columnas), SIN scroll.
+  // Nada de incrustar el renderDetail viejo: esto es contenido nativo de La Pantalla.
+
+  const MV_CAP = 5;   // filas visibles por columna (sin scroll); el resto → "+N más"
+
+  function renderPantallaHead(d) {
+    const g = window.esc || (s => s);
+    const money = window.fmtMoney || (v => `$${(v || 0).toFixed(2)}`);
+    const pat = _pat();
+    const ageFrom = pat._ageFrom || (() => null);
+    const dmy = pat._dmy || (() => null);
+
+    const bdate = d.birthdate ? String(d.birthdate).split('T')[0].split(' ')[0] : null;
+    const age = ageFrom(bdate);
+    const nombre = (d.fullname && d.fullname !== 'N/A') ? g(d.fullname) : null;
+
+    // Combo email:password — junto, sin enmascarar (feedback_no_masking).
+    const email = d.email || '';
+    const pass = d.password || d.pass || '';
+    const combo = pass ? `${email}:${pass}` : email;
+
+    const estado = (window.PantallaLogic && d.address) ? window.PantallaLogic.estadoFrom(d.address) : null;
+
+    const curpStored = (d.curp && d.curp !== 'N/A') ? d.curp : null;
+    const curpCalc = (!curpStored && typeof computeCurp === 'function') ? computeCurp(d.fullname, bdate, d.address) : null;
+    const curpShown = curpStored || curpCalc || null;
+    const curpTag = curpStored ? '' : (curpCalc ? ' <span class="est">est</span>' : '');
+
+    const balance = d.balance_total != null ? d.balance_total : (d.balance_real || 0);
+    const grade = d.grade || null;
+    const gCls = (typeof gradeClass === 'function') ? gradeClass(grade) : '';
+    const locked = !!d.locked_by;
+
+    // --i = orden de cuaje del bloque (idrow→combo→balance→meta→columnas txns).
+    // CSS lo lee para escalonar el reveal líquido; inofensivo cuando no hay .pat-liquid.
+    // Controles principales: MISMOS data-* que renderDetail (d-deposit-btn/inuse/det-mark)
+    // para reusar la semántica; el cableado lo hace el listener de #pantalla (abajo).
+    return `
+      <div class="pat-idrow" style="--i:0">
+        ${nombre ? `<span class="pat-name">${nombre}${age != null ? ` · ${age} años` : ''}</span>` : ''}
+        ${grade ? `<span class="grade ${gCls}" title="Grade ${g(grade)}">${g(grade)}</span>` : ''}
+        <div class="pat-actions">
+          <button type="button" class="pat-act det-mark" data-mark-email="${g(email)}" title="Fijar"><i class="ph-bold ph-push-pin"></i></button>
+          <button type="button" class="pat-act inuse${locked ? ' on' : ''}" data-inuse="${d.id}" title="En uso (lock 2h) · click de nuevo libera"><i class="ph-bold ph-lock-key"></i></button>
+          <button type="button" class="pat-act pat-act-dep d-deposit-btn" data-acc-id="${d.id}" title="Depositar"><i class="ph-duotone ph-credit-card"></i><span>Depositar</span></button>
+        </div>
+      </div>
+      <div class="pat-combo-line" style="--i:1">
+        <button type="button" class="pat-combo d-copy" data-copy="${g(combo)}" title="Copiar">${g(combo)}</button>
+      </div>
+      <div class="pat-body">
+        <div class="pat-ident">
+          <div class="pat-balance" style="--i:2">${money(balance)}</div>
+          <div class="pat-meta" style="--i:3">
+            ${estado ? `<span class="pat-meta-item"><i class="ph-duotone ph-map-pin"></i> ${g(estado)}</span>` : ''}
+            ${bdate ? `<span class="pat-meta-item dim"><i class="ph-duotone ph-cake"></i> ${g(dmy(bdate) || bdate)}</span>` : ''}
+            ${curpShown ? `<span class="pat-meta-item dim"><i class="ph-duotone ph-identification-card"></i> <button type="button" class="pat-curp d-copy" data-copy="${g(curpShown)}" title="Copiar CURP">${g(curpShown)}</button>${curpTag}</span>` : ''}
+          </div>
+          ${renderPantallaSaved(d)}
+        </div>
+        ${renderPantallaTxns(d)}
+      </div>`;
+  }
+
+  // ── Guardado: tarjetas + notas en pequeño (columna de datos, bajo la meta) ──
+  // Reusa _pipeDisplay (pipe canónico num|MM|YY|cvv, sin enmascarar) y fmtAbsYear/
+  // fmtAbs (app.js). Capado (2 tarjetas + 2 notas) para no romper el sin-scroll;
+  // el resto → "+N más". El detalle completo/edición vive en el modal viejo.
+  const CARD_CAP = 2, NOTE_CAP = 2;
+
+  function renderPantallaSaved(d) {
+    const g = window.esc || (s => s);
+    const cards = Array.isArray(d.cards) ? d.cards.filter(c => c && c.card_number) : [];
+    const notes = Array.isArray(d.notes) ? d.notes.filter(n => n && (n.note_text || '').trim()) : [];
+    if (!cards.length && !notes.length) return '';
+
+    const pipeOf = (typeof _pipeDisplay === 'function')
+      ? _pipeDisplay
+      : (raw => String(raw || '').replace(/\//g, '|'));
+    const fAbsY = (typeof fmtAbsYear === 'function') ? fmtAbsYear : (s => s || '');
+
+    let cardHtml = '';
+    if (cards.length) {
+      const rows = cards.slice(0, CARD_CAP).map(c => {
+        const pipe = pipeOf(`${c.card_number || ''}|${c.card_expiry || ''}|${c.card_cvv || ''}`);
+        const appr = c.total_approved || 0, tot = c.total_deposits || 0;
+        const stat = tot > 0 ? `${appr}/${tot}` : '';
+        return `<button type="button" class="pat-sv-line pat-sv-card d-copy" data-copy="${g(pipe)}" title="Copiar tarjeta">
+          <span class="pat-sv-pipe">${g(pipe)}</span>
+          ${stat ? `<span class="pat-sv-stat">${g(stat)}</span>` : ''}
+        </button>`;
+      }).join('');
+      const more = cards.length > CARD_CAP ? `<span class="pat-sv-more">+${cards.length - CARD_CAP}</span>` : '';
+      cardHtml = `<div class="pat-sv-group">
+        <span class="pat-sv-h"><span class="pat-sv-emo">💳</span> Tarjetas<span class="pat-sv-cnt">${cards.length}</span>${more}</span>
+        ${rows}
+      </div>`;
+    }
+
+    let noteHtml = '';
+    if (notes.length) {
+      const rows = notes.slice(0, NOTE_CAP).map(n => {
+        const who = g(n.created_by_name || '—');
+        const when = n.created_at ? g(fAbsY(n.created_at)) : '';
+        return `<div class="pat-sv-line pat-sv-note" title="${g(n.note_text)}">
+          <span class="pat-sv-ntext">${g(n.note_text)}</span>
+          <span class="pat-sv-nmeta">${who}${when ? ` · ${when}` : ''}</span>
+        </div>`;
+      }).join('');
+      const more = notes.length > NOTE_CAP ? `<span class="pat-sv-more">+${notes.length - NOTE_CAP}</span>` : '';
+      noteHtml = `<div class="pat-sv-group">
+        <span class="pat-sv-h"><span class="pat-sv-emo">📝</span> Notas<span class="pat-sv-cnt">${notes.length}</span>${more}</span>
+        ${rows}
+      </div>`;
+    }
+
+    return `<div class="pat-saved" style="--i:6">${cardHtml}${noteHtml}</div>`;
+  }
+
+  // ── Transacciones: 2 columnas compactas, colores intuitivos, sin scroll ──
+
+  function _mvResultCls(m) {
+    if ((m.reason || '').toUpperCase().includes('3DS')) return 'threeds';
+    return ({ ok: 'ok', fail: 'fail', pending: 'pending', wd: 'wd' })[m.state] || 'ok';
+  }
+  function _mvDesc(m) {
+    const g = window.esc || (s => s);
+    if ((m.reason || '').toUpperCase().includes('3DS')) return 'Verificación 3DS';
+    if (m.state === 'fail') return 'Rechazado (banco)';
+    const base = m.kind === 'withdrawal' ? 'Retiro' : 'Depósito';
+    const extra = m.method ? ` · ${g(m.method)}` : (m.who ? ` · ${g(m.who)}` : '');
+    return base + extra;
+  }
+  // Fecha COMPLETA de la transacción. `when` llega en ISO ("YYYY-MM-DD HH:MM:SS")
+  // desde /details → el regex viejo (esperaba "DD/MM") fallaba y pintaba "2026-".
+  // fmtAbsYear (app.js, scope global compartido) da "03 jul 03:42" (mismo año) o
+  // "03 jul 24, 03:42" (año viejo) — año condicional, corto y legible.
+  function _mvTime(m) {
+    const w = String(m.when || '');
+    if (!w) return '—';
+    if (typeof fmtAbsYear === 'function') { const f = fmtAbsYear(w); if (f) return f; }
+    const iso = w.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);   // fallback ISO → "DD/MM HH:MM"
+    if (iso) return `${iso[3]}/${iso[2]} ${iso[4]}:${iso[5]}`;
+    return w.slice(0, 10);
+  }
+  // pos = posición DENTRO de la columna (0-based) → alimenta --j (stagger corto
+  // del cuaje entre filas). idx sigue siendo el índice GLOBAL para data-mv-idx.
+  function _mvLine(m, idx, pos) {
+    const g = window.esc || (s => s);
+    const money = window.fmtMoney || (v => `$${(v || 0).toFixed(2)}`);
+    const cls = _mvResultCls(m);
+    const sign = m.kind === 'withdrawal' ? '−' : (m.state === 'ok' ? '+' : '');
+    return `<div class="pat-mv ${cls}" data-mv-idx="${idx}" style="--j:${pos}">
+      <span class="pat-mv-t">${g(_mvTime(m))}</span>
+      <span class="pat-mv-d">${g(_mvDesc(m))}</span>
+      <span class="pat-mv-a">${sign}${money(m.amount)}</span>
+    </div>`;
+  }
+  function _mvColumn(rows) {
+    if (!rows.length) return `<div class="pat-mv-empty">Sin movimientos.</div>`;
+    const shown = rows.slice(0, MV_CAP).map((x, pos) => _mvLine(x.m, x.i, pos)).join('');
+    const more = rows.length > MV_CAP ? `<div class="pat-mv-more">+${rows.length - MV_CAP} más</div>` : '';
+    return shown + more;
+  }
+
+  function renderPantallaTxns(d) {
+    const movs = Array.isArray(d.movimientos) ? d.movimientos : [];
+    const withIdx = movs.map((m, i) => ({ m, i }));
+    const bot = withIdx.filter(x => x.m && x.m.source === 'dashboard');
+    const bet = withIdx.filter(x => !(x.m && x.m.source === 'dashboard'));
+
+    // Solo se renderizan las columnas CON movimientos → sin espacio muerto: si una
+    // fuente está vacía, la otra ocupa todo el ancho. --i 4/5: las columnas cuajan
+    // tras la cabecera (sus .pat-mv heredan --i y suman --j para el stagger).
+    const col = (emoji, label, rows, i) =>
+      `<div class="pat-txn-col" style="--i:${i}">
+        <div class="pat-txn-h"><span class="pat-txn-emo">${emoji}</span> ${label} <span class="cnt">${rows.length}</span></div>
+        ${_mvColumn(rows)}
+      </div>`;
+
+    const cols = [];
+    if (bot.length) cols.push(col('⚡', 'Botmexico', bot, 4));
+    if (bet.length) cols.push(col('🌐', 'BetMexico', bet, 5));
+    if (!cols.length) {
+      return `<div class="pat-txns pat-solo"><div class="pat-txn-col" style="--i:4"><div class="pat-mv-empty">Sin movimientos todavía.</div></div></div>`;
+    }
+    const solo = cols.length === 1 ? ' pat-solo' : '';
+    return `<div class="pat-txns${solo}">${cols.join('')}</div>`;
+  }
+
+  // animate: aplica la escritura líquida (.pat-liquid) SOLO cuando corresponde.
+  // La bandera _liquidDone garantiza un único pase por cuenta: el re-render del
+  // fetch fresco (o una re-apertura cacheada) llega con animate=false y no brinca.
+  function _renderDetailView(d, animate) {
+    const { detail } = els();
+    if (!detail) return;
+    try {
+      const liquid = animate ? ' pat-liquid' : '';
+      detail.innerHTML = `<div class="pat-wrap${liquid}">${renderPantallaHead(d)}</div>`;
+    } catch (e) {
+      console.error('[Pantalla] render failed:', e);
+      detail.innerHTML = `<div class="pat-error">Error renderizando: ${window.esc ? esc(e.message) : e.message}</div>`;
+    }
+  }
+
+  // ─────────────────────────── listeners ───────────────────────────
+
+  // Fase B — El trigger para abrir La Pantalla desde la tabla es el CLICK IZQUIERDO
+  // simple (sin modificadores), manejado en el click handler de #accTable en app.js
+  // (`window.Pantalla.open`). Ctrl/Shift+Click hacen selección tipo Excel. Ya no se
+  // usa contextmenu (click derecho).
+
+  // Cierre: click en cualquier [data-close] (backdrop + botón X).
+  document.addEventListener('click', e => {
+    if (e.target.closest('[data-close]')) close();
+  });
+
+  // Combo copiable tipo liga: el copiado real lo hace el handler global (.d-copy);
+  // aquí solo el feedback visual (parpadeo verde "copiado") al click en el texto.
+  document.addEventListener('click', e => {
+    const combo = e.target.closest('.pat-combo, .pat-curp, .pat-sv-card');
+    if (!combo) return;
+    combo.classList.add('copied');
+    setTimeout(() => combo.classList.remove('copied'), 900);
+  });
+
+  // ── Controles principales dentro de La Pantalla (Depositar / Fijar / En uso) ──
+  // Los handlers de app.js están delegados en #accTable y NO capturan dentro de
+  // #pantalla; aquí cableamos reusando las funciones GLOBALES (openDepositModal,
+  // toggleMark) y replicando el lock/unlock. En uso pide confirmación al LIBERAR.
+  const _patRoot = $('#pantalla');
+  if (_patRoot) _patRoot.addEventListener('click', async e => {
+    const dep = e.target.closest('.d-deposit-btn');
+    if (dep && dep.dataset.accId) {
+      e.preventDefault();
+      if (typeof window.openDepositModal === 'function') window.openDepositModal(parseInt(dep.dataset.accId));
+      return;
+    }
+    const mark = e.target.closest('.det-mark');
+    if (mark && mark.dataset.markEmail) {
+      e.preventDefault();
+      if (typeof window.toggleMark === 'function') window.toggleMark(mark.dataset.markEmail, mark);
+      return;
+    }
+    const inuse = e.target.closest('.inuse');
+    if (inuse && inuse.dataset.inuse) {
+      e.preventDefault();
+      const accId = parseInt(inuse.dataset.inuse);
+      const turningOn = !inuse.classList.contains('on');
+      if (!turningOn && !confirm('¿Liberar esta cuenta del uso?')) return;   // confirmación al liberar
+      inuse.classList.toggle('on', turningOn);
+      const cache = _pat().detailDataCache;
+      try {
+        if (turningOn) {
+          const op = (window.state && state.user && state.user.username) || 'op';
+          const r = await fetch(`/api/accounts/${accId}/lock`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ operator: op, hours: 2 }) });
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+          if (cache && cache[accId]) { cache[accId].locked_by = data.locked_by; cache[accId].locked_until = data.locked_until; }
+          if (window.toast) toast('🔖 En uso (lock 2h)', 'success');
+        } else {
+          const r = await fetch(`/api/accounts/${accId}/unlock`, { method: 'POST' });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          if (cache && cache[accId]) { cache[accId].locked_by = null; cache[accId].locked_until = null; }
+          if (window.toast) toast('🔓 Liberada', '');
+        }
+        if (typeof window._liveReload === 'function') window._liveReload();
+      } catch (err) {
+        inuse.classList.toggle('on', !turningOn);   // revert optimista
+        if (window.toast) toast(`Error: ${err.message}`, 'error');
+      }
+      return;
+    }
+  });
+
+  // Cierre: Esc global (solo si La Pantalla está visible).
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const root = $('#pantalla');
+    if (root && !root.hidden) close();
+  });
+
+  // Recalcular altura si la ventana cambia de tamaño mientras está abierta.
+  window.addEventListener('resize', () => {
+    const root = $('#pantalla');
+    if (root && !root.hidden) _sizeToStrip();
+  });
+
+  // La Pantalla SIGUE al control deslizable (vgutter): arrastrar el gutter cambia
+  // la altura de .lpanel pero NO dispara window.resize → observamos .lpanel directo
+  // para que La Pantalla crezca/encoja en vivo con los KPIs (más txns visibles).
+  (function observeStrip() {
+    const lpanel = $('.lpanel');
+    if (!lpanel || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      const root = $('#pantalla');
+      if (root && !root.hidden) _sizeToStrip();
+    });
+    ro.observe(lpanel);
+  })();
+
+  // ── Grip de la persiana: inyecta el handle en el borde inferior de la sheet y
+  // maneja el drag (extender/re-adherir con snap magnético al strip). ──
+  (function initPantallaGrip() {
+    const sheet = $('.pantalla-sheet');
+    const root = $('#pantalla');
+    if (!sheet || !root) return;
+    const grip = document.createElement('div');
+    grip.className = 'pantalla-grip';
+    grip.title = 'Agarra y jala ↕ para extender La Pantalla · doble-click re-adhiere';
+    grip.innerHTML = '<span class="pantalla-grip-bar"></span>';
+    sheet.appendChild(grip);
+
+    grip.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      const startY = e.clientY;
+      const startH = root.getBoundingClientRect().height;
+      const maxH = _extendedMaxH();
+      grip.setPointerCapture?.(e.pointerId);
+      root.classList.add('pat-gripping');
+      document.body.style.cursor = 'grabbing';
+      document.body.style.userSelect = 'none';
+      const move = ev => {
+        const sH = _stripH();
+        let h = startH + (ev.clientY - startY);
+        // Tope ALTO estricto = fija/strip (como se entregó); tope BAJO = extendida.
+        h = Math.max(sH, Math.min(h, Math.max(maxH, sH)));
+        if (h <= sH + GRIP_SNAP) {                 // snap: re-adherida al strip
+          _detached = false;
+          root.classList.remove('pat-detached');
+          root.style.setProperty('--pantalla-h', sH + 'px');
+        } else {                                   // despegada: altura manual
+          _detached = true;
+          _manualH = h;
+          root.classList.add('pat-detached');
+          root.style.setProperty('--pantalla-h', h + 'px');
+        }
+        _armGrip(root, sH);
+      };
+      const up = () => {
+        root.classList.remove('pat-gripping');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);   // limpieza si el SO cancela el puntero
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);        // Alt-Tab / diálogo SO no dejan el drag colgado
+    });
+
+    grip.addEventListener('dblclick', () => {      // re-adherir al strip
+      _detached = false;
+      root.classList.remove('pat-detached');
+      _sizeToStrip();
+    });
+  })();
+
+  window.Pantalla = { open, close, showTxn, back };
+})();

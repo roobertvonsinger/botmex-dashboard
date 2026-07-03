@@ -16,8 +16,9 @@
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/duotone/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
-<link rel="stylesheet" href="/static/style.css?v=20260630h">
+<link rel="stylesheet" href="/static/style.css?v=20260703p">
 <link rel="stylesheet" href="/static/depos.css?v=20260628e">
+<link rel="stylesheet" href="/static/pantalla.css?v=20260703m">
 </head>
 <body>
 <!-- Cenefa superior: banda delgada full-width (top del top) con el wordmark
@@ -142,8 +143,20 @@
         </div>
       </section>
 
+      <!-- La Pantalla: superficie ámbar de proyección al frente de los KPIs (tanda 6) -->
+      <div id="pantalla" class="pantalla" data-mode="detail" hidden aria-hidden="true">
+        <div class="pantalla-backdrop" data-close></div>
+        <div class="pantalla-sheet" role="dialog" aria-label="Detalle de cuenta">
+          <button class="pantalla-close" data-close title="Cerrar (Esc)" aria-label="Cerrar"><i class="ph-bold ph-x"></i></button>
+          <div id="pantallaDetail" class="pantalla-view"></div>
+          <div id="pantallaTxn" class="pantalla-view" hidden></div>
+          <div id="pantallaScene" class="pantalla-view" hidden></div>
+          <div id="pantallaLog" class="pantalla-log" hidden></div>
+        </div>
+      </div>
+
       <!-- Divisor horizontal arrastrable (↕): ajusta la altura del strip vs la tabla · doble-click restaura -->
-      <div class="lp-vgutter" id="lpVGutter" title="Arrastra ↕ para ajustar la altura del panel · doble-click restaura" role="separator" aria-orientation="horizontal"><span class="lp-vgrip"></span></div>
+      <div class="lp-vgutter" id="lpVGutter" title="Agarra y jala ↕ para ajustar la altura del panel · doble-click restaura" role="separator" aria-orientation="horizontal"><span class="lp-vgrip"></span></div>
 
       <!-- Zona de acople del panel de depósitos (dock izq/der lo comprime, sin tocar las cards de arriba ni el menú) -->
       <div id="accDockZone">
@@ -1019,10 +1032,12 @@
 <div id="toast" class="toast hidden"></div>
 
 <script src="/static/activity_logic.js?v=20260629b"></script>
+<script src="/static/pantalla_logic.js?v=20260702a"></script>
 <script src="/static/strip_logic.js?v=20260630a"></script>
-<script src="/static/app.js?v=20260630g"></script>
+<script src="/static/app.js?v=20260703p"></script>
 <script src="/static/depos_logic.js?v=20260628e"></script>
 <script src="/static/depos_window.js?v=20260630a"></script>
 <script src="/static/depos.js?v=20260628e"></script>
+<script src="/static/pantalla.js?v=20260703n" defer></script>
 </body>
 </html>

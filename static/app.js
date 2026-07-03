@@ -54,9 +54,12 @@ const _actNewIds = new Set();   // ids/keys de eventos llegados via SSE — para
 let notifications = [];
 let _evtSrc = null;
 let _sortCol = null, _sortDir = -1;
-// P7 — drag-select de filas (arrastrar el mouse para seleccionar/deseleccionar varias)
-let _dragSel = null;              // { mode:'select'|'deselect', startId, moved }
-let _suppressNextRowClick = false; // tras un drag, evita que el click re-togglee la fila inicial
+// Fase B — selección tipo Excel: id de la última fila clickeada con Ctrl/Shift
+// (ancla para el rango de Shift+Click). Los checkboxes se retiraron.
+let _lastClickedId = null;
+// Fase C — marquee (recuadro tipo Explorer): cuando un arrastre acaba de seleccionar,
+// suprime el `click` sintético que dispara el mouseup para que NO abra La Pantalla.
+let _marqueeSuppress = false;
 
 // ─── Detalle de cuenta inline (acordeón) ───
 // expandedAccountId: id de la cuenta cuyo panel de detalle está desplegado
@@ -544,14 +547,14 @@ function renderTable() {
   const cols = state.view === 'simple'
     ? `<tr>
         <th class="grade-bar-th"></th>
-        <th class="sel-cell"><input type="checkbox" id="selAll"></th>
+        <th class="sel-cell"></th>
         ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
         ${_th('last_deposit_date','Últ. depósito')}
         <th class="ic-col-th"></th><th class="ic-col-th"></th><th class="ic-col-th"></th>
       </tr>`
     : `<tr>
         <th class="grade-bar-th"></th>
-        <th class="sel-cell"><input type="checkbox" id="selAll"></th>
+        <th class="sel-cell"></th>
         ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
         ${_th('last_deposit_date','Últ. depósito')}
         ${_th('last_checked_at','Últ. check')}${_th('check_count','Checks','num')}
@@ -573,7 +576,6 @@ function renderTable() {
     const until = r.locked_by ? fmtUntil(r.locked_until) : null;
     const lockedCls = r.locked_by ? (until?.expired ? 'row-locked row-lock-expired' : 'row-locked') : '';
     const selCls = selectedIds.has(r.id) ? 'row-sel' : '';
-    const checked = selectedIds.has(r.id) ? 'checked' : '';
     const dep = r.last_deposit_amount
       ? `<b>${fmtMoney(r.last_deposit_amount)}</b><span class="ago">${fmtAgo(r.last_deposit_date)}</span>`
       : '<span class="dim">sin dep.</span>';
@@ -609,9 +611,9 @@ function renderTable() {
     if (state.view === 'simple') {
       return `<tr class="${trClasses}" data-id="${r.id}" title="${trTitle || ''}">
         <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
-        <td class="sel-cell" title="Click selecciona la fila"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
+        <td class="sel-cell"></td>
         <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-        <td class="combo d-copy" data-combo="${esc(combo)}" title="Click izquierdo: copiar combo · Click derecho en la fila: ver/ocultar detalle"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b>${lockChip}</td>
+        <td class="combo" title="Click: abrir La Pantalla · Ctrl/Shift+Click: seleccionar"><b>${esc(combo)}</b>${lockChip}</td>
         <td class="dep" title="Último depósito hecho">${dep}</td>
         <td class="ic-col ic-nota-col">${cellNota}</td>
         <td class="ic-col ic-cards-col">${cellCards}</td>
@@ -620,9 +622,9 @@ function renderTable() {
     }
     return `<tr class="${trClasses}" data-id="${r.id}" title="${trTitle || ''}">
       <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
-      <td class="sel-cell" title="Click selecciona la fila"><input type="checkbox" class="rowsel" data-id="${r.id}" ${checked}></td>
+      <td class="sel-cell"></td>
       <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-      <td class="combo d-copy" data-combo="${esc(combo)}" title="Click izquierdo: copiar combo · Click derecho en la fila: ver/ocultar detalle"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b></td>
+      <td class="combo" title="Click: abrir La Pantalla · Ctrl/Shift+Click: seleccionar"><b>${esc(combo)}</b></td>
       <td class="dep" title="Último depósito hecho">${dep}</td>
       <td class="dep dim" title="Cuándo se actualizó por última vez">${fmtAgo(r.last_checked_at)}</td>
       <td class="num" title="Total de veces actualizada">${r.check_count || 0}</td>
@@ -638,11 +640,6 @@ function renderTable() {
   // renderTable reescribe innerHTML completo en cada tick SSE/sort/filtro, así
   // que el acordeón sobrevive re-renders re-inyectándose desde expandedAccountId.
   _injectExpandedDetail();
-
-  // selectAll en sync con visible
-  const allChecked = visible.length > 0 && visible.every(r => selectedIds.has(r.id));
-  const selAll = $('#selAll');
-  if (selAll) selAll.checked = allChecked;
 
   renderPagination(paged);
   updateCmdBar();
@@ -1156,7 +1153,13 @@ async function openAccountByEmail(email) {
     const r = await fetch('/api/accounts?status=all&limit=5&q=' + encodeURIComponent(email));
     const rows = await r.json();
     const hit = (rows || []).find(x => (x.email || '').toLowerCase() === String(email).toLowerCase()) || (rows || [])[0];
-    if (hit && hit.id != null) { openDetailModal(hit.id); return; }
+    // Detalle universal: Actividad/Recientes/combo abren LA PANTALLA (no el modal
+    // viejo). Fallback al inline si La Pantalla no está cargada.
+    if (hit && hit.id != null) {
+      if (window.Pantalla && window.Pantalla.open) { closeDetailModal(); window.Pantalla.open(hit.id); }
+      else openDetailModal(hit.id);
+      return;
+    }
   } catch {}
   toast('No encontré esa cuenta', 'error');
 }
@@ -2511,7 +2514,7 @@ $$('.seg').forEach(seg => {
       const startX = e.clientX;
       g.classList.add('dragging');
       g.setPointerCapture?.(e.pointerId);
-      document.body.style.cursor = 'col-resize';
+      document.body.style.cursor = 'grabbing';
       document.body.style.userSelect = 'none';
 
       const move = ev => {
@@ -2575,7 +2578,7 @@ $$('.seg').forEach(seg => {
     gutter.classList.add('dragging');
     panel.classList.add('lp-resizing');   // sin transición durante el drag (tracking directo)
     gutter.setPointerCapture?.(e.pointerId);
-    document.body.style.cursor = 'row-resize';
+    document.body.style.cursor = 'grabbing';
     document.body.style.userSelect = 'none';
     const move = ev => {
       let h = startH + (ev.clientY - startY);
@@ -2917,6 +2920,9 @@ async function _quickAddNote(accId, email) {
 
 // ─── Tabla: click en checkbox, click en combo (copia), click en fila (detalle) ───
 $('#accTable').addEventListener('click', e => {
+  // Marquee: si el click viene de soltar un arrastre de selección, ignorarlo
+  // (si no, abriría La Pantalla de la última fila tocada al soltar).
+  if (_marqueeSuppress) { _marqueeSuppress = false; return; }
   // Clicks DENTRO del panel inline de detalle los maneja su propio listener;
   // este handler de tabla los ignora (si no, toggle-aría la selección de la
   // cuenta al clickear cualquier parte del panel).
@@ -2949,102 +2955,51 @@ $('#accTable').addEventListener('click', e => {
   }
   const th = e.target.closest('th.th-sort');
   if (th?.dataset.sort) { sortRows(th.dataset.sort); return; }
-  const cb = e.target.closest('.rowsel');
-  if (cb) {
-    const id = parseInt(cb.dataset.id);
-    if (cb.checked) selectedIds.add(id); else selectedIds.delete(id);
-    const tr = cb.closest('tr');
-    if (tr) tr.classList.toggle('row-sel', cb.checked);
-    updateCmdBar();
-    return;
-  }
-  // P7 — Click IZQUIERDO sobre el combo (email:password) → copiar. Copia TODA el
-  // área de la celda (no solo el <b>) para atinarle fácil. Va ANTES del row-toggle
-  // para no marcar la cuenta cuando solo querés copiar el combo.
-  const comboCell = e.target.closest('td.combo');
-  if (comboCell && comboCell.dataset.combo) {
-    e.stopPropagation();
-    navigator.clipboard.writeText(comboCell.dataset.combo)
-      .then(() => toast(`✓ ${comboCell.dataset.combo}`, 'success'))
-      .catch(err => toast(`Error: ${err.message}`, 'error'));
-    return;
-  }
-  if (e.target.id === 'selAll') {
-    const visible = getVisible();
-    if (e.target.checked) visible.forEach(r => selectedIds.add(r.id));
-    else visible.forEach(r => selectedIds.delete(r.id));
-    renderTable();
-    return;
-  }
-  // P7 — Click IZQUIERDO en cualquier parte de la fila (de la columna Cuenta a la
-  // derecha, salvo el combo y los controles atendidos arriba) → toggle selección.
-  // El detalle ya NO se abre con click izq (ahora es click derecho).
-  const tr = e.target.closest('tr');
+  // Fix (Robert): el combo YA NO copia al click — la celda/combo/fila ABREN La Pantalla.
+  // El copiado del combo vive DENTRO de La Pantalla (botón dedicado .pat-combo). Al
+  // quitarle data-combo a la celda, el click cae directo al row-handler de abajo.
+  // Fase B — interacción tipo Excel + La Pantalla en la fila:
+  //   · Click simple    → abre La Pantalla (ver detalle de la cuenta)
+  //   · Ctrl/Cmd+Click  → agrega/quita esa fila de la selección múltiple
+  //   · Shift+Click     → selecciona el rango desde la última fila clickeada (orden visible)
+  const tr = e.target.closest('tr[data-id]');
   if (tr && tr.dataset.id) {
-    // Si veníamos de un arrastre (drag-select), el toggle lo hizo el drag → suprimir.
-    if (_suppressNextRowClick) { _suppressNextRowClick = false; return; }
     const id = parseInt(tr.dataset.id);
-    const wasSelected = selectedIds.has(id);
-    if (wasSelected) selectedIds.delete(id);
-    else selectedIds.add(id);
-    tr.classList.toggle('row-sel', !wasSelected);
-    const cb = tr.querySelector('.rowsel');
-    if (cb) cb.checked = !wasSelected;
-    updateCmdBar();
+    if (e.shiftKey) {
+      _selectRange(id);
+    } else if (e.ctrlKey || e.metaKey) {
+      if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+      tr.classList.toggle('row-sel', selectedIds.has(id));
+      _lastClickedId = id;
+      updateCmdBar();
+    } else if (window.Pantalla) {
+      closeDetailModal();                 // exclusión mutua: cierra el acordeón viejo si estaba abierto
+      window.Pantalla.open(id, 'detail');
+    }
   }
 });
 
-// P7 — Click DERECHO en cualquier parte de la fila → abrir/cerrar el detalle
-// (acordeón inline). Reemplaza la columna "Detalles" eliminada. No aplica dentro
-// del panel de detalle ya abierto.
-$('#accTable').addEventListener('contextmenu', e => {
-  if (e.target.closest('.acc-detail')) return;
-  const tr = e.target.closest('tr[data-id]');
-  if (!tr) return;
-  e.preventDefault();
-  openDetailModal(parseInt(tr.dataset.id));   // toggle: abre si está cerrado, cierra si abierto
-});
-
-// P7 — Drag-select: arrastrá el mouse sobre las filas para seleccionar/deseleccionar
-// varias de un jalón. El modo (marcar o desmarcar) lo fija el estado de la fila donde
-// empezás el arrastre. No arranca sobre el combo (copia) ni sobre controles.
-function _applyDragSel(id) {
-  if (id == null || Number.isNaN(id) || !_dragSel) return;
-  const sel = _dragSel.mode === 'select';
-  if (sel) selectedIds.add(id); else selectedIds.delete(id);
-  const tr = document.querySelector(`#accTable tbody tr[data-id="${id}"]`);
-  if (tr) {
-    tr.classList.toggle('row-sel', sel);
-    const cb = tr.querySelector('.rowsel'); if (cb) cb.checked = sel;
+// Fase B — Selección de RANGO (Shift+Click), estilo Excel. Selecciona todas las
+// filas VISIBLES entre la última clickeada (_lastClickedId) y la actual, inclusive.
+// Sin ancla previa, se comporta como un Ctrl+Click simple sobre la fila actual.
+function _selectRange(id) {
+  const visible = getVisible();
+  const idxTo = visible.findIndex(r => r.id === id);
+  if (idxTo < 0) return;
+  const anchor = _lastClickedId != null ? visible.findIndex(r => r.id === _lastClickedId) : -1;
+  if (anchor < 0) {
+    selectedIds.add(id);
+    _lastClickedId = id;
+  } else {
+    const [lo, hi] = anchor < idxTo ? [anchor, idxTo] : [idxTo, anchor];
+    for (let i = lo; i <= hi; i++) selectedIds.add(visible[i].id);
   }
-}
-$('#accTable').addEventListener('mousedown', e => {
-  if (e.button !== 0) return;  // solo botón izquierdo
-  if (e.target.closest('td.combo, .row-ic, .row-refresh-one, .rowsel, .acc-detail, th, button, input, a, select')) return;
-  const tr = e.target.closest('tr[data-id]');
-  if (!tr) return;
-  e.preventDefault();  // evita que el arrastre seleccione texto de las celdas
-  const id = parseInt(tr.dataset.id);
-  _dragSel = { mode: selectedIds.has(id) ? 'deselect' : 'select', startId: id, moved: false };
-});
-$('#accTable').addEventListener('mousemove', e => {
-  if (!_dragSel) return;
-  const tr = e.target.closest('tr[data-id]');
-  if (!tr) return;
-  if (!_dragSel.moved) {
-    _dragSel.moved = true;
-    document.body.classList.add('dragging-sel');  // bloquea selección de texto al arrastrar
-    _applyDragSel(_dragSel.startId);              // incluir la fila inicial
-  }
-  _applyDragSel(parseInt(tr.dataset.id));
+  // Reflejar el resaltado en las filas presentes en el DOM.
+  document.querySelectorAll('#accTable tbody tr[data-id]').forEach(tr => {
+    tr.classList.toggle('row-sel', selectedIds.has(parseInt(tr.dataset.id)));
+  });
   updateCmdBar();
-});
-document.addEventListener('mouseup', () => {
-  if (!_dragSel) return;
-  if (_dragSel.moved) _suppressNextRowClick = true;  // el click posterior NO debe re-togglear
-  _dragSel = null;
-  document.body.classList.remove('dragging-sel');
-});
+}
 
 // Modal de detalle: botón "Validar CURP en gob.mx"
 $('#detModalBody').addEventListener('click', async e => {
@@ -3394,11 +3349,7 @@ $('#detModalBody').addEventListener('click', e => {
   btn.textContent = willSelect ? '✓ Seleccionada · click para quitar' : '+ Seleccionar (multi)';
   // Refrescar fila visible en la tabla principal (checkbox + clase row-sel)
   const tr = document.querySelector(`#accTable tr[data-id="${accId}"]`);
-  if (tr) {
-    tr.classList.toggle('row-sel', willSelect);
-    const cb = tr.querySelector('.rowsel');
-    if (cb) cb.checked = willSelect;
-  }
+  if (tr) tr.classList.toggle('row-sel', willSelect);
   // Refrescar la barra de comandos (cuenta seleccionada, botones Depositar/Copiar combos)
   if (typeof updateCmdBar === 'function') updateCmdBar();
   toast(willSelect ? '✓ Sumada a la selección' : '— Removida de selección', willSelect ? 'success' : '');
@@ -3472,69 +3423,83 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ─── Drag-select sobre cualquier celda de la fila ───
-// Pointer Events: cubre mouse + touch + pen sin long-press.
-let _dragMode = null;  // null | 'select' | 'deselect'
-let _dragPointerId = null;
-let _dragLastId = null;  // anti-toggle: no re-tocar la misma fila durante un drag
+// ─── Fase C — Marquee (recuadro de selección tipo Windows Explorer) ───
+// Reintroduce el drag-select retirado en Fase B, reconciliado con el click→La Pantalla
+// mediante un UMBRAL DE MOVIMIENTO (6px). Los tres gestos conviven sin pisarse:
+//   · Click simple (sin mover)     → cae al handler de fila → abre La Pantalla
+//   · Arrastrar > 6px sobre filas  → dibuja recuadro y selecciona las filas que toca
+//   · Ctrl mientras arrastras      → suma a la selección previa (no la reemplaza)
+//   · Shift+Click                  → rango (no inicia marquee)
+// Usa coordenadas de viewport (clientX/Y) + getBoundingClientRect por fila, así que el
+// recuadro es position:fixed y no necesita matemática de scroll.
+(function initMarquee() {
+  let box = null, sx = 0, sy = 0, pending = false, active = false, baseSel = null, addMode = false;
 
-function _toggleRowSelection(tr, wantChecked) {
-  if (!tr) return;
-  const cb = tr.querySelector('.rowsel');
-  if (!cb) return;
-  const id = parseInt(cb.dataset.id);
-  if (selectedIds.has(id) === wantChecked) return;
-  cb.checked = wantChecked;
-  if (wantChecked) selectedIds.add(id); else selectedIds.delete(id);
-  tr.classList.toggle('row-sel', wantChecked);
-  updateCmdBar();
-}
-
-function _rowAtPoint(x, y) {
-  const el = document.elementFromPoint(x, y);
-  if (!el) return null;
-  // Ignora interactivos (botones / inputs) para drag
-  if (el.closest('button, a, input, .row-details, .row-ic, .help-dismiss')) return null;
-  return el.closest('#accTable tbody tr[data-id]');
-}
-
-const _accTable = $('#accTable');
-_accTable.addEventListener('pointerdown', e => {
-  // Ignorar si arrancó en un botón/input
-  if (e.target.closest('button, a, input, th, .row-details, .row-ic')) return;
-  const tr = e.target.closest('#accTable tbody tr[data-id]');
-  if (!tr) return;
-  const id = parseInt(tr.dataset.id);
-  const isSelected = selectedIds.has(id);
-  // Si arrancas en una marcada, el drag deselecciona; si no, selecciona.
-  _dragMode = isSelected ? 'deselect' : 'select';
-  _dragPointerId = e.pointerId;
-  _dragLastId = id;
-  try { _accTable.setPointerCapture(e.pointerId); } catch {}
-});
-_accTable.addEventListener('pointermove', e => {
-  if (!_dragMode) return;
-  const tr = _rowAtPoint(e.clientX, e.clientY);
-  if (!tr) return;
-  const id = parseInt(tr.dataset.id);
-  if (id === _dragLastId) return;  // misma fila, no re-toggle
-  _dragLastId = id;
-  e.preventDefault();
-  _toggleRowSelection(tr, _dragMode === 'select');
-});
-function _endDrag(e) {
-  if (_dragPointerId != null) {
-    try { _accTable.releasePointerCapture(_dragPointerId); } catch {}
-    _dragPointerId = null;
+  function rowsInBand(top, bottom) {
+    const hits = new Set();
+    document.querySelectorAll('#accTable tbody tr[data-id]').forEach(tr => {
+      const b = tr.getBoundingClientRect();
+      if (b.bottom < top || b.top > bottom) return;   // sin solape vertical → fuera
+      hits.add(parseInt(tr.dataset.id));
+    });
+    return hits;
   }
-  _dragMode = null;
-  _dragLastId = null;
-}
-_accTable.addEventListener('pointerup', _endDrag);
-_accTable.addEventListener('pointercancel', _endDrag);
-document.addEventListener('pointerup', _endDrag);
 
-// touch-action: none en sel-cell para no scrollear mientras arrastras (CSS lo aplica).
+  function applyBand(top, bottom) {
+    const hit = rowsInBand(top, bottom);
+    selectedIds.clear();
+    if (addMode && baseSel) baseSel.forEach(id => selectedIds.add(id));
+    hit.forEach(id => selectedIds.add(id));
+    document.querySelectorAll('#accTable tbody tr[data-id]').forEach(tr => {
+      tr.classList.toggle('row-sel', selectedIds.has(parseInt(tr.dataset.id)));
+    });
+    updateCmdBar();
+  }
+
+  document.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;                         // solo botón izquierdo
+    if (!$('#accTable')) return;
+    const tr = e.target.closest('#accTable tbody tr[data-id]');
+    if (!tr) return;                                    // solo arranca sobre una fila
+    // No secuestrar controles interactivos ni el panel inline de detalle
+    if (e.target.closest('.row-ic, .row-refresh-one, a, button, input, textarea, select, .acc-detail')) return;
+    if (e.shiftKey) return;                             // Shift = rango, no marquee
+    sx = e.clientX; sy = e.clientY;
+    pending = true; active = false;
+    addMode = e.ctrlKey || e.metaKey;
+    baseSel = new Set(selectedIds);
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!pending) return;
+    if (!active) {
+      if (Math.hypot(e.clientX - sx, e.clientY - sy) < 6) return;   // umbral
+      active = true;
+      box = document.createElement('div');
+      box.className = 'sel-marquee';
+      document.body.appendChild(box);
+      document.body.classList.add('dragging-sel');      // bloquea selección de texto (CSS existente)
+    }
+    const tblRect = $('#accTable').getBoundingClientRect();
+    const left = Math.min(sx, e.clientX);
+    const right = Math.max(sx, e.clientX);
+    const top = Math.max(Math.min(sy, e.clientY), tblRect.top);      // clampa al área de la tabla
+    const bottom = Math.min(Math.max(sy, e.clientY), tblRect.bottom);
+    box.style.left = left + 'px';
+    box.style.top = top + 'px';
+    box.style.width = Math.max(0, right - left) + 'px';
+    box.style.height = Math.max(0, bottom - top) + 'px';
+    applyBand(top, bottom);
+    e.preventDefault();
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (active) _marqueeSuppress = true;                // el `click` que sigue no debe abrir La Pantalla
+    if (box) { box.remove(); box = null; }
+    document.body.classList.remove('dragging-sel');
+    pending = false; active = false; baseSel = null; sx = 0; sy = 0;
+  });
+})();
 
 // ─── Admin coachmarks (hints contextuales no invasivos solo para rol admin) ───
 const HINTS_KEY = 'admin_hints_v1';
@@ -3692,6 +3657,8 @@ function hideAdminHints() {
 async function openDetailModal(id) {
   id = parseInt(id);
   if (!id) return;
+  // Exclusión mutua: el acordeón y La Pantalla nunca coexisten (mata el doble panel).
+  if (window.Pantalla && window.Pantalla.close) window.Pantalla.close();
   // Toggle: si ya está abierta, cerrar (con micro-animación).
   if (expandedAccountId === id) {
     _closePanelAnimated();
@@ -4071,6 +4038,10 @@ function renderDetail(d) {
   </div>`;
 }
 
+// Exposición mínima y aditiva para La Pantalla (static/pantalla.js): reusa estos
+// helpers privados de app.js en vez de duplicar lógica. NO cambia nada de arriba.
+window.__pat = { renderDetail, _renderMovimiento, _mvWhen, _MV_MESES, _mvStateCls, _mvStatusIcon, _pipeDisplay, _ageFrom, _dmy, detailDataCache };
+
 async function submitNote(accId, text) {
   const r = await fetch(`/api/accounts/${accId}/notes`, {
     method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -4150,11 +4121,10 @@ document.body.addEventListener('click', e => {
   // stopPropagation suprime el handler de fila/sort de #accTable
   e.stopPropagation();
   _copyText(txt);
-  // Click sobre las LETRAS de un combo de CUENTA → además de copiar, despliega
-  // esa cuenta en detalle (Robert: "autocopia y despliega al mismo tiempo").
-  // Solo combos de cuenta: data-id (combo de la tabla) o data-email (Recientes).
-  // Los d-copy de tarjeta/CURP/pipe NO abren detalle (no tienen id/email).
-  if (t.dataset.id) openDetailModal(parseInt(t.dataset.id));
+  // Recientes/marquesina (data-email) → abrir La Pantalla tras copiar. Los d-copy de
+  // tarjeta/CURP/pipe NO abren detalle (no tienen id/email). El combo de la TABLA ya no
+  // llega aquí (se le quitó data-combo): su click abre La Pantalla vía el row-handler.
+  if (t.dataset.id && window.Pantalla) window.Pantalla.open(parseInt(t.dataset.id));
   else if (t.dataset.email) openAccountByEmail(t.dataset.email);
 }, true);
 
