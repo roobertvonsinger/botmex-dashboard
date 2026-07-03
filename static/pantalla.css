@@ -1,9 +1,12 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    pantalla.css — "La Pantalla" (Task 3: el MARCO).
-   Superficie ámbar/dorada translúcida que se MATERIALIZA al frente de los KPIs
-   (.lpanel, strip superior de la vista Cuentas), como una manta que un proyector
-   láser escribe. Hereda el vocabulario de depos.css (vidrio/grano/pecera/glow)
-   RECOLOREADO a ámbar (gold hue 85 / warn hue 75 del tema real).
+   Superficie de vidrio VERDE (botmexico, hue 160, suavizado) translúcida que se
+   MATERIALIZA al frente de los KPIs (.lpanel, strip superior de la vista Cuentas),
+   como una manta que un proyector láser escribe, con un mesh de manchas de color
+   grabado sutilmente en el vidrio (ver .pantalla-sheet background). Hereda el
+   vocabulario de depos.css (vidrio/grano/pecera/glow) recoloreado a verde.
+   OJO: --pat-3ds preserva el ámbar original SOLO para el badge de estado 3DS
+   (semántica de transacción, no del tema — no se recolorea con lo demás, ver #12).
    Aquí solo: lámina + backdrop + animación de despliegue/repliegue + contenedores
    listos para contenido (que llega en tasks posteriores). Anclado a static/style.css.
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -14,14 +17,18 @@
 
 /* ═══════════════ LÁMINA — contenedor raíz ═══════════════ */
 .pantalla {
-  /* Vars locales ámbar derivadas del tema (NO se inventa hue nuevo: gold 85 / warn 75). */
-  --pat-gold:      var(--gold);                       /* oklch(0.82 0.14 85) */
-  --pat-gold-soft: var(--gold-soft);                  /* oklch(0.82 0.14 85 / 0.14) */
-  --pat-edge:      oklch(0.82 0.14 85 / 0.28);        /* borde hairline dorado */
-  --pat-edge-h:    oklch(0.82 0.14 85 / 0.45);        /* borde en hover/foco */
-  --pat-warm:      oklch(0.80 0.16 75);               /* --warn, acento cálido */
-  --pat-tint:      oklch(0.82 0.14 85 / 0.10);        /* tinte dorado sobre el vidrio */
-  --pat-tint-2:    oklch(0.80 0.16 75 / 0.06);        /* segunda capa cálida (pecera) */
+  /* Vars locales VERDE botmexico suavizado (hue 160, mismo hue que --accent pero
+     más claro/menos saturado — se lee como tinte de vidrio premium, no como
+     el verde de acción de la nav). Deriva del hue real del tema, no inventa uno nuevo. */
+  --pat-gold:      oklch(0.80 0.085 160);             /* verde suavizado — acento principal de La Pantalla */
+  --pat-gold-soft: oklch(0.80 0.085 160 / 0.14);
+  --pat-edge:      oklch(0.80 0.085 160 / 0.28);      /* borde hairline verde */
+  --pat-edge-h:    oklch(0.80 0.085 160 / 0.45);      /* borde en hover/foco */
+  --pat-warm:      oklch(0.68 0.09 165);              /* acento verde profundo (2ª capa) */
+  --pat-tint:      oklch(0.80 0.085 160 / 0.10);      /* tinte verde sobre el vidrio */
+  --pat-tint-2:    oklch(0.68 0.09 165 / 0.06);       /* segunda capa (pecera) */
+  --pat-3ds:       oklch(0.82 0.14 85);                /* ÁMBAR preservado — SOLO semántica 3DS (no tema) */
+  --pat-3ds-soft:  oklch(0.82 0.14 85 / 0.14);
   --pat-r: 13px;                                      /* radius de la sheet */
 
   /* Anclaje al strip. La ALTURA la refina el JS via --pantalla-h (mide .lpanel);
@@ -116,23 +123,27 @@
   overflow: hidden;
 
   /* VIDRIO TEMPLADO SEMI-TRANSLÚCIDO (glassmorphism) — se ven los KPIs difuminados
-     DETRÁS. Un poco más OSCURO que la resina ámbar: base de vidrio oscuro con cuerpo
-     (gradiente 0.17→0.11) + baño ámbar SUTIL arriba + reflejo glass diagonal. El peso
-     lo da el backdrop-filter, no un fondo sólido. */
+     DETRÁS. Un poco más OSCURO que la resina verde: base de vidrio oscuro con cuerpo
+     (gradiente 0.17→0.11) + MESH de manchas verdes suaves (referencia: vecteezy
+     abstract-gradation-color, mismo lenguaje que las covers #2/#3 del set: 2-3 tonos
+     de un mismo hue difuminándose entre sí) + reflejo glass diagonal. El peso lo da
+     el backdrop-filter, no un fondo sólido. */
   background:
     linear-gradient(133deg, rgba(255,255,255,.05), transparent 24%, transparent 76%, rgba(255,255,255,.02)),   /* reflejo glass */
     radial-gradient(70% 52% at 90% -14%, oklch(0.86 0.03 330 / 0.05), transparent 58%),                        /* PERLA (mate): nácar rosa esq. sup-der */
     radial-gradient(62% 48% at 3% 112%,  oklch(0.85 0.03 200 / 0.04), transparent 58%),                        /* PERLA (mate): nácar cian esq. inf-izq */
-    radial-gradient(120% 80% at 12% 0%, oklch(0.82 0.14 85 / 0.09), transparent 46%),                          /* baño ámbar tenue */
-    linear-gradient(180deg, oklch(0.17 0.020 80 / 0.36), oklch(0.115 0.014 80 / 0.52));                        /* vidrio templado oscuro (un poco más cuerpo) */
+    radial-gradient(85% 65% at 14% 4%,  oklch(0.80 0.085 155 / 0.16), transparent 52%),                        /* mancha 1 — mint claro, esq. sup-izq */
+    radial-gradient(75% 60% at 88% 30%, oklch(0.60 0.075 165 / 0.11), transparent 55%),                        /* mancha 2 — sage medio, derecha */
+    radial-gradient(90% 70% at 30% 108%, oklch(0.32 0.06 170 / 0.20), transparent 58%),                        /* mancha 3 — sombra verde profunda, abajo */
+    linear-gradient(180deg, oklch(0.17 0.020 160 / 0.36), oklch(0.115 0.014 160 / 0.52));                      /* vidrio templado oscuro (un poco más cuerpo) */
   border: 1px solid var(--pat-edge);
   box-shadow:
     0 34px 100px -34px rgba(0,0,0,.70),
-    0 0 64px -24px var(--pat-gold-soft),                          /* halo ámbar flotante */
+    0 0 64px -24px var(--pat-gold-soft),                          /* halo verde flotante */
     inset 0 1px 0 rgba(255,255,255,.10),                          /* filo superior nacarado (perla) */
     inset 0 -1px 0 rgba(0,0,0,.25),                               /* filo inferior */
     inset 0 0 40px -24px oklch(0.86 0.025 320 / 0.05),            /* PERLA (mate): halo nácar interno muy tenue, solo en el borde */
-    inset 0 0 0 1px oklch(0.82 0.14 85 / 0.05);                   /* borde interno cálido */
+    inset 0 0 0 1px oklch(0.80 0.085 160 / 0.05);                 /* borde interno verde */
   backdrop-filter: blur(34px) saturate(1.45);
   -webkit-backdrop-filter: blur(34px) saturate(1.45);
 
@@ -155,9 +166,9 @@
   z-index: 4; pointer-events: none; opacity: 0;
   background: linear-gradient(100deg,
     transparent,
-    oklch(0.82 0.14 85 / 0.10) 40%,
-    oklch(0.86 0.14 85 / 0.28) 50%,
-    oklch(0.82 0.14 85 / 0.10) 60%,
+    oklch(0.80 0.085 160 / 0.10) 40%,
+    oklch(0.84 0.09 160 / 0.28) 50%,
+    oklch(0.80 0.085 160 / 0.10) 60%,
     transparent);
   transform: skewX(-14deg);
 }
@@ -284,7 +295,7 @@
 .pat-idrow { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
 .pat-name { font-size: 11.5px; color: var(--text-muted); font-weight: 500; letter-spacing: .3px; }
 
-/* Controles principales (Depositar / En uso / Fijar) — ámbar, a la derecha. */
+/* Controles principales (Depositar / En uso / Fijar) — verde, a la derecha. */
 .pat-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 .pat-act {
   -webkit-appearance: none; appearance: none; cursor: pointer;
@@ -299,7 +310,7 @@
 .pat-act:hover { color: var(--pat-gold); border-color: var(--pat-edge); background: var(--pat-gold-soft); }
 .pat-act.inuse.on { color: var(--pat-gold); border-color: var(--pat-edge-h); background: var(--pat-gold-soft); box-shadow: 0 0 14px -4px var(--pat-gold-soft); }
 .pat-act-dep { color: #08090c; background: var(--pat-gold); border-color: transparent; }
-.pat-act-dep:hover { background: oklch(0.86 0.14 88); color: #08090c; box-shadow: 0 0 18px -4px var(--pat-gold-soft); }
+.pat-act-dep:hover { background: oklch(0.86 0.09 160); color: #08090c; box-shadow: 0 0 18px -4px var(--pat-gold-soft); }
 
 /* Fila 2 — COMBO copiable POR ENCIMA de todo, tipo liga (copia al click en el texto). */
 .pat-combo-line { flex: 0 0 auto; line-height: 1; }
@@ -338,16 +349,17 @@
 }
 .pat-curp:hover { color: var(--pat-gold); }
 
-/* Transacciones — 2 columnas compactas, SIN scroll (filas capadas + "+N más").
+/* Transacciones — UN historial cronológico (más reciente primero), fuentes
+   Botmexico/BetMexico mezcladas pero distinguibles por fila (badge ⚡/🌐).
+   Antes 2 columnas por fuente partían el orden temporal real; ahora ocupa
+   todo el ancho disponible → más detalle por fila, más filas visibles.
    El DIVISOR (border-left dorado hairline + leve glow) marca la frontera con los datos. */
 .pat-txns {
-  flex: 1 1 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 22px;
+  flex: 1 1 auto; display: flex; flex-direction: column;
   min-width: 0; min-height: 0; padding-left: 22px;
   border-left: 1px solid var(--pat-edge);
   box-shadow: -1px 0 16px -12px var(--pat-gold-soft);
 }
-/* Una sola fuente con movimientos → una columna a todo el ancho (sin hueco). */
-.pat-txns.pat-solo { grid-template-columns: 1fr; }
 .pat-txn-emo { font-size: 12px; line-height: 1; filter: saturate(1.1); }
 .pat-txn-col { display: flex; flex-direction: column; gap: 4px; min-height: 0; overflow: hidden; }
 .pat-txn-h {
@@ -356,7 +368,7 @@
   text-transform: uppercase; letter-spacing: .6px; color: var(--text-dim);
 }
 .pat-txn-h i { font-size: 13px; color: var(--pat-gold); }
-.pat-txn-h .cnt { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); background: oklch(0.82 0.14 85 / 0.10); border-radius: 20px; padding: 1px 7px; }
+.pat-txn-h .cnt { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); background: oklch(0.80 0.085 160 / 0.10); border-radius: 20px; padding: 1px 7px; }
 
 /* Fila de movimiento compacta (una línea). COLORES INTUITIVOS por resultado —
    barra lateral + tinte de fondo suave (semántica del historial viejo, más
@@ -368,6 +380,18 @@
   transition: background var(--ease-fast), border-color var(--ease-fast);
 }
 .pat-mv-t { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); white-space: nowrap; flex: 0 0 auto; }
+.pat-mv-src {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 17px; height: 17px; flex: 0 0 auto; border-radius: 5px;
+  font-size: 10px; line-height: 1; cursor: help;
+  transition: transform var(--ease-fast);
+}
+.pat-mv-src i { display: block; }
+.pat-mv:hover .pat-mv-src { transform: scale(1.08); }
+/* Violeta = movimiento nativo del dashboard (Botmexico) · cian = movimiento importado de BetMexico —
+   colores fuera de la paleta ok/fail/3DS (155/24/85) para no confundir fuente con resultado */
+.pat-mv-src--dash { background: oklch(0.72 0.16 292 / 0.16); color: oklch(0.78 0.16 292); }
+.pat-mv-src--bet  { background: oklch(0.74 0.13 228 / 0.16); color: oklch(0.80 0.12 228); }
 .pat-mv-d { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
 .pat-mv-a { font-family: var(--font-mono); font-weight: 700; white-space: nowrap; flex: 0 0 auto; }
 /* Verde = aprobado · rojo nítido = rechazado · dorado = 3DS · tenue = pendiente/retiro */
@@ -376,14 +400,14 @@
 .pat-mv.fail    { border-left-color: var(--danger); background: var(--danger-soft); }
 .pat-mv.fail .pat-mv-a { color: oklch(0.68 0.22 24); }
 .pat-mv.fail .pat-mv-d { color: oklch(0.72 0.12 24); }
-.pat-mv.threeds { border-left-color: var(--pat-gold); background: oklch(0.82 0.14 85 / 0.06); }
-.pat-mv.threeds .pat-mv-a { color: var(--pat-gold); }
+.pat-mv.threeds { border-left-color: var(--pat-3ds); background: oklch(0.82 0.14 85 / 0.06); }
+.pat-mv.threeds .pat-mv-a { color: var(--pat-3ds); }
 .pat-mv.threeds .pat-mv-d { color: oklch(0.82 0.11 85); }
 .pat-mv.pending { border-left-color: oklch(0.82 0.11 85 / 0.30); }
 .pat-mv.pending .pat-mv-a { color: var(--text-muted); }
 .pat-mv.wd      { border-left-color: var(--text-faint); }
 .pat-mv.wd .pat-mv-a { color: var(--text-dim); }
-.pat-mv:hover   { background: oklch(0.82 0.14 85 / 0.09); }
+.pat-mv:hover   { background: oklch(0.80 0.085 160 / 0.09); }
 .pat-mv-more { font-size: 10px; color: var(--text-muted); padding: 4px 0 0 8px; }
 .pat-mv-empty { font-size: 11px; color: var(--text-muted); padding: 6px 8px; }
 
@@ -415,14 +439,14 @@
 .pat-sv-pipe {
   flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim);
-  border-bottom: 1px dashed oklch(0.82 0.14 85 / 0.22);
+  border-bottom: 1px dashed oklch(0.80 0.085 160 / 0.22);
   transition: color var(--ease-fast), border-color var(--ease-fast);
 }
 .pat-sv-card:hover .pat-sv-pipe { color: var(--pat-gold); border-bottom-color: var(--pat-gold); }
 .pat-sv-card.copied .pat-sv-pipe { color: oklch(0.75 0.16 155); border-bottom-color: transparent; }
 .pat-sv-stat {
   flex: 0 0 auto; margin-left: auto; font-family: var(--font-mono); font-size: 9.5px;
-  color: var(--text-muted); background: oklch(0.82 0.14 85 / 0.08);
+  color: var(--text-muted); background: oklch(0.80 0.085 160 / 0.08);
   border-radius: 10px; padding: 0 6px;
 }
 /* Nota: 2 líneas (texto + meta), truncadas. */

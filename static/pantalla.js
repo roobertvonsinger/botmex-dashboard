@@ -235,10 +235,10 @@
   }
 
   // ─────────────────────────── render: detalle premium ───────────────────────────
-  // Layout horizontal (identidad+saldo | transacciones en 2 columnas), SIN scroll.
+  // Layout horizontal (identidad+saldo | historial de movimientos), SIN scroll.
   // Nada de incrustar el renderDetail viejo: esto es contenido nativo de La Pantalla.
 
-  const MV_CAP = 5;   // filas visibles por columna (sin scroll); el resto → "+N más"
+  const MV_CAP = 12;   // filas visibles del historial (sin scroll, antes 5×2 col); el resto → "+N más"
 
   function renderPantallaHead(d) {
     const g = window.esc || (s => s);
@@ -354,19 +354,42 @@
     return `<div class="pat-saved" style="--i:6">${cardHtml}${noteHtml}</div>`;
   }
 
-  // ── Transacciones: 2 columnas compactas, colores intuitivos, sin scroll ──
+  // ── Transacciones: UN historial cronológico (más reciente primero), fuentes
+  // Botmexico/BetMexico mezcladas pero distinguibles por fila (pill de color +
+  // ícono, mismo par que ya usaba el acordeón viejo: ph-lightning/ph-globe —
+  // ver app.js _mvHead ~L3863) — antes se partían en 2 columnas por fuente, lo
+  // que rompía el orden temporal real que el backend ya entrega (movimientos
+  // viene pre-ordenado desc, ver app.py _mv_sort_key). Ahora que La Pantalla
+  // tiene todo el ancho disponible para una sola lista, cada fila lleva más
+  // detalle (operador, tarjeta, motivo en el title) en vez de repartir el
+  // espacio en 2 columnas angostas. */
 
   function _mvResultCls(m) {
     if ((m.reason || '').toUpperCase().includes('3DS')) return 'threeds';
     return ({ ok: 'ok', fail: 'fail', pending: 'pending', wd: 'wd' })[m.state] || 'ok';
   }
+  function _mvSrcCls(m) {
+    return m.source === 'dashboard' ? 'pat-mv-src--dash' : 'pat-mv-src--bet';
+  }
+  function _mvSrcBadge(m) {
+    return m.source === 'dashboard'
+      ? '<i class="ph-fill ph-lightning"></i>'
+      : '<i class="ph-duotone ph-globe-hemisphere-west"></i>';
+  }
+  function _mvSrcLabel(m) {
+    return m.source === 'dashboard' ? 'Botmexico' : 'BetMexico';
+  }
   function _mvDesc(m) {
     const g = window.esc || (s => s);
-    if ((m.reason || '').toUpperCase().includes('3DS')) return 'Verificación 3DS';
-    if (m.state === 'fail') return 'Rechazado (banco)';
-    const base = m.kind === 'withdrawal' ? 'Retiro' : 'Depósito';
-    const extra = m.method ? ` · ${g(m.method)}` : (m.who ? ` · ${g(m.who)}` : '');
-    return base + extra;
+    let base;
+    if ((m.reason || '').toUpperCase().includes('3DS')) base = 'Verificación 3DS';
+    else if (m.state === 'fail') base = 'Rechazado (banco)';
+    else base = m.kind === 'withdrawal' ? 'Retiro' : 'Depósito';
+    const bits = [];
+    if (m.method) bits.push(g(m.method));
+    if (m.who) bits.push(g(m.who));                              // operador que lo disparó (solo dashboard)
+    if (m.card_pipe) bits.push(`···${g(String(m.card_pipe).replace(/\|.*/, '').slice(-4))}`);  // últimos 4 de la tarjeta usada
+    return bits.length ? `${base} · ${bits.join(' · ')}` : base;
   }
   // Fecha COMPLETA de la transacción. `when` llega en ISO ("YYYY-MM-DD HH:MM:SS")
   // desde /details → el regex viejo (esperaba "DD/MM") fallaba y pintaba "2026-".
@@ -380,15 +403,17 @@
     if (iso) return `${iso[3]}/${iso[2]} ${iso[4]}:${iso[5]}`;
     return w.slice(0, 10);
   }
-  // pos = posición DENTRO de la columna (0-based) → alimenta --j (stagger corto
+  // pos = posición dentro del historial (0-based) → alimenta --j (stagger corto
   // del cuaje entre filas). idx sigue siendo el índice GLOBAL para data-mv-idx.
   function _mvLine(m, idx, pos) {
     const g = window.esc || (s => s);
     const money = window.fmtMoney || (v => `$${(v || 0).toFixed(2)}`);
     const cls = _mvResultCls(m);
     const sign = m.kind === 'withdrawal' ? '−' : (m.state === 'ok' ? '+' : '');
-    return `<div class="pat-mv ${cls}" data-mv-idx="${idx}" style="--j:${pos}">
+    const title = m.reason ? ` title="${g(m.reason)}"` : '';
+    return `<div class="pat-mv ${cls}" data-mv-idx="${idx}" style="--j:${pos}"${title}>
       <span class="pat-mv-t">${g(_mvTime(m))}</span>
+      <span class="pat-mv-src ${_mvSrcCls(m)}" title="${g(_mvSrcLabel(m))}">${_mvSrcBadge(m)}</span>
       <span class="pat-mv-d">${g(_mvDesc(m))}</span>
       <span class="pat-mv-a">${sign}${money(m.amount)}</span>
     </div>`;
@@ -402,27 +427,20 @@
 
   function renderPantallaTxns(d) {
     const movs = Array.isArray(d.movimientos) ? d.movimientos : [];
-    const withIdx = movs.map((m, i) => ({ m, i }));
-    const bot = withIdx.filter(x => x.m && x.m.source === 'dashboard');
-    const bet = withIdx.filter(x => !(x.m && x.m.source === 'dashboard'));
+    // Ya viene ordenado desc por el backend (_mv_sort_key); sort defensivo por si
+    // el string "when" (YYYY-MM-DD HH:MM:SS) llega desordenado de algún caller viejo.
+    const sorted = movs.slice().sort((a, b) => String((b || {}).when || '').localeCompare(String((a || {}).when || '')));
+    const rows = sorted.map((m, i) => ({ m, i }));
 
-    // Solo se renderizan las columnas CON movimientos → sin espacio muerto: si una
-    // fuente está vacía, la otra ocupa todo el ancho. --i 4/5: las columnas cuajan
-    // tras la cabecera (sus .pat-mv heredan --i y suman --j para el stagger).
-    const col = (emoji, label, rows, i) =>
-      `<div class="pat-txn-col" style="--i:${i}">
-        <div class="pat-txn-h"><span class="pat-txn-emo">${emoji}</span> ${label} <span class="cnt">${rows.length}</span></div>
-        ${_mvColumn(rows)}
-      </div>`;
-
-    const cols = [];
-    if (bot.length) cols.push(col('⚡', 'Botmexico', bot, 4));
-    if (bet.length) cols.push(col('🌐', 'BetMexico', bet, 5));
-    if (!cols.length) {
-      return `<div class="pat-txns pat-solo"><div class="pat-txn-col" style="--i:4"><div class="pat-mv-empty">Sin movimientos todavía.</div></div></div>`;
+    if (!rows.length) {
+      return `<div class="pat-txns"><div class="pat-txn-col" style="--i:4"><div class="pat-mv-empty">Sin movimientos todavía.</div></div></div>`;
     }
-    const solo = cols.length === 1 ? ' pat-solo' : '';
-    return `<div class="pat-txns${solo}">${cols.join('')}</div>`;
+    return `<div class="pat-txns">
+      <div class="pat-txn-col" style="--i:4">
+        <div class="pat-txn-h"><i class="ph-duotone ph-clock-counter-clockwise"></i> Movimientos <span class="cnt">${rows.length}</span></div>
+        ${_mvColumn(rows)}
+      </div>
+    </div>`;
   }
 
   // animate: aplica la escritura líquida (.pat-liquid) SOLO cuando corresponde.
