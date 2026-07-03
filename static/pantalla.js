@@ -266,13 +266,21 @@
     const balance = d.balance_total != null ? d.balance_total : (d.balance_real || 0);
     const grade = d.grade || null;
     const gCls = (typeof gradeClass === 'function') ? gradeClass(grade) : '';
+    const locked = !!d.locked_by;
 
     // --i = orden de cuaje del bloque (idrow→combo→balance→meta→columnas txns).
     // CSS lo lee para escalonar el reveal líquido; inofensivo cuando no hay .pat-liquid.
+    // Controles principales: MISMOS data-* que renderDetail (d-deposit-btn/inuse/det-mark)
+    // para reusar la semántica; el cableado lo hace el listener de #pantalla (abajo).
     return `
       <div class="pat-idrow" style="--i:0">
         ${nombre ? `<span class="pat-name">${nombre}${age != null ? ` · ${age} años` : ''}</span>` : ''}
         ${grade ? `<span class="grade ${gCls}" title="Grade ${g(grade)}">${g(grade)}</span>` : ''}
+        <div class="pat-actions">
+          <button type="button" class="pat-act det-mark" data-mark-email="${g(email)}" title="Fijar"><i class="ph-bold ph-push-pin"></i></button>
+          <button type="button" class="pat-act inuse${locked ? ' on' : ''}" data-inuse="${d.id}" title="En uso (lock 2h) · click de nuevo libera"><i class="ph-bold ph-lock-key"></i></button>
+          <button type="button" class="pat-act pat-act-dep d-deposit-btn" data-acc-id="${d.id}" title="Depositar"><i class="ph-duotone ph-credit-card"></i><span>Depositar</span></button>
+        </div>
       </div>
       <div class="pat-combo-line" style="--i:1">
         <button type="button" class="pat-combo d-copy" data-copy="${g(combo)}" title="Copiar">${g(combo)}</button>
@@ -394,6 +402,55 @@
     if (!combo) return;
     combo.classList.add('copied');
     setTimeout(() => combo.classList.remove('copied'), 900);
+  });
+
+  // ── Controles principales dentro de La Pantalla (Depositar / Fijar / En uso) ──
+  // Los handlers de app.js están delegados en #accTable y NO capturan dentro de
+  // #pantalla; aquí cableamos reusando las funciones GLOBALES (openDepositModal,
+  // toggleMark) y replicando el lock/unlock. En uso pide confirmación al LIBERAR.
+  const _patRoot = $('#pantalla');
+  if (_patRoot) _patRoot.addEventListener('click', async e => {
+    const dep = e.target.closest('.d-deposit-btn');
+    if (dep && dep.dataset.accId) {
+      e.preventDefault();
+      if (typeof window.openDepositModal === 'function') window.openDepositModal(parseInt(dep.dataset.accId));
+      return;
+    }
+    const mark = e.target.closest('.det-mark');
+    if (mark && mark.dataset.markEmail) {
+      e.preventDefault();
+      if (typeof window.toggleMark === 'function') window.toggleMark(mark.dataset.markEmail, mark);
+      return;
+    }
+    const inuse = e.target.closest('.inuse');
+    if (inuse && inuse.dataset.inuse) {
+      e.preventDefault();
+      const accId = parseInt(inuse.dataset.inuse);
+      const turningOn = !inuse.classList.contains('on');
+      if (!turningOn && !confirm('¿Liberar esta cuenta del uso?')) return;   // confirmación al liberar
+      inuse.classList.toggle('on', turningOn);
+      const cache = _pat().detailDataCache;
+      try {
+        if (turningOn) {
+          const op = (window.state && state.user && state.user.username) || 'op';
+          const r = await fetch(`/api/accounts/${accId}/lock`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ operator: op, hours: 2 }) });
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+          if (cache && cache[accId]) { cache[accId].locked_by = data.locked_by; cache[accId].locked_until = data.locked_until; }
+          if (window.toast) toast('🔖 En uso (lock 2h)', 'success');
+        } else {
+          const r = await fetch(`/api/accounts/${accId}/unlock`, { method: 'POST' });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          if (cache && cache[accId]) { cache[accId].locked_by = null; cache[accId].locked_until = null; }
+          if (window.toast) toast('🔓 Liberada', '');
+        }
+        if (typeof window._liveReload === 'function') window._liveReload();
+      } catch (err) {
+        inuse.classList.toggle('on', !turningOn);   // revert optimista
+        if (window.toast) toast(`Error: ${err.message}`, 'error');
+      }
+      return;
+    }
   });
 
   // Cierre: Esc global (solo si La Pantalla está visible).

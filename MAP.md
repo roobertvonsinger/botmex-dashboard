@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `e096e4f` | feat(pantalla): persiana magnetica — grip propio + despegar/re-adherir al strip |
 | `c86f367` | feat(pantalla): acabado premium — glassmorphism vidrio templado + escritura liquida (goo) + sigue vgutter |
 | `c9e9903` | fix(pantalla): vidrio semi-translucido real + layout horizontal sin scroll |
 | `5da9ede` | chore(pantalla): cache-bust app.js (v20260703a) para cargar window.__pat en prod |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `24a6145` | docs(plan): La Pantalla — plan de implementacion (fase 1 + fase 2) |
 | `8c93d6c` | docs(spec): tanda 6 — La Pantalla integrada a vista principal (sin seguimiento entre vistas) |
 | `4440dfd` | docs(spec): tanda 6 — La Pantalla (superficie ambar de feedback + interaccion) |
-| `5362df2` | docs(spec): tanda 6 — rework strip KPI (detalle + feed + pool/fijadas) |
 <!-- GEN:end:recientes -->
 
 ---

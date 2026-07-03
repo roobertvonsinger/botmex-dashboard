@@ -1156,7 +1156,13 @@ async function openAccountByEmail(email) {
     const r = await fetch('/api/accounts?status=all&limit=5&q=' + encodeURIComponent(email));
     const rows = await r.json();
     const hit = (rows || []).find(x => (x.email || '').toLowerCase() === String(email).toLowerCase()) || (rows || [])[0];
-    if (hit && hit.id != null) { openDetailModal(hit.id); return; }
+    // Detalle universal: Actividad/Recientes/combo abren LA PANTALLA (no el modal
+    // viejo). Fallback al inline si La Pantalla no está cargada.
+    if (hit && hit.id != null) {
+      if (window.Pantalla && window.Pantalla.open) window.Pantalla.open(hit.id);
+      else openDetailModal(hit.id);
+      return;
+    }
   } catch {}
   toast('No encontré esa cuenta', 'error');
 }
