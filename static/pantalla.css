@@ -59,17 +59,20 @@
   border-radius: var(--pat-r);
   overflow: hidden;
 
-  /* Vidrio oscuro (patrón .bmx de depos) + tinte dorado encima. */
+  /* VIDRIO ÁMBAR SEMI-TRANSLÚCIDO — se ven los KPIs difuminados DETRÁS (pantalla
+     virtual flotante, NO pared opaca). Base oscura a baja opacidad + tinte dorado;
+     el peso visual lo da el backdrop-filter, no un fondo sólido. */
   background:
-    linear-gradient(180deg, var(--pat-tint), transparent 42%),   /* baño dorado arriba */
-    linear-gradient(180deg, rgba(16,19,26,.82), rgba(9,11,15,.94));
+    linear-gradient(158deg, oklch(0.82 0.14 85 / 0.12), oklch(0.80 0.16 75 / 0.05) 52%, oklch(0.82 0.14 85 / 0.02)),
+    oklch(0.16 0.015 85 / 0.34);
   border: 1px solid var(--pat-edge);
   box-shadow:
-    0 40px 120px -30px rgba(0,0,0,.82),
-    0 0 44px -18px var(--pat-gold-soft),                          /* glow ámbar tenue */
-    inset 0 1px 0 rgba(255,255,255,.05);
-  backdrop-filter: blur(26px) saturate(1.2);
-  -webkit-backdrop-filter: blur(26px) saturate(1.2);
+    0 30px 90px -34px rgba(0,0,0,.62),
+    0 0 60px -22px var(--pat-gold-soft),                          /* halo ámbar flotante */
+    inset 0 1px 0 rgba(255,255,255,.07),
+    inset 0 0 0 1px oklch(0.82 0.14 85 / 0.05);                   /* borde interno vidrio */
+  backdrop-filter: blur(32px) saturate(1.4);
+  -webkit-backdrop-filter: blur(32px) saturate(1.4);
 
   /* Estado replegado por default (la animación de entrada lo despliega). */
   transform-origin: top center;
@@ -160,20 +163,16 @@
 
 /* ═══════════════ CONTENEDORES DE CONTENIDO (listos, sin llenar) ═══════════════ */
 
-/* Vista de modo (detail / txn / scene). Padding cómodo; scroll interno suave. */
+/* Vista de modo (detail / txn / scene). SIN scroll: el contenido se distribuye
+   para caber en el alto del strip (layout horizontal, filas capadas). */
 .pantalla-view {
   position: relative; z-index: 2;
   height: 100%;
-  padding: 22px 24px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: var(--hairline-h) transparent;
+  padding: 20px 26px 18px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
 }
 .pantalla-view[hidden] { display: none; }
-.pantalla-view::-webkit-scrollbar { width: 6px; }
-.pantalla-view::-webkit-scrollbar-thumb { background: var(--hairline-h); border-radius: 6px; }
-.pantalla-view::-webkit-scrollbar-track { background: transparent; }
 
 /* Botón de cierre discreto, arriba-derecha, hairline + glow ámbar sutil en hover. */
 .pantalla-close {
@@ -212,83 +211,82 @@
    existe en ningún lado: cabecera premium + encabezados de sección.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-.pat-head {
-  display: flex; flex-direction: column; gap: 6px;
-  padding-bottom: 16px; margin-bottom: 14px;
-  border-bottom: 1px solid var(--pat-edge);
-}
-.pat-head-top { display: flex; align-items: center; gap: 10px; }
-.pat-name {
-  font-size: 12.5px; color: var(--text-dim); font-weight: 500;
-  letter-spacing: .2px;
-}
-.pat-combo-row { display: flex; }
+/* Raíz del detalle: columna que LLENA el alto del strip sin scroll. */
+.pat-wrap { display: flex; flex-direction: column; height: 100%; gap: 11px; min-height: 0; }
+
+/* Fila 1 — identidad mínima (nombre · edad) + grade, discretos, no dominan. */
+.pat-idrow { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+.pat-name { font-size: 11.5px; color: var(--text-muted); font-weight: 500; letter-spacing: .3px; }
+
+/* Fila 2 — COMBO copiable POR ENCIMA de todo, tipo liga (copia al click en el texto). */
+.pat-combo-line { flex: 0 0 auto; line-height: 1; }
 .pat-combo {
   -webkit-appearance: none; appearance: none; border: 0; background: transparent;
   cursor: pointer; text-align: left; padding: 0;
-  font-family: var(--font-mono); font-size: 12.5px; font-weight: 500;
-  color: var(--text-dim); letter-spacing: .2px;
-  transition: color var(--ease-fast);
+  font-family: var(--font-mono); font-size: 15px; font-weight: 600;
+  color: var(--pat-gold); letter-spacing: .2px; text-decoration: none;
+  border-bottom: 1px dashed oklch(0.82 0.14 85 / 0.35);
+  transition: color var(--ease-fast), border-color var(--ease-fast);
 }
-.pat-combo:hover { color: var(--pat-gold); }
-.pat-balance-row { display: flex; align-items: baseline; }
+.pat-combo:hover { color: oklch(0.90 0.13 88); border-bottom-color: var(--pat-gold); }
+.pat-combo:active { color: #fff; }
+.pat-combo.copied { color: oklch(0.75 0.16 155); border-bottom-color: transparent; }
+
+/* Cuerpo — 2 zonas lado a lado (identidad+saldo | transacciones), llenan el resto. */
+.pat-body { display: flex; gap: 26px; flex: 1 1 auto; min-height: 0; }
+
+.pat-ident { flex: 0 0 30%; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .pat-balance {
   font-family: var(--font-display); font-weight: 700;
-  font-size: 34px; line-height: 1.1; letter-spacing: .2px;
-  color: var(--pat-gold);
+  font-size: 40px; line-height: 1; letter-spacing: .2px;
+  color: var(--pat-gold); text-shadow: 0 0 30px var(--pat-gold-soft);
 }
-.pat-meta-row {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
-  margin-top: 2px;
-}
-.pat-meta-item {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: 11.5px; color: var(--text-dim);
-}
-.pat-meta-item.dim { color: var(--text-muted, var(--text-dim)); }
-.pat-meta-item i { font-size: 13px; color: var(--pat-gold); opacity: .85; }
+.pat-meta { display: flex; flex-direction: column; gap: 5px; }
+.pat-meta-item { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-dim); min-width: 0; }
+.pat-meta-item.dim { color: var(--text-muted); }
+.pat-meta-item i { font-size: 13px; color: var(--pat-gold); opacity: .8; flex: 0 0 auto; }
 .pat-curp {
   -webkit-appearance: none; appearance: none; border: 0; background: transparent;
   cursor: pointer; padding: 0; font: inherit; font-family: var(--font-mono);
   color: inherit; text-decoration: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .pat-curp:hover { color: var(--pat-gold); }
 
-/* ── Secciones de transacciones (Botmexico / BetMexico) ── */
-.pat-txn-sections { display: flex; flex-direction: column; gap: 18px; }
-.pat-txn-sec-h {
-  display: flex; align-items: center; gap: 8px;
-  font-family: var(--font-display); font-weight: 600; font-size: 12.5px;
-  text-transform: uppercase; letter-spacing: .5px;
-  color: var(--text-dim); margin-bottom: 8px;
+/* Transacciones — 2 columnas compactas, SIN scroll (filas capadas + "+N más"). */
+.pat-txns { flex: 1 1 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; min-width: 0; min-height: 0; }
+.pat-txn-col { display: flex; flex-direction: column; gap: 4px; min-height: 0; overflow: hidden; }
+.pat-txn-h {
+  display: flex; align-items: center; gap: 7px; margin-bottom: 3px;
+  font-family: var(--font-display); font-weight: 600; font-size: 10.5px;
+  text-transform: uppercase; letter-spacing: .6px; color: var(--text-dim);
 }
-.pat-txn-sec-h i { font-size: 14px; color: var(--pat-gold); }
-.pat-txn-sec-h .cnt {
-  font-family: var(--font-mono); font-size: 10.5px; font-weight: 500;
-  color: var(--text-muted, var(--text-dim));
-  background: rgba(255,255,255,0.05); border-radius: 20px;
-  padding: 1px 8px; margin-left: 2px;
-}
-.pat-mv-row { display: block; }
-.pat-mv-empty {
-  font-size: 12px; color: var(--text-muted, var(--text-dim));
-  padding: 10px 2px;
-}
-/* Fallback (si _renderMovimiento no está disponible/compatible) — compacto,
-   mismos datos, sin depender del grid de .mhead. */
-.pat-mv-fallback {
-  display: flex; align-items: center; gap: 12px;
-  padding: 7px 12px; border-radius: 9px;
-  background: rgba(255,255,255,0.03); border: 1px solid var(--hairline);
-  font-size: 12px; margin-bottom: 4px;
-}
-.pat-mv-fallback .pat-mv-when { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); white-space: nowrap; }
-.pat-mv-fallback .pat-mv-kind { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
-.pat-mv-fallback .pat-mv-amt { font-weight: 700; white-space: nowrap; }
-.pat-mv-fallback.mv-fail .pat-mv-amt { color: var(--danger); }
-.pat-mv-fallback.mv-threeds .pat-mv-amt { color: var(--warn); }
+.pat-txn-h i { font-size: 13px; color: var(--pat-gold); }
+.pat-txn-h .cnt { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); background: oklch(0.82 0.14 85 / 0.10); border-radius: 20px; padding: 1px 7px; }
 
-/* ── Estados de carga / error de la vista ── */
+/* Fila de movimiento compacta (una línea). COLORES INTUITIVOS por resultado. */
+.pat-mv {
+  display: flex; align-items: center; gap: 8px; font-size: 11.5px;
+  padding: 3px 0; border-bottom: 1px solid var(--hairline); cursor: pointer;
+  transition: background var(--ease-fast);
+}
+.pat-mv:hover { background: oklch(0.82 0.14 85 / 0.05); }
+.pat-mv-t { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); white-space: nowrap; flex: 0 0 auto; }
+.pat-mv-d { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
+.pat-mv-a { font-family: var(--font-mono); font-weight: 700; white-space: nowrap; flex: 0 0 auto; }
+/* Verde = aprobado · rojo nítido = rechazado · dorado = 3DS · tenue = pendiente */
+.pat-mv.ok .pat-mv-a { color: oklch(0.74 0.16 155); }
+.pat-mv.ok .pat-mv-d { color: var(--text-dim); }
+.pat-mv.fail .pat-mv-a { color: oklch(0.68 0.22 24); }
+.pat-mv.fail .pat-mv-d { color: oklch(0.70 0.13 24); }
+.pat-mv.threeds .pat-mv-a { color: var(--pat-gold); }
+.pat-mv.threeds .pat-mv-d { color: oklch(0.82 0.11 85); }
+.pat-mv.pending .pat-mv-a { color: var(--text-muted); }
+.pat-mv.wd .pat-mv-a { color: var(--text-dim); }
+.pat-mv-more { font-size: 10px; color: var(--text-muted); padding-top: 4px; }
+.pat-mv-empty { font-size: 11px; color: var(--text-muted); padding: 6px 0; }
+
+/* Estados de carga / error. */
 .pat-loading, .pat-error, .pat-stub {
   display: flex; align-items: center; gap: 8px;
   font-size: 12.5px; color: var(--text-dim); padding: 20px 2px;

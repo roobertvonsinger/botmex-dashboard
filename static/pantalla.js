@@ -150,7 +150,11 @@
     setMode('detail');
   }
 
-  // ─────────────────────────── render: cabecera ───────────────────────────
+  // ─────────────────────────── render: detalle premium ───────────────────────────
+  // Layout horizontal (identidad+saldo | transacciones en 2 columnas), SIN scroll.
+  // Nada de incrustar el renderDetail viejo: esto es contenido nativo de La Pantalla.
+
+  const MV_CAP = 6;   // filas visibles por columna (sin scroll); el resto → "+N más"
 
   function renderPantallaHead(d) {
     const g = window.esc || (s => s);
@@ -161,8 +165,6 @@
 
     const bdate = d.birthdate ? String(d.birthdate).split('T')[0].split(' ')[0] : null;
     const age = ageFrom(bdate);
-    const nacimiento = dmy(bdate);
-
     const nombre = (d.fullname && d.fullname !== 'N/A') ? g(d.fullname) : null;
 
     // Combo email:password — junto, sin enmascarar (feedback_no_masking).
@@ -170,10 +172,8 @@
     const pass = d.password || d.pass || '';
     const combo = pass ? `${email}:${pass}` : email;
 
-    // Estado MX (solo estado, no calle completa) vía PantallaLogic.
     const estado = (window.PantallaLogic && d.address) ? window.PantallaLogic.estadoFrom(d.address) : null;
 
-    // CURP — real o estimado (computeCurp global de app.js), igual criterio que renderDetail.
     const curpStored = (d.curp && d.curp !== 'N/A') ? d.curp : null;
     const curpCalc = (!curpStored && typeof computeCurp === 'function') ? computeCurp(d.fullname, bdate, d.address) : null;
     const curpShown = curpStored || curpCalc || null;
@@ -184,91 +184,78 @@
     const gCls = (typeof gradeClass === 'function') ? gradeClass(grade) : '';
 
     return `
-      <div class="pat-head">
-        <div class="pat-head-top">
-          ${nombre ? `<span class="pat-name">${nombre}${age != null ? ` · ${age} años` : ''}</span>` : ''}
-          ${grade ? `<span class="grade ${gCls}" title="Grade ${g(grade)}">${g(grade)}</span>` : ''}
+      <div class="pat-idrow">
+        ${nombre ? `<span class="pat-name">${nombre}${age != null ? ` · ${age} años` : ''}</span>` : ''}
+        ${grade ? `<span class="grade ${gCls}" title="Grade ${g(grade)}">${g(grade)}</span>` : ''}
+      </div>
+      <div class="pat-combo-line">
+        <button type="button" class="pat-combo d-copy" data-copy="${g(combo)}" title="Copiar">${g(combo)}</button>
+      </div>
+      <div class="pat-body">
+        <div class="pat-ident">
+          <div class="pat-balance">${money(balance)}</div>
+          <div class="pat-meta">
+            ${estado ? `<span class="pat-meta-item"><i class="ph-duotone ph-map-pin"></i> ${g(estado)}</span>` : ''}
+            ${bdate ? `<span class="pat-meta-item dim"><i class="ph-duotone ph-cake"></i> ${g(dmy(bdate) || bdate)}</span>` : ''}
+            ${curpShown ? `<span class="pat-meta-item dim"><i class="ph-duotone ph-identification-card"></i> <button type="button" class="pat-curp d-copy" data-copy="${g(curpShown)}" title="Copiar CURP">${g(curpShown)}</button>${curpTag}</span>` : ''}
+          </div>
         </div>
-        <div class="pat-combo-row">
-          <button type="button" class="pat-combo d-copy" data-copy="${g(combo)}" title="Click para copiar">${g(combo)}</button>
-        </div>
-        <div class="pat-balance-row">
-          <span class="pat-balance">${money(balance)}</span>
-        </div>
-        <div class="pat-meta-row">
-          ${estado ? `<span class="pat-meta-item"><i class="ph-duotone ph-map-pin"></i> ${g(estado)}</span>` : ''}
-          ${nacimiento ? `<span class="pat-meta-item dim">${g(nacimiento)}</span>` : ''}
-          ${curpShown ? `<span class="pat-meta-item dim">CURP: <button type="button" class="pat-curp d-copy" data-copy="${g(curpShown)}" title="Click para copiar">${g(curpShown)}</button>${curpTag}</span>` : ''}
-        </div>
+        ${renderPantallaTxns(d)}
       </div>`;
   }
 
-  // ─────────────────────────── render: 2 secciones ───────────────────────────
+  // ── Transacciones: 2 columnas compactas, colores intuitivos, sin scroll ──
 
-  function _renderMvRow(m, idx) {
-    const pat = _pat();
-    // Preferimos reusar _renderMovimiento tal cual (mismo look que el panel
-    // inline) — le añadimos el wrapper con data-mv-idx para Task 7.
-    if (typeof pat._renderMovimiento === 'function') {
-      try {
-        const html = pat._renderMovimiento(m);
-        return `<div class="pat-mv-row" data-mv-idx="${idx}">${html}</div>`;
-      } catch (e) {
-        // cae al render propio si algo truena
-      }
-    }
-    return _renderMvRowFallback(m, idx);
+  function _mvResultCls(m) {
+    if ((m.reason || '').toUpperCase().includes('3DS')) return 'threeds';
+    return ({ ok: 'ok', fail: 'fail', pending: 'pending', wd: 'wd' })[m.state] || 'ok';
   }
-
-  // Render propio compacto, por si _renderMovimiento no está accesible o
-  // truena con esta forma de dato. Conserva los mismos campos.
-  function _renderMvRowFallback(m, idx) {
+  function _mvDesc(m) {
+    const g = window.esc || (s => s);
+    if ((m.reason || '').toUpperCase().includes('3DS')) return 'Verificación 3DS';
+    if (m.state === 'fail') return 'Rechazado (banco)';
+    const base = m.kind === 'withdrawal' ? 'Retiro' : 'Depósito';
+    const extra = m.method ? ` · ${g(m.method)}` : (m.who ? ` · ${g(m.who)}` : '');
+    return base + extra;
+  }
+  function _mvTime(m) {
+    const w = String(m.when || '');
+    const md = w.match(/^(\d{2}\/\d{2})/);      // "DD/MM/YYYY HH:MM" → "DD/MM"
+    return md ? md[1] : (w.slice(0, 5) || '—');
+  }
+  function _mvLine(m, idx) {
     const g = window.esc || (s => s);
     const money = window.fmtMoney || (v => `$${(v || 0).toFixed(2)}`);
-    const isThreeDs = (m.reason || '').toUpperCase().includes('3DS');
-    const stateCls = isThreeDs ? 'mv-threeds' : ({ ok: 'mv-dep', fail: 'mv-fail', pending: 'mv-pend', wd: 'mv-wd' })[m.state] || 'mv-dep';
-    const kindLabel = m.kind === 'withdrawal' ? 'Retiro' : 'Depósito';
+    const cls = _mvResultCls(m);
     const sign = m.kind === 'withdrawal' ? '−' : (m.state === 'ok' ? '+' : '');
-    const who = m.who ? ` · ${g(m.who)}` : '';
-    const method = m.method ? ` · ${g(m.method)}` : '';
-    return `<div class="pat-mv-row pat-mv-fallback ${stateCls}" data-mv-idx="${idx}">
-      <span class="pat-mv-when">${g(m.when || '—')}</span>
-      <span class="pat-mv-kind">${g(kindLabel)}${method}${who}</span>
-      <span class="pat-mv-amt">${sign}${money(m.amount)}</span>
+    return `<div class="pat-mv ${cls}" data-mv-idx="${idx}">
+      <span class="pat-mv-t">${g(_mvTime(m))}</span>
+      <span class="pat-mv-d">${g(_mvDesc(m))}</span>
+      <span class="pat-mv-a">${sign}${money(m.amount)}</span>
     </div>`;
+  }
+  function _mvColumn(rows) {
+    if (!rows.length) return `<div class="pat-mv-empty">Sin movimientos.</div>`;
+    const shown = rows.slice(0, MV_CAP).map(x => _mvLine(x.m, x.i)).join('');
+    const more = rows.length > MV_CAP ? `<div class="pat-mv-more">+${rows.length - MV_CAP} más</div>` : '';
+    return shown + more;
   }
 
   function renderPantallaTxns(d) {
     const movs = Array.isArray(d.movimientos) ? d.movimientos : [];
-    const split = window.PantallaLogic
-      ? window.PantallaLogic.splitTransactions(movs)
-      : { botmexico: [], betmexico: [] };
-
-    // Índices reales dentro de d.movimientos (para que Task 7 pueda indexar
-    // de vuelta al arreglo original con data-mv-idx).
     const withIdx = movs.map((m, i) => ({ m, i }));
-    const botIdx = withIdx.filter(x => x.m && x.m.source === 'dashboard');
-    const betIdx = withIdx.filter(x => !(x.m && x.m.source === 'dashboard'));
-
-    const botRows = botIdx.length
-      ? botIdx.map(x => _renderMvRow(x.m, x.i)).join('')
-      : `<div class="pat-mv-empty">Sin transacciones de Botmexico.</div>`;
-    const betRows = betIdx.length
-      ? betIdx.map(x => _renderMvRow(x.m, x.i)).join('')
-      : `<div class="pat-mv-empty">Sin transacciones directas en BetMexico.</div>`;
-
-    // Envuelto en .acc-detail para heredar gratis el styling ya hecho de
-    // .mitem/.mhead/.mv-*/.when/etc. (style.css) sin duplicar CSS de movimientos.
+    const bot = withIdx.filter(x => x.m && x.m.source === 'dashboard');
+    const bet = withIdx.filter(x => !(x.m && x.m.source === 'dashboard'));
     return `
-      <div class="acc-detail pat-txn-sections">
-        <section class="pat-txn-sec">
-          <div class="pat-txn-sec-h"><i class="ph-fill ph-lightning"></i> Botmexico <span class="cnt">${botIdx.length}</span></div>
-          <div class="mlist pat-txn-list">${botRows}</div>
-        </section>
-        <section class="pat-txn-sec">
-          <div class="pat-txn-sec-h"><i class="ph-duotone ph-globe-hemisphere-west"></i> BetMexico <span class="cnt">${betIdx.length}</span></div>
-          <div class="mlist pat-txn-list">${betRows}</div>
-        </section>
+      <div class="pat-txns">
+        <div class="pat-txn-col">
+          <div class="pat-txn-h"><i class="ph-fill ph-lightning"></i> Botmexico <span class="cnt">${bot.length}</span></div>
+          ${_mvColumn(bot)}
+        </div>
+        <div class="pat-txn-col">
+          <div class="pat-txn-h"><i class="ph-duotone ph-globe-hemisphere-west"></i> BetMexico <span class="cnt">${bet.length}</span></div>
+          ${_mvColumn(bet)}
+        </div>
       </div>`;
   }
 
@@ -276,7 +263,7 @@
     const { detail } = els();
     if (!detail) return;
     try {
-      detail.innerHTML = renderPantallaHead(d) + renderPantallaTxns(d);
+      detail.innerHTML = `<div class="pat-wrap">${renderPantallaHead(d)}</div>`;
     } catch (e) {
       console.error('[Pantalla] render failed:', e);
       detail.innerHTML = `<div class="pat-error">Error renderizando: ${window.esc ? esc(e.message) : e.message}</div>`;
@@ -304,6 +291,15 @@
   // Cierre: click en cualquier [data-close] (backdrop + botón X).
   document.addEventListener('click', e => {
     if (e.target.closest('[data-close]')) close();
+  });
+
+  // Combo copiable tipo liga: el copiado real lo hace el handler global (.d-copy);
+  // aquí solo el feedback visual (parpadeo verde "copiado") al click en el texto.
+  document.addEventListener('click', e => {
+    const combo = e.target.closest('.pat-combo, .pat-curp');
+    if (!combo) return;
+    combo.classList.add('copied');
+    setTimeout(() => combo.classList.remove('copied'), 900);
   });
 
   // Cierre: Esc global (solo si La Pantalla está visible).

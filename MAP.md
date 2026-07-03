@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `5da9ede` | chore(pantalla): cache-bust app.js (v20260703a) para cargar window.__pat en prod |
 | `c55a1f0` | feat(pantalla): contextmenu → detalle (cabecera + 2 secciones txn botmexico/betmexico) |
 | `c842dc3` | feat(pantalla): lamina ambar + materializacion (despliegue de manta + scanline) |
 | `3bd728e` | feat(pantalla): markup del contenedor #pantalla + carga de assets |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `5362df2` | docs(spec): tanda 6 — rework strip KPI (detalle + feed + pool/fijadas) |
 | `530bc81` | docs(session): cierre 2026-07-02 sesión 2 — deploy 94fd057 verificado en vivo + higiene KVM4 |
 | `94fd057` | fix(flujos): auditoria 7 flujos — 3 criticos + 5 mayores (proxyless, drenaje captcha, doble cargo, caps, guardrail, auth, indice) |
-| `81ad8b5` | fix(proxy): reemplazar pool DataImpulse rotatorio por lote sticky fresco (100 sesiones) |
 <!-- GEN:end:recientes -->
 
 ---
