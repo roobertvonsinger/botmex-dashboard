@@ -4071,6 +4071,10 @@ function renderDetail(d) {
   </div>`;
 }
 
+// Exposición mínima y aditiva para La Pantalla (static/pantalla.js): reusa estos
+// helpers privados de app.js en vez de duplicar lógica. NO cambia nada de arriba.
+window.__pat = { renderDetail, _renderMovimiento, _mvWhen, _MV_MESES, _mvStateCls, _mvStatusIcon, _pipeDisplay, _ageFrom, _dmy, detailDataCache };
+
 async function submitNote(accId, text) {
   const r = await fetch(`/api/accounts/${accId}/notes`, {
     method: 'POST', headers: {'Content-Type': 'application/json'},

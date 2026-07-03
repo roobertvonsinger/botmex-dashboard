@@ -205,6 +205,96 @@
 }
 .pantalla-log[hidden] { display: none; }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONTENIDO — Task 4: cabecera + 2 secciones de transacciones.
+   Reusa el sistema .acc-detail/.mitem/.mhead/.grade ya definido en style.css
+   (los envolvemos en esas clases desde pantalla.js) — aquí SOLO lo que no
+   existe en ningún lado: cabecera premium + encabezados de sección.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.pat-head {
+  display: flex; flex-direction: column; gap: 6px;
+  padding-bottom: 16px; margin-bottom: 14px;
+  border-bottom: 1px solid var(--pat-edge);
+}
+.pat-head-top { display: flex; align-items: center; gap: 10px; }
+.pat-name {
+  font-size: 12.5px; color: var(--text-dim); font-weight: 500;
+  letter-spacing: .2px;
+}
+.pat-combo-row { display: flex; }
+.pat-combo {
+  -webkit-appearance: none; appearance: none; border: 0; background: transparent;
+  cursor: pointer; text-align: left; padding: 0;
+  font-family: var(--font-mono); font-size: 12.5px; font-weight: 500;
+  color: var(--text-dim); letter-spacing: .2px;
+  transition: color var(--ease-fast);
+}
+.pat-combo:hover { color: var(--pat-gold); }
+.pat-balance-row { display: flex; align-items: baseline; }
+.pat-balance {
+  font-family: var(--font-display); font-weight: 700;
+  font-size: 34px; line-height: 1.1; letter-spacing: .2px;
+  color: var(--pat-gold);
+}
+.pat-meta-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+  margin-top: 2px;
+}
+.pat-meta-item {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; color: var(--text-dim);
+}
+.pat-meta-item.dim { color: var(--text-muted, var(--text-dim)); }
+.pat-meta-item i { font-size: 13px; color: var(--pat-gold); opacity: .85; }
+.pat-curp {
+  -webkit-appearance: none; appearance: none; border: 0; background: transparent;
+  cursor: pointer; padding: 0; font: inherit; font-family: var(--font-mono);
+  color: inherit; text-decoration: none;
+}
+.pat-curp:hover { color: var(--pat-gold); }
+
+/* ── Secciones de transacciones (Botmexico / BetMexico) ── */
+.pat-txn-sections { display: flex; flex-direction: column; gap: 18px; }
+.pat-txn-sec-h {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-display); font-weight: 600; font-size: 12.5px;
+  text-transform: uppercase; letter-spacing: .5px;
+  color: var(--text-dim); margin-bottom: 8px;
+}
+.pat-txn-sec-h i { font-size: 14px; color: var(--pat-gold); }
+.pat-txn-sec-h .cnt {
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 500;
+  color: var(--text-muted, var(--text-dim));
+  background: rgba(255,255,255,0.05); border-radius: 20px;
+  padding: 1px 8px; margin-left: 2px;
+}
+.pat-mv-row { display: block; }
+.pat-mv-empty {
+  font-size: 12px; color: var(--text-muted, var(--text-dim));
+  padding: 10px 2px;
+}
+/* Fallback (si _renderMovimiento no está disponible/compatible) — compacto,
+   mismos datos, sin depender del grid de .mhead. */
+.pat-mv-fallback {
+  display: flex; align-items: center; gap: 12px;
+  padding: 7px 12px; border-radius: 9px;
+  background: rgba(255,255,255,0.03); border: 1px solid var(--hairline);
+  font-size: 12px; margin-bottom: 4px;
+}
+.pat-mv-fallback .pat-mv-when { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+.pat-mv-fallback .pat-mv-kind { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
+.pat-mv-fallback .pat-mv-amt { font-weight: 700; white-space: nowrap; }
+.pat-mv-fallback.mv-fail .pat-mv-amt { color: var(--danger); }
+.pat-mv-fallback.mv-threeds .pat-mv-amt { color: var(--warn); }
+
+/* ── Estados de carga / error de la vista ── */
+.pat-loading, .pat-error, .pat-stub {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12.5px; color: var(--text-dim); padding: 20px 2px;
+}
+.pat-error { color: var(--danger); }
+
 /* ═══════════════ ACCESIBILIDAD — reduce motion ═══════════════
    Sin scanline, sin blur animado, sin escritura líquida: fade simple de opacity. */
 @media (prefers-reduced-motion: reduce) {
