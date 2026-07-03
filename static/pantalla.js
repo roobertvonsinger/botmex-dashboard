@@ -93,7 +93,11 @@
   function _extendedMaxH() {    // límite bajo de la persiana (cubre parte de la tabla)
     const main = $('#accountsMain');
     const m = main ? main.clientHeight : 0;
-    return m > 160 ? m - 90 : 560;
+    const raw = m > 160 ? m - 90 : 560;
+    // Clamp al mismo 88vh que trunca pantalla.css (.pantalla-sheet max-height) —
+    // si no, en viewports bajos el grip sigue "respondiendo" en JS más allá de
+    // donde el CSS ya recortó visualmente, y el operador no predice el tope.
+    return Math.min(raw, window.innerHeight * 0.88);
   }
   function _armGrip(root, sH) {
     // El grip aparece cuando el strip está en su tope o cuando ya está despegada.
@@ -148,8 +152,8 @@
     // el re-render del fetch fresco no vuelva a cuajar.
     const cached = _cacheGet(id);
     if (cached) {
-      _renderDetailView(cached, firstReveal);
-      if (firstReveal) _liquidDone.add(id);
+      const ok = _renderDetailView(cached, firstReveal);
+      if (firstReveal && ok) _liquidDone.add(id);
     } else {
       const { detail } = els();
       if (detail) detail.innerHTML = `<div class="pat-loading"><span class="dep-spinner"></span> Cargando…</div>`;
@@ -178,8 +182,8 @@
           // Anima solo si aún no se cuajó esta cuenta (caso sin cache: el spinner
           // estuvo en pantalla y este es el primer render real → cuaja aquí).
           const doAnim = !_liquidDone.has(id);
-          _renderDetailView(data, doAnim);
-          if (doAnim) _liquidDone.add(id);
+          const ok = _renderDetailView(data, doAnim);
+          if (doAnim && ok) _liquidDone.add(id);
         }
       })
       .catch(err => {
@@ -479,15 +483,21 @@
   // animate: aplica la escritura líquida (.pat-liquid) SOLO cuando corresponde.
   // La bandera _liquidDone garantiza un único pase por cuenta: el re-render del
   // fetch fresco (o una re-apertura cacheada) llega con animate=false y no brinca.
+  // Devuelve true si pintó el detalle real (false si tronó y solo mostró
+  // .pat-error) — el llamador usa esto para NO marcar _liquidDone en un
+  // render fallido; si no, al reabrir con datos ya buenos nunca se ve el
+  // cuaje líquido (la bandera quedó puesta sobre un render que nunca ocurrió).
   function _renderDetailView(d, animate) {
     const { detail } = els();
-    if (!detail) return;
+    if (!detail) return false;
     try {
       const liquid = animate ? ' pat-liquid' : '';
       detail.innerHTML = `<div class="pat-wrap${liquid}">${renderPantallaHead(d)}</div>`;
+      return true;
     } catch (e) {
       console.error('[Pantalla] render failed:', e);
       detail.innerHTML = `<div class="pat-error">Error renderizando: ${window.esc ? esc(e.message) : e.message}</div>`;
+      return false;
     }
   }
 

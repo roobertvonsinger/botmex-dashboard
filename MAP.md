@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `864f3fd` | feat(pantalla): CRUD de notas + guardar CURP validado (Task 3, parcial) |
 | `1ee0c17` | feat(pantalla): historial de transacciones unificado + fuente por color |
 | `7af566f` | feat(pantalla): Fase C — marquee de seleccion tipo Explorer (umbral 6px) |
 | `d55170b` | fix(backend): dedup exige coincidencia de estado — no oculta depositos APROBADOS reales |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `ff51ebe` | feat(pantalla): universal parcial — controles Depositar/EnUso/Fijar + Actividad/Recientes abren La Pantalla |
 | `e096e4f` | feat(pantalla): persiana magnetica — grip propio + despegar/re-adherir al strip |
 | `c86f367` | feat(pantalla): acabado premium — glassmorphism vidrio templado + escritura liquida (goo) + sigue vgutter |
-| `c9e9903` | fix(pantalla): vidrio semi-translucido real + layout horizontal sin scroll |
 <!-- GEN:end:recientes -->
 
 ---
