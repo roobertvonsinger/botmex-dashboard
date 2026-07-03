@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `3bd728e` | feat(pantalla): markup del contenedor #pantalla + carga de assets |
 | `06439df` | feat(pantalla): logica pura — split txn (botmexico/betmexico) + estadoFrom + formatHito |
 | `b36ce32` | docs(session): cierre 2026-07-02 sesion 3 — diseno + plan de La Pantalla listo para /Smartexe |
 | `24a6145` | docs(plan): La Pantalla — plan de implementacion (fase 1 + fase 2) |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `81ad8b5` | fix(proxy): reemplazar pool DataImpulse rotatorio por lote sticky fresco (100 sesiones) |
 | `c044428` | feat(frontend): tanda 5 P10 — vidrio + glow casino sutil (vista de Cuentas) |
 | `3d26e73` | feat(frontend): tanda 5 P1 (buscador premium + X) + P8 (memoria de vista por usuario) |
-| `b3bf565` | feat(frontend): tanda 5 — layout de columnas 2-bloques + iconos Nota|tarjetas|pin |
 <!-- GEN:end:recientes -->
 
 ---
