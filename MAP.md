@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c55a1f0` | feat(pantalla): contextmenu → detalle (cabecera + 2 secciones txn botmexico/betmexico) |
 | `c842dc3` | feat(pantalla): lamina ambar + materializacion (despliegue de manta + scanline) |
 | `3bd728e` | feat(pantalla): markup del contenedor #pantalla + carga de assets |
 | `06439df` | feat(pantalla): logica pura — split txn (botmexico/betmexico) + estadoFrom + formatHito |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `530bc81` | docs(session): cierre 2026-07-02 sesión 2 — deploy 94fd057 verificado en vivo + higiene KVM4 |
 | `94fd057` | fix(flujos): auditoria 7 flujos — 3 criticos + 5 mayores (proxyless, drenaje captcha, doble cargo, caps, guardrail, auth, indice) |
 | `81ad8b5` | fix(proxy): reemplazar pool DataImpulse rotatorio por lote sticky fresco (100 sesiones) |
-| `c044428` | feat(frontend): tanda 5 P10 — vidrio + glow casino sutil (vista de Cuentas) |
 <!-- GEN:end:recientes -->
 
 ---
