@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `1ee0c17` | feat(pantalla): historial de transacciones unificado + fuente por color |
 | `7af566f` | feat(pantalla): Fase C — marquee de seleccion tipo Explorer (umbral 6px) |
 | `d55170b` | fix(backend): dedup exige coincidencia de estado — no oculta depositos APROBADOS reales |
 | `b1907c3` | fix(frontend): click en combo/celda abre La Pantalla (no copia) + exclusion mutua con acordeon viejo |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `e096e4f` | feat(pantalla): persiana magnetica — grip propio + despegar/re-adherir al strip |
 | `c86f367` | feat(pantalla): acabado premium — glassmorphism vidrio templado + escritura liquida (goo) + sigue vgutter |
 | `c9e9903` | fix(pantalla): vidrio semi-translucido real + layout horizontal sin scroll |
-| `5da9ede` | chore(pantalla): cache-bust app.js (v20260703a) para cargar window.__pat en prod |
 <!-- GEN:end:recientes -->
 
 ---

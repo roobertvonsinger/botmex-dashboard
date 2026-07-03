@@ -450,9 +450,58 @@
   border-radius: 10px; padding: 0 6px;
 }
 /* Nota: 2 líneas (texto + meta), truncadas. */
-.pat-sv-note { flex-direction: column; align-items: flex-start; gap: 0; }
+.pat-sv-note { flex-direction: column; align-items: flex-start; gap: 0; position: relative; padding-right: 14px; }
 .pat-sv-ntext { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--text-dim); }
 .pat-sv-nmeta { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); }
+
+/* ── Edición inline: nota nueva + validar CURP (portado del acordeón viejo) ── */
+.pat-sv-add {
+  -webkit-appearance: none; appearance: none; border: 0; background: transparent;
+  cursor: pointer; margin-left: auto; color: var(--text-muted); font-size: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; border-radius: 4px;
+  transition: color var(--ease-fast), background var(--ease-fast);
+}
+.pat-sv-add:hover { color: var(--pat-gold); background: var(--pat-gold-soft); }
+.pat-sv-del {
+  -webkit-appearance: none; appearance: none; border: 0; background: transparent;
+  cursor: pointer; position: absolute; top: 1px; right: -2px;
+  color: var(--text-faint); font-size: 10px; line-height: 1; padding: 2px;
+  opacity: 0; transition: opacity var(--ease-fast), color var(--ease-fast);
+}
+.pat-sv-note:hover .pat-sv-del { opacity: 1; }
+.pat-sv-del:hover { color: oklch(0.68 0.22 24); }
+
+.pat-form { display: flex; flex-direction: column; gap: 5px; margin-top: 2px; }
+.pat-input, .pat-textarea {
+  -webkit-appearance: none; appearance: none; width: 100%; box-sizing: border-box;
+  background: oklch(0.20 0.02 160 / 0.35); border: 1px solid var(--pat-edge);
+  border-radius: 6px; padding: 5px 7px; font-size: 11px; color: var(--text-dim);
+  font-family: inherit; transition: border-color var(--ease-fast);
+}
+.pat-input:focus, .pat-textarea:focus { outline: none; border-color: var(--pat-gold); }
+.pat-textarea { resize: vertical; min-height: 40px; }
+.pat-input.pat-input-mono { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .5px; }
+.pat-input.pat-input-err { border-color: oklch(0.68 0.22 24 / 0.6); }
+.pat-form-row { display: flex; gap: 6px; justify-content: flex-end; }
+.pat-btn {
+  -webkit-appearance: none; appearance: none; border: 0; cursor: pointer;
+  border-radius: 6px; padding: 4px 10px; font-size: 10.5px; font-weight: 600;
+  font-family: var(--font-display); transition: background var(--ease-fast), opacity var(--ease-fast);
+}
+.pat-btn-save { background: var(--pat-gold-soft); color: var(--pat-gold); }
+.pat-btn-save:hover { background: var(--pat-edge); }
+.pat-btn-ghost { background: transparent; color: var(--text-muted); }
+.pat-btn-ghost:hover { color: var(--text-dim); }
+.pat-btn:disabled { opacity: .5; cursor: default; }
+.pat-form-err { font-size: 9.5px; color: oklch(0.72 0.18 24); }
+
+.pat-curp-add {
+  -webkit-appearance: none; appearance: none; border: 0; background: transparent;
+  cursor: pointer; color: var(--text-faint); font-size: 10.5px;
+  display: inline-flex; align-items: center; gap: 3px;
+}
+.pat-curp-add:hover { color: var(--pat-gold); }
 
 /* Estados de carga / error. */
 .pat-loading, .pat-error, .pat-stub {

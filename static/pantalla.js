@@ -291,7 +291,21 @@
           <div class="pat-meta" style="--i:3">
             ${estado ? `<span class="pat-meta-item"><i class="ph-duotone ph-map-pin"></i> ${g(estado)}</span>` : ''}
             ${bdate ? `<span class="pat-meta-item dim"><i class="ph-duotone ph-cake"></i> ${g(dmy(bdate) || bdate)}</span>` : ''}
-            ${curpShown ? `<span class="pat-meta-item dim"><i class="ph-duotone ph-identification-card"></i> <button type="button" class="pat-curp d-copy" data-copy="${g(curpShown)}" title="Copiar CURP">${g(curpShown)}</button>${curpTag}</span>` : ''}
+            <span class="pat-meta-item dim"><i class="ph-duotone ph-identification-card"></i>
+              ${curpShown
+                ? `<button type="button" class="pat-curp d-copy" data-copy="${g(curpShown)}" title="Copiar CURP">${g(curpShown)}</button>${curpTag}`
+                : ''}
+              <button type="button" class="pat-curp-add" data-curp-toggle="${g(curpStored || '')}" title="${curpStored ? 'Editar CURP guardado' : 'Guardar CURP validado'}"><i class="ph-bold ${curpStored ? 'ph-pencil-simple' : 'ph-plus'}"></i>${curpStored ? '' : ' CURP'}</button>
+            </span>
+          </div>
+          <div class="pat-form" data-curp-form hidden>
+            <input type="text" class="pat-input pat-input-mono" data-curp-input maxlength="18" placeholder="CURP (18 caracteres, validado en gob.mx)">
+            <div class="pat-form-err" data-curp-err hidden></div>
+            <div class="pat-form-row">
+              <a href="https://www.gob.mx/curp/" target="_blank" rel="noopener" class="pat-btn pat-btn-ghost" title="Abrir validador oficial">gob.mx ↗</a>
+              <button type="button" class="pat-btn pat-btn-ghost" data-curp-cancel>Cancelar</button>
+              <button type="button" class="pat-btn pat-btn-save" data-curp-save>Guardar</button>
+            </div>
           </div>
           ${renderPantallaSaved(d)}
         </div>
@@ -302,14 +316,23 @@
   // ── Guardado: tarjetas + notas en pequeño (columna de datos, bajo la meta) ──
   // Reusa _pipeDisplay (pipe canónico num|MM|YY|cvv, sin enmascarar) y fmtAbsYear/
   // fmtAbs (app.js). Capado (2 tarjetas + 2 notas) para no romper el sin-scroll;
-  // el resto → "+N más". El detalle completo/edición vive en el modal viejo.
+  // el resto → "+N más". Tarjetas: NO hay alta/edición manual real — se guardan
+  // solo al aprobarse un depósito (deposits.py); por eso acá siguen solo-lectura.
+  // Notas SÍ tienen CRUD real (crear/borrar) — portado del acordeón viejo, mismos
+  // endpoints (POST/DELETE /api/accounts/{id}/notes). Borrar: dueño o superadmin.
   const CARD_CAP = 2, NOTE_CAP = 2;
+
+  function _isNoteOwner(n) {
+    const u = (window.state && state.user) || null;
+    if (!u) return false;
+    if (u.role === 'superadmin') return true;
+    return !!(n.created_by && Number(n.created_by) === Number(u.telegram_id));
+  }
 
   function renderPantallaSaved(d) {
     const g = window.esc || (s => s);
     const cards = Array.isArray(d.cards) ? d.cards.filter(c => c && c.card_number) : [];
     const notes = Array.isArray(d.notes) ? d.notes.filter(n => n && (n.note_text || '').trim()) : [];
-    if (!cards.length && !notes.length) return '';
 
     const pipeOf = (typeof _pipeDisplay === 'function')
       ? _pipeDisplay
@@ -334,22 +357,32 @@
       </div>`;
     }
 
-    let noteHtml = '';
-    if (notes.length) {
-      const rows = notes.slice(0, NOTE_CAP).map(n => {
-        const who = g(n.created_by_name || '—');
-        const when = n.created_at ? g(fAbsY(n.created_at)) : '';
-        return `<div class="pat-sv-line pat-sv-note" title="${g(n.note_text)}">
-          <span class="pat-sv-ntext">${g(n.note_text)}</span>
-          <span class="pat-sv-nmeta">${who}${when ? ` · ${when}` : ''}</span>
-        </div>`;
-      }).join('');
-      const more = notes.length > NOTE_CAP ? `<span class="pat-sv-more">+${notes.length - NOTE_CAP}</span>` : '';
-      noteHtml = `<div class="pat-sv-group">
-        <span class="pat-sv-h"><span class="pat-sv-emo">📝</span> Notas<span class="pat-sv-cnt">${notes.length}</span>${more}</span>
-        ${rows}
+    const noteRows = notes.slice(0, NOTE_CAP).map(n => {
+      const who = g(n.created_by_name || '—');
+      const when = n.created_at ? g(fAbsY(n.created_at)) : '';
+      const del = _isNoteOwner(n)
+        ? `<button type="button" class="pat-sv-del" data-del-note="${n.id}" title="Borrar nota"><i class="ph-bold ph-x"></i></button>`
+        : '';
+      return `<div class="pat-sv-line pat-sv-note" title="${g(n.note_text)}">
+        <span class="pat-sv-ntext">${g(n.note_text)}</span>
+        <span class="pat-sv-nmeta">${who}${when ? ` · ${when}` : ''}</span>
+        ${del}
       </div>`;
-    }
+    }).join('');
+    const moreNotes = notes.length > NOTE_CAP ? `<span class="pat-sv-more">+${notes.length - NOTE_CAP}</span>` : '';
+    const noteHtml = `<div class="pat-sv-group">
+      <span class="pat-sv-h"><span class="pat-sv-emo">📝</span> Notas${notes.length ? `<span class="pat-sv-cnt">${notes.length}</span>` : ''}${moreNotes}
+        <button type="button" class="pat-sv-add" data-add-note title="Agregar nota"><i class="ph-bold ph-plus"></i></button>
+      </span>
+      ${noteRows}
+      <div class="pat-form" data-note-form hidden>
+        <textarea class="pat-textarea" data-note-input maxlength="2000" placeholder="Nota…"></textarea>
+        <div class="pat-form-row">
+          <button type="button" class="pat-btn pat-btn-ghost" data-note-cancel>Cancelar</button>
+          <button type="button" class="pat-btn pat-btn-save" data-note-save>Guardar</button>
+        </div>
+      </div>
+    </div>`;
 
     return `<div class="pat-saved" style="--i:6">${cardHtml}${noteHtml}</div>`;
   }
@@ -523,6 +556,122 @@
       } catch (err) {
         inuse.classList.toggle('on', !turningOn);   // revert optimista
         if (window.toast) toast(`Error: ${err.message}`, 'error');
+      }
+      return;
+    }
+
+    // ── Notas: agregar/borrar (portado del acordeón viejo — mismos endpoints) ──
+    if (e.target.closest('[data-add-note]')) {
+      e.preventDefault();
+      const form = _patRoot.querySelector('[data-note-form]');
+      if (form) { form.hidden = !form.hidden; if (!form.hidden) form.querySelector('[data-note-input]').focus(); }
+      return;
+    }
+    if (e.target.closest('[data-note-cancel]')) {
+      e.preventDefault();
+      const form = _patRoot.querySelector('[data-note-form]');
+      if (form) { form.hidden = true; form.querySelector('[data-note-input]').value = ''; }
+      return;
+    }
+    const noteSave = e.target.closest('[data-note-save]');
+    if (noteSave) {
+      e.preventDefault();
+      const accId = _currentId;
+      const form = noteSave.closest('[data-note-form]');
+      const input = form && form.querySelector('[data-note-input]');
+      const text = (input && input.value || '').trim();
+      if (!text || !accId) return;
+      noteSave.disabled = true;
+      try {
+        const r = await fetch(`/api/accounts/${accId}/notes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+        const cache = _cacheGet(accId);
+        if (cache) {
+          const u = (window.state && state.user) || {};
+          const note = { id: data.id, note_text: text, created_by: u.telegram_id, created_by_name: u.display || u.username || '?', created_at: data.created_at };
+          cache.notes = [note, ...(Array.isArray(cache.notes) ? cache.notes : [])];
+          _renderDetailView(cache, false);
+        }
+        if (window.toast) toast('📝 Nota guardada', 'success');
+      } catch (err) {
+        if (window.toast) toast(`Error: ${err.message}`, 'error');
+      } finally {
+        noteSave.disabled = false;
+      }
+      return;
+    }
+    const delNote = e.target.closest('[data-del-note]');
+    if (delNote) {
+      e.preventDefault();
+      const accId = _currentId;
+      const noteId = delNote.dataset.delNote;
+      if (!accId || !noteId) return;
+      if (!confirm('¿Borrar esta nota?')) return;
+      try {
+        const r = await fetch(`/api/accounts/${accId}/notes/${noteId}`, { method: 'DELETE' });
+        if (!r.ok) { const data = await r.json().catch(() => ({})); throw new Error(data.detail || `HTTP ${r.status}`); }
+        const cache = _cacheGet(accId);
+        if (cache && Array.isArray(cache.notes)) {
+          cache.notes = cache.notes.filter(n => String(n.id) !== String(noteId));
+          _renderDetailView(cache, false);
+        }
+        if (window.toast) toast('Nota borrada', '');
+      } catch (err) {
+        if (window.toast) toast(`Error: ${err.message}`, 'error');
+      }
+      return;
+    }
+
+    // ── CURP: guardar validado manualmente (mismo endpoint/regex que el acordeón viejo) ──
+    const curpToggle = e.target.closest('[data-curp-toggle]');
+    if (curpToggle) {
+      e.preventDefault();
+      const form = _patRoot.querySelector('[data-curp-form]');
+      if (!form) return;
+      form.hidden = !form.hidden;
+      if (!form.hidden) {
+        const input = form.querySelector('[data-curp-input]');
+        input.value = curpToggle.dataset.curpToggle || '';
+        input.focus();
+        input.classList.remove('pat-input-err');
+        const err = form.querySelector('[data-curp-err]'); if (err) err.hidden = true;
+      }
+      return;
+    }
+    if (e.target.closest('[data-curp-cancel]')) {
+      e.preventDefault();
+      const form = _patRoot.querySelector('[data-curp-form]');
+      if (form) form.hidden = true;
+      return;
+    }
+    const curpSave = e.target.closest('[data-curp-save]');
+    if (curpSave) {
+      e.preventDefault();
+      const accId = _currentId;
+      const form = curpSave.closest('[data-curp-form]');
+      const input = form && form.querySelector('[data-curp-input]');
+      const errEl = form && form.querySelector('[data-curp-err]');
+      const curp = (input && input.value || '').trim().toUpperCase();
+      const CURP_RE = /^[A-Z]{4}\d{6}[HM][A-Z]{5}[0-9A-Z]\d$/;   // misma regex que app.py update_curp
+      if (!CURP_RE.test(curp)) {
+        if (errEl) { errEl.textContent = 'CURP inválido (formato de 18 caracteres)'; errEl.hidden = false; }
+        if (input) input.classList.add('pat-input-err');
+        return;
+      }
+      if (!accId) return;
+      curpSave.disabled = true;
+      try {
+        const r = await fetch(`/api/accounts/${accId}/curp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ curp }) });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+        const cache = _cacheGet(accId);
+        if (cache) { cache.curp = data.curp; _renderDetailView(cache, false); }
+        if (window.toast) toast('🪪 CURP guardado', 'success');
+      } catch (err) {
+        if (errEl) { errEl.textContent = err.message; errEl.hidden = false; }
+      } finally {
+        curpSave.disabled = false;
       }
       return;
     }
