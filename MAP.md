@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d0af096` | docs(session): cierre 2026-07-03 — Fase A+B completas, proxima sesion = AUDITORIA |
 | `5a1acb1` | feat(pantalla): Fase B — click izquierdo abre La Pantalla + seleccion tipo Excel |
 | `ee17523` | feat(pantalla): Fase A — densidad + dedup + acabado perla + controles manita |
 | `714718f` | fix(pantalla): persiana — pointercancel (no dejar drag colgado) + tope alto estricto = fija/strip |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `c55a1f0` | feat(pantalla): contextmenu → detalle (cabecera + 2 secciones txn botmexico/betmexico) |
 | `c842dc3` | feat(pantalla): lamina ambar + materializacion (despliegue de manta + scanline) |
 | `3bd728e` | feat(pantalla): markup del contenedor #pantalla + carga de assets |
-| `06439df` | feat(pantalla): logica pura — split txn (botmexico/betmexico) + estadoFrom + formatHito |
 <!-- GEN:end:recientes -->
 
 ---

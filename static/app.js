@@ -610,7 +610,7 @@ function renderTable() {
         <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
         <td class="sel-cell"></td>
         <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-        <td class="combo d-copy" data-combo="${esc(combo)}" title="Click en el combo: copiar · Click en la fila: ver detalle · Ctrl/Shift+Click: seleccionar"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b>${lockChip}</td>
+        <td class="combo" title="Click: abrir La Pantalla · Ctrl/Shift+Click: seleccionar"><b>${esc(combo)}</b>${lockChip}</td>
         <td class="dep" title="Último depósito hecho">${dep}</td>
         <td class="ic-col ic-nota-col">${cellNota}</td>
         <td class="ic-col ic-cards-col">${cellCards}</td>
@@ -621,7 +621,7 @@ function renderTable() {
       <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
       <td class="sel-cell"></td>
       <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-      <td class="combo d-copy" data-combo="${esc(combo)}" title="Click en el combo: copiar · Click en la fila: ver detalle · Ctrl/Shift+Click: seleccionar"><b data-id="${r.id}" data-combo="${esc(combo)}">${esc(combo)}</b></td>
+      <td class="combo" title="Click: abrir La Pantalla · Ctrl/Shift+Click: seleccionar"><b>${esc(combo)}</b></td>
       <td class="dep" title="Último depósito hecho">${dep}</td>
       <td class="dep dim" title="Cuándo se actualizó por última vez">${fmtAgo(r.last_checked_at)}</td>
       <td class="num" title="Total de veces actualizada">${r.check_count || 0}</td>
@@ -1153,7 +1153,7 @@ async function openAccountByEmail(email) {
     // Detalle universal: Actividad/Recientes/combo abren LA PANTALLA (no el modal
     // viejo). Fallback al inline si La Pantalla no está cargada.
     if (hit && hit.id != null) {
-      if (window.Pantalla && window.Pantalla.open) window.Pantalla.open(hit.id);
+      if (window.Pantalla && window.Pantalla.open) { closeDetailModal(); window.Pantalla.open(hit.id); }
       else openDetailModal(hit.id);
       return;
     }
@@ -2949,16 +2949,9 @@ $('#accTable').addEventListener('click', e => {
   }
   const th = e.target.closest('th.th-sort');
   if (th?.dataset.sort) { sortRows(th.dataset.sort); return; }
-  // Click IZQUIERDO sobre el combo (email:password) → copiar. Va ANTES del row-click
-  // para no abrir La Pantalla cuando solo querés copiar el combo.
-  const comboCell = e.target.closest('td.combo');
-  if (comboCell && comboCell.dataset.combo) {
-    e.stopPropagation();
-    navigator.clipboard.writeText(comboCell.dataset.combo)
-      .then(() => toast(`✓ ${comboCell.dataset.combo}`, 'success'))
-      .catch(err => toast(`Error: ${err.message}`, 'error'));
-    return;
-  }
+  // Fix (Robert): el combo YA NO copia al click — la celda/combo/fila ABREN La Pantalla.
+  // El copiado del combo vive DENTRO de La Pantalla (botón dedicado .pat-combo). Al
+  // quitarle data-combo a la celda, el click cae directo al row-handler de abajo.
   // Fase B — interacción tipo Excel + La Pantalla en la fila:
   //   · Click simple    → abre La Pantalla (ver detalle de la cuenta)
   //   · Ctrl/Cmd+Click  → agrega/quita esa fila de la selección múltiple
@@ -2974,6 +2967,7 @@ $('#accTable').addEventListener('click', e => {
       _lastClickedId = id;
       updateCmdBar();
     } else if (window.Pantalla) {
+      closeDetailModal();                 // exclusión mutua: cierra el acordeón viejo si estaba abierto
       window.Pantalla.open(id, 'detail');
     }
   }
@@ -3583,6 +3577,8 @@ function hideAdminHints() {
 async function openDetailModal(id) {
   id = parseInt(id);
   if (!id) return;
+  // Exclusión mutua: el acordeón y La Pantalla nunca coexisten (mata el doble panel).
+  if (window.Pantalla && window.Pantalla.close) window.Pantalla.close();
   // Toggle: si ya está abierta, cerrar (con micro-animación).
   if (expandedAccountId === id) {
     _closePanelAnimated();
@@ -4045,11 +4041,10 @@ document.body.addEventListener('click', e => {
   // stopPropagation suprime el handler de fila/sort de #accTable
   e.stopPropagation();
   _copyText(txt);
-  // Click sobre las LETRAS de un combo de CUENTA → además de copiar, despliega
-  // esa cuenta en detalle (Robert: "autocopia y despliega al mismo tiempo").
-  // Solo combos de cuenta: data-id (combo de la tabla) o data-email (Recientes).
-  // Los d-copy de tarjeta/CURP/pipe NO abren detalle (no tienen id/email).
-  if (t.dataset.id) openDetailModal(parseInt(t.dataset.id));
+  // Recientes/marquesina (data-email) → abrir La Pantalla tras copiar. Los d-copy de
+  // tarjeta/CURP/pipe NO abren detalle (no tienen id/email). El combo de la TABLA ya no
+  // llega aquí (se le quitó data-combo): su click abre La Pantalla vía el row-handler.
+  if (t.dataset.id && window.Pantalla) window.Pantalla.open(parseInt(t.dataset.id));
   else if (t.dataset.email) openAccountByEmail(t.dataset.email);
 }, true);
 

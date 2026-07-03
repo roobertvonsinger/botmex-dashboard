@@ -180,9 +180,9 @@ Visible cuando `selectedIds.size > 0`. Actualizado por `updateCmdBar()` (app.js:
 **Handler global** (app.js:2034 — `#accTable.click`):
 | Target | Acción |
 |---|---|
-| `.row-ic` (iconitos 💳/📝/+) | Abre detalle o quick-add note |
+| `.row-ic` (iconitos 💳/📝/+) | 💳/📝 abren el **acordeón viejo** (`openDetailModal` — acceso a EDICIÓN de tarjetas/notas + validar CURP); `+` = quick-add note |
 | `th.th-sort` | Ordena por columna |
-| `td.combo` | **Click izquierdo copia combo `email:password`** (copia toda la celda) |
+| `td.combo` (celda + `<b>`) | **Click izquierdo abre La Pantalla** (ya NO copia — fix 2026-07-03; el copiado del combo vive DENTRO de La Pantalla). Se le quitó `d-copy`/`data-combo`. |
 | Fila (click simple) | **Abre La Pantalla** (`window.Pantalla.open`) — Fase B |
 | Fila + **Ctrl/Cmd** | Toggle esa fila en la selección múltiple (Excel) |
 | Fila + **Shift** | Rango desde la última clickeada (`_selectRange`, orden visible) |
@@ -409,9 +409,11 @@ Ver `docs/SSE_EVENTS.md` para tabla maestra de `kind` y su handler.
 
 > Panel de detalle de cuenta que se MATERIALIZA como una lámina de vidrio ámbar translúcido sobre el strip de KPIs (`#pantalla` anclado a `#accountsMain`). Reemplaza al detalle inline viejo para ver una cuenta. Rama `feat/la-pantalla`.
 
-**Apertura:** `window.Pantalla.open(id, mode)`. Disparador (Fase B): **click IZQUIERDO simple** en fila de `#accTable` (sin modificadores), manejado en el click handler de `#accTable` (app.js). También `openAccountByEmail` desde Actividad/Recientes/combo. Ya NO se usa contextmenu (click derecho).
+**Apertura:** `window.Pantalla.open(id, mode)`. Disparador (Fase B): **click IZQUIERDO simple** en la fila de `#accTable` (sin modificadores) — **incluye la celda del combo** (fix 2026-07-03: el combo dejó de copiar; su click abre La Pantalla). También `openAccountByEmail` desde Actividad/Recientes/marquesina. Ya NO se usa contextmenu (click derecho).
 
-**Selección de tabla tipo Excel (Fase B, reemplaza drag-select + checkboxes):** click simple = abrir La Pantalla; **Ctrl/Cmd+Click** = toggle esa fila en la selección múltiple; **Shift+Click** = rango desde la última fila clickeada (`_lastClickedId`, orden visible, helper `_selectRange`). El click en `td.combo` copia (va antes). Se retiraron: los checkboxes de 1ª columna (la `.sel-cell` quedó como **indicador**: dot accent en `tr.row-sel`), el drag-select por mouse y por pointer, y el `#selAll`.
+**Exclusión mutua con el acordeón viejo (fix 2026-07-03):** La Pantalla y el acordeón inline (`openDetailModal`) NUNCA coexisten (antes se veían dos paneles de detalle a la vez). Abrir La Pantalla llama `closeDetailModal()`; abrir el acordeón llama `window.Pantalla.close()`. El acordeón viejo quedó accesible SOLO por los iconos 💳/📝 (edición de tarjetas/notas + validar CURP, que La Pantalla aún no porta — ver `docs/ERRORS.md` / auditoría 2026-07-03).
+
+**Selección de tabla tipo Excel (Fase B, reemplaza drag-select + checkboxes):** click simple = abrir La Pantalla; **Ctrl/Cmd+Click** = toggle esa fila en la selección múltiple; **Shift+Click** = rango desde la última fila clickeada (`_lastClickedId`, orden visible, helper `_selectRange`). El click simple en `td.combo` abre La Pantalla (ya no copia). Se retiraron: los checkboxes de 1ª columna (la `.sel-cell` quedó como **indicador**: dot accent en `tr.row-sel`), el drag-select por mouse y por pointer, y el `#selAll`.
 
 **Layout (`renderPantallaHead`, sin scroll, altura mínima `min-height:288px`):**
 - Fila identidad (nombre·edad + grade) + controles **Depositar / En uso / Fijar** (reusan `openDepositModal`/`toggleMark`/lock; "en uso" pide confirmación al liberar).
@@ -430,7 +432,7 @@ Ver `docs/SSE_EVENTS.md` para tabla maestra de `kind` y su handler.
 ## Convenciones
 
 - **`data-copy`** en cualquier elemento → click izquierdo copia el valor. Handler global en app.js:2715.
-- **`data-combo`** en `<b>` dentro de `td.combo` → click izquierdo copia. Handler en row click handler (app.js:2034).
+- **Combo de la tabla (`td.combo`)** → click abre La Pantalla (se le quitó `data-combo`/`d-copy` el 2026-07-03; ya no copia en la tabla). El copiado del combo vive en La Pantalla (`.pat-combo`, botón dedicado).
 - **`.d-copy`** clase utilitaria para elementos copiables (estilo + handler).
 - **Cache-bust** en `index.html` con `?v=<timestamp>` para forzar refresh tras deploy (no requiere Ctrl+F5 normalmente).
 
