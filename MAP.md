@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `ff51ebe` | feat(pantalla): universal parcial — controles Depositar/EnUso/Fijar + Actividad/Recientes abren La Pantalla |
 | `e096e4f` | feat(pantalla): persiana magnetica — grip propio + despegar/re-adherir al strip |
 | `c86f367` | feat(pantalla): acabado premium — glassmorphism vidrio templado + escritura liquida (goo) + sigue vgutter |
 | `c9e9903` | fix(pantalla): vidrio semi-translucido real + layout horizontal sin scroll |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `b36ce32` | docs(session): cierre 2026-07-02 sesion 3 — diseno + plan de La Pantalla listo para /Smartexe |
 | `24a6145` | docs(plan): La Pantalla — plan de implementacion (fase 1 + fase 2) |
 | `8c93d6c` | docs(spec): tanda 6 — La Pantalla integrada a vista principal (sin seguimiento entre vistas) |
-| `4440dfd` | docs(spec): tanda 6 — La Pantalla (superficie ambar de feedback + interaccion) |
 <!-- GEN:end:recientes -->
 
 ---

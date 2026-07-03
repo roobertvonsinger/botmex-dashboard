@@ -503,7 +503,8 @@
       const move = ev => {
         const sH = _stripH();
         let h = startH + (ev.clientY - startY);
-        h = Math.max(sH - 40, Math.min(h, maxH));
+        // Tope ALTO estricto = fija/strip (como se entregó); tope BAJO = extendida.
+        h = Math.max(sH, Math.min(h, Math.max(maxH, sH)));
         if (h <= sH + GRIP_SNAP) {                 // snap: re-adherida al strip
           _detached = false;
           root.classList.remove('pat-detached');
@@ -522,9 +523,11 @@
         document.body.style.userSelect = '';
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);   // limpieza si el SO cancela el puntero
       };
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);        // Alt-Tab / diálogo SO no dejan el drag colgado
     });
 
     grip.addEventListener('dblclick', () => {      // re-adherir al strip
