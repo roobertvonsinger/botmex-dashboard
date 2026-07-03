@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b36ce32` | docs(session): cierre 2026-07-02 sesion 3 — diseno + plan de La Pantalla listo para /Smartexe |
 | `24a6145` | docs(plan): La Pantalla — plan de implementacion (fase 1 + fase 2) |
 | `8c93d6c` | docs(spec): tanda 6 — La Pantalla integrada a vista principal (sin seguimiento entre vistas) |
 | `4440dfd` | docs(spec): tanda 6 — La Pantalla (superficie ambar de feedback + interaccion) |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `3d26e73` | feat(frontend): tanda 5 P1 (buscador premium + X) + P8 (memoria de vista por usuario) |
 | `b3bf565` | feat(frontend): tanda 5 — layout de columnas 2-bloques + iconos Nota|tarjetas|pin |
 | `3cdfe06` | feat(frontend): rework premium tanda 5 — barra fusionada + tabla densa/agrupada (P4/P6) |
-| `79fa001` | feat(frontend): tanda 5 P7 — interaccion de tabla (copy izq / seleccion / detalle der / drag) |
 <!-- GEN:end:recientes -->
 
 ---
