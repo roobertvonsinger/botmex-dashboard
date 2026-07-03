@@ -12,6 +12,34 @@
 
   const $ = sel => document.querySelector(sel);
 
+  // ── Filtro goo "mercurio líquido" para texto HTML (Task 5) ──
+  // index.html ya trae filtros goo SVG (lg-goo/fm-goo/…) pero viven en <svg>
+  // de escenas y no son aplicables a HTML vía CSS. Inyectamos UNA sola vez un
+  // <svg> oculto con #pat-goo (mismo patrón: feGaussianBlur + feColorMatrix con
+  // alpha contrast) para poder hacer filter: url(#pat-goo) sobre el detalle.
+  // NO se tocan los filtros existentes de index.html.
+  function _ensureGooFilter() {
+    if (document.getElementById('pat-goo')) return;      // idempotente
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('width', '0');
+    svg.setAttribute('height', '0');
+    svg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;pointer-events:none';
+    // stdDeviation 3.2 + alpha "0 0 0 20 -9": mismo rango viscoso que rt-goo/pr-goo.
+    svg.innerHTML =
+      '<defs><filter id="pat-goo" x="-30%" y="-30%" width="160%" height="160%">' +
+      '<feGaussianBlur in="SourceGraphic" stdDeviation="3.2" result="b"/>' +
+      '<feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9" result="goo"/>' +
+      '<feBlend in="SourceGraphic" in2="goo"/>' +
+      '</filter></defs>';
+    document.body.appendChild(svg);
+  }
+
+  // Cuentas ya materializadas con el efecto líquido en esta sesión: el cuaje corre
+  // UNA vez por cuenta (la primera apertura). Re-renders por fetch fresco o
+  // re-aperturas cacheadas NO re-animan (evita brincos al refrescar datos).
+  const _liquidDone = new Set();
+
   // Cache local por si window.__pat.detailDataCache no está disponible por
   // algún motivo (defensivo; en condiciones normales reusamos el de app.js).
   const _localCache = {};
@@ -66,12 +94,20 @@
     _currentId = id;
     clearTimeout(_closeTimer);
 
+    _ensureGooFilter();     // idempotente: el filtro #pat-goo debe existir antes de animar
     _sizeToStrip();
 
+    // ¿Corre el cuaje líquido en esta apertura? Solo la PRIMERA vez que se
+    // materializa esta cuenta (aditivo al despliegue del marco pat-unfurl).
+    const firstReveal = !_liquidDone.has(id);
+
     // Pinta de inmediato si hay cache; si no, estado de carga mínimo.
+    // Si animamos aquí (cache-hit + primera vez), marcamos ya la bandera para que
+    // el re-render del fetch fresco no vuelva a cuajar.
     const cached = _cacheGet(id);
     if (cached) {
-      _renderDetailView(cached);
+      _renderDetailView(cached, firstReveal);
+      if (firstReveal) _liquidDone.add(id);
     } else {
       const { detail } = els();
       if (detail) detail.innerHTML = `<div class="pat-loading"><span class="dep-spinner"></span> Cargando…</div>`;
@@ -96,7 +132,13 @@
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then(data => {
         _cacheSet(id, data);
-        if (_currentId === id && !root.hidden) _renderDetailView(data);
+        if (_currentId === id && !root.hidden) {
+          // Anima solo si aún no se cuajó esta cuenta (caso sin cache: el spinner
+          // estuvo en pantalla y este es el primer render real → cuaja aquí).
+          const doAnim = !_liquidDone.has(id);
+          _renderDetailView(data, doAnim);
+          if (doAnim) _liquidDone.add(id);
+        }
       })
       .catch(err => {
         if (_currentId !== id || root.hidden) return;
@@ -183,18 +225,20 @@
     const grade = d.grade || null;
     const gCls = (typeof gradeClass === 'function') ? gradeClass(grade) : '';
 
+    // --i = orden de cuaje del bloque (idrow→combo→balance→meta→columnas txns).
+    // CSS lo lee para escalonar el reveal líquido; inofensivo cuando no hay .pat-liquid.
     return `
-      <div class="pat-idrow">
+      <div class="pat-idrow" style="--i:0">
         ${nombre ? `<span class="pat-name">${nombre}${age != null ? ` · ${age} años` : ''}</span>` : ''}
         ${grade ? `<span class="grade ${gCls}" title="Grade ${g(grade)}">${g(grade)}</span>` : ''}
       </div>
-      <div class="pat-combo-line">
+      <div class="pat-combo-line" style="--i:1">
         <button type="button" class="pat-combo d-copy" data-copy="${g(combo)}" title="Copiar">${g(combo)}</button>
       </div>
       <div class="pat-body">
         <div class="pat-ident">
-          <div class="pat-balance">${money(balance)}</div>
-          <div class="pat-meta">
+          <div class="pat-balance" style="--i:2">${money(balance)}</div>
+          <div class="pat-meta" style="--i:3">
             ${estado ? `<span class="pat-meta-item"><i class="ph-duotone ph-map-pin"></i> ${g(estado)}</span>` : ''}
             ${bdate ? `<span class="pat-meta-item dim"><i class="ph-duotone ph-cake"></i> ${g(dmy(bdate) || bdate)}</span>` : ''}
             ${curpShown ? `<span class="pat-meta-item dim"><i class="ph-duotone ph-identification-card"></i> <button type="button" class="pat-curp d-copy" data-copy="${g(curpShown)}" title="Copiar CURP">${g(curpShown)}</button>${curpTag}</span>` : ''}
@@ -223,12 +267,14 @@
     const md = w.match(/^(\d{2}\/\d{2})/);      // "DD/MM/YYYY HH:MM" → "DD/MM"
     return md ? md[1] : (w.slice(0, 5) || '—');
   }
-  function _mvLine(m, idx) {
+  // pos = posición DENTRO de la columna (0-based) → alimenta --j (stagger corto
+  // del cuaje entre filas). idx sigue siendo el índice GLOBAL para data-mv-idx.
+  function _mvLine(m, idx, pos) {
     const g = window.esc || (s => s);
     const money = window.fmtMoney || (v => `$${(v || 0).toFixed(2)}`);
     const cls = _mvResultCls(m);
     const sign = m.kind === 'withdrawal' ? '−' : (m.state === 'ok' ? '+' : '');
-    return `<div class="pat-mv ${cls}" data-mv-idx="${idx}">
+    return `<div class="pat-mv ${cls}" data-mv-idx="${idx}" style="--j:${pos}">
       <span class="pat-mv-t">${g(_mvTime(m))}</span>
       <span class="pat-mv-d">${g(_mvDesc(m))}</span>
       <span class="pat-mv-a">${sign}${money(m.amount)}</span>
@@ -236,7 +282,7 @@
   }
   function _mvColumn(rows) {
     if (!rows.length) return `<div class="pat-mv-empty">Sin movimientos.</div>`;
-    const shown = rows.slice(0, MV_CAP).map(x => _mvLine(x.m, x.i)).join('');
+    const shown = rows.slice(0, MV_CAP).map((x, pos) => _mvLine(x.m, x.i, pos)).join('');
     const more = rows.length > MV_CAP ? `<div class="pat-mv-more">+${rows.length - MV_CAP} más</div>` : '';
     return shown + more;
   }
@@ -246,24 +292,30 @@
     const withIdx = movs.map((m, i) => ({ m, i }));
     const bot = withIdx.filter(x => x.m && x.m.source === 'dashboard');
     const bet = withIdx.filter(x => !(x.m && x.m.source === 'dashboard'));
+    // --i 4/5: las columnas cuajan tras la cabecera. Sus .pat-mv HEREDAN este --i
+    // (custom props heredan) y le suman --j para el stagger fila-a-fila.
     return `
       <div class="pat-txns">
-        <div class="pat-txn-col">
+        <div class="pat-txn-col" style="--i:4">
           <div class="pat-txn-h"><i class="ph-fill ph-lightning"></i> Botmexico <span class="cnt">${bot.length}</span></div>
           ${_mvColumn(bot)}
         </div>
-        <div class="pat-txn-col">
+        <div class="pat-txn-col" style="--i:5">
           <div class="pat-txn-h"><i class="ph-duotone ph-globe-hemisphere-west"></i> BetMexico <span class="cnt">${bet.length}</span></div>
           ${_mvColumn(bet)}
         </div>
       </div>`;
   }
 
-  function _renderDetailView(d) {
+  // animate: aplica la escritura líquida (.pat-liquid) SOLO cuando corresponde.
+  // La bandera _liquidDone garantiza un único pase por cuenta: el re-render del
+  // fetch fresco (o una re-apertura cacheada) llega con animate=false y no brinca.
+  function _renderDetailView(d, animate) {
     const { detail } = els();
     if (!detail) return;
     try {
-      detail.innerHTML = `<div class="pat-wrap">${renderPantallaHead(d)}</div>`;
+      const liquid = animate ? ' pat-liquid' : '';
+      detail.innerHTML = `<div class="pat-wrap${liquid}">${renderPantallaHead(d)}</div>`;
     } catch (e) {
       console.error('[Pantalla] render failed:', e);
       detail.innerHTML = `<div class="pat-error">Error renderizando: ${window.esc ? esc(e.message) : e.message}</div>`;
@@ -314,6 +366,19 @@
     const root = $('#pantalla');
     if (root && !root.hidden) _sizeToStrip();
   });
+
+  // La Pantalla SIGUE al control deslizable (vgutter): arrastrar el gutter cambia
+  // la altura de .lpanel pero NO dispara window.resize → observamos .lpanel directo
+  // para que La Pantalla crezca/encoja en vivo con los KPIs (más txns visibles).
+  (function observeStrip() {
+    const lpanel = $('.lpanel');
+    if (!lpanel || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      const root = $('#pantalla');
+      if (root && !root.hidden) _sizeToStrip();
+    });
+    ro.observe(lpanel);
+  })();
 
   window.Pantalla = { open, close, showTxn, back };
 })();

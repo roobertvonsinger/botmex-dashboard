@@ -59,20 +59,23 @@
   border-radius: var(--pat-r);
   overflow: hidden;
 
-  /* VIDRIO ÁMBAR SEMI-TRANSLÚCIDO — se ven los KPIs difuminados DETRÁS (pantalla
-     virtual flotante, NO pared opaca). Base oscura a baja opacidad + tinte dorado;
-     el peso visual lo da el backdrop-filter, no un fondo sólido. */
+  /* VIDRIO TEMPLADO SEMI-TRANSLÚCIDO (glassmorphism) — se ven los KPIs difuminados
+     DETRÁS. Un poco más OSCURO que la resina ámbar: base de vidrio oscuro con cuerpo
+     (gradiente 0.17→0.11) + baño ámbar SUTIL arriba + reflejo glass diagonal. El peso
+     lo da el backdrop-filter, no un fondo sólido. */
   background:
-    linear-gradient(158deg, oklch(0.82 0.14 85 / 0.12), oklch(0.80 0.16 75 / 0.05) 52%, oklch(0.82 0.14 85 / 0.02)),
-    oklch(0.16 0.015 85 / 0.34);
+    linear-gradient(133deg, rgba(255,255,255,.06), transparent 26%, transparent 74%, rgba(255,255,255,.025)),  /* reflejo glass */
+    radial-gradient(120% 80% at 12% 0%, oklch(0.82 0.14 85 / 0.10), transparent 46%),                          /* baño ámbar tenue */
+    linear-gradient(180deg, oklch(0.17 0.020 80 / 0.34), oklch(0.115 0.014 80 / 0.50));                        /* vidrio templado oscuro */
   border: 1px solid var(--pat-edge);
   box-shadow:
-    0 30px 90px -34px rgba(0,0,0,.62),
-    0 0 60px -22px var(--pat-gold-soft),                          /* halo ámbar flotante */
-    inset 0 1px 0 rgba(255,255,255,.07),
-    inset 0 0 0 1px oklch(0.82 0.14 85 / 0.05);                   /* borde interno vidrio */
-  backdrop-filter: blur(32px) saturate(1.4);
-  -webkit-backdrop-filter: blur(32px) saturate(1.4);
+    0 34px 100px -34px rgba(0,0,0,.70),
+    0 0 64px -24px var(--pat-gold-soft),                          /* halo ámbar flotante */
+    inset 0 1px 0 rgba(255,255,255,.09),                          /* filo superior de vidrio */
+    inset 0 -1px 0 rgba(0,0,0,.25),                               /* filo inferior */
+    inset 0 0 0 1px oklch(0.82 0.14 85 / 0.05);                   /* borde interno cálido */
+  backdrop-filter: blur(34px) saturate(1.45);
+  -webkit-backdrop-filter: blur(34px) saturate(1.45);
 
   /* Estado replegado por default (la animación de entrada lo despliega). */
   transform-origin: top center;
@@ -293,6 +296,45 @@
 }
 .pat-error { color: var(--danger); }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   ESCRITURA LÍQUIDA — Task 5: el texto/números CUAJAN de gotas de mercurio
+   dorado. Evoca los blobs viscosos goo de las escenas de #depos (mismo filtro
+   feGaussianBlur+feColorMatrix, ver #pat-goo inyectado por pantalla.js). Cada
+   bloque arranca fundido (goo blur + opacity 0 + micro translateY/scale) y
+   "cristaliza" a nítido. Escalonado por bloque via --i (delay = i · paso).
+   Corre UNA vez al materializar (clase .pat-liquid puesta por JS, bandera
+   anti-re-render); solo anima filter/opacity/transform → CERO reflow. ── */
+
+/* Cada hijo directo animado lleva --i (índice de orden) inyectado inline por JS.
+   El goo del padre .pat-wrap.pat-liquid funde las letras mientras están borrosas:
+   al desenfocar+opacar juntas varias glifos, el feColorMatrix las liga como gotas. */
+.pat-wrap.pat-liquid { filter: url(#pat-goo); }
+
+.pat-wrap.pat-liquid .pat-idrow,
+.pat-wrap.pat-liquid .pat-combo-line,
+.pat-wrap.pat-liquid .pat-balance,
+.pat-wrap.pat-liquid .pat-meta,
+.pat-wrap.pat-liquid .pat-txn-col {
+  animation: pat-cuaje 0.42s var(--ease-curve) both;
+  animation-delay: calc(var(--i, 0) * 0.062s);   /* paso corto (6 bloques → ~0.31s de cola) */
+}
+
+/* Las filas de movimiento cuajan con un stagger extra-corto DENTRO de su columna
+   (se suman al delay heredado por la columna via --i). Peor caso: col i=5 + fila
+   j=5 → 0.31s+0.15s = 0.46s de delay + 0.42s dur ≈ 0.88s total (< 900ms). */
+.pat-wrap.pat-liquid .pat-mv {
+  animation: pat-cuaje 0.42s var(--ease-curve) both;
+  animation-delay: calc(var(--i, 0) * 0.062s + var(--j, 0) * 0.030s);
+}
+
+/* El cuaje: de gota borrosa dorada (el goo del padre la vuelve viscosa) a glifo
+   nítido. El leve blur propio refuerza la fusión antes de que el padre suelte el goo. */
+@keyframes pat-cuaje {
+  0%   { opacity: 0; filter: blur(3px); transform: translateY(6px) scale(0.965); }
+  55%  { opacity: 1; filter: blur(1px); transform: translateY(0)    scale(1); }
+  100% { opacity: 1; filter: blur(0);   transform: translateY(0)    scale(1); }
+}
+
 /* ═══════════════ ACCESIBILIDAD — reduce motion ═══════════════
    Sin scanline, sin blur animado, sin escritura líquida: fade simple de opacity. */
 @media (prefers-reduced-motion: reduce) {
@@ -310,4 +352,21 @@
   .pantalla-on .pantalla-sheet { opacity: 1; }
   .pantalla-out .pantalla-sheet { opacity: 0; }
   .pantalla-sheet::after { display: none; }         /* sin barrido láser */
+
+  /* Escritura líquida: sin goo ni cuaje. Fade simple de opacity, sin blur ni
+     transform, sin stagger (delay 0) — el contenido aparece de una, suave. */
+  .pat-wrap.pat-liquid { filter: none; }
+  .pat-wrap.pat-liquid .pat-idrow,
+  .pat-wrap.pat-liquid .pat-combo-line,
+  .pat-wrap.pat-liquid .pat-balance,
+  .pat-wrap.pat-liquid .pat-meta,
+  .pat-wrap.pat-liquid .pat-txn-col,
+  .pat-wrap.pat-liquid .pat-mv {
+    animation: pat-cuaje-rm 0.2s var(--ease-fast) both;
+    animation-delay: 0s;
+  }
+  @keyframes pat-cuaje-rm {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
 }
