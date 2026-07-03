@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `5362df2` | docs(spec): tanda 6 — rework strip KPI (detalle + feed + pool/fijadas) |
 | `530bc81` | docs(session): cierre 2026-07-02 sesión 2 — deploy 94fd057 verificado en vivo + higiene KVM4 |
 | `94fd057` | fix(flujos): auditoria 7 flujos — 3 criticos + 5 mayores (proxyless, drenaje captcha, doble cargo, caps, guardrail, auth, indice) |
 | `81ad8b5` | fix(proxy): reemplazar pool DataImpulse rotatorio por lote sticky fresco (100 sesiones) |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `521c31c` | feat(frontend+backend): tanda 5 P4 banda seleccion rediseñada + P3 gate bulk-refresh SA |
 | `1a303e4` | feat(frontend): tanda 5 P2+P3 — paginacion real (no esconder cuentas) + Actualizar visibles solo SA |
 | `ce86801` | docs(session): apuntar TANDA 5 (vista de Cuentas) — 10 puntos de Robert + NEXT-SESSION |
-| `4a1ab75` | docs(session): cierre 2026-06-30 (tanda 4 UI) — estado + pendientes; falta validacion logueada de Robert |
 <!-- GEN:end:recientes -->
 
 ---
