@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `24a6145` | docs(plan): La Pantalla — plan de implementacion (fase 1 + fase 2) |
 | `8c93d6c` | docs(spec): tanda 6 — La Pantalla integrada a vista principal (sin seguimiento entre vistas) |
 | `4440dfd` | docs(spec): tanda 6 — La Pantalla (superficie ambar de feedback + interaccion) |
 | `5362df2` | docs(spec): tanda 6 — rework strip KPI (detalle + feed + pool/fijadas) |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `b3bf565` | feat(frontend): tanda 5 — layout de columnas 2-bloques + iconos Nota|tarjetas|pin |
 | `3cdfe06` | feat(frontend): rework premium tanda 5 — barra fusionada + tabla densa/agrupada (P4/P6) |
 | `79fa001` | feat(frontend): tanda 5 P7 — interaccion de tabla (copy izq / seleccion / detalle der / drag) |
-| `521c31c` | feat(frontend+backend): tanda 5 P4 banda seleccion rediseñada + P3 gate bulk-refresh SA |
 <!-- GEN:end:recientes -->
 
 ---

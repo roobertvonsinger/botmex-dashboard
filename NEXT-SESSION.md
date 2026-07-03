@@ -5,49 +5,50 @@
 
 ## 🎯 Objetivo en curso
 
-**Auditoría de los 7 flujos → deployada y verificada en vivo.** `94fd057` (3 críticos + 5 mayores) ya está en KVM4, con smoke funcional completo y C1/C2 confirmados con tráfico real. Cierra el ciclo de "flujos" por ahora. **Próxima sesión: pivote a UI** (pedido explícito de Robert).
+**"La Pantalla" (tanda 6 UI).** Superficie ámbar líquida que se materializa al frente de los KPIs de la vista Cuentas: muestra el detalle interactivo de una cuenta (click derecho), y después absorbe las animaciones del panel de depósitos + un carril de resultados en vivo solo-SA. **Diseño CERRADO y aprobado por Robert. Plan de implementación LISTO.** Falta ejecutar.
 
 ## ▶ Con qué arrancas (1ra acción concreta)
 
-**Preguntar a Robert qué área de UI ataca** — no hay spec en cola (tanda 5 ya cerrada en `c044428`). Candidato conocido: el drawer de bloqueo diferenciado (SA agarra cuenta = invisible/permanente vs operador 2h/24h) sigue pendiente del lado UI — ver memoria `project_bloqueo_diferenciado_historial`. Si Robert trae algo nuevo, usar `superpowers:brainstorming` antes de tocar código.
+**`/Smartexe` sobre `docs/superpowers/plans/2026-07-02-la-pantalla.md`, empezando por la FASE 1.** NO re-brainstormear — el diseño ya está cerrado. Leer primero el spec (`docs/superpowers/specs/2026-07-02-tanda6-la-pantalla.md`) COMPLETO y el plan. Arrancar por Task 1 (lógica pura: `splitTransactions` + `estadoFrom` + `formatHito`, TDD).
 
 ## 🧭 Recomendación de approach
 
-Sin spec, no asumir alcance — dejar que Robert defina objetivo concreto primero (brainstorming corto), armar spec solo si es sustancial, y evitar reabrir tanda 5 sin necesidad. Los pendientes de flujos (M3/M4/M7/M9 + 15 menores) quedan en pausa hasta que Robert los retome explícitamente.
+Ejecutar fase 1 completa (Tasks 1–8) antes de tocar fase 2 (amarillo: confirmar con Robert antes de fase 2). Respetar la sección **Orquestación** del plan: modelos por subagente (Opus solo para lo estético — lámina/escritura líquida/recompactar drawer; Sonnet para el build; Haiku para markup mecánico), loops con salida clara, y vigilancia anti-cuelgue (máx 3 iteraciones por loop visual; systematic-debugging al 2º fallo de test). Verificar lo visual MEDIDO (`getBoundingClientRect`, preview real), NO a ojo — Robert corrige mucho la alineación asumida.
 
 ## ⏳ Pendientes próximos
 
-- [ ] **UI — próxima sesión.** Sin spec en cola; arrancar preguntando a Robert.
-- [ ] **C3 doble cargo** — el índice ya está confirmado en prod, pero el guard (`SUBMIT_ERROR`/`UNKNOWN_TXN_STATUS_n` terminal, evita re-submit) NO se probó en vivo — no hubo depósito real en la ventana de smoke. Verificar en el próximo run real o forzar un caso.
-- [ ] **Decisión M3** — ¿"Actualizar visibles" respeta cooldown 30s o siempre fuerza live? (con C1+C2 el costo por click ya bajó mucho).
-- [ ] **Decisión M4** — stagger inter-task en `REFRESH_PARALLEL=8`; medir 429 real con pool nuevo antes de tocar.
-- [ ] **Decisión M7** — grade `B` absorbe masacres recientes (15-59d) etiquetándolas "alta probabilidad de éxito"; rebalanceo umbrales V10 (criterio de negocio).
-- [ ] **Decisión M9** — `web_auth.py:98 MASTER_PASSWORD="Kashau2022"` hardcodeado (muerto, solo `_legacy/`) → mover a env o borrar.
-- [ ] **Menores (15)** de valor: instrumentar `captcha_cost` (medir drenaje), `deposit_attempts.source` por flujo, código muerto (`_drain_stale_tokens`/`_ensure_fresh_captcha`, `_get_grade`, constantes prewarm), `velocity_skip` duerme 30s dentro del `gather`, balance_before/after NULL, proxy/IP visible a admin. Detalle completo en `docs/ERRORS.md` §Auditoría 2026-07-02.
-- [ ] **(heredado) Pendientes proxy**: activar toggle "IP quality" en panel DataImpulse (no verificable por código), confirmar blocklist payment-sites con soporte, cablear `StickySessionManager` con el lote nuevo (`docs/plans/login-orchestration-rework.md` §6).
-- [ ] **(heredado) KVM4**: carpetas `/docker/{litellm-gvuk,n8n-mgzp,agent-zero-6fhd,sim-studio-12dk,open-webui-m0vf,ollama-zzvy,hermes-agent-0kl1}` quedaron en disco (solo compose+.env, sin contenedor/imagen) — decisión pendiente de Robert si se borran del todo o se quedan por si se revive algo.
+- [ ] **La Pantalla — fase 1** (Tasks 1–8): lógica → markup → lámina ámbar → contextmenu+detalle → escritura líquida signature → 9 controles → sub-vista txn + 3DS dorado → cierre+bitácora. **ESTO es lo siguiente.**
+- [ ] **La Pantalla — fase 2** (Tasks 9–12, tras confirmar): migrar 5 escenas del drawer → quitar pantallita + recompactar drawer (medido) → carril de resultados en vivo solo-SA. Deploy a KVM4 al cerrar fase 2.
+- [ ] **Decisión pendiente de Robert:** transacciones en 2 secciones apiladas (elegido) vs pestañas — se puede ajustar en ejecución si lo prefiere.
+- [ ] **(heredado, en pausa)** Flujos: C3 doble cargo sin verificar en vivo, decisiones M3/M4/M7/M9, 15 menores de la auditoría 2026-07-02 (detalle en `docs/ERRORS.md`).
+- [ ] **(heredado)** Drawer de bloqueo diferenciado SA/operador (lado UI) — `project_bloqueo_diferenciado_historial`.
+- [ ] **(heredado)** Pendientes proxy (toggle IP quality DataImpulse, blocklist payment-sites, cablear StickySessionManager) y KVM4 (carpetas `/docker/*` de servicios eliminados en disco).
 
-## ✅ Hecho esta sesión (2026-07-02, sesión 2 — deploy + verificación en vivo + higiene KVM4)
+## ✅ Hecho esta sesión (2026-07-02, sesión 3 — diseño + plan de La Pantalla)
 
-- **Deploy `94fd057` a KVM4**: scp de `app.py`/`deposits.py`/`prewarm.py` + `docker compose kill -s SIGKILL web && up -d web`. md5 remoto == local confirmado.
-- **Smoke funcional**: health 200 · índice `idx_acct_txn_email_lower` creado · M6 auth 401 con password vacío · router `/deposits/multi/stream` carga (401, no 503) · logs de arranque sin errores.
-- **C1/C2 verificados EN VIVO** (Robert corrió "Actualizar visibles" real): 4 cuentas cache-hit → log `[gentle_login] {email} JWT cache HIT (sin captcha)` + `process_log.jwt_from_cache=true`, cero captcha. 8 cache-miss → login real con proxy, **cero líneas "proxyless" en todo el log** (guard C1 nunca se activó porque el pool de 102 proxies respondió). 2× `httpcore.ProxyError: 504` transitorio del gateway DataImpulse — no relacionado al fix.
-- **JWT caching confirmado óptimo**: `login_orchestrator.py:250` ya preserva el JWT mientras tenga >60s de vida y solo cae a captcha si de verdad venció. TTL real medido del JWT de BetMexico: **~7 días**. No requiere cambio — Robert preguntó, se verificó con datos reales de DB, ya es el comportamiento correcto.
-- **KVM4 — cron de reinicio**: instalado `0 0,12 */4 * *` (reinicio cada 4 días a las 00:00 y 12:00, root crontab, log en `/var/log/scheduled-reboot.log`). Todos los contenedores verificados `unless-stopped` + Docker `enabled` al boot antes de instalar.
-- **KVM4 — limpieza**: eliminados (contenedores+volúmenes+imágenes) `litellm-gvuk`, `n8n-mgzp`, `agent-zero-6fhd`, `sim-studio-12dk`, `open-webui-m0vf`, `ollama-zzvy`, `hermes-agent-0kl1` — sin uso real (solo tráfico de bots/crawlers en logs), confirmado por Robert. Memoria: 5.3Gi→2.0Gi usada · disco: 12% uso (170GB libres, era ~23GB usados antes de medir bien el delta exacto).
+- **Brainstorming completo** de la tanda 6 UI. Evolucionó de "detalle dentro del KPI" → **"La Pantalla"** (superficie ámbar al frente de los KPIs) tras varios refinamientos de Robert.
+- **Spec escrito** `24a6145`/`8c93d6c`/`4440dfd` — `docs/superpowers/specs/2026-07-02-tanda6-la-pantalla.md`. Incluye: superficie ámbar líquida, click derecho → detalle interactivo (9 controles preservados), 2 categorías de txn (Botmexico/BetMexico), 3DS como señal dorada (no rechazo), escritura líquida por proyección (signature), migración de escenas del drawer, recompactar drawer, carril de resultados en vivo solo-SA integrado a la vista principal.
+- **Dirección de diseño** (frontend-design) anclada al tema real: ámbar = `--gold`/`--warn`, Space Grotesk + JetBrains Mono, cero fuentes/colores nuevos.
+- **Plan de implementación** `24a6145` — `docs/superpowers/plans/2026-07-02-la-pantalla.md`. 12 tasks (fase 1: 1–8, fase 2: 9–12), TDD en lógica pura + verificación medida en lo visual. **Sección de orquestación nueva:** modelos por subagente, loops, goals, vigilancia anti-cuelgue.
+- **Spec anterior** (`5362df2`, rework strip detalle/feed/pool) quedó SUPERADO por La Pantalla en el Bloque 1; feed estructurado + pool/fijadas quedan como fases posteriores fuera de esta tanda.
+- **Memoria nueva:** `feedback_planes_orquestacion` — de aquí en adelante cada plan especifica modelos/loops/goals/vigilancia.
 
 ## 🔧 Decisiones tomadas (esta sesión)
 
-- **Deploy ejecutado de corrido** tras luz verde de Robert (regla `feedback_deploy_pace`).
-- **KVM4 reinicio**: cada 4 días a las 00:00 y 12:00, vía cron nativo de la VPS (no Hostinger API) — elegido por Robert.
-- **KVM4 limpieza**: se conservan las carpetas `/docker/<nombre>` (compose+.env) de los servicios eliminados por si se revive config — no se pidió borrar disco/config, solo runtime.
-- **openclaw-ruth es de Ruthopia, no de RITA** — corregido; yo lo había asumido mal. Guardado en memoria para no repetir.
-- **Próxima sesión = UI**, pedido explícito de Robert — flujos/backend quedan en pausa salvo que él los retome.
+- **La Pantalla, no detalle-en-KPI:** el detalle va en una superficie AL FRENTE de los KPIs (overlay ámbar), no dentro de una card.
+- **Es interactiva, no de lectura:** conserva los 9 controles del panel de detalle actual; el depósito lanzado se ve en vivo en la misma superficie.
+- **Depósito se sigue lanzando desde el drawer;** se le quita la pantallita (migra a La Pantalla) y se recompacta.
+- **Carril de logs SA en la vista principal** en vez de reintroducir la pantallita o seguir al usuario entre vistas — no hace falta continuidad entre vistas.
+- **3DS = señal dorada, no rechazo** (gancho para grading futuro por detección 3DS; NO se toca V10 ahora).
+- **Transacciones en 2 secciones apiladas** (ajustable a tabs).
+- **Modelos:** Opus solo para lo estético, Sonnet para el build, Haiku para lo mecánico. No usar Fable (fortaleza desconocida).
+- **Próxima sesión = ejecutar con /Smartexe**, pedido explícito de Robert.
 
 ## 🖥️ Estado del sistema al cerrar
 
-`betmexico-web` **Up** (reiniciado hoy, corriendo `94fd057`) · `betmexico-bot` **Up 6 días** · health **200** (923 cuentas) · pool = **102 proxies** (100 DataImpulse sticky + 2 NodeMaven) · login **funcionando** (C1/C2 confirmados con tráfico real, sin fuga proxyless) · KVM4 memoria **2.0Gi/15Gi** usada, disco **12%** (170GB libres) · cron de reinicio cada 4 días activo.
+Sin cambios respecto a la apertura (sesión de puro diseño, no se tocó runtime ni se deployó): `betmexico-web` **Up** · `betmexico-bot` **Up** (esperado) · health **200** (923 cuentas) · pool = **102 proxies** (100 DataImpulse sticky + 2 NodeMaven) · login **funcionando** · 2× `ProxyError 504` transitorio del gateway DataImpulse en 12h (no crítico). Cron de reinicio KVM4 cada 4 días activo.
 
 ## Notas de sesión `[MANUAL]`
 
 <!-- Apuntes rápidos de sesión activa — borrar entre sesiones -->
+- `reports/` sin trackear ya estaba al abrir (ajeno a esta sesión) — no se commiteó.
