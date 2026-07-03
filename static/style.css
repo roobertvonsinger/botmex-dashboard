@@ -965,9 +965,22 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 
 /* ─── Selection checkbox (entre grade-bar y saldo, comprimido) ─── */
 .sel-cell {
-  width: 22px !important; min-width: 22px !important; max-width: 22px !important;
+  width: 15px !important; min-width: 15px !important; max-width: 15px !important;
   padding: 0 !important;
-  text-align: center;
+  text-align: center; position: relative;
+}
+/* Indicador de selección tipo Excel (ya no hay checkbox): dot accent cuando la
+   fila está seleccionada con Ctrl/Shift+Click. Aparece con un pequeño pop. */
+tr.row-sel .sel-cell::before {
+  content: ""; position: absolute; top: 50%; left: 50%;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 6px var(--accent-glow);
+  transform: translate(-50%, -50%);
+  animation: selDotPop 220ms var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)) both;
+}
+@keyframes selDotPop {
+  from { transform: translate(-50%, -50%) scale(0); }
+  to   { transform: translate(-50%, -50%) scale(1); }
 }
 /* Oculta el checkbox nativo y lo reemplaza por un dot personalizado */
 .sel-cell input[type="checkbox"] {

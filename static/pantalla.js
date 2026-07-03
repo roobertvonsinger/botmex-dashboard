@@ -442,21 +442,10 @@
 
   // ─────────────────────────── listeners ───────────────────────────
 
-  // contextmenu sobre cualquier fila de #accTable → abre La Pantalla.
-  // Capture phase + stopImmediatePropagation: gana sobre el listener legacy
-  // (bubble phase, ~línea 3000 de app.js) que abre el panel inline viejo.
-  // No se toca ese listener; simplemente dejamos de dejarlo correr para este
-  // evento puntual, cumpliendo "aditivo, no romper lo existente".
-  const accTable = $('#accTable');
-  if (accTable) {
-    accTable.addEventListener('contextmenu', e => {
-      const tr = e.target.closest('tr[data-id]');
-      if (!tr) return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      open(parseInt(tr.dataset.id), 'detail');
-    }, true);
-  }
+  // Fase B — El trigger para abrir La Pantalla desde la tabla es el CLICK IZQUIERDO
+  // simple (sin modificadores), manejado en el click handler de #accTable en app.js
+  // (`window.Pantalla.open`). Ctrl/Shift+Click hacen selección tipo Excel. Ya no se
+  // usa contextmenu (click derecho).
 
   // Cierre: click en cualquier [data-close] (backdrop + botón X).
   document.addEventListener('click', e => {

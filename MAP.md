@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `ee17523` | feat(pantalla): Fase A — densidad + dedup + acabado perla + controles manita |
 | `714718f` | fix(pantalla): persiana — pointercancel (no dejar drag colgado) + tope alto estricto = fija/strip |
 | `ff51ebe` | feat(pantalla): universal parcial — controles Depositar/EnUso/Fijar + Actividad/Recientes abren La Pantalla |
 | `e096e4f` | feat(pantalla): persiana magnetica — grip propio + despegar/re-adherir al strip |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `3bd728e` | feat(pantalla): markup del contenedor #pantalla + carga de assets |
 | `06439df` | feat(pantalla): logica pura — split txn (botmexico/betmexico) + estadoFrom + formatHito |
 | `b36ce32` | docs(session): cierre 2026-07-02 sesion 3 — diseno + plan de La Pantalla listo para /Smartexe |
-| `24a6145` | docs(plan): La Pantalla — plan de implementacion (fase 1 + fase 2) |
 <!-- GEN:end:recientes -->
 
 ---
