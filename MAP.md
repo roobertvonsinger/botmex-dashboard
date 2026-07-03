@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c86f367` | feat(pantalla): acabado premium — glassmorphism vidrio templado + escritura liquida (goo) + sigue vgutter |
 | `c9e9903` | fix(pantalla): vidrio semi-translucido real + layout horizontal sin scroll |
 | `5da9ede` | chore(pantalla): cache-bust app.js (v20260703a) para cargar window.__pat en prod |
 | `c55a1f0` | feat(pantalla): contextmenu → detalle (cabecera + 2 secciones txn botmexico/betmexico) |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `8c93d6c` | docs(spec): tanda 6 — La Pantalla integrada a vista principal (sin seguimiento entre vistas) |
 | `4440dfd` | docs(spec): tanda 6 — La Pantalla (superficie ambar de feedback + interaccion) |
 | `5362df2` | docs(spec): tanda 6 — rework strip KPI (detalle + feed + pool/fijadas) |
-| `530bc81` | docs(session): cierre 2026-07-02 sesión 2 — deploy 94fd057 verificado en vivo + higiene KVM4 |
 <!-- GEN:end:recientes -->
 
 ---

@@ -36,6 +36,27 @@
 /* El atributo [hidden] gana siempre: sin ver, sin interceptar clics. */
 .pantalla[hidden] { display: none; }
 
+/* Persiana DESPEGADA: puede extenderse más allá del tope del strip (sobre la
+   tabla) hasta el límite bajo. Durante el arrastre, sin animación (tracking directo). */
+.pantalla.pat-detached { max-height: 88vh; }
+.pantalla.pat-gripping .pantalla-sheet { animation: none; }
+
+/* ── Grip de la persiana (handle propio de La Pantalla, borde inferior) ── */
+.pantalla-grip {
+  position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%);
+  z-index: 7; width: 54px; height: 16px; cursor: ns-resize;
+  display: grid; place-items: center;
+  opacity: 0; transition: opacity var(--ease-fast);
+}
+.pantalla-grip-bar {
+  width: 36px; height: 3px; border-radius: 3px;
+  background: var(--pat-edge-h);
+  box-shadow: 0 0 12px -2px var(--pat-gold-soft);
+}
+.pantalla.pat-grip-armed .pantalla-grip { opacity: .55; }
+.pantalla-grip:hover { opacity: 1; }
+.pantalla.pat-detached .pantalla-grip { opacity: .9; }
+
 /* ═══════════════ BACKDROP — difumina los KPIs detrás ═══════════════ */
 .pantalla-backdrop {
   position: absolute; inset: 0;

@@ -71,13 +71,55 @@
     };
   }
 
-  // ── Medir .lpanel y setear --pantalla-h para cubrir exactamente el strip ──
+  // ── Persiana: control de altura propio de La Pantalla ──
+  // Por defecto La Pantalla va ADHERIDA al strip (sigue el vgutter). Cuando el
+  // strip llega a su tope, el grip propio se "arma" y permite DESPEGARLA para
+  // extenderla más abajo (sobre la tabla) hasta un límite. Al subir el grip y
+  // toparse otra vez con el strip, se re-adhiere (magnético). Modelo de Robert.
+  const TABLE_RESERVE = 300;   // igual que el vgutter (app.js): px reservados a la tabla
+  const GRIP_SNAP = 16;        // umbral magnético para re-adherir al strip
+  let _detached = false;       // true = altura manual (despegada del strip)
+  let _manualH = 0;            // altura manual vigente cuando _detached
+
+  function _stripH() {
+    const lp = $('.lpanel');
+    return lp ? lp.getBoundingClientRect().height : 0;
+  }
+  function _stripMaxH() {       // tope del strip (donde "terminan los KPIs")
+    const main = $('#accountsMain');
+    const m = main ? main.clientHeight : 0;
+    return m > (TABLE_RESERVE + 96) ? m - TABLE_RESERVE : 460;
+  }
+  function _extendedMaxH() {    // límite bajo de la persiana (cubre parte de la tabla)
+    const main = $('#accountsMain');
+    const m = main ? main.clientHeight : 0;
+    return m > 160 ? m - 90 : 560;
+  }
+  function _armGrip(root, sH) {
+    // El grip aparece cuando el strip está en su tope o cuando ya está despegada.
+    root.classList.toggle('pat-grip-armed', _detached || sH >= _stripMaxH() - 4);
+  }
+
+  // ── Medir .lpanel y setear --pantalla-h ──
+  // Adherida: sigue el strip. Despegada: respeta la altura manual y sólo re-adhiere
+  // cuando el strip crece y la alcanza (se "topan" → se pegan).
   function _sizeToStrip() {
     const root = $('#pantalla');
-    const lpanel = $('.lpanel');
-    if (!root || !lpanel) return;
-    const rect = lpanel.getBoundingClientRect();
-    if (rect.height > 0) root.style.setProperty('--pantalla-h', rect.height + 'px');
+    if (!root) return;
+    const sH = _stripH();
+    if (sH <= 0) return;
+    if (_detached) {
+      if (sH >= _manualH - GRIP_SNAP) {           // el strip alcanzó a La Pantalla → re-adherir
+        _detached = false;
+        root.classList.remove('pat-detached');
+      } else {
+        root.style.setProperty('--pantalla-h', _manualH + 'px');
+        _armGrip(root, sH);
+        return;
+      }
+    }
+    root.style.setProperty('--pantalla-h', sH + 'px');
+    _armGrip(root, sH);
   }
 
   // ─────────────────────────── open / close ───────────────────────────
@@ -378,6 +420,61 @@
       if (root && !root.hidden) _sizeToStrip();
     });
     ro.observe(lpanel);
+  })();
+
+  // ── Grip de la persiana: inyecta el handle en el borde inferior de la sheet y
+  // maneja el drag (extender/re-adherir con snap magnético al strip). ──
+  (function initPantallaGrip() {
+    const sheet = $('.pantalla-sheet');
+    const root = $('#pantalla');
+    if (!sheet || !root) return;
+    const grip = document.createElement('div');
+    grip.className = 'pantalla-grip';
+    grip.title = 'Arrastra ↕ para extender La Pantalla · doble-click re-adhiere';
+    grip.innerHTML = '<span class="pantalla-grip-bar"></span>';
+    sheet.appendChild(grip);
+
+    grip.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      const startY = e.clientY;
+      const startH = root.getBoundingClientRect().height;
+      const maxH = _extendedMaxH();
+      grip.setPointerCapture?.(e.pointerId);
+      root.classList.add('pat-gripping');
+      document.body.style.cursor = 'ns-resize';
+      document.body.style.userSelect = 'none';
+      const move = ev => {
+        const sH = _stripH();
+        let h = startH + (ev.clientY - startY);
+        h = Math.max(sH - 40, Math.min(h, maxH));
+        if (h <= sH + GRIP_SNAP) {                 // snap: re-adherida al strip
+          _detached = false;
+          root.classList.remove('pat-detached');
+          root.style.setProperty('--pantalla-h', sH + 'px');
+        } else {                                   // despegada: altura manual
+          _detached = true;
+          _manualH = h;
+          root.classList.add('pat-detached');
+          root.style.setProperty('--pantalla-h', h + 'px');
+        }
+        _armGrip(root, sH);
+      };
+      const up = () => {
+        root.classList.remove('pat-gripping');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    });
+
+    grip.addEventListener('dblclick', () => {      // re-adherir al strip
+      _detached = false;
+      root.classList.remove('pat-detached');
+      _sizeToStrip();
+    });
   })();
 
   window.Pantalla = { open, close, showTxn, back };
