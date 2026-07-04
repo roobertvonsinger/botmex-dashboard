@@ -2550,33 +2550,63 @@ $$('.seg').forEach(seg => {
   });
 })();
 
-// ─── Divisor horizontal del strip (↕ altura) ───
-// Arrastra ↕ para ajustar la altura del strip vs la tabla (reclamar el espacio
-// de las cards para ver más cuentas). Doble-click restaura. Persiste en
-// localStorage. Solo aplica a la vista Cuentas (#accountsMain).
+// ─── Divisor horizontal del strip (↕ altura) + control de 2 estados ───
+// Arrastra ↕ para ajustar la altura del panel KPI vs la tabla. Doble-click
+// restaura. El TOPE hacia abajo ya no es un TABLE_RESERVE=300 fijo: se MIDE
+// (filterbar + pagebar + 10 filas reales) para garantizar un piso de 10 cuentas
+// visibles. Expone window.KpiPanel: control dominante del alto que La Pantalla
+// (pantalla.js) dispara con la banda inferior (plegada 212px ↔ desplegada tope).
 (function initLpVResize() {
   const panel = document.getElementById('adminPanel');
   const gutter = document.getElementById('lpVGutter');
   const main = document.getElementById('accountsMain');
   if (!panel || !gutter || !main) return;
-  const KEY = 'bmx.lpHeight.v2';   // v2: ignora alturas guardadas viejas (nuevo default 212px)
+  const KEY = 'bmx.lpHeight.v2';
   const MIN = 96;
-  const TABLE_RESERVE = 300;   // px que SIEMPRE quedan para filterbar+tabla+pagebar
+  const DEFAULT_H = 212;   // default CSS de .lpanel (style.css:629) = estado "plegada"
+  const MIN_ROWS = 10;     // piso operativo: nunca menos de 10 cuentas visibles
+  const FALLBACK_ROW_H = 34;
+  const PL = window.PantallaLogic;
+
   const apply = h => { panel.style.height = h + 'px'; panel.style.minHeight = h + 'px'; };
-  // Tope máximo: nunca dejar la tabla sin espacio. Cae a 460 si aún no hay layout.
-  function maxH() { const m = main.clientHeight; return m > (TABLE_RESERVE + MIN) ? m - TABLE_RESERVE : 460; }
+
+  // Mide una fila real de #accTable; si la página no tiene filas (ej. filtro DEAD
+  // vacío), usa la fila del header como proxy; si tampoco, una constante.
+  function rowH() {
+    const body = document.querySelector('#accTable tbody tr');
+    if (body) { const h = body.getBoundingClientRect().height; if (h > 8) return h; }
+    const head = document.querySelector('#accTable thead tr');
+    if (head) { const h = head.getBoundingClientRect().height; if (h > 8) return h; }
+    return FALLBACK_ROW_H;
+  }
+  function measuredReserve() {
+    const fb = document.querySelector('.filterbar-accounts');
+    const pb = document.getElementById('pagebar');
+    return PL.panelReserve({
+      filterbarH: fb ? fb.getBoundingClientRect().height : 0,
+      pagebarH: pb ? pb.getBoundingClientRect().height : 0,
+      rowH: rowH(),
+      minRows: MIN_ROWS,
+    });
+  }
+  function maxH() {
+    return PL.panelMaxH({ mainH: main.clientHeight, reserve: measuredReserve(), minPanelH: MIN, fallback: 460 });
+  }
+  function currentH() { return panel.getBoundingClientRect().height; }
+
   try {
     const saved = parseInt(localStorage.getItem(KEY) || '', 10);
     if (saved > 0) apply(Math.min(Math.max(saved, MIN), maxH()));
   } catch (_) {}
 
+  // ── Drag del gutter: control libre, capado por el piso de 10 filas ──
   gutter.addEventListener('pointerdown', e => {
     e.preventDefault();
     const startY = e.clientY;
     const startH = panel.getBoundingClientRect().height;
     const mx = maxH();
     gutter.classList.add('dragging');
-    panel.classList.add('lp-resizing');   // sin transición durante el drag (tracking directo)
+    panel.classList.add('lp-resizing');
     gutter.setPointerCapture?.(e.pointerId);
     document.body.style.cursor = 'grabbing';
     document.body.style.userSelect = 'none';
@@ -2598,12 +2628,31 @@ $$('.seg').forEach(seg => {
     window.addEventListener('pointerup', up);
   });
   gutter.addEventListener('dblclick', () => {
-    // Reset al default CSS (212px) con micro-animación suave (transition activa)
     panel.style.removeProperty('height');
     panel.style.removeProperty('min-height');
     try { localStorage.removeItem(KEY); } catch (_) {}
     toast('↕ Altura del panel restaurada', 'success');
   });
+
+  // ── Control de 2 estados (lo dispara La Pantalla desde su banda inferior) ──
+  // applyH con animación: .lpanel ya tiene transition:height en CSS; el
+  // ResizeObserver de pantalla.js la sigue frame a frame → no necesita animación
+  // propia. Persiste el alto resultante para sobrevivir reload.
+  function applyH(h, animate) {
+    const clamped = Math.max(MIN, Math.min(h, maxH()));
+    if (!animate) panel.classList.add('lp-resizing');
+    apply(clamped);
+    if (!animate) requestAnimationFrame(() => panel.classList.remove('lp-resizing'));
+    try { localStorage.setItem(KEY, String(Math.round(clamped))); } catch (_) {}
+  }
+  function expand() { applyH(maxH(), true); }
+  function collapse() { applyH(DEFAULT_H, true); }
+  function toggle() {
+    const dir = PL.toggleTarget({ currentH: currentH(), collapsedH: DEFAULT_H, expandedH: maxH() });
+    if (dir === 'expand') expand(); else collapse();
+  }
+
+  window.KpiPanel = { toggle, expand, collapse, maxH, applyH, currentH, DEFAULT_H };
 })();
 
 // ── Colapso del sidebar a rail (tanda 4 — feedback Robert) ──────────────────
