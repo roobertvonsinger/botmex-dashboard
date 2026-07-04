@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `52aae4b` | fix(pantalla): pat-expanded por direccion decidida (no lectura mid-transicion) + notas excluidas del cierre por espacio limpio |
 | `965a165` | docs: KpiPanel + persiana de 2 estados en FRONTEND/AUDIT (bitacora) |
 | `50ca6f7` | style(pantalla): banda toggle con chevron + glow del boton Depositar en reposo |
 | `468a890` | feat(pantalla): 2 estados por banda (toggle KpiPanel) + close en espacio limpio; se retira el grip de arrastre |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `76c0c29` | docs(plan): plan de implementación persiana KPI + La Pantalla 2 estados |
 | `70cb938` | docs(spec): diseño persiana KPI + La Pantalla a 2 estados + fix depos flotante |
 | `98da9ec` | fix(pantalla): clamp de grip persiana + guard de liquidDone (auditoría #5/#7) |
-| `864f3fd` | feat(pantalla): CRUD de notas + guardar CURP validado (Task 3, parcial) |
 <!-- GEN:end:recientes -->
 
 ---
