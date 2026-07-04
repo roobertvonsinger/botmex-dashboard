@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `76c0c29` | docs(plan): plan de implementación persiana KPI + La Pantalla 2 estados |
 | `70cb938` | docs(spec): diseño persiana KPI + La Pantalla a 2 estados + fix depos flotante |
 | `98da9ec` | fix(pantalla): clamp de grip persiana + guard de liquidDone (auditoría #5/#7) |
 | `864f3fd` | feat(pantalla): CRUD de notas + guardar CURP validado (Task 3, parcial) |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `5a1acb1` | feat(pantalla): Fase B — click izquierdo abre La Pantalla + seleccion tipo Excel |
 | `ee17523` | feat(pantalla): Fase A — densidad + dedup + acabado perla + controles manita |
 | `714718f` | fix(pantalla): persiana — pointercancel (no dejar drag colgado) + tope alto estricto = fija/strip |
-| `ff51ebe` | feat(pantalla): universal parcial — controles Depositar/EnUso/Fijar + Actividad/Recientes abren La Pantalla |
 <!-- GEN:end:recientes -->
 
 ---
