@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `70cb938` | docs(spec): diseño persiana KPI + La Pantalla a 2 estados + fix depos flotante |
 | `98da9ec` | fix(pantalla): clamp de grip persiana + guard de liquidDone (auditoría #5/#7) |
 | `864f3fd` | feat(pantalla): CRUD de notas + guardar CURP validado (Task 3, parcial) |
 | `1ee0c17` | feat(pantalla): historial de transacciones unificado + fuente por color |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `ee17523` | feat(pantalla): Fase A — densidad + dedup + acabado perla + controles manita |
 | `714718f` | fix(pantalla): persiana — pointercancel (no dejar drag colgado) + tope alto estricto = fija/strip |
 | `ff51ebe` | feat(pantalla): universal parcial — controles Depositar/EnUso/Fijar + Actividad/Recientes abren La Pantalla |
-| `e096e4f` | feat(pantalla): persiana magnetica — grip propio + despegar/re-adherir al strip |
 <!-- GEN:end:recientes -->
 
 ---
