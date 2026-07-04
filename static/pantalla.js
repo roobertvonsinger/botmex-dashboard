@@ -477,7 +477,7 @@
   // LIMPIO dentro del sheet (no sobre un control/texto/fila ni la banda). Click en
   // cualquier OTRA parte del dashboard NO cierra (Robert: se queda abierta y solo
   // cambia de cuenta al seleccionar otra fila).
-  const _INTERACTIVE = 'button, a, input, textarea, .pat-mv, .pat-combo, .pat-curp, .pat-sv-card, [data-copy], .pantalla-banda';
+  const _INTERACTIVE = 'button, a, input, textarea, .pat-mv, .pat-combo, .pat-curp, .pat-sv-card, .pat-sv-note, [data-copy], .pantalla-banda';
   document.addEventListener('click', e => {
     if (e.target.closest('[data-close]')) { close(); return; }
     const sheet = e.target.closest('.pantalla-sheet');
@@ -701,13 +701,17 @@
       e.preventDefault();
       e.stopPropagation();
       if (window.KpiPanel && typeof window.KpiPanel.toggle === 'function') {
-        window.KpiPanel.toggle();
-        // Refleja el estado en la clase raíz para orientar el chevron (Task 5 CSS).
-        requestAnimationFrame(() => {
-          const cur = window.KpiPanel.currentH();
-          const expanded = cur > (window.KpiPanel.DEFAULT_H + window.KpiPanel.maxH()) / 2;
-          root.classList.toggle('pat-expanded', expanded);
+        // Decide la dirección ANTES de animar (mismo criterio geométrico que usa
+        // KpiPanel.toggle internamente) y refleja la clase de una vez: leer
+        // currentH() en un rAF posterior atrapa la altura A MEDIO camino de la
+        // transición CSS (--ease ~420ms) y deja el chevron invertido.
+        const dir = window.PantallaLogic.toggleTarget({
+          currentH: window.KpiPanel.currentH(),
+          collapsedH: window.KpiPanel.DEFAULT_H,
+          expandedH: window.KpiPanel.maxH(),
         });
+        window.KpiPanel.toggle();
+        root.classList.toggle('pat-expanded', dir === 'expand');
       }
     });
   })();
