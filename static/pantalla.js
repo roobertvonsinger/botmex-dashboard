@@ -130,6 +130,9 @@
     root.setAttribute('aria-hidden', 'false');
     root.classList.remove('pantalla-out');
     root.classList.add('pantalla-in');
+    // Con La Pantalla abierta, el panel de depósitos NUNCA comparte su franja (decisión
+    // de Robert, campo: siempre dockeado debajo de la tabla mientras esto está visible).
+    try { window.DeposWindow?._instance?.relayout?.(); } catch (_) {}
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         root.classList.add('pantalla-on');
@@ -178,6 +181,9 @@
     root.setAttribute('aria-hidden', 'true');
     root.classList.remove('pantalla-out');
     _currentId = null;
+    // Cerrada La Pantalla, el panel de depósitos puede volver a flotar si esa era
+    // la preferencia del operador (el forzado a dockeado era solo mientras estaba abierta).
+    try { window.DeposWindow?._instance?.relayout?.(); } catch (_) {}
   }
 
   function setMode(mode) {
@@ -710,8 +716,14 @@
           collapsedH: window.KpiPanel.DEFAULT_H,
           expandedH: window.KpiPanel.maxH(),
         });
+        // El contenido de movimientos se reflowea bajo el puntero mientras dura la
+        // transición (--ease ~420ms). Sin bloquear la selección, ese reflow bajo un
+        // click sostenido se lee como un drag y selecciona texto (visto en campo,
+        // prod: "se ve torpe"). Mismo patrón que el drag del vgutter (app.js).
+        document.body.style.userSelect = 'none';
         window.KpiPanel.toggle();
         root.classList.toggle('pat-expanded', dir === 'expand');
+        setTimeout(() => { document.body.style.userSelect = ''; }, 460);
       }
     });
   })();

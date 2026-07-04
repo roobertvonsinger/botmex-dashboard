@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c59981a` | docs(next-session): cierre persiana KPI — ejecutado, mergeado, deployado; gate de prod para Robert |
 | `52aae4b` | fix(pantalla): pat-expanded por direccion decidida (no lectura mid-transicion) + notas excluidas del cierre por espacio limpio |
 | `965a165` | docs: KpiPanel + persiana de 2 estados en FRONTEND/AUDIT (bitacora) |
 | `50ca6f7` | style(pantalla): banda toggle con chevron + glow del boton Depositar en reposo |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `2a9d2ca` | docs(frontend): historial unificado + pills de fuente + notas/CURP portados a La Pantalla |
 | `76c0c29` | docs(plan): plan de implementación persiana KPI + La Pantalla 2 estados |
 | `70cb938` | docs(spec): diseño persiana KPI + La Pantalla a 2 estados + fix depos flotante |
-| `98da9ec` | fix(pantalla): clamp de grip persiana + guard de liquidDone (auditoría #5/#7) |
 <!-- GEN:end:recientes -->
 
 ---

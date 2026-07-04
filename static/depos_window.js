@@ -140,10 +140,38 @@
       return { left: r.left, top: r.top, width: r.width, height: r.height };
     }
 
+    // Mismos márgenes que .pantalla-sheet (pantalla.css: left/right 20px, top 18px,
+    // bottom 14px) — ancla contra #accountsMain, NO contra el viewport crudo. Así el
+    // panel flotante respeta el mismo borde vertical que La Pantalla (visto en campo,
+    // prod: con vw()/vh() el panel quedaba "un poco fuera" al no coincidir márgenes).
+    function mainBounds() {
+      var m = document.getElementById('accountsMain');
+      var r = m ? m.getBoundingClientRect() : null;
+      return (r && r.width > 0) ? r : { left: 0, top: 0, width: vw(), height: vh() };
+    }
+
     function defaultFloat() {
-      var w = Math.min(440, vw() - 40);
-      var h = Math.min(640, vh() - 80);
-      return { left: vw() - w - 28, top: 96, width: w, height: h };
+      var mb = mainBounds();
+      var w = Math.min(440, mb.width - 40);
+      var h = Math.min(640, mb.height - 80);
+      return { left: mb.left + mb.width - w - 20, top: mb.top + 18, width: w, height: h };
+    }
+
+    // Re-encuadra CUALQUIER rect flotante (nuevo o restaurado de localStorage) a los
+    // márgenes vigentes de #accountsMain. Sin esto, un rect guardado de una sesión
+    // previa (con otra altura de KPI/La Pantalla) queda fuera de cuadro y no se
+    // autocorrige porque apply() solo llama defaultFloat() cuando ST.float es null.
+    function clampFloat(r) {
+      var mb = mainBounds();
+      var w = Math.min(r.width, mb.width - 40);
+      var h = Math.min(r.height, mb.height - 34);
+      var minLeft = mb.left + 20, maxLeft = Math.max(minLeft, mb.left + mb.width - 20 - w);
+      var minTop = mb.top + 18, maxTop = Math.max(minTop, mb.top + mb.height - 14 - h);
+      return {
+        left: Geo.clamp(r.left, minLeft, maxLeft),
+        top: Geo.clamp(r.top, minTop, maxTop),
+        width: w, height: h,
+      };
     }
 
     function setZonePad(side, w) {
@@ -165,8 +193,17 @@
 
     // Modo efectivo según la sección: en logs/activity (SA) el panel se ancla a la
     // izquierda sin sobreescribir la preferencia de accounts (ST.mode).
+    function pantallaAbierta() {
+      var p = document.getElementById('pantalla');
+      return !!p && !p.hidden;
+    }
     function effectiveMode() {
       if (ST.section === 'logs' || ST.section === 'activity') return 'left';
+      // Decisión de Robert (campo): con La Pantalla desplegada, el panel de depósitos
+      // SIEMPRE queda debajo (dockeado a #accDockZone, que en el DOM vive después del
+      // strip de La Pantalla) — nunca comparte su franja aunque el operador prefiera
+      // flotante. Al cerrarse, vuelve a la preferencia guardada (ST.mode intacto).
+      if (ST.mode === 'float' && pantallaAbierta()) return 'right';
       return ST.mode;
     }
     // En esas vistas el panel queda fijo (no se arrastra/redimensiona por el header).
@@ -202,6 +239,7 @@
         setZonePad(em, w);
       } else {
         if (!ST.float) ST.float = defaultFloat();
+        ST.float = clampFloat(ST.float);
         setZonePad(null);
         applyRect(ST.float, anim);
       }

@@ -266,7 +266,10 @@
 .pat-wrap { display: flex; flex-direction: column; height: 100%; gap: 9px; min-height: 0; }
 
 /* Fila 1 — identidad mínima (nombre · edad) + grade, discretos, no dominan. */
-.pat-idrow { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+/* padding-right reserva el hueco de .pantalla-close (30px + 12px de offset = 42px,
+   +8px de aire) — sin esto el botón Depositar (rightmost de .pat-actions) queda
+   justo debajo de la X (visto en campo, prod: la X se sobreponía a Depositar). */
+.pat-idrow { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; padding-right: 50px; }
 .pat-name { font-size: 11.5px; color: var(--text-muted); font-weight: 500; letter-spacing: .3px; }
 
 /* Controles principales (Depositar / En uso / Fijar) — verde, a la derecha. */
