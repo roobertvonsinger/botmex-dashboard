@@ -3,6 +3,19 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-07-04 (persiana KPI de 2 estados — resuelve hallazgo #5/#7 auditoría La Pantalla)
+
+### La Pantalla — persiana (`static/pantalla.js` + `app.js` `window.KpiPanel`)
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Grip propio de La Pantalla retirado** | `.pantalla-grip` (arrastre libre en el borde inferior) eliminado — bloqueaba clics del contenido cuando armado (hallazgo #5/#7, `reports/auditoria-la-pantalla-2026-07-03.md`) | ✅ retirado | ✅ node (lógica) |
+| **Modelo de 2 estados** | Plegada `212px` (`DEFAULT_H`) ↔ desplegada `maxH()` medido (piso 10 filas de tabla). Único control fino restante en esa zona: `.lp-vgutter` del panel KPI | ✅ implementado — `window.KpiPanel.{toggle,expand,collapse,maxH,applyH,currentH,DEFAULT_H}` (`app.js:2559`) | ✅ `node static/pantalla_logic.test.js` |
+| **La Pantalla sigue al panel KPI** | `ResizeObserver` sobre `.lpanel` (`observeStrip()`, `pantalla.js`) — cualquier cambio de alto del KPI (vgutter o toggle) arrastra a La Pantalla en vivo | ✅ implementado | ⚠️ runtime-pending (ver gate abajo) |
+| **Banda inferior dispara el toggle** | Click en `.pantalla-banda` → `window.KpiPanel.toggle()`, refleja `pat-expanded` para el chevron | ✅ implementado | ⚠️ runtime-pending |
+| **Resize estructural (`#adminPanel` expand/collapse)** | `expand()`→`maxH()`, `collapse()`→`DEFAULT_H` | ✅ verificado vía preview MCP contra `index.html` real | ❌ bloqueado — server plano `depos` (puerto 8099) sirve `/static/*` con doble-prefijo → 404 en todos los JS/CSS del entry, `window.KpiPanel` queda `undefined`. No es fallo del código; harness de preview no resuelve las rutas del entry real |
+| **Gate de prod (Robert)** | (1) la banda cierra en espacio limpio pero no al copiar combo/tarjeta ni tocar un botón; (2) el panel de depósitos no "vuela" al plegar/desplegar; (3) el toggle arrastra a La Pantalla junto con el panel KPI | 🔵 requiere La Pantalla abierta con cuenta real + panel de depósitos montado sobre la tabla real | 🔵 pendiente Robert en prod |
+
 ## Captura: 2026-06-29 (reorg UI — SSE scoped, strip 3 cards, marcador, pool manager, panel persistente)
 
 ### SSE filtrado server-side (`app.py`)

@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `50ca6f7` | style(pantalla): banda toggle con chevron + glow del boton Depositar en reposo |
 | `468a890` | feat(pantalla): 2 estados por banda (toggle KpiPanel) + close en espacio limpio; se retira el grip de arrastre |
 | `0a7aa4b` | fix(depos): ResizeObserver sobre .lpanel re-ancla el panel de depositos en vivo |
 | `91d87d6` | feat(kpi): piso de 10 filas medido + window.KpiPanel (control dominante del alto) |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `98da9ec` | fix(pantalla): clamp de grip persiana + guard de liquidDone (auditoría #5/#7) |
 | `864f3fd` | feat(pantalla): CRUD de notas + guardar CURP validado (Task 3, parcial) |
 | `1ee0c17` | feat(pantalla): historial de transacciones unificado + fuente por color |
-| `7af566f` | feat(pantalla): Fase C — marquee de seleccion tipo Explorer (umbral 6px) |
 <!-- GEN:end:recientes -->
 
 ---
