@@ -2655,6 +2655,25 @@ $$('.seg').forEach(seg => {
   window.KpiPanel = { toggle, expand, collapse, maxH, applyH, currentH, DEFAULT_H };
 })();
 
+// ── El panel de depósitos (DeposWindow) se ancla leyendo el rect de #accDockZone,
+// pero solo recalcula en .relayout(). Cuando el panel KPI cambia de alto (drag del
+// vgutter, o La Pantalla plegando/desplegando) la zona de la tabla se mueve y el
+// panel quedaba "volando" fuera. Un ResizeObserver sobre .lpanel lo re-ancla en
+// vivo (mismo patrón que pantalla.js observeStrip). ──
+(function observeKpiForDepos() {
+  const lpanel = document.getElementById('adminPanel');
+  if (!lpanel || typeof ResizeObserver === 'undefined') return;
+  let raf = 0;
+  const ro = new ResizeObserver(() => {
+    if (raf) return;                       // coalesce: 1 relayout por frame durante el drag/animación
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      try { window.DeposWindow?._instance?.relayout?.(); } catch (_) {}
+    });
+  });
+  ro.observe(lpanel);
+})();
+
 // ── Colapso del sidebar a rail (tanda 4 — feedback Robert) ──────────────────
 // Botón #sidebarToggle alterna body.sidebar-collapsed; el CSS hace el rail de
 // iconos. Persistente por navegador. Frictionless: la navegación nunca se pierde.
