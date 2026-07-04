@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `0a7aa4b` | fix(depos): ResizeObserver sobre .lpanel re-ancla el panel de depositos en vivo |
 | `91d87d6` | feat(kpi): piso de 10 filas medido + window.KpiPanel (control dominante del alto) |
 | `821170d` | feat(pantalla): fns puras de medida de persiana (reserve/maxH/toggle) + tests |
 | `e6ff06e` | docs(next-session): cierre — persiana lista para /Smartexe + estado del sistema |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `1ee0c17` | feat(pantalla): historial de transacciones unificado + fuente por color |
 | `7af566f` | feat(pantalla): Fase C — marquee de seleccion tipo Explorer (umbral 6px) |
 | `d55170b` | fix(backend): dedup exige coincidencia de estado — no oculta depositos APROBADOS reales |
-| `b1907c3` | fix(frontend): click en combo/celda abre La Pantalla (no copia) + exclusion mutua con acordeon viejo |
 <!-- GEN:end:recientes -->
 
 ---
