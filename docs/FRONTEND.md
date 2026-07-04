@@ -429,9 +429,27 @@ Ver `docs/SSE_EVENTS.md` para tabla maestra de `kind` y su handler.
 
 **Acabado:** vidrio templado ámbar + detalles **perla translúcida** (reflejos nácar rosa/cian mate en esquinas + halo interno tenue). El contenido (`.pantalla-view z-index:5`) va ENCIMA del grano/acabado para no opacarse. Contorno (`text-shadow`) en todo el texto para nitidez. Cuaje líquido (`.pat-liquid`, una vez por cuenta; el filtro goo se retiró por distorsión).
 
-**Persiana / control de tamaño:** grip propio en TODO el borde inferior (`.pantalla-grip`, cursor **manita** grab/grabbing; `pointer-events` solo cuando armado/despegado — si no, bloquea clics del contenido). Adherida al strip por defecto (sigue el vgutter via ResizeObserver), se despega al tope, re-adhiere magnética (dbl-click). El asa rebota (spring `--ease-spring`) al hover y se aplasta (squash) al agarrar.
+**Persiana de 2 estados (reemplaza el grip propio, 2026-07-04):** La Pantalla ya NO tiene grip de arrastre libre en su borde inferior. Se retiró `.pantalla-grip` (bloqueaba clics del contenido cuando armado; hallazgo #5/#7 de la auditoría). Modelo actual: **2 estados fijos** —
+- **Plegada**: `212px` (`DEFAULT_H`, default CSS de `.lpanel`).
+- **Desplegada**: `maxH()` medido (piso operativo de 10 filas de tabla siempre visibles; nunca tapa la tabla).
 
-**Controles deslizantes — patrón manita unificado:** grip de La Pantalla + `.lp-vgutter` (altura KPIs) + `.lp-gutter` (ancho cards) usan `grab`/`grabbing` + spring/squash. Los edges de resize de `depos_window` siguen con flechas `ns/ew-resize` (comunican eje). Skills de referencia: `design-engineer` + `micro-100-200ms` + `hover-interactions` (instaladas global).
+El único control deslizable fino de esa zona es el **`.lp-vgutter`** del panel KPI (`#adminPanel`) — arrastra ↕ para ajustar el alto libremente entre `MIN=96` y `maxH()`. La Pantalla no arrastra por sí misma: **sigue** al panel KPI vía `ResizeObserver` sobre `.lpanel` (`observeStrip()` en `pantalla.js`) — si el KPI cambia de alto (drag del vgutter o el toggle de 2 estados), La Pantalla crece/encoge en vivo (`_sizeToStrip()`).
+
+**`window.KpiPanel`** (`initLpVResize()`, `app.js:2559`) — control dominante del alto del panel KPI, consumido por La Pantalla:
+
+| Método | Firma | Efecto |
+|---|---|---|
+| `toggle()` | — | Alterna plegada↔desplegada según punto medio (`PantallaLogic.toggleTarget`) |
+| `expand()` | — | `applyH(maxH(), true)` — anima a desplegada |
+| `collapse()` | — | `applyH(DEFAULT_H, true)` — anima a plegada (212px) |
+| `maxH()` | → number | Tope medido (`PantallaLogic.panelMaxH`, reserva filterbar+pagebar+10 filas reales) |
+| `applyH(h, animate)` | — | Aplica alto clamped `[MIN, maxH()]`, persiste en `localStorage['bmx.lpHeight.v2']` |
+| `currentH()` | → number | Alto actual vía `getBoundingClientRect()` |
+| `DEFAULT_H` | 212 | Constante de la altura plegada |
+
+**Quién lo dispara:** la **banda inferior** de La Pantalla (`.pantalla-banda`, inyectada por `initPantallaBanda()` en `pantalla.js:690`) — click → `window.KpiPanel.toggle()` → refleja `pat-expanded` en `#pantalla` para orientar el chevron (`▲`/`▼`). Lógica pura compartida: `PantallaLogic.panelReserve/panelMaxH/toggleTarget` (`pantalla_logic.js`, testeada con `node static/pantalla_logic.test.js`).
+
+**Controles deslizantes — patrón manita unificado:** `.lp-vgutter` (altura KPIs, único control fino de esa zona) + `.lp-gutter` (ancho cards) usan `grab`/`grabbing` + spring/squash. Los edges de resize de `depos_window` siguen con flechas `ns/ew-resize` (comunican eje). Skills de referencia: `design-engineer` + `micro-100-200ms` + `hover-interactions` (instaladas global).
 
 ## Convenciones
 

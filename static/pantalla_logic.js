@@ -54,7 +54,26 @@
     return { label: ev.kind || '—', cls: 'proc', tone: 'proc' };
   }
 
-  const api = { splitTransactions, estadoFrom, formatHito };
+  // ── Medida del piso de la tabla + tope del panel KPI (persiana coherente) ──
+  // panelReserve: px que SIEMPRE quedan para filterbar + pagebar + minRows filas
+  // (piso operativo: nunca menos de minRows cuentas visibles). Reemplaza el
+  // TABLE_RESERVE=300 fijo que no medía cuántas filas cabían.
+  function panelReserve({ filterbarH, pagebarH, rowH, minRows }) {
+    return filterbarH + pagebarH + rowH * minRows;
+  }
+  // panelMaxH: tope de altura del panel KPI. Si el viewport no da ni para el
+  // reserve + el piso del panel, cae a un fallback razonable.
+  function panelMaxH({ mainH, reserve, minPanelH, fallback }) {
+    return mainH > reserve + minPanelH ? mainH - reserve : fallback;
+  }
+  // toggleTarget: decide plegar/desplegar por GEOMETRÍA (qué tan cerca está el
+  // alto actual del tope vs del default), no por un flag que se desincroniza si
+  // el operador arrastró el vgutter a un punto intermedio.
+  function toggleTarget({ currentH, collapsedH, expandedH }) {
+    return currentH < (collapsedH + expandedH) / 2 ? 'expand' : 'collapse';
+  }
+
+  const api = { splitTransactions, estadoFrom, formatHito, panelReserve, panelMaxH, toggleTarget };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PantallaLogic = api;
 })(typeof window !== 'undefined' ? window : globalThis);

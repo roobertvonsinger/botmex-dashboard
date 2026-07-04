@@ -192,18 +192,18 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `965a165` | docs: KpiPanel + persiana de 2 estados en FRONTEND/AUDIT (bitacora) |
+| `50ca6f7` | style(pantalla): banda toggle con chevron + glow del boton Depositar en reposo |
+| `468a890` | feat(pantalla): 2 estados por banda (toggle KpiPanel) + close en espacio limpio; se retira el grip de arrastre |
+| `0a7aa4b` | fix(depos): ResizeObserver sobre .lpanel re-ancla el panel de depositos en vivo |
+| `91d87d6` | feat(kpi): piso de 10 filas medido + window.KpiPanel (control dominante del alto) |
+| `821170d` | feat(pantalla): fns puras de medida de persiana (reserve/maxH/toggle) + tests |
+| `e6ff06e` | docs(next-session): cierre — persiana lista para /Smartexe + estado del sistema |
 | `2a9d2ca` | docs(frontend): historial unificado + pills de fuente + notas/CURP portados a La Pantalla |
 | `76c0c29` | docs(plan): plan de implementación persiana KPI + La Pantalla 2 estados |
 | `70cb938` | docs(spec): diseño persiana KPI + La Pantalla a 2 estados + fix depos flotante |
 | `98da9ec` | fix(pantalla): clamp de grip persiana + guard de liquidDone (auditoría #5/#7) |
 | `864f3fd` | feat(pantalla): CRUD de notas + guardar CURP validado (Task 3, parcial) |
-| `1ee0c17` | feat(pantalla): historial de transacciones unificado + fuente por color |
-| `7af566f` | feat(pantalla): Fase C — marquee de seleccion tipo Explorer (umbral 6px) |
-| `d55170b` | fix(backend): dedup exige coincidencia de estado — no oculta depositos APROBADOS reales |
-| `b1907c3` | fix(frontend): click en combo/celda abre La Pantalla (no copia) + exclusion mutua con acordeon viejo |
-| `d0af096` | docs(session): cierre 2026-07-03 — Fase A+B completas, proxima sesion = AUDITORIA |
-| `5a1acb1` | feat(pantalla): Fase B — click izquierdo abre La Pantalla + seleccion tipo Excel |
-| `ee17523` | feat(pantalla): Fase A — densidad + dedup + acabado perla + controles manita |
 <!-- GEN:end:recientes -->
 
 ---

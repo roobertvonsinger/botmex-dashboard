@@ -76,54 +76,19 @@
   // strip llega a su tope, el grip propio se "arma" y permite DESPEGARLA para
   // extenderla más abajo (sobre la tabla) hasta un límite. Al subir el grip y
   // toparse otra vez con el strip, se re-adhiere (magnético). Modelo de Robert.
-  const TABLE_RESERVE = 300;   // igual que el vgutter (app.js): px reservados a la tabla
-  const GRIP_SNAP = 16;        // umbral magnético para re-adherir al strip
-  let _detached = false;       // true = altura manual (despegada del strip)
-  let _manualH = 0;            // altura manual vigente cuando _detached
-
+  // La Pantalla SIGUE el alto del panel KPI (.lpanel). Ya no tiene control de
+  // arrastre propio: el único control deslizable de esta zona es el vgutter del
+  // panel KPI (app.js). Aquí solo reflejamos su alto en --pantalla-h.
   function _stripH() {
     const lp = $('.lpanel');
     return lp ? lp.getBoundingClientRect().height : 0;
   }
-  function _stripMaxH() {       // tope del strip (donde "terminan los KPIs")
-    const main = $('#accountsMain');
-    const m = main ? main.clientHeight : 0;
-    return m > (TABLE_RESERVE + 96) ? m - TABLE_RESERVE : 460;
-  }
-  function _extendedMaxH() {    // límite bajo de la persiana (cubre parte de la tabla)
-    const main = $('#accountsMain');
-    const m = main ? main.clientHeight : 0;
-    const raw = m > 160 ? m - 90 : 560;
-    // Clamp al mismo 88vh que trunca pantalla.css (.pantalla-sheet max-height) —
-    // si no, en viewports bajos el grip sigue "respondiendo" en JS más allá de
-    // donde el CSS ya recortó visualmente, y el operador no predice el tope.
-    return Math.min(raw, window.innerHeight * 0.88);
-  }
-  function _armGrip(root, sH) {
-    // El grip aparece cuando el strip está en su tope o cuando ya está despegada.
-    root.classList.toggle('pat-grip-armed', _detached || sH >= _stripMaxH() - 4);
-  }
-
-  // ── Medir .lpanel y setear --pantalla-h ──
-  // Adherida: sigue el strip. Despegada: respeta la altura manual y sólo re-adhiere
-  // cuando el strip crece y la alcanza (se "topan" → se pegan).
   function _sizeToStrip() {
     const root = $('#pantalla');
     if (!root) return;
     const sH = _stripH();
     if (sH <= 0) return;
-    if (_detached) {
-      if (sH >= _manualH - GRIP_SNAP) {           // el strip alcanzó a La Pantalla → re-adherir
-        _detached = false;
-        root.classList.remove('pat-detached');
-      } else {
-        root.style.setProperty('--pantalla-h', _manualH + 'px');
-        _armGrip(root, sH);
-        return;
-      }
-    }
     root.style.setProperty('--pantalla-h', sH + 'px');
-    _armGrip(root, sH);
   }
 
   // ─────────────────────────── open / close ───────────────────────────
@@ -508,9 +473,15 @@
   // (`window.Pantalla.open`). Ctrl/Shift+Click hacen selección tipo Excel. Ya no se
   // usa contextmenu (click derecho).
 
-  // Cierre: click en cualquier [data-close] (backdrop + botón X).
+  // Cierre: (a) click en [data-close] (backdrop + botón X); (b) click en espacio
+  // LIMPIO dentro del sheet (no sobre un control/texto/fila ni la banda). Click en
+  // cualquier OTRA parte del dashboard NO cierra (Robert: se queda abierta y solo
+  // cambia de cuenta al seleccionar otra fila).
+  const _INTERACTIVE = 'button, a, input, textarea, .pat-mv, .pat-combo, .pat-curp, .pat-sv-card, .pat-sv-note, [data-copy], .pantalla-banda';
   document.addEventListener('click', e => {
-    if (e.target.closest('[data-close]')) close();
+    if (e.target.closest('[data-close]')) { close(); return; }
+    const sheet = e.target.closest('.pantalla-sheet');
+    if (sheet && !e.target.closest(_INTERACTIVE)) close();   // espacio limpio del sheet
   });
 
   // Combo copiable tipo liga: el copiado real lo hace el handler global (.d-copy);
@@ -713,61 +684,35 @@
     ro.observe(lpanel);
   })();
 
-  // ── Grip de la persiana: inyecta el handle en el borde inferior de la sheet y
-  // maneja el drag (extender/re-adherir con snap magnético al strip). ──
-  (function initPantallaGrip() {
+  // ── Banda inferior: click = toggle plegar/desplegar el panel KPI (que arrastra
+  // a La Pantalla vía el ResizeObserver de observeStrip). Ya NO se arrastra: el
+  // control deslizable fino es el vgutter del panel KPI. ──
+  (function initPantallaBanda() {
     const sheet = $('.pantalla-sheet');
     const root = $('#pantalla');
     if (!sheet || !root) return;
-    const grip = document.createElement('div');
-    grip.className = 'pantalla-grip';
-    grip.title = 'Agarra y jala ↕ para extender La Pantalla · doble-click re-adhiere';
-    grip.innerHTML = '<span class="pantalla-grip-bar"></span>';
-    sheet.appendChild(grip);
+    const banda = document.createElement('div');
+    banda.className = 'pantalla-banda';
+    banda.title = 'Click para plegar/desplegar';
+    banda.innerHTML = '<span class="pantalla-banda-chev"><i class="ph-bold ph-caret-up"></i></span>';
+    sheet.appendChild(banda);
 
-    grip.addEventListener('pointerdown', e => {
+    banda.addEventListener('click', e => {
       e.preventDefault();
-      const startY = e.clientY;
-      const startH = root.getBoundingClientRect().height;
-      const maxH = _extendedMaxH();
-      grip.setPointerCapture?.(e.pointerId);
-      root.classList.add('pat-gripping');
-      document.body.style.cursor = 'grabbing';
-      document.body.style.userSelect = 'none';
-      const move = ev => {
-        const sH = _stripH();
-        let h = startH + (ev.clientY - startY);
-        // Tope ALTO estricto = fija/strip (como se entregó); tope BAJO = extendida.
-        h = Math.max(sH, Math.min(h, Math.max(maxH, sH)));
-        if (h <= sH + GRIP_SNAP) {                 // snap: re-adherida al strip
-          _detached = false;
-          root.classList.remove('pat-detached');
-          root.style.setProperty('--pantalla-h', sH + 'px');
-        } else {                                   // despegada: altura manual
-          _detached = true;
-          _manualH = h;
-          root.classList.add('pat-detached');
-          root.style.setProperty('--pantalla-h', h + 'px');
-        }
-        _armGrip(root, sH);
-      };
-      const up = () => {
-        root.classList.remove('pat-gripping');
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-        window.removeEventListener('pointermove', move);
-        window.removeEventListener('pointerup', up);
-        window.removeEventListener('pointercancel', up);   // limpieza si el SO cancela el puntero
-      };
-      window.addEventListener('pointermove', move);
-      window.addEventListener('pointerup', up);
-      window.addEventListener('pointercancel', up);        // Alt-Tab / diálogo SO no dejan el drag colgado
-    });
-
-    grip.addEventListener('dblclick', () => {      // re-adherir al strip
-      _detached = false;
-      root.classList.remove('pat-detached');
-      _sizeToStrip();
+      e.stopPropagation();
+      if (window.KpiPanel && typeof window.KpiPanel.toggle === 'function') {
+        // Decide la dirección ANTES de animar (mismo criterio geométrico que usa
+        // KpiPanel.toggle internamente) y refleja la clase de una vez: leer
+        // currentH() en un rAF posterior atrapa la altura A MEDIO camino de la
+        // transición CSS (--ease ~420ms) y deja el chevron invertido.
+        const dir = window.PantallaLogic.toggleTarget({
+          currentH: window.KpiPanel.currentH(),
+          collapsedH: window.KpiPanel.DEFAULT_H,
+          expandedH: window.KpiPanel.maxH(),
+        });
+        window.KpiPanel.toggle();
+        root.classList.toggle('pat-expanded', dir === 'expand');
+      }
     });
   })();
 
