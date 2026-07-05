@@ -36,7 +36,12 @@
   position: absolute;
   left: 0; right: 0; top: 0;
   height: var(--pantalla-h, 300px);
-  min-height: 288px;              /* PISO: altura mínima — no se aplasta. Perilla única para tunear el alto. */
+  /* PISO = el mismo mínimo que usa KpiPanel (app.js MIN=96) para .lpanel. 288px era
+     el piso de la ÉPOCA del grip propio de La Pantalla (antes del modelo de 2 estados);
+     con DEFAULT_H=212 (plegada) ese piso viejo GANABA sobre --pantalla-h y estiraba
+     La Pantalla 76px más abajo de lo que .lpanel realmente mide, tapando la filterbar
+     de abajo (visto en campo, prod: "tapa los controles de los filtros"). */
+  min-height: 96px;
   max-height: 52vh;
   z-index: 40;                    /* sobre el strip, bajo modales/drawer (z alto) */
 }

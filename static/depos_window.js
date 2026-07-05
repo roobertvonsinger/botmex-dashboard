@@ -121,7 +121,7 @@
 
     // Default 'right': el panel encaja a la derecha de la tabla (el espacio que
     // Robert reservó en la maqueta). `section` rige el modo efectivo por vista.
-    var ST = { mode: 'right', section: 'accounts', float: null, dockW: { left: 400, right: 400 } };
+    var ST = { mode: 'right', section: 'accounts', float: null, dockW: { left: 400, right: 400 }, open: false };
     load();
 
     var zone = function () { return document.getElementById(zoneId); };
@@ -397,13 +397,18 @@
 
     // reclamp al cambiar el viewport
     var rt;
-    window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { apply(false); }, 120); });
+    window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { if (ST.open) apply(false); }, 120); });
 
     // API pública del controlador
     var api = {
-      show: function () { ST._hiddenBySection = false; apply(false); },
-      hide: function () { clearAllZonePads(); ST._hiddenBySection = false; }, // cierre explícito
-      relayout: function () { apply(false); },
+      show: function () { ST.open = true; ST._hiddenBySection = false; apply(false); },
+      hide: function () { ST.open = false; clearAllZonePads(); ST._hiddenBySection = false; }, // cierre explícito
+      // apply() reserva espacio en accDockZone (setZonePad) como efecto lateral. Sin
+      // el guard de ST.open, cualquier relayout de fondo (el resize listener de abajo,
+      // o el ResizeObserver de app.js que dispara en CADA toggle de La Pantalla) volvía
+      // a reservar ese hueco aunque el panel estuviera cerrado — mesa de cuentas quedaba
+      // comprimida con espacio vacío sin ventana visible ahí (visto en campo, prod).
+      relayout: function () { if (ST.open) apply(false); },
       isDocked: function () { return effectiveMode() !== 'float'; },
       mode: function () { return effectiveMode(); },
       // Política por vista/rol (tanda 4). Recibe la sección destino y si el viewer
