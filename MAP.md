@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `ce3d03e` | docs(next-session): cierre — persiana KPI confirmada por Robert en prod; siembra brainstorm de logs/actividad/notificaciones para sig. sesion |
 | `35b5535` | feat(pantalla): historial scrolleable (rueda+drag) + detalle expandible por click + fix icono 💳/📝 abria acordeon viejo |
 | `2ae4c39` | fix(pantalla): depos SIEMPRE dockeado bajo La Pantalla + margenes reales + notas del closer 2026-07-04 |
 | `bdb11d5` | fix(pantalla): depos SIEMPRE dockeado bajo La Pantalla + margenes reales + notas del closer 2026-07-04 |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `468a890` | feat(pantalla): 2 estados por banda (toggle KpiPanel) + close en espacio limpio; se retira el grip de arrastre |
 | `0a7aa4b` | fix(depos): ResizeObserver sobre .lpanel re-ancla el panel de depositos en vivo |
 | `91d87d6` | feat(kpi): piso de 10 filas medido + window.KpiPanel (control dominante del alto) |
-| `821170d` | feat(pantalla): fns puras de medida de persiana (reserve/maxH/toggle) + tests |
 <!-- GEN:end:recientes -->
 
 ---
