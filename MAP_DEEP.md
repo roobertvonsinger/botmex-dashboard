@@ -71,41 +71,42 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `api_marks_list` | def | L1494–L1501 |
 | `api_marks_toggle` | def | L1505–L1523 |
 | `api_recent` | def | L1527–L1599 |
-| `_health_loop` | def | L1602–L1612 |
-| `_release_account` | def | L1615–L1636 |
-| `_run_lock_janitor` | def | L1639–L1687 |
-| `_janitor_loop` | def | L1690–L1700 |
-| `_run_window_watcher` | def | L1709–L1781 |
-| `_window_watcher_loop` | def | L1784–L1793 |
-| `_release_watchdog_tick` | def | L1796–L1895 |
-| `_release_watchdog_loop` | def | L1898–L1906 |
-| `_start_bg_tasks` | def | L1910–L1914 |
-| `LockRequest` | class | L1917–L1919 |
-| `lock_account` | def | L1923–L1962 |
-| `PublishRequest` | class | L1965–L1967 |
-| `publish_accounts` | def | L1971–L1994 |
-| `hide_all_accounts` | def | L1998–L2010 |
-| `pool_accounts` | def | L2014–L2032 |
-| `api_pool_split` | def | L2036–L2050 |
-| `api_pool_publish` | def | L2054–L2086 |
-| `unlock_account` | def | L2090–L2108 |
-| `_sse_generator` | def | L2111–L2137 |
-| `events` | def | L2141–L2151 |
-| `account_cards_pipe` | def | L2155–L2181 |
-| `account_notes_summary` | def | L2185–L2210 |
-| `account_details` | def | L2214–L2508 |
-| `NoteCreate` | class | L2511–L2512 |
-| `create_note` | def | L2516–L2545 |
-| `CurpUpdate` | class | L2548–L2549 |
-| `update_curp` | def | L2553–L2564 |
-| `delete_note` | def | L2568–L2580 |
-| `CombosRequest` | class | L2583–L2584 |
-| `accounts_combos` | def | L2588–L2601 |
-| `accounts_pass_map` | def | L2605–L2610 |
-| `list_all_cards` | def | L2614–L2689 |
-| `activity_feed` | def | L2693–L2810 |
-| `list_deposits` | def | L2814–L2843 |
-| `deposits_stats` | def | L2847–L2872 |
+| `api_accounts_at_hand` | def | L1603–L1711 |
+| `_health_loop` | def | L1714–L1724 |
+| `_release_account` | def | L1727–L1748 |
+| `_run_lock_janitor` | def | L1751–L1799 |
+| `_janitor_loop` | def | L1802–L1812 |
+| `_run_window_watcher` | def | L1821–L1893 |
+| `_window_watcher_loop` | def | L1896–L1905 |
+| `_release_watchdog_tick` | def | L1908–L2007 |
+| `_release_watchdog_loop` | def | L2010–L2018 |
+| `_start_bg_tasks` | def | L2022–L2026 |
+| `LockRequest` | class | L2029–L2031 |
+| `lock_account` | def | L2035–L2074 |
+| `PublishRequest` | class | L2077–L2079 |
+| `publish_accounts` | def | L2083–L2106 |
+| `hide_all_accounts` | def | L2110–L2122 |
+| `pool_accounts` | def | L2126–L2144 |
+| `api_pool_split` | def | L2148–L2162 |
+| `api_pool_publish` | def | L2166–L2198 |
+| `unlock_account` | def | L2202–L2220 |
+| `_sse_generator` | def | L2223–L2249 |
+| `events` | def | L2253–L2263 |
+| `account_cards_pipe` | def | L2267–L2293 |
+| `account_notes_summary` | def | L2297–L2322 |
+| `account_details` | def | L2326–L2620 |
+| `NoteCreate` | class | L2623–L2624 |
+| `create_note` | def | L2628–L2657 |
+| `CurpUpdate` | class | L2660–L2661 |
+| `update_curp` | def | L2665–L2676 |
+| `delete_note` | def | L2680–L2692 |
+| `CombosRequest` | class | L2695–L2696 |
+| `accounts_combos` | def | L2700–L2713 |
+| `accounts_pass_map` | def | L2717–L2722 |
+| `list_all_cards` | def | L2726–L2801 |
+| `activity_feed` | def | L2805–L2922 |
+| `list_deposits` | def | L2926–L2955 |
+| `deposits_stats` | def | L2959–L2984 |
 
 ### `auth.py`
 
@@ -376,6 +377,17 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_acquire_rate_limited_sets_cooldown_and_fails` | def | L248–L255 |
 | `test_set_account_cooldown_persists` | def | L258–L271 |
 
+### `test_at_hand.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `test_shape_has_pinned_and_recent_keys` | def | L7–L14 |
+| `test_pinned_account_enriched_with_id_and_combo` | def | L17–L30 |
+| `test_recent_account_has_id_and_last_ts` | def | L33–L41 |
+| `test_operator_does_not_see_foreign_account` | def | L44–L50 |
+| `test_sa_sees_own_recent_and_pinned` | def | L53–L64 |
+| `test_every_row_has_id_field_present` | def | L67–L73 |
+
 ### `test_deposit_step.py`
 
 | Símbolo | Tipo | Líneas |
@@ -530,6 +542,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `GET` | `/api/marks` | `app.py` |
 | `POST` | `/api/marks/toggle` | `app.py` |
 | `GET` | `/api/recent` | `app.py` |
+| `GET` | `/api/accounts/at-hand` | `app.py` |
 | `POST` | `/api/accounts/{account_id}/lock` | `app.py` |
 | `POST` | `/api/accounts/publish` | `app.py` |
 | `POST` | `/api/accounts/hide-all` | `app.py` |

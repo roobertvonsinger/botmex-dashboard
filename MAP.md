@@ -92,7 +92,7 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2879 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2991 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -109,6 +109,7 @@ prewarm.py (router)
 | `test_account_touch.py` | 51 | `—` | _[completar]_ |
 | `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
 | `test_anti_rate_limit.py` | 271 | `—` | _[completar]_ |
+| `test_at_hand.py` | 73 | `—` | _[completar]_ |
 | `test_deposit_step.py` | 132 | `—` | _[completar]_ |
 | `test_marks.py` | 32 | `—` | _[completar]_ |
 | `test_pool_manage.py` | 26 | `—` | _[completar]_ |
@@ -196,6 +197,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `88680a8` | feat(kpis): backend deposit_step — wrapper broadcast en los 3 flujos (Fase 2) |
 | `c765c7e` | feat(kpis): backend account_touch — tabla + hook en account_details + visibilidad (Fase 1) |
 | `d31bdfe` | docs(kpis): spec + plan reorg del strip a 2 KPIs (Logs + Cuentas a la mano) |
 | `ce3d03e` | docs(next-session): cierre — persiana KPI confirmada por Robert en prod; siembra brainstorm de logs/actividad/notificaciones para sig. sesion |
@@ -207,7 +209,6 @@ prewarm.py (router)
 | `52aae4b` | fix(pantalla): pat-expanded por direccion decidida (no lectura mid-transicion) + notas excluidas del cierre por espacio limpio |
 | `965a165` | docs: KpiPanel + persiana de 2 estados en FRONTEND/AUDIT (bitacora) |
 | `50ca6f7` | style(pantalla): banda toggle con chevron + glow del boton Depositar en reposo |
-| `468a890` | feat(pantalla): 2 estados por banda (toggle KpiPanel) + close en espacio limpio; se retira el grip de arrastre |
 <!-- GEN:end:recientes -->
 
 ---

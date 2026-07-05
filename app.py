@@ -1599,6 +1599,118 @@ def api_recent(user: dict = Depends(require_session)):
     return {"recent": rec, "stats": {"attempts": attempts, "approved": approved, "amount": amount, "rate": rate}}
 
 
+@app.get("/api/accounts/at-hand")
+def api_accounts_at_hand(user: dict = Depends(require_session)):
+    """KPI Cuentas a la mano: pineadas (marks del usuario) + recientes,
+    enriquecidas con id/status/balance/grade/combo y filtradas por rol.
+    Un solo origen de verdad server-side (evita 3 llamadas del front +
+    resolver email->id, que /api/recent no da)."""
+    my = user.get("telegram_id")
+    uk = str(my)
+    with db() as c:
+        # base_cols de list_accounts (app.py ~558) trae fullname/curp/phone que
+        # en algunas BD (incl. el harness de tests) no existen todavia -> el
+        # SELECT se arma dinamico contra el schema real, sin romper ninguno.
+        cols_present = {r[1] for r in c.execute("PRAGMA table_info(accounts)").fetchall()}
+        enrich_cols = ["id", "email", "password", "status", "balance_total",
+                       "balance_real", "grade", "locked_by", "locked_until"]
+        for optional in ("fullname",):
+            if optional in cols_present:
+                enrich_cols.append(optional)
+        sql_cols = ", ".join(enrich_cols)
+
+        def _combo(email, pw=None):
+            if pw is None:
+                row = c.execute("SELECT password FROM accounts WHERE email=? LIMIT 1", (email,)).fetchone()
+                pw = (row["password"] if row else "") or ""
+            return f"{email}:{pw}" if pw else email
+
+        # ── pineadas: marks del usuario, orden id DESC (igual que /api/marks) ──
+        pinned_emails = [
+            r["account_email"] for r in c.execute(
+                "SELECT account_email FROM account_marks WHERE user_key=? ORDER BY id DESC",
+                (uk,),
+            ).fetchall()
+        ]
+
+        # ── recientes: misma recoleccion que /api/recent (deposits propios,
+        # locks propios, marcadas), dedup por email, last_ts DESC ──
+        recent: dict = {}
+
+        def _add(email, ts, reason):
+            if not email:
+                return
+            cur = recent.get(email)
+            if cur is None or str(ts or "") > str(cur["last_ts"] or ""):
+                recent[email] = {"email": email, "last_ts": ts, "reason": reason}
+
+        dsql = "SELECT account_email, created_at FROM deposit_attempts WHERE operator_id=? ORDER BY id DESC LIMIT 50"
+        try:
+            for r in c.execute(dsql, (my,)).fetchall():
+                _add(r["account_email"], r["created_at"], "deposit")
+        except sqlite3.OperationalError:
+            pass
+
+        for r in c.execute(
+            "SELECT email, locked_at FROM accounts WHERE locked_by=? ORDER BY locked_at DESC LIMIT 50",
+            (str(my),),
+        ).fetchall():
+            _add(r["email"], r["locked_at"], "lock")
+
+        for r in c.execute(
+            "SELECT account_email, created_at FROM account_marks WHERE user_key=? ORDER BY id DESC LIMIT 50",
+            (uk,),
+        ).fetchall():
+            _add(r["account_email"], r["created_at"], "mark")
+
+        # Ley del pool (misma que /api/recent): non-SA no ve combos fuera de su
+        # universo visible, ni siquiera de cuentas que el marco.
+        vis = _visible_emails(user, c)
+        if vis is not None:
+            pinned_emails = [e for e in pinned_emails if e in vis]
+            recent = {e: v for e, v in recent.items() if e in vis}
+
+        # recent no duplica lo que ya esta en pinned (dos listas limpias)
+        pinned_set = set(pinned_emails)
+        recent_rows = [v for e, v in recent.items() if e not in pinned_set]
+        recent_rows.sort(key=lambda x: str(x["last_ts"] or ""), reverse=True)
+        recent_rows = recent_rows[:20]
+
+        # ── enrich con UNA query: email -> fila de accounts ──
+        all_emails = list(pinned_set | {r["email"] for r in recent_rows})
+        by_email: dict = {}
+        if all_emails:
+            qmarks = ",".join("?" * len(all_emails))
+            for row in c.execute(
+                f"SELECT {sql_cols} FROM accounts a WHERE a.email IN ({qmarks})",
+                all_emails,
+            ).fetchall():
+                by_email[row["email"]] = dict(row)
+
+        def _build(email, extra=None):
+            base = by_email.get(email)
+            item = {
+                "id": base["id"] if base else None,
+                "email": email,
+                "combo": _combo(email, base["password"] if base else None),
+                "fullname": base.get("fullname") if base else None,
+                "status": base["status"] if base else None,
+                "balance_total": base["balance_total"] if base else None,
+                "balance_real": base["balance_real"] if base else None,
+                "grade": base["grade"] if base else None,
+                "locked_by": base["locked_by"] if base else None,
+                "locked_until": base["locked_until"] if base else None,
+            }
+            if extra:
+                item.update(extra)
+            return item
+
+        pinned = [_build(e) for e in pinned_emails]
+        recent_out = [_build(r["email"], {"last_ts": r["last_ts"], "reason": r["reason"]}) for r in recent_rows]
+
+    return {"pinned": pinned, "recent": recent_out}
+
+
 async def _health_loop():
     """Cada 6 horas corre el check. Si falla, broadcast SSE."""
     await asyncio.sleep(60)  # primer check al minuto del start
