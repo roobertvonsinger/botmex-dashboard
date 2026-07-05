@@ -137,7 +137,13 @@
       if (!z) return null;
       var r = z.getBoundingClientRect();
       if (r.height < 60) return null; // sección oculta → no dockear
-      return { left: r.left, top: r.top, width: r.width, height: r.height };
+      // #accDockZone envuelve la filterbar (Cuentas/buscador/Restaurar/Actualizar
+      // visibles) ADEMÁS de la tabla (index.html:162-186) — su rect crudo empieza en
+      // la filterbar, no en la tabla. El dock debe alinearse con la TABLA (línea que
+      // Robert marcó), así que descontamos la filterbar del top/height si existe.
+      var fb = z.querySelector('.filterbar-accounts');
+      var fbH = fb ? fb.getBoundingClientRect().height : 0;
+      return { left: r.left, top: r.top + fbH, width: r.width, height: r.height - fbH };
     }
 
     // Mismos márgenes que .pantalla-sheet (pantalla.css: left/right 20px, top 18px,
