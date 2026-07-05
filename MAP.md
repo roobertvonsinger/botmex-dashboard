@@ -192,6 +192,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `2ae4c39` | fix(pantalla): depos SIEMPRE dockeado bajo La Pantalla + margenes reales + notas del closer 2026-07-04 |
 | `bdb11d5` | fix(pantalla): depos SIEMPRE dockeado bajo La Pantalla + margenes reales + notas del closer 2026-07-04 |
 | `82a94b5` | fix(pantalla): depos SIEMPRE dockeado bajo La Pantalla + margenes reales + notas del closer 2026-07-04 |
 | `c59981a` | docs(next-session): cierre persiana KPI — ejecutado, mergeado, deployado; gate de prod para Robert |
@@ -203,7 +204,6 @@ prewarm.py (router)
 | `91d87d6` | feat(kpi): piso de 10 filas medido + window.KpiPanel (control dominante del alto) |
 | `821170d` | feat(pantalla): fns puras de medida de persiana (reserve/maxH/toggle) + tests |
 | `e6ff06e` | docs(next-session): cierre — persiana lista para /Smartexe + estado del sistema |
-| `2a9d2ca` | docs(frontend): historial unificado + pills de fuente + notas/CURP portados a La Pantalla |
 <!-- GEN:end:recientes -->
 
 ---

@@ -3015,8 +3015,13 @@ $('#accTable').addEventListener('click', e => {
     const email = ic.dataset.email;
     if (ic.classList.contains('ic-add')) {
       _quickAddNote(accId, email);
+    } else if (window.Pantalla) {
+      // 💳 / 📝 → La Pantalla ya porta tarjetas+notas+CURP (mismo camino que el
+      // click de fila, misma exclusión mutua). Antes abrían el acordeón viejo
+      // (openDetailModal) sin pasar por Pantalla — visto en campo, prod.
+      closeDetailModal();
+      window.Pantalla.open(accId, 'detail');
     } else {
-      // 💳 / 📝 → abre modal de detalle
       openDetailModal(accId);
     }
     return;

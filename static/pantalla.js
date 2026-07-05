@@ -94,6 +94,10 @@
   // ─────────────────────────── open / close ───────────────────────────
 
   let _currentId = null;
+  // true mientras el último gesto sobre .pat-txn-col fue un drag-scroll (>6px de
+  // movimiento) — el click handler de .pat-mv lo consulta para NO togglear el
+  // detalle expandible al soltar tras arrastrar (initTxnScroll, más abajo).
+  let _mvDragged = false;
 
   function open(id, mode) {
     mode = mode || 'detail';
@@ -213,7 +217,11 @@
   // Layout horizontal (identidad+saldo | historial de movimientos), SIN scroll.
   // Nada de incrustar el renderDetail viejo: esto es contenido nativo de La Pantalla.
 
-  const MV_CAP = 12;   // filas visibles del historial (sin scroll, antes 5×2 col); el resto → "+N más"
+  // El historial ahora ES scrolleable (.pat-txn-col, rueda + click-y-jala) — ya no
+  // necesita truncar a un cap fijo con "+N más"; se renderiza completo y el scroll
+  // maneja el volumen. Tope duro solo para no reventar el DOM en cuentas con miles
+  // de movimientos.
+  const MV_CAP = 400;
 
   function renderPantallaHead(d) {
     const g = window.esc || (s => s);
@@ -413,6 +421,19 @@
   }
   // pos = posición dentro del historial (0-based) → alimenta --j (stagger corto
   // del cuaje entre filas). idx sigue siendo el índice GLOBAL para data-mv-idx.
+  // Detalle expandible al click de la fila. Solo los movimientos del propio
+  // dashboard (m.who/m.card_pipe) traen algo que mostrar — el eco de BetMexico no
+  // carga esos campos (lo dice el spec: "por lo menos las hechas en Botmexico").
+  // Tarjeta SIN enmascarar (memoria: pipe puro, copiado rápido es prioridad).
+  function _mvExpand(m) {
+    const g = window.esc || (s => s);
+    const rows = [];
+    if (m.who) rows.push(`<div class="pat-mv-exp-row"><span class="k">Operador</span><span class="v">${g(m.who)}</span></div>`);
+    if (m.card_pipe) rows.push(`<div class="pat-mv-exp-row"><span class="k">Tarjeta</span><span class="v pat-mv-exp-copy d-copy" data-copy="${g(m.card_pipe)}" title="Click para copiar">${g(m.card_pipe)}</span></div>`);
+    if (m.reason) rows.push(`<div class="pat-mv-exp-row"><span class="k">Motivo</span><span class="v">${g(m.reason)}</span></div>`);
+    if (!rows.length) rows.push(`<div class="pat-mv-exp-row"><span class="v dim">Eco de BetMexico — sin detalle interno.</span></div>`);
+    return `<div class="pat-mv-exp"><div class="pat-mv-exp-in">${rows.join('')}</div></div>`;
+  }
   function _mvLine(m, idx, pos) {
     const g = window.esc || (s => s);
     const money = window.fmtMoney || (v => `$${(v || 0).toFixed(2)}`);
@@ -420,10 +441,13 @@
     const sign = m.kind === 'withdrawal' ? '−' : (m.state === 'ok' ? '+' : '');
     const title = m.reason ? ` title="${g(m.reason)}"` : '';
     return `<div class="pat-mv ${cls}" data-mv-idx="${idx}" style="--j:${pos}"${title}>
-      <span class="pat-mv-t">${g(_mvTime(m))}</span>
-      <span class="pat-mv-src ${_mvSrcCls(m)}" title="${g(_mvSrcLabel(m))}">${_mvSrcBadge(m)}</span>
-      <span class="pat-mv-d">${g(_mvDesc(m))}</span>
-      <span class="pat-mv-a">${sign}${money(m.amount)}</span>
+      <div class="pat-mv-row">
+        <span class="pat-mv-t">${g(_mvTime(m))}</span>
+        <span class="pat-mv-src ${_mvSrcCls(m)}" title="${g(_mvSrcLabel(m))}">${_mvSrcBadge(m)}</span>
+        <span class="pat-mv-d">${g(_mvDesc(m))}</span>
+        <span class="pat-mv-a">${sign}${money(m.amount)}</span>
+      </div>
+      ${_mvExpand(m)}
     </div>`;
   }
   function _mvColumn(rows) {
@@ -493,7 +517,7 @@
   // Combo copiable tipo liga: el copiado real lo hace el handler global (.d-copy);
   // aquí solo el feedback visual (parpadeo verde "copiado") al click en el texto.
   document.addEventListener('click', e => {
-    const combo = e.target.closest('.pat-combo, .pat-curp, .pat-sv-card');
+    const combo = e.target.closest('.pat-combo, .pat-curp, .pat-sv-card, .pat-mv-exp-copy');
     if (!combo) return;
     combo.classList.add('copied');
     setTimeout(() => combo.classList.remove('copied'), 900);
@@ -505,6 +529,15 @@
   // toggleMark) y replicando el lock/unlock. En uso pide confirmación al LIBERAR.
   const _patRoot = $('#pantalla');
   if (_patRoot) _patRoot.addEventListener('click', async e => {
+    // Click en una fila de movimiento → toggle del detalle expandible (quién,
+    // tarjeta completa, motivo). No si el click cayó en la tarjeta copiable de
+    // adentro (ese click copia, no debe además abrir/cerrar el detalle) ni si
+    // el mousedown→mouseup vino de un drag-scroll (ver initTxnScroll, _mvDragged).
+    const mv = e.target.closest('.pat-mv');
+    if (mv && !e.target.closest('.pat-mv-exp-copy') && !_mvDragged) {
+      mv.classList.toggle('exp');
+      return;
+    }
     const dep = e.target.closest('.d-deposit-btn');
     if (dep && dep.dataset.accId) {
       e.preventDefault();
@@ -688,6 +721,44 @@
       if (root && !root.hidden) _sizeToStrip();
     });
     ro.observe(lpanel);
+  })();
+
+  // ── Click-y-jala para scrollear el historial (.pat-txn-col) — la rueda ya
+  // funciona nativo (overflow-y:auto en CSS). Delegado en #pantalla porque
+  // .pat-txn-col se re-renderiza en cada refresh de detalle (innerHTML) — un
+  // listener puesto directo en el nodo se perdería al siguiente render.
+  // Mismo umbral de 6px que la selección tipo Explorer del repo (app.js) para
+  // distinguir un click (togglea detalle) de un drag (solo scrollea).
+  (function initTxnDragScroll() {
+    const root = $('#pantalla');
+    if (!root) return;
+    let col = null, startY = 0, startTop = 0, dragging = false;
+    root.addEventListener('pointerdown', e => {
+      const c = e.target.closest('.pat-txn-col');
+      if (!c || e.target.closest('.pat-mv-exp-copy')) return;
+      col = c; startY = e.clientY; startTop = c.scrollTop; dragging = true; _mvDragged = false;
+      col.setPointerCapture?.(e.pointerId);
+    });
+    root.addEventListener('pointermove', e => {
+      if (!dragging || !col) return;
+      const dy = e.clientY - startY;
+      if (!_mvDragged && Math.abs(dy) > 6) {
+        _mvDragged = true;
+        col.classList.add('dw-dragging');
+        document.body.style.userSelect = 'none';   // evita seleccionar texto de las filas al arrastrar
+      }
+      if (_mvDragged) { col.scrollTop = startTop - dy; e.preventDefault(); }
+    });
+    const endDrag = () => {
+      if (col) col.classList.remove('dw-dragging');
+      document.body.style.userSelect = '';
+      dragging = false; col = null;
+      // El click sincrónico tras pointerup todavía necesita ver _mvDragged=true
+      // (para no togglear el detalle); se limpia en el siguiente tick.
+      setTimeout(() => { _mvDragged = false; }, 0);
+    };
+    root.addEventListener('pointerup', endDrag);
+    root.addEventListener('pointercancel', endDrag);
   })();
 
   // ── Banda inferior: click = toggle plegar/desplegar el panel KPI (que arrastra

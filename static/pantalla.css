@@ -351,7 +351,18 @@
   box-shadow: -1px 0 16px -12px var(--pat-gold-soft);
 }
 .pat-txn-emo { font-size: 12px; line-height: 1; filter: saturate(1.1); }
-.pat-txn-col { display: flex; flex-direction: column; gap: 4px; min-height: 0; overflow: hidden; }
+/* Rueda de scroll nativa (overflow-y) + click-y-jala (JS, pantalla.js) — cursor
+   grab en reposo, grabbing mientras arrastra. Scrollbar propia, delgada, discreta
+   (Robert: "que pueda usar la rueda... o click y jalar... microanimaciones"). */
+.pat-txn-col {
+  display: flex; flex-direction: column; gap: 4px; min-height: 0;
+  overflow-y: auto; overflow-x: hidden; scroll-behavior: smooth; cursor: grab;
+}
+.pat-txn-col.dw-dragging { cursor: grabbing; scroll-behavior: auto; user-select: none; }
+.pat-txn-col::-webkit-scrollbar { width: 5px; }
+.pat-txn-col::-webkit-scrollbar-track { background: transparent; }
+.pat-txn-col::-webkit-scrollbar-thumb { background: var(--pat-edge); border-radius: 4px; }
+.pat-txn-col::-webkit-scrollbar-thumb:hover { background: var(--pat-edge-h); }
 .pat-txn-h {
   display: flex; align-items: center; gap: 7px; margin-bottom: 3px;
   font-family: var(--font-display); font-weight: 600; font-size: 10.5px;
@@ -364,11 +375,14 @@
    barra lateral + tinte de fondo suave (semántica del historial viejo, más
    compacto y sin romper la UI: el color es el acento, no el relleno). */
 .pat-mv {
-  display: flex; align-items: center; gap: 8px; font-size: 11.5px;
+  display: flex; flex-direction: column; font-size: 11.5px;
   padding: 3px 8px; border-radius: 7px;
   border-left: 2px solid transparent; cursor: pointer;
   transition: background var(--ease-fast), border-color var(--ease-fast);
 }
+/* Fila visible (siempre montada) — antes eran hijos directos de .pat-mv; ahora
+   .pat-mv es columna (fila + detalle expandible) y esta es la fila en sí. */
+.pat-mv-row { display: flex; align-items: center; gap: 8px; }
 .pat-mv-t { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); white-space: nowrap; flex: 0 0 auto; }
 .pat-mv-src {
   display: inline-flex; align-items: center; justify-content: center;
@@ -400,6 +414,24 @@
 .pat-mv:hover   { background: oklch(0.80 0.085 160 / 0.09); }
 .pat-mv-more { font-size: 10px; color: var(--text-muted); padding: 4px 0 0 8px; }
 .pat-mv-empty { font-size: 11px; color: var(--text-muted); padding: 6px 8px; }
+
+/* Detalle expandible al click (quién/tarjeta completa/motivo — solo movimientos
+   de Botmexico traen who/card_pipe; el eco de BetMexico no tiene más que mostrar).
+   Técnica grid-rows 0fr→1fr: anima sin medir alto por JS, 180ms cae en la
+   ventana de micro-interacción (100-200ms) — se siente inmediato, no brusco. */
+.pat-mv-exp {
+  display: grid; grid-template-rows: 0fr; transition: grid-template-rows 180ms ease-out;
+}
+.pat-mv.exp .pat-mv-exp { grid-template-rows: 1fr; }
+.pat-mv-exp-in { overflow: hidden; min-height: 0; }
+.pat-mv.exp .pat-mv-exp-in { padding: 6px 2px 2px 25px; } /* alinea bajo .pat-mv-d, no bajo la hora */
+.pat-mv-exp-row { display: flex; align-items: baseline; gap: 8px; font-size: 10.5px; padding: 1px 0; }
+.pat-mv-exp-row .k { flex: 0 0 auto; width: 62px; color: var(--text-faint); text-transform: uppercase; font-size: 9.5px; letter-spacing: .4px; }
+.pat-mv-exp-row .v { color: var(--text-dim); font-family: var(--font-mono); overflow-wrap: anywhere; }
+.pat-mv-exp-row .v.dim { color: var(--text-faint); font-family: var(--font-display); font-style: italic; }
+.pat-mv-exp-copy { cursor: pointer; border-radius: 4px; transition: color var(--ease-fast); }
+.pat-mv-exp-copy:hover { color: var(--pat-gold); }
+.pat-mv-exp-copy.copied { color: var(--pat-gold); }
 
 /* ══════════ GUARDADO — tarjetas + notas en pequeño (columna de datos) ══════════
    Pegado al fondo de la columna (margin-top:auto) para no dejar espacio muerto
