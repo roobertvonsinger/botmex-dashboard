@@ -212,8 +212,8 @@ Reemplazó el sistema viejo (`zero`/`dim-amount`/`glow` con cortes en $5/$10). S
 
 | Card | ID / `data-mod` | Contenido | Fuente |
 |---|---|---|---|
-| **📋 Logs** | `#lpActivity` (`data-mod="activity"`) | Feed vertical scrolleable (ex-marquesina horizontal). Agrupa `deposit_step` en traza por intento (`✓login ✓begin ✗submit → CODE`), muestra `account_touch` (`👁 {who} abrió {target}`), fallos de otras acciones. 2 idiomas por rol (ver abajo). | SSE bus `/api/events` (`_LOGS_KINDS`: incluye `deposit_step`, `account_touch`, `deposit`, etc.) |
-| **📌 Cuentas a la mano** | `#lpRecientes` (`data-mod="recientes"`) | Por-cuenta (no por-evento): 2 secciones — **Pineadas ★** (marks del usuario) y **Recientes ·** (depósitos/locks/marks propios). Cada fila: nombre, estado LIVE/DEAD/🔒, balance, grade `[A-D]`. | `GET /api/accounts/at-hand` (`_atHandRow`/`renderRecientes`, app.js) |
+| **📋 Logs** | `#lpActivity` (`data-mod="activity"`) | Feed vertical scrolleable **cronológico único** (nada pineado por tipo) con **cabeceras de día** (Hoy/Ayer/fecha MX). Agrupa `deposit_step` en traza por intento (`✓login ✓begin ✗submit → CODE`), muestra `account_touch` (`👁 {who} abrió {target}`), fallos de otras acciones. 2 idiomas por rol (ver abajo). | SSE bus `/api/events` (`_LOGS_KINDS`: incluye `deposit_step`, `account_touch`, `deposit`, etc.) |
+| **📌 Cuentas a la mano** | `#lpRecientes` (`data-mod="recientes"`) | Por-cuenta (no por-evento): 2 secciones — **Pineadas ★** (marks del usuario) y **Recientes ·** (depósitos/locks/marks propios). Cada fila: **combo `email:password` copiable (protagonista, mono)** + nombre chico/suave al lado, estado (badge SOLO si bloqueada/DEAD — LIVE no muestra badge), balance, grade `[A-D]`. | `GET /api/accounts/at-hand` (`_atHandRow`/`renderRecientes`, app.js) |
 
 **Card `Pool` ELIMINADO** (ya no existe ni como card SA ni operador). `renderPoolCard` borrado del JS. **Online** ya vivía en sidebar (`.sb-online`, solo-SA) desde la reorg anterior — sin cambio.
 
@@ -221,9 +221,15 @@ Reemplazó el sistema viejo (`zero`/`dim-amount`/`glow` con cortes en $5/$10). S
 
 `_DEPOSIT_CODE_HUMANO` (app.js, extiende `_humanizeCritical`) traduce el `code` técnico de `deposit_step`/`deposit` (`RATE_LIMITED`, `LOGIN_DENIED`, `PROXY_FAILOVER_EXHAUSTED`, etc.) a lenguaje llano — mismo principio que el resto del dashboard (E-RED, capas operador vs backend): el operador NUNCA ve `result_code` crudo ni jerga interna; el SA puede ver más detalle técnico (traza completa login/begin/submit/check). Click en una fila → `Pantalla.open(id)`; el combo es copiable.
 
+### 📋 Logs — orden cronológico + día (fix 2026-07-05)
+
+El feed combina eventos cuyos `ts` vienen en **formatos y zonas mezclados** (medido en prod): `account_touch`/`deposit_step` en **hora MX naive** (`"2026-07-05 15:22:43"`), `deposit`/`note`/`prewarm` en **UTC naive** (`created_at`), `lock` en **UTC con tz** (`"...T21:23:10+00:00"`). El sort viejo comparaba strings crudos → el separador `'T'` (0x54) ganaba a `' '` (0x20) y los locks quedaban pineados arriba sin importar la hora. **Fix**: `_feedEpoch(ts, kind)` (app.js) colapsa todo a **epoch ms absoluto** (respeta tz explícita; los `_MX_NAIVE_KINDS` suman 6h); `renderActivityMarquee` ordena por epoch y muestra hora/día en tz MX vía `_exactHoraEp`/`_dayLabelEp`/`_mxYmd` (`Intl.DateTimeFormat` `America/Mexico_City`). Corrige de paso el `+6h` que tenían deposit/lock por interpretar su UTC como hora local. Cabecera `.lp-feed-day` se inserta al cambiar de día. Ver `docs/ERRORS.md`.
+
 ### 📌 Cuentas a la mano — consumo del endpoint
 
-`renderRecientes(data)` (app.js) recibe `{pinned, recent}` de `GET /api/accounts/at-hand` (fetch en `athand` — app.js:6050). `_atHandRow(it, {pinned})` arma cada fila; `_atHandStatus(it)` resuelve el badge de estado con prioridad **DEAD > 🔒 bloqueada > LIVE**. Reemplaza a `renderRecientes` viejo (que consumía `/api/recent`, por-evento) — el nuevo endpoint resuelve `email→id` server-side, cosa que `/api/recent` no daba (evitaba que el click abriera La Pantalla directo).
+`renderRecientes(data)` (app.js) recibe `{pinned, recent}` de `GET /api/accounts/at-hand` (fetch en `athand` — app.js:6050). `_atHandRow(it, {pinned})` arma cada fila; `_atHandStatus(it)` resuelve el badge de estado con prioridad **DEAD > 🔒 bloqueada > (LIVE = sin badge)**. Reemplaza a `renderRecientes` viejo (que consumía `/api/recent`, por-evento) — el nuevo endpoint resuelve `email→id` server-side, cosa que `/api/recent` no daba (evitaba que el click abriera La Pantalla directo).
+
+**Jerarquía (2026-07-05)**: el **combo `email:password` es el protagonista** (`.lp-recent-combo`, mono, lo que el operador copia/usa); el **nombre** va chico y suave al lado (`.lp-recent-name`, sans, `--text-dim`, `max-width:40%`), solo como referencia. El badge de estado **solo habla cuando orienta**: `🔒 bloqueada` (guardarraíl) o `DEAD` (no tocar). `LIVE` es el default usable → **sin badge** (ausencia = agárrala); mostrar "LIVE" era adorno sin criterio.
 
 ### ⚠️ Regresión conocida: filtro "en uso" quedó sin acceso en la UI
 

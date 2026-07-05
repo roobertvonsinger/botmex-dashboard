@@ -860,6 +860,15 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
   font-size: 9.5px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* Cabecera de día del feed (Hoy / Ayer / fecha) — separa el stream cronológico */
+.lp-feed-day {
+  font-size: 8.5px; letter-spacing: 0.7px; text-transform: uppercase;
+  color: var(--text-faint);
+  padding: 6px 4px 2px; flex-shrink: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  margin-bottom: 1px;
+}
+.lp-feed-day:first-child { padding-top: 0; }
 
 /* Tokens de color por operador (chip + feed-who) */
 .lp-color-warn   { color: var(--warn); }
@@ -2476,7 +2485,15 @@ td.row-icons, th.row-icons-th {
   transition: background var(--ease-fast);
 }
 .lp-recent-row:hover { background: rgba(255,255,255,0.03); }
-.lp-recent-combo { flex: 1; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+/* Combo email:password = protagonista copiable (mono, fuerte). El nombre va
+   chico y suave al lado, solo como referencia — no compite por el espacio. */
+.lp-recent-combo { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text); font-weight: 500; }
+.lp-recent-name {
+  flex: 0 1 auto; min-width: 0; max-width: 40%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 9px; color: var(--text-dim);
+  font-family: var(--font-sans);
+}
 .lp-recent-st {
   font-size: 8.5px; font-family: var(--font-mono); flex-shrink: 0;
   padding: 1px 6px; border-radius: 99px; letter-spacing: 0.3px;

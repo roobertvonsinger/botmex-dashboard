@@ -84,6 +84,21 @@ PY
 
 ## UI / layout
 
+### Feed KPI Logs desordenado: locks pineados arriba, no cronológico (2026-07-05)
+
+**Síntoma (Robert)**: en el panel 📋 Logs, los eventos con candado (`🔒 tomó` = locks) quedaban **agrupados arriba** en vez de intercalarse por hora con los depósitos; además la hora sola no servía sin saber el día, y un mismo depósito aparecía a dos horas distintas (`deposit_step` 15:25 vs evento `deposit` 21:25).
+
+**Causa raíz (medida en prod, NO supuesta)**: el feed combina eventos cuyos `ts` vienen en **formatos y zonas mezclados**:
+- `account_touch` / `deposit_step` → **hora MX naive** `"2026-07-05 15:22:43"` (`strftime` MX en `app.py`/`deposits.py`).
+- `deposit` (`created_at`) / `note` / `prewarm` → **UTC naive** `"2026-07-05 21:25:24"`.
+- `lock` (`locked_at`) → **UTC con tz** `"2026-07-05T21:23:10+00:00"`.
+
+`renderActivityMarquee` (`static/app.js`) ordenaba con `a.ts < b.ts` sobre **strings crudos**. El carácter separador en la posición 10 (`'T'` = 0x54 para locks vs `' '` = 0x20 para el resto) domina la comparación lexicográfica → **todos los locks quedan antes que todos los depósitos**, sin importar la hora real. Aparte, `parseTs` interpretaba el UTC naive de `deposit`/`lock` como hora local del browser → **+6h** de desfase mostrado.
+
+**Fix** (`static/app.js`, frontend-only, sin tocar backend/BD): `_feedEpoch(ts, kind)` colapsa cualquier `ts` a **epoch ms absoluto** — tz explícita → `Date.parse`; naive de `_MX_NAIVE_KINDS` (`account_touch`/`deposit_step`) suma 6h; naive del resto se trata como UTC. `renderActivityMarquee` ordena por epoch (`b.ep - a.ep`) y renderiza hora/día en tz MX con `_exactHoraEp`/`_dayLabelEp`/`_mxYmd` (`Intl.DateTimeFormat` `America/Mexico_City`). Se insertan **cabeceras de día** (`.lp-feed-day`: Hoy/Ayer/fecha) al cambiar de día. Corrige de paso el `+6h`. Verificado con los 3 `ts` reales de prod (node): orden `deposit 15:25 > lock 15:23 > touch 15:22`.
+
+**Deuda de origen**: la mezcla MX-vs-UTC nace de que Fase 1/2 emitió `account_touch`/`deposit_step` en MX mientras el resto usa `datetime.now(timezone.utc)`. El fix la absorbe en el front; unificar el backend a UTC-iso queda como limpieza futura (mayor superficie, no urgente).
+
 ### Pool card (3ª del strip) desbordada / "se sale de la pantalla" (2026-06-29)
 
 **Síntoma (Robert)**: el último card del strip (Pool) aparece recortado en el borde derecho de la ventana ("155 LIV" cortado, GESTIONAR POOL fuera de vista).
