@@ -451,6 +451,14 @@ El único control deslizable fino de esa zona es el **`.lp-vgutter`** del panel 
 
 **Controles deslizantes — patrón manita unificado:** `.lp-vgutter` (altura KPIs, único control fino de esa zona) + `.lp-gutter` (ancho cards) usan `grab`/`grabbing` + spring/squash. Los edges de resize de `depos_window` siguen con flechas `ns/ew-resize` (comunican eje). Skills de referencia: `design-engineer` + `micro-100-200ms` + `hover-interactions` (instaladas global).
 
+**Fixes de campo post-persiana (2026-07-04, prod, capturas de Robert):**
+- **`DEFAULT_H` (212) vs `.pantalla{min-height:288px}`:** el piso viejo (época del grip propio) ganaba sobre `--pantalla-h` y estiraba La Pantalla 76px de más al plegar, tapando la filterbar de abajo. Bajado a `min-height:96px` (mismo `MIN` de `KpiPanel`).
+- **`DeposWindow` — dockeo real:** `zoneRect()` medía el rect crudo de `#accDockZone`, que envuelve la filterbar ADEMÁS de la tabla (`index.html:162-186`) → el panel dockeaba con el top en la filterbar, no en la tabla. Ahora descuenta `.filterbar-accounts` del top/height. Además: mientras La Pantalla está abierta, `effectiveMode()` fuerza dockeado (nunca `float`, aunque esa sea la preferencia guardada) — decisión de Robert, el panel de depósitos NUNCA comparte franja con La Pantalla. `defaultFloat()`/`clampFloat()` anclan contra `#accountsMain` (mismos márgenes 20/18/14px que `.pantalla-sheet`), no contra `vw()/vh()` crudos.
+- **`ST.open` guard:** `relayout()`/el resize listener de `DeposWindow` llamaban `apply()` sin checar si el panel estaba realmente abierto → el `ResizeObserver` de `observeKpiForDepos` (dispara en cada toggle de La Pantalla) volvía a reservar espacio en `accDockZone` (`setZonePad`) con el panel cerrado, dejando hueco vacío en la tabla. Fix: flag `ST.open` seteado en `show()`/`hide()`.
+- **Íconos 💳/📝 de fila:** llamaban `openDetailModal()` (acordeón viejo) en vez de `window.Pantalla.open()` — único camino que no pasaba por la exclusión mutua. Corregido.
+
+**Historial scrolleable + detalle expandible (2026-07-04):** `.pat-txn-col` pasó de `overflow:hidden` + cap fijo de 12 filas (`+N más`) a `overflow-y:auto` (rueda nativa) + click-y-jala delegado en `#pantalla` (el nodo se re-renderiza en cada refresh de detalle; un listener directo se perdería) — umbral de 6px para distinguir drag de click (mismo patrón que la selección tipo Explorer). Cap subido a 400 (solo backstop). Cada fila `.pat-mv` togglea un detalle expandible al click (`grid-template-rows: 0fr↔1fr`, 180ms) con operador/tarjeta completa SIN enmascarar (copiable, `.pat-mv-exp-copy`)/motivo — solo hay sustancia real en movimientos nativos (`m.who`/`m.card_pipe`); el eco de BetMexico muestra "sin detalle interno". `_mvDragged` (module-level flag) evita que soltar un drag-scroll también togglee la fila.
+
 ## Convenciones
 
 - **`data-copy`** en cualquier elemento → click izquierdo copia el valor. Handler global en app.js:2715.

@@ -4,41 +4,41 @@
 > **Lente rectora de TODO:** ver memoria `feedback_frictionless_norte` + `NORTE.md`. BOTMEXICO = frictionless, a prueba de desmadre, y tiene que GANARLE a entrar directo a BetMexico.
 
 ## 🎯 Objetivo en curso
-Plan de la persiana KPI/La Pantalla **ejecutado, mergeado a main y deployado a KVM4** (2026-07-04). Toca decidir el siguiente foco: retirar el acordeón viejo (pendiente #1 abajo) u otro punto de la auditoría.
+Persiana KPI/La Pantalla **cerrada y confirmada por Robert en prod** (gate pasó tras 4 rondas de fixes de campo). Robert dio el siguiente foco: **los KPIs tienen que aportar datos reales, no solo marquesinas en movimiento**. Punto de entrada elegido: sustituir el KPI de **"Pool"** por un **log de actividad en vivo** (quién/cuándo/qué hizo cualquiera en el bot), filtrado por rol — Robert ve todo con detalle técnico básico; cada usuario ve solo lo suyo, en lenguaje aún más simple.
 
 ## ▶ Con qué arrancas
-Gate de prod pendiente de que **Robert verifique con datos reales** (ver "Gate de prod" abajo). Si todo cuadra, decidir el pendiente #1 (retirar acordeón viejo) es el siguiente candidato natural.
+**Brainstorming** (usar `superpowers:brainstorming` — es creación de feature nueva, no bugfix) sobre el sistema completo de **logs / registro de actividad / notificaciones / alertas / feedback al usuario**. NO empieces a codear directo — el encargo de Robert es sembrar la conversación, no un spec cerrado. Primer punto concreto a resolver en el brainstorm: qué reemplaza al KPI "Pool" (layout/slot) y qué pipeline de datos alimenta esa vista.
 
 ## 🧭 Recomendación de approach
-Antes de abrir nueva feature: que Robert confirme visualmente el gate de prod (3 bullets abajo). Si pasa, ir por la decisión #1 (acordeón viejo) — es una decisión de producto simple (sí/no) que desbloquea simplificar código, no requiere nuevo spec.
+Antes de tocar código, mapea qué fuentes de actividad YA existen (SSE `_broadcast`/`_event_visible_to` en `app.py` ya filtra por rol — ver `docs/SSE_EVENTS.md` — puede ser la base del pipeline, no reinventar) vs qué falta (idioma técnico-básico por audiencia, dónde vive el filtro de "spam visual"). El filtrado por rol (SA ve todo / operador ve lo suyo) YA está resuelto en el backend para SSE — el trabajo nuevo es de **presentación + síntesis de lenguaje**, no de plomería de visibilidad desde cero.
 
 ## ⏳ Pendientes próximos
-- [ ] **Gate de prod de la persiana (Robert, con datos reales):** (1) la banda cierra en espacio limpio pero NO al copiar combo/tarjeta ni tocar un botón/nota; (2) el panel de depósitos no "vuela" al plegar/desplegar el KPI; (3) el toggle arrastra a La Pantalla junto con el panel KPI.
-- [ ] **Decisión de Robert (#1 auditoría):** ¿retirar el acordeón viejo por completo ahora que La Pantalla porta notas+CURP? Lo único que le queda exclusivo es tarjetas (que no tienen alta manual). Ver `reports/auditoria-la-pantalla-2026-07-03.md`.
+- [ ] **Brainstorm de logs/actividad/notificaciones/alertas/feedback** (Robert lo pidió explícito para el arranque de la sig. sesión).
+- [ ] **KPI "Pool" → log de actividad filtrado.** Requisitos dados por Robert: (a) actualiza en vivo con cada acción de cualquiera en el bot; (b) distingue claramente QUIÉN, CUÁNDO, QUÉ hizo; (c) vista de Robert = limpia, TDAH-friendly, lenguaje técnico básico pero con MÁS detalle; (d) cada usuario ve SU PROPIO log en tiempo real, en lenguaje aún más básico; (e) filtrar el "spam visual" — no todo evento crudo debe llegar a la vista.
+- [ ] **Decisión de Robert (#1 auditoría, sigue abierta):** ¿retirar el acordeón viejo por completo ahora que La Pantalla porta notas+CURP+tarjetas-lectura? Ver `reports/auditoria-la-pantalla-2026-07-03.md`.
 - [ ] **Ositos-avatar (Depp-ositos)** — pospuesto. Spec acordada: 4 estados (idle/aprobado/rechazado/pendiente), plomería con placeholders + arte que genera Robert (Antigravity/Gemini web).
 - [ ] Hallazgos menores auditoría #6/#8/#9/#10/#11 — parqueados (feel/ambiguos, con Robert presente).
-- [ ] `idea_vaga.txt` (raíz, untracked): nota de Robert sobre una pantalla de salud/actividad en vivo de los bots. Sin tocar — recuérdalo si retoma.
-- [ ] `⚠️` pool de proxies cambió de mezcla vs sesión pasada: ahora 102 total (100 `dataimpulse` + 2 `nodemaven`), sin IPRoyal/LitPort visibles. `ProxyError 502 NO_HOST_CONNECTION` recurrente en dataimpulse en logs de 12h — no bloqueante hoy, vigilar si sube.
+- [ ] `idea_vaga.txt` (raíz, untracked): nota de Robert sobre una pantalla de salud/actividad en vivo de los bots — **puede fusionarse con el brainstorm de logs de arriba**, léela al empezar.
+- [ ] `⚠️` pool de proxies: 102 total (100 `dataimpulse` + 2 `nodemaven`), sin IPRoyal/LitPort visibles. `ProxyError 502 NO_HOST_CONNECTION` recurrente en dataimpulse en logs de 12h — no bloqueante, vigilar si sube.
 
-## ✅ Hecho esta sesión (2026-07-04, `/Smartexe`)
-Plan `docs/superpowers/plans/2026-07-04-persiana-kpi-pantalla.md` ejecutado completo, subagent-driven (Haiku Task1 TDD, Sonnet Tasks 2-6) + review adversarial + 2 fixes:
-- `821170d` fns puras `panelReserve/panelMaxH/toggleTarget` (TDD, 8 casos verdes).
-- `91d87d6` `window.KpiPanel` en `app.js` (control dominante del alto, piso de 10 filas medido).
-- `0a7aa4b` `ResizeObserver` que re-ancla `DeposWindow` al cambiar el alto del KPI.
-- `468a890` `pantalla.js`: grip de arrastre retirado → banda toggle (`initPantallaBanda`) + cierre en espacio limpio del sheet.
-- `50ca6f7` CSS de la banda (cursor pointer, chevron) + glow del botón Depositar en reposo.
-- `965a165` bitácora (`FRONTEND.md`/`AUDIT.md`).
-- `52aae4b` **fix post-review adversarial**: (a) `pat-expanded` se fijaba leyendo altura A MEDIO CAMINO de la transición CSS (rAF a ~16ms de 420ms) → chevron invertido en cada toggle; ahora se decide la dirección ANTES de animar. (b) `.pat-sv-note` faltaba en el whitelist de cierre → click en una nota cerraba La Pantalla completa.
-- Merge a `main` (`0b7916c`) + push a Forgejo + **deploy a KVM4 completo**: `scp` de los 4 archivos `static/` tocados + `docker compose restart web`. Verificado: `StartedAt` (16:25:37) > mtime del archivo (16:24:31), health 200, smoke test contra `https://botmexico.com.mx` confirma código nuevo sirviéndose (`initPantallaBanda`/`panelReserve` presentes en el JS servido).
-- Verificación local: 3 test files node en verde (`pantalla_logic`, `strip_logic`, `depos_window`); resize estructural end-to-end **bloqueado en local** (requiere sesión autenticada — `adminPanel` queda `display:none` sin login real), consistente con lo previsto por el propio plan.
+## ✅ Hecho esta sesión (2026-07-04/05)
+Persiana KPI (plan `docs/superpowers/plans/2026-07-04-persiana-kpi-pantalla.md`, ejecutado con `/Smartexe`) + 3 rondas de fixes de campo (capturas de Robert en prod) + 1 feature nueva, todo deployado a KVM4 y confirmado:
+
+- **Persiana base** (`0b7916c` merge): fns puras (`panelReserve/panelMaxH/toggleTarget`), `window.KpiPanel`, `ResizeObserver` KPI→depos, banda toggle (retira el grip), CSS + review adversarial (`52aae4b`: fix `pat-expanded` mid-transición + notas excluidas del cierre).
+- **Ronda 1 de campo** (`82a94b5`): X sobre Depositar (padding-right en `.pat-idrow`), drag-select de texto al togglear (user-select:none temporal), depos flotante fuera de cuadro (ancla a `#accountsMain`), depósitos SIEMPRE dockeado bajo La Pantalla (decisión de Robert).
+- **Ronda 2 de campo** (`bdb11d5`): `zoneRect()` descontaba mal la filterbar de `#accDockZone` → el dock alineaba con la filterbar, no con la tabla.
+- **Ronda 3 de campo** (`2ae4c39`): `ST.open` guard en `DeposWindow` (hueco vacío con panel cerrado) + `.pantalla{min-height:96px}` (era 288, tapaba la filterbar al plegar).
+- **Feature nueva** (`35b5535`): historial de movimientos scrolleable (rueda + click-y-jala, umbral 6px) + detalle expandible por click (operador/tarjeta completa copiable/motivo) + fix de los íconos 💳/📝 que aún abrían el acordeón viejo.
+- **Gate de prod: ✅ confirmado por Robert** — los 3 puntos pendientes de la sesión anterior (banda cierra bien, depos no vuela, toggle arrastra a La Pantalla) pasaron tras las 3 rondas de campo.
+- Docs actualizados: `FRONTEND.md` (persiana + fixes + historial) y `AUDIT.md` (captura 2026-07-04 con los 8 hallazgos de campo, todos ✅ confirmados por Robert en prod).
 
 ## 🔧 Decisiones tomadas
-- La Pantalla pasa a 2 estados y pierde su grip de arrastre; el vgutter del panel KPI queda como control deslizable dominante.
-- Cierre de La Pantalla SOLO por click en espacio limpio del sheet / backdrop / X / Esc — click en otro lado del dashboard la deja abierta (cambia de cuenta al seleccionar otra fila); notas de texto excluidas del hit-test de cierre.
-- Piso de 10 filas visibles reemplaza el `TABLE_RESERVE=300` fijo (se mide 1 fila real ×10).
+- Panel de depósitos SIEMPRE debajo de La Pantalla mientras esta está abierta (nunca comparte franja, aunque la preferencia guardada del operador sea flotante).
+- Historial de La Pantalla es scrolleable sin cap artificial (antes truncaba a 12 filas); click en una fila expande detalle in-place (no modal nuevo).
+- Íconos 💳/📝 de la tabla son 100% equivalentes al click de fila (abren La Pantalla) — no queda ningún camino que abra el acordeón viejo desde la tabla.
 
 ## 🖥️ Estado del sistema al cerrar
-- **web** up, health 200 (923 cuentas), `StartedAt` post-restart > mtime de los archivos deployados.
-- **bot** up (8 días, no tocado).
-- **pool** 102 proxies (100 `dataimpulse` + 2 `nodemaven`) — mezcla distinta a la sesión pasada, ver pendiente arriba.
-- **static/ deployado a KVM4** — el código de esta sesión SÍ está en el contenedor (no solo en Forgejo).
+- **web** up, health 200 (923 cuentas), deploy confirmado (`StartedAt` post-restart > mtime de cada archivo subido, en las 4 rondas).
+- **bot** up (no tocado esta sesión).
+- **pool** 102 proxies (100 `dataimpulse` + 2 `nodemaven`) — ver pendiente de vigilancia arriba.
+- **static/ deployado a KVM4 en su versión final** — Forgejo y el contenedor coinciden (`main` @ `35b5535`).

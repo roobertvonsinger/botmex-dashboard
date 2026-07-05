@@ -14,7 +14,22 @@
 | **La Pantalla sigue al panel KPI** | `ResizeObserver` sobre `.lpanel` (`observeStrip()`, `pantalla.js`) — cualquier cambio de alto del KPI (vgutter o toggle) arrastra a La Pantalla en vivo | ✅ implementado | ⚠️ runtime-pending (ver gate abajo) |
 | **Banda inferior dispara el toggle** | Click en `.pantalla-banda` → `window.KpiPanel.toggle()`, refleja `pat-expanded` para el chevron | ✅ implementado | ⚠️ runtime-pending |
 | **Resize estructural (`#adminPanel` expand/collapse)** | `expand()`→`maxH()`, `collapse()`→`DEFAULT_H` | ✅ verificado vía preview MCP contra `index.html` real | ❌ bloqueado — server plano `depos` (puerto 8099) sirve `/static/*` con doble-prefijo → 404 en todos los JS/CSS del entry, `window.KpiPanel` queda `undefined`. No es fallo del código; harness de preview no resuelve las rutas del entry real |
-| **Gate de prod (Robert)** | (1) la banda cierra en espacio limpio pero no al copiar combo/tarjeta ni tocar un botón; (2) el panel de depósitos no "vuela" al plegar/desplegar; (3) el toggle arrastra a La Pantalla junto con el panel KPI | 🔵 requiere La Pantalla abierta con cuenta real + panel de depósitos montado sobre la tabla real | 🔵 pendiente Robert en prod |
+| **Gate de prod (Robert)** | (1) la banda cierra en espacio limpio pero no al copiar combo/tarjeta ni tocar un botón; (2) el panel de depósitos no "vuela" al plegar/desplegar; (3) el toggle arrastra a La Pantalla junto con el panel KPI | ✅ confirmado por Robert en prod 2026-07-04, tras 4 rondas de fixes de campo (ver captura siguiente) | ✅ Robert, prod real |
+
+## Captura: 2026-07-04 (fixes de campo post-persiana + historial scrolleable — confirmado por Robert en prod)
+
+Los 3 puntos del gate anterior fallaron en la primera vuelta (capturas de Robert en prod); root-cause de cada uno + fix, iterado hasta confirmación.
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **`.pantalla{min-height:288px}` vs `DEFAULT_H=212`** | Piso viejo (época del grip propio) ganaba sobre `--pantalla-h`, estiraba La Pantalla 76px de más al plegar, tapaba la filterbar | ✅ `min-height:96px` (mismo `MIN` de `KpiPanel`) | ✅ Robert, prod |
+| **`DeposWindow.zoneRect()` medía la filterbar como parte de la tabla** | `#accDockZone` envuelve `.filterbar-accounts` ADEMÁS de la tabla → dockeaba con el top en la filterbar | ✅ descuenta la altura de `.filterbar-accounts` | ✅ Robert, prod |
+| **Depósitos flotante quedaba fuera de cuadro** | `defaultFloat()`/`apply()` anclaban contra `vw()/vh()` crudos, solo re-encuadraban al crearse | ✅ ancla contra `#accountsMain` (márgenes 20/18/14px, igual que `.pantalla-sheet`), re-encuadra en cada `apply()` | ✅ Robert, prod |
+| **Decisión: depósitos SIEMPRE debajo de La Pantalla** | Mientras `#pantalla` está abierta, nunca comparte franja con el panel de depósitos aunque la preferencia guardada sea `float` | ✅ `effectiveMode()` fuerza dockeado | ✅ Robert, prod |
+| **`setZonePad` compresión con panel cerrado** | `relayout()`/resize listener llamaban `apply()` sin checar si el panel estaba abierto → hueco vacío en la tabla sin ventana visible | ✅ flag `ST.open`, seteado en `show()`/`hide()` | ✅ Robert, prod |
+| **Íconos 💳/📝 abrían el acordeón viejo** | Único camino que no pasaba por la exclusión mutua con La Pantalla (b1907c3) | ✅ ahora `window.Pantalla.open()` | ✅ Robert, prod |
+| **Historial de movimientos sin scroll** | `.pat-txn-col` truncaba a 12 filas fijas (`+N más`), sin rueda ni drag | ✅ `overflow-y:auto` + click-y-jala delegado (umbral 6px) | ✅ Robert, prod |
+| **Click en movimiento no hacía nada** | `.pat-mv` tenía `cursor:pointer` sin handler | ✅ togglea detalle expandible (operador/tarjeta completa copiable/motivo) | ✅ Robert, prod |
 
 ## Captura: 2026-06-29 (reorg UI — SSE scoped, strip 3 cards, marcador, pool manager, panel persistente)
 
