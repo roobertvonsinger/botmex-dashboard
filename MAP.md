@@ -96,7 +96,7 @@ prewarm.py (router)
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2531 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2592 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `login_orchestrator.py` | 392 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 736 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 342 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
@@ -109,6 +109,7 @@ prewarm.py (router)
 | `test_account_touch.py` | 51 | `—` | _[completar]_ |
 | `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
 | `test_anti_rate_limit.py` | 271 | `—` | _[completar]_ |
+| `test_deposit_step.py` | 132 | `—` | _[completar]_ |
 | `test_marks.py` | 32 | `—` | _[completar]_ |
 | `test_pool_manage.py` | 26 | `—` | _[completar]_ |
 | `test_search.py` | 70 | `—` | _[completar]_ |
@@ -195,6 +196,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c765c7e` | feat(kpis): backend account_touch — tabla + hook en account_details + visibilidad (Fase 1) |
 | `d31bdfe` | docs(kpis): spec + plan reorg del strip a 2 KPIs (Logs + Cuentas a la mano) |
 | `ce3d03e` | docs(next-session): cierre — persiana KPI confirmada por Robert en prod; siembra brainstorm de logs/actividad/notificaciones para sig. sesion |
 | `35b5535` | feat(pantalla): historial scrolleable (rueda+drag) + detalle expandible por click + fix icono 💳/📝 abria acordeon viejo |
@@ -206,7 +208,6 @@ prewarm.py (router)
 | `965a165` | docs: KpiPanel + persiana de 2 estados en FRONTEND/AUDIT (bitacora) |
 | `50ca6f7` | style(pantalla): banda toggle con chevron + glow del boton Depositar en reposo |
 | `468a890` | feat(pantalla): 2 estados por banda (toggle KpiPanel) + close en espacio limpio; se retira el grip de arrastre |
-| `0a7aa4b` | fix(depos): ResizeObserver sobre .lpanel re-ancla el panel de depositos en vivo |
 <!-- GEN:end:recientes -->
 
 ---

@@ -16,6 +16,7 @@
 | `type` | `kind` | Disparado por | Payload | Handler frontend |
 |---|---|---|---|---|
 | `activity` | `deposit` | `_record_attempt()` en `deposits.py` | `{ts, who, target, amount, status, reason, duration_ms, card_pipe}` | `pushActivityEvent()` → `renderActivity()` |
+| `activity` | `deposit_step` | `_wrap_deposit_step()` en `deposits.py` — envuelve el `phase_cb` de los 3 flujos (single/matchmaker/scheduled) en cada cierre de fase | `{ts, email, step, ok, code, duration_ms, who, who_color, who_id, attempt_id?/run_id?/sched_id?}`. `step` ∈ `{login, begin, submit, check}` (mapeado desde `login_done/gateway_begin_done/gateway_submit_done/gateway_check_done`). `ok` viene de login/begin (`None` en submit/check). `code` = `result_code` (submit) o `txn:{txn_status}` (check). | KPI Logs (pendiente UI) — filtrado server-side igual que cualquier `activity` vía `_event_visible_to` |
 | `activity` | `scheduled_started` | `scheduled_create.loop()` ANTES de `pool.start_factory()` | `{sched_id, total, email, ts, who}` | log info — sirve como heartbeat para confirmar al frontend que la misión arrancó. Sin esto, los 5-15s del pool warm-up dejaban el modal en "Preparando…" estático sin señal de vida. |
 | `activity` | `scheduled` | `scheduled_create.loop()` en `deposits.py` (summary por iter) | `{sched_id, iter, total, email, amount, success, code, ts, who}` | `pushActivityEvent()` |
 | `activity` | `scheduled_phase` | `scheduled_create.loop()` via `phase_cb` → `_run_deposit_with_phases` (1 por sub-fase) | `{sched_id, iter, total, name, data, email, ts, who}`. `name` ∈ {login_start, login_done, **login_reused**, gateway_begin, gateway_begin_done, gateway_submit, gateway_submit_done, gateway_check, gateway_check_done, done}. `data` igual al de execute-stream. **iter 0** emite `login_start`/`login_done` (login real); **iter 1..N** emite `login_reused` (sesión reutilizada, sin captcha). | `pushActivityEvent()` (`_schedPhaseLabel()` formatea) |
@@ -103,6 +104,15 @@ Endpoint `/api/prewarm/select` (SSE):
 | `start` | `{accounts, cap_remaining}` | Prewarm iniciado |
 | `result` | `{email, ok, code, duration_ms, balance, jwt_cached, fail_reason}` | Resultado por cuenta |
 | `done` | `{cap_remaining, cap_used}` | Terminado |
+
+## `deposit_step` — logging paso a paso (Fase 2 KPI Logs, 2026-07-05)
+
+`_wrap_deposit_step(inner_cb, *, email, actor, **ids)` (deposits.py, cerca de `_safe_phase`) envuelve el `phase_cb` de CADA uno de los 3 flujos de depósito. Reglas de diseño:
+- **Nunca reemplaza el streaming local**: `inner_cb` (el callback original — encola a la queue del stream single/matchmaker, o hace el broadcast `scheduled_phase` en scheduled) se llama SIEMPRE primero e intacto.
+- Broadcastea `deposit_step` SOLO en los 4 cierres de fase (`login_done`, `gateway_begin_done`, `gateway_submit_done`, `gateway_check_done`) — nunca en `*_start`/`done`. Esto evita duplicar el evento `deposit` de cierre, que sigue siendo emitido únicamente por `_record_attempt`.
+- Best-effort: si `_broadcast` falla, se loguea warning y el depósito sigue sin verse afectado (try/except interno).
+- Filtro de rol server-side reutiliza `_event_visible_to` sin cambios — el evento lleva `who_id` vía `_resolve_who(actor)`.
+- Aplicado en los 3 call sites: `execute-stream` (single, `attempt_id`), `/multi/stream` (matchmaker, `run_id`), `scheduled_create.loop()` (scheduled, `sched_id`).
 
 ## Patrón de duplicado conocido
 

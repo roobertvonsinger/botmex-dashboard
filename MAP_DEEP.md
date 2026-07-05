@@ -164,22 +164,25 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_check_card_velocity` | def | L485–L532 |
 | `_record_attempt` | def | L535–L645 |
 | `_safe_phase` | def | L655–L662 |
-| `_build_admin_proxy_url` | def | L665–L669 |
-| `_refresh_account_after_deposit` | def | L672–L719 |
-| `_should_relogin_after_401` | def | L722–L726 |
-| `_acquire_session_and_begin` | def | L729–L977 |
-| `_run_deposit_with_phases` | def | L980–L1294 |
-| `deposit_execute_stream` | def | L1298–L1506 |
-| `cap_status` | def | L1510–L1522 |
-| `_mm_is_real_decline` | def | L1559–L1565 |
-| `_mm_is_ambiguous_charge` | def | L1568–L1578 |
-| `_mm_session_get` | def | L1620–L1624 |
-| `_mm_session_update` | def | L1627–L1636 |
-| `multi_stream` | def | L1640–L2112 |
-| `multi_cancel` | def | L2116–L2121 |
-| `scheduled_create` | def | L2134–L2493 |
-| `scheduled_list` | def | L2497–L2519 |
-| `scheduled_cancel` | def | L2523–L2531 |
+| `_now_mx_str` | def | L670–L679 |
+| `_deposit_step_payload` | def | L688–L696 |
+| `_wrap_deposit_step` | def | L699–L718 |
+| `_build_admin_proxy_url` | def | L721–L725 |
+| `_refresh_account_after_deposit` | def | L728–L775 |
+| `_should_relogin_after_401` | def | L778–L782 |
+| `_acquire_session_and_begin` | def | L785–L1033 |
+| `_run_deposit_with_phases` | def | L1036–L1350 |
+| `deposit_execute_stream` | def | L1354–L1562 |
+| `cap_status` | def | L1566–L1578 |
+| `_mm_is_real_decline` | def | L1615–L1621 |
+| `_mm_is_ambiguous_charge` | def | L1624–L1634 |
+| `_mm_session_get` | def | L1676–L1680 |
+| `_mm_session_update` | def | L1683–L1692 |
+| `multi_stream` | def | L1696–L2171 |
+| `multi_cancel` | def | L2175–L2180 |
+| `scheduled_create` | def | L2193–L2554 |
+| `scheduled_list` | def | L2558–L2580 |
+| `scheduled_cancel` | def | L2584–L2592 |
 
 ### `login_orchestrator.py`
 
@@ -372,6 +375,16 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_acquire_cache_401_invalidates_and_relogins` | def | L228–L245 |
 | `test_acquire_rate_limited_sets_cooldown_and_fails` | def | L248–L255 |
 | `test_set_account_cooldown_persists` | def | L258–L271 |
+
+### `test_deposit_step.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `_run` | def | L17–L18 |
+| `test_wrapper_emits_on_all_four_phase_closures` | def | L23–L65 |
+| `test_submit_and_check_map_code` | def | L70–L89 |
+| `test_wrapper_does_not_broadcast_on_other_phases` | def | L94–L114 |
+| `test_role_filter_reuses_event_visible_to` | def | L119–L132 |
 
 ### `test_marks.py`
 
