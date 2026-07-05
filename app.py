@@ -205,6 +205,20 @@ def _migrate():
     except sqlite3.OperationalError as e:
         if "no such table" not in str(e):
             raise
+    # Toque de cuenta (spec KPIs Fase 1): registra quién metió mano al abrir el
+    # detalle de una cuenta. Dedup 1/día por usuario+cuenta vía UNIQUE. Aditiva.
+    try:
+        with db(write=True) as c:
+            c.execute(
+                "CREATE TABLE IF NOT EXISTS account_touches ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "account_id INTEGER NOT NULL, account_email TEXT NOT NULL, "
+                "actor_id INTEGER NOT NULL, touched_at TEXT NOT NULL, "
+                "touched_date TEXT NOT NULL, "
+                "UNIQUE(account_id, actor_id, touched_date))"
+            )
+    except sqlite3.OperationalError:
+        pass
 
 
 _migrate()
@@ -877,6 +891,11 @@ def _event_visible_to(event: dict, ctx: dict) -> bool:
     """Whitelisting de visibilidad para SSE/feeds. SA ve todo; admin/user ven
     SOLO lo suyo. Las acciones del SA no aparecen para nadie más (fix bug
     'admin ve actividad de Robert')."""
+    if event.get("kind") == "account_touch":
+        who_id = event.get("who_id")
+        my = ctx.get("telegram_id")
+        if who_id is not None and my is not None and str(who_id) == str(my):
+            return False
     if ctx.get("role") == "superadmin":
         return True
     my = ctx.get("telegram_id")
@@ -2460,6 +2479,31 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                 f"[Details] movimientos merge failed: {_mv_err}"
             )
             result["movimientos"] = []
+
+        # Toque de cuenta (vigilancia: quién metió mano) — dedup 1/día por usuario+cuenta.
+        try:
+            actor_id = _user.get("telegram_id")
+            if actor_id is not None:
+                try:
+                    from zoneinfo import ZoneInfo
+                    now_mx = datetime.now(ZoneInfo("UTC")).astimezone(ZoneInfo("America/Mexico_City"))
+                except Exception:
+                    now_mx = datetime.utcnow() - timedelta(hours=6)  # MX = UTC-6 fijo (sin DST desde 2022)
+                touched_at = now_mx.strftime("%Y-%m-%d %H:%M:%S")
+                touched_date = touched_at[:10]
+                with db(write=True) as c2:
+                    cur = c2.execute(
+                        "INSERT OR IGNORE INTO account_touches "
+                        "(account_id, account_email, actor_id, touched_at, touched_date) "
+                        "VALUES (?,?,?,?,?)",
+                        (account_id, acc["email"], int(actor_id), touched_at, touched_date),
+                    )
+                if cur.rowcount:  # solo si fue un toque nuevo (no dedup)
+                    _broadcast({"type": "activity", "kind": "account_touch",
+                                "ts": touched_at, "target": acc["email"], "id": account_id,
+                                **_resolve_who(actor_id)})
+        except sqlite3.OperationalError:
+            pass
 
     return result
 

@@ -92,7 +92,7 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2835 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2879 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -106,6 +106,7 @@ prewarm.py (router)
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
+| `test_account_touch.py` | 51 | `—` | _[completar]_ |
 | `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
 | `test_anti_rate_limit.py` | 271 | `—` | _[completar]_ |
 | `test_marks.py` | 32 | `—` | _[completar]_ |
@@ -171,6 +172,8 @@ prewarm.py (router)
 | `SCORE_FLOOR` | `{"A": 80, "B": 60, "C": 40, "D": 0}` | `shared/betmexico_payment_analyzer.py` |
 | `SCORE_CEIL` | `{"A": 100, "B": 79, "C": 59, "D": 39}` | `shared/betmexico_payment_analyzer.py` |
 | `SCHEMA` | `"""` | `test_a1_estados.py` |
+| `OP_A` | `{"role": "user", "telegram_id": 555, "display": "Lau"}` | `test_account_touch.py` |
+| `OP_B` | `{"role": "user", "telegram_id": 777, "display": "Otro"}` | `test_account_touch.py` |
 | `PIPE` | `"4111111111111111|12|30|123"` | `test_unificacion_sp1.py` |
 | `WEB_USERS` | `{k.lower(): v for k, v in WEB_USERS_RAW.items()}` | `web_auth.py` |
 <!-- GEN:end:constantes -->
@@ -192,6 +195,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d31bdfe` | docs(kpis): spec + plan reorg del strip a 2 KPIs (Logs + Cuentas a la mano) |
 | `ce3d03e` | docs(next-session): cierre — persiana KPI confirmada por Robert en prod; siembra brainstorm de logs/actividad/notificaciones para sig. sesion |
 | `35b5535` | feat(pantalla): historial scrolleable (rueda+drag) + detalle expandible por click + fix icono 💳/📝 abria acordeon viejo |
 | `2ae4c39` | fix(pantalla): depos SIEMPRE dockeado bajo La Pantalla + margenes reales + notas del closer 2026-07-04 |
@@ -203,7 +207,6 @@ prewarm.py (router)
 | `50ca6f7` | style(pantalla): banda toggle con chevron + glow del boton Depositar en reposo |
 | `468a890` | feat(pantalla): 2 estados por banda (toggle KpiPanel) + close en espacio limpio; se retira el grip de arrastre |
 | `0a7aa4b` | fix(depos): ResizeObserver sobre .lpanel re-ancla el panel de depositos en vivo |
-| `91d87d6` | feat(kpi): piso de 10 filas medido + window.KpiPanel (control dominante del alto) |
 <!-- GEN:end:recientes -->
 
 ---
