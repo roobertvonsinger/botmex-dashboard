@@ -41,6 +41,19 @@
 | `notification` | `release_available_again` | `_release_watchdog_tick` (24h+10min, 2do aviso) | `{msg, target_user, account_id, icon:⏰, severity:warn, actions:[deposit,release]}` | `pushNotif()` con botones |
 | `notification` | `release_auto` | `_release_watchdog_tick` (27h auto-release) | `{msg, target_user, account_id, icon:🕒, severity:info}` | `pushNotif()` |
 | `activity` | `unlock_auto` | `_release_watchdog_tick` (al auto-release a las 27h) | `{ts, target, id, reason}` | `pushActivityEvent()` |
+| `activity` | `account_touch` | `account_details()` en `app.py` (GET detalle de cuenta — `INSERT OR IGNORE` en `account_touches`, solo si fue toque NUEVO por rowcount) | `{ts, target:email, id:account_id, who, who_color, who_id}` | KPI Logs — `👁 {who} abrió {target}` |
+
+### Visibilidad especial de `account_touch`
+
+`_event_visible_to` trata este `kind` distinto al resto (chequeo ANTES del early-return de superadmin):
+
+| Viewer | ¿Ve el toque? |
+|---|---|
+| El propio actor (quien tocó la cuenta) | **NUNCA**, ni siendo superadmin — `who_id == ctx.telegram_id` corta en `False` de entrada |
+| SA (viendo el toque de OTRO actor) | Sí — único que ve toques ajenos |
+| Operador (viendo el toque de OTRO actor, incluido el del SA) | No — cae al filtro estándar `who_id == su telegram_id`, que es `False` |
+
+Motivo: es un evento de vigilancia ("quién metió mano"), no de actividad propia — a nadie le sirve verse a sí mismo tocando una cuenta, y un operador no debe ver qué cuentas toca otro operador (mismo principio de separación por rol que el resto del bus).
 
 ## Tipos de eventos del matchmaker (multi/stream)
 

@@ -3,6 +3,36 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-07-05 (KPIs Logs + Cuentas a la mano — reorg strip 3→2, rama `feat/kpis-logs-cuentas`)
+
+> Deployado a KVM4, smoke verde (health 200 + endpoint at-hand responde 401 sin sesión). Verificación runtime con sesión real PENDIENTE (Robert en prod).
+
+### Backend
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Tabla `account_touches`** | `id, account_id, account_email, actor_id, touched_at, touched_date`, `UNIQUE(account_id, actor_id, touched_date)` — dedup 1/día/usuario/cuenta. Migración aditiva en `_migrate()` | ✅ implementado | ✅ migración corrió en deploy (tabla presente) |
+| **Escritura del toque en `account_details()`** | `INSERT OR IGNORE` best-effort al GET del detalle de cuenta; solo broadcastea si fue toque NUEVO (`rowcount`) | ✅ implementado (`app.py:2596-2618`) | ⚠️ falta verificar en runtime con sesión real (que el toque se registre al abrir una cuenta) |
+| **SSE `account_touch`** | `{type:activity, kind:account_touch, ts, target:email, id:account_id, who, who_color, who_id}` | ✅ implementado | ⚠️ runtime-pending (requiere abrir cuenta con 2 sesiones distintas para observar el broadcast) |
+| **Visibilidad especial `account_touch`** | El actor NUNCA ve su propio toque (ni siendo SA); solo el SA ve toques ajenos; operador no ve toques de otros | ✅ implementado en `_event_visible_to` (chequeo previo al early-return de superadmin) | ✅ cubierto por `test_account_touch.py` (4 casos de visibilidad + 1 dedup, verde) |
+| **`deposit_step` en los 4 cierres de fase** | Envuelve `phase_cb` de los 3 flujos (single/matchmaker/scheduled) vía `_wrap_deposit_step`; nunca reemplaza el streaming local (`inner_cb` siempre primero); no duplica el evento `deposit` de cierre | ✅ implementado (`deposits.py:699-718`, call sites en `execute-stream`/`multi/stream`/`scheduled_create.loop`) | ⚠️ falta verificar en runtime que emita en un depósito real (código revisado, no observado en vivo) |
+| **`GET /api/accounts/at-hand`** | `{pinned, recent}` — pineadas (marks) + recientes (deposits/locks/marks propios), enriquecidas, email→id resuelto server-side, visibilidad via `_visible_emails` | ✅ implementado (`app.py:1602`) | ✅ responde 401 sin sesión (smoke); ⚠️ falta verificar shape de respuesta con sesión real y datos reales |
+
+### Frontend
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Strip 3→2 cards** | `.lpanel` grid de 5 tracks (3 cards) → 3 tracks (2 cards + 1 gutter); card Pool eliminado del HTML, `renderPoolCard` borrado del JS | ✅ implementado (`static/index.html` solo tiene 2 `.lp-card`) | ⚠️ pulido visual pendiente de depurar en prod (Robert) |
+| **📋 Logs (feed vertical + 2 idiomas)** | Agrupa `deposit_step` en traza por intento; muestra `account_touch`; diccionario `_DEPOSIT_CODE_HUMANO` extiende `_humanizeCritical` para operador vs SA | ✅ implementado | ⚠️ runtime-pending — pulido visual se depura en prod |
+| **📌 Cuentas a la mano (por-cuenta)** | Consume `/api/accounts/at-hand`; 2 secciones Pineadas★/Recientes·; fila con nombre/estado/balance/grade | ✅ implementado (`_atHandRow`/`renderRecientes`, app.js) | ⚠️ runtime-pending — pulido visual se depura en prod |
+| **localStorage invalidado (`v1→v2`)** | `bmx.lpCols.v1→v2`, `bmx.lpOrder.v1→v2` — invalida ratios/orden de la era 3-columnas | ✅ implementado | ✅ código verificado (limpia key vieja al leer) |
+
+### ⚠️ Regresión: filtro "en uso" sin acceso en la UI
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Filtro `state.filterInUse` (botones `#lpInUse`/`#lpPool`)** | Antes vivían DENTRO del card Pool; alternaban `state.filterInUse` para mostrar solo cuentas con lock activo | ⚠️ **código intacto pero sin contenedor DOM** — listeners siguen en `static/app.js:5950-5962`, pero el card Pool que los alojaba ya no existe en `static/index.html`. No crashea; `filterInUse` queda permanentemente `false`. Pendiente decisión de Robert: reubicar el filtro (ej. filterbar de Cuentas) o retirar el código muerto. | ⚠️ confirmado por lectura de código (grep cruzado JS↔HTML), no requiere runtime para confirmarse |
+
 ## Captura: 2026-07-04 (persiana KPI de 2 estados — resuelve hallazgo #5/#7 auditoría La Pantalla)
 
 ### La Pantalla — persiana (`static/pantalla.js` + `app.js` `window.KpiPanel`)

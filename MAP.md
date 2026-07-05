@@ -197,6 +197,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b931e5a` | feat(kpis): frontend strip 3->2 — quitar Pool, grid 2 columnas (Fase 6) |
 | `7fcad36` | feat(kpis): frontend KPI Cuentas a la mano — por-cuenta (Fase 5) |
 | `5753315` | feat(kpis): frontend KPI Logs — feed vertical + deposit_step/account_touch + 2 idiomas (Fase 4) |
 | `65bfe13` | feat(kpis): backend endpoint /api/accounts/at-hand (Fase 3) |
@@ -208,7 +209,6 @@ prewarm.py (router)
 | `2ae4c39` | fix(pantalla): depos SIEMPRE dockeado bajo La Pantalla + margenes reales + notas del closer 2026-07-04 |
 | `bdb11d5` | fix(pantalla): depos SIEMPRE dockeado bajo La Pantalla + margenes reales + notas del closer 2026-07-04 |
 | `82a94b5` | fix(pantalla): depos SIEMPRE dockeado bajo La Pantalla + margenes reales + notas del closer 2026-07-04 |
-| `c59981a` | docs(next-session): cierre persiana KPI — ejecutado, mergeado, deployado; gate de prod para Robert |
 <!-- GEN:end:recientes -->
 
 ---

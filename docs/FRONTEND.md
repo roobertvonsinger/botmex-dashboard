@@ -206,7 +206,32 @@ Visible cuando `selectedIds.size > 0`. Actualizado por `updateCmdBar()` (app.js:
 
 Reemplazó el sistema viejo (`zero`/`dim-amount`/`glow` con cortes en $5/$10). Si cambian los umbrales, actualizar ambos puntos a la vez (JS + CSS docstring).
 
-## Strip superior (`#adminPanel`) — reorg 2026-06-29
+## Strip superior (`#adminPanel`) — reorg 2026-07-05 (3 cards → 2 KPIs)
+
+> **REEMPLAZA la reorg 2026-06-29 de abajo** (histórico preservado más abajo en esta sección para contexto). El grid `.lpanel` pasó de **5 tracks** (3 cards: Actividad Live | Recientes | Pool) a **3 tracks** (2 cards + 1 `.lp-gutter`). Spec: 2 KPIs — Logs (traza técnica/operativa) + Cuentas a la mano (por-cuenta, no por-evento).
+
+| Card | ID / `data-mod` | Contenido | Fuente |
+|---|---|---|---|
+| **📋 Logs** | `#lpActivity` (`data-mod="activity"`) | Feed vertical scrolleable (ex-marquesina horizontal). Agrupa `deposit_step` en traza por intento (`✓login ✓begin ✗submit → CODE`), muestra `account_touch` (`👁 {who} abrió {target}`), fallos de otras acciones. 2 idiomas por rol (ver abajo). | SSE bus `/api/events` (`_LOGS_KINDS`: incluye `deposit_step`, `account_touch`, `deposit`, etc.) |
+| **📌 Cuentas a la mano** | `#lpRecientes` (`data-mod="recientes"`) | Por-cuenta (no por-evento): 2 secciones — **Pineadas ★** (marks del usuario) y **Recientes ·** (depósitos/locks/marks propios). Cada fila: nombre, estado LIVE/DEAD/🔒, balance, grade `[A-D]`. | `GET /api/accounts/at-hand` (`_atHandRow`/`renderRecientes`, app.js) |
+
+**Card `Pool` ELIMINADO** (ya no existe ni como card SA ni operador). `renderPoolCard` borrado del JS. **Online** ya vivía en sidebar (`.sb-online`, solo-SA) desde la reorg anterior — sin cambio.
+
+### 📋 Logs — 2 idiomas por rol
+
+`_DEPOSIT_CODE_HUMANO` (app.js, extiende `_humanizeCritical`) traduce el `code` técnico de `deposit_step`/`deposit` (`RATE_LIMITED`, `LOGIN_DENIED`, `PROXY_FAILOVER_EXHAUSTED`, etc.) a lenguaje llano — mismo principio que el resto del dashboard (E-RED, capas operador vs backend): el operador NUNCA ve `result_code` crudo ni jerga interna; el SA puede ver más detalle técnico (traza completa login/begin/submit/check). Click en una fila → `Pantalla.open(id)`; el combo es copiable.
+
+### 📌 Cuentas a la mano — consumo del endpoint
+
+`renderRecientes(data)` (app.js) recibe `{pinned, recent}` de `GET /api/accounts/at-hand` (fetch en `athand` — app.js:6050). `_atHandRow(it, {pinned})` arma cada fila; `_atHandStatus(it)` resuelve el badge de estado con prioridad **DEAD > 🔒 bloqueada > LIVE**. Reemplaza a `renderRecientes` viejo (que consumía `/api/recent`, por-evento) — el nuevo endpoint resuelve `email→id` server-side, cosa que `/api/recent` no daba (evitaba que el click abriera La Pantalla directo).
+
+### ⚠️ Regresión conocida: filtro "en uso" quedó sin acceso en la UI
+
+El botón `#lpInUse` (toggle `state.filterInUse` — filtra la tabla a solo cuentas con lock activo) y su compañero `#lpPool` vivían **dentro del card Pool** (`static/app.js:5950-5962`, listeners aún presentes en el JS; **no se borraron**). Al eliminar el card Pool del HTML (`static/index.html`, solo quedan los 2 `.lp-card` de arriba), esos botones **ya no tienen contenedor en el DOM** → inaccesibles desde la UI. No crashea (los `addEventListener` con `?.` simplemente no encuentran el elemento); `state.filterInUse` queda permanentemente en `false`. **Pendiente**: decidir si se reubica el filtro (ej. dentro de la filterbar de Cuentas) o se retira el código muerto.
+
+localStorage: `bmx.lpCols.v1` → `v2` y `bmx.lpOrder.v1` → `v2` (invalidan ratios de ancho / orden de módulos guardados de la era 3-columnas; `initLpResize`/`initStripReorder` limpian la key vieja al leer).
+
+## Strip superior — reorg 2026-06-29 (histórico, superada arriba)
 
 `#adminPanel` (`.lpanel`) pasó de **4 cards** (Online | Feed | Alertas | Pool) a **3 cards** y de ser solo-SA a **visible para todos** (contenido filtrado por rol server-side).
 
