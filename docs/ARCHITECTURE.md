@@ -158,3 +158,4 @@ Similar pero:
 | `assignments` | Cuenta ↔ operador |
 | `process_phases` | Telemetría por fase de cada proceso |
 | `account_marks` | Marcador privado por operador (`user_key TEXT, account_email TEXT, UNIQUE(user_key,account_email)`). Migración aditiva 2026-06-29. No toca `locked_by` ni `published_to_pool`. |
+| `account_touches` | "Toque de cuenta" (vigilancia — quién metió mano abriendo el detalle). `id, account_id, account_email, actor_id, touched_at, touched_date`, `UNIQUE(account_id, actor_id, touched_date)` → dedup 1 toque/día/usuario/cuenta. Escrita con `INSERT OR IGNORE` desde `account_details()` (`app.py`, GET, best-effort). Migración aditiva 2026-07-05 (KPI Logs Fase 1). Solo se broadcastea SSE `account_touch` cuando el `INSERT` fue nuevo (rowcount>0, no dedup). Ver `docs/SSE_EVENTS.md` §`account_touch` para la regla de visibilidad especial. |

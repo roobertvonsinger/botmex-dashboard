@@ -1081,13 +1081,15 @@ async function reloadActivity() {
 function pushActivityEvent(ev) {
   // Insert at top, dedupe-ish, cap 500
   const row = {
-    kind: ev.kind, ts: ev.ts, who: ev.who, who_color: ev.who_color,
+    kind: ev.kind, ts: ev.ts, who: ev.who, who_color: ev.who_color, who_id: ev.who_id,
     target: ev.target, amount: ev.amount, status: ev.status,
     reason: ev.reason, duration_ms: ev.duration_ms, id: ev.id, text: ev.text,
     // Campos para scheduled / scheduled_phase / scheduled_aborted / scheduled_cancelled
     sched_id: ev.sched_id, iter: ev.iter, total: ev.total,
     code: ev.code, success: ev.success,
     name: ev.name, data: ev.data, email: ev.email,
+    // Campos de deposit_step (Fase 2 KPI Logs): traza paso a paso.
+    step: ev.step, ok: ev.ok, attempt_id: ev.attempt_id, run_id: ev.run_id,
   };
   // Si el evento trae 'email' (scheduled*) pero no 'target', usar email como target
   // para que la columna "Cuenta" del feed muestre el combo y filtros por target funcionen.
@@ -1100,9 +1102,17 @@ function pushActivityEvent(ev) {
   renderActivityMarquee();
 }
 
-// ─── Marquesina Actividad Live ───
-const _MARQUEE_KINDS = new Set([
+// ─── 📋 Logs — feed vertical (ex-marquesina de Actividad LIVE) ───
+// Fase 4 (spec 2026-07-05): éxito rutinario calla, fallo siempre habla.
+// Familias: deposit_step (traza paso a paso, agrupada), account_touch (vigilancia
+// de quién metió mano), y el resto de acciones (solo si fue fallo).
+// Nota: lock/unlock/mark/pool_move son eventos de ACCIÓN (no tienen resultado
+// éxito/fallo propio en su payload — "alguien bloqueó X" ya es el hecho
+// completo), por eso siempre se muestran. deposit_step/account_touch/deposit
+// sí tienen lógica de éxito/fallo y la aplican en su propio render.
+const _LOGS_KINDS = new Set([
   'deposit','lock','unlock','unlock_auto','account_cooling','mark','pool_move','critical_error',
+  'deposit_step','account_touch',
 ]);
 
 async function loadActivityMarquee() {
@@ -1114,35 +1124,135 @@ async function loadActivityMarquee() {
   } catch {}
 }
 
+// Traduce un `code` técnico de deposit_step/deposit al idioma llano del
+// operador. Extiende _humanizeCritical (misma familia de traducciones).
+// Si no hay traducción conocida, degrada elegante devolviendo el code crudo.
+const _DEPOSIT_CODE_HUMANO = {
+  BANK_REJECTED: 'el banco rechazó tu tarjeta',
+  'E-RED': 'error de red, intenta de nuevo',
+  '3DS_REQUIRED': 'pidió verificación 3DS',
+  RATE_LIMITED: 'la cuenta entró en enfriamiento',
+  LOGIN_DENIED: 'la cuenta no dejó entrar',
+  KYC_PENDING: 'la cuenta tiene KYC pendiente',
+  AUTOEXCLUSION: 'la cuenta está autoexcluida',
+  SUBMIT_ERROR: 'el envío quedó ambiguo, revísalo manual',
+  TIMEOUT: 'la pasarela no respondió a tiempo',
+};
+function _humanizeDepositCode(code) {
+  if (!code) return null;
+  if (_DEPOSIT_CODE_HUMANO[code]) return _DEPOSIT_CODE_HUMANO[code];
+  const key = Object.keys(_DEPOSIT_CODE_HUMANO).find(k => String(code).includes(k));
+  return key ? _DEPOSIT_CODE_HUMANO[key] : String(code);
+}
+
+// Agrupa los steps sueltos de un mismo depósito (deposit_step) en UNA traza
+// acumulada por corrida: attempt_id (single) / run_id (matchmaker) / sched_id
+// (scheduled) + email como fallback si ninguno viene.
+const _STEP_ORDER = ['login', 'begin', 'submit', 'check'];
+function _depositStepRunKey(ev) {
+  return `run:${ev.attempt_id || ev.run_id || ev.sched_id || ''}:${ev.email || ev.target || ''}`;
+}
+function _groupDepositSteps(rows) {
+  const runs = new Map(); // runKey -> { ts, email, who, who_id, who_color, steps:{login:{ok,code}, ...} }
+  const order = []; // orden de aparición (más reciente primero, ya viene así en activityRows)
+  for (const ev of rows) {
+    if (ev.kind !== 'deposit_step') continue;
+    const key = _depositStepRunKey(ev);
+    let run = runs.get(key);
+    if (!run) {
+      run = { key, ts: ev.ts, email: ev.email || ev.target, who: ev.who, who_id: ev.who_id, who_color: ev.who_color, steps: {} };
+      runs.set(key, run);
+      order.push(key);
+    }
+    // El primer step visto (más reciente, activityRows viene newest-first) manda el ts.
+    if (ev.ts > run.ts) run.ts = ev.ts;
+    if (!run.steps[ev.step]) run.steps[ev.step] = { ok: ev.ok, code: ev.code };
+  }
+  return order.map(k => runs.get(k));
+}
+// Traza técnica: "✓login ✓begin ✗submit → BANK_REJECTED"
+function _depositRunTraceSA(run) {
+  const parts = _STEP_ORDER.filter(s => run.steps[s]).map(s => {
+    const st = run.steps[s];
+    const mark = st.ok === false ? '✗' : '✓';
+    return `${mark}${s}`;
+  });
+  const lastFail = _STEP_ORDER.map(s => run.steps[s]).reverse().find(st => st && (st.ok === false || st.code));
+  const codeTxt = lastFail && (lastFail.ok === false || lastFail.code) ? ` → ${esc(lastFail.code || 'FALLO')}` : '';
+  return `${parts.join(' ')}${codeTxt}`;
+}
+// Síntesis operador: 1 línea simple, sin jerga técnica.
+function _depositRunTraceOperador(run) {
+  const failStep = _STEP_ORDER.map(s => run.steps[s]).find(st => st && st.ok === false);
+  const okAll = _STEP_ORDER.every(s => !run.steps[s] || run.steps[s].ok !== false);
+  if (failStep && failStep.code) return `❌ ${_humanizeDepositCode(failStep.code)}`;
+  if (!okAll) return '❌ el depósito no completó';
+  const checkCode = run.steps.check?.code;
+  if (checkCode && String(checkCode).startsWith('txn:') && !String(checkCode).endsWith(':1')) {
+    return `❌ ${_humanizeDepositCode(checkCode)}`;
+  }
+  return '✓ en curso';
+}
+
 function renderActivityMarquee() {
   const host = document.getElementById('lpActivity');
   if (!host) return;
   const isSA = state.user?.role === 'superadmin';
-  const deduped = ActivityLogic.dedupeActivity(activityRows)
-    .filter(ev => _MARQUEE_KINDS.has(ev.kind))
-    .slice(0, 30);
+
+  // 1) deposit_step agrupados en trazas (máx 15 corridas más recientes)
+  const depositRuns = _groupDepositSteps(activityRows).slice(0, 15);
+  const runKeys = new Set(depositRuns.map(r => r.key));
+
+  // 2) resto de eventos del feed (sin deposit_step suelto — ya va agrupado)
+  const rest = ActivityLogic.dedupeActivity(activityRows)
+    .filter(ev => ev.kind !== 'deposit_step' && _LOGS_KINDS.has(ev.kind));
+
+  // Combinar y ordenar por ts desc (deposit_step runs ya vienen con su ts más reciente)
+  const combined = [
+    ...depositRuns.map(r => ({ __run: r, ts: r.ts })),
+    ...rest.map(ev => ({ __ev: ev, ts: ev.ts })),
+  ].sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0)).slice(0, 30);
 
   const counter = document.getElementById('lpFeedCount');
-  if (counter) counter.textContent = deduped.length ? `${deduped.length} eventos` : '—';
+  if (counter) counter.textContent = combined.length ? `${combined.length} eventos` : '—';
 
-  if (deduped.length === 0) {
+  if (combined.length === 0) {
     host.innerHTML = '<div class="lp-empty dim mono">esperando actividad…</div>';
     return;
   }
 
-  const makeRow = ev => {
+  const makeRunRow = run => {
+    const email = String(run.email || '').split(':')[0];
+    const who = isSA ? esc(run.who || '—') : 'Tú';
+    const amt = ''; // deposit_step no trae amount — la traza no lo necesita
+    const trace = isSA ? _depositRunTraceSA(run) : _depositRunTraceOperador(run);
+    const hasFail = _STEP_ORDER.some(s => run.steps[s]?.ok === false);
+    const cls = hasFail ? 'fail' : 'neutral';
+    const icon = hasFail ? '✗' : '⏳';
+    const headline = isSA
+      ? `${who} · depósito${amt} · ${esc(email)}`
+      : `Depositando en ${esc(email)}`;
+    return `<div class="lp-feed-row lp-feed-${cls} lp-feed-clickable lp-feed-run" data-open-email="${esc(email)}" title="Abrir cuenta">` +
+      `<span class="lp-feed-ic">${icon}</span>` +
+      `<div class="lp-feed-body"><span class="lp-feed-txt">${headline}</span><span class="lp-feed-trace mono dim">${trace}</span></div>` +
+      `<span class="lp-feed-time mono dim">${_exactHora(run.ts)}</span></div>`;
+  };
+
+  const makeEvRow = ev => {
+    if (ev.kind === 'account_touch') {
+      const email = String(ev.target || '').split(':')[0];
+      const who = isSA ? esc(ev.who || '—') : 'Tú';
+      const txt = isSA ? `${who} · 👁 abrió ${esc(email)} <span class="dim">(1/día)</span>` : `👁 abriste ${esc(email)}`;
+      return `<div class="lp-feed-row lp-feed-neutral lp-feed-clickable" data-open-email="${esc(email)}" data-open-id="${esc(ev.id ?? '')}" title="Abrir cuenta"><span class="lp-feed-ic">👁</span><span class="lp-feed-txt">${txt}</span><span class="lp-feed-time mono dim">${_exactHora(ev.ts)}</span></div>`;
+    }
     const c = ActivityLogic.formatActivityCopy(ev, isSA);
     const email = String(ev.target || ev.email || '').split(':')[0];
-    return `<div class="lp-feed-row lp-feed-${esc(c.cls)} lp-feed-clickable" data-open-email="${esc(email)}" title="Abrir cuenta"><span class="lp-feed-ic">${c.icon}</span><span class="lp-feed-txt">${esc(c.text)}</span><span class="lp-feed-time mono dim">${fmtAgo(ev.ts)}</span></div>`;
+    return `<div class="lp-feed-row lp-feed-${esc(c.cls)} lp-feed-clickable" data-open-email="${esc(email)}" title="Abrir cuenta"><span class="lp-feed-ic">${c.icon}</span><span class="lp-feed-txt">${esc(c.text)}</span><span class="lp-feed-time mono dim">${_exactHora(ev.ts)}</span></div>`;
   };
-  const rowsHtml = deduped.map(makeRow).join('');
-  // Duplicar para el loop sin costura (-50% keyframe)
-  host.innerHTML = `<div class="lp-ticker-track">${rowsHtml}${rowsHtml}</div>`;
-  // Marquesina lenta y legible: ~2.2s por evento (mín 30s) — adaptativo al # de
-  // eventos para que el ritmo sea constante (antes 20s fijos = veloz con 30
-  // eventos, imposible de clickear). Pausa al hover ya la maneja el CSS.
-  const track = host.querySelector('.lp-ticker-track');
-  if (track) track.style.animationDuration = Math.max(30, deduped.length * 2.2) + 's';
+
+  const rowsHtml = combined.map(item => item.__run ? makeRunRow(item.__run) : makeEvRow(item.__ev)).join('');
+  // Feed vertical scrolleable — SIN duplicado de ticker, SIN animación de loop.
+  host.innerHTML = rowsHtml;
 }
 
 // Abre el DETALLE de una cuenta a partir de su email (marquesina / recientes).
@@ -1171,6 +1281,11 @@ function _humanizeCritical(ev) {
     return 'Problema de conexión con la pasarela';
   if (ev.type === 'health_warning')
     return 'Servicio degradado, reintentando';
+  // deposit_step / deposit: traduce el code técnico (ver _DEPOSIT_CODE_HUMANO,
+  // misma familia de traducciones que este humanizador). Degrada al code
+  // crudo o al msg si no hay traducción conocida.
+  if ((ev.kind === 'deposit_step' || ev.kind === 'deposit') && ev.code)
+    return _humanizeDepositCode(ev.code);
   return ev.msg || 'Problema de conexión';
 }
 
@@ -1250,6 +1365,15 @@ document.getElementById('lpActivity')?.addEventListener('click', e => {
   const row = e.target.closest('.lp-feed-clickable[data-open-email]');
   if (!row) return;
   e.stopPropagation(); // no burbujear al data-nav del header
+  // account_touch trae el id de cuenta directo (data-open-id) — evita el
+  // round-trip de resolver email→id. deposit_step/resto no traen id → cae
+  // al fallback por email (openAccountByEmail ya resuelve, sin inventar nada).
+  const accId = row.dataset.openId ? parseInt(row.dataset.openId, 10) : null;
+  if (accId) {
+    if (window.Pantalla && window.Pantalla.open) { closeDetailModal(); window.Pantalla.open(accId); }
+    else openDetailModal(accId);
+    return;
+  }
   const email = row.dataset.openEmail;
   if (email) openAccountByEmail(email);
 });
@@ -1710,24 +1834,6 @@ async function refreshKpis() {
         ${o.in_use ? `<span class="lp-op-n mono">${o.in_use}</span>` : ''}
       </div>`;
     }).join('');
-
-    // ── Bloque 4: Pool ──
-    const p = k.pool || {};
-    const poolN = p.pool ?? 0, useN = p.in_use ?? 0, liveN = poolN + useN;
-    $('#lpPool').textContent = poolN.toLocaleString();
-    $('#lpInUse').textContent = useN.toLocaleString();
-    $('#lpTras').textContent = p.trastienda ?? 0;
-    $('#lpReb').textContent = (p.rebotadas ?? 0).toLocaleString();
-    $('#lpPoolSub').textContent = `${liveN} LIVE`;
-    // Hero (número grande) + barra de salud free/used — salud de un vistazo
-    const heroNum = $('#lpPoolHeroNum'); if (heroNum) heroNum.textContent = poolN.toLocaleString();
-    const barFree = $('#lpPoolBarFree'), barUsed = $('#lpPoolBarUsed');
-    if (barFree && barUsed) {
-      const pct = liveN > 0 ? (100 * poolN / liveN) : 0;
-      barFree.style.width = pct + '%';
-      barUsed.style.width = (100 - pct) + '%';
-    }
-    renderPoolCard();
   } catch (e) {
     console.error('KPI error:', e);
   } finally {
@@ -2458,33 +2564,39 @@ $$('.seg').forEach(seg => {
   });
 });
 
-// ─── Divisores arrastrables del strip (Actividad | Recientes | Pool) ───
+// ─── Divisor arrastrable del strip (Logs | Cuentas a la mano) ───
 // Patrón Claude Desktop: arrastra el divisor para repartir el ancho entre los
-// dos cards adyacentes. Doble-click restaura. Persiste en localStorage como
-// proporciones (resiliente a cambios de ancho de ventana). Frictionless: se
-// ajusta una vez y queda.
+// dos cards. Doble-click restaura. Persiste en localStorage como proporciones
+// (resiliente a cambios de ancho de ventana). Frictionless: se ajusta una vez
+// y queda.
+// v2 (Fase 6): el strip pasó de 3 cards (Logs/Recientes/Pool) a 2 (Logs/
+// Recientes) — se quitó el card Pool. Bump de key v1→v2 para invalidar
+// ratios guardadas de 3 columnas: aplicarlas tal cual al grid de 2 columnas
+// desbordaba el strip (bug histórico ya reportado por Robert).
 (function initLpResize() {
   const panel = document.getElementById('adminPanel');
   if (!panel) return;
-  const KEY = 'bmx.lpCols.v1';
+  const KEY = 'bmx.lpCols.v2';
   const GW = 7;          // ancho del gutter (coincide con --lp-gw)
   const MIN = 150;       // ancho mínimo por card (px)
-  let ratios = null;     // [r0, r1, r2] (suman 1) o null = usar defaults CSS (fr)
+  let ratios = null;     // [r0, r1] (suman 1) o null = usar defaults CSS (fr)
+
+  try { localStorage.removeItem('bmx.lpCols.v1'); } catch (_) {}  // limpia ratios viejas de 3-col
 
   const cards = () => [...panel.querySelectorAll('.lp-card')];
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || 'null');
-    if (Array.isArray(s) && s.length === 3) ratios = s;
+    if (Array.isArray(s) && s.length === 2) ratios = s;
   } catch (_) {}
 
-  // Ancho disponible para las 3 cards = ancho de contenido del panel − 2 gutters.
+  // Ancho disponible para las 2 cards = ancho de contenido del panel − 1 gutter.
   // clientWidth INCLUYE el padding del .lpanel (10px 22px = 44px horizontal); si
-  // no se resta, las columnas px suman de más y la 3ª card (Pool) se desborda /
+  // no se resta, las columnas px suman de más y la 2ª card se desborda /
   // se sale de la pantalla (overflow:hidden la recorta). Root cause del bug.
   function availW() {
     const cs = getComputedStyle(panel);
     const pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
-    return panel.clientWidth - pad - 2 * GW;
+    return panel.clientWidth - pad - GW;
   }
   function applyRatios() {
     if (!ratios) return;
@@ -2492,13 +2604,11 @@ $$('.seg').forEach(seg => {
     if (avail <= 0) return;
     panel.style.setProperty('--lpc0', (avail * ratios[0]) + 'px');
     panel.style.setProperty('--lpc1', (avail * ratios[1]) + 'px');
-    panel.style.setProperty('--lpc2', (avail * ratios[2]) + 'px');
   }
   function clearRatios() {
     ratios = null;
     panel.style.removeProperty('--lpc0');
     panel.style.removeProperty('--lpc1');
-    panel.style.removeProperty('--lpc2');
     try { localStorage.removeItem(KEY); } catch (_) {}
   }
   applyRatios();
@@ -2507,7 +2617,7 @@ $$('.seg').forEach(seg => {
   panel.querySelectorAll('.lp-gutter').forEach(g => {
     g.addEventListener('pointerdown', e => {
       e.preventDefault();
-      const gi = +g.dataset.g;          // 0 = Act|Rec · 1 = Rec|Pool
+      const gi = +g.dataset.g;          // 0 = Logs|Cuentas
       const a = gi, b = gi + 1;          // cards adyacentes
       const cs = cards();
       const w = cs.map(c => c.getBoundingClientRect().width);
@@ -2526,7 +2636,6 @@ $$('.seg').forEach(seg => {
         cur[b] = w[b] - dx;
         panel.style.setProperty('--lpc0', cur[0] + 'px');
         panel.style.setProperty('--lpc1', cur[1] + 'px');
-        panel.style.setProperty('--lpc2', cur[2] + 'px');
       };
       const up = () => {
         g.classList.remove('dragging');
@@ -2700,16 +2809,49 @@ $$('.seg').forEach(seg => {
 })();
 
 // ── Strip: módulos intercambiables de lugar (tanda 4 — feedback Robert) ──────
-// Las 3 cards del strip (Actividad/Recientes/Pool) son módulos: se arrastran por
+// Las cards del strip (Logs/Cuentas a la mano) son módulos: se arrastran por
 // el grip (.lp-reorder) y se intercambian de lugar (swap). Orden persistido.
 // Las proporciones de ancho son por SLOT (posición), no por card → al reordenar,
-// cada card toma el ancho del slot destino; se reajusta con los gutters. Lógica
-// pura saneada/probada en StripLogic (strip_logic.js + strip_logic.test.js).
+// cada card toma el ancho del slot destino; se reajusta con los gutters.
+// Fase 6: el strip pasó de 3 módulos (activity/recientes/pool) a 2
+// (activity/recientes) al quitarse el card Pool. StripLogic (strip_logic.js)
+// sigue anclado a los 3 módulos originales — en vez de tocar ese archivo,
+// DEFAULT/sanitize/isDefault se derivan aquí de los módulos que existen
+// REALMENTE en el DOM, para no depender de un módulo 'pool' ya inexistente.
 (function initStripReorder() {
   const panel = document.getElementById('adminPanel');
-  if (!panel || !window.StripLogic) return;
-  const KEY = 'bmx.lpOrder.v1';
-  const SL = window.StripLogic;
+  if (!panel) return;
+  const KEY = 'bmx.lpOrder.v2';
+  const DEFAULT = [...panel.querySelectorAll('.lp-card[data-mod]')].map(c => c.dataset.mod);
+  if (DEFAULT.length < 2) return;   // nada que reordenar con 0-1 módulos
+
+  try { localStorage.removeItem('bmx.lpOrder.v1'); } catch (_) {}  // limpia orden viejo (incluía 'pool')
+
+  function sanitize(order) {
+    const seen = {}, out = [];
+    (Array.isArray(order) ? order : []).forEach(m => {
+      if (DEFAULT.indexOf(m) !== -1 && !seen[m]) { seen[m] = true; out.push(m); }
+    });
+    DEFAULT.forEach(m => { if (!seen[m]) out.push(m); });
+    return out;
+  }
+  function isDefault(order) {
+    const s = sanitize(order);
+    return s.every((m, i) => m === DEFAULT[i]);
+  }
+  const SL = {
+    DEFAULT,
+    sanitize,
+    isDefault,
+    reorder(order, fromId, toId) {
+      const cur = sanitize(order);
+      if (fromId === toId) return cur;
+      const a = cur.indexOf(fromId), b = cur.indexOf(toId);
+      if (a === -1 || b === -1) return cur;
+      const t = cur[a]; cur[a] = cur[b]; cur[b] = t;
+      return cur;
+    },
+  };
 
   function cardsByMod() {
     const m = {};
@@ -2720,7 +2862,7 @@ $$('.seg').forEach(seg => {
     const ord = SL.sanitize(order);
     const cards = cardsByMod();
     const gutters = [...panel.querySelectorAll('.lp-gutter')];
-    // Reinsertar en el orden: card, gutter, card, gutter, card (gutters SIEMPRE
+    // Reinsertar en el orden: card, gutter, card, gutter, ... (gutters SIEMPRE
     // entre cards, conservan su data-g por posición → el resize sigue intacto).
     ord.forEach((mod, i) => {
       if (cards[mod]) panel.appendChild(cards[mod]);
@@ -5900,73 +6042,59 @@ async function rehydrateActiveScheduled() {
   }
 }
 
-// ─── Pool card — role-aware render ───
-function renderPoolCard() {
-  const isSA = state.user?.role === 'superadmin';
-  const card = document.querySelector('.lp-card.lp-pool');
-  if (!card) return;
-
-  if (isSA) {
-    // SA: hero + barra de salud visibles; grid 4-stat (la llena refreshKpis)
-    const hero = document.getElementById('lpPoolHero'); if (hero) hero.style.display = '';
-    const bar = document.getElementById('lpPoolBar'); if (bar) bar.style.display = '';
-    // solo añadir Gestionar una vez
-    if (!card.querySelector('.lp-pool-manage')) {
-      const btn = document.createElement('button');
-      btn.className = 'lp-pool-manage';
-      btn.type = 'button';
-      btn.textContent = 'Gestionar pool';
-      btn.addEventListener('click', () => showSection('pool'));
-      card.appendChild(btn);
-    }
-    return;
-  }
-
-  // Operador: "Mis stats del día" — hero/barra del pool NO aplican (se ocultan)
-  const hero = document.getElementById('lpPoolHero'); if (hero) hero.style.display = 'none';
-  const bar = document.getElementById('lpPoolBar'); if (bar) bar.style.display = 'none';
-  const s = window._recentStats || { attempts: 0, approved: 0, amount: 0, rate: 0 };
-  const body = document.getElementById('lpPoolCard');
-  if (!body) return;
-  // Cambiar sub-header de "Pool" → "hoy"
-  const sub = document.getElementById('lpPoolSub');
-  if (sub) sub.textContent = 'hoy';
-  body.innerHTML = `
-    <div class="lp-stat"><span class="lp-stat-label">Intentos</span><b class="lp-stat-val">${s.attempts}</b></div>
-    <div class="lp-stat"><span class="lp-stat-label">Aprobados</span><b class="lp-stat-val">${s.approved}</b></div>
-    <div class="lp-stat"><span class="lp-stat-label">Monto</span><b class="lp-stat-val">$${(s.amount || 0).toLocaleString()}</b></div>
-    <div class="lp-stat"><span class="lp-stat-label">Tasa</span><b class="lp-stat-val">${s.rate}%</b></div>`;
-}
-
-// ─── Recientes (card lateral) ───
+// ─── 📌 Cuentas a la mano (card lateral, por-cuenta: pineadas + recientes) ───
+// Reemplaza el viejo "Recientes" (por-evento). Endpoint ya trae ambas listas
+// resueltas (pinned/recent) con id, status, balance, grade, lock.
 async function loadRecientes() {
   try {
-    const d = await (await fetch('/api/recent')).json();
-    renderRecientes(d.recent || []);
-    window._recentStats = d.stats || null;
-    renderPoolCard();
+    const athand = await fetch('/api/accounts/at-hand').then(r => r.json());
+    renderRecientes(athand || {});
   } catch {}
 }
-function renderRecientes(items) {
+// Estado visual de una cuenta at-hand: DEAD > 🔒 bloqueada > LIVE
+function _atHandStatus(it) {
+  if (it.status === 'DEAD') return { cls: 'rec-dead', lbl: 'DEAD' };
+  if (it.locked_by != null) return { cls: 'rec-locked', lbl: '🔒 bloqueada' };
+  return { cls: 'rec-live', lbl: 'LIVE' };
+}
+function _atHandRow(it, { pinned }) {
+  const st = _atHandStatus(it);
+  const name = esc(it.fullname || it.email);
+  const bal = fmtMoney(it.balance_total);
+  const grade = it.grade ? `<span class="grade ${esc(it.grade)}">${esc(it.grade)}</span>` : '';
+  const timeHtml = pinned ? '' : `<span class="lp-recent-time">hace ${fmtAgo(it.last_ts)}</span>`;
+  const mark = pinned ? '<span class="lp-recent-pin" aria-hidden="true">★</span>' : '<span class="lp-recent-pin dim" aria-hidden="true">·</span>';
+  return `<div class="lp-recent-row ${st.cls} d-copy" data-id="${esc(it.id)}" data-copy="${esc(it.combo)}" title="Click para copiar combo · abre La Pantalla">
+    ${mark}
+    <span class="lp-recent-combo mono">${name}</span>
+    <span class="lp-recent-st">${st.lbl}</span>
+    <span class="lp-recent-bal mono">${bal}</span>
+    ${grade}
+    ${timeHtml}
+  </div>`;
+}
+function renderRecientes(data) {
   const host = $('#lpRecientes');
   if (!host) return;
+  const pinned = data.pinned || [];
+  const recent = data.recent || [];
   const cnt = $('#lpRecientesCount');
-  if (cnt) cnt.textContent = items.length;
-  // Estado a color (escaneable): en uso=verde · depósito=oro · fijada=púrpura
-  const meta = r => r === 'deposit' ? { cls: 'rec-dep',  lbl: 'depósito' }
-                  : r === 'lock'    ? { cls: 'rec-use',  lbl: 'en uso'   }
-                  : r === 'mark'    ? { cls: 'rec-mark', lbl: 'fijada'   }
-                  : { cls: '', lbl: r };
-  host.innerHTML = items.length === 0
-    ? '<div class="lp-empty dim mono">sin recientes</div>'
-    : items.map(it => {
-        const m = meta(it.reason);
-        return `<div class="lp-recent-row ${m.cls} d-copy" data-email="${esc(it.email)}" data-copy="${esc(it.combo)}" title="Click para copiar combo">
-        <span class="lp-recent-combo mono">${esc(it.combo)}</span>
-        <span class="lp-recent-st">${m.lbl}</span>
-        <span class="lp-recent-time">${fmtAgo(it.last_ts)}</span>
-      </div>`;
-      }).join('');
+  if (cnt) cnt.textContent = pinned.length + recent.length;
+
+  if (pinned.length === 0 && recent.length === 0) {
+    host.innerHTML = '<div class="lp-empty dim mono">sin cuentas a la mano</div>';
+    return;
+  }
+  const sections = [];
+  if (pinned.length) {
+    sections.push('<div class="lp-athand-sub mono dim">PINEADAS</div>');
+    sections.push(pinned.map(it => _atHandRow(it, { pinned: true })).join(''));
+  }
+  if (recent.length) {
+    sections.push('<div class="lp-athand-sub mono dim">RECIENTES</div>');
+    sections.push(recent.map(it => _atHandRow(it, { pinned: false })).join(''));
+  }
+  host.innerHTML = sections.join('');
 }
 
 // ─── P8 (tanda 5): memoria de la vista de Cuentas POR USUARIO ───
@@ -6017,7 +6145,6 @@ _acctWrap()?.addEventListener('scroll', _saveAcctStateSoon, { passive: true });
   await reload();
   _restoreAcctScroll();   // P8: restaura el scroll de la tabla tras el render inicial
   _loadPassMap();
-  renderPoolCard();
   refreshKpis();
   setInterval(refreshKpis, 30_000);
   loadActivityMarquee();

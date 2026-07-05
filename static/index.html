@@ -90,12 +90,12 @@
     <!-- Vista: Cuentas -->
     <div id="accountsMain" style="display:flex;flex-direction:column;flex:1;min-height:0">
       <section class="lpanel" id="adminPanel">
-        <!-- Bloque 1: Actividad LIVE (ex-Feed) -->
+        <!-- Bloque 1: 📋 Logs (ex-Actividad LIVE / ex-Feed) — feed vertical scrolleable -->
         <div class="lp-card lp-feed lp-activity" data-mod="activity">
           <div class="lp-head lp-head-clickable" data-nav="activity" title="Ir al panel de Actividad">
             <span class="lp-reorder" title="Arrastra para intercambiar este módulo de lugar" aria-hidden="true"><svg viewBox="0 0 10 16" width="10" height="16"><circle cx="3" cy="3" r="1.1"/><circle cx="7" cy="3" r="1.1"/><circle cx="3" cy="8" r="1.1"/><circle cx="7" cy="8" r="1.1"/><circle cx="3" cy="13" r="1.1"/><circle cx="7" cy="13" r="1.1"/></svg></span>
             <span class="lp-pulse"></span>
-            <span class="lp-label">Actividad LIVE</span>
+            <span class="lp-label">📋 Logs</span>
             <span class="lp-counter mono dim" id="lpFeedCount">—</span>
           </div>
           <div class="lp-feed-rows" id="lpActivity"></div>
@@ -104,43 +104,18 @@
         <!-- Divisor arrastrable (Actividad ↔ Recientes) · doble-click restaura -->
         <div class="lp-gutter" data-g="0" title="Arrastra para ajustar el ancho · doble-click restaura" role="separator" aria-orientation="vertical"></div>
 
-        <!-- Bloque 2: Recientes (ex-Alertas) -->
+        <!-- Bloque 2: 📌 Cuentas a la mano (ex-Recientes / ex-Alertas) — por-cuenta: pineadas + recientes -->
         <div class="lp-card lp-recientes" data-mod="recientes">
           <div class="lp-head">
             <span class="lp-reorder" title="Arrastra para intercambiar este módulo de lugar" aria-hidden="true"><svg viewBox="0 0 10 16" width="10" height="16"><circle cx="3" cy="3" r="1.1"/><circle cx="7" cy="3" r="1.1"/><circle cx="3" cy="8" r="1.1"/><circle cx="7" cy="8" r="1.1"/><circle cx="3" cy="13" r="1.1"/><circle cx="7" cy="13" r="1.1"/></svg></span>
-            <span class="lp-label">Recientes</span>
+            <span class="lp-label">📌 Cuentas a la mano</span>
             <span class="lp-counter mono" id="lpRecientesCount">0</span>
           </div>
           <div class="lp-alert-rows" id="lpRecientes">
-            <div class="lp-empty dim mono">sin recientes</div>
+            <div class="lp-empty dim mono">sin cuentas a la mano</div>
           </div>
         </div>
 
-        <!-- Divisor arrastrable (Recientes ↔ Pool) · doble-click restaura -->
-        <div class="lp-gutter" data-g="1" title="Arrastra para ajustar el ancho · doble-click restaura" role="separator" aria-orientation="vertical"></div>
-
-        <!-- Bloque 3: Pool stats 2×2 -->
-        <div class="lp-card lp-pool" data-mod="pool">
-          <div class="lp-head">
-            <span class="lp-reorder" title="Arrastra para intercambiar este módulo de lugar" aria-hidden="true"><svg viewBox="0 0 10 16" width="10" height="16"><circle cx="3" cy="3" r="1.1"/><circle cx="7" cy="3" r="1.1"/><circle cx="3" cy="8" r="1.1"/><circle cx="7" cy="8" r="1.1"/><circle cx="3" cy="13" r="1.1"/><circle cx="7" cy="13" r="1.1"/></svg></span>
-            <span class="lp-label">Pool</span>
-            <span class="lp-counter mono dim" id="lpPoolSub">—</span>
-          </div>
-          <div class="lp-pool-hero" id="lpPoolHero">
-            <span class="lp-pool-hero-num" id="lpPoolHeroNum">—</span>
-            <span class="lp-pool-hero-unit">en pool</span>
-          </div>
-          <div class="lp-pool-healthbar" id="lpPoolBar" title="Disponibles en pool vs en uso">
-            <i class="lp-pool-bar-free" id="lpPoolBarFree" style="width:0"></i>
-            <i class="lp-pool-bar-used" id="lpPoolBarUsed" style="width:0"></i>
-          </div>
-          <div class="lp-pool-grid" id="lpPoolCard">
-            <div class="lp-stat"><span class="lp-stat-label">Pool</span><b id="lpPool" class="lp-stat-val">—</b></div>
-            <div class="lp-stat"><span class="lp-stat-label">En uso</span><b id="lpInUse" class="lp-stat-val warn">—</b></div>
-            <div class="lp-stat"><span class="lp-stat-label">Trastienda</span><b id="lpTras" class="lp-stat-val dim">—</b></div>
-            <div class="lp-stat"><span class="lp-stat-label">Rebotadas</span><b id="lpReb" class="lp-stat-val danger">—</b></div>
-          </div>
-        </div>
       </section>
 
       <!-- La Pantalla: superficie ámbar de proyección al frente de los KPIs (tanda 6) -->

@@ -92,11 +92,11 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2835 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2991 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2531 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2592 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `login_orchestrator.py` | 392 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 736 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 342 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
@@ -106,8 +106,11 @@ prewarm.py (router)
 | `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
+| `test_account_touch.py` | 51 | `—` | _[completar]_ |
 | `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
 | `test_anti_rate_limit.py` | 271 | `—` | _[completar]_ |
+| `test_at_hand.py` | 73 | `—` | _[completar]_ |
+| `test_deposit_step.py` | 132 | `—` | _[completar]_ |
 | `test_marks.py` | 32 | `—` | _[completar]_ |
 | `test_pool_manage.py` | 26 | `—` | _[completar]_ |
 | `test_search.py` | 70 | `—` | _[completar]_ |
@@ -171,6 +174,8 @@ prewarm.py (router)
 | `SCORE_FLOOR` | `{"A": 80, "B": 60, "C": 40, "D": 0}` | `shared/betmexico_payment_analyzer.py` |
 | `SCORE_CEIL` | `{"A": 100, "B": 79, "C": 59, "D": 39}` | `shared/betmexico_payment_analyzer.py` |
 | `SCHEMA` | `"""` | `test_a1_estados.py` |
+| `OP_A` | `{"role": "user", "telegram_id": 555, "display": "Lau"}` | `test_account_touch.py` |
+| `OP_B` | `{"role": "user", "telegram_id": 777, "display": "Otro"}` | `test_account_touch.py` |
 | `PIPE` | `"4111111111111111|12|30|123"` | `test_unificacion_sp1.py` |
 | `WEB_USERS` | `{k.lower(): v for k, v in WEB_USERS_RAW.items()}` | `web_auth.py` |
 <!-- GEN:end:constantes -->
@@ -192,18 +197,18 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b931e5a` | feat(kpis): frontend strip 3->2 — quitar Pool, grid 2 columnas (Fase 6) |
+| `7fcad36` | feat(kpis): frontend KPI Cuentas a la mano — por-cuenta (Fase 5) |
+| `5753315` | feat(kpis): frontend KPI Logs — feed vertical + deposit_step/account_touch + 2 idiomas (Fase 4) |
+| `65bfe13` | feat(kpis): backend endpoint /api/accounts/at-hand (Fase 3) |
+| `88680a8` | feat(kpis): backend deposit_step — wrapper broadcast en los 3 flujos (Fase 2) |
+| `c765c7e` | feat(kpis): backend account_touch — tabla + hook en account_details + visibilidad (Fase 1) |
+| `d31bdfe` | docs(kpis): spec + plan reorg del strip a 2 KPIs (Logs + Cuentas a la mano) |
 | `ce3d03e` | docs(next-session): cierre — persiana KPI confirmada por Robert en prod; siembra brainstorm de logs/actividad/notificaciones para sig. sesion |
 | `35b5535` | feat(pantalla): historial scrolleable (rueda+drag) + detalle expandible por click + fix icono 💳/📝 abria acordeon viejo |
 | `2ae4c39` | fix(pantalla): depos SIEMPRE dockeado bajo La Pantalla + margenes reales + notas del closer 2026-07-04 |
 | `bdb11d5` | fix(pantalla): depos SIEMPRE dockeado bajo La Pantalla + margenes reales + notas del closer 2026-07-04 |
 | `82a94b5` | fix(pantalla): depos SIEMPRE dockeado bajo La Pantalla + margenes reales + notas del closer 2026-07-04 |
-| `c59981a` | docs(next-session): cierre persiana KPI — ejecutado, mergeado, deployado; gate de prod para Robert |
-| `52aae4b` | fix(pantalla): pat-expanded por direccion decidida (no lectura mid-transicion) + notas excluidas del cierre por espacio limpio |
-| `965a165` | docs: KpiPanel + persiana de 2 estados en FRONTEND/AUDIT (bitacora) |
-| `50ca6f7` | style(pantalla): banda toggle con chevron + glow del boton Depositar en reposo |
-| `468a890` | feat(pantalla): 2 estados por banda (toggle KpiPanel) + close en espacio limpio; se retira el grip de arrastre |
-| `0a7aa4b` | fix(depos): ResizeObserver sobre .lpanel re-ancla el panel de depositos en vivo |
-| `91d87d6` | feat(kpi): piso de 10 filas medido + window.KpiPanel (control dominante del alto) |
 <!-- GEN:end:recientes -->
 
 ---

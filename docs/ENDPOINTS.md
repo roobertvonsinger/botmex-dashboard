@@ -118,6 +118,7 @@
 |---|---|---|---|---|---|---|
 | GET | `/api/activity` | Feed de actividad **scoped por rol**: SA ve todo; operador solo sus propios depósitos y locks. Retorna `{"feed":[...]}` (era lista bare). | require_session | query: `limit, offset, kind, who, q` | `{"feed":[evento,...]}` | `app.py` |
 | GET | `/api/recent` | Cuentas con las que el usuario interactuó recientemente (depósitos propios + locks propios + marcadas). Scoped por operador. `reason ∈ {deposit, lock, mark}`. Incluye stats del día. | require_session | — | `{"recent":[{email,combo,last_ts,reason}], "stats":{attempts,approved,amount,rate}}` | `app.py` |
+| GET | `/api/accounts/at-hand` | KPI "Cuentas a la mano" (📌): pineadas (marks del usuario) + recientes (deposits/locks/marks propios), enriquecidas y resueltas email→id server-side (`/api/recent` no lo daba). Fuente única — evita 3 fetches del front. Visibilidad reusa `_visible_emails` (non-SA no ve fuera de su universo, ni cuentas marcadas fuera de él). `recent` excluye lo que ya está en `pinned` (dos listas sin solape). Cap 20 c/u. | require_session (401 sin sesión) | — | `{"pinned":[{id,email,combo,fullname,status,balance_total,balance_real,grade,locked_by,locked_until}], "recent":[{...mismo shape..., last_ts, reason}]}` | `app.py:1602` |
 
 ## Depósitos (router `/api/deposits/*`)
 

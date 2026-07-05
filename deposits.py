@@ -662,6 +662,62 @@ async def _safe_phase(cb, name: str, payload: dict) -> None:
         logger.warning(f"[Deposits] phase_cb error en '{name}': {e}")
 
 
+# ── deposit_step: broadcast observacional paso a paso (Fase 2, 2026-07-05) ───
+# NO toca el evento `deposit` de cierre (ese lo emite _record_attempt, aparte).
+# NO altera el streaming local existente — el inner_cb original se llama
+# SIEMPRE primero e intacto; esto es un ADD-ON best-effort.
+
+def _now_mx_str() -> str:
+    """Hora MX (America/Mexico_City) como string 'YYYY-MM-DD HH:MM:SS'.
+    Mismo patrón que app.py:2488-2491 (zoneinfo con fallback UTC-6 fijo,
+    México no tiene DST desde 2022)."""
+    try:
+        from zoneinfo import ZoneInfo
+        now_mx = datetime.now(ZoneInfo("UTC")).astimezone(ZoneInfo("America/Mexico_City"))
+    except Exception:
+        now_mx = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=6)
+    return now_mx.strftime("%Y-%m-%d %H:%M:%S")
+
+
+_DEPOSIT_STEP_PHASES = {
+    "login_done": "login", "gateway_begin_done": "begin",
+    "gateway_submit_done": "submit", "gateway_check_done": "check",
+}
+
+
+def _deposit_step_payload(name: str, payload: dict) -> dict:
+    """Mapea el payload crudo de fase → shape estable para el KPI Logs."""
+    step = _DEPOSIT_STEP_PHASES[name]
+    ok = payload.get("ok")  # login/begin lo traen; submit/check no (queda None)
+    code = payload.get("code") or payload.get("result_code")
+    if code is None and payload.get("txn_status") is not None:
+        code = f"txn:{payload.get('txn_status')}"
+    return {"step": step, "ok": ok, "code": code,
+            "duration_ms": payload.get("duration_ms")}
+
+
+def _wrap_deposit_step(inner_cb, *, email: str, actor, **ids):
+    """Envuelve un phase_cb: preserva su comportamiento (stream local intacto)
+    y ADEMÁS broadcastea `deposit_step` en los cierres de fase, con filtro de
+    rol server-side (lleva who_id vía _resolve_who). Best-effort: si el
+    broadcast falla NO afecta el depósito. `ids`: attempt_id/run_id/sched_id.
+    """
+    async def wrapped(name: str, payload: dict) -> None:
+        if inner_cb is not None:
+            await inner_cb(name, payload)          # comportamiento original PRIMERO
+        if name in _DEPOSIT_STEP_PHASES:
+            try:
+                from app import _broadcast, _resolve_who
+                ev = {"type": "activity", "kind": "deposit_step", "email": email,
+                      "ts": _now_mx_str(), **_deposit_step_payload(name, payload),
+                      **_resolve_who(actor)}
+                ev.update({k: v for k, v in ids.items() if v is not None})
+                _broadcast(ev)
+            except Exception as e:
+                logger.warning(f"[Deposits] deposit_step broadcast error: {e}")
+    return wrapped
+
+
 def _build_admin_proxy_url() -> Optional[str]:
     """Construye URL de proxy admin (http://user:pass@server) para httpx.
     Wrapper sobre proxy_pool (combina bot + extras locales del dashboard)."""
@@ -1391,7 +1447,7 @@ async def deposit_execute_stream(request: Request, user: dict = Depends(require_
                     amount=amount,
                     user={"telegram_id": operator_id, "username": user.get("username", "")},
                     pool=pool,
-                    phase_cb=phase_cb,
+                    phase_cb=_wrap_deposit_step(phase_cb, email=email, actor=operator_id, attempt_id=attempt_id),
                 )
             )
 
@@ -1769,7 +1825,10 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
             # mismo shape de retorno que _run_deposit. NO escribe en BD, NO
             # marca DEAD, NO maneja marriage — eso lo hace el caller (este
             # bloque) con _record_attempt + la lógica de estado del matchmaker.
-            phase_cb = make_attempt_phase_cb(email, card["tail"])
+            phase_cb = _wrap_deposit_step(
+                make_attempt_phase_cb(email, card["tail"]),
+                email=email, actor=operator_id, run_id=run_id,
+            )
             try:
                 sess_jwt, sess_proxy = _mm_session_get(account_sessions, email)
                 r = await _run_deposit_with_phases(
@@ -2258,7 +2317,9 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                         amount=amount,
                         user={"telegram_id": operator_id, "username": user.get("username", "")},
                         pool=pool,
-                        phase_cb=phase_cb,
+                        phase_cb=_wrap_deposit_step(
+                            phase_cb, email=email, actor=operator_id, sched_id=sched_id,
+                        ),
                         persist_login_data=(session_jwt is None),
                         session_jwt=session_jwt,
                         session_proxy=session_proxy,
