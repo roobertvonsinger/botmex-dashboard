@@ -1081,13 +1081,15 @@ async function reloadActivity() {
 function pushActivityEvent(ev) {
   // Insert at top, dedupe-ish, cap 500
   const row = {
-    kind: ev.kind, ts: ev.ts, who: ev.who, who_color: ev.who_color,
+    kind: ev.kind, ts: ev.ts, who: ev.who, who_color: ev.who_color, who_id: ev.who_id,
     target: ev.target, amount: ev.amount, status: ev.status,
     reason: ev.reason, duration_ms: ev.duration_ms, id: ev.id, text: ev.text,
     // Campos para scheduled / scheduled_phase / scheduled_aborted / scheduled_cancelled
     sched_id: ev.sched_id, iter: ev.iter, total: ev.total,
     code: ev.code, success: ev.success,
     name: ev.name, data: ev.data, email: ev.email,
+    // Campos de deposit_step (Fase 2 KPI Logs): traza paso a paso.
+    step: ev.step, ok: ev.ok, attempt_id: ev.attempt_id, run_id: ev.run_id,
   };
   // Si el evento trae 'email' (scheduled*) pero no 'target', usar email como target
   // para que la columna "Cuenta" del feed muestre el combo y filtros por target funcionen.
@@ -1100,9 +1102,17 @@ function pushActivityEvent(ev) {
   renderActivityMarquee();
 }
 
-// ─── Marquesina Actividad Live ───
-const _MARQUEE_KINDS = new Set([
+// ─── 📋 Logs — feed vertical (ex-marquesina de Actividad LIVE) ───
+// Fase 4 (spec 2026-07-05): éxito rutinario calla, fallo siempre habla.
+// Familias: deposit_step (traza paso a paso, agrupada), account_touch (vigilancia
+// de quién metió mano), y el resto de acciones (solo si fue fallo).
+// Nota: lock/unlock/mark/pool_move son eventos de ACCIÓN (no tienen resultado
+// éxito/fallo propio en su payload — "alguien bloqueó X" ya es el hecho
+// completo), por eso siempre se muestran. deposit_step/account_touch/deposit
+// sí tienen lógica de éxito/fallo y la aplican en su propio render.
+const _LOGS_KINDS = new Set([
   'deposit','lock','unlock','unlock_auto','account_cooling','mark','pool_move','critical_error',
+  'deposit_step','account_touch',
 ]);
 
 async function loadActivityMarquee() {
@@ -1114,35 +1124,135 @@ async function loadActivityMarquee() {
   } catch {}
 }
 
+// Traduce un `code` técnico de deposit_step/deposit al idioma llano del
+// operador. Extiende _humanizeCritical (misma familia de traducciones).
+// Si no hay traducción conocida, degrada elegante devolviendo el code crudo.
+const _DEPOSIT_CODE_HUMANO = {
+  BANK_REJECTED: 'el banco rechazó tu tarjeta',
+  'E-RED': 'error de red, intenta de nuevo',
+  '3DS_REQUIRED': 'pidió verificación 3DS',
+  RATE_LIMITED: 'la cuenta entró en enfriamiento',
+  LOGIN_DENIED: 'la cuenta no dejó entrar',
+  KYC_PENDING: 'la cuenta tiene KYC pendiente',
+  AUTOEXCLUSION: 'la cuenta está autoexcluida',
+  SUBMIT_ERROR: 'el envío quedó ambiguo, revísalo manual',
+  TIMEOUT: 'la pasarela no respondió a tiempo',
+};
+function _humanizeDepositCode(code) {
+  if (!code) return null;
+  if (_DEPOSIT_CODE_HUMANO[code]) return _DEPOSIT_CODE_HUMANO[code];
+  const key = Object.keys(_DEPOSIT_CODE_HUMANO).find(k => String(code).includes(k));
+  return key ? _DEPOSIT_CODE_HUMANO[key] : String(code);
+}
+
+// Agrupa los steps sueltos de un mismo depósito (deposit_step) en UNA traza
+// acumulada por corrida: attempt_id (single) / run_id (matchmaker) / sched_id
+// (scheduled) + email como fallback si ninguno viene.
+const _STEP_ORDER = ['login', 'begin', 'submit', 'check'];
+function _depositStepRunKey(ev) {
+  return `run:${ev.attempt_id || ev.run_id || ev.sched_id || ''}:${ev.email || ev.target || ''}`;
+}
+function _groupDepositSteps(rows) {
+  const runs = new Map(); // runKey -> { ts, email, who, who_id, who_color, steps:{login:{ok,code}, ...} }
+  const order = []; // orden de aparición (más reciente primero, ya viene así en activityRows)
+  for (const ev of rows) {
+    if (ev.kind !== 'deposit_step') continue;
+    const key = _depositStepRunKey(ev);
+    let run = runs.get(key);
+    if (!run) {
+      run = { key, ts: ev.ts, email: ev.email || ev.target, who: ev.who, who_id: ev.who_id, who_color: ev.who_color, steps: {} };
+      runs.set(key, run);
+      order.push(key);
+    }
+    // El primer step visto (más reciente, activityRows viene newest-first) manda el ts.
+    if (ev.ts > run.ts) run.ts = ev.ts;
+    if (!run.steps[ev.step]) run.steps[ev.step] = { ok: ev.ok, code: ev.code };
+  }
+  return order.map(k => runs.get(k));
+}
+// Traza técnica: "✓login ✓begin ✗submit → BANK_REJECTED"
+function _depositRunTraceSA(run) {
+  const parts = _STEP_ORDER.filter(s => run.steps[s]).map(s => {
+    const st = run.steps[s];
+    const mark = st.ok === false ? '✗' : '✓';
+    return `${mark}${s}`;
+  });
+  const lastFail = _STEP_ORDER.map(s => run.steps[s]).reverse().find(st => st && (st.ok === false || st.code));
+  const codeTxt = lastFail && (lastFail.ok === false || lastFail.code) ? ` → ${esc(lastFail.code || 'FALLO')}` : '';
+  return `${parts.join(' ')}${codeTxt}`;
+}
+// Síntesis operador: 1 línea simple, sin jerga técnica.
+function _depositRunTraceOperador(run) {
+  const failStep = _STEP_ORDER.map(s => run.steps[s]).find(st => st && st.ok === false);
+  const okAll = _STEP_ORDER.every(s => !run.steps[s] || run.steps[s].ok !== false);
+  if (failStep && failStep.code) return `❌ ${_humanizeDepositCode(failStep.code)}`;
+  if (!okAll) return '❌ el depósito no completó';
+  const checkCode = run.steps.check?.code;
+  if (checkCode && String(checkCode).startsWith('txn:') && !String(checkCode).endsWith(':1')) {
+    return `❌ ${_humanizeDepositCode(checkCode)}`;
+  }
+  return '✓ en curso';
+}
+
 function renderActivityMarquee() {
   const host = document.getElementById('lpActivity');
   if (!host) return;
   const isSA = state.user?.role === 'superadmin';
-  const deduped = ActivityLogic.dedupeActivity(activityRows)
-    .filter(ev => _MARQUEE_KINDS.has(ev.kind))
-    .slice(0, 30);
+
+  // 1) deposit_step agrupados en trazas (máx 15 corridas más recientes)
+  const depositRuns = _groupDepositSteps(activityRows).slice(0, 15);
+  const runKeys = new Set(depositRuns.map(r => r.key));
+
+  // 2) resto de eventos del feed (sin deposit_step suelto — ya va agrupado)
+  const rest = ActivityLogic.dedupeActivity(activityRows)
+    .filter(ev => ev.kind !== 'deposit_step' && _LOGS_KINDS.has(ev.kind));
+
+  // Combinar y ordenar por ts desc (deposit_step runs ya vienen con su ts más reciente)
+  const combined = [
+    ...depositRuns.map(r => ({ __run: r, ts: r.ts })),
+    ...rest.map(ev => ({ __ev: ev, ts: ev.ts })),
+  ].sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0)).slice(0, 30);
 
   const counter = document.getElementById('lpFeedCount');
-  if (counter) counter.textContent = deduped.length ? `${deduped.length} eventos` : '—';
+  if (counter) counter.textContent = combined.length ? `${combined.length} eventos` : '—';
 
-  if (deduped.length === 0) {
+  if (combined.length === 0) {
     host.innerHTML = '<div class="lp-empty dim mono">esperando actividad…</div>';
     return;
   }
 
-  const makeRow = ev => {
+  const makeRunRow = run => {
+    const email = String(run.email || '').split(':')[0];
+    const who = isSA ? esc(run.who || '—') : 'Tú';
+    const amt = ''; // deposit_step no trae amount — la traza no lo necesita
+    const trace = isSA ? _depositRunTraceSA(run) : _depositRunTraceOperador(run);
+    const hasFail = _STEP_ORDER.some(s => run.steps[s]?.ok === false);
+    const cls = hasFail ? 'fail' : 'neutral';
+    const icon = hasFail ? '✗' : '⏳';
+    const headline = isSA
+      ? `${who} · depósito${amt} · ${esc(email)}`
+      : `Depositando en ${esc(email)}`;
+    return `<div class="lp-feed-row lp-feed-${cls} lp-feed-clickable lp-feed-run" data-open-email="${esc(email)}" title="Abrir cuenta">` +
+      `<span class="lp-feed-ic">${icon}</span>` +
+      `<div class="lp-feed-body"><span class="lp-feed-txt">${headline}</span><span class="lp-feed-trace mono dim">${trace}</span></div>` +
+      `<span class="lp-feed-time mono dim">${_exactHora(run.ts)}</span></div>`;
+  };
+
+  const makeEvRow = ev => {
+    if (ev.kind === 'account_touch') {
+      const email = String(ev.target || '').split(':')[0];
+      const who = isSA ? esc(ev.who || '—') : 'Tú';
+      const txt = isSA ? `${who} · 👁 abrió ${esc(email)} <span class="dim">(1/día)</span>` : `👁 abriste ${esc(email)}`;
+      return `<div class="lp-feed-row lp-feed-neutral lp-feed-clickable" data-open-email="${esc(email)}" data-open-id="${esc(ev.id ?? '')}" title="Abrir cuenta"><span class="lp-feed-ic">👁</span><span class="lp-feed-txt">${txt}</span><span class="lp-feed-time mono dim">${_exactHora(ev.ts)}</span></div>`;
+    }
     const c = ActivityLogic.formatActivityCopy(ev, isSA);
     const email = String(ev.target || ev.email || '').split(':')[0];
-    return `<div class="lp-feed-row lp-feed-${esc(c.cls)} lp-feed-clickable" data-open-email="${esc(email)}" title="Abrir cuenta"><span class="lp-feed-ic">${c.icon}</span><span class="lp-feed-txt">${esc(c.text)}</span><span class="lp-feed-time mono dim">${fmtAgo(ev.ts)}</span></div>`;
+    return `<div class="lp-feed-row lp-feed-${esc(c.cls)} lp-feed-clickable" data-open-email="${esc(email)}" title="Abrir cuenta"><span class="lp-feed-ic">${c.icon}</span><span class="lp-feed-txt">${esc(c.text)}</span><span class="lp-feed-time mono dim">${_exactHora(ev.ts)}</span></div>`;
   };
-  const rowsHtml = deduped.map(makeRow).join('');
-  // Duplicar para el loop sin costura (-50% keyframe)
-  host.innerHTML = `<div class="lp-ticker-track">${rowsHtml}${rowsHtml}</div>`;
-  // Marquesina lenta y legible: ~2.2s por evento (mín 30s) — adaptativo al # de
-  // eventos para que el ritmo sea constante (antes 20s fijos = veloz con 30
-  // eventos, imposible de clickear). Pausa al hover ya la maneja el CSS.
-  const track = host.querySelector('.lp-ticker-track');
-  if (track) track.style.animationDuration = Math.max(30, deduped.length * 2.2) + 's';
+
+  const rowsHtml = combined.map(item => item.__run ? makeRunRow(item.__run) : makeEvRow(item.__ev)).join('');
+  // Feed vertical scrolleable — SIN duplicado de ticker, SIN animación de loop.
+  host.innerHTML = rowsHtml;
 }
 
 // Abre el DETALLE de una cuenta a partir de su email (marquesina / recientes).
@@ -1171,6 +1281,11 @@ function _humanizeCritical(ev) {
     return 'Problema de conexión con la pasarela';
   if (ev.type === 'health_warning')
     return 'Servicio degradado, reintentando';
+  // deposit_step / deposit: traduce el code técnico (ver _DEPOSIT_CODE_HUMANO,
+  // misma familia de traducciones que este humanizador). Degrada al code
+  // crudo o al msg si no hay traducción conocida.
+  if ((ev.kind === 'deposit_step' || ev.kind === 'deposit') && ev.code)
+    return _humanizeDepositCode(ev.code);
   return ev.msg || 'Problema de conexión';
 }
 
@@ -1250,6 +1365,15 @@ document.getElementById('lpActivity')?.addEventListener('click', e => {
   const row = e.target.closest('.lp-feed-clickable[data-open-email]');
   if (!row) return;
   e.stopPropagation(); // no burbujear al data-nav del header
+  // account_touch trae el id de cuenta directo (data-open-id) — evita el
+  // round-trip de resolver email→id. deposit_step/resto no traen id → cae
+  // al fallback por email (openAccountByEmail ya resuelve, sin inventar nada).
+  const accId = row.dataset.openId ? parseInt(row.dataset.openId, 10) : null;
+  if (accId) {
+    if (window.Pantalla && window.Pantalla.open) { closeDetailModal(); window.Pantalla.open(accId); }
+    else openDetailModal(accId);
+    return;
+  }
   const email = row.dataset.openEmail;
   if (email) openAccountByEmail(email);
 });

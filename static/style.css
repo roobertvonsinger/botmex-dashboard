@@ -808,31 +808,20 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 .lp-op.lp-op-online::after { background: var(--accent); box-shadow: 0 0 4px var(--accent-glow); }
 .lp-op.lp-op-idle::after { background: var(--warn); }
 
-/* Bloque 2: Feed actividad LIVE — marquesina ticker */
+/* Bloque 1: 📋 Logs — feed vertical scrolleable (ex-marquesina ticker) */
 .lp-feed-rows {
   display: flex; flex-direction: column;
   gap: 3px;
-  /* NO overflow:auto — marquesina via ticker track. flex:1 para llenar la card
-     y adaptarse al divisor horizontal (altura del strip). */
+  /* Scroll vertical limpio: SIN scroll horizontal, sin overflow que rompa el
+     layout. flex:1 llena la card y se adapta al divisor horizontal del strip. */
   flex: 1; min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   font-size: 11px;
   font-family: var(--font-mono);
-  /* Fade suave abajo: el recorte se ve estético, insinúa que hay más */
+  /* Fade suave abajo: insinúa que hay más sin cortar en seco */
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
   mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
-}
-
-/* Track interior que el JS duplica para loop sin salto */
-.lp-ticker-track {
-  display: flex; flex-direction: column; gap: 3px;
-  animation: lpTicker 20s linear infinite;
-}
-#lpActivity:hover .lp-ticker-track { animation-play-state: paused; }
-
-@keyframes lpTicker {
-  from { transform: translateY(0); }
-  to   { transform: translateY(-50%); }
 }
 .lp-feed-row {
   display: flex; align-items: center; gap: 7px;
@@ -857,6 +846,21 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 .lp-feed-row.lp-feed-fail .lp-feed-ic  { color: var(--danger); opacity: 0.7; }
 .lp-feed-row.lp-feed-fail              { opacity: 0.72; }
 .lp-feed-row.lp-feed-neutral .lp-feed-amt { color: var(--text-dim); }
+
+/* Traza de deposit_step agrupada: headline + línea técnica secundaria */
+.lp-feed-run {
+  align-items: flex-start;
+  white-space: normal;
+}
+.lp-feed-body {
+  display: flex; flex-direction: column; gap: 1px;
+  flex: 1; min-width: 0;
+}
+.lp-feed-body .lp-feed-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp-feed-trace {
+  font-size: 9.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* Tokens de color por operador (chip + feed-who) */
 .lp-color-warn   { color: var(--warn); }
@@ -959,7 +963,7 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 
 /* Calma de motion — respeta prefers-reduced-motion (anti-burnout TDAH) */
 @media (prefers-reduced-motion: reduce) {
-  .lp-ticker-track { animation: none !important; }
+  .lp-feed-row:first-child { animation: none !important; }
   .lp-dot.live, .lp-pulse { animation: none !important; }
 }
 
