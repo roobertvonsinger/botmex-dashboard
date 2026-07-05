@@ -197,6 +197,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `5753315` | feat(kpis): frontend KPI Logs — feed vertical + deposit_step/account_touch + 2 idiomas (Fase 4) |
 | `65bfe13` | feat(kpis): backend endpoint /api/accounts/at-hand (Fase 3) |
 | `88680a8` | feat(kpis): backend deposit_step — wrapper broadcast en los 3 flujos (Fase 2) |
 | `c765c7e` | feat(kpis): backend account_touch — tabla + hook en account_details + visibilidad (Fase 1) |
@@ -208,7 +209,6 @@ prewarm.py (router)
 | `82a94b5` | fix(pantalla): depos SIEMPRE dockeado bajo La Pantalla + margenes reales + notas del closer 2026-07-04 |
 | `c59981a` | docs(next-session): cierre persiana KPI — ejecutado, mergeado, deployado; gate de prod para Robert |
 | `52aae4b` | fix(pantalla): pat-expanded por direccion decidida (no lectura mid-transicion) + notas excluidas del cierre por espacio limpio |
-| `965a165` | docs: KpiPanel + persiana de 2 estados en FRONTEND/AUDIT (bitacora) |
 <!-- GEN:end:recientes -->
 
 ---

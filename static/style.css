@@ -868,15 +868,23 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 .lp-color-accent { color: var(--accent); }
 .lp-color-azure  { color: oklch(0.78 0.16 250); }
 
-/* Bloque 3: Recientes — llena la card; se recorta al encoger el strip */
+/* Bloque 3: 📌 Cuentas a la mano — llena la card; scroll vertical propio (sin horizontal) */
 .lp-alert-rows {
   display: flex; flex-direction: column; gap: 4px;
   flex: 1; min-height: 0;
-  overflow: hidden;
-  /* Fade suave abajo: recorte estético en vez de corte duro */
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Fade suave abajo: insinúa que hay más sin cortar en seco */
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
   mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
 }
+/* Subcabeceras de sección (PINEADAS / RECIENTES) dentro de Cuentas a la mano */
+.lp-athand-sub {
+  font-size: 8.5px; letter-spacing: 0.6px;
+  padding: 3px 6px 1px;
+  flex-shrink: 0;
+}
+.lp-athand-sub:first-child { padding-top: 0; }
 .lp-alert-row {
   font-size: 10.5px; padding: 4px 7px;
   border-left: 2px solid var(--warn);
@@ -2544,13 +2552,24 @@ td.row-icons, th.row-icons-th {
   background: rgba(255,255,255,0.05); color: var(--text-muted);
 }
 .lp-recent-time { font-size: 9px; flex-shrink: 0; color: var(--text-muted); min-width: 26px; text-align: right; font-family: var(--font-mono); }
-/* Estado por reason: en uso (verde) · depósito (oro) · fijada (púrpura) */
+/* Estado por reason (legado, feed por-evento): en uso (verde) · depósito (oro) · fijada (púrpura) */
 .lp-recent-row.rec-use  { border-left-color: var(--accent); }
 .lp-recent-row.rec-use  .lp-recent-st { color: var(--accent); background: var(--accent-soft); }
 .lp-recent-row.rec-dep  { border-left-color: var(--gold); }
 .lp-recent-row.rec-dep  .lp-recent-st { color: var(--gold); background: var(--gold-soft); }
 .lp-recent-row.rec-mark { border-left-color: var(--purple); }
 .lp-recent-row.rec-mark .lp-recent-st { color: var(--purple); background: oklch(0.74 0.17 295 / 0.14); }
+
+/* 📌 Cuentas a la mano (por-cuenta): estado LIVE/DEAD/🔒 + balance + grade */
+.lp-recent-row.rec-live   { border-left-color: var(--accent); }
+.lp-recent-row.rec-live   .lp-recent-st { color: var(--accent); background: var(--accent-soft); }
+.lp-recent-row.rec-dead   { border-left-color: var(--text-faint); opacity: 0.6; }
+.lp-recent-row.rec-dead   .lp-recent-st { color: var(--text-muted); }
+.lp-recent-row.rec-locked { border-left-color: var(--warn); }
+.lp-recent-row.rec-locked .lp-recent-st { color: var(--warn); background: var(--warn-soft); }
+.lp-recent-pin { flex-shrink: 0; color: #f5a623; font-size: 10px; width: 10px; text-align: center; }
+.lp-recent-pin.dim { color: var(--text-faint); }
+.lp-recent-bal { flex-shrink: 0; color: var(--text); min-width: 46px; text-align: right; }
 
 /* Tooltip ── */
 .row-tip {

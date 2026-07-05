@@ -6062,35 +6062,65 @@ function renderPoolCard() {
     <div class="lp-stat"><span class="lp-stat-label">Tasa</span><b class="lp-stat-val">${s.rate}%</b></div>`;
 }
 
-// ─── Recientes (card lateral) ───
+// ─── 📌 Cuentas a la mano (card lateral, por-cuenta: pineadas + recientes) ───
+// Reemplaza el viejo "Recientes" (por-evento). Endpoint ya trae ambas listas
+// resueltas (pinned/recent) con id, status, balance, grade, lock — sin
+// depender del shape viejo de /api/recent (que sigue vivo para _recentStats).
 async function loadRecientes() {
   try {
-    const d = await (await fetch('/api/recent')).json();
-    renderRecientes(d.recent || []);
-    window._recentStats = d.stats || null;
+    const [athand, rec] = await Promise.all([
+      fetch('/api/accounts/at-hand').then(r => r.json()),
+      fetch('/api/recent').then(r => r.json()),
+    ]);
+    renderRecientes(athand || {});
+    window._recentStats = rec.stats || null;
     renderPoolCard();
   } catch {}
 }
-function renderRecientes(items) {
+// Estado visual de una cuenta at-hand: DEAD > 🔒 bloqueada > LIVE
+function _atHandStatus(it) {
+  if (it.status === 'DEAD') return { cls: 'rec-dead', lbl: 'DEAD' };
+  if (it.locked_by != null) return { cls: 'rec-locked', lbl: '🔒 bloqueada' };
+  return { cls: 'rec-live', lbl: 'LIVE' };
+}
+function _atHandRow(it, { pinned }) {
+  const st = _atHandStatus(it);
+  const name = esc(it.fullname || it.email);
+  const bal = fmtMoney(it.balance_total);
+  const grade = it.grade ? `<span class="grade ${esc(it.grade)}">${esc(it.grade)}</span>` : '';
+  const timeHtml = pinned ? '' : `<span class="lp-recent-time">hace ${fmtAgo(it.last_ts)}</span>`;
+  const mark = pinned ? '<span class="lp-recent-pin" aria-hidden="true">★</span>' : '<span class="lp-recent-pin dim" aria-hidden="true">·</span>';
+  return `<div class="lp-recent-row ${st.cls} d-copy" data-id="${esc(it.id)}" data-copy="${esc(it.combo)}" title="Click para copiar combo · abre La Pantalla">
+    ${mark}
+    <span class="lp-recent-combo mono">${name}</span>
+    <span class="lp-recent-st">${st.lbl}</span>
+    <span class="lp-recent-bal mono">${bal}</span>
+    ${grade}
+    ${timeHtml}
+  </div>`;
+}
+function renderRecientes(data) {
   const host = $('#lpRecientes');
   if (!host) return;
+  const pinned = data.pinned || [];
+  const recent = data.recent || [];
   const cnt = $('#lpRecientesCount');
-  if (cnt) cnt.textContent = items.length;
-  // Estado a color (escaneable): en uso=verde · depósito=oro · fijada=púrpura
-  const meta = r => r === 'deposit' ? { cls: 'rec-dep',  lbl: 'depósito' }
-                  : r === 'lock'    ? { cls: 'rec-use',  lbl: 'en uso'   }
-                  : r === 'mark'    ? { cls: 'rec-mark', lbl: 'fijada'   }
-                  : { cls: '', lbl: r };
-  host.innerHTML = items.length === 0
-    ? '<div class="lp-empty dim mono">sin recientes</div>'
-    : items.map(it => {
-        const m = meta(it.reason);
-        return `<div class="lp-recent-row ${m.cls} d-copy" data-email="${esc(it.email)}" data-copy="${esc(it.combo)}" title="Click para copiar combo">
-        <span class="lp-recent-combo mono">${esc(it.combo)}</span>
-        <span class="lp-recent-st">${m.lbl}</span>
-        <span class="lp-recent-time">${fmtAgo(it.last_ts)}</span>
-      </div>`;
-      }).join('');
+  if (cnt) cnt.textContent = pinned.length + recent.length;
+
+  if (pinned.length === 0 && recent.length === 0) {
+    host.innerHTML = '<div class="lp-empty dim mono">sin cuentas a la mano</div>';
+    return;
+  }
+  const sections = [];
+  if (pinned.length) {
+    sections.push('<div class="lp-athand-sub mono dim">PINEADAS</div>');
+    sections.push(pinned.map(it => _atHandRow(it, { pinned: true })).join(''));
+  }
+  if (recent.length) {
+    sections.push('<div class="lp-athand-sub mono dim">RECIENTES</div>');
+    sections.push(recent.map(it => _atHandRow(it, { pinned: false })).join(''));
+  }
+  host.innerHTML = sections.join('');
 }
 
 // ─── P8 (tanda 5): memoria de la vista de Cuentas POR USUARIO ───
