@@ -629,12 +629,11 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 .lpanel {
   padding: 10px 22px 10px;
   display: grid;
-  /* 3 cards + 2 divisores arrastrables. Anchos por defecto en fr; al arrastrar,
-     el JS sobreescribe --lpc0/1/2 con px (initLpResize en app.js). */
+  /* 2 cards + 1 divisor arrastrable. Anchos por defecto en fr; al arrastrar,
+     el JS sobreescribe --lpc0/1 con px (initLpResize en app.js). */
   grid-template-columns:
-    var(--lpc0, minmax(0, 1.7fr)) var(--lp-gw)
-    var(--lpc1, minmax(0, 1.1fr)) var(--lp-gw)
-    var(--lpc2, 210px);
+    var(--lpc0, minmax(0, 1.4fr)) var(--lp-gw)
+    var(--lpc1, minmax(0, 1fr));
   gap: 0;
   /* Default COMPACTO (Robert): el strip arranca a esta altura, la tabla gana el
      resto. Ajustable con el divisor horizontal (initLpVResize fija height inline).
@@ -900,74 +899,6 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 .lp-alert-msg { color: var(--text); }
 .lp-alert-time { font-size: 9px; }
 .lp-empty { font-size: 10.5px; padding: 4px 0; font-style: italic; }
-
-/* Bloque 4: Pool 2×2 */
-.lp-pool-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-auto-rows: 1fr;
-  gap: 1px;
-  background: var(--hairline);
-  border-radius: 6px;
-  overflow: hidden;
-  flex: 1;
-  min-height: 80px;
-}
-.lp-stat {
-  background: var(--surface-solid);
-  padding: 6px 9px;
-  display: flex; flex-direction: column; justify-content: center;
-}
-.lp-stat-label {
-  font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px;
-  color: var(--text-muted); font-family: var(--font-mono);
-}
-.lp-stat-val {
-  font-family: var(--font-display); font-size: 18px; font-weight: 700;
-  color: var(--text); line-height: 1.1;
-}
-.lp-stat-val.warn { color: var(--warn); }
-.lp-stat-val.danger { color: var(--danger); }
-.lp-stat-val.dim { color: var(--text-muted); }
-/* lp-stat clickable (En uso, Pool) */
-#lpInUse, #lpPool { cursor: pointer; transition: color 140ms; }
-#lpInUse:hover, #lpPool:hover { filter: brightness(1.3); }
-#lpInUse.lp-stat-active {
-  color: var(--accent);
-  text-shadow: 0 0 6px var(--accent-glow);
-}
-
-/* Pool card — Gestionar button (SA) */
-.lp-pool-manage {
-  display: block; width: 100%; margin-top: 7px;
-  padding: 5px 0; border: 1px solid var(--hairline); border-radius: 5px;
-  background: transparent; color: var(--text-muted);
-  font-family: var(--font-mono); font-size: 9.5px; font-weight: 700;
-  letter-spacing: 0.5px; text-transform: uppercase;
-  cursor: pointer; transition: color 140ms, border-color 140ms;
-}
-.lp-pool-manage:hover {
-  color: var(--accent); border-color: var(--accent);
-}
-
-/* Pool — hero (número grande, salud de un vistazo) + barra free/used.
-   Solo-SA: el operador (Mis stats) los oculta vía renderPoolCard. */
-.lp-pool-hero { display: flex; align-items: baseline; gap: 7px; margin-bottom: 7px; }
-.lp-pool-hero-num {
-  font-family: var(--font-display); font-size: 28px; font-weight: 700;
-  line-height: 1; color: var(--accent); text-shadow: 0 0 14px var(--accent-glow);
-}
-.lp-pool-hero-unit {
-  font-family: var(--font-mono); font-size: 9px; letter-spacing: 1px;
-  text-transform: uppercase; color: var(--text-muted);
-}
-.lp-pool-healthbar {
-  height: 5px; border-radius: 99px; overflow: hidden; margin-bottom: 8px;
-  background: rgba(255,255,255,0.06); display: flex;
-}
-.lp-pool-healthbar i { height: 100%; transition: width var(--ease); }
-.lp-pool-bar-free { background: var(--accent); }
-.lp-pool-bar-used { background: var(--warn); }
 
 /* Calma de motion — respeta prefers-reduced-motion (anti-burnout TDAH) */
 @media (prefers-reduced-motion: reduce) {
@@ -2637,8 +2568,8 @@ td.row-icons, th.row-icons-th {
    RESPONSIVE / MOBILE
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* Tablet horizontal (≤ 1100px): KPI panel se compacta. El template de 5 tracks
-   (3 cards + 2 gutters) del .lpanel base sigue aplicando — solo afina el padding. */
+/* Tablet horizontal (≤ 1100px): KPI panel se compacta. El template de 3 tracks
+   (2 cards + 1 gutter) del .lpanel base sigue aplicando — solo afina el padding. */
 @media (max-width: 1100px) {
   .lpanel { padding: 8px; }
 }
@@ -2713,7 +2644,7 @@ td.row-icons, th.row-icons-th {
   .dep-mm-col { min-height: 120px; max-height: 180px; }
   .dep-mm-col-feed { max-height: 220px; }
 
-  /* Strip: en móvil los 3 cards se apilan y los divisores se ocultan */
+  /* Strip: en móvil las cards se apilan y los divisores se ocultan */
   .lpanel { grid-template-columns: 1fr !important; gap: 8px; }
   .lp-gutter { display: none; }
 

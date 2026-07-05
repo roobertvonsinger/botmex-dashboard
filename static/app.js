@@ -1834,24 +1834,6 @@ async function refreshKpis() {
         ${o.in_use ? `<span class="lp-op-n mono">${o.in_use}</span>` : ''}
       </div>`;
     }).join('');
-
-    // ── Bloque 4: Pool ──
-    const p = k.pool || {};
-    const poolN = p.pool ?? 0, useN = p.in_use ?? 0, liveN = poolN + useN;
-    $('#lpPool').textContent = poolN.toLocaleString();
-    $('#lpInUse').textContent = useN.toLocaleString();
-    $('#lpTras').textContent = p.trastienda ?? 0;
-    $('#lpReb').textContent = (p.rebotadas ?? 0).toLocaleString();
-    $('#lpPoolSub').textContent = `${liveN} LIVE`;
-    // Hero (número grande) + barra de salud free/used — salud de un vistazo
-    const heroNum = $('#lpPoolHeroNum'); if (heroNum) heroNum.textContent = poolN.toLocaleString();
-    const barFree = $('#lpPoolBarFree'), barUsed = $('#lpPoolBarUsed');
-    if (barFree && barUsed) {
-      const pct = liveN > 0 ? (100 * poolN / liveN) : 0;
-      barFree.style.width = pct + '%';
-      barUsed.style.width = (100 - pct) + '%';
-    }
-    renderPoolCard();
   } catch (e) {
     console.error('KPI error:', e);
   } finally {
@@ -2582,33 +2564,39 @@ $$('.seg').forEach(seg => {
   });
 });
 
-// ─── Divisores arrastrables del strip (Actividad | Recientes | Pool) ───
+// ─── Divisor arrastrable del strip (Logs | Cuentas a la mano) ───
 // Patrón Claude Desktop: arrastra el divisor para repartir el ancho entre los
-// dos cards adyacentes. Doble-click restaura. Persiste en localStorage como
-// proporciones (resiliente a cambios de ancho de ventana). Frictionless: se
-// ajusta una vez y queda.
+// dos cards. Doble-click restaura. Persiste en localStorage como proporciones
+// (resiliente a cambios de ancho de ventana). Frictionless: se ajusta una vez
+// y queda.
+// v2 (Fase 6): el strip pasó de 3 cards (Logs/Recientes/Pool) a 2 (Logs/
+// Recientes) — se quitó el card Pool. Bump de key v1→v2 para invalidar
+// ratios guardadas de 3 columnas: aplicarlas tal cual al grid de 2 columnas
+// desbordaba el strip (bug histórico ya reportado por Robert).
 (function initLpResize() {
   const panel = document.getElementById('adminPanel');
   if (!panel) return;
-  const KEY = 'bmx.lpCols.v1';
+  const KEY = 'bmx.lpCols.v2';
   const GW = 7;          // ancho del gutter (coincide con --lp-gw)
   const MIN = 150;       // ancho mínimo por card (px)
-  let ratios = null;     // [r0, r1, r2] (suman 1) o null = usar defaults CSS (fr)
+  let ratios = null;     // [r0, r1] (suman 1) o null = usar defaults CSS (fr)
+
+  try { localStorage.removeItem('bmx.lpCols.v1'); } catch (_) {}  // limpia ratios viejas de 3-col
 
   const cards = () => [...panel.querySelectorAll('.lp-card')];
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || 'null');
-    if (Array.isArray(s) && s.length === 3) ratios = s;
+    if (Array.isArray(s) && s.length === 2) ratios = s;
   } catch (_) {}
 
-  // Ancho disponible para las 3 cards = ancho de contenido del panel − 2 gutters.
+  // Ancho disponible para las 2 cards = ancho de contenido del panel − 1 gutter.
   // clientWidth INCLUYE el padding del .lpanel (10px 22px = 44px horizontal); si
-  // no se resta, las columnas px suman de más y la 3ª card (Pool) se desborda /
+  // no se resta, las columnas px suman de más y la 2ª card se desborda /
   // se sale de la pantalla (overflow:hidden la recorta). Root cause del bug.
   function availW() {
     const cs = getComputedStyle(panel);
     const pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
-    return panel.clientWidth - pad - 2 * GW;
+    return panel.clientWidth - pad - GW;
   }
   function applyRatios() {
     if (!ratios) return;
@@ -2616,13 +2604,11 @@ $$('.seg').forEach(seg => {
     if (avail <= 0) return;
     panel.style.setProperty('--lpc0', (avail * ratios[0]) + 'px');
     panel.style.setProperty('--lpc1', (avail * ratios[1]) + 'px');
-    panel.style.setProperty('--lpc2', (avail * ratios[2]) + 'px');
   }
   function clearRatios() {
     ratios = null;
     panel.style.removeProperty('--lpc0');
     panel.style.removeProperty('--lpc1');
-    panel.style.removeProperty('--lpc2');
     try { localStorage.removeItem(KEY); } catch (_) {}
   }
   applyRatios();
@@ -2631,7 +2617,7 @@ $$('.seg').forEach(seg => {
   panel.querySelectorAll('.lp-gutter').forEach(g => {
     g.addEventListener('pointerdown', e => {
       e.preventDefault();
-      const gi = +g.dataset.g;          // 0 = Act|Rec · 1 = Rec|Pool
+      const gi = +g.dataset.g;          // 0 = Logs|Cuentas
       const a = gi, b = gi + 1;          // cards adyacentes
       const cs = cards();
       const w = cs.map(c => c.getBoundingClientRect().width);
@@ -2650,7 +2636,6 @@ $$('.seg').forEach(seg => {
         cur[b] = w[b] - dx;
         panel.style.setProperty('--lpc0', cur[0] + 'px');
         panel.style.setProperty('--lpc1', cur[1] + 'px');
-        panel.style.setProperty('--lpc2', cur[2] + 'px');
       };
       const up = () => {
         g.classList.remove('dragging');
@@ -2824,16 +2809,49 @@ $$('.seg').forEach(seg => {
 })();
 
 // ── Strip: módulos intercambiables de lugar (tanda 4 — feedback Robert) ──────
-// Las 3 cards del strip (Actividad/Recientes/Pool) son módulos: se arrastran por
+// Las cards del strip (Logs/Cuentas a la mano) son módulos: se arrastran por
 // el grip (.lp-reorder) y se intercambian de lugar (swap). Orden persistido.
 // Las proporciones de ancho son por SLOT (posición), no por card → al reordenar,
-// cada card toma el ancho del slot destino; se reajusta con los gutters. Lógica
-// pura saneada/probada en StripLogic (strip_logic.js + strip_logic.test.js).
+// cada card toma el ancho del slot destino; se reajusta con los gutters.
+// Fase 6: el strip pasó de 3 módulos (activity/recientes/pool) a 2
+// (activity/recientes) al quitarse el card Pool. StripLogic (strip_logic.js)
+// sigue anclado a los 3 módulos originales — en vez de tocar ese archivo,
+// DEFAULT/sanitize/isDefault se derivan aquí de los módulos que existen
+// REALMENTE en el DOM, para no depender de un módulo 'pool' ya inexistente.
 (function initStripReorder() {
   const panel = document.getElementById('adminPanel');
-  if (!panel || !window.StripLogic) return;
-  const KEY = 'bmx.lpOrder.v1';
-  const SL = window.StripLogic;
+  if (!panel) return;
+  const KEY = 'bmx.lpOrder.v2';
+  const DEFAULT = [...panel.querySelectorAll('.lp-card[data-mod]')].map(c => c.dataset.mod);
+  if (DEFAULT.length < 2) return;   // nada que reordenar con 0-1 módulos
+
+  try { localStorage.removeItem('bmx.lpOrder.v1'); } catch (_) {}  // limpia orden viejo (incluía 'pool')
+
+  function sanitize(order) {
+    const seen = {}, out = [];
+    (Array.isArray(order) ? order : []).forEach(m => {
+      if (DEFAULT.indexOf(m) !== -1 && !seen[m]) { seen[m] = true; out.push(m); }
+    });
+    DEFAULT.forEach(m => { if (!seen[m]) out.push(m); });
+    return out;
+  }
+  function isDefault(order) {
+    const s = sanitize(order);
+    return s.every((m, i) => m === DEFAULT[i]);
+  }
+  const SL = {
+    DEFAULT,
+    sanitize,
+    isDefault,
+    reorder(order, fromId, toId) {
+      const cur = sanitize(order);
+      if (fromId === toId) return cur;
+      const a = cur.indexOf(fromId), b = cur.indexOf(toId);
+      if (a === -1 || b === -1) return cur;
+      const t = cur[a]; cur[a] = cur[b]; cur[b] = t;
+      return cur;
+    },
+  };
 
   function cardsByMod() {
     const m = {};
@@ -2844,7 +2862,7 @@ $$('.seg').forEach(seg => {
     const ord = SL.sanitize(order);
     const cards = cardsByMod();
     const gutters = [...panel.querySelectorAll('.lp-gutter')];
-    // Reinsertar en el orden: card, gutter, card, gutter, card (gutters SIEMPRE
+    // Reinsertar en el orden: card, gutter, card, gutter, ... (gutters SIEMPRE
     // entre cards, conservan su data-g por posición → el resize sigue intacto).
     ord.forEach((mod, i) => {
       if (cards[mod]) panel.appendChild(cards[mod]);
@@ -6024,57 +6042,13 @@ async function rehydrateActiveScheduled() {
   }
 }
 
-// ─── Pool card — role-aware render ───
-function renderPoolCard() {
-  const isSA = state.user?.role === 'superadmin';
-  const card = document.querySelector('.lp-card.lp-pool');
-  if (!card) return;
-
-  if (isSA) {
-    // SA: hero + barra de salud visibles; grid 4-stat (la llena refreshKpis)
-    const hero = document.getElementById('lpPoolHero'); if (hero) hero.style.display = '';
-    const bar = document.getElementById('lpPoolBar'); if (bar) bar.style.display = '';
-    // solo añadir Gestionar una vez
-    if (!card.querySelector('.lp-pool-manage')) {
-      const btn = document.createElement('button');
-      btn.className = 'lp-pool-manage';
-      btn.type = 'button';
-      btn.textContent = 'Gestionar pool';
-      btn.addEventListener('click', () => showSection('pool'));
-      card.appendChild(btn);
-    }
-    return;
-  }
-
-  // Operador: "Mis stats del día" — hero/barra del pool NO aplican (se ocultan)
-  const hero = document.getElementById('lpPoolHero'); if (hero) hero.style.display = 'none';
-  const bar = document.getElementById('lpPoolBar'); if (bar) bar.style.display = 'none';
-  const s = window._recentStats || { attempts: 0, approved: 0, amount: 0, rate: 0 };
-  const body = document.getElementById('lpPoolCard');
-  if (!body) return;
-  // Cambiar sub-header de "Pool" → "hoy"
-  const sub = document.getElementById('lpPoolSub');
-  if (sub) sub.textContent = 'hoy';
-  body.innerHTML = `
-    <div class="lp-stat"><span class="lp-stat-label">Intentos</span><b class="lp-stat-val">${s.attempts}</b></div>
-    <div class="lp-stat"><span class="lp-stat-label">Aprobados</span><b class="lp-stat-val">${s.approved}</b></div>
-    <div class="lp-stat"><span class="lp-stat-label">Monto</span><b class="lp-stat-val">$${(s.amount || 0).toLocaleString()}</b></div>
-    <div class="lp-stat"><span class="lp-stat-label">Tasa</span><b class="lp-stat-val">${s.rate}%</b></div>`;
-}
-
 // ─── 📌 Cuentas a la mano (card lateral, por-cuenta: pineadas + recientes) ───
 // Reemplaza el viejo "Recientes" (por-evento). Endpoint ya trae ambas listas
-// resueltas (pinned/recent) con id, status, balance, grade, lock — sin
-// depender del shape viejo de /api/recent (que sigue vivo para _recentStats).
+// resueltas (pinned/recent) con id, status, balance, grade, lock.
 async function loadRecientes() {
   try {
-    const [athand, rec] = await Promise.all([
-      fetch('/api/accounts/at-hand').then(r => r.json()),
-      fetch('/api/recent').then(r => r.json()),
-    ]);
+    const athand = await fetch('/api/accounts/at-hand').then(r => r.json());
     renderRecientes(athand || {});
-    window._recentStats = rec.stats || null;
-    renderPoolCard();
   } catch {}
 }
 // Estado visual de una cuenta at-hand: DEAD > 🔒 bloqueada > LIVE
@@ -6171,7 +6145,6 @@ _acctWrap()?.addEventListener('scroll', _saveAcctStateSoon, { passive: true });
   await reload();
   _restoreAcctScroll();   // P8: restaura el scroll de la tabla tras el render inicial
   _loadPassMap();
-  renderPoolCard();
   refreshKpis();
   setInterval(refreshKpis, 30_000);
   loadActivityMarquee();
