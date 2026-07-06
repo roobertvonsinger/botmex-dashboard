@@ -869,6 +869,19 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
   margin-bottom: 1px;
 }
 .lp-feed-day:first-child { padding-top: 0; }
+/* Punto de color por operador (feed SA) — ubicación visual rápida de quién */
+.lp-feed-dot { font-size: 8px; line-height: 1; flex-shrink: 0; }
+/* Badge "×N" desplegable de un grupo de depósitos repetidos */
+.lp-feed-badge {
+  flex-shrink: 0; font-size: 9px; line-height: 1;
+  padding: 1px 5px; border-radius: 99px;
+  background: rgba(255,255,255,0.06); color: var(--text-muted);
+  border: 0; cursor: pointer; font-family: var(--font-mono);
+}
+.lp-feed-badge:hover { background: rgba(255,255,255,0.12); color: var(--text); }
+/* Repeticiones sublistadas al desplegar el grupo — indentadas y atenuadas */
+.lp-feed-kid { padding-left: 16px; opacity: 0.7; }
+.lp-feed-kid .lp-feed-ic { font-size: 9px; }
 
 /* Tokens de color por operador (chip + feed-who) */
 .lp-color-warn   { color: var(--warn); }

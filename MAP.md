@@ -92,7 +92,7 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 2991 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 2995 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -197,6 +197,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `1771bc9` | fix(frontend): KPI Logs cronológico + día + Cuentas a la mano combo protagonista |
 | `1f793af` | docs(kpis): bitacora Fase 7 + NEXT-SESSION — cierre 2 KPIs deployados |
 | `b931e5a` | feat(kpis): frontend strip 3->2 — quitar Pool, grid 2 columnas (Fase 6) |
 | `7fcad36` | feat(kpis): frontend KPI Cuentas a la mano — por-cuenta (Fase 5) |
@@ -208,7 +209,6 @@ prewarm.py (router)
 | `ce3d03e` | docs(next-session): cierre — persiana KPI confirmada por Robert en prod; siembra brainstorm de logs/actividad/notificaciones para sig. sesion |
 | `35b5535` | feat(pantalla): historial scrolleable (rueda+drag) + detalle expandible por click + fix icono 💳/📝 abria acordeon viejo |
 | `2ae4c39` | fix(pantalla): depos SIEMPRE dockeado bajo La Pantalla + margenes reales + notas del closer 2026-07-04 |
-| `bdb11d5` | fix(pantalla): depos SIEMPRE dockeado bajo La Pantalla + margenes reales + notas del closer 2026-07-04 |
 <!-- GEN:end:recientes -->
 
 ---

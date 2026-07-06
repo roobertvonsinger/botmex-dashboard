@@ -2847,6 +2847,7 @@ def activity_feed(
                 events.append({
                     "kind": "deposit", "ts": r["created_at"],
                     "who": _resolve_operator(r["operator_id"]),
+                    "who_color": _operator_color(r["operator_id"]), "who_id": r["operator_id"],
                     "target": _combo(r["account_email"]),
                     "amount": r["amount"], "status": r["status"],
                     "reason": r["rejection_reason"], "duration_ms": r["duration_ms"],
@@ -2866,6 +2867,7 @@ def activity_feed(
             events.append({
                 "kind": "lock", "ts": r["locked_at"],
                 "who": _resolve_operator(r["locked_by"]),
+                "who_color": _operator_color(r["locked_by"]), "who_id": r["locked_by"],
                 "target": _combo(r["email"]),
             })
 
@@ -2885,6 +2887,7 @@ def activity_feed(
                 events.append({
                     "kind": "note", "ts": r["created_at"],
                     "who": r["created_by_name"] or _resolve_operator(r["created_by"]),
+                    "who_color": _operator_color(r["created_by"]), "who_id": r["created_by"],
                     "target": _combo(r["account_email"]),
                     "text": (r["note_text"] or "")[:160],
                     "id": r["id"],
@@ -2913,6 +2916,7 @@ def activity_feed(
                 events.append({
                     "kind": f"prewarm_{r['phase']}", "ts": r["created_at"],
                     "who": _resolve_operator(p.get("operator_id")),
+                    "who_color": _operator_color(p.get("operator_id")), "who_id": p.get("operator_id"),
                     "target": _combo(p.get("email", "")),
                 })
         except sqlite3.OperationalError:

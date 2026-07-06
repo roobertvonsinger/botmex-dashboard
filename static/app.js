@@ -1047,6 +1047,13 @@ function _exactHoraEp(ep) {
       hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(ep));
   } catch { return '—'; }
 }
+// Punto de color del operador — ubica de un vistazo quién hizo qué en el feed SA.
+// Reusa el esquema USER_COLORS del backend (who_color: warn/purple/accent/azure).
+function _whoDot(colorTok) {
+  return colorTok ? `<span class="lp-feed-dot lp-color-${esc(colorTok)}" aria-hidden="true">●</span>` : '';
+}
+// Grupos de depósito desplegados en el feed (persiste el toggle entre re-renders).
+const _feedExpanded = new Set();
 
 function renderActivity() {
   const t = $('#actTable');
@@ -1158,7 +1165,7 @@ function pushActivityEvent(ev) {
 // completo), por eso siempre se muestran. deposit_step/account_touch/deposit
 // sí tienen lógica de éxito/fallo y la aplican en su propio render.
 const _LOGS_KINDS = new Set([
-  'deposit','lock','unlock','unlock_auto','account_cooling','mark','pool_move','critical_error',
+  'deposit','lock','unlock','unlock_auto','account_cooling','mark','pool_move',
   'deposit_step','account_touch',
 ]);
 
@@ -1250,16 +1257,40 @@ function renderActivityMarquee() {
   const depositRuns = _groupDepositSteps(activityRows).slice(0, 15);
   const runKeys = new Set(depositRuns.map(r => r.key));
 
-  // 2) resto de eventos del feed (sin deposit_step suelto — ya va agrupado)
+  // 2) resto de eventos del feed (sin deposit_step suelto — ya va agrupado).
+  //    Dedup de account_touch: 1 por (operador, cuenta, día) — no spamear con
+  //    "X entró a la misma cuenta" repetido (el dato completo persiste en BD).
+  const _touchSeen = new Set();
   const rest = ActivityLogic.dedupeActivity(activityRows)
-    .filter(ev => ev.kind !== 'deposit_step' && _LOGS_KINDS.has(ev.kind));
+    .filter(ev => ev.kind !== 'deposit_step' && _LOGS_KINDS.has(ev.kind))
+    .filter(ev => {
+      if (ev.kind !== 'account_touch') return true;
+      const k = `${ev.who_id ?? ev.who}|${ev.target}|${_mxYmd(_feedEpoch(ev.ts, ev.kind))}`;
+      if (_touchSeen.has(k)) return false;
+      _touchSeen.add(k); return true;
+    });
+
+  // 3) Agrupar depósitos repetidos (mismo operador+cuenta+resultado+monto+día) en
+  //    una fila representante (la más nueva) desplegable; los demás se sublistan
+  //    al click. activityRows viene newest-first → el 1º de cada grupo es el rep.
+  const depGroups = new Map();
+  const restItems = []; // {__ev,ep} | {__group,ep}
+  for (const ev of rest) {
+    const ep = _feedEpoch(ev.ts, ev.kind);
+    if (ev.kind !== 'deposit') { restItems.push({ __ev: ev, ep }); continue; }
+    const email = String(ev.target || ev.email || '').split(':')[0];
+    const key = `d|${ev.who_id ?? ev.who}|${email}|${ev.status}|${ev.amount ?? ''}|${_mxYmd(ep)}`;
+    let g = depGroups.get(key);
+    if (!g) { g = { key, rep: ev, kids: [] }; depGroups.set(key, g); restItems.push({ __group: g, ep }); }
+    else g.kids.push({ ev, ep });
+  }
 
   // Combinar y ordenar por EPOCH ABSOLUTO desc (no por string: ts vienen en
   // formatos/zonas mezclados — ver _feedEpoch). Sin esto los locks (ts con 'T')
   // se pineaban arriba de los depósitos (ts con ' ') sin importar la hora real.
   const combined = [
     ...depositRuns.map(r => ({ __run: r, ep: _feedEpoch(r.ts, 'deposit_step') })),
-    ...rest.map(ev => ({ __ev: ev, ep: _feedEpoch(ev.ts, ev.kind) })),
+    ...restItems,
   ].sort((a, b) => b.ep - a.ep).slice(0, 30);
 
   const counter = document.getElementById('lpFeedCount');
@@ -1282,7 +1313,7 @@ function renderActivityMarquee() {
       ? `${who} · depósito${amt} · ${esc(email)}`
       : `Depositando en ${esc(email)}`;
     return `<div class="lp-feed-row lp-feed-${cls} lp-feed-clickable lp-feed-run" data-open-email="${esc(email)}" title="Abrir cuenta">` +
-      `<span class="lp-feed-ic">${icon}</span>` +
+      `${isSA ? _whoDot(run.who_color) : ''}<span class="lp-feed-ic">${icon}</span>` +
       `<div class="lp-feed-body"><span class="lp-feed-txt">${headline}</span><span class="lp-feed-trace mono dim">${trace}</span></div>` +
       `<span class="lp-feed-time mono dim">${_exactHoraEp(ep)}</span></div>`;
   };
@@ -1292,11 +1323,33 @@ function renderActivityMarquee() {
       const email = String(ev.target || '').split(':')[0];
       const who = isSA ? esc(ev.who || '—') : 'Tú';
       const txt = isSA ? `${who} · 👁 abrió ${esc(email)} <span class="dim">(1/día)</span>` : `👁 abriste ${esc(email)}`;
-      return `<div class="lp-feed-row lp-feed-neutral lp-feed-clickable" data-open-email="${esc(email)}" data-open-id="${esc(ev.id ?? '')}" title="Abrir cuenta"><span class="lp-feed-ic">👁</span><span class="lp-feed-txt">${txt}</span><span class="lp-feed-time mono dim">${_exactHoraEp(ep)}</span></div>`;
+      return `<div class="lp-feed-row lp-feed-neutral lp-feed-clickable" data-open-email="${esc(email)}" data-open-id="${esc(ev.id ?? '')}" title="Abrir cuenta">${isSA ? _whoDot(ev.who_color) : ''}<span class="lp-feed-ic">👁</span><span class="lp-feed-txt">${txt}</span><span class="lp-feed-time mono dim">${_exactHoraEp(ep)}</span></div>`;
     }
     const c = ActivityLogic.formatActivityCopy(ev, isSA);
     const email = String(ev.target || ev.email || '').split(':')[0];
-    return `<div class="lp-feed-row lp-feed-${esc(c.cls)} lp-feed-clickable" data-open-email="${esc(email)}" title="Abrir cuenta"><span class="lp-feed-ic">${c.icon}</span><span class="lp-feed-txt">${esc(c.text)}</span><span class="lp-feed-time mono dim">${_exactHoraEp(ep)}</span></div>`;
+    return `<div class="lp-feed-row lp-feed-${esc(c.cls)} lp-feed-clickable" data-open-email="${esc(email)}" title="Abrir cuenta">${isSA ? _whoDot(ev.who_color) : ''}<span class="lp-feed-ic">${c.icon}</span><span class="lp-feed-txt">${esc(c.text)}</span><span class="lp-feed-time mono dim">${_exactHoraEp(ep)}</span></div>`;
+  };
+
+  // Fila de grupo de depósitos: representante (más nuevo) + badge "×N" desplegable.
+  // Click en el badge → despliega los demás sublistados con su hora. N=1 → normal.
+  // Click en el cuerpo → abre la cuenta (como cualquier fila).
+  const makeGroupRows = (g, ep) => {
+    if (g.kids.length === 0) return makeEvRow(g.rep, ep);
+    const c = ActivityLogic.formatActivityCopy(g.rep, isSA);
+    const email = String(g.rep.target || g.rep.email || '').split(':')[0];
+    const total = g.kids.length + 1;
+    const open = _feedExpanded.has(g.key);
+    const dot = isSA ? _whoDot(g.rep.who_color) : '';
+    const head = `<div class="lp-feed-row lp-feed-${esc(c.cls)} lp-feed-clickable lp-feed-group" data-open-email="${esc(email)}" title="Abrir cuenta · el badge despliega los ${total}">` +
+      `${dot}<span class="lp-feed-ic">${c.icon}</span>` +
+      `<span class="lp-feed-txt">${esc(c.text)}</span>` +
+      `<button type="button" class="lp-feed-badge mono" data-grp-toggle="${esc(g.key)}" title="Desplegar los ${total}">${open ? '▾' : '▸'} ×${total}</button>` +
+      `<span class="lp-feed-time mono dim">${_exactHoraEp(ep)}</span></div>`;
+    if (!open) return head;
+    const kids = g.kids.map(k =>
+      `<div class="lp-feed-row lp-feed-${esc(c.cls)} lp-feed-clickable lp-feed-kid" data-open-email="${esc(email)}" title="Abrir cuenta"><span class="lp-feed-ic dim">↳</span><span class="lp-feed-txt dim">${esc(c.text)}</span><span class="lp-feed-time mono dim">${_exactHoraEp(k.ep)}</span></div>`
+    ).join('');
+    return head + kids;
   };
 
   // Render con cabeceras de día (Hoy / Ayer / fecha MX): el feed es un stream
@@ -1309,7 +1362,11 @@ function renderActivityMarquee() {
       lastDay = dayKey;
       head = `<div class="lp-feed-day mono">${esc(_dayLabelEp(item.ep))}</div>`;
     }
-    return head + (item.__run ? makeRunRow(item.__run, item.ep) : makeEvRow(item.__ev, item.ep));
+    let body;
+    if (item.__run) body = makeRunRow(item.__run, item.ep);
+    else if (item.__group) body = makeGroupRows(item.__group, item.ep);
+    else body = makeEvRow(item.__ev, item.ep);
+    return head + body;
   }).join('');
   // Feed vertical scrolleable — SIN duplicado de ticker, SIN animación de loop.
   host.innerHTML = rowsHtml;
@@ -1422,6 +1479,15 @@ document.body.addEventListener('click', e => {
 
 // Marquesina: click en fila → abrir detalle de cuenta (resuelve email→id)
 document.getElementById('lpActivity')?.addEventListener('click', e => {
+  // Badge "×N" de un grupo de depósitos → despliega/colapsa las repeticiones.
+  const tog = e.target.closest('[data-grp-toggle]');
+  if (tog) {
+    e.stopPropagation();
+    const key = tog.dataset.grpToggle;
+    if (_feedExpanded.has(key)) _feedExpanded.delete(key); else _feedExpanded.add(key);
+    renderActivityMarquee();
+    return;
+  }
   const row = e.target.closest('.lp-feed-clickable[data-open-email]');
   if (!row) return;
   e.stopPropagation(); // no burbujear al data-nav del header
@@ -1764,16 +1830,12 @@ function connectSSE() {
           }
         }
         // prewarm_*: silencioso — auditoría interna, sin notif ruidosa
-      } else if (ev.type === 'health_warning') {
-        pushNotif({ icon: '⚠️', msg: `Salud: ${(ev.issues || []).join(' · ')}` });
-        activityRows.unshift({ kind: 'critical_error', ts: new Date().toISOString(), msg: _humanizeCritical(ev) });
-        renderActivityMarquee();
-      } else if (ev.type === 'alert') {
-        // Alertas críticas (capmonster_low, proxy_down) — push notif + toast
-        pushNotif({ icon: ev.icon || '⚠️', msg: ev.msg });
-        toast(`${ev.icon || '⚠️'} ${ev.msg}`, ev.severity === 'danger' ? 'error' : 'warn');
-        activityRows.unshift({ kind: 'critical_error', ts: new Date().toISOString(), msg: _humanizeCritical(ev) });
-        renderActivityMarquee();
+      } else if (ev.type === 'health_warning' || ev.type === 'alert') {
+        // Alertas de servicio (capmonster sin saldo, proxy caído, salud degradada)
+        // NO van al feed ni a notificaciones: el polling de salud las reemitía en
+        // bucle y spameaban ("y mame y mame"). El estado ya vive en el indicador
+        // de salud del header (stCap con balance/warn). Robert: "ya lo estoy viendo".
+        // Se ignoran a propósito.
       } else if (ev.type === 'window_warning') {
         // Window 24h por cerrar (~30 min)
         const myTg = state.user?.telegram_id;
