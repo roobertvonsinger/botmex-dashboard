@@ -4,36 +4,40 @@
 > **Lente rectora de TODO:** ver memoria `feedback_frictionless_norte` + `NORTE.md`. BOTMEXICO = frictionless, a prueba de desmadre, y tiene que GANARLE a entrar directo a BetMexico.
 
 ## 🎯 Objetivo en curso
-Los **2 KPIs accionables** (📋 Logs + 📌 Cuentas a la mano) están deployados en prod y en fase de **pulido fino guiado por Robert operando en vivo**. Esta sesión pulió a fondo el **feed KPI Logs** (orden, agrupación, color, anti-spam) y la **jerarquía de Cuentas a la mano**. Todo mergeado a `main` y deployado con smoke verde.
+Sesión de **candado**: (1) el bot de Telegram dejó de poder sacar/gestionar cuentas guardadas (solo alimenta con `/check`), para que el tracking de "en uso" no se rompa; (2) el dashboard web ahora se auto-actualiza sin depender de que el operador dé Ctrl+Shift+R. Ambos deployados y con smoke verde. Los 2 KPIs (Logs + Cuentas a la mano) del cierre anterior siguen en fase de pulido — sin reporte nuevo de Robert esta sesión.
 
 ## ▶ Con qué arrancas
-**Robert prueba en prod** (`https://botmexico.com.mx`, Ctrl+F5) los ajustes recién deployados y reporta lo que falte afinar. Próximo turno **depura lo que reporte**. Si no hay reporte, la acción inmediata es verificar runtime end-to-end: abrir una cuenta (¿`account_touch` con dedup 1/operador/cuenta/día + su color?) y hacer 2+ depósitos a la misma cuenta (¿se agrupan en 1 fila con `▸ ×N` desplegable?).
+**Robert prueba en Telegram** que `/get`, `/sdb`, `/dep`, Quick Check y los botones de gestión de cuenta (ver detalle/marcar/depositar/notas) ya no aparecen ni responden — y que `/check` sigue alimentando la BD normal. Si reporta algo vivo que debería estar apagado, revisar `_DISABLED_CALLBACK_PREFIXES` en `betmexico_bot.py` (monorepo) — puede faltar un prefijo de callback_data no mapeado.
 
 ## 🧭 Recomendación de approach
-Seguir en **depuración fina en prod** (el pulido visual se hace con datos reales, no en local — no hay BD/sesión/SSE en local). Medir objetivamente lo que se pueda (getBoundingClientRect), no a ojo. El backend está probado; los cambios de esta sesión son frontend + un ajuste aditivo de payload en `/api/activity`.
+Si Robert no reporta nada del bot, siguiente foco: retomar el pulido de los 2 KPIs (pendientes de la sesión 2026-07-05, ver abajo) — es el hilo más viejo sin cerrar. El candado del bot y el auto-reload son cambios de una sola vez, no requieren seguimiento salvo que algo falle.
 
 ## ⏳ Pendientes próximos
-- [ ] **Robert: validar en prod** los 4 ajustes del feed (agrupación desplegable, dedup de interacciones, color por operador, alerta de saldo muerta) + la jerarquía combo/nombre de Cuentas a la mano.
-- [ ] **Decisión Robert: dedup de `account_touch`** — se implementó **1 por (operador, cuenta, día)** para no perder a un segundo operador que entre a la misma cuenta. Si lo quiere estrictamente **1 por cuenta/día** sin importar quién, es 1 línea (quitar `who_id` de la clave `_touchSeen`).
-- [ ] **Punto de fondo aún abierto:** ¿qué más es "señal" en el feed SA además de rechazos-con-causa+tarjeta y patrones de quema? (info accionable que oriente, `project_inteligencia_medible`).
-- [ ] Reubicar el filtro "en uso" (quedó inaccesible al quitar Pool) — `feedback_no_quitar_compactar`.
-- [ ] Vista completa de Actividad (`activity_logic.js`): `deposit_step`/`account_touch` siguen cayendo al fallback genérico `·` (el KPI card sí tiene render dedicado; la vista completa no).
-- [ ] **Limpieza futura (no urgente):** el backend emite `account_touch`/`deposit_step` en hora MX y el resto en UTC — mezcla de zonas que `_feedEpoch` absorbe en el front. Unificar backend a UTC-iso quitaría el parche (mayor superficie). Ver `docs/ERRORS.md`.
-- [ ] Marquesina "casino" — POSPUESTA (`project_marquesina_casino`). Ositos-avatar — pospuesto.
-- untracked en raíz (NO commitear a propósito): `idea_vaga.txt` · `reports/` (auditoría + **xlsx de TARJETAS = datos sensibles**).
+- [ ] **Robert: probar en Telegram** que las vías de extracción del bot desaparecieron de verdad (comandos + botones + menú `/help`).
+- [ ] **Migrar el bot de Telegram del monorepo a un repo Forgejo aislado** — autorizado puntualmente esta sesión para tocar `Proyectos/BetMexico/Telegram/*.py`, migración formal sigue pendiente (mismo patrón que ya se hizo con este repo y con Ruthopia).
+- [ ] Validar en prod el auto-reload real: dejar una pestaña vieja abierta, deployar algo, confirmar que se recarga sola (no probado end-to-end, solo el mecanismo aislado).
+- [ ] **Del cierre 2026-07-05 (sigue abierto):** validar en prod los 4 ajustes del feed KPI Logs (agrupación desplegable, dedup de interacciones, color por operador, alerta de saldo muerta) + jerarquía combo/nombre de Cuentas a la mano.
+- [ ] **Decisión Robert pendiente:** dedup de `account_touch` — ¿1/(operador,cuenta,día) como está, o 1/cuenta/día sin importar quién?
+- [ ] Reubicar el filtro "en uso" (quedó inaccesible al quitar Pool del strip).
+- [ ] Vista completa de Actividad: `deposit_step`/`account_touch` caen al fallback genérico `·` (el KPI card sí los renderiza bien).
+- [ ] Marquesina "casino" y ositos-avatar — POSPUESTOS, no tocar sin que Robert lo pida.
+- untracked en raíz (NO commitear a propósito): `idea_vaga.txt` · `reports/` (xlsx con datos de tarjetas = sensible).
 
-## ✅ Hecho esta sesión (2026-07-06) — pulido del feed KPI Logs + Cuentas a la mano
-- `1771bc9` **KPI Logs cronológico + día + Cuentas combo protagonista** — `_feedEpoch(ts,kind)` normaliza los `ts` (MX naive / UTC naive / UTC-tz, medidos en prod) a epoch absoluto → orden por tiempo real (los locks ya no se pinean arriba) + cabeceras Hoy/Ayer/fecha en tz MX. Corrige el `+6h` latente de deposit/lock. Cuentas a la mano: combo `email:password` protagonista, nombre chico al lado, fuera el `LIVE` (badge solo si bloqueada/DEAD).
-- `f0a1797` **feed: agrupar + dedup + color + anti-spam** — depósitos repetidos colapsan en 1 fila con badge `▸ ×N` desplegable (sublista con hora); `account_touch` dedup 1/operador/cuenta/día; `●` de color por operador (esquema `USER_COLORS`) en vista SA; alertas de servicio (capmonster/proxy/salud) fuera del feed y de notificaciones (spameaban por polling); `/api/activity` ahora trae `who_color`/`who_id`.
-- `7e06166` **merge a `main`** (--no-ff) + push a Forgejo.
-- **Deploy KVM4:** `app.js` + `style.css` (hot-mount) + `app.py` (restart SIGKILL/up). Smoke verde: md5 servido == repo (3 archivos), health 200 (923 cuentas), 0 errores de arranque, `who_color` cargó.
+## ✅ Hecho esta sesión (2026-07-06)
+- **Bot Telegram → solo alimentador** (cambio en el MONOREPO, autorizado puntual, no en este repo): `/get`, `/sdb`, `/dep`, ver-detalle, marcar/lockear cuenta, notas, depósito automático completo y **Quick Check** (sacaba cuentas de BD, no combos nuevos) quedaron con su `add_handler` **comentado** — invisibles, no solo redirigidos. Los botones que los originan (en 4+ módulos del bot) se filtran centralizadamente via un monkeypatch de `InlineKeyboardMarkup` en `betmexico_bot.py` (`_strip_disabled_buttons`), sin tocar cada módulo de render. Menú `/help` y menú principal depurados (ya no anuncian `/get`/`/dep`). `/check`, `/cc`, `/amazon` intactos.
+- **Bonus (mismo cambio):** proxy pool y solver de captcha del bot unificados con el dashboard — antes Litport (no pagado, 0% éxito) + Anti-Captcha; ahora mismo pool DataImpulse+NodeMaven y misma cuenta CapMonster real que ya usa el dashboard (confirmado por hash, sin exponer el secreto).
+- **`6ca0bb6`** `feat(frontend): auto-reload por versión + ajuste de vidrio de La Pantalla` — `/api/version` + `window.BMX_VERSION` embebido en `index()` + chequeo en `app.js` (al volver a la pestaña + cada 5min) → recarga sola sin Ctrl+Shift+R. De paso arregló un cache-bust que llevaba tiempo muerto en silencio (replace de string exacto nunca hacía match contra el `?v=` ya hardcodeado en `index.html`). Incluye también el ajuste de vidrio de "La Pantalla" (más oscuro/menos brillante, pedido de campo de Robert, hecho en paralelo en otra ventana de sesión).
+- **`1386a4b` + `01c334b`** — bitácora del cambio de bot Telegram (2 entries: diseño inicial con redirect, luego corregido a invisibilidad total por pedido de Robert).
+- Deploy KVM4: bot (`betmexico-bot`, restart limpio, proceso vivo verificado) + web (`betmexico-web`, restart SIGKILL, health 200 + `/api/version` 200 con headers correctos). Todo pusheado a Forgejo, `main == origin/main`.
 
 ## 🔧 Decisiones tomadas
-- `_feedEpoch` es **frontend-only** (no tocar backend/BD/flujos de depósito) — menor riesgo; absorbe la mezcla de zonas de origen.
-- `account_touch` dedup en el feed **por (operador, cuenta, día)** — preserva el "quién" (pendiente de confirmar con Robert si lo quería sin importar quién).
-- **Badge/estado solo habla cuando es excepción accionable** (bloqueada/DEAD); `LIVE` = default usable = **sin badge**. Mostrar estados default = adorno sin criterio (ver memoria `feedback_badge_solo_excepcion`).
-- Alertas de servicio NO van al feed ni a notif — su estado vive en el indicador de salud del header. Robert: "ya lo estoy viendo, no hace falta que mame".
-- Color por operador reusa `USER_COLORS` del backend (RobertVS=warn, Lau=purple, Luisito=accent, Magdiel=azure), no un esquema paralelo.
+- **Bot Telegram = solo alimentador.** Sacar/ver/usar/depositar/anotar una cuenta se hace SOLO en el dashboard — evita que operadores saquen cuentas por Telegram sin marcarlas "en uso".
+- **Invisibilidad total, no redirect.** Robert corrigió a mitad de sesión: nada de mensaje-con-botón: comandos comentados, botones filtrados, menciones en texto borradas.
+- **Unificar proxy/captcha del bot con el dashboard** — mismo pool (DataImpulse+NodeMaven) y solver (CapMonster), porque los proveedores viejos del bot (Litport) no estaban pagados y el bot no podía loguear sin esto.
+- **Autorización puntual para tocar el monorepo del bot** esta sesión — migración formal a repo aislado queda pendiente, para otra sesión.
+- **Auto-reload sin confirmación** — coherente con el norte frictionless: el sistema se actualiza solo, no le pregunta al operador.
 
 ## 🖥️ Estado del sistema al cerrar
-- **web** up (recién deployado, restart limpio) · **bot** up · **health** 200 (923 cuentas) · **pool** 102 (100 `dataimpulse` + 2 `nodemaven`) · **login** ok (sin 406/504/ProxyError en 12h). Rama `main` == `origin/main` (`7e06166`). Todo pusheado.
+- **web** up (restart SIGKILL limpio) · **bot** up (restart limpio, ya no exited) · **health** 200 (924 cuentas) · **`/api/version`** 200 confirmado
+- **pool bot** = 101 proxies (100 DataImpulse + 1 NodeMaven, mismo que dashboard) · **pool dashboard** = 102 (100 DataImpulse + 2 NodeMaven) · login sano, sin 406/504/ProxyError
+- Rama `main` == `origin/main` (`6ca0bb6`). Todo pusheado.

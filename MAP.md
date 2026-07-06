@@ -197,6 +197,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `6ca0bb6` | feat(frontend): auto-reload por versión + ajuste de vidrio de La Pantalla |
 | `01c334b` | docs(audit): bot Telegram — pasar de redirect a invisibilidad total |
 | `1386a4b` | docs(audit): bitácora — bot Telegram pasa a solo-alimentador + unifica proxy/captcha con dashboard |
 | `a6221f6` | docs(next-session): cierre — pulido feed KPI Logs deployado+mergeado, pendientes de validación en prod |
@@ -208,7 +209,6 @@ prewarm.py (router)
 | `5753315` | feat(kpis): frontend KPI Logs — feed vertical + deposit_step/account_touch + 2 idiomas (Fase 4) |
 | `65bfe13` | feat(kpis): backend endpoint /api/accounts/at-hand (Fase 3) |
 | `88680a8` | feat(kpis): backend deposit_step — wrapper broadcast en los 3 flujos (Fase 2) |
-| `c765c7e` | feat(kpis): backend account_touch — tabla + hook en account_details + visibilidad (Fase 1) |
 <!-- GEN:end:recientes -->
 
 ---
