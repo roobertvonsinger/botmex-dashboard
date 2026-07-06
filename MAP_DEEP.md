@@ -104,9 +104,9 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `accounts_combos` | def | L2700–L2713 |
 | `accounts_pass_map` | def | L2717–L2722 |
 | `list_all_cards` | def | L2726–L2801 |
-| `activity_feed` | def | L2805–L2922 |
-| `list_deposits` | def | L2926–L2955 |
-| `deposits_stats` | def | L2959–L2984 |
+| `activity_feed` | def | L2805–L2926 |
+| `list_deposits` | def | L2930–L2959 |
+| `deposits_stats` | def | L2963–L2988 |
 
 ### `auth.py`
 

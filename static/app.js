@@ -1001,6 +1001,60 @@ function _dayKey(ts) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
+// ─── Normalización de ts del feed KPI Logs (2026-07-05) ───
+// El feed combina eventos con ts en formatos Y zonas MEZCLADAS (medido en prod):
+//   · account_touch / deposit_step → hora MX naive  "2026-07-05 15:22:43"
+//   · deposit (created_at) / note / prewarm         → UTC naive  "2026-07-05 21:25:24"
+//   · lock (locked_at)                              → UTC con tz "2026-07-05T21:23:10+00:00"
+// Ordenar por comparación de strings agrupaba por FORMATO ('T' 0x54 > ' ' 0x20),
+// no por tiempo → los locks quedaban pineados arriba. Estos helpers colapsan todo
+// a epoch ms absoluto y muestran la hora/día en tz MX (arregla de paso el +6h que
+// tenían deposit/lock por interpretar su UTC naive como hora local).
+const _MX_NAIVE_KINDS = new Set(['account_touch', 'deposit_step']);
+function _feedEpoch(ts, kind) {
+  if (!ts) return 0;
+  ts = String(ts);
+  // tz explícita ('...+00:00' / 'Z') → epoch absoluto directo.
+  if (/[Zz]$|[+-]\d{2}:?\d{2}$/.test(ts)) { const t = Date.parse(ts); return isNaN(t) ? 0 : t; }
+  const m = ts.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) { const t = Date.parse(ts); return isNaN(t) ? 0 : t; }
+  const utc = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+  // account_touch/deposit_step vienen en MX (UTC-6): su epoch real = utc + 6h.
+  return _MX_NAIVE_KINDS.has(kind) ? utc + 6 * 3600 * 1000 : utc;
+}
+// 'YYYY-MM-DD' del epoch en tz MX (para agrupar por día sin depender del browser).
+function _mxYmd(ep) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City',
+      year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ep));
+  } catch { return 'unknown'; }
+}
+// Cabecera de día MX a partir de epoch absoluto: "Hoy" / "Ayer" / "5 jul".
+function _dayLabelEp(ep) {
+  const key = _mxYmd(ep);
+  if (key === _mxYmd(Date.now())) return 'Hoy';
+  if (key === _mxYmd(Date.now() - 86400000)) return 'Ayer';
+  try {
+    return new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City',
+      day: 'numeric', month: 'short' }).format(new Date(ep)).replace('.', '');
+  } catch { return key; }
+}
+// Hora HH:MM MX a partir de epoch absoluto (reemplaza _exactHora en el feed).
+function _exactHoraEp(ep) {
+  if (!ep) return '—';
+  try {
+    return new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City',
+      hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(ep));
+  } catch { return '—'; }
+}
+// Punto de color del operador — ubica de un vistazo quién hizo qué en el feed SA.
+// Reusa el esquema USER_COLORS del backend (who_color: warn/purple/accent/azure).
+function _whoDot(colorTok) {
+  return colorTok ? `<span class="lp-feed-dot lp-color-${esc(colorTok)}" aria-hidden="true">●</span>` : '';
+}
+// Grupos de depósito desplegados en el feed (persiste el toggle entre re-renders).
+const _feedExpanded = new Set();
+
 function renderActivity() {
   const t = $('#actTable');
   // Resetear thead — solo necesitamos espacio para una columna (feed de líneas)
@@ -1111,7 +1165,7 @@ function pushActivityEvent(ev) {
 // completo), por eso siempre se muestran. deposit_step/account_touch/deposit
 // sí tienen lógica de éxito/fallo y la aplican en su propio render.
 const _LOGS_KINDS = new Set([
-  'deposit','lock','unlock','unlock_auto','account_cooling','mark','pool_move','critical_error',
+  'deposit','lock','unlock','unlock_auto','account_cooling','mark','pool_move',
   'deposit_step','account_touch',
 ]);
 
@@ -1203,15 +1257,41 @@ function renderActivityMarquee() {
   const depositRuns = _groupDepositSteps(activityRows).slice(0, 15);
   const runKeys = new Set(depositRuns.map(r => r.key));
 
-  // 2) resto de eventos del feed (sin deposit_step suelto — ya va agrupado)
+  // 2) resto de eventos del feed (sin deposit_step suelto — ya va agrupado).
+  //    Dedup de account_touch: 1 por (operador, cuenta, día) — no spamear con
+  //    "X entró a la misma cuenta" repetido (el dato completo persiste en BD).
+  const _touchSeen = new Set();
   const rest = ActivityLogic.dedupeActivity(activityRows)
-    .filter(ev => ev.kind !== 'deposit_step' && _LOGS_KINDS.has(ev.kind));
+    .filter(ev => ev.kind !== 'deposit_step' && _LOGS_KINDS.has(ev.kind))
+    .filter(ev => {
+      if (ev.kind !== 'account_touch') return true;
+      const k = `${ev.who_id ?? ev.who}|${ev.target}|${_mxYmd(_feedEpoch(ev.ts, ev.kind))}`;
+      if (_touchSeen.has(k)) return false;
+      _touchSeen.add(k); return true;
+    });
 
-  // Combinar y ordenar por ts desc (deposit_step runs ya vienen con su ts más reciente)
+  // 3) Agrupar depósitos repetidos (mismo operador+cuenta+resultado+monto+día) en
+  //    una fila representante (la más nueva) desplegable; los demás se sublistan
+  //    al click. activityRows viene newest-first → el 1º de cada grupo es el rep.
+  const depGroups = new Map();
+  const restItems = []; // {__ev,ep} | {__group,ep}
+  for (const ev of rest) {
+    const ep = _feedEpoch(ev.ts, ev.kind);
+    if (ev.kind !== 'deposit') { restItems.push({ __ev: ev, ep }); continue; }
+    const email = String(ev.target || ev.email || '').split(':')[0];
+    const key = `d|${ev.who_id ?? ev.who}|${email}|${ev.status}|${ev.amount ?? ''}|${_mxYmd(ep)}`;
+    let g = depGroups.get(key);
+    if (!g) { g = { key, rep: ev, kids: [] }; depGroups.set(key, g); restItems.push({ __group: g, ep }); }
+    else g.kids.push({ ev, ep });
+  }
+
+  // Combinar y ordenar por EPOCH ABSOLUTO desc (no por string: ts vienen en
+  // formatos/zonas mezclados — ver _feedEpoch). Sin esto los locks (ts con 'T')
+  // se pineaban arriba de los depósitos (ts con ' ') sin importar la hora real.
   const combined = [
-    ...depositRuns.map(r => ({ __run: r, ts: r.ts })),
-    ...rest.map(ev => ({ __ev: ev, ts: ev.ts })),
-  ].sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0)).slice(0, 30);
+    ...depositRuns.map(r => ({ __run: r, ep: _feedEpoch(r.ts, 'deposit_step') })),
+    ...restItems,
+  ].sort((a, b) => b.ep - a.ep).slice(0, 30);
 
   const counter = document.getElementById('lpFeedCount');
   if (counter) counter.textContent = combined.length ? `${combined.length} eventos` : '—';
@@ -1221,7 +1301,7 @@ function renderActivityMarquee() {
     return;
   }
 
-  const makeRunRow = run => {
+  const makeRunRow = (run, ep) => {
     const email = String(run.email || '').split(':')[0];
     const who = isSA ? esc(run.who || '—') : 'Tú';
     const amt = ''; // deposit_step no trae amount — la traza no lo necesita
@@ -1233,24 +1313,61 @@ function renderActivityMarquee() {
       ? `${who} · depósito${amt} · ${esc(email)}`
       : `Depositando en ${esc(email)}`;
     return `<div class="lp-feed-row lp-feed-${cls} lp-feed-clickable lp-feed-run" data-open-email="${esc(email)}" title="Abrir cuenta">` +
-      `<span class="lp-feed-ic">${icon}</span>` +
+      `${isSA ? _whoDot(run.who_color) : ''}<span class="lp-feed-ic">${icon}</span>` +
       `<div class="lp-feed-body"><span class="lp-feed-txt">${headline}</span><span class="lp-feed-trace mono dim">${trace}</span></div>` +
-      `<span class="lp-feed-time mono dim">${_exactHora(run.ts)}</span></div>`;
+      `<span class="lp-feed-time mono dim">${_exactHoraEp(ep)}</span></div>`;
   };
 
-  const makeEvRow = ev => {
+  const makeEvRow = (ev, ep) => {
     if (ev.kind === 'account_touch') {
       const email = String(ev.target || '').split(':')[0];
       const who = isSA ? esc(ev.who || '—') : 'Tú';
       const txt = isSA ? `${who} · 👁 abrió ${esc(email)} <span class="dim">(1/día)</span>` : `👁 abriste ${esc(email)}`;
-      return `<div class="lp-feed-row lp-feed-neutral lp-feed-clickable" data-open-email="${esc(email)}" data-open-id="${esc(ev.id ?? '')}" title="Abrir cuenta"><span class="lp-feed-ic">👁</span><span class="lp-feed-txt">${txt}</span><span class="lp-feed-time mono dim">${_exactHora(ev.ts)}</span></div>`;
+      return `<div class="lp-feed-row lp-feed-neutral lp-feed-clickable" data-open-email="${esc(email)}" data-open-id="${esc(ev.id ?? '')}" title="Abrir cuenta">${isSA ? _whoDot(ev.who_color) : ''}<span class="lp-feed-ic">👁</span><span class="lp-feed-txt">${txt}</span><span class="lp-feed-time mono dim">${_exactHoraEp(ep)}</span></div>`;
     }
     const c = ActivityLogic.formatActivityCopy(ev, isSA);
     const email = String(ev.target || ev.email || '').split(':')[0];
-    return `<div class="lp-feed-row lp-feed-${esc(c.cls)} lp-feed-clickable" data-open-email="${esc(email)}" title="Abrir cuenta"><span class="lp-feed-ic">${c.icon}</span><span class="lp-feed-txt">${esc(c.text)}</span><span class="lp-feed-time mono dim">${_exactHora(ev.ts)}</span></div>`;
+    return `<div class="lp-feed-row lp-feed-${esc(c.cls)} lp-feed-clickable" data-open-email="${esc(email)}" title="Abrir cuenta">${isSA ? _whoDot(ev.who_color) : ''}<span class="lp-feed-ic">${c.icon}</span><span class="lp-feed-txt">${esc(c.text)}</span><span class="lp-feed-time mono dim">${_exactHoraEp(ep)}</span></div>`;
   };
 
-  const rowsHtml = combined.map(item => item.__run ? makeRunRow(item.__run) : makeEvRow(item.__ev)).join('');
+  // Fila de grupo de depósitos: representante (más nuevo) + badge "×N" desplegable.
+  // Click en el badge → despliega los demás sublistados con su hora. N=1 → normal.
+  // Click en el cuerpo → abre la cuenta (como cualquier fila).
+  const makeGroupRows = (g, ep) => {
+    if (g.kids.length === 0) return makeEvRow(g.rep, ep);
+    const c = ActivityLogic.formatActivityCopy(g.rep, isSA);
+    const email = String(g.rep.target || g.rep.email || '').split(':')[0];
+    const total = g.kids.length + 1;
+    const open = _feedExpanded.has(g.key);
+    const dot = isSA ? _whoDot(g.rep.who_color) : '';
+    const head = `<div class="lp-feed-row lp-feed-${esc(c.cls)} lp-feed-clickable lp-feed-group" data-open-email="${esc(email)}" title="Abrir cuenta · el badge despliega los ${total}">` +
+      `${dot}<span class="lp-feed-ic">${c.icon}</span>` +
+      `<span class="lp-feed-txt">${esc(c.text)}</span>` +
+      `<button type="button" class="lp-feed-badge mono" data-grp-toggle="${esc(g.key)}" title="Desplegar los ${total}">${open ? '▾' : '▸'} ×${total}</button>` +
+      `<span class="lp-feed-time mono dim">${_exactHoraEp(ep)}</span></div>`;
+    if (!open) return head;
+    const kids = g.kids.map(k =>
+      `<div class="lp-feed-row lp-feed-${esc(c.cls)} lp-feed-clickable lp-feed-kid" data-open-email="${esc(email)}" title="Abrir cuenta"><span class="lp-feed-ic dim">↳</span><span class="lp-feed-txt dim">${esc(c.text)}</span><span class="lp-feed-time mono dim">${_exactHoraEp(k.ep)}</span></div>`
+    ).join('');
+    return head + kids;
+  };
+
+  // Render con cabeceras de día (Hoy / Ayer / fecha MX): el feed es un stream
+  // cronológico único — nada pineado por tipo, y la hora sin día no reconstruye.
+  let lastDay = null;
+  const rowsHtml = combined.map(item => {
+    const dayKey = _mxYmd(item.ep);
+    let head = '';
+    if (dayKey !== lastDay) {
+      lastDay = dayKey;
+      head = `<div class="lp-feed-day mono">${esc(_dayLabelEp(item.ep))}</div>`;
+    }
+    let body;
+    if (item.__run) body = makeRunRow(item.__run, item.ep);
+    else if (item.__group) body = makeGroupRows(item.__group, item.ep);
+    else body = makeEvRow(item.__ev, item.ep);
+    return head + body;
+  }).join('');
   // Feed vertical scrolleable — SIN duplicado de ticker, SIN animación de loop.
   host.innerHTML = rowsHtml;
 }
@@ -1362,6 +1479,15 @@ document.body.addEventListener('click', e => {
 
 // Marquesina: click en fila → abrir detalle de cuenta (resuelve email→id)
 document.getElementById('lpActivity')?.addEventListener('click', e => {
+  // Badge "×N" de un grupo de depósitos → despliega/colapsa las repeticiones.
+  const tog = e.target.closest('[data-grp-toggle]');
+  if (tog) {
+    e.stopPropagation();
+    const key = tog.dataset.grpToggle;
+    if (_feedExpanded.has(key)) _feedExpanded.delete(key); else _feedExpanded.add(key);
+    renderActivityMarquee();
+    return;
+  }
   const row = e.target.closest('.lp-feed-clickable[data-open-email]');
   if (!row) return;
   e.stopPropagation(); // no burbujear al data-nav del header
@@ -1704,16 +1830,12 @@ function connectSSE() {
           }
         }
         // prewarm_*: silencioso — auditoría interna, sin notif ruidosa
-      } else if (ev.type === 'health_warning') {
-        pushNotif({ icon: '⚠️', msg: `Salud: ${(ev.issues || []).join(' · ')}` });
-        activityRows.unshift({ kind: 'critical_error', ts: new Date().toISOString(), msg: _humanizeCritical(ev) });
-        renderActivityMarquee();
-      } else if (ev.type === 'alert') {
-        // Alertas críticas (capmonster_low, proxy_down) — push notif + toast
-        pushNotif({ icon: ev.icon || '⚠️', msg: ev.msg });
-        toast(`${ev.icon || '⚠️'} ${ev.msg}`, ev.severity === 'danger' ? 'error' : 'warn');
-        activityRows.unshift({ kind: 'critical_error', ts: new Date().toISOString(), msg: _humanizeCritical(ev) });
-        renderActivityMarquee();
+      } else if (ev.type === 'health_warning' || ev.type === 'alert') {
+        // Alertas de servicio (capmonster sin saldo, proxy caído, salud degradada)
+        // NO van al feed ni a notificaciones: el polling de salud las reemitía en
+        // bucle y spameaban ("y mame y mame"). El estado ya vive en el indicador
+        // de salud del header (stCap con balance/warn). Robert: "ya lo estoy viendo".
+        // Se ignoran a propósito.
       } else if (ev.type === 'window_warning') {
         // Window 24h por cerrar (~30 min)
         const myTg = state.user?.telegram_id;
@@ -6051,23 +6173,31 @@ async function loadRecientes() {
     renderRecientes(athand || {});
   } catch {}
 }
-// Estado visual de una cuenta at-hand: DEAD > 🔒 bloqueada > LIVE
+// Estado visual de una cuenta at-hand. El badge SOLO habla cuando es una
+// excepción que orienta (bloqueada = guardarraíl, DEAD = no la toques). LIVE es
+// el default usable → sin badge (ausencia = agárrala). Mostrar "LIVE" era adorno.
 function _atHandStatus(it) {
   if (it.status === 'DEAD') return { cls: 'rec-dead', lbl: 'DEAD' };
   if (it.locked_by != null) return { cls: 'rec-locked', lbl: '🔒 bloqueada' };
-  return { cls: 'rec-live', lbl: 'LIVE' };
+  return { cls: 'rec-live', lbl: '' };
 }
+// Protagonista = combo email:password copiable (mono, lo que se usa). El nombre
+// va chico y suave al lado, solo como referencia de quién es.
 function _atHandRow(it, { pinned }) {
   const st = _atHandStatus(it);
-  const name = esc(it.fullname || it.email);
+  const combo = esc(it.combo || it.email);
+  const nameTxt = it.fullname && it.fullname !== it.email ? esc(it.fullname) : '';
+  const nameHtml = nameTxt ? `<span class="lp-recent-name" title="${nameTxt}">${nameTxt}</span>` : '';
   const bal = fmtMoney(it.balance_total);
   const grade = it.grade ? `<span class="grade ${esc(it.grade)}">${esc(it.grade)}</span>` : '';
   const timeHtml = pinned ? '' : `<span class="lp-recent-time">hace ${fmtAgo(it.last_ts)}</span>`;
+  const stHtml = st.lbl ? `<span class="lp-recent-st">${st.lbl}</span>` : '';
   const mark = pinned ? '<span class="lp-recent-pin" aria-hidden="true">★</span>' : '<span class="lp-recent-pin dim" aria-hidden="true">·</span>';
   return `<div class="lp-recent-row ${st.cls} d-copy" data-id="${esc(it.id)}" data-copy="${esc(it.combo)}" title="Click para copiar combo · abre La Pantalla">
     ${mark}
-    <span class="lp-recent-combo mono">${name}</span>
-    <span class="lp-recent-st">${st.lbl}</span>
+    <span class="lp-recent-combo mono">${combo}</span>
+    ${nameHtml}
+    ${stHtml}
     <span class="lp-recent-bal mono">${bal}</span>
     ${grade}
     ${timeHtml}
