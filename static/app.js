@@ -397,6 +397,27 @@ function toast(msg, kind = '') {
   _toastTimer = setTimeout(() => el.classList.add('hidden'), 2500);
 }
 
+// ─── auto-reload por versión ───
+// Pestañas abiertas de días atrás nunca vuelven a pedir index.html, así que
+// nunca ven un deploy nuevo aunque app.js/style.css ya no cacheen (operadores
+// dependían de Ctrl+Shift+R). Compara la versión con la que sirvió esta carga
+// contra la actual del server; si difiere, recarga sola.
+async function _checkVersion() {
+  if (!window.BMX_VERSION) return;
+  try {
+    const r = await fetch('/api/version', { cache: 'no-store' });
+    const { v } = await r.json();
+    if (v && v !== window.BMX_VERSION) {
+      toast('🔄 Nueva versión — actualizando…');
+      setTimeout(() => location.reload(), 1200);
+    }
+  } catch {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') _checkVersion();
+});
+setInterval(_checkVersion, 5 * 60_000);
+
 // ─── greeting + frase ───
 function tickGreeting() {
   const now = new Date();

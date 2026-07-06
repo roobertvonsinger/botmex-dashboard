@@ -259,14 +259,14 @@
       <div class="pat-idrow" style="--i:0">
         ${nombre ? `<span class="pat-name">${nombre}${age != null ? ` · ${age} años` : ''}</span>` : ''}
         ${grade ? `<span class="grade ${gCls}" title="Grade ${g(grade)}">${g(grade)}</span>` : ''}
+      </div>
+      <div class="pat-combo-line" style="--i:1">
+        <button type="button" class="pat-combo d-copy" data-copy="${g(combo)}" title="Copiar">${g(combo)}</button>
         <div class="pat-actions">
           <button type="button" class="pat-act det-mark" data-mark-email="${g(email)}" title="Fijar"><i class="ph-bold ph-push-pin"></i></button>
           <button type="button" class="pat-act inuse${locked ? ' on' : ''}" data-inuse="${d.id}" title="En uso (lock 2h) · click de nuevo libera"><i class="ph-bold ph-lock-key"></i></button>
           <button type="button" class="pat-act pat-act-dep d-deposit-btn" data-acc-id="${d.id}" title="Depositar"><i class="ph-duotone ph-credit-card"></i><span>Depositar</span></button>
         </div>
-      </div>
-      <div class="pat-combo-line" style="--i:1">
-        <button type="button" class="pat-combo d-copy" data-copy="${g(combo)}" title="Copiar">${g(combo)}</button>
       </div>
       <div class="pat-body">
         <div class="pat-ident">

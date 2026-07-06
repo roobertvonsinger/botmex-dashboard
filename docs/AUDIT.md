@@ -3,6 +3,19 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-07-06 (Auto-reload por versión — pestañas viejas ya no dependen de Ctrl+Shift+R)
+
+**Motivo**: Robert no sabía si todos los operadores habían dado Ctrl+Shift+R tras deploys recientes; quería forzar que todos vean la interfaz nueva sin depender de que el operador sepa hacerlo.
+
+**Hallazgo de paso**: el cache-bust por mtime en `index()` (`app.py`) llevaba tiempo **muerto en silencio** — `index.html` ya trae un `?v=YYYYMMDDx` hardcodeado a mano, así que el `.replace('src="/static/app.js"', ...)` (string exacto, sin el sufijo `?v=`) nunca hacía match. Lo que sí protegía contra caché vieja era el middleware `_no_cache_static_assets` (fuerza `no-store` en todo `/static/*`) — pero eso solo cubre `app.js`/`style.css` una vez que el navegador vuelve a pedir `index.html`; si la pestaña nunca recarga el HTML, nunca se entera de nada.
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Cache-bust de `index()` reparado** (`app.py`) | El replace de string exacto se cambió a `re.sub` que pisa CUALQUIER query string existente (`?v=...` o ninguno) en `app.js`/`style.css`. | ✅ implementado | ✅ probado contra el `index.html` real (no un string sintético): `?v=` se actualiza al mtime fresco |
+| **`window.BMX_VERSION` embebido en el HTML** (`app.py` `index()`) | Un `<script>window.BMX_VERSION="<mtime_js>-<mtime_css>";</script>` se inyecta justo antes del `<script src="/static/app.js...">`. | ✅ implementado | ✅ verificado contra el HTML real; runtime en prod: `/api/version` responde `{"v":"1783375027-1783329294"}` |
+| **`GET /api/version`** (`app.py`) | Devuelve `{"v": "<mtime_js>-<mtime_css>"}` recalculado fresco en cada llamada (solo `stat()`, sin leer contenido) — sin auth (no expone nada sensible), headers `no-store/no-cache`. | ✅ implementado | ✅ smoke prod: `200 {"v":"1783375027-1783329294"}`, header `Cache-Control: no-store, no-cache, must-revalidate` confirmado |
+| **Auto-reload en `app.js`** (`_checkVersion`) | Al volver a una pestaña (`visibilitychange`→visible) y cada 5 min (`setInterval`, fallback para pestañas siempre visibles), compara `window.BMX_VERSION` contra `/api/version`; si difiere, `toast()` + `location.reload()` a 1.2s. Sin diálogo de confirmación (frictionless — el sistema se actualiza solo). | ✅ implementado | ✅ sintaxis verificada (`node -c`); runtime del endpoint confirmado; el reload en sí requiere una pestaña vieja real para observarse (no probado end-to-end por falta de 2 versiones desplegadas simultáneas) |
+
 ## Captura: 2026-07-06 (Bot Telegram → solo alimentador + unificación proxy/captcha con dashboard)
 
 > ⚠️ **Cambio hecho en el MONOREPO** (`Proyectos/BetMexico/Telegram/betmexico_bot.py` + `betmexico_config.py` + `betmexico_utils.py`), NO en este repo — autorización puntual de Robert (migración formal a repo aislado pendiente para otra sesión). Deployado a KVM4 `/docker/betmexico/code/`, backup previo en `/docker/betmexico/backups/`. Restart limpio verificado (proceso vivo confirmado por PID+ELAPSED dentro del container, no solo disco).

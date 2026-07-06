@@ -33,6 +33,7 @@
 | GET | `/api/health/full` | Healthcheck completo (CapMonster, proxies, WSai) | require_session | — | `{checks: [...]}` | `app.py:948` |
 | GET | `/api/health/last` | Último healthcheck cacheado | require_session | — | `{ts, summary}` | `app.py:1159` |
 | POST | `/api/health/dismiss` | Marcar issue como dismisseada | superadmin | `{kind}` | `{ok}` | `app.py:1164` |
+| GET | `/api/version` | Versión actual de assets (mtime app.js+style.css). Frontend la compara vs `window.BMX_VERSION` cada 5min/al volver a la pestaña → auto-reload sin Ctrl+Shift+R | público | — | `{v: "<mtime_js>-<mtime_css>"}` | `app.py:374` |
 
 ## Cuentas
 

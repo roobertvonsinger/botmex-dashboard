@@ -3,7 +3,7 @@
 # Lee betmexico_accounts.db (la misma que el bot TG). Sin lógica de polling.
 
 from __future__ import annotations
-import sqlite3, os, sys
+import sqlite3, os, re, sys
 import asyncio
 import json as _json
 import logging as _logging
@@ -354,17 +354,40 @@ def login_page(bmx_session: str = Cookie(default=None)):
 def index(bmx_session: str = Cookie(default=None)):
     if not bmx_session or not _auth.get_session(bmx_session):
         return RedirectResponse("/login", status_code=302)
-    # Cache-bust: añadir mtime de los assets al src para forzar re-fetch tras deploy
+    # Cache-bust: añadir mtime de los assets al src para forzar re-fetch tras deploy.
+    # Regex (no string fijo): index.html ya trae un `?v=YYYYMMDDx` hardcodeado a mano,
+    # así que un replace de string exacto ("...app.js\"") nunca hacía match — quedaba
+    # muerto en silencio. El regex pisa CUALQUIER query string existente.
     try:
         html = (STATIC / "index.html").read_text(encoding="utf-8")
         v_js = int((STATIC / "app.js").stat().st_mtime)
         v_css = int((STATIC / "style.css").stat().st_mtime)
-        html = html.replace('src="/static/app.js"', f'src="/static/app.js?v={v_js}"')
-        html = html.replace('href="/static/style.css"', f'href="/static/style.css?v={v_css}"')
+        html = re.sub(r'src="/static/app\.js(\?[^"]*)?"', f'src="/static/app.js?v={v_js}"', html)
+        html = re.sub(r'href="/static/style\.css(\?[^"]*)?"', f'href="/static/style.css?v={v_css}"', html)
+        html = html.replace(
+            '<script src="/static/app.js',
+            f'<script>window.BMX_VERSION="{v_js}-{v_css}";</script>\n<script src="/static/app.js',
+        )
         return Response(content=html, media_type="text/html",
                         headers={"Cache-Control": "no-cache, must-revalidate"})
     except Exception:
         return FileResponse(STATIC / "index.html")
+
+
+@app.get("/api/version")
+def api_version():
+    """Versión actual de los assets (mtime de app.js+style.css). El frontend
+    la compara contra `window.BMX_VERSION` (fijada al cargar la página) para
+    auto-recargar pestañas viejas tras un deploy — sin que el operador
+    dependa de Ctrl+Shift+R."""
+    try:
+        v_js = int((STATIC / "app.js").stat().st_mtime)
+        v_css = int((STATIC / "style.css").stat().st_mtime)
+        v = f"{v_js}-{v_css}"
+    except Exception:
+        v = ""
+    return Response(content=f'{{"v":"{v}"}}', media_type="application/json",
+                     headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
 
 
 # ── Auth endpoints ─────────────────────────────────────────────────────────────

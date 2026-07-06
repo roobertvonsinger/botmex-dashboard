@@ -114,7 +114,7 @@
     radial-gradient(85% 65% at 14% 4%,  oklch(0.80 0.085 155 / 0.16), transparent 52%),                        /* mancha 1 — mint claro, esq. sup-izq */
     radial-gradient(75% 60% at 88% 30%, oklch(0.60 0.075 165 / 0.11), transparent 55%),                        /* mancha 2 — sage medio, derecha */
     radial-gradient(90% 70% at 30% 108%, oklch(0.32 0.06 170 / 0.20), transparent 58%),                        /* mancha 3 — sombra verde profunda, abajo */
-    linear-gradient(180deg, oklch(0.17 0.020 160 / 0.36), oklch(0.115 0.014 160 / 0.52));                      /* vidrio templado oscuro (un poco más cuerpo) */
+    linear-gradient(180deg, oklch(0.14 0.017 160 / 0.56), oklch(0.09 0.012 160 / 0.72));                       /* vidrio templado oscuro — 2026-07-06: +cuerpo/−brillo (lightness↓, alpha↑), 2 pasadas por pedido de campo */
   border: 1px solid var(--pat-edge);
   box-shadow:
     0 34px 100px -34px rgba(0,0,0,.70),
@@ -123,8 +123,8 @@
     inset 0 -1px 0 rgba(0,0,0,.25),                               /* filo inferior */
     inset 0 0 40px -24px oklch(0.86 0.025 320 / 0.05),            /* PERLA (mate): halo nácar interno muy tenue, solo en el borde */
     inset 0 0 0 1px oklch(0.80 0.085 160 / 0.05);                 /* borde interno verde */
-  backdrop-filter: blur(34px) saturate(1.45);
-  -webkit-backdrop-filter: blur(34px) saturate(1.45);
+  backdrop-filter: blur(34px) saturate(1.2);    /* 2026-07-06: saturate 1.45→1.2 — menos vividez/brillo del fondo filtrado */
+  -webkit-backdrop-filter: blur(34px) saturate(1.2);
 
   /* Estado replegado por default (la animación de entrada lo despliega). */
   transform-origin: top center;
@@ -270,14 +270,18 @@
 /* Raíz del detalle: columna que LLENA el alto del strip sin scroll. */
 .pat-wrap { display: flex; flex-direction: column; height: 100%; gap: 9px; min-height: 0; }
 
-/* Fila 1 — identidad mínima (nombre · edad) + grade, discretos, no dominan. */
-/* padding-right reserva el hueco de .pantalla-close (30px + 12px de offset = 42px,
-   +8px de aire) — sin esto el botón Depositar (rightmost de .pat-actions) queda
-   justo debajo de la X (visto en campo, prod: la X se sobreponía a Depositar). */
-.pat-idrow { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; padding-right: 50px; }
+/* Fila 1 — identidad mínima (nombre · edad) + grade, discretos, no dominan.
+   2026-07-06: los controles (.pat-actions) YA NO viven aquí — se movieron a
+   .pat-combo-line (su "lugar" propio, una fila más abajo). Sin ellos esta fila
+   mide solo el alto del texto → la cabecera se compacta y .pat-body (divisor +
+   transacciones) arranca más arriba (pedido de campo: "que no empiecen a mitad
+   de pantalla"). Ya no necesita reservar hueco para la X (no hay contenido
+   empujado a la derecha en esta fila). */
+.pat-idrow { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
 .pat-name { font-size: 11.5px; color: var(--text-muted); font-weight: 500; letter-spacing: .3px; }
 
-/* Controles principales (Depositar / En uso / Fijar) — verde, a la derecha. */
+/* Controles principales (Depositar / En uso / Fijar) — verde, a la derecha,
+   ahora en la fila del combo (ver .pat-combo-line). */
 .pat-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 .pat-act {
   -webkit-appearance: none; appearance: none; cursor: pointer;
@@ -302,8 +306,12 @@
   box-shadow: 0 0 20px -3px var(--pat-gold), 0 1px 2px oklch(0 0 0 / 0.25);
 }
 
-/* Fila 2 — COMBO copiable POR ENCIMA de todo, tipo liga (copia al click en el texto). */
-.pat-combo-line { flex: 0 0 auto; line-height: 1; }
+/* Fila 2 — COMBO copiable POR ENCIMA de todo, tipo liga (copia al click en el texto)
+   + .pat-actions (Fijar/En uso/Depositar) a la derecha, en la MISMA fila (2026-07-06,
+   antes vivían en .pat-idrow). padding-right reserva el hueco de .pantalla-close
+   (30px + 12px de offset = 42px, +8px de aire) — sin esto Depositar (rightmost de
+   .pat-actions) queda justo debajo de la X (visto en campo, prod). */
+.pat-combo-line { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; line-height: 1; padding-right: 50px; }
 .pat-combo {
   -webkit-appearance: none; appearance: none; border: 0; background: transparent;
   cursor: pointer; text-align: left; padding: 0;
