@@ -4,43 +4,36 @@
 > **Lente rectora de TODO:** ver memoria `feedback_frictionless_norte` + `NORTE.md`. BOTMEXICO = frictionless, a prueba de desmadre, y tiene que GANARLE a entrar directo a BetMexico.
 
 ## 🎯 Objetivo en curso
-Los **2 KPIs accionables** (📋 Logs + 📌 Cuentas a la mano) están **IMPLEMENTADOS y DEPLOYADOS a KVM4** (smoke funcional verde). Fase actual: **depurar en prod con datos reales** (pulido visual + verificación runtime end-to-end). El plan de 7 fases se ejecutó completo salvo el pulido visual, que por decisión de Robert se hace ya deployado.
+Los **2 KPIs accionables** (📋 Logs + 📌 Cuentas a la mano) están deployados en prod y en fase de **pulido fino guiado por Robert operando en vivo**. Esta sesión pulió a fondo el **feed KPI Logs** (orden, agrupación, color, anti-spam) y la **jerarquía de Cuentas a la mano**. Todo mergeado a `main` y deployado con smoke verde.
 
 ## ▶ Con qué arrancas
-**Robert prueba en prod** (`https://botmexico.com.mx`) los 2 KPIs y marca lo que haya que ajustar. El próximo turno **depura lo que Robert reporte** (alineación de columnas, ritmo del feed, contraste). Si no hay reporte visual, la primera acción es **verificar runtime**: abrir una cuenta (¿registra toque `account_touch`, visible al SA no al actor?) y hacer un depósito (¿emite `deposit_step` paso a paso en el KPI Logs?).
+**Robert prueba en prod** (`https://botmexico.com.mx`, Ctrl+F5) los ajustes recién deployados y reporta lo que falte afinar. Próximo turno **depura lo que reporte**. Si no hay reporte, la acción inmediata es verificar runtime end-to-end: abrir una cuenta (¿`account_touch` con dedup 1/operador/cuenta/día + su color?) y hacer 2+ depósitos a la misma cuenta (¿se agrupan en 1 fila con `▸ ×N` desplegable?).
 
 ## 🧭 Recomendación de approach
-Entrar en modo **depuración fina guiada por Robert** (medición objetiva `getBoundingClientRect` con datos reales, no a ojo — `feedback_verificar_entry_real`). Lo visual es lo único que quedó pendiente a propósito; el backend está probado (15 tests nuevos verde + 42 no-regresión) y el deploy es consistente (md5 servido == repo, migración corrió en proceso vivo).
+Seguir en **depuración fina en prod** (el pulido visual se hace con datos reales, no en local — no hay BD/sesión/SSE en local). Medir objetivamente lo que se pueda (getBoundingClientRect), no a ojo. El backend está probado; los cambios de esta sesión son frontend + un ajuste aditivo de payload en `/api/activity`.
 
 ## ⏳ Pendientes próximos
-- [ ] **Robert: probar los 2 KPIs en prod** y reportar ajustes visuales. Verificación runtime end-to-end (toque/deposit_step/carga del KPI Cuentas) con sesión real.
-- [ ] **Decisión Robert: reubicar el filtro "en uso"** — el card Pool tenía embebidos los botones `#lpInUse`/`#lpPool` que alternaban `state.filterInUse` (mostrar solo cuentas con lock activo). Al quitar Pool, ese filtro ya NO es accesible desde la UI (`state.filterInUse` queda en `false`; no crashea). `getVisible()`/`resetFilters()` aún lo contemplan. Si se quiere, reubicarlo en otra parte (ej. toolbar de la tabla). Toca `feedback_no_quitar_compactar`.
-- [ ] **Vista completa de Actividad (`activity_logic.js`)**: `deposit_step`/`account_touch` en el KPI card ya tienen render dedicado, pero en la **vista completa** (`renderActivity()` → `ActivityLogic.formatActivityCopy`) siguen cayendo al fallback genérico `·`. Si Robert quiere la traza también ahí, extender `activity_logic.js` (fuera del scope de esta sesión).
-- [ ] **Integrar hallazgos del review adversarial** (`feature-dev:code-reviewer` lanzado al cierre sobre `d31bdfe..b931e5a`): si dejó hallazgos accionables en su output, aplicarlos. (Deploy ya hecho por orden de Robert; el review fue verificación post-deploy.)
-- [ ] Decisión #1 auditoría (sigue abierta): ¿retirar el acordeón viejo? (`reports/auditoria-la-pantalla-2026-07-03.md`).
-- [ ] **Marquesina "casino" global** — POSPUESTA por Robert (el hueco del Pool eliminado queda libre para ella). Ver memoria `project_marquesina_casino`.
-- [ ] Ositos-avatar (Depp-ositos) — pospuesto.
-- untracked en raíz (NO commiteados a propósito): `idea_vaga.txt` · `reports/` (auditoría + **xlsx de TARJETAS = datos sensibles, NO subir a git**).
-- `pool`: 102 proxies (100 `dataimpulse` sticky + 2 `nodemaven`). Estable, sin 406/504/ProxyError.
+- [ ] **Robert: validar en prod** los 4 ajustes del feed (agrupación desplegable, dedup de interacciones, color por operador, alerta de saldo muerta) + la jerarquía combo/nombre de Cuentas a la mano.
+- [ ] **Decisión Robert: dedup de `account_touch`** — se implementó **1 por (operador, cuenta, día)** para no perder a un segundo operador que entre a la misma cuenta. Si lo quiere estrictamente **1 por cuenta/día** sin importar quién, es 1 línea (quitar `who_id` de la clave `_touchSeen`).
+- [ ] **Punto de fondo aún abierto:** ¿qué más es "señal" en el feed SA además de rechazos-con-causa+tarjeta y patrones de quema? (info accionable que oriente, `project_inteligencia_medible`).
+- [ ] Reubicar el filtro "en uso" (quedó inaccesible al quitar Pool) — `feedback_no_quitar_compactar`.
+- [ ] Vista completa de Actividad (`activity_logic.js`): `deposit_step`/`account_touch` siguen cayendo al fallback genérico `·` (el KPI card sí tiene render dedicado; la vista completa no).
+- [ ] **Limpieza futura (no urgente):** el backend emite `account_touch`/`deposit_step` en hora MX y el resto en UTC — mezcla de zonas que `_feedEpoch` absorbe en el front. Unificar backend a UTC-iso quitaría el parche (mayor superficie). Ver `docs/ERRORS.md`.
+- [ ] Marquesina "casino" — POSPUESTA (`project_marquesina_casino`). Ositos-avatar — pospuesto.
+- untracked en raíz (NO commitear a propósito): `idea_vaga.txt` · `reports/` (auditoría + **xlsx de TARJETAS = datos sensibles**).
 
-## ✅ Hecho esta sesión (2026-07-05) — plan de 7 fases ejecutado con `/Smartexe`
-- **Fase 0:** verificación de anclas. Resolvió la contradicción del spec: las fases de depósito viven en **`deposits.py`**, NO en `app.py` (el addendum §6.1 estaba equivocado).
-- `c765c7e` **Fase 1** — backend `account_touch`: tabla `account_touches` + hook en `account_details()` + visibilidad (actor no ve el suyo, ni el SA). 5 tests verde.
-- `88680a8` **Fase 2** — backend `deposit_step`: `_wrap_deposit_step` envuelve el `phase_cb` de los 3 flujos (single/matchmaker/scheduled), broadcast paso a paso sin tocar la lógica del motor. 4 tests + 42 no-regresión.
-- `65bfe13` **Fase 3** — backend endpoint `GET /api/accounts/at-hand` (pineadas+recientes enriquecidas, resuelve email→id). 6 tests verde.
-- `5753315` **Fase 4** — frontend KPI 📋 Logs (feed vertical, traza deposit_step, account_touch, 2 idiomas por rol).
-- `7fcad36` **Fase 5** — frontend KPI 📌 Cuentas a la mano (por-cuenta, consume at-hand).
-- `b931e5a` **Fase 6** — frontend strip 3→2 (quita Pool, grid 2 cols, invalida ratios localStorage).
-- **Fase 7** — bitácora (docs) + **deploy a KVM4** (5 archivos + SIGKILL/up) + **smoke funcional verde**: health 200, migración `account_touches` corrió en proceso vivo, ruta at-hand 401 (existe), md5 servido == repo, 0 errores de arranque.
+## ✅ Hecho esta sesión (2026-07-06) — pulido del feed KPI Logs + Cuentas a la mano
+- `1771bc9` **KPI Logs cronológico + día + Cuentas combo protagonista** — `_feedEpoch(ts,kind)` normaliza los `ts` (MX naive / UTC naive / UTC-tz, medidos en prod) a epoch absoluto → orden por tiempo real (los locks ya no se pinean arriba) + cabeceras Hoy/Ayer/fecha en tz MX. Corrige el `+6h` latente de deposit/lock. Cuentas a la mano: combo `email:password` protagonista, nombre chico al lado, fuera el `LIVE` (badge solo si bloqueada/DEAD).
+- `f0a1797` **feed: agrupar + dedup + color + anti-spam** — depósitos repetidos colapsan en 1 fila con badge `▸ ×N` desplegable (sublista con hora); `account_touch` dedup 1/operador/cuenta/día; `●` de color por operador (esquema `USER_COLORS`) en vista SA; alertas de servicio (capmonster/proxy/salud) fuera del feed y de notificaciones (spameaban por polling); `/api/activity` ahora trae `who_color`/`who_id`.
+- `7e06166` **merge a `main`** (--no-ff) + push a Forgejo.
+- **Deploy KVM4:** `app.js` + `style.css` (hot-mount) + `app.py` (restart SIGKILL/up). Smoke verde: md5 servido == repo (3 archivos), health 200 (923 cuentas), 0 errores de arranque, `who_color` cargó.
 
 ## 🔧 Decisiones tomadas
-- Fases de depósito viven en `deposits.py` (no `app.py`) — corregido el spec en Fase 0.
-- `deposit_step` = **wrapper** del `phase_cb` (no tocar la lógica del motor; `inner_cb` intacto primero); el evento `deposit` de cierre NO se toca (1 sola vez).
-- `account_touch` se registra en un GET (`account_details`) best-effort; día MX para el dedup.
-- Camino de datos del KPI Cuentas = **endpoint server-side `/api/accounts/at-hand`** (reforzado porque `/api/recent` no traía `id`), no front-hidrata.
-- Strip 3→2: `Pool` fuera (su hueco queda para la marquesina futura).
-- Pulido visual = **en prod** (decisión de Robert), no en local (sin backend+datos).
+- `_feedEpoch` es **frontend-only** (no tocar backend/BD/flujos de depósito) — menor riesgo; absorbe la mezcla de zonas de origen.
+- `account_touch` dedup en el feed **por (operador, cuenta, día)** — preserva el "quién" (pendiente de confirmar con Robert si lo quería sin importar quién).
+- **Badge/estado solo habla cuando es excepción accionable** (bloqueada/DEAD); `LIVE` = default usable = **sin badge**. Mostrar estados default = adorno sin criterio (ver memoria `feedback_badge_solo_excepcion`).
+- Alertas de servicio NO van al feed ni a notif — su estado vive en el indicador de salud del header. Robert: "ya lo estoy viendo, no hace falta que mame".
+- Color por operador reusa `USER_COLORS` del backend (RobertVS=warn, Lau=purple, Luisito=accent, Magdiel=azure), no un esquema paralelo.
 
 ## 🖥️ Estado del sistema al cerrar
-- **web** up (recién deployado `07:57Z`, código nuevo servido) · **bot** up · **health** 200 (923 cuentas) · **pool** 102 (100 `dataimpulse` + 2 `nodemaven`) · **login** ok (sin 406/504/ProxyError). Migración `account_touches` aplicada.
-- Rama `feat/kpis-logs-cuentas` con 6 commits; **pendiente merge a `main` + push** (se hace en el cierre).
+- **web** up (recién deployado, restart limpio) · **bot** up · **health** 200 (923 cuentas) · **pool** 102 (100 `dataimpulse` + 2 `nodemaven`) · **login** ok (sin 406/504/ProxyError en 12h). Rama `main` == `origin/main` (`7e06166`). Todo pusheado.
