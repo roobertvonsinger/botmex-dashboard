@@ -197,6 +197,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `1386a4b` | docs(audit): bitácora — bot Telegram pasa a solo-alimentador + unifica proxy/captcha con dashboard |
 | `a6221f6` | docs(next-session): cierre — pulido feed KPI Logs deployado+mergeado, pendientes de validación en prod |
 | `f0a1797` | feat(frontend): feed KPI Logs — agrupar depósitos, dedup touches, color por operador, matar spam de alertas |
 | `1771bc9` | fix(frontend): KPI Logs cronológico + día + Cuentas a la mano combo protagonista |
@@ -208,7 +209,6 @@ prewarm.py (router)
 | `88680a8` | feat(kpis): backend deposit_step — wrapper broadcast en los 3 flujos (Fase 2) |
 | `c765c7e` | feat(kpis): backend account_touch — tabla + hook en account_details + visibilidad (Fase 1) |
 | `d31bdfe` | docs(kpis): spec + plan reorg del strip a 2 KPIs (Logs + Cuentas a la mano) |
-| `ce3d03e` | docs(next-session): cierre — persiana KPI confirmada por Robert en prod; siembra brainstorm de logs/actividad/notificaciones para sig. sesion |
 <!-- GEN:end:recientes -->
 
 ---
