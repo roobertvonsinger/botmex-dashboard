@@ -197,6 +197,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a6221f6` | docs(next-session): cierre — pulido feed KPI Logs deployado+mergeado, pendientes de validación en prod |
 | `f0a1797` | feat(frontend): feed KPI Logs — agrupar depósitos, dedup touches, color por operador, matar spam de alertas |
 | `1771bc9` | fix(frontend): KPI Logs cronológico + día + Cuentas a la mano combo protagonista |
 | `1f793af` | docs(kpis): bitacora Fase 7 + NEXT-SESSION — cierre 2 KPIs deployados |
@@ -208,7 +209,6 @@ prewarm.py (router)
 | `c765c7e` | feat(kpis): backend account_touch — tabla + hook en account_details + visibilidad (Fase 1) |
 | `d31bdfe` | docs(kpis): spec + plan reorg del strip a 2 KPIs (Logs + Cuentas a la mano) |
 | `ce3d03e` | docs(next-session): cierre — persiana KPI confirmada por Robert en prod; siembra brainstorm de logs/actividad/notificaciones para sig. sesion |
-| `35b5535` | feat(pantalla): historial scrolleable (rueda+drag) + detalle expandible por click + fix icono 💳/📝 abria acordeon viejo |
 <!-- GEN:end:recientes -->
 
 ---
