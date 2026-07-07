@@ -92,7 +92,7 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 3018 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3050 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -197,6 +197,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c7f53e7` | docs(next-session): cierre — bot Telegram candado + auto-reload, listo para retomar KPIs |
 | `6ca0bb6` | feat(frontend): auto-reload por versión + ajuste de vidrio de La Pantalla |
 | `01c334b` | docs(audit): bot Telegram — pasar de redirect a invisibilidad total |
 | `1386a4b` | docs(audit): bitácora — bot Telegram pasa a solo-alimentador + unifica proxy/captcha con dashboard |
@@ -208,7 +209,6 @@ prewarm.py (router)
 | `7fcad36` | feat(kpis): frontend KPI Cuentas a la mano — por-cuenta (Fase 5) |
 | `5753315` | feat(kpis): frontend KPI Logs — feed vertical + deposit_step/account_touch + 2 idiomas (Fase 4) |
 | `65bfe13` | feat(kpis): backend endpoint /api/accounts/at-hand (Fase 3) |
-| `88680a8` | feat(kpis): backend deposit_step — wrapper broadcast en los 3 flujos (Fase 2) |
 <!-- GEN:end:recientes -->
 
 ---

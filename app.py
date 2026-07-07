@@ -350,23 +350,57 @@ def login_page(bmx_session: str = Cookie(default=None)):
     return FileResponse(STATIC / "login.html")
 
 
+# Todo asset propio referenciado por index.html con cache-bust (?v=...). 2026-07-06:
+# antes solo se trackeaban app.js+style.css — un deploy de pantalla.css/pantalla.js
+# (u otro asset fuera de esta lista) NO cambiaba window.BMX_VERSION/`/api/version`,
+# así que el auto-reload NUNCA disparaba para los operadores ya conectados (bug de
+# campo: deploy hecho, md5 correcto en prod, pero nadie refrescaba solo). Agregar
+# aquí CUALQUIER .css/.js nuevo que index.html cargue desde /static/.
+FRONTEND_ASSETS = [
+    "style.css", "depos.css", "pantalla.css",
+    "activity_logic.js", "pantalla_logic.js", "strip_logic.js",
+    "app.js", "depos_logic.js", "depos_window.js", "depos.js", "pantalla.js",
+]
+
+
+def _asset_mtimes():
+    mtimes = {}
+    for name in FRONTEND_ASSETS:
+        try:
+            mtimes[name] = int((STATIC / name).stat().st_mtime)
+        except Exception:
+            mtimes[name] = 0
+    return mtimes
+
+
+def _frontend_version(mtimes=None):
+    """Versión única = mtime MÁS RECIENTE entre todos los FRONTEND_ASSETS.
+    Cambia si se toca CUALQUIERA de ellos → dispara el auto-reload global."""
+    mtimes = mtimes if mtimes is not None else _asset_mtimes()
+    return str(max(mtimes.values(), default=0))
+
+
 @app.get("/")
 def index(bmx_session: str = Cookie(default=None)):
     if not bmx_session or not _auth.get_session(bmx_session):
         return RedirectResponse("/login", status_code=302)
-    # Cache-bust: añadir mtime de los assets al src para forzar re-fetch tras deploy.
-    # Regex (no string fijo): index.html ya trae un `?v=YYYYMMDDx` hardcodeado a mano,
-    # así que un replace de string exacto ("...app.js\"") nunca hacía match — quedaba
-    # muerto en silencio. El regex pisa CUALQUIER query string existente.
+    # Cache-bust: añadir mtime de cada asset a su propio src/href para forzar
+    # re-fetch tras deploy. Regex (no string fijo): index.html ya trae un
+    # `?v=YYYYMMDDx` hardcodeado a mano, así que un replace de string exacto
+    # nunca hacía match — quedaba muerto en silencio. El regex pisa CUALQUIER
+    # query string existente, por archivo, usando FRONTEND_ASSETS (arriba).
     try:
         html = (STATIC / "index.html").read_text(encoding="utf-8")
-        v_js = int((STATIC / "app.js").stat().st_mtime)
-        v_css = int((STATIC / "style.css").stat().st_mtime)
-        html = re.sub(r'src="/static/app\.js(\?[^"]*)?"', f'src="/static/app.js?v={v_js}"', html)
-        html = re.sub(r'href="/static/style\.css(\?[^"]*)?"', f'href="/static/style.css?v={v_css}"', html)
+        mtimes = _asset_mtimes()
+        for name, mt in mtimes.items():
+            html = re.sub(
+                rf'(src|href)="/static/{re.escape(name)}(\?[^"]*)?"',
+                rf'\1="/static/{name}?v={mt}"',
+                html,
+            )
         html = html.replace(
             '<script src="/static/app.js',
-            f'<script>window.BMX_VERSION="{v_js}-{v_css}";</script>\n<script src="/static/app.js',
+            f'<script>window.BMX_VERSION="{_frontend_version(mtimes)}";</script>\n<script src="/static/app.js',
         )
         return Response(content=html, media_type="text/html",
                         headers={"Cache-Control": "no-cache, must-revalidate"})
@@ -376,14 +410,12 @@ def index(bmx_session: str = Cookie(default=None)):
 
 @app.get("/api/version")
 def api_version():
-    """Versión actual de los assets (mtime de app.js+style.css). El frontend
-    la compara contra `window.BMX_VERSION` (fijada al cargar la página) para
-    auto-recargar pestañas viejas tras un deploy — sin que el operador
-    dependa de Ctrl+Shift+R."""
+    """Versión actual de TODOS los FRONTEND_ASSETS (mtime más reciente entre
+    ellos). El frontend la compara contra `window.BMX_VERSION` (fijada al
+    cargar la página) para auto-recargar pestañas viejas tras un deploy —
+    sin que el operador dependa de Ctrl+Shift+R."""
     try:
-        v_js = int((STATIC / "app.js").stat().st_mtime)
-        v_css = int((STATIC / "style.css").stat().st_mtime)
-        v = f"{v_js}-{v_css}"
+        v = _frontend_version()
     except Exception:
         v = ""
     return Response(content=f'{{"v":"{v}"}}', media_type="application/json",

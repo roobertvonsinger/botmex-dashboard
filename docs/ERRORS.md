@@ -2,6 +2,14 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## [CRÍTICO] Auto-reload por versión era ciego a `pantalla.css`/`pantalla.js` (y a todo asset fuera de app.js+style.css) (2026-07-06)
+
+- **Síntoma**: deploy de un cambio de UI en `pantalla.css`/`pantalla.js` (vidrio + layout de La Pantalla) via `pscp` — md5 idéntico repo↔prod confirmado, container corriendo — pero los operadores YA conectados seguían viendo la versión vieja indefinidamente. Robert: "como le doy ctrl refresh a los demás usuarios" (no puede pedirle a cada operador que refresque a mano).
+- **Causa raíz** (`app.py`, `index()` + `/api/version`): `window.BMX_VERSION` y `/api/version` calculaban su valor SOLO con el mtime de `app.js` + `style.css`. El auto-reload (`static/app.js:_checkVersion`, poll cada 5min / al volver a la pestaña) compara ese valor contra el que trae la pestaña ya abierta — si el asset que cambió no estaba en esa cuenta de 2 archivos, el valor nunca cambiaba y el JS concluía "no hay nada nuevo", sin importar qué tan fresco estuviera el archivo en disco.
+- **Fix**: `FRONTEND_ASSETS` (`app.py`) ahora lista TODOS los .css/.js propios que `index.html` carga desde `/static/` (style/depos/pantalla .css + los 7 .js). `_frontend_version()` = mtime MÁS RECIENTE entre todos ellos — cambia con cualquiera de ellos. El cache-bust por-archivo en `index()` también se generalizó (antes solo regex-sustituía `app.js` y `style.css`; ahora itera `FRONTEND_ASSETS`).
+- **Verificado en prod**: mtime de `pantalla.css`/`pantalla.js` en el container = `1783375906`, `/api/version` responde `{"v":"1783375906"}` — coincide. `betmexico-web` reinició limpio (health 200).
+- **Lección**: cualquier archivo estático NUEVO que se agregue a `index.html` debe sumarse a `FRONTEND_ASSETS` en `app.py`, o vuelve a quedar ciego al auto-reload.
+
 ## [CRÍTICO] Dedup de movimientos ocultaba depósitos APROBADOS reales (2026-07-03)
 
 - **Síntoma**: en el detalle de cuenta (La Pantalla / acordeón), un depósito **aprobado real** de BetMexico podía NO mostrarse si coincidía en monto+tiempo con un intento del dashboard **rechazado**. Robert: "¿habrá pasado que sí depositó y el dashboard no nos dijo?".
