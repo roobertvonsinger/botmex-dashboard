@@ -272,11 +272,16 @@ def bin_stats_overview(user: dict = Depends(require_session)):
     try:
         with db() as c:
             rows = c.execute(
+                # SOLO toques REALES de banco cuentan para la inteligencia del BIN
+                # (bug 2026-07-06): approved + rechazo real + 3DS. Los no-banco
+                # (rate_limited/account_dead/login_lost/gateway_error/timeout/ambiguous/
+                # incomplete) NUNCA tocaron el banco con esa tarjeta → los excluye el
+                # WHERE. Antes contaban como `rejected` del BIN y hundían approval_rate.
                 "SELECT SUBSTR(card_pipe,1,6) AS bin, "
                 "  COUNT(*) AS attempts, "
                 "  SUM(CASE WHEN status='approved' THEN 1 ELSE 0 END) AS approved, "
-                "  SUM(CASE WHEN status!='approved' AND LOWER(COALESCE(rejection_reason,'')) LIKE '%3ds%' THEN 1 ELSE 0 END) AS threeds, "
-                "  SUM(CASE WHEN status!='approved' AND LOWER(COALESCE(rejection_reason,'')) NOT LIKE '%3ds%' THEN 1 ELSE 0 END) AS rejected, "
+                "  SUM(CASE WHEN status='threeds' OR LOWER(COALESCE(rejection_reason,'')) LIKE '%3ds%' THEN 1 ELSE 0 END) AS threeds, "
+                "  SUM(CASE WHEN status='rejected' AND LOWER(COALESCE(rejection_reason,'')) NOT LIKE '%3ds%' THEN 1 ELSE 0 END) AS rejected, "
                 "  COALESCE(SUM(CASE WHEN status='approved' THEN amount ELSE 0 END),0) AS approved_amount, "
                 # `cards` = tarjetas DISTINTAS que CASARON (aprobaron) este BIN — lo
                 # accionable/reusable, y lo que el buscador encuentra. `accounts` =
@@ -289,6 +294,8 @@ def bin_stats_overview(user: dict = Depends(require_session)):
                 "  MAX(created_at) AS last_seen "
                 "FROM deposit_attempts "
                 "WHERE card_pipe IS NOT NULL AND LENGTH(card_pipe) >= 6 "
+                "  AND (status IN ('approved','rejected','threeds') "
+                "       OR LOWER(COALESCE(rejection_reason,'')) LIKE '%3ds%') "
                 "GROUP BY bin HAVING attempts > 0 "
                 "ORDER BY attempts DESC"
             ).fetchall()
@@ -1521,18 +1528,10 @@ async def deposit_execute_stream(request: Request, user: dict = Depends(require_
                 try:
                     duration_ms_final = int((time.time() - t_start) * 1000)
                     success_final = bool(result.get("success"))
-                    # Mapping de status alineado con _persist_final
                     rc = result.get("result_code") or ""
-                    if success_final:
-                        status_final = "approved"
-                    elif rc in ("LOGIN_FAILED", "CAPTCHA_POOL_EMPTY"):
-                        status_final = "login_lost"
-                    elif rc in ("BEGIN_ERROR", "PAYMENT_ERROR"):
-                        status_final = "gateway_error"
-                    elif rc == "TIMEOUT":
-                        status_final = "timeout"
-                    else:
-                        status_final = "rejected"
+                    # Fuente de verdad única (classify_deposit_status): SOLO el
+                    # rechazo real de banco es "rejected"; rate-limit/infra/cuenta NO.
+                    status_final = classify_deposit_status(rc, success_final)
                     reason_final = result.get("error") or rc or None
                     _record_attempt(
                         attempt_id, email, amount, status_final, reason_final,
@@ -1632,6 +1631,41 @@ def _mm_is_ambiguous_charge(code: str) -> bool:
     Regla Robert: submit NUNCA se reintenta; begin sí (es pre-cobro)."""
     u = (code or "").upper()
     return u == "SUBMIT_ERROR" or u.startswith("UNKNOWN_TXN_STATUS")
+
+
+def classify_deposit_status(result_code: str, success: bool) -> str:
+    """FUENTE DE VERDAD ÚNICA: result_code → status persistido en deposit_attempts.
+
+    La usan los 3 flujos (single/matchmaker/scheduled) para NO divergir. Reusa la
+    taxonomía de Robert (MM_REAL_DECLINE_RC / MM_DEAD_RC / _mm_is_ambiguous_charge).
+
+    Ley (bug 2026-07-06): SOLO un rechazo REAL de banco/tarjeta es "rejected" — es
+    el único status que la UI pinta "Rechazado (banco)" y el único que bin_stats
+    cuenta como rechazo del BIN. Todo lo demás (rate-limit, cuenta muerta, login,
+    gateway, timeout, ambiguo, error nuestro) tiene su propio status y JAMÁS se
+    atribuye al banco (rompía [capas operador vs backend] + envenenaba bin_stats).
+    """
+    if success:
+        return "approved"
+    rc = (result_code or "").upper()
+    if "3DS" in rc:
+        return "threeds"
+    if _mm_is_real_decline(rc):
+        return "rejected"                       # ← ÚNICO "banco"
+    if rc in MM_DEAD_RC:                          # AUTOEXCLUSION, KYC_PENDING, LOGIN_DENIED
+        return "account_dead"
+    if rc == "RATE_LIMITED":
+        return "rate_limited"
+    if rc in ("LOGIN_FAILED", "CAPTCHA_POOL_EMPTY", "DEPS_MISSING"):
+        return "login_lost"
+    if rc in ("BEGIN_ERROR", "PAYMENT_ERROR"):
+        return "gateway_error"
+    if rc == "TIMEOUT":
+        return "timeout"
+    if _mm_is_ambiguous_charge(rc):              # SUBMIT_ERROR, UNKNOWN_TXN_STATUS_*
+        return "ambiguous"
+    return "incomplete"                          # catch-all NEUTRAL — nuestro lado, NO banco
+
 
 MM_COOLDOWN = 60
 # Segundos. Piso entre reusos de la MISMA tarjeta o cuenta (se evalúa al armar el
@@ -1847,7 +1881,7 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
             ok = bool(r.get("success"))
             _record_attempt(
                 uuid.uuid4().hex, email, amount,
-                "approved" if ok else "rejected",
+                classify_deposit_status(r.get("result_code"), ok),
                 r.get("error") or r.get("result_code"),
                 duration, operator_id,
                 card_pipe=card.get("pipe"),
@@ -2357,7 +2391,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                 # Registrar SIEMPRE el intento en BD (trazabilidad), exitoso o no.
                 _record_attempt(
                     uuid.uuid4().hex, email, amount,
-                    "approved" if ok else "rejected",
+                    classify_deposit_status(code, ok),
                     reason, duration, operator_id,
                     card_pipe=card_pipe,
                 )

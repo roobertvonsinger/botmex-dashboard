@@ -2561,13 +2561,20 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                 # 3DS = estado propio (ámbar): NO se acreditó pero NO es rechazo del
                 # banco — el procesador pidió autenticación (Robert 2026-05-29).
                 # Guardamos/mostramos aunque BetMexico no liste la txn en su historial.
-                is_3ds = "3ds" in reason_txt.lower()
+                is_3ds = "3ds" in reason_txt.lower() or st == "threeds"
                 if st == "approved":
                     state = "ok"
                 elif is_3ds:
                     state = "threeds"
-                elif st in ("rejected", "error"):
-                    state = "fail"
+                elif st == "rejected":
+                    state = "fail"                      # SOLO rechazo REAL de banco
+                elif st in ("rate_limited", "account_dead", "login_lost",
+                            "gateway_error", "timeout", "ambiguous",
+                            "incomplete", "error"):
+                    # No-banco (rate-limit/infra/cuenta/nuestro lado): NO se atribuye
+                    # al banco ni se firma como txn (no llegó al gateway). El `reason`
+                    # da el detalle operativo (bug 2026-07-06).
+                    state = "incomplete"
                 else:
                     state = "pending"
                 when_mx = _utc_to_mx(a.get("created_at"))
@@ -2580,7 +2587,7 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                     "state": state,
                     "who": _op_name(a.get("operator_id")),
                     "card_pipe": a.get("card_pipe"),
-                    "reason": reason_txt if state in ("fail", "threeds") else None,
+                    "reason": reason_txt if state in ("fail", "threeds", "incomplete") else None,
                 })
                 # Firma para dedup: aprobados y rechazados se reflejan en BetMexico
                 # (status 6 y -4). Los 3DS/pending no generan txn → no se firman.

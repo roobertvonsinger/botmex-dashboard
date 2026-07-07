@@ -21,8 +21,12 @@
     const amt = ev.amount != null ? `$${ev.amount}` : '';
     if (ev.kind === 'deposit') {
       if (ev.status === 'approved') return { icon: '💰', cls: 'ok', text: `${who} depositó ${amt} a ${email} — aprobado` };
-      if (ev.code === '3DS_REQUIRED' || ev.reason === '3DS') return { icon: '🔐', cls: 'neutral', text: `${who} ${amt} a ${email} — pidió verificación 3DS` };
-      return { icon: '✗', cls: 'fail', text: `${who} intentó ${amt} a ${email} — rechazado (banco)` };
+      if (ev.code === '3DS_REQUIRED' || ev.reason === '3DS' || ev.status === 'threeds') return { icon: '🔐', cls: 'neutral', text: `${who} ${amt} a ${email} — pidió verificación 3DS` };
+      // SOLO status 'rejected' es rechazo REAL de banco (bug 2026-07-06): rate-limit,
+      // cuenta muerta, login/gateway/timeout NO se atribuyen al banco.
+      if (ev.status === 'rejected') return { icon: '✗', cls: 'fail', text: `${who} intentó ${amt} a ${email} — rechazado (banco)` };
+      const motivo = ev.reason || ev.code || '';
+      return { icon: '⏸', cls: 'neutral', text: `${who} ${amt} a ${email} — no aplicado${motivo ? ` (${motivo})` : ''}` };
     }
     if (ev.kind === 'lock') return { icon: '🔒', cls: 'neutral', text: `${who} tomó ${email}` };
     if (ev.kind === 'unlock' || ev.kind === 'unlock_auto') return { icon: '🔓', cls: 'neutral', text: `${email} liberada` };

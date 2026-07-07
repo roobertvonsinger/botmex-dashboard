@@ -152,7 +152,7 @@ Similar pero:
 | `account_cards` | Tarjetas válidas (registered al primer approved) |
 | `account_transactions` | Historial BetMexico (depósitos/retiros confirmados por backend de BetMexico) |
 | `account_notes` | Notas por cuenta (usuario / SA) |
-| `deposit_attempts` | Cada intento de depósito desde el dashboard (con `card_pipe` desde 2026-05-11) |
+| `deposit_attempts` | Cada intento de depósito desde el dashboard (con `card_pipe` desde 2026-05-11). Valores de `status` (fuente única `deposits.classify_deposit_status`, 2026-07-06): `approved` · `rejected` (**SOLO** rechazo real de banco) · `threeds` · `rate_limited` · `account_dead` · `login_lost` · `gateway_error` · `timeout` · `ambiguous` · `incomplete`. Solo `rejected` se pinta "Rechazado (banco)" y cuenta como rechazo del BIN. |
 | `payment_tests` | Resultado legacy del bot Telegram |
 | `users` | Operadores del dashboard |
 | `assignments` | Cuenta ↔ operador |

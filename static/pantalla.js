@@ -382,7 +382,7 @@
 
   function _mvResultCls(m) {
     if ((m.reason || '').toUpperCase().includes('3DS')) return 'threeds';
-    return ({ ok: 'ok', fail: 'fail', pending: 'pending', wd: 'wd' })[m.state] || 'ok';
+    return ({ ok: 'ok', fail: 'fail', pending: 'pending', wd: 'wd', incomplete: 'pending' })[m.state] || 'pending';
   }
   function _mvSrcCls(m) {
     return m.source === 'dashboard' ? 'pat-mv-src--dash' : 'pat-mv-src--bet';
@@ -399,7 +399,8 @@
     const g = window.esc || (s => s);
     let base;
     if ((m.reason || '').toUpperCase().includes('3DS')) base = 'Verificación 3DS';
-    else if (m.state === 'fail') base = 'Rechazado (banco)';
+    else if (m.state === 'fail') base = 'Rechazado (banco)';   // SOLO rechazo REAL de banco
+    else if (m.state === 'incomplete') base = 'No aplicado';   // rate-limit/infra/cuenta — motivo en el detalle
     else base = m.kind === 'withdrawal' ? 'Retiro' : 'Depósito';
     const bits = [];
     if (m.method) bits.push(g(m.method));
