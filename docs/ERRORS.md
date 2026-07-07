@@ -2,6 +2,13 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## `_operator_color()` crasheaba (500) cuando `locked_by`/`operator_id` no era numérico (2026-07-07)
+
+- **Síntoma**: `docker logs betmexico-web` mostraba `ValueError: invalid literal for int() with base 10: 'op'` repetido en `activity_feed` (`app.py`, vía `_operator_color`). Encontrado revisando logs tras el deploy del fix de auto-reload (no relacionado a ese cambio).
+- **Causa raíz** (`app.py` `_operator_color`, antes L925): hacía `int(tg_id)` a secas. `locked_by`/`operator_id` normalmente es el `telegram_id` (numérico) pero también puede ser un username string manual (en prod: 1 cuenta con `locked_by='op'`, lock reciente y legítimo — no es basura a limpiar). El helper hermano `_resolve_operator` ya soportaba ambos casos; `_operator_color` nunca se actualizó a la par, y 5 call-sites lo llamaban directo → cualquier request que tocara esa fila tronaba 500.
+- **Fix**: `_operator_color` ahora replica el patrón robusto ya usado inline en la query de top-holders (L648-653) — si es string, intenta resolver via `_auth.USERS` (username → telegram_id) antes de castear; si no matchea nada conocido, devuelve `None` en vez de crashear. Cubre los 5 call-sites (`activity_feed`, notificaciones, KPIs) de una sola vez.
+- **Verificado**: `py_compile` OK, `betmexico-web` reinició limpio, health 200.
+
 ## [CRÍTICO] Auto-reload por versión era ciego a `pantalla.css`/`pantalla.js` (y a todo asset fuera de app.js+style.css) (2026-07-06)
 
 - **Síntoma**: deploy de un cambio de UI en `pantalla.css`/`pantalla.js` (vidrio + layout de La Pantalla) via `pscp` — md5 idéntico repo↔prod confirmado, container corriendo — pero los operadores YA conectados seguían viendo la versión vieja indefinidamente. Robert: "como le doy ctrl refresh a los demás usuarios" (no puede pedirle a cada operador que refresque a mano).

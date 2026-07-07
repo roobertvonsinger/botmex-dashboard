@@ -923,7 +923,21 @@ def _capmonster_balance() -> dict:
 # ─── KPIs L invertida (spec chat2) ─────────────────────────────────────────────
 
 def _operator_color(tg_id):
-    return _auth.USER_COLORS.get(int(tg_id)) if tg_id else None
+    """Color del operador para acentos de UI (borde lateral, badges).
+    Acepta int/str numérico (telegram_id) o string username (locked_by /
+    operator_id legacy o manual, ej. 'op') — NUNCA truena el request; sin
+    match conocido devuelve None (2026-07-07: `int(tg_id)` a secas crasheaba
+    activity_feed con `ValueError` en cuanto locked_by traía un username)."""
+    if not tg_id:
+        return None
+    if isinstance(tg_id, str):
+        u = _auth.USERS.get(tg_id.lower())
+        if u:
+            return _auth.USER_COLORS.get(u["telegram_id"])
+    try:
+        return _auth.USER_COLORS.get(int(tg_id))
+    except (TypeError, ValueError):
+        return None
 
 
 def _resolve_who(val):

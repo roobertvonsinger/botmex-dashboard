@@ -92,7 +92,7 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 3050 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3064 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -110,6 +110,7 @@ prewarm.py (router)
 | `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
 | `test_anti_rate_limit.py` | 271 | `—` | _[completar]_ |
 | `test_at_hand.py` | 73 | `—` | _[completar]_ |
+| `test_deposit_status_classify.py` | 95 | `—` | _[completar]_ |
 | `test_deposit_step.py` | 132 | `—` | _[completar]_ |
 | `test_marks.py` | 32 | `—` | _[completar]_ |
 | `test_pool_manage.py` | 26 | `—` | _[completar]_ |
@@ -197,6 +198,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b8e3d62` | fix(backend): auto-reload por versión era ciego a pantalla.css/js (y a todo asset fuera de app.js+style.css) |
 | `c7f53e7` | docs(next-session): cierre — bot Telegram candado + auto-reload, listo para retomar KPIs |
 | `6ca0bb6` | feat(frontend): auto-reload por versión + ajuste de vidrio de La Pantalla |
 | `01c334b` | docs(audit): bot Telegram — pasar de redirect a invisibilidad total |
@@ -208,7 +210,6 @@ prewarm.py (router)
 | `b931e5a` | feat(kpis): frontend strip 3->2 — quitar Pool, grid 2 columnas (Fase 6) |
 | `7fcad36` | feat(kpis): frontend KPI Cuentas a la mano — por-cuenta (Fase 5) |
 | `5753315` | feat(kpis): frontend KPI Logs — feed vertical + deposit_step/account_touch + 2 idiomas (Fase 4) |
-| `65bfe13` | feat(kpis): backend endpoint /api/accounts/at-hand (Fase 3) |
 <!-- GEN:end:recientes -->
 
 ---
