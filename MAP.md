@@ -200,6 +200,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `cbe9db5` | fix(deposits): rate-limit (429) ya no se reporta como "Rechazado (banco)" |
 | `9441bd6` | fix(backend): _operator_color crasheaba (500) con locked_by no-numérico |
 | `b8e3d62` | fix(backend): auto-reload por versión era ciego a pantalla.css/js (y a todo asset fuera de app.js+style.css) |
 | `c7f53e7` | docs(next-session): cierre — bot Telegram candado + auto-reload, listo para retomar KPIs |
@@ -211,7 +212,6 @@ prewarm.py (router)
 | `1771bc9` | fix(frontend): KPI Logs cronológico + día + Cuentas a la mano combo protagonista |
 | `1f793af` | docs(kpis): bitacora Fase 7 + NEXT-SESSION — cierre 2 KPIs deployados |
 | `b931e5a` | feat(kpis): frontend strip 3->2 — quitar Pool, grid 2 columnas (Fase 6) |
-| `7fcad36` | feat(kpis): frontend KPI Cuentas a la mano — por-cuenta (Fase 5) |
 <!-- GEN:end:recientes -->
 
 ---
