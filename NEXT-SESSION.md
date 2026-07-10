@@ -4,7 +4,7 @@
 > **Lente rectora de TODO:** ver memoria `feedback_frictionless_norte` + `NORTE.md`. BOTMEXICO = frictionless, a prueba de desmadre, y tiene que GANARLE a entrar directo a BetMexico.
 
 ## 🎯 Objetivo en curso
-**Cierre de la sesión de La Pantalla** (5ª ronda sobre el mismo hilo de campo, empezó 2026-07-09): reparto de columnas, tinte por grade, meta reubicada al topbar, marco completo, fix de flicker de apertura. `b6f16bb` deployado a prod (2026-07-10), Robert queda de revisar visualmente.
+**Cierre de la sesión de La Pantalla** (6ª ronda sobre el mismo hilo de campo, empezó 2026-07-09): reparto de columnas, tinte por grade, meta reubicada al topbar, marco completo, fix de flicker de apertura, ancho real del form CURP, cristal aun más mate. `1fa4219` deployado a prod (2026-07-10), Robert queda de revisar visualmente.
 
 ## ▶ Con qué arrancas
 Robert explícitamente pidió pivotar: **"ver que onda con los cambios recientes al cálculo del grade"** — la próxima sesión NO es más ajuste visual de La Pantalla (salvo que Robert reporte algo roto primero), es **auditar el algoritmo de grading V10** tras los cambios de la sesión pasada (M7 + A+ lifecycle + regla "aprobación reciente sana→A", commits `a71b9e8`/`58c990d` y ver `reference_analyzer_deploy_path` en memoria). Objetivo: confirmar que la distribución de grades en prod tiene sentido con los datos reales (no solo que los tests pasen) — pedir a Robert qué específicamente le preocupa antes de tocar código.
@@ -15,7 +15,7 @@ Robert explícitamente pidió pivotar: **"ver que onda con los cambios recientes
 3. Trae `docs/AUDIT.md` (capturas 2026-07-09/10 sobre grading) y `test_grading_a_plus_m7.py` como punto de partida — ya hay 16 tests y 2 backfills corridos (v10_m7, v10_m8).
 
 ## ⏳ Pendientes próximos
-- [ ] **Robert: revisar visualmente en prod** los cambios de La Pantalla de esta sesión (5 rondas: anchos de columna, saldo más chico, Estado corregido, scroll en datos, meta al topbar, marco completo, fix de flicker). Si algo se ve mal, screenshot + anotación como siempre.
+- [ ] **Robert: revisar visualmente en prod** los cambios de La Pantalla de esta sesión (6 rondas: anchos de columna, saldo más chico, Estado corregido, scroll en datos, meta al topbar, marco completo, fix de flicker, ancho real del form CURP, cristal aun más mate). Si algo se ve mal, screenshot + anotación como siempre.
 - [ ] **Robert: confirmar que ya no parpadea/abre brusco** al cambiar de cuenta con La Pantalla abierta — el fix (`wasHidden` guard en `pantalla.js` `open()`) es lógicamente sólido (causa raíz confirmada leyendo el código: se re-disparaba toda la animación de entrada en cada click de fila) pero no se pudo probar en un navegador real esta sesión.
 - [ ] **Robert: correr el `docker exec` de diagnóstico** de la cuenta `ljesus06` (ver bloque abajo) — desbloquea el bug de saldos desincronizados (Panel $0 / Pantalla $1850 / BetMexico $300 + retiros ausentes). Bloqueado desde 2026-07-06, sigue sin correr.
 - [ ] **Migrar el bot de Telegram del monorepo a un repo Forgejo aislado** — pendiente de varias sesiones atrás.
@@ -53,6 +53,10 @@ Decide: BD tiene $0 o $1850 (cuál caché) · ¿hay retiros `txn_type=2`? · si 
   - Blanquecino recortado otra vez a la mitad.
   - **Bug real encontrado leyendo el código** (causa de "se abre brusco o parpadea raro"): `open()` en `pantalla.js` disparaba TODA la secuencia de entrada (clases + backdrop + scanline) en CADA click de fila, incluso con La Pantalla ya abierta con `backdrop-filter:blur(34px)` activo. Fix: `wasHidden = root.hidden` guarda si es apertura en frío; la secuencia solo corre entonces. Validado con skill `design-engineer` + blur del keyframe recortado (14px→9px, 5px→3px — animar `filter:blur()` propio encima de `backdrop-filter` constante duplicaba el costo de repintado).
 - Los 3 commits: deployados a KVM4 (`betmexico-web`), verificados con `StartedAt` > mtime + health 200 + grep del código nuevo en disco en cada ronda. **Ningún cambio se verificó en navegador real** (Robert pidió deploy directo, "lo reviso allá") — pendiente su confirmación visual.
+- **`1fa4219`** `fix(pantalla): form CURP con ancho REAL de la columna (no full-width) · cristal aun mas mate` (4ª ronda, ya cerrando)
+  - **Bug real**: `data-curp-form` es hijo directo de `.pat-wrap` (flex-column, `align-items:stretch` default) → se estiraba al ancho COMPLETO de la sheet; input+botones (gob.mx/Cancelar/Guardar) terminaban pegados al borde derecho en vez de donde Robert marcó con línea amarilla (borde derecho de `.pat-col-ident`). Fix con MEDIDA REAL, no px inventado (regla `feedback_ui_ancla_medida_no_pixel_inventado`): `pantalla.js` `_syncIdentWidth()` mide `.pat-col-ident.getBoundingClientRect().width` post-render (rAF) y lo escribe como `--pat-ident-w` en `.pat-wrap`; CSS usa `width: var(--pat-ident-w, 300px)`. `.pat-form-row` gana `flex-wrap:wrap` de colchón.
+  - Cristal 3ª pasada de "más mate": reflejo glass .012/.006→.005/.003, perlas nácar .05/.04→.03/.025, halo nácar interno .05→.025, filo superior nacarado del box-shadow .10→.06.
+  - Deployado y verificado igual que los anteriores (StartedAt>mtime, health 200, grep de `_syncIdentWidth`/`pat-ident-w` en disco). **Tampoco verificado en navegador real.**
 
 ## 🔧 Decisiones tomadas
 - **Deploy directo sin verificación en navegador cuando Robert lo pide explícitamente** ("deploya alla lo reviso") — no bloquear la iteración esperando un preview local si él va a revisar en prod de todos modos.
