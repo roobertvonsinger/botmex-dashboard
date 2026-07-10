@@ -31,6 +31,7 @@ const state = {
   pageSize: 50,
   lockHours: 2,
   filterInUse: false,
+  filterJwt: '',  // '' | 'alive' | 'expired' — filtro SA-only por estado de sesión JWT
   cardsOnly: false,  // filter: solo cuentas con al menos 1 tarjeta
   truncated: false,  // P2: true si el fetch tocó ACCOUNTS_FETCH_LIMIT (hay más cuentas que las traídas)
 };
@@ -376,7 +377,12 @@ const balanceCls = v => {
 function getVisible() {
   if (state.refreshMode) return state.refreshMode.updatedRows;
   if (searchQuery) return state.rows;  // búsqueda dominante: sin filtros locales
-  return state.filterInUse ? state.rows.filter(r => r.locked_by) : state.rows;
+  let rows = state.rows;
+  if (state.filterInUse) rows = rows.filter(r => r.locked_by);
+  // Filtro SA-only por sesión JWT (jwt_alive solo viene a superadmin).
+  if (state.filterJwt === 'alive') rows = rows.filter(r => r.jwt_alive === true);
+  else if (state.filterJwt === 'expired') rows = rows.filter(r => r.jwt_alive === false);
+  return rows;
 }
 
 function getPaged() {
@@ -482,6 +488,10 @@ async function loadMe() {
   // Trastienda solo SA (es feature de dosificación tuya)
   if (!isSuper) {
     $('#cmdTrastienda').style.display = 'none';
+  }
+  // Filtro de sesión JWT: SOLO-SA (internal operativo, ley de capas operador/SA).
+  if (!isSuper) {
+    const sj = $('#segJwt'); if (sj) sj.style.display = 'none';
   }
   // P3: "Actualizar visibles" (refresh masivo de la página entera) solo SA.
   // Operadores refrescan individual (↻ por fila) o por selección. El endpoint
@@ -608,11 +618,13 @@ function renderTable() {
     const lockChip = r.locked_by
       ? `<span class="lock-chip op-${esc(opCol)} ${until?.expired ? 'expired' : ''}" title="Lockeada por ${esc(r.locked_by)}${until ? ` · ${until.expired ? 'vencido' : `vence en ${until.text}`}` : ''}">🔒 ${esc(r.locked_by)}${until && !until.expired ? ` <span class="lock-chip-time dim">${until.text}</span>` : ''}</span>`
       : '';
-    // Badge JWT: 🟢 sesión viva (reutilizable, sin captcha) · 🔑 expirada (requiere captcha).
-    // El keeper (jwt_keeper.py) refresca proactivo para mantener el 🟢 el mayor tiempo posible.
-    const jwtBadge = r.jwt_alive
-      ? `<span class="jwt-chip jwt-alive" title="Sesión viva — reutilizable sin captcha">🟢</span>`
-      : `<span class="jwt-chip jwt-expired" title="Sesión expirada — el próximo uso requiere resolver captcha">🔑</span>`;
+    // Badge JWT (SA-only): 🟢 sesión viva (reutilizable, sin captcha) · 🔑 expirada.
+    // Backend solo manda `jwt_alive` a superadmin → doble candado (internal, ley capas).
+    const jwtBadge = (state.user?.role === 'superadmin' && r.jwt_alive !== undefined)
+      ? (r.jwt_alive
+          ? `<span class="jwt-chip jwt-alive" title="Sesión viva — reutilizable sin captcha">🟢</span>`
+          : `<span class="jwt-chip jwt-expired" title="Sesión expirada — el próximo uso requiere resolver captcha">🔑</span>`)
+      : '';
     const isSA = state.user?.role === 'superadmin';
     const trTitle = isSA ? `Grade ${esc(r.grade) || '?'}` : '';
     // Iconos de fila: 💳 (tarjetas), 📝 (notas), siempre + (quick add), 📌 (marcador) + botón Detalles
@@ -2398,6 +2410,7 @@ function _isFiltersDefault() {
       && state.grade === ''
       && !searchQuery
       && !state.filterInUse
+      && state.filterJwt === ''
       && _sortCol === null;
 }
 function _updateResetBtn() {
@@ -2415,6 +2428,7 @@ $('#btnResetFilters')?.addEventListener('click', () => {
   state.grade = '';
   searchQuery = '';
   state.filterInUse = false;
+  state.filterJwt = '';
   state.cardsOnly = false;
   state.page = 1;
   _sortCol = null;
@@ -2422,6 +2436,7 @@ $('#btnResetFilters')?.addEventListener('click', () => {
   // UI segments back to default
   document.querySelectorAll('.seg[data-seg="status"] button').forEach(b => b.classList.toggle('on', b.dataset.v === 'LIVE'));
   document.querySelectorAll('.seg[data-seg="grade"] button').forEach(b => b.classList.toggle('on', b.dataset.v === ''));
+  document.querySelectorAll('.seg[data-seg="jwt"] button').forEach(b => b.classList.toggle('on', b.dataset.v === ''));
   $('#searchInput').value = '';
   _reflectSearchUI();
   const lpInUse = $('#lpInUse'); if (lpInUse) lpInUse.classList.remove('lp-stat-active');
@@ -6083,6 +6098,17 @@ $('#lpPool')?.addEventListener('click', () => {
     showSection('accounts');
     renderTable();
   }
+});
+
+// Filtro SA-only por sesión JWT (client-side, sin recargar del backend).
+document.querySelector('.seg[data-seg="jwt"]')?.addEventListener('click', e => {
+  const b = e.target.closest('button[data-v]');
+  if (!b) return;
+  document.querySelectorAll('.seg[data-seg="jwt"] button')
+    .forEach(x => x.classList.toggle('on', x === b));
+  state.filterJwt = b.dataset.v || '';
+  state.page = 1;
+  renderTable();
 });
 
 // Click en avatar de la L invertida → filtra activity por ese operador

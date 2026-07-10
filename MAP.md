@@ -92,7 +92,7 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 3179 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3182 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -205,6 +205,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `799bf58` | feat(jwt-keeper): mantener JWT de sesión vivos para bajar el rate-limit (429) |
 | `b17954e` | feat(grading): V10 M9 — revivir cuentas masacradas a B si descansaron 30d, 0 penalty a MACHINE_GUN_2x5m, A+ = 3DS |
 | `6dc7ae3` | docs: formalizar Figma First protocol para diseño UI (MCP html-to-design) |
 | `3ea668b` | fix(pantalla): popover CURP fuera de flujo (no empuja movimientos) · vidrio ligado al glow ambiental de la app |
@@ -216,7 +217,6 @@ prewarm.py (router)
 | `14af44c` | fix(pantalla): reparto 2:1 movimientos/escenario · botones a esq inf-der · tinte por grade |
 | `5ef2c19` | docs(next-session): cierre sesion 2026-07-10 (movimientos 2:1, botones abajo, grade-color) |
 | `58c990d` | feat(pantalla): grade-color por cuenta · movimientos 2:1 · botones esquina inf-der |
-| `a71b9e8` | feat(grading+ui): aprobación reciente sana→A · combo en una línea con divisor al final |
 <!-- GEN:end:recientes -->
 
 ---

@@ -736,10 +736,13 @@ def list_accounts(
                 r["locked_color"] = _auth.USER_COLORS.get(tg_id) if tg_id else None
                 # JWT vivo = reutilizable sin captcha (gentle_login cache-hit exige
                 # exp > now+60s). Alimenta el badge 🟢/🔑 de la lista. Ver jwt_keeper.
-                _exp = r.get("jwt_expires_at")
-                r["jwt_alive"] = bool(
-                    _exp not in (None, "")
-                    and int(_exp) > datetime.now(timezone.utc).timestamp() + 60)
+                # SOLO-SA: es un internal operativo → NO se filtra al operador (ley de
+                # capas operador/SA). Se quita SIEMPRE el epoch crudo del payload.
+                _exp = r.pop("jwt_expires_at", None)
+                if role == "superadmin":
+                    r["jwt_alive"] = bool(
+                        _exp not in (None, "")
+                        and int(_exp) > datetime.now(timezone.utc).timestamp() + 60)
             return rows
     except sqlite3.OperationalError:
         # Si no hay tabla account_assignments todavía

@@ -447,6 +447,11 @@
           <button data-v="C" title="🟡 Cuidado — señales raras">C</button>
           <button data-v="D" title="🔴 Pasarela quemada, no pierdas tiempo">D</button>
         </div>
+        <div class="seg" data-seg="jwt" id="segJwt" title="Separar por sesión (JWT): viva vs expirada — solo tú lo ves">
+          <button data-v="" class="on" title="Sin filtrar por sesión">Sesión</button>
+          <button data-v="alive" title="🟢 Sesión viva — reutilizable sin captcha">🟢</button>
+          <button data-v="expired" title="🔑 Sesión expirada — requiere resolver captcha">🔑</button>
+        </div>
         <button class="seg-btn fb-cards" id="btnCardsOnly" title="Solo cuentas con al menos 1 tarjeta guardada (en account_cards o notas con card)">💳 Con tarjeta</button>
         <button class="seg-btn reset-btn" id="btnResetFilters" title="Restaurar la vista al default: LIVE, sin grade, sin búsqueda, sin orden">↺ Restaurar</button>
         <button class="seg-btn fb-refresh" id="btnRefreshVisible" title="Login en vivo de las cuentas visibles — verás el progreso">↻ Actualizar visibles</button>
