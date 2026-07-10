@@ -59,6 +59,7 @@ Decide: BD tiene $0 o $1850 (cuál caché) · ¿hay retiros `txn_type=2`? · si 
   - Deployado y verificado igual que los anteriores (StartedAt>mtime, health 200, grep de `_syncIdentWidth`/`pat-ident-w` en disco). **Tampoco verificado en navegador real.**
 
 ## 🔧 Decisiones tomadas
+- **FIGMA FIRST para todo diseño UI:** Utilizar Figma para *todo* el mocking up. Mantenemos el diseño centralizado ahí para modificarlo y visualizarlo visualmente antes de pasarlo a código. Apoyados en el MCP `html-to-design` para importar/exportar componentes. Se acabaron las iteraciones visuales a ciegas con deploys directos a prod para features nuevas.
 - **Deploy directo sin verificación en navegador cuando Robert lo pide explícitamente** ("deploya alla lo reviso") — no bloquear la iteración esperando un preview local si él va a revisar en prod de todos modos.
 - **La Pantalla es de tamaño FIJO, sin ningún control de resize** — ni ella ni el panel KPI. No reabrir sin que él lo pida.
 - **Botones de acción: esquina inferior derecha, no topbar** — el cuaje líquido deja transform en `.pat-topbar` que lo vuelve contenedor de posicionamiento; `.pat-wrap` no tiene transform → ancla limpia. La ✕ se queda arriba (convención universal de cierre).

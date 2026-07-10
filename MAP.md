@@ -201,6 +201,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `3ea668b` | fix(pantalla): popover CURP fuera de flujo (no empuja movimientos) · vidrio ligado al glow ambiental de la app |
 | `b9a2fb1` | docs(next-session): registrar 4a ronda (fix ancho CURP + cristal mate) en el cierre |
 | `1fa4219` | fix(pantalla): form CURP con ancho REAL de la columna (no full-width) · cristal aun mas mate |
 | `940fdc5` | docs(next-session): cierre sesion 2026-07-10 (5 rondas La Pantalla) — proximo objetivo: auditar cambios recientes de grading |
@@ -212,7 +213,6 @@ prewarm.py (router)
 | `a71b9e8` | feat(grading+ui): aprobación reciente sana→A · combo en una línea con divisor al final |
 | `3d680a0` | chore(gitignore): ignorar reports/ e idea_vaga.txt (datos sensibles de tarjetas) |
 | `6dbfbe6` | feat(grading): rebalanceo M7 + ciclo de vida A+ (3DS→A+, 2 declines de banco→B) |
-| `50ea3cb` | fix(pantalla): combo largo sin espacios desbordaba .pat-col-ident e invadía Movimientos |
 <!-- GEN:end:recientes -->
 
 ---
