@@ -71,27 +71,12 @@
     };
   }
 
-  // ── Persiana: control de altura propio de La Pantalla ──
-  // Por defecto La Pantalla va ADHERIDA al strip (sigue el vgutter). Cuando el
-  // strip llega a su tope, el grip propio se "arma" y permite DESPEGARLA para
-  // extenderla más abajo (sobre la tabla) hasta un límite. Al subir el grip y
-  // toparse otra vez con el strip, se re-adhiere (magnético). Modelo de Robert.
-  // La Pantalla SIGUE el alto del panel KPI (.lpanel). Ya no tiene control de
-  // arrastre propio: el único control deslizable de esta zona es el vgutter del
-  // panel KPI (app.js). Aquí solo reflejamos su alto en --pantalla-h.
-  function _stripH() {
-    const lp = $('.lpanel');
-    return lp ? lp.getBoundingClientRect().height : 0;
-  }
-  function _sizeToStrip() {
-    const root = $('#pantalla');
-    if (!root) return;
-    const sH = _stripH();
-    if (sH <= 0) return;
-    root.style.setProperty('--pantalla-h', sH + 'px');
-  }
-
   // ─────────────────────────── open / close ───────────────────────────
+  // 2026-07-09 (decisión de Robert, campo): La Pantalla no tiene controles PROPIOS
+  // de tamaño (sin drag, sin ResizeObserver) — pero app.js (initLpVResize → apply())
+  // sí la sincroniza al alto real del panel KPI en cada cambio, así nunca queda
+  // desalineada (tapando la tabla o con hueco). El default es ANCHOR_H (app.js):
+  // "Sistema" a la altura de "Cuentas". Aquí solo se muestra/esconde.
 
   let _currentId = null;
   // true mientras el último gesto sobre .pat-txn-col fue un drag-scroll (>6px de
@@ -110,7 +95,6 @@
     clearTimeout(_closeTimer);
 
     _ensureGooFilter();     // idempotente: el filtro #pat-goo debe existir antes de animar
-    _sizeToStrip();
 
     // ¿Corre el cuaje líquido en esta apertura? Solo la PRIMERA vez que se
     // materializa esta cuenta (aditivo al despliegue del marco pat-unfurl).
@@ -255,21 +239,24 @@
     // CSS lo lee para escalonar el reveal líquido; inofensivo cuando no hay .pat-liquid.
     // Controles principales: MISMOS data-* que renderDetail (d-deposit-btn/inuse/det-mark)
     // para reusar la semántica; el cableado lo hace el listener de #pantalla (abajo).
+    // 2026-07-09 (pedido de campo, imagen de referencia): barra superior full-width
+    // (nombre+grade | controles) por encima de 3 columnas reales (datos | movimientos
+    // compactos | escenario). El combo baja a ser la 1ª fila de la columna de datos.
     return `
-      <div class="pat-idrow" style="--i:0">
+      <div class="pat-topbar" style="--i:0">
         ${nombre ? `<span class="pat-name">${nombre}${age != null ? ` · ${age} años` : ''}</span>` : ''}
         ${grade ? `<span class="grade ${gCls}" title="Grade ${g(grade)}">${g(grade)}</span>` : ''}
-      </div>
-      <div class="pat-combo-line" style="--i:1">
-        <button type="button" class="pat-combo d-copy" data-copy="${g(combo)}" title="Copiar">${g(combo)}</button>
         <div class="pat-actions">
           <button type="button" class="pat-act det-mark" data-mark-email="${g(email)}" title="Fijar"><i class="ph-bold ph-push-pin"></i></button>
           <button type="button" class="pat-act inuse${locked ? ' on' : ''}" data-inuse="${d.id}" title="En uso (lock 2h) · click de nuevo libera"><i class="ph-bold ph-lock-key"></i></button>
           <button type="button" class="pat-act pat-act-dep d-deposit-btn" data-acc-id="${d.id}" title="Depositar"><i class="ph-duotone ph-credit-card"></i><span>Depositar</span></button>
         </div>
       </div>
-      <div class="pat-body">
-        <div class="pat-ident">
+      <div class="pat-columns">
+        <div class="pat-col-ident">
+          <div class="pat-combo-line" style="--i:1">
+            <button type="button" class="pat-combo d-copy" data-copy="${g(combo)}" title="Copiar">${g(combo)}</button>
+          </div>
           <div class="pat-balance" style="--i:2">${money(balance)}</div>
           <div class="pat-meta" style="--i:3">
             ${estado ? `<span class="pat-meta-item"><i class="ph-duotone ph-map-pin"></i> ${g(estado)}</span>` : ''}
@@ -293,6 +280,7 @@
           ${renderPantallaSaved(d)}
         </div>
         ${renderPantallaTxns(d)}
+        <div class="pat-col-stage" id="patStageSlot"></div>
       </div>`;
   }
 
@@ -465,12 +453,18 @@
     const sorted = movs.slice().sort((a, b) => String((b || {}).when || '').localeCompare(String((a || {}).when || '')));
     const rows = sorted.map((m, i) => ({ m, i }));
 
+    // El header (.pat-txn-h) YA NO vive dentro del área scrolleable — antes se iba
+    // con el scroll (desaparecía el rótulo "Movimientos" al bajar la lista). Ahora
+    // es hermano fijo de .pat-txn-col, arriba de la columna (2026-07-09, campo).
     if (!rows.length) {
-      return `<div class="pat-txns"><div class="pat-txn-col" style="--i:4"><div class="pat-mv-empty">Sin movimientos todavía.</div></div></div>`;
+      return `<div class="pat-col-txns">
+        <div class="pat-txn-h"><i class="ph-duotone ph-clock-counter-clockwise"></i> Movimientos</div>
+        <div class="pat-txn-col" style="--i:4"><div class="pat-mv-empty">Sin movimientos todavía.</div></div>
+      </div>`;
     }
-    return `<div class="pat-txns">
+    return `<div class="pat-col-txns">
+      <div class="pat-txn-h"><i class="ph-duotone ph-clock-counter-clockwise"></i> Movimientos <span class="cnt">${rows.length}</span></div>
       <div class="pat-txn-col" style="--i:4">
-        <div class="pat-txn-h"><i class="ph-duotone ph-clock-counter-clockwise"></i> Movimientos <span class="cnt">${rows.length}</span></div>
         ${_mvColumn(rows)}
       </div>
     </div>`;
@@ -483,12 +477,24 @@
   // .pat-error) — el llamador usa esto para NO marcar _liquidDone en un
   // render fallido; si no, al reabrir con datos ya buenos nunca se ve el
   // cuaje líquido (la bandera quedó puesta sobre un render que nunca ocurrió).
+  // Monta (re-parenta) el ESCENARIO de depósito #depStage en su zona derecha
+  // (#patStageSlot). El slot se recrea en cada render del detalle (innerHTML), pero
+  // #depStage es el MISMO nodo (movido del panel, no clonado) → una animación en curso
+  // sobrevive al re-render. En reposo #depStage va hidden (zona derecha vacía); una
+  // misión de depósito lo enciende (depos.js).
+  function _mountStage() {
+    const slot = document.getElementById('patStageSlot');
+    const stage = document.getElementById('depStage');
+    if (slot && stage && stage.parentNode !== slot) slot.appendChild(stage);
+  }
+
   function _renderDetailView(d, animate) {
     const { detail } = els();
     if (!detail) return false;
     try {
       const liquid = animate ? ' pat-liquid' : '';
       detail.innerHTML = `<div class="pat-wrap${liquid}">${renderPantallaHead(d)}</div>`;
+      _mountStage();               // re-parenta el escenario de depósito a la zona derecha
       return true;
     } catch (e) {
       console.error('[Pantalla] render failed:', e);
@@ -505,10 +511,10 @@
   // usa contextmenu (click derecho).
 
   // Cierre: (a) click en [data-close] (backdrop + botón X); (b) click en espacio
-  // LIMPIO dentro del sheet (no sobre un control/texto/fila ni la banda). Click en
-  // cualquier OTRA parte del dashboard NO cierra (Robert: se queda abierta y solo
-  // cambia de cuenta al seleccionar otra fila).
-  const _INTERACTIVE = 'button, a, input, textarea, .pat-mv, .pat-combo, .pat-curp, .pat-sv-card, .pat-sv-note, [data-copy], .pantalla-banda';
+  // LIMPIO dentro del sheet (no sobre un control/texto/fila). Click en cualquier
+  // OTRA parte del dashboard NO cierra (Robert: se queda abierta y solo cambia
+  // de cuenta al seleccionar otra fila).
+  const _INTERACTIVE = 'button, a, input, textarea, .pat-mv, .pat-combo, .pat-curp, .pat-sv-card, .pat-sv-note, [data-copy]';
   document.addEventListener('click', e => {
     if (e.target.closest('[data-close]')) { close(); return; }
     const sheet = e.target.closest('.pantalla-sheet');
@@ -705,25 +711,6 @@
     if (root && !root.hidden) close();
   });
 
-  // Recalcular altura si la ventana cambia de tamaño mientras está abierta.
-  window.addEventListener('resize', () => {
-    const root = $('#pantalla');
-    if (root && !root.hidden) _sizeToStrip();
-  });
-
-  // La Pantalla SIGUE al control deslizable (vgutter): arrastrar el gutter cambia
-  // la altura de .lpanel pero NO dispara window.resize → observamos .lpanel directo
-  // para que La Pantalla crezca/encoja en vivo con los KPIs (más txns visibles).
-  (function observeStrip() {
-    const lpanel = $('.lpanel');
-    if (!lpanel || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => {
-      const root = $('#pantalla');
-      if (root && !root.hidden) _sizeToStrip();
-    });
-    ro.observe(lpanel);
-  })();
-
   // ── Click-y-jala para scrollear el historial (.pat-txn-col) — la rueda ya
   // funciona nativo (overflow-y:auto en CSS). Delegado en #pantalla porque
   // .pat-txn-col se re-renderiza en cada refresh de detalle (innerHTML) — un
@@ -765,40 +752,9 @@
   // ── Banda inferior: click = toggle plegar/desplegar el panel KPI (que arrastra
   // a La Pantalla vía el ResizeObserver de observeStrip). Ya NO se arrastra: el
   // control deslizable fino es el vgutter del panel KPI. ──
-  (function initPantallaBanda() {
-    const sheet = $('.pantalla-sheet');
-    const root = $('#pantalla');
-    if (!sheet || !root) return;
-    const banda = document.createElement('div');
-    banda.className = 'pantalla-banda';
-    banda.title = 'Click para plegar/desplegar';
-    banda.innerHTML = '<span class="pantalla-banda-chev"><i class="ph-bold ph-caret-up"></i></span>';
-    sheet.appendChild(banda);
-
-    banda.addEventListener('click', e => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (window.KpiPanel && typeof window.KpiPanel.toggle === 'function') {
-        // Decide la dirección ANTES de animar (mismo criterio geométrico que usa
-        // KpiPanel.toggle internamente) y refleja la clase de una vez: leer
-        // currentH() en un rAF posterior atrapa la altura A MEDIO camino de la
-        // transición CSS (--ease ~420ms) y deja el chevron invertido.
-        const dir = window.PantallaLogic.toggleTarget({
-          currentH: window.KpiPanel.currentH(),
-          collapsedH: window.KpiPanel.DEFAULT_H,
-          expandedH: window.KpiPanel.maxH(),
-        });
-        // El contenido de movimientos se reflowea bajo el puntero mientras dura la
-        // transición (--ease ~420ms). Sin bloquear la selección, ese reflow bajo un
-        // click sostenido se lee como un drag y selecciona texto (visto en campo,
-        // prod: "se ve torpe"). Mismo patrón que el drag del vgutter (app.js).
-        document.body.style.userSelect = 'none';
-        window.KpiPanel.toggle();
-        root.classList.toggle('pat-expanded', dir === 'expand');
-        setTimeout(() => { document.body.style.userSelect = ''; }, 460);
-      }
-    });
-  })();
+  // La banda inferior (plegar/desplegar) se ELIMINÓ (2026-07-09, Robert: "ya no
+  // debería haber drag/collapse ni de los KPI ni de la pantalla, se quedan fijos").
+  // El alto es fijo (ANCHOR_H, app.js) — nada que togglear.
 
   window.Pantalla = { open, close, showTxn, back };
 })();

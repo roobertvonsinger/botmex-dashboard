@@ -73,7 +73,18 @@
     return currentH < (collapsedH + expandedH) / 2 ? 'expand' : 'collapse';
   }
 
-  const api = { splitTransactions, estadoFrom, formatHito, panelReserve, panelMaxH, toggleTarget };
+  // anchoredPanelH: alto del panel KPI (y de La Pantalla, que lo copia) tal que la
+  // barra "Cuentas" quede a la misma altura que la etiqueta "Sistema" del menú
+  // lateral (regla de Robert, campo 2026-07-09: "que Sistema quede a la altura de
+  // Cuentas... el límite para ambos, lo que quepa arriba sin deformar la interfaz").
+  // delta = cuánto hay que crecer/encoger el panel para que Cuentas alcance a Sistema;
+  // se suma al alto ACTUAL del panel (no se asume nada del layout, solo se mide).
+  function anchoredPanelH({ currentPanelH, filterbarTop, sistemaTop, minH }) {
+    const delta = sistemaTop - filterbarTop;
+    return Math.max(minH, Math.round(currentPanelH + delta));
+  }
+
+  const api = { splitTransactions, estadoFrom, formatHito, panelReserve, panelMaxH, toggleTarget, anchoredPanelH };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PantallaLogic = api;
 })(typeof window !== 'undefined' ? window : globalThis);

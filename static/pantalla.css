@@ -31,52 +31,24 @@
   --pat-3ds-soft:  oklch(0.82 0.14 85 / 0.14);
   --pat-r: 13px;                                      /* radius de la sheet */
 
-  /* Anclaje al strip. La ALTURA la refina el JS via --pantalla-h (mide .lpanel);
-     default razonable + tope para no desbordar el viewport. */
+  /* Tamaño FIJO, sin controles PROPIOS (decisión de Robert, campo 2026-07-09): La
+     Pantalla no se arrastra ni se pliega por su cuenta — pero SÍ espeja el alto real
+     del panel KPI (.lpanel), que app.js (initLpVResize → apply()) sincroniza en cada
+     cambio. El alto por default lo calcula ANCHOR_H (app.js): que "Sistema" (menú
+     lateral) quede a la altura de "Cuentas" (regla exacta de Robert, imagen de
+     referencia) — "el límite para ambos, KPI y Pantalla". 212px aquí es SOLO el
+     fallback CSS antes de que el JS corra (o si falla la medición). */
   position: absolute;
   left: 0; right: 0; top: 0;
-  height: var(--pantalla-h, 300px);
-  /* PISO = el mismo mínimo que usa KpiPanel (app.js MIN=96) para .lpanel. 288px era
-     el piso de la ÉPOCA del grip propio de La Pantalla (antes del modelo de 2 estados);
-     con DEFAULT_H=212 (plegada) ese piso viejo GANABA sobre --pantalla-h y estiraba
-     La Pantalla 76px más abajo de lo que .lpanel realmente mide, tapando la filterbar
-     de abajo (visto en campo, prod: "tapa los controles de los filtros"). */
-  min-height: 96px;
-  max-height: 52vh;
+  height: 212px;
   z-index: 40;                    /* sobre el strip, bajo modales/drawer (z alto) */
 }
 
 /* El atributo [hidden] gana siempre: sin ver, sin interceptar clics. */
 .pantalla[hidden] { display: none; }
 
-/* ── Banda inferior: NO se arrastra (eso lo hace el vgutter del panel KPI).
-   Es un TOGGLE por click: pliega/despliega. Cursor pointer, chevron que orienta
-   (arriba = puede desplegar · abajo = puede plegar). ── */
-.pantalla-banda {
-  position: absolute; left: 0; right: 0; bottom: 0;
-  z-index: 7; height: 18px; cursor: pointer;
-  display: grid; place-items: center;
-  opacity: .55; transition: opacity var(--ease-fast);
-}
-.pantalla-banda:hover { opacity: 1; }
-.pantalla-banda::before {   /* hairline a lo ancho: señala la franja activa */
-  content: ""; position: absolute; left: 16px; right: 16px; bottom: 5px; height: 2px;
-  border-radius: 2px; background: var(--pat-edge);
-  transition: background var(--ease-fast), left var(--ease-fast), right var(--ease-fast), box-shadow var(--ease-fast);
-}
-.pantalla-banda:hover::before {
-  background: var(--pat-edge-h); left: 8px; right: 8px;
-  box-shadow: 0 0 14px -3px var(--pat-gold-soft);
-}
-.pantalla-banda-chev {
-  position: relative; display: grid; place-items: center;
-  color: var(--pat-gold); font-size: 12px; line-height: 1; margin-bottom: 1px;
-  transition: transform 220ms var(--ease-spring), color var(--ease-fast);
-}
-.pantalla-banda:hover .pantalla-banda-chev { color: var(--pat-gold); transform: translateY(-1px); }
-/* Desplegada: el chevron apunta hacia abajo (la acción disponible es plegar). */
-.pantalla.pat-expanded .pantalla-banda-chev { transform: rotate(180deg); }
-.pantalla.pat-expanded .pantalla-banda:hover .pantalla-banda-chev { transform: rotate(180deg) translateY(-1px); }
+/* La banda inferior (plegar/desplegar) se ELIMINÓ (2026-07-09, Robert: alto fijo,
+   sin drag ni collapse). El único scroll dentro de La Pantalla es .pat-txn-col. */
 
 /* ═══════════════ BACKDROP — difumina los KPIs detrás ═══════════════ */
 .pantalla-backdrop {
@@ -270,18 +242,13 @@
 /* Raíz del detalle: columna que LLENA el alto del strip sin scroll. */
 .pat-wrap { display: flex; flex-direction: column; height: 100%; gap: 9px; min-height: 0; }
 
-/* Fila 1 — identidad mínima (nombre · edad) + grade, discretos, no dominan.
-   2026-07-06: los controles (.pat-actions) YA NO viven aquí — se movieron a
-   .pat-combo-line (su "lugar" propio, una fila más abajo). Sin ellos esta fila
-   mide solo el alto del texto → la cabecera se compacta y .pat-body (divisor +
-   transacciones) arranca más arriba (pedido de campo: "que no empiecen a mitad
-   de pantalla"). Ya no necesita reservar hueco para la X (no hay contenido
-   empujado a la derecha en esta fila). */
-.pat-idrow { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+/* Barra superior — full width, ÚNICA fila por encima de las 3 columnas. Nombre+edad+
+   grade a la izquierda, controles (Fijar/En uso/Depositar) a la derecha (2026-07-09:
+   suben aquí desde .pat-combo-line — pedido de campo, imagen de referencia: los
+   botones van arriba, a la altura del nombre, no a media pantalla). padding-right
+   reserva el hueco de .pantalla-close (30px + 12px offset = 42px, +8px de aire). */
+.pat-topbar { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; padding-right: 50px; }
 .pat-name { font-size: 11.5px; color: var(--text-muted); font-weight: 500; letter-spacing: .3px; }
-
-/* Controles principales (Depositar / En uso / Fijar) — verde, a la derecha,
-   ahora en la fila del combo (ver .pat-combo-line). */
 .pat-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 .pat-act {
   -webkit-appearance: none; appearance: none; cursor: pointer;
@@ -306,12 +273,10 @@
   box-shadow: 0 0 20px -3px var(--pat-gold), 0 1px 2px oklch(0 0 0 / 0.25);
 }
 
-/* Fila 2 — COMBO copiable POR ENCIMA de todo, tipo liga (copia al click en el texto)
-   + .pat-actions (Fijar/En uso/Depositar) a la derecha, en la MISMA fila (2026-07-06,
-   antes vivían en .pat-idrow). padding-right reserva el hueco de .pantalla-close
-   (30px + 12px de offset = 42px, +8px de aire) — sin esto Depositar (rightmost de
-   .pat-actions) queda justo debajo de la X (visto en campo, prod). */
-.pat-combo-line { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; line-height: 1; padding-right: 50px; }
+/* COMBO copiable — ahora vive DENTRO de la columna de datos (.pat-col-ident), como
+   primera fila de esa columna (2026-07-09: ya no reserva hueco de la X, los
+   controles subieron a .pat-topbar). */
+.pat-combo-line { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; line-height: 1; }
 .pat-combo {
   -webkit-appearance: none; appearance: none; border: 0; background: transparent;
   cursor: pointer; text-align: left; padding: 0;
@@ -325,10 +290,18 @@
 .pat-combo.copied { color: oklch(0.80 0.14 155); border-bottom-color: transparent; }   /* verde solo al copiar (feedback) */
 
 /* Cuerpo — 2 zonas lado a lado (datos | transacciones), llenan el resto. Un
-   DIVISOR vertical (border en .pat-txns) separa datos de transacciones. */
-.pat-body { display: flex; gap: 0; flex: 1 1 auto; min-height: 0; }
+   DIVISOR vertical (border en .pat-col-txns) separa datos de transacciones. */
+/* ═══ 3 COLUMNAS reales: datos | movimientos compactos | escenario de animación ═══
+   2026-07-09 (pedido de campo, imagen de referencia): antes eran 2 zonas donde
+   movimientos se estiraba a TODO el ancho (el monto se iba al borde derecho con
+   un hueco muerto en medio) y su header vivía DENTRO del contenedor scrolleable
+   (desaparecía al hacer scroll). Ahora cada columna es dueña de su header (fijo,
+   no scrollea) + su contenido, con un hairline dorado CONTINUO (header→contenido)
+   marcando cada frontera — visible pero sutil, mismo lenguaje visual que ya
+   existía (border-left + glow), no un elemento nuevo. */
+.pat-columns { display: flex; gap: 0; flex: 1 1 auto; min-height: 0; }
 
-.pat-ident { flex: 0 0 218px; display: flex; flex-direction: column; gap: 8px; min-width: 0; padding-right: 22px; }
+.pat-col-ident { flex: 0 0 218px; display: flex; flex-direction: column; gap: 8px; min-width: 0; padding-right: 22px; }
 .pat-balance {
   font-family: var(--font-display); font-weight: 700;
   font-size: 36px; line-height: 1; letter-spacing: .2px;
@@ -347,23 +320,42 @@
 }
 .pat-curp:hover { color: var(--pat-gold); }
 
-/* Transacciones — UN historial cronológico (más reciente primero), fuentes
-   Botmexico/BetMexico mezcladas pero distinguibles por fila (badge ⚡/🌐).
-   Antes 2 columnas por fuente partían el orden temporal real; ahora ocupa
-   todo el ancho disponible → más detalle por fila, más filas visibles.
-   El DIVISOR (border-left dorado hairline + leve glow) marca la frontera con los datos. */
-.pat-txns {
-  flex: 1 1 auto; display: flex; flex-direction: column;
-  min-width: 0; min-height: 0; padding-left: 22px;
+/* Columna 2 — movimientos, COMPACTA (ya no se estira a todo el ancho). Header
+   (.pat-txn-h) es hijo DIRECTO de la columna (fijo, arriba) — .pat-txn-col es
+   SOLO el área scrolleable de filas, ya no envuelve al header. */
+.pat-col-txns {
+  flex: 0 1 420px; display: flex; flex-direction: column;
+  min-width: 260px; min-height: 0; padding-left: 22px;
   border-left: 1px solid var(--pat-edge);
   box-shadow: -1px 0 16px -12px var(--pat-gold-soft);
 }
+
+/* Columna 3 (derecha) — ESCENARIO del progreso de depósito. En reposo va vacía; el
+   motor de depósitos (depos.js) re-parenta aquí el bloque de escenas (#scene-stage
+   + estado) cuando corre una misión. Antes los movimientos se estiraban a TODO
+   el ancho y el monto se iba al borde derecho — ahora quedan compactos y este
+   espacio queda libre para el feedback en vivo (pedido de Robert, campo). */
+.pat-col-stage {
+  flex: 1 1 0; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; justify-content: center;
+  padding-left: 22px;
+  border-left: 1px solid var(--pat-edge);
+  box-shadow: -1px 0 16px -12px var(--pat-gold-soft);
+}
+.pat-col-stage[hidden] { display: none; }
 .pat-txn-emo { font-size: 12px; line-height: 1; filter: saturate(1.1); }
+.pat-txn-h {
+  display: flex; align-items: center; gap: 7px; margin-bottom: 5px; flex: 0 0 auto;
+  font-family: var(--font-display); font-weight: 600; font-size: 10.5px;
+  text-transform: uppercase; letter-spacing: .6px; color: var(--text-dim);
+}
+.pat-txn-h i { font-size: 13px; color: var(--pat-gold); }
+.pat-txn-h .cnt { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); background: oklch(0.80 0.085 160 / 0.10); border-radius: 20px; padding: 1px 7px; }
 /* Rueda de scroll nativa (overflow-y) + click-y-jala (JS, pantalla.js) — cursor
    grab en reposo, grabbing mientras arrastra. Scrollbar propia, delgada, discreta
    (Robert: "que pueda usar la rueda... o click y jalar... microanimaciones"). */
 .pat-txn-col {
-  display: flex; flex-direction: column; gap: 4px; min-height: 0;
+  flex: 1 1 auto; display: flex; flex-direction: column; gap: 4px; min-height: 0;
   overflow-y: auto; overflow-x: hidden; scroll-behavior: smooth; cursor: grab;
 }
 .pat-txn-col.dw-dragging { cursor: grabbing; scroll-behavior: auto; user-select: none; }
@@ -371,13 +363,6 @@
 .pat-txn-col::-webkit-scrollbar-track { background: transparent; }
 .pat-txn-col::-webkit-scrollbar-thumb { background: var(--pat-edge); border-radius: 4px; }
 .pat-txn-col::-webkit-scrollbar-thumb:hover { background: var(--pat-edge-h); }
-.pat-txn-h {
-  display: flex; align-items: center; gap: 7px; margin-bottom: 3px;
-  font-family: var(--font-display); font-weight: 600; font-size: 10.5px;
-  text-transform: uppercase; letter-spacing: .6px; color: var(--text-dim);
-}
-.pat-txn-h i { font-size: 13px; color: var(--pat-gold); }
-.pat-txn-h .cnt { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); background: oklch(0.80 0.085 160 / 0.10); border-radius: 20px; padding: 1px 7px; }
 
 /* Fila de movimiento compacta (una línea). COLORES INTUITIVOS por resultado —
    barra lateral + tinte de fondo suave (semántica del historial viejo, más
@@ -555,7 +540,7 @@
    (el saldo se veía con doble exposición). El cuaje (blur→nítido) ya materializa
    sin degradar la nitidez. Prioridad: texto pixel-perfect > efecto goo. */
 
-.pat-wrap.pat-liquid .pat-idrow,
+.pat-wrap.pat-liquid .pat-topbar,
 .pat-wrap.pat-liquid .pat-combo-line,
 .pat-wrap.pat-liquid .pat-balance,
 .pat-wrap.pat-liquid .pat-meta,
@@ -602,7 +587,7 @@
   /* Escritura líquida: sin goo ni cuaje. Fade simple de opacity, sin blur ni
      transform, sin stagger (delay 0) — el contenido aparece de una, suave. */
   .pat-wrap.pat-liquid { filter: none; }
-  .pat-wrap.pat-liquid .pat-idrow,
+  .pat-wrap.pat-liquid .pat-topbar,
   .pat-wrap.pat-liquid .pat-combo-line,
   .pat-wrap.pat-liquid .pat-balance,
   .pat-wrap.pat-liquid .pat-meta,

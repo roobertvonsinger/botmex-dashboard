@@ -2,6 +2,14 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## Header "Movimientos" de La Pantalla desaparecía al hacer scroll (2026-07-09)
+
+- **Síntoma**: dentro de La Pantalla, si bajabas el scroll de la lista de transacciones, el rótulo "🕐 Movimientos · N" se iba con el scroll — al bajar unas filas, el header ya no estaba visible en ningún lado.
+- **Causa raíz** (`renderPantallaTxns`, `pantalla.js`): `.pat-txn-h` (el header) se renderizaba como **hijo DIRECTO de `.pat-txn-col`** — el mismo contenedor con `overflow-y:auto` que scrollea las filas (`.pat-mv`). Al no tener `position:sticky` ni ser hermano fuera del área scrolleable, el header scrolleaba junto con el contenido.
+- **Descubierto de paso** durante el rediseño de 3 columnas de La Pantalla (no reportado por Robert, hallado leyendo el código).
+- **Fix**: `.pat-txn-h` pasó a ser HERMANO de `.pat-txn-col`, ambos hijos directos de `.pat-col-txns` (nueva columna contenedora) — el header queda fijo arriba, `.pat-txn-col` (con `flex:1 1 auto; overflow-y:auto`) es SOLO el área de filas.
+- **Lección**: un header decorativo dentro de un `overflow:auto` es invisible-a-futuro — hay que ponerlo como hermano fijo o `position:sticky` explícito, nunca asumir que "vive arriba" visualmente basta.
+
 ## [CRÍTICO] Rate-limit (429) se reportaba como "Rechazado (banco)" + envenenaba bin_stats (2026-07-06)
 
 - **Síntoma**: Robert vio en La Pantalla un movimiento `Rechazado (banco) · Pago con tarjeta · $10.00` a las 18:05, cuando el log del backend a esa misma hora decía claramente `[BAN] 429 Rate limit ... RATE_LIMITED (BAN)`. El banco **ni tocó la tarjeta** — el login murió antes por rate-limit — pero la UI culpaba al banco.

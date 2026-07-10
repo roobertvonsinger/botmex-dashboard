@@ -35,4 +35,22 @@ assert.strictEqual(P.toggleTarget({ currentH: 468, collapsedH: 212, expandedH: 4
 assert.strictEqual(P.toggleTarget({ currentH: 300, collapsedH: 212, expandedH: 468 }), 'expand', 'toggleTarget bajo el punto medio → expandir');
 assert.strictEqual(P.toggleTarget({ currentH: 400, collapsedH: 212, expandedH: 468 }), 'collapse', 'toggleTarget sobre el punto medio → plegar');
 
+// ── anchoredPanelH: crece/encoge el panel para que Cuentas alcance a Sistema ──
+assert.strictEqual(
+  P.anchoredPanelH({ currentPanelH: 212, filterbarTop: 534, sistemaTop: 381, minH: 96 }),
+  96, 'Sistema arriba de Cuentas → encoge (212-153=59, pero el piso minH=96 gana)'
+);
+assert.strictEqual(
+  P.anchoredPanelH({ currentPanelH: 212, filterbarTop: 300, sistemaTop: 534, minH: 96 }),
+  446, 'Sistema abajo de Cuentas → crece (534-300=234 más)'
+);
+assert.strictEqual(
+  P.anchoredPanelH({ currentPanelH: 212, filterbarTop: 500, sistemaTop: 100, minH: 96 }),
+  96, 'delta negativo grande no baja del piso minH'
+);
+assert.strictEqual(
+  P.anchoredPanelH({ currentPanelH: 300, filterbarTop: 400, sistemaTop: 400, minH: 96 }),
+  300, 'ya alineado (delta=0) → sin cambio'
+);
+
 console.log('OK pantalla_logic');

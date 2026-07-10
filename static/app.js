@@ -2802,25 +2802,31 @@ $$('.seg').forEach(seg => {
   });
 })();
 
-// ─── Divisor horizontal del strip (↕ altura) + control de 2 estados ───
-// Arrastra ↕ para ajustar la altura del panel KPI vs la tabla. Doble-click
-// restaura. El TOPE hacia abajo ya no es un TABLE_RESERVE=300 fijo: se MIDE
-// (filterbar + pagebar + 10 filas reales) para garantizar un piso de 10 cuentas
-// visibles. Expone window.KpiPanel: control dominante del alto que La Pantalla
-// (pantalla.js) dispara con la banda inferior (plegada 212px ↔ desplegada tope).
+// ─── Alto FIJO del panel KPI + La Pantalla — SIN drag, SIN collapse (2026-07-09,
+// decisión de Robert, campo: "ya no debería haber drag/collapse ni de los KPI ni
+// de la pantalla, se quedan fijos"). El único cálculo dinámico es el ANCLA (una
+// vez al cargar): que "Sistema" (menú lateral) quede a la altura de "Cuentas".
+// Scrolls que SÍ siguen vivos (sin tocar): .lp-feed-rows / .lp-alert-rows dentro
+// de las cards KPI, y .pat-txn-col dentro de La Pantalla.
 (function initLpVResize() {
   const panel = document.getElementById('adminPanel');
-  const gutter = document.getElementById('lpVGutter');
   const main = document.getElementById('accountsMain');
-  if (!panel || !gutter || !main) return;
-  const KEY = 'bmx.lpHeight.v2';
+  if (!panel || !main) return;
   const MIN = 96;
-  const DEFAULT_H = 212;   // default CSS de .lpanel (style.css:629) = estado "plegada"
+  const DEFAULT_H = 212;   // fallback SOLO si no se puede medir el ancla (ver ANCHOR_H)
   const MIN_ROWS = 10;     // piso operativo: nunca menos de 10 cuentas visibles
   const FALLBACK_ROW_H = 34;
   const PL = window.PantallaLogic;
 
-  const apply = h => { panel.style.height = h + 'px'; panel.style.minHeight = h + 'px'; };
+  // apply(): ÚNICA fuente de verdad del alto — sincroniza panel KPI Y La Pantalla
+  // en el mismo golpe (se llama UNA sola vez, al cargar; ya no hay drag que la
+  // vuelva a invocar).
+  const apply = h => {
+    panel.style.height = h + 'px';
+    panel.style.minHeight = h + 'px';
+    const p = document.getElementById('pantalla');
+    if (p) p.style.height = h + 'px';
+  };
 
   // Mide una fila real de #accTable; si la página no tiene filas (ej. filtro DEAD
   // vacío), usa la fila del header como proxy; si tampoco, una constante.
@@ -2846,65 +2852,27 @@ $$('.seg').forEach(seg => {
   }
   function currentH() { return panel.getBoundingClientRect().height; }
 
-  try {
-    const saved = parseInt(localStorage.getItem(KEY) || '', 10);
-    if (saved > 0) apply(Math.min(Math.max(saved, MIN), maxH()));
-  } catch (_) {}
-
-  // ── Drag del gutter: control libre, capado por el piso de 10 filas ──
-  gutter.addEventListener('pointerdown', e => {
-    e.preventDefault();
-    const startY = e.clientY;
-    const startH = panel.getBoundingClientRect().height;
-    const mx = maxH();
-    gutter.classList.add('dragging');
-    panel.classList.add('lp-resizing');
-    gutter.setPointerCapture?.(e.pointerId);
-    document.body.style.cursor = 'grabbing';
-    document.body.style.userSelect = 'none';
-    const move = ev => {
-      let h = startH + (ev.clientY - startY);
-      h = Math.max(MIN, Math.min(h, mx));
-      apply(h);
-    };
-    const up = () => {
-      gutter.classList.remove('dragging');
-      panel.classList.remove('lp-resizing');
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      try { localStorage.setItem(KEY, String(Math.round(panel.getBoundingClientRect().height))); } catch (_) {}
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-  });
-  gutter.addEventListener('dblclick', () => {
-    panel.style.removeProperty('height');
-    panel.style.removeProperty('min-height');
-    try { localStorage.removeItem(KEY); } catch (_) {}
-    toast('↕ Altura del panel restaurada', 'success');
-  });
-
-  // ── Control de 2 estados (lo dispara La Pantalla desde su banda inferior) ──
-  // applyH con animación: .lpanel ya tiene transition:height en CSS; el
-  // ResizeObserver de pantalla.js la sigue frame a frame → no necesita animación
-  // propia. Persiste el alto resultante para sobrevivir reload.
-  function applyH(h, animate) {
-    const clamped = Math.max(MIN, Math.min(h, maxH()));
-    if (!animate) panel.classList.add('lp-resizing');
-    apply(clamped);
-    if (!animate) requestAnimationFrame(() => panel.classList.remove('lp-resizing'));
-    try { localStorage.setItem(KEY, String(Math.round(clamped))); } catch (_) {}
+  // ANCHOR_H: alto FIJO tal que "Sistema" (menú lateral, #sbSectionSistema) quede
+  // a la altura de "Cuentas" (.filterbar-accounts) — regla exacta de Robert, campo
+  // 2026-07-09 (imagen de referencia). Medido UNA vez al cargar, no estimado.
+  function computeAnchorH() {
+    const sysEl = document.getElementById('sbSectionSistema');
+    const fb = document.querySelector('.filterbar-accounts');
+    if (!sysEl || !fb) return null;
+    return PL.anchoredPanelH({
+      currentPanelH: currentH(),
+      filterbarTop: fb.getBoundingClientRect().top,
+      sistemaTop: sysEl.getBoundingClientRect().top,
+      minH: MIN,
+    });
   }
-  function expand() { applyH(maxH(), true); }
-  function collapse() { applyH(DEFAULT_H, true); }
-  function toggle() {
-    const dir = PL.toggleTarget({ currentH: currentH(), collapsedH: DEFAULT_H, expandedH: maxH() });
-    if (dir === 'expand') expand(); else collapse();
-  }
+  const ANCHOR_H = computeAnchorH() || DEFAULT_H;
+  apply(Math.min(ANCHOR_H, maxH()));
 
-  window.KpiPanel = { toggle, expand, collapse, maxH, applyH, currentH, DEFAULT_H };
+  // Se expone SOLO por si algún módulo necesita leer el alto vigente (currentH) o
+  // el tope teórico del viewport (maxH) — sin toggle/expand/collapse/applyH, ya
+  // no existen controles de tamaño en ningún lado.
+  window.KpiPanel = { maxH, currentH, DEFAULT_H: ANCHOR_H };
 })();
 
 // ── El panel de depósitos (DeposWindow) se ancla leyendo el rect de #accDockZone,

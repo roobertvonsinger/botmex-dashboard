@@ -47,7 +47,7 @@
     <button class="nav on" data-section="accounts" title="Tu chamba diaria — todas las cuentas vivas"><span class="i">▦</span>Cuentas<span class="b" id="navCount">…</span></button>
     <button class="nav" data-section="pool" id="navPool" title="Las que ven los operadores ahorita"><span class="i">◈</span>Pool<span class="b" id="navPoolCount">…</span></button>
     <button class="nav" data-section="activity" title="Quién hizo qué y cuándo — la chismografía"><span class="i">⚡</span>Actividad<span class="b" id="navActivityBadge"></span></button>
-    <div class="sb-section">Sistema</div>
+    <div class="sb-section" id="sbSectionSistema">Sistema</div>
     <button class="nav" data-section="notifications" title="Lo que pasó mientras no veías"><span class="i">◔</span>Notificaciones<span class="b warn hidden" id="navNotifBadge">·</span></button>
     <button class="nav" data-section="logs" id="navLogs" title="Tripas en vivo del servidor"><span class="i">▤</span>Logs<span class="b" id="navLogsBadge"></span></button>
     <button class="nav" data-section="health" id="navHealth" title="¿Está vivo todo? Aquí lo dice"><span class="i">◉</span>Salud<span class="b ok hidden" id="navHealthBadge">✓</span></button>
@@ -130,8 +130,300 @@
         </div>
       </div>
 
-      <!-- Divisor horizontal arrastrable (↕): ajusta la altura del strip vs la tabla · doble-click restaura -->
-      <div class="lp-vgutter" id="lpVGutter" title="Agarra y jala ↕ para ajustar la altura del panel · doble-click restaura" role="separator" aria-orientation="horizontal"><span class="lp-vgrip"></span></div>
+      <!-- ESCENARIO de depósito (movido del panel #depos): pantalla.js lo monta en #patStageSlot al abrir La Pantalla -->
+      <div id="depStage" hidden>
+    <section class="journey" aria-label="Viaje del deposito">
+      <div class="j-balance" id="jbal" style="visibility:hidden">
+        <span class="j-bal-now" id="balNow">$512.00</span><span class="j-bal-arrow">&#8594;</span><span class="j-bal-to" id="balTo">$512.00</span>
+      </div>
+      <div class="scene-stage" id="scene-stage">
+        <div class="guide" id="guide">
+          <div class="guide-steps">
+            <div class="gstep"><span class="gi">&#128100;</span><span class="gt">Elige cuentas</span></div>
+            <span class="garrow">&#8594;</span>
+            <div class="gstep"><span class="gi">&#128179;</span><span class="gt">Pega tarjetas</span></div>
+            <span class="garrow">&#8594;</span>
+            <div class="gstep"><span class="gi">$</span><span class="gt">Pon el monto</span></div>
+            <span class="garrow">&#8594;</span>
+            <div class="gstep"><span class="gi">&#9889;</span><span class="gt">Deposita</span></div>
+          </div>
+          <div class="guide-hint">El proceso se anima aqui  espera el resultado</div>
+        </div>
+<div class="scene" id="scene-login">
+  <svg viewBox="0 0 380 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Iniciando sesion">
+    <defs>
+      <radialGradient id="lg-core" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#9ff5e4"/>
+        <stop offset="100%" stop-color="#00bd72"/>
+      </radialGradient>
+      <linearGradient id="lg-key-grad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#00bd72" stop-opacity=".45"/>
+        <stop offset="100%" stop-color="#7fe8b5"/>
+      </linearGradient>
+      <filter id="lg-glow" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="2.2" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="lg-soft" x="-80%" y="-80%" width="260%" height="260%">
+        <feGaussianBlur stdDeviation="6"/>
+      </filter>
+      <filter id="lg-goo" x="-40%" y="-40%" width="180%" height="180%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="bl"/>
+        <feColorMatrix in="bl" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -10" result="goo"/>
+        <feBlend in="SourceGraphic" in2="goo"/>
+      </filter>
+    </defs>
+
+    <!-- halo respirando -->
+    <g class="lg-haze"><circle cx="190" cy="100" r="56" fill="#00bd72" opacity=".10" filter="url(#lg-soft)"/></g>
+
+    <!-- cerradura: anillos finos -->
+    <g class="lg-lock" fill="none" stroke-linecap="round">
+      <circle cx="190" cy="100" r="46" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
+      <circle cx="190" cy="100" r="46" class="lg-arc" stroke="#00bd72" stroke-width="1.4" stroke-dasharray="36 253" filter="url(#lg-glow)"/>
+      <circle cx="190" cy="100" r="18" stroke="rgba(255,255,255,.12)" stroke-width="1"/>
+    </g>
+
+    <!-- ojo de cerradura -->
+    <g class="lg-hole" fill="none" stroke="#00bd72" stroke-width="1.4" stroke-linecap="round" filter="url(#lg-glow)">
+      <circle cx="190" cy="95" r="5.5"/>
+      <path d="M187 99 L186 111 M193 99 L194 111"/>
+    </g>
+
+    <!-- pulso de apertura -->
+    <g class="lg-pulse"><circle cx="190" cy="100" r="20" fill="none" stroke="#7fe8b5" stroke-width="1.3"/></g>
+
+    <!-- llave: blob de mercurio que se traza y gira -->
+    <g class="lg-key">
+      <g class="lg-key-inner">
+        <g class="lg-key-line" filter="url(#lg-glow)">
+          <circle class="lg-draw lg-bow" style="--len:69" cx="112" cy="100" r="11" fill="none" stroke="url(#lg-key-grad)" stroke-width="1.8"/>
+          <circle cx="112" cy="100" r="4" fill="none" stroke="#00bd72" stroke-width="1.3"/>
+          <path class="lg-draw lg-stem" style="--len:96" d="M123 100 H188 M178 100 V109 M186 100 V106" fill="none" stroke="url(#lg-key-grad)" stroke-width="1.8" stroke-linecap="round"/>
+        </g>
+      </g>
+    </g>
+  </svg>
+</div>
+<div class="scene" id="scene-form">
+  <svg viewBox="0 0 380 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Formulario: tarjeta leida en lector">
+    <defs>
+      <filter id="fm-goo" x="-40%" y="-40%" width="180%" height="180%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="3.4" result="blur"/>
+        <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 16 -7" result="goo"/>
+        <feBlend in="SourceGraphic" in2="goo"/>
+      </filter>
+      <filter id="fm-glow" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="2" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <linearGradient id="fm-sweep" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#00bd72" stop-opacity="0"/>
+        <stop offset="50%" stop-color="#7fe8b5" stop-opacity=".9"/>
+        <stop offset="100%" stop-color="#00bd72" stop-opacity="0"/>
+      </linearGradient>
+      <clipPath id="fm-cardclip"><rect x="136" y="67" width="108" height="66" rx="9"/></clipPath>
+    </defs>
+
+    <g class="fm-grid" opacity=".5" fill="none" stroke="rgba(255,255,255,.045)" stroke-width="1">
+      <path d="M70 70 H310 M70 100 H310 M70 130 H310"/>
+      <path d="M120 56 V144 M190 56 V144 M260 56 V144"/>
+    </g>
+
+    <g class="fm-slot" fill="none">
+      <rect class="fm-frame" x="92" y="58" width="196" height="84" rx="13" stroke="rgba(255,255,255,.10)" stroke-width="1"/>
+      <rect class="fm-mouth" x="102" y="94" width="176" height="12" rx="6" fill="#06070a" stroke="rgba(255,255,255,.12)" stroke-width="1"/>
+      <line class="fm-lip" x1="110" y1="100" x2="270" y2="100" stroke="#00bd72" stroke-width="1" stroke-linecap="round" opacity=".35"/>
+    </g>
+
+    <g class="fm-card">
+      <g class="fm-card-inner">
+        <rect x="136" y="67" width="108" height="66" rx="9" fill="none" stroke="#00bd72" stroke-width="1.4" filter="url(#fm-glow)"/>
+        <rect x="148" y="80" width="18" height="13" rx="3" fill="none" stroke="#00bd72" stroke-width="1" opacity=".9"/>
+        <path d="M150 83 q5 3.5 0 7 M156 81.5 q8 5 0 10" fill="none" stroke="#00bd72" stroke-width=".9" opacity=".55"/>
+        <line x1="148" y1="112" x2="214" y2="112" stroke="#00bd72" stroke-width="1.2" stroke-linecap="round" opacity=".7"/>
+        <line x1="148" y1="120" x2="190" y2="120" stroke="rgba(255,255,255,.20)" stroke-width="1" stroke-linecap="round"/>
+      </g>
+    </g>
+
+    <g clip-path="url(#fm-cardclip)">
+      <rect class="fm-scan" x="130" y="67" width="26" height="66" fill="url(#fm-sweep)" filter="url(#fm-glow)"/>
+    </g>
+  </svg>
+</div>
+<div class="scene" id="scene-processing">
+  <svg viewBox="0 0 380 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Procesando">
+    <defs>
+      <radialGradient id="pr-core-grad" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#bffaee"/>
+        <stop offset="48%" stop-color="#00bd72"/>
+        <stop offset="100%" stop-color="#00bd72" stop-opacity="0"/>
+      </radialGradient>
+      <radialGradient id="pr-halo-grad" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#00bd72" stop-opacity=".30"/>
+        <stop offset="60%" stop-color="#00bd72" stop-opacity=".06"/>
+        <stop offset="100%" stop-color="#00bd72" stop-opacity="0"/>
+      </radialGradient>
+      <filter id="pr-goo" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b"/>
+        <feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9"/>
+      </filter>
+      <filter id="pr-soft" x="-80%" y="-80%" width="260%" height="260%">
+        <feGaussianBlur stdDeviation="3"/>
+      </filter>
+    </defs>
+
+    <circle class="pr-halo" cx="190" cy="100" r="66" fill="url(#pr-halo-grad)"/>
+
+    <g class="pr-orbit" fill="none" stroke="rgba(255,255,255,.07)" stroke-width=".8">
+      <ellipse cx="190" cy="100" rx="78" ry="30"/>
+      <ellipse cx="190" cy="100" rx="78" ry="30" transform="rotate(60 190 100)"/>
+      <ellipse cx="190" cy="100" rx="78" ry="30" transform="rotate(120 190 100)"/>
+    </g>
+
+    <g class="pr-waves" fill="none" stroke="#00bd72" stroke-linecap="round">
+      <circle class="pr-w pr-w1" cx="190" cy="100" r="22" stroke-width="1.4"/>
+      <circle class="pr-w pr-w2" cx="190" cy="100" r="22" stroke-width="1.1"/>
+      <circle class="pr-w pr-w3" cx="190" cy="100" r="22" stroke-width=".9"/>
+    </g>
+
+    <g class="pr-data" fill="#9ff6e4" filter="url(#pr-soft)">
+      <circle class="pr-d pr-d1" cx="190" cy="100" r="2.1"/>
+      <circle class="pr-d pr-d2" cx="190" cy="100" r="1.9"/>
+      <circle class="pr-d pr-d3" cx="190" cy="100" r="2.1"/>
+      <circle class="pr-d pr-d4" cx="190" cy="100" r="1.7"/>
+    </g>
+
+    <g class="pr-core" filter="url(#pr-goo)">
+      <circle class="pr-blob-a" cx="190" cy="100" r="14" fill="url(#pr-core-grad)"/>
+      <circle class="pr-blob-b" cx="190" cy="100" r="7.5" fill="#bffaee"/>
+    </g>
+    <circle class="pr-seed" cx="190" cy="100" r="2.6" fill="#eafffb"/>
+  </svg>
+</div>
+<div class="scene" id="scene-retry">
+  <svg viewBox="0 0 380 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Reintentando: recalibracion liquida sutil">
+    <defs>
+      <filter id="rt-goo" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="3.2" result="b"/>
+        <feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -8" result="g"/>
+        <feBlend in="SourceGraphic" in2="g"/>
+      </filter>
+      <filter id="rt-soft" x="-80%" y="-80%" width="260%" height="260%">
+        <feGaussianBlur stdDeviation="2" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <linearGradient id="rt-arc" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#f2b25a" stop-opacity="0"/>
+        <stop offset="55%" stop-color="#f2b25a" stop-opacity=".5"/>
+        <stop offset="100%" stop-color="#f3c77a" stop-opacity=".85"/>
+      </linearGradient>
+    </defs>
+
+    <rect class="rt-tint" width="380" height="200" fill="#f2b25a" opacity="0"/>
+
+    <circle class="rt-aura" cx="190" cy="100" r="42" fill="#f2b25a" opacity="0"/>
+    <circle class="rt-ripple" cx="190" cy="100" r="20" fill="none" stroke="#f2b25a" stroke-width="1" opacity="0"/>
+
+    <circle class="rt-track" cx="190" cy="100" r="32" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="1"/>
+
+    <g class="rt-cyc" transform="translate(190 100)">
+      <path class="rt-stroke" d="M0 -32 A32 32 0 1 1 -22 23" fill="none"
+            stroke="url(#rt-arc)" stroke-width="1.6" stroke-linecap="round"
+            pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"
+            filter="url(#rt-soft)"/>
+      <g class="rt-head" filter="url(#rt-goo)">
+        <circle cx="-22" cy="23" r="3.6" fill="#f3c77a"/>
+        <circle cx="-15" cy="29" r="2.2" fill="#f2b25a"/>
+      </g>
+    </g>
+
+    <g class="rt-drop" filter="url(#rt-goo)">
+      <circle r="2.6" fill="#f3c77a" opacity="0"
+              style="offset-path:path('M212 78 A32 32 0 1 1 168 123');offset-rotate:auto"/>
+    </g>
+  </svg>
+</div>
+<div class="scene" id="scene-done">
+  <svg viewBox="0 0 380 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Terminando: deposito acreditado">
+    <defs>
+      <radialGradient id="dn-gold" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#ffe9bd"/>
+        <stop offset="50%" stop-color="#f3c77a"/>
+        <stop offset="100%" stop-color="#f3c77a" stop-opacity="0"/>
+      </radialGradient>
+      <radialGradient id="dn-bloom-grad" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#f3c77a" stop-opacity=".9"/>
+        <stop offset="42%" stop-color="#f3c77a" stop-opacity=".24"/>
+        <stop offset="100%" stop-color="#f3c77a" stop-opacity="0"/>
+      </radialGradient>
+      <filter id="dn-goo" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b"/>
+        <feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -10"/>
+      </filter>
+      <filter id="dn-soft" x="-100%" y="-100%" width="300%" height="300%">
+        <feGaussianBlur stdDeviation="2.6"/>
+      </filter>
+    </defs>
+
+    <g class="dn-converge" stroke-linecap="round">
+      <line class="dn-cv dn-cv1" x1="56"  y1="100" x2="150" y2="100"/>
+      <line class="dn-cv dn-cv2" x1="324" y1="100" x2="230" y2="100"/>
+      <line class="dn-cv dn-cv3" x1="190" y1="40"  x2="190" y2="74"/>
+      <line class="dn-cv dn-cv4" x1="190" y1="160" x2="190" y2="126"/>
+      <line class="dn-cv dn-cv5" x1="120" y1="56"  x2="172" y2="86"/>
+      <line class="dn-cv dn-cv6" x1="260" y1="144" x2="208" y2="114"/>
+    </g>
+
+    <circle class="dn-bloom" cx="190" cy="100" r="74" fill="url(#dn-bloom-grad)" opacity="0"/>
+
+    <g class="dn-melt" filter="url(#dn-goo)">
+      <circle class="dn-drop dn-d1" cx="150" cy="72"  r="4" fill="url(#dn-gold)"/>
+      <circle class="dn-drop dn-d2" cx="236" cy="80"  r="4" fill="url(#dn-gold)"/>
+      <circle class="dn-drop dn-d3" cx="152" cy="130" r="4" fill="url(#dn-gold)"/>
+      <circle class="dn-drop dn-d4" cx="232" cy="126" r="4" fill="url(#dn-gold)"/>
+      <circle class="dn-core" cx="190" cy="100" r="22" fill="url(#dn-gold)"/>
+    </g>
+
+    <g class="dn-rays" stroke="#f3c77a" stroke-width="1" stroke-linecap="round" opacity="0" filter="url(#dn-soft)">
+      <line x1="190" y1="58"  x2="190" y2="44"/>
+      <line x1="221" y1="69"  x2="231" y2="59"/>
+      <line x1="232" y1="100" x2="246" y2="100"/>
+      <line x1="221" y1="131" x2="231" y2="141"/>
+      <line x1="190" y1="142" x2="190" y2="156"/>
+      <line x1="159" y1="131" x2="149" y2="141"/>
+      <line x1="148" y1="100" x2="134" y2="100"/>
+      <line x1="159" y1="69"  x2="149" y2="59"/>
+    </g>
+
+    <circle class="dn-ring dn-ring1" cx="190" cy="100" r="28" fill="none" stroke="#f3c77a" stroke-width="1.4" opacity="0"/>
+    <circle class="dn-ring dn-ring2" cx="190" cy="100" r="28" fill="none" stroke="#f3c77a" stroke-width="1" opacity="0"/>
+
+    <circle class="dn-disc" cx="190" cy="100" r="27" fill="none" stroke="#f3c77a" stroke-width="1.2" opacity="0" filter="url(#dn-soft)"/>
+
+    <path class="dn-check" d="M177 100 L186 110 L205 87" fill="none" stroke="#fff8e6" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <g class="dn-coins" fill="#f3c77a">
+      <circle class="dn-coin dn-coin1" cx="166" cy="128" r="1.5"/>
+      <circle class="dn-coin dn-coin2" cx="190" cy="134" r="1.3"/>
+      <circle class="dn-coin dn-coin3" cx="214" cy="128" r="1.5"/>
+      <circle class="dn-coin dn-coin4" cx="178" cy="132" r="1.1"/>
+      <circle class="dn-coin dn-coin5" cx="202" cy="132" r="1.1"/>
+    </g>
+  </svg>
+</div>
+      </div>
+      <div class="j-status" id="jstatus" style="visibility:hidden">
+        <span class="j-pct" id="pct">0%</span><span class="j-sub" id="sub">Listo</span><span class="seg-mini" id="etaSeg" style="display:none"></span>
+      </div>
+      <div class="jglass" aria-hidden="true"></div>
+    </section>
+      </div>
+
+      <!-- Separación fija entre el panel KPI y la tabla — el divisor ARRASTRABLE se
+           eliminó (2026-07-09, Robert: alto fijo, sin drag ni collapse), pero se
+           conserva el hueco de 10px para no correr la tabla contra el panel. -->
+      <div class="lp-vspacer"></div>
 
       <!-- Zona de acople del panel de depósitos (dock izq/der lo comprime, sin tocar las cards de arriba ni el menú) -->
       <div id="accDockZone">
@@ -706,294 +998,9 @@
       </div>
     </section>
 
-    <section class="journey" aria-label="Viaje del deposito">
-      <div class="j-balance" id="jbal" style="visibility:hidden">
-        <span class="j-bal-now" id="balNow">$512.00</span><span class="j-bal-arrow">&#8594;</span><span class="j-bal-to" id="balTo">$512.00</span>
-      </div>
-      <div class="scene-stage" id="scene-stage">
-        <div class="guide" id="guide">
-          <div class="guide-steps">
-            <div class="gstep"><span class="gi">&#128100;</span><span class="gt">Elige cuentas</span></div>
-            <span class="garrow">&#8594;</span>
-            <div class="gstep"><span class="gi">&#128179;</span><span class="gt">Pega tarjetas</span></div>
-            <span class="garrow">&#8594;</span>
-            <div class="gstep"><span class="gi">$</span><span class="gt">Pon el monto</span></div>
-            <span class="garrow">&#8594;</span>
-            <div class="gstep"><span class="gi">&#9889;</span><span class="gt">Deposita</span></div>
-          </div>
-          <div class="guide-hint">El proceso se anima aqui  espera el resultado</div>
-        </div>
-<div class="scene" id="scene-login">
-  <svg viewBox="0 0 380 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Iniciando sesion">
-    <defs>
-      <radialGradient id="lg-core" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#9ff5e4"/>
-        <stop offset="100%" stop-color="#00bd72"/>
-      </radialGradient>
-      <linearGradient id="lg-key-grad" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stop-color="#00bd72" stop-opacity=".45"/>
-        <stop offset="100%" stop-color="#7fe8b5"/>
-      </linearGradient>
-      <filter id="lg-glow" x="-60%" y="-60%" width="220%" height="220%">
-        <feGaussianBlur stdDeviation="2.2" result="b"/>
-        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-      <filter id="lg-soft" x="-80%" y="-80%" width="260%" height="260%">
-        <feGaussianBlur stdDeviation="6"/>
-      </filter>
-      <filter id="lg-goo" x="-40%" y="-40%" width="180%" height="180%">
-        <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="bl"/>
-        <feColorMatrix in="bl" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -10" result="goo"/>
-        <feBlend in="SourceGraphic" in2="goo"/>
-      </filter>
-    </defs>
+    <!-- escenario de depósito movido a #depStage (La Pantalla) -->
 
-    <!-- halo respirando -->
-    <g class="lg-haze"><circle cx="190" cy="100" r="56" fill="#00bd72" opacity=".10" filter="url(#lg-soft)"/></g>
-
-    <!-- cerradura: anillos finos -->
-    <g class="lg-lock" fill="none" stroke-linecap="round">
-      <circle cx="190" cy="100" r="46" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
-      <circle cx="190" cy="100" r="46" class="lg-arc" stroke="#00bd72" stroke-width="1.4" stroke-dasharray="36 253" filter="url(#lg-glow)"/>
-      <circle cx="190" cy="100" r="18" stroke="rgba(255,255,255,.12)" stroke-width="1"/>
-    </g>
-
-    <!-- ojo de cerradura -->
-    <g class="lg-hole" fill="none" stroke="#00bd72" stroke-width="1.4" stroke-linecap="round" filter="url(#lg-glow)">
-      <circle cx="190" cy="95" r="5.5"/>
-      <path d="M187 99 L186 111 M193 99 L194 111"/>
-    </g>
-
-    <!-- pulso de apertura -->
-    <g class="lg-pulse"><circle cx="190" cy="100" r="20" fill="none" stroke="#7fe8b5" stroke-width="1.3"/></g>
-
-    <!-- llave: blob de mercurio que se traza y gira -->
-    <g class="lg-key">
-      <g class="lg-key-inner">
-        <g class="lg-key-line" filter="url(#lg-glow)">
-          <circle class="lg-draw lg-bow" style="--len:69" cx="112" cy="100" r="11" fill="none" stroke="url(#lg-key-grad)" stroke-width="1.8"/>
-          <circle cx="112" cy="100" r="4" fill="none" stroke="#00bd72" stroke-width="1.3"/>
-          <path class="lg-draw lg-stem" style="--len:96" d="M123 100 H188 M178 100 V109 M186 100 V106" fill="none" stroke="url(#lg-key-grad)" stroke-width="1.8" stroke-linecap="round"/>
-        </g>
-      </g>
-    </g>
-  </svg>
-</div>
-<div class="scene" id="scene-form">
-  <svg viewBox="0 0 380 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Formulario: tarjeta leida en lector">
-    <defs>
-      <filter id="fm-goo" x="-40%" y="-40%" width="180%" height="180%">
-        <feGaussianBlur in="SourceGraphic" stdDeviation="3.4" result="blur"/>
-        <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 16 -7" result="goo"/>
-        <feBlend in="SourceGraphic" in2="goo"/>
-      </filter>
-      <filter id="fm-glow" x="-60%" y="-60%" width="220%" height="220%">
-        <feGaussianBlur stdDeviation="2" result="b"/>
-        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-      <linearGradient id="fm-sweep" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stop-color="#00bd72" stop-opacity="0"/>
-        <stop offset="50%" stop-color="#7fe8b5" stop-opacity=".9"/>
-        <stop offset="100%" stop-color="#00bd72" stop-opacity="0"/>
-      </linearGradient>
-      <clipPath id="fm-cardclip"><rect x="136" y="67" width="108" height="66" rx="9"/></clipPath>
-    </defs>
-
-    <g class="fm-grid" opacity=".5" fill="none" stroke="rgba(255,255,255,.045)" stroke-width="1">
-      <path d="M70 70 H310 M70 100 H310 M70 130 H310"/>
-      <path d="M120 56 V144 M190 56 V144 M260 56 V144"/>
-    </g>
-
-    <g class="fm-slot" fill="none">
-      <rect class="fm-frame" x="92" y="58" width="196" height="84" rx="13" stroke="rgba(255,255,255,.10)" stroke-width="1"/>
-      <rect class="fm-mouth" x="102" y="94" width="176" height="12" rx="6" fill="#06070a" stroke="rgba(255,255,255,.12)" stroke-width="1"/>
-      <line class="fm-lip" x1="110" y1="100" x2="270" y2="100" stroke="#00bd72" stroke-width="1" stroke-linecap="round" opacity=".35"/>
-    </g>
-
-    <g class="fm-card">
-      <g class="fm-card-inner">
-        <rect x="136" y="67" width="108" height="66" rx="9" fill="none" stroke="#00bd72" stroke-width="1.4" filter="url(#fm-glow)"/>
-        <rect x="148" y="80" width="18" height="13" rx="3" fill="none" stroke="#00bd72" stroke-width="1" opacity=".9"/>
-        <path d="M150 83 q5 3.5 0 7 M156 81.5 q8 5 0 10" fill="none" stroke="#00bd72" stroke-width=".9" opacity=".55"/>
-        <line x1="148" y1="112" x2="214" y2="112" stroke="#00bd72" stroke-width="1.2" stroke-linecap="round" opacity=".7"/>
-        <line x1="148" y1="120" x2="190" y2="120" stroke="rgba(255,255,255,.20)" stroke-width="1" stroke-linecap="round"/>
-      </g>
-    </g>
-
-    <g clip-path="url(#fm-cardclip)">
-      <rect class="fm-scan" x="130" y="67" width="26" height="66" fill="url(#fm-sweep)" filter="url(#fm-glow)"/>
-    </g>
-  </svg>
-</div>
-<div class="scene" id="scene-processing">
-  <svg viewBox="0 0 380 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Procesando">
-    <defs>
-      <radialGradient id="pr-core-grad" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#bffaee"/>
-        <stop offset="48%" stop-color="#00bd72"/>
-        <stop offset="100%" stop-color="#00bd72" stop-opacity="0"/>
-      </radialGradient>
-      <radialGradient id="pr-halo-grad" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#00bd72" stop-opacity=".30"/>
-        <stop offset="60%" stop-color="#00bd72" stop-opacity=".06"/>
-        <stop offset="100%" stop-color="#00bd72" stop-opacity="0"/>
-      </radialGradient>
-      <filter id="pr-goo" x="-60%" y="-60%" width="220%" height="220%">
-        <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b"/>
-        <feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9"/>
-      </filter>
-      <filter id="pr-soft" x="-80%" y="-80%" width="260%" height="260%">
-        <feGaussianBlur stdDeviation="3"/>
-      </filter>
-    </defs>
-
-    <circle class="pr-halo" cx="190" cy="100" r="66" fill="url(#pr-halo-grad)"/>
-
-    <g class="pr-orbit" fill="none" stroke="rgba(255,255,255,.07)" stroke-width=".8">
-      <ellipse cx="190" cy="100" rx="78" ry="30"/>
-      <ellipse cx="190" cy="100" rx="78" ry="30" transform="rotate(60 190 100)"/>
-      <ellipse cx="190" cy="100" rx="78" ry="30" transform="rotate(120 190 100)"/>
-    </g>
-
-    <g class="pr-waves" fill="none" stroke="#00bd72" stroke-linecap="round">
-      <circle class="pr-w pr-w1" cx="190" cy="100" r="22" stroke-width="1.4"/>
-      <circle class="pr-w pr-w2" cx="190" cy="100" r="22" stroke-width="1.1"/>
-      <circle class="pr-w pr-w3" cx="190" cy="100" r="22" stroke-width=".9"/>
-    </g>
-
-    <g class="pr-data" fill="#9ff6e4" filter="url(#pr-soft)">
-      <circle class="pr-d pr-d1" cx="190" cy="100" r="2.1"/>
-      <circle class="pr-d pr-d2" cx="190" cy="100" r="1.9"/>
-      <circle class="pr-d pr-d3" cx="190" cy="100" r="2.1"/>
-      <circle class="pr-d pr-d4" cx="190" cy="100" r="1.7"/>
-    </g>
-
-    <g class="pr-core" filter="url(#pr-goo)">
-      <circle class="pr-blob-a" cx="190" cy="100" r="14" fill="url(#pr-core-grad)"/>
-      <circle class="pr-blob-b" cx="190" cy="100" r="7.5" fill="#bffaee"/>
-    </g>
-    <circle class="pr-seed" cx="190" cy="100" r="2.6" fill="#eafffb"/>
-  </svg>
-</div>
-<div class="scene" id="scene-retry">
-  <svg viewBox="0 0 380 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Reintentando: recalibracion liquida sutil">
-    <defs>
-      <filter id="rt-goo" x="-60%" y="-60%" width="220%" height="220%">
-        <feGaussianBlur in="SourceGraphic" stdDeviation="3.2" result="b"/>
-        <feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -8" result="g"/>
-        <feBlend in="SourceGraphic" in2="g"/>
-      </filter>
-      <filter id="rt-soft" x="-80%" y="-80%" width="260%" height="260%">
-        <feGaussianBlur stdDeviation="2" result="b"/>
-        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-      <linearGradient id="rt-arc" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="#f2b25a" stop-opacity="0"/>
-        <stop offset="55%" stop-color="#f2b25a" stop-opacity=".5"/>
-        <stop offset="100%" stop-color="#f3c77a" stop-opacity=".85"/>
-      </linearGradient>
-    </defs>
-
-    <rect class="rt-tint" width="380" height="200" fill="#f2b25a" opacity="0"/>
-
-    <circle class="rt-aura" cx="190" cy="100" r="42" fill="#f2b25a" opacity="0"/>
-    <circle class="rt-ripple" cx="190" cy="100" r="20" fill="none" stroke="#f2b25a" stroke-width="1" opacity="0"/>
-
-    <circle class="rt-track" cx="190" cy="100" r="32" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="1"/>
-
-    <g class="rt-cyc" transform="translate(190 100)">
-      <path class="rt-stroke" d="M0 -32 A32 32 0 1 1 -22 23" fill="none"
-            stroke="url(#rt-arc)" stroke-width="1.6" stroke-linecap="round"
-            pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"
-            filter="url(#rt-soft)"/>
-      <g class="rt-head" filter="url(#rt-goo)">
-        <circle cx="-22" cy="23" r="3.6" fill="#f3c77a"/>
-        <circle cx="-15" cy="29" r="2.2" fill="#f2b25a"/>
-      </g>
-    </g>
-
-    <g class="rt-drop" filter="url(#rt-goo)">
-      <circle r="2.6" fill="#f3c77a" opacity="0"
-              style="offset-path:path('M212 78 A32 32 0 1 1 168 123');offset-rotate:auto"/>
-    </g>
-  </svg>
-</div>
-<div class="scene" id="scene-done">
-  <svg viewBox="0 0 380 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Terminando: deposito acreditado">
-    <defs>
-      <radialGradient id="dn-gold" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#ffe9bd"/>
-        <stop offset="50%" stop-color="#f3c77a"/>
-        <stop offset="100%" stop-color="#f3c77a" stop-opacity="0"/>
-      </radialGradient>
-      <radialGradient id="dn-bloom-grad" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#f3c77a" stop-opacity=".9"/>
-        <stop offset="42%" stop-color="#f3c77a" stop-opacity=".24"/>
-        <stop offset="100%" stop-color="#f3c77a" stop-opacity="0"/>
-      </radialGradient>
-      <filter id="dn-goo" x="-60%" y="-60%" width="220%" height="220%">
-        <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b"/>
-        <feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -10"/>
-      </filter>
-      <filter id="dn-soft" x="-100%" y="-100%" width="300%" height="300%">
-        <feGaussianBlur stdDeviation="2.6"/>
-      </filter>
-    </defs>
-
-    <g class="dn-converge" stroke-linecap="round">
-      <line class="dn-cv dn-cv1" x1="56"  y1="100" x2="150" y2="100"/>
-      <line class="dn-cv dn-cv2" x1="324" y1="100" x2="230" y2="100"/>
-      <line class="dn-cv dn-cv3" x1="190" y1="40"  x2="190" y2="74"/>
-      <line class="dn-cv dn-cv4" x1="190" y1="160" x2="190" y2="126"/>
-      <line class="dn-cv dn-cv5" x1="120" y1="56"  x2="172" y2="86"/>
-      <line class="dn-cv dn-cv6" x1="260" y1="144" x2="208" y2="114"/>
-    </g>
-
-    <circle class="dn-bloom" cx="190" cy="100" r="74" fill="url(#dn-bloom-grad)" opacity="0"/>
-
-    <g class="dn-melt" filter="url(#dn-goo)">
-      <circle class="dn-drop dn-d1" cx="150" cy="72"  r="4" fill="url(#dn-gold)"/>
-      <circle class="dn-drop dn-d2" cx="236" cy="80"  r="4" fill="url(#dn-gold)"/>
-      <circle class="dn-drop dn-d3" cx="152" cy="130" r="4" fill="url(#dn-gold)"/>
-      <circle class="dn-drop dn-d4" cx="232" cy="126" r="4" fill="url(#dn-gold)"/>
-      <circle class="dn-core" cx="190" cy="100" r="22" fill="url(#dn-gold)"/>
-    </g>
-
-    <g class="dn-rays" stroke="#f3c77a" stroke-width="1" stroke-linecap="round" opacity="0" filter="url(#dn-soft)">
-      <line x1="190" y1="58"  x2="190" y2="44"/>
-      <line x1="221" y1="69"  x2="231" y2="59"/>
-      <line x1="232" y1="100" x2="246" y2="100"/>
-      <line x1="221" y1="131" x2="231" y2="141"/>
-      <line x1="190" y1="142" x2="190" y2="156"/>
-      <line x1="159" y1="131" x2="149" y2="141"/>
-      <line x1="148" y1="100" x2="134" y2="100"/>
-      <line x1="159" y1="69"  x2="149" y2="59"/>
-    </g>
-
-    <circle class="dn-ring dn-ring1" cx="190" cy="100" r="28" fill="none" stroke="#f3c77a" stroke-width="1.4" opacity="0"/>
-    <circle class="dn-ring dn-ring2" cx="190" cy="100" r="28" fill="none" stroke="#f3c77a" stroke-width="1" opacity="0"/>
-
-    <circle class="dn-disc" cx="190" cy="100" r="27" fill="none" stroke="#f3c77a" stroke-width="1.2" opacity="0" filter="url(#dn-soft)"/>
-
-    <path class="dn-check" d="M177 100 L186 110 L205 87" fill="none" stroke="#fff8e6" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-
-    <g class="dn-coins" fill="#f3c77a">
-      <circle class="dn-coin dn-coin1" cx="166" cy="128" r="1.5"/>
-      <circle class="dn-coin dn-coin2" cx="190" cy="134" r="1.3"/>
-      <circle class="dn-coin dn-coin3" cx="214" cy="128" r="1.5"/>
-      <circle class="dn-coin dn-coin4" cx="178" cy="132" r="1.1"/>
-      <circle class="dn-coin dn-coin5" cx="202" cy="132" r="1.1"/>
-    </g>
-  </svg>
-</div>
-      </div>
-      <div class="j-status" id="jstatus" style="visibility:hidden">
-        <span class="j-pct" id="pct">0%</span><span class="j-sub" id="sub">Listo</span><span class="seg-mini" id="etaSeg" style="display:none"></span>
-      </div>
-      <div class="jglass" aria-hidden="true"></div>
-    </section>
-
-    <section class="mov">
+        <section class="mov">
       <div class="mov-head"><span class="label">Movimientos</span><span class="mov-line"></span></div>
       <div class="mov-list" id="mov"></div>
     </section>

@@ -179,49 +179,67 @@
   font-size:11px; padding:4px 9px; border-radius:7px; white-space:nowrap; pointer-events:none; box-shadow:0 8px 24px -8px #000}
 
 
-#depos .journey{position:relative; margin:8px 14px 4px; padding:14px; border-radius:var(--r);
+/* ═══ Host portátil del ESCENARIO de depósito ═══
+   Movido (no duplicado) desde el panel #depos a La Pantalla (#patStageSlot, pantalla.js).
+   Trae SUS PROPIAS variables (copiadas de #depos) + reset, para que las escenas
+   rendericen idénticas fuera del panel. La mini-pantalla del panel desapareció. */
+#depStage{
+  --void:#06070a; --void-2:#0a0c11; --panel:rgba(20,24,32,.55);
+  --line:rgba(255,255,255,.06);
+  --ink:#eef2f6; --ink-dim:#9aa6b4; --ink-faint:#5b6675;
+  --aqua:#00bd72; --aqua-soft:rgba(0,189,114,.16); --aqua-line:rgba(0,189,114,.45);
+  --gold:#f3c77a; --gold-soft:rgba(243,199,122,.14); --amber:#f2b25a;
+  --grade-a:#00bd72;
+  --r:18px; --t:.42s cubic-bezier(.22,.61,.36,1);
+  width:100%; min-width:0; display:flex; flex-direction:column; justify-content:center;
+}
+#depStage[hidden]{display:none}
+#depStage *{box-sizing:border-box; margin:0; padding:0}
+/* En La Pantalla la franja es más ancha que el panel: la .journey ya no necesita
+   el margen lateral del panel; que llene su zona. */
+#depStage .journey{position:relative; margin:0; padding:14px; border-radius:var(--r);
   background:radial-gradient(120% 90% at 50% 0%, rgba(0,189,114,.05), transparent 60%), var(--void-2);
   border:1px solid var(--line); overflow:hidden}
 
-#depos .jglass{position:absolute; inset:0; pointer-events:none; z-index:8; border-radius:var(--r); overflow:hidden}
-#depos .jglass::before{content:""; position:absolute; inset:0;
+#depStage .jglass{position:absolute; inset:0; pointer-events:none; z-index:8; border-radius:var(--r); overflow:hidden}
+#depStage .jglass::before{content:""; position:absolute; inset:0;
   background:linear-gradient(135deg, rgba(255,255,255,.05), transparent 30%, transparent 70%, rgba(255,255,255,.025))}
-#depos .jglass::after{content:""; position:absolute; inset:-25%;
+#depStage .jglass::after{content:""; position:absolute; inset:-25%;
   background:radial-gradient(55% 42% at 28% 22%, rgba(0,189,114,.07), transparent 60%), radial-gradient(48% 46% at 76% 80%, rgba(124,196,255,.05), transparent 60%);
   filter:blur(11px); opacity:.12; animation:pecera 17s ease-in-out infinite}
 @keyframes pecera{0%,100%{opacity:.08; transform:translate(0,0)} 40%{opacity:.42; transform:translate(2.5%,-2%)} 66%{opacity:.14; transform:translate(-1.5%,1.5%)}}
-#depos .j-balance{display:flex; align-items:baseline; justify-content:center; gap:10px; margin-bottom:2px; min-height:26px}
-#depos .j-bal-now{font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--ink-faint)}
-#depos .j-bal-to{font-family:'Clash Display',sans-serif; font-weight:600; font-size:23px; color:var(--gold); text-shadow:0 0 24px var(--gold-soft); transition:var(--t)}
-#depos .j-bal-arrow{color:var(--ink-faint); font-size:13px}
-#depos .scene-stage{position:relative; height:172px; margin:2px 0}
-#depos .scene{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+#depStage .j-balance{display:flex; align-items:baseline; justify-content:center; gap:10px; margin-bottom:2px; min-height:26px}
+#depStage .j-bal-now{font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--ink-faint)}
+#depStage .j-bal-to{font-family:'Clash Display',sans-serif; font-weight:600; font-size:23px; color:var(--gold); text-shadow:0 0 24px var(--gold-soft); transition:var(--t)}
+#depStage .j-bal-arrow{color:var(--ink-faint); font-size:13px}
+#depStage .scene-stage{position:relative; height:172px; margin:2px 0}
+#depStage .scene{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   opacity:0; filter:blur(13px) saturate(.6); transform:scale(.965); pointer-events:none;
   transition:opacity .85s cubic-bezier(.65,.02,.25,1), filter 1s cubic-bezier(.65,.02,.25,1), transform 1s cubic-bezier(.65,.02,.25,1)}
-#depos .scene.on{opacity:1; filter:blur(0) saturate(1); transform:scale(1);
+#depStage .scene.on{opacity:1; filter:blur(0) saturate(1); transform:scale(1);
   transition:opacity 1s cubic-bezier(.2,.7,.2,1), filter 1.1s cubic-bezier(.2,.7,.2,1), transform 1.1s cubic-bezier(.2,.7,.2,1)}
-#depos .scene svg{width:100%; height:100%; display:block}
+#depStage .scene svg{width:100%; height:100%; display:block}
 
-#depos .guide{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:11px;
+#depStage .guide{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:11px;
   transition:opacity .5s; z-index:5}
-#depos .guide.hide{opacity:0; pointer-events:none}
-#depos .guide-steps{display:flex; align-items:center; gap:6px}
-#depos .gstep{display:flex; flex-direction:column; align-items:center; gap:6px; width:74px}
-#depos .gstep .gi{width:34px;height:34px;border-radius:10px; display:grid; place-items:center; color:var(--aqua);
+#depStage .guide.hide{opacity:0; pointer-events:none}
+#depStage .guide-steps{display:flex; align-items:center; gap:6px}
+#depStage .gstep{display:flex; flex-direction:column; align-items:center; gap:6px; width:74px}
+#depStage .gstep .gi{width:34px;height:34px;border-radius:10px; display:grid; place-items:center; color:var(--aqua);
   background:var(--aqua-soft); border:1px solid var(--aqua-line); font-size:15px}
-#depos .gstep .gt{font-size:10.5px; color:var(--ink-dim); text-align:center; line-height:1.25}
-#depos .garrow{color:var(--ink-faint); font-size:12px}
-#depos .guide-hint{font-size:11px; color:var(--ink-faint)}
+#depStage .gstep .gt{font-size:10.5px; color:var(--ink-dim); text-align:center; line-height:1.25}
+#depStage .garrow{color:var(--ink-faint); font-size:12px}
+#depStage .guide-hint{font-size:11px; color:var(--ink-faint)}
 
 
 
-#depos #scene-login .lg-draw{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);}
-#depos #scene-login.on .lg-bow{animation:lg-trace 1.1s cubic-bezier(.16,.84,.34,1) .15s forwards;}
-#depos #scene-login.on .lg-stem{animation:lg-trace 1.2s cubic-bezier(.16,.84,.34,1) .35s forwards;}
+#depStage #scene-login .lg-draw{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);}
+#depStage #scene-login.on .lg-bow{animation:lg-trace 1.1s cubic-bezier(.16,.84,.34,1) .15s forwards;}
+#depStage #scene-login.on .lg-stem{animation:lg-trace 1.2s cubic-bezier(.16,.84,.34,1) .35s forwards;}
 @keyframes lg-trace{to{stroke-dashoffset:0;}}
 
 
-#depos #scene-login.on .lg-key-inner{
+#depStage #scene-login.on .lg-key-inner{
   transform-origin:190px 100px;
   animation:lg-glide 4.4s cubic-bezier(.16,1,.3,1) infinite;
 }
@@ -236,7 +254,7 @@
 }
 
 
-#depos #scene-login.on .lg-arc{
+#depStage #scene-login.on .lg-arc{
   transform-origin:190px 100px;
   animation:lg-bolt 4.4s cubic-bezier(.45,0,.15,1) infinite;
 }
@@ -247,7 +265,7 @@
 }
 
 
-#depos #scene-login.on .lg-hole{animation:lg-hole 4.4s ease-in-out infinite;}
+#depStage #scene-login.on .lg-hole{animation:lg-hole 4.4s ease-in-out infinite;}
 @keyframes lg-hole{
   0%,58% {opacity:.55;}
   78%    {opacity:1;filter:drop-shadow(0 0 5px #00bd72);}
@@ -255,7 +273,7 @@
 }
 
 
-#depos #scene-login.on .lg-pulse{
+#depStage #scene-login.on .lg-pulse{
   transform-origin:190px 100px;
   animation:lg-pulse 4.4s cubic-bezier(.2,.7,.2,1) infinite;
 }
@@ -266,12 +284,12 @@
 }
 
 
-#depos #scene-login.on .lg-haze{animation:lg-breath 4.4s ease-in-out infinite;}
+#depStage #scene-login.on .lg-haze{animation:lg-breath 4.4s ease-in-out infinite;}
 @keyframes lg-breath{0%,100%{opacity:.45;}80%{opacity:1;}}
 
 
 
-#depos #scene-form.on .fm-card-inner{
+#depStage #scene-form.on .fm-card-inner{
   animation: fm-insert 5s cubic-bezier(.22,.61,.36,1) infinite;
   transform-box: fill-box;
   transform-origin: center;
@@ -284,7 +302,7 @@
   100% { transform: translateX(-12px) scale(.985); opacity:0; }
 }
 
-#depos #scene-form.on .fm-scan{
+#depStage #scene-form.on .fm-scan{
   animation: fm-sweep 5s cubic-bezier(.45,0,.18,1) infinite;
 }
 @keyframes fm-sweep{
@@ -294,7 +312,7 @@
   80%,100% { transform: translateX(96px); opacity:0; }
 }
 
-#depos #scene-form.on .fm-lip{
+#depStage #scene-form.on .fm-lip{
   animation: fm-lip 5s ease-in-out infinite;
 }
 @keyframes fm-lip{
@@ -304,7 +322,7 @@
   100%    { opacity:.2; }
 }
 
-#depos #scene-form.on .fm-slot{
+#depStage #scene-form.on .fm-slot{
   animation: fm-breath 5s ease-in-out infinite;
 }
 @keyframes fm-breath{
@@ -312,7 +330,7 @@
   50%     { opacity:1; }
 }
 
-#depos #scene-form.on .fm-grid{
+#depStage #scene-form.on .fm-grid{
   animation: fm-float 7s ease-in-out infinite;
 }
 @keyframes fm-float{
@@ -322,15 +340,15 @@
 
 
 
-#depos .scene.on#scene-processing .pr-blob-a{
+#depStage .scene.on#scene-processing .pr-blob-a{
   transform-origin:190px 100px;
   animation:pr-beat 3.1s cubic-bezier(.37,0,.18,1) infinite;
 }
-#depos .scene.on#scene-processing .pr-blob-b{
+#depStage .scene.on#scene-processing .pr-blob-b{
   transform-origin:190px 100px;
   animation:pr-beat 3.1s cubic-bezier(.37,0,.18,1) infinite .1s;
 }
-#depos .scene.on#scene-processing .pr-seed{
+#depStage .scene.on#scene-processing .pr-seed{
   transform-origin:190px 100px;
   animation:pr-seed 3.1s cubic-bezier(.37,0,.18,1) infinite;
 }
@@ -344,17 +362,17 @@
   42%{opacity:1;transform:scale(1.15);}
 }
 
-#depos .scene.on#scene-processing .pr-w{transform-origin:190px 100px;}
-#depos .scene.on#scene-processing .pr-w1{animation:pr-wave 4.2s cubic-bezier(.22,.61,.3,1) infinite;}
-#depos .scene.on#scene-processing .pr-w2{animation:pr-wave 4.2s cubic-bezier(.22,.61,.3,1) infinite 1.4s;}
-#depos .scene.on#scene-processing .pr-w3{animation:pr-wave 4.2s cubic-bezier(.22,.61,.3,1) infinite 2.8s;}
+#depStage .scene.on#scene-processing .pr-w{transform-origin:190px 100px;}
+#depStage .scene.on#scene-processing .pr-w1{animation:pr-wave 4.2s cubic-bezier(.22,.61,.3,1) infinite;}
+#depStage .scene.on#scene-processing .pr-w2{animation:pr-wave 4.2s cubic-bezier(.22,.61,.3,1) infinite 1.4s;}
+#depStage .scene.on#scene-processing .pr-w3{animation:pr-wave 4.2s cubic-bezier(.22,.61,.3,1) infinite 2.8s;}
 @keyframes pr-wave{
   0%{transform:scale(.42);opacity:0;}
   16%{opacity:.55;}
   100%{transform:scale(2.9);opacity:0;}
 }
 
-#depos .scene.on#scene-processing .pr-halo{
+#depStage .scene.on#scene-processing .pr-halo{
   transform-origin:190px 100px;
   animation:pr-halo 3.1s cubic-bezier(.37,0,.18,1) infinite;
 }
@@ -363,16 +381,16 @@
   42%{opacity:1;transform:scale(1.06);}
 }
 
-#depos .scene.on#scene-processing .pr-orbit{
+#depStage .scene.on#scene-processing .pr-orbit{
   transform-origin:190px 100px;
   animation:pr-drift 26s linear infinite;
 }
 @keyframes pr-drift{to{transform:rotate(360deg);}}
 
-#depos .scene.on#scene-processing .pr-d1{animation:pr-flow1 3s cubic-bezier(.6,.04,.24,1) infinite;}
-#depos .scene.on#scene-processing .pr-d2{animation:pr-flow2 3s cubic-bezier(.6,.04,.24,1) infinite .8s;}
-#depos .scene.on#scene-processing .pr-d3{animation:pr-flow3 3s cubic-bezier(.6,.04,.24,1) infinite 1.5s;}
-#depos .scene.on#scene-processing .pr-d4{animation:pr-flow4 3s cubic-bezier(.6,.04,.24,1) infinite 2.2s;}
+#depStage .scene.on#scene-processing .pr-d1{animation:pr-flow1 3s cubic-bezier(.6,.04,.24,1) infinite;}
+#depStage .scene.on#scene-processing .pr-d2{animation:pr-flow2 3s cubic-bezier(.6,.04,.24,1) infinite .8s;}
+#depStage .scene.on#scene-processing .pr-d3{animation:pr-flow3 3s cubic-bezier(.6,.04,.24,1) infinite 1.5s;}
+#depStage .scene.on#scene-processing .pr-d4{animation:pr-flow4 3s cubic-bezier(.6,.04,.24,1) infinite 2.2s;}
 @keyframes pr-flow1{0%{transform:translate(54px,-14px);opacity:0;}22%{opacity:1;}100%{transform:translate(0,0);opacity:0;}}
 @keyframes pr-flow2{0%{transform:translate(-50px,22px);opacity:0;}22%{opacity:1;}100%{transform:translate(0,0);opacity:0;}}
 @keyframes pr-flow3{0%{transform:translate(0,0);opacity:0;}22%{opacity:1;}100%{transform:translate(48px,24px);opacity:0;}}
@@ -381,7 +399,7 @@
 
 
 
-#depos #scene-retry.on .rt-cyc{
+#depStage #scene-retry.on .rt-cyc{
   transform-origin:190px 100px;
   animation:rt-turn 3.6s cubic-bezier(.45,.05,.3,1) infinite;
 }
@@ -391,7 +409,7 @@
   70%  {transform:translate(190px,100px) rotate(316deg);opacity:.9;}
   100% {transform:translate(190px,100px) rotate(346deg);opacity:0;}
 }
-#depos #scene-retry.on .rt-stroke{
+#depStage #scene-retry.on .rt-stroke{
   animation:rt-draw 3.6s cubic-bezier(.45,.05,.3,1) infinite;
 }
 @keyframes rt-draw{
@@ -401,7 +419,7 @@
 }
 
 
-#depos #scene-retry.on .rt-head{
+#depStage #scene-retry.on .rt-head{
   animation:rt-breathe 3.6s ease-in-out infinite;
 }
 @keyframes rt-breathe{
@@ -410,7 +428,7 @@
 }
 
 
-#depos #scene-retry.on .rt-drop circle{
+#depStage #scene-retry.on .rt-drop circle{
   animation:rt-drop 3.6s cubic-bezier(.5,.02,.3,1) infinite;
 }
 @keyframes rt-drop{
@@ -421,7 +439,7 @@
 }
 
 
-#depos #scene-retry.on .rt-ripple{
+#depStage #scene-retry.on .rt-ripple{
   animation:rt-ripple 3.6s ease-out infinite;
 }
 @keyframes rt-ripple{
@@ -431,7 +449,7 @@
 }
 
 
-#depos #scene-retry.on .rt-tint{
+#depStage #scene-retry.on .rt-tint{
   animation:rt-tint 3.6s ease-in-out infinite;
 }
 @keyframes rt-tint{
@@ -440,7 +458,7 @@
 }
 
 
-#depos #scene-retry.on .rt-aura{
+#depStage #scene-retry.on .rt-aura{
   animation:rt-aura 3.6s ease-in-out infinite;
 }
 @keyframes rt-aura{
@@ -450,10 +468,10 @@
 
 
 
-#depos #scene-done .dn-cv{stroke:#00bd72;stroke-width:1.3;opacity:0;}
-#depos #scene-done .dn-converge{transform-origin:190px 100px;}
+#depStage #scene-done .dn-cv{stroke:#00bd72;stroke-width:1.3;opacity:0;}
+#depStage #scene-done .dn-converge{transform-origin:190px 100px;}
 
-#depos #scene-done.on .dn-converge{
+#depStage #scene-done.on .dn-converge{
   animation:dn-collapse 4.2s cubic-bezier(.65,0,.35,1) infinite;
 }
 @keyframes dn-collapse{
@@ -465,14 +483,14 @@
 }
 
 
-#depos #scene-done.on .dn-d1{animation:dn-drop 4.2s cubic-bezier(.65,.02,.25,1) infinite;}
-#depos #scene-done.on .dn-d2{animation:dn-drop 4.2s cubic-bezier(.65,.02,.25,1) infinite .06s;}
-#depos #scene-done.on .dn-d3{animation:dn-drop 4.2s cubic-bezier(.65,.02,.25,1) infinite .12s;}
-#depos #scene-done.on .dn-d4{animation:dn-drop 4.2s cubic-bezier(.65,.02,.25,1) infinite .18s;}
-#depos #scene-done.on .dn-d1{--dx:40px;--dy:28px;}
-#depos #scene-done.on .dn-d2{--dx:-46px;--dy:20px;}
-#depos #scene-done.on .dn-d3{--dx:38px;--dy:-30px;}
-#depos #scene-done.on .dn-d4{--dx:-42px;--dy:-26px;}
+#depStage #scene-done.on .dn-d1{animation:dn-drop 4.2s cubic-bezier(.65,.02,.25,1) infinite;}
+#depStage #scene-done.on .dn-d2{animation:dn-drop 4.2s cubic-bezier(.65,.02,.25,1) infinite .06s;}
+#depStage #scene-done.on .dn-d3{animation:dn-drop 4.2s cubic-bezier(.65,.02,.25,1) infinite .12s;}
+#depStage #scene-done.on .dn-d4{animation:dn-drop 4.2s cubic-bezier(.65,.02,.25,1) infinite .18s;}
+#depStage #scene-done.on .dn-d1{--dx:40px;--dy:28px;}
+#depStage #scene-done.on .dn-d2{--dx:-46px;--dy:20px;}
+#depStage #scene-done.on .dn-d3{--dx:38px;--dy:-30px;}
+#depStage #scene-done.on .dn-d4{--dx:-42px;--dy:-26px;}
 @keyframes dn-drop{
   0%{transform:translate(0,0) scale(.7);opacity:0;}
   18%{opacity:.95;}
@@ -480,7 +498,7 @@
   100%{opacity:0;}
 }
 
-#depos #scene-done.on .dn-core{
+#depStage #scene-done.on .dn-core{
   transform-origin:190px 100px;
   animation:dn-core 4.2s cubic-bezier(.45,0,.15,1) infinite;
 }
@@ -492,7 +510,7 @@
   100%{transform:scale(.55);opacity:0;}
 }
 
-#depos #scene-done.on .dn-bloom{
+#depStage #scene-done.on .dn-bloom{
   transform-origin:190px 100px;
   animation:dn-bloom 4.2s cubic-bezier(.16,.84,.34,1) infinite;
 }
@@ -503,11 +521,11 @@
   100%{opacity:0;}
 }
 
-#depos #scene-done.on .dn-ring1{
+#depStage #scene-done.on .dn-ring1{
   transform-origin:190px 100px;
   animation:dn-ring 4.2s cubic-bezier(.22,.61,.36,1) infinite;
 }
-#depos #scene-done.on .dn-ring2{
+#depStage #scene-done.on .dn-ring2{
   transform-origin:190px 100px;
   animation:dn-ring 4.2s cubic-bezier(.22,.61,.36,1) infinite .18s;
 }
@@ -518,7 +536,7 @@
   100%{opacity:0;}
 }
 
-#depos #scene-done.on .dn-rays{
+#depStage #scene-done.on .dn-rays{
   transform-origin:190px 100px;
   animation:dn-rays 4.2s cubic-bezier(.2,.7,.2,1) infinite;
 }
@@ -529,7 +547,7 @@
   100%{opacity:0;}
 }
 
-#depos #scene-done.on .dn-disc{
+#depStage #scene-done.on .dn-disc{
   transform-origin:190px 100px;
   animation:dn-disc 4.2s ease-out infinite;
 }
@@ -539,7 +557,7 @@
   100%{opacity:.55;transform:scale(1);}
 }
 
-#depos #scene-done.on .dn-check{
+#depStage #scene-done.on .dn-check{
   stroke-dasharray:46;
   stroke-dashoffset:46;
   animation:dn-check 4.2s cubic-bezier(.65,.02,.25,1) infinite;
@@ -550,21 +568,21 @@
   100%{stroke-dashoffset:0;opacity:1;}
 }
 
-#depos #scene-done.on .dn-coin1{animation:dn-coin 4.2s ease-out infinite 1.9s;}
-#depos #scene-done.on .dn-coin2{animation:dn-coin 4.2s ease-out infinite 2.05s;}
-#depos #scene-done.on .dn-coin3{animation:dn-coin 4.2s ease-out infinite 1.98s;}
-#depos #scene-done.on .dn-coin4{animation:dn-coin 4.2s ease-out infinite 2.18s;}
-#depos #scene-done.on .dn-coin5{animation:dn-coin 4.2s ease-out infinite 2.1s;}
+#depStage #scene-done.on .dn-coin1{animation:dn-coin 4.2s ease-out infinite 1.9s;}
+#depStage #scene-done.on .dn-coin2{animation:dn-coin 4.2s ease-out infinite 2.05s;}
+#depStage #scene-done.on .dn-coin3{animation:dn-coin 4.2s ease-out infinite 1.98s;}
+#depStage #scene-done.on .dn-coin4{animation:dn-coin 4.2s ease-out infinite 2.18s;}
+#depStage #scene-done.on .dn-coin5{animation:dn-coin 4.2s ease-out infinite 2.1s;}
 @keyframes dn-coin{
   0%{opacity:0;transform:translateY(0) scale(.6);}
   18%{opacity:.85;}
   100%{opacity:0;transform:translateY(-40px) scale(1);}
 }
-#depos .j-status{display:flex; align-items:center; justify-content:center; gap:10px; margin-top:4px; min-height:20px}
-#depos .j-pct{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--aqua)}
-#depos .j-sub{font-size:12px; color:var(--ink-dim); transition:var(--t)}
-#depos .j-sub.good{color:var(--gold)}
-#depos .j-eta{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-faint)}
+#depStage .j-status{display:flex; align-items:center; justify-content:center; gap:10px; margin-top:4px; min-height:20px}
+#depStage .j-pct{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--aqua)}
+#depStage .j-sub{font-size:12px; color:var(--ink-dim); transition:var(--t)}
+#depStage .j-sub.good{color:var(--gold)}
+#depStage .j-eta{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-faint)}
 
 #depos .mov{padding:4px 18px 16px}
 #depos .mov-head{display:flex; align-items:center; gap:8px; margin:6px 0 8px}

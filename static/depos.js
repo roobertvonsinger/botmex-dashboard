@@ -14,6 +14,10 @@
   let _greetTimer = null;
   let _win = null;        // controlador de ventana (depos_window.js): float / dock-izq / dock-der
   const qs = (s) => (el ? el.querySelector(s) : null);
+  // El ESCENARIO (escenas + %/sub + balance) ya NO vive en el panel: se movió a
+  // #depStage, que La Pantalla monta en su zona derecha (#patStageSlot). sqs() lo
+  // resuelve esté donde esté (re-parenteado por pantalla.js). #mov sigue en el panel → qs().
+  const sqs = (s) => { const st = document.getElementById('depStage'); return st ? st.querySelector(s) : null; };
 
   let _dx = { open: false, accounts: [], cards: [], reps: 1, amount: 50, mode: 'single', running: false };
 
@@ -227,13 +231,13 @@
 
   // ── journey: escenas, %, sub, movimientos ──
   function setScene(k) {
-    const st = qs('#scene-stage'); if (!st) return;
+    const st = sqs('#scene-stage'); if (!st) return;
     st.querySelectorAll('.scene.on').forEach((e) => e.classList.remove('on'));
-    const n = el.querySelector('#scene-' + k);
+    const n = sqs('#scene-' + k);
     if (n) { void n.offsetWidth; n.classList.add('on'); }
   }
-  function setPct(v) { const p = qs('#pct'); if (p) p.textContent = Math.round(v) + '%'; }
-  function setSub(t, good) { const s = qs('#sub'); if (s) { s.className = 'j-sub' + (good ? ' good' : ''); s.textContent = t; } }
+  function setPct(v) { const p = sqs('#pct'); if (p) p.textContent = Math.round(v) + '%'; }
+  function setSub(t, good) { const s = sqs('#sub'); if (s) { s.className = 'j-sub' + (good ? ' good' : ''); s.textContent = t; } }
 
   // labels humanos de fase — NUNCA result_codes crudos al operador (L3)
   const PHASE_LABEL = {
@@ -272,9 +276,21 @@
   function movRemoveLast() { if (_lastMov) { _lastMov.remove(); _lastMov = null; } }
 
   function journeyStart() {
-    const g = qs('#guide'); if (g) g.classList.add('hide');
-    const jb = qs('#jbal'); if (jb) jb.style.visibility = 'visible';
-    const js = qs('#jstatus'); if (js) js.style.visibility = 'visible';
+    // El escenario vive en La Pantalla (#depStage), ya no en el panel. Enciéndelo y, si
+    // La Pantalla está cerrada, ábrela en la cuenta primaria para que el progreso tenga
+    // dónde verse. Si ya está abierta, se respeta lo que el operador mira (el escenario
+    // es genérico; el resultado por-cuenta va en la lista #mov del panel).
+    const stg = document.getElementById('depStage'); if (stg) stg.hidden = false;
+    const patRoot = document.getElementById('pantalla');
+    if (patRoot && patRoot.hidden) {
+      const primary = _dx.accounts[0];
+      if (primary && primary.id && window.Pantalla && typeof window.Pantalla.open === 'function') {
+        window.Pantalla.open(primary.id);
+      }
+    }
+    const g = sqs('#guide'); if (g) g.classList.add('hide');
+    const jb = sqs('#jbal'); if (jb) jb.style.visibility = 'visible';
+    const js = sqs('#jstatus'); if (js) js.style.visibility = 'visible';
     const dep = qs('#dep'); if (dep) dep.style.display = 'none';
     const rr = qs('#runrow'); if (rr) rr.classList.add('on');
   }
@@ -351,7 +367,7 @@
     if (ev.kind === 'account_refreshed' && _dx.running) {
       const target = ev.email || ev.target;
       if (_dx.accounts.some((a) => a.email === target) && ev.balance_total != null) {
-        const balTo = qs('#balTo'); if (balTo) balTo.textContent = D.fmtMoney(ev.balance_total);
+        const balTo = sqs('#balTo'); if (balTo) balTo.textContent = D.fmtMoney(ev.balance_total);
         _dx.balRefreshed = true; // el bus trajo el balance REAL → el provisional no debe pisarlo (L2)
       }
     }
@@ -369,7 +385,7 @@
 
     _dx.running = true; _dx.balRefreshed = false; journeyStart(); busOpen();
     const fromBal = Number(acc.balance || 0);
-    const balNow = qs('#balNow'), balTo = qs('#balTo');
+    const balNow = sqs('#balNow'), balTo = sqs('#balTo');
     if (balNow) balNow.textContent = D.fmtMoney(fromBal);
     if (balTo) balTo.textContent = D.fmtMoney(fromBal);
     setScene('login'); setSub('Iniciando sesión'); setPct(14);
@@ -422,10 +438,10 @@
     elm.style.display = 'flex';
   }
   let _schedCountdown = null;
-  function clearSchedCountdown() { if (_schedCountdown) { clearInterval(_schedCountdown); _schedCountdown = null; } const e = qs('#etaSeg'); if (e) e.style.display = 'none'; }
+  function clearSchedCountdown() { if (_schedCountdown) { clearInterval(_schedCountdown); _schedCountdown = null; } const e = sqs('#etaSeg'); if (e) e.style.display = 'none'; }
   function startSchedCountdown(sec) {
     clearSchedCountdown();
-    let t = sec; const e = qs('#etaSeg'); if (e) segMini(e, 'ETA', t);
+    let t = sec; const e = sqs('#etaSeg'); if (e) segMini(e, 'ETA', t);
     _schedCountdown = setInterval(() => { t -= 1; if (e) segMini(e, 'ETA', Math.max(0, t)); if (t <= 0) clearSchedCountdown(); }, 1000);
   }
 
@@ -442,7 +458,7 @@
     _dx.sched = { sched_id: null, total: reps, iter: 0, done: 0, pending: [] };
     setScene('login'); setSub('Preparando…'); setPct(0);
     const fromBal = Number(acc.balance || 0);
-    const balNow = qs('#balNow'), balTo = qs('#balTo');
+    const balNow = sqs('#balNow'), balTo = sqs('#balTo');
     if (balNow) balNow.textContent = D.fmtMoney(fromBal);
     if (balTo) balTo.textContent = D.fmtMoney(fromBal);
     try {
@@ -759,9 +775,10 @@
     _lastMov = null; _mmRows = {};
     const movEl = qs('#mov'); if (movEl) movEl.innerHTML = '';
     setSub('Listo'); setPct(0);
-    const jb = qs('#jbal'); if (jb) jb.style.visibility = 'hidden';
-    const jst = qs('#jstatus'); if (jst) jst.style.visibility = 'hidden';
-    const gd = qs('#guide'); if (gd) gd.classList.remove('hide');
+    const stg = document.getElementById('depStage'); if (stg) stg.hidden = true;  // idle: zona derecha vacía hasta correr
+    const jb = sqs('#jbal'); if (jb) jb.style.visibility = 'hidden';
+    const jst = sqs('#jstatus'); if (jst) jst.style.visibility = 'hidden';
+    const gd = sqs('#guide'); if (gd) gd.classList.remove('hide');
     // mostrar de inmediato (optimista); los datos del backend se completan en background
     renderAccounts(); renderCards(); refreshMode();
     root.classList.remove('hidden');

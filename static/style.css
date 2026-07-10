@@ -673,31 +673,10 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
   box-shadow: 0 0 11px var(--accent-glow), 0 0 3px var(--accent);
 }
 
-/* Divisor HORIZONTAL (↕) entre el strip y la tabla — ajusta la altura del strip.
-   Mismo patrón Claude Desktop pero en eje vertical. */
-.lp-vgutter {
-  height: 10px; flex-shrink: 0; position: relative;
-  cursor: grab; touch-action: none;              /* manita — consistente con el grip de La Pantalla */
-}
-.lp-vgutter:active, .lp-vgutter.dragging { cursor: grabbing; }
-.lp-vgrip {
-  position: absolute; top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  width: 44px; height: 3px; border-radius: 3px;
-  background: var(--hairline-h);
-  /* spring al crecer (rebota), color/glow rápidos ease-out — animamos transform, no width (60fps) */
-  transition: background 150ms ease-out, transform 220ms var(--ease-spring), box-shadow 150ms ease-out;
-}
-.lp-vgutter:hover .lp-vgrip {
-  background: var(--accent);
-  transform: translate(-50%, -50%) scaleX(1.5) scaleY(1.35);
-  box-shadow: 0 0 8px var(--accent-glow), 0 0 2px var(--accent);
-}
-.lp-vgutter.dragging .lp-vgrip {
-  background: var(--accent);
-  transform: translate(-50%, -50%) scaleX(1.5) scaleY(1.7);   /* engorda al jalar (solid drawing) */
-  box-shadow: 0 0 11px var(--accent-glow), 0 0 3px var(--accent);
-}
+/* Separación fija entre el panel KPI y la tabla (2026-07-09: el divisor
+   ARRASTRABLE se eliminó — Robert: alto fijo, sin drag ni collapse en ningún
+   lado. Se conserva solo el hueco de 10px, sin cursor ni affordance de drag). */
+.lp-vspacer { height: 10px; flex-shrink: 0; }
 .lp-card {
   background: var(--surface);
   border: 1px solid var(--hairline);
