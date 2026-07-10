@@ -19,8 +19,15 @@
 .pantalla {
   /* Vars locales VERDE botmexico suavizado (hue 160, mismo hue que --accent pero
      más claro/menos saturado — se lee como tinte de vidrio premium, no como
-     el verde de acción de la nav). Deriva del hue real del tema, no inventa uno nuevo. */
-  --pat-gold:      oklch(0.80 0.085 160);             /* verde suavizado — acento principal de La Pantalla */
+     el verde de acción de la nav). Deriva del hue real del tema, no inventa uno nuevo.
+     ── Grade-color (Robert 2026-07-09): el tinte de acento (--pat-gold y derivados)
+     refleja el grade de la cuenta. .pat-wrap lleva data-grade="APlus|A|B|C|D|U"
+     (seteado por pantalla.js) y reescribe estas vars. El mesh de fondo (pantalla-sheet
+     background) NO cambia — el vidrio templado es siempre el mismo, el acento sí varía.
+     Paleta: A+ verde vivo, A verde, B azul grisáceo (oklch .80 .05 235), C ámbar
+     warn, D rojo danger, U neutro (default verde). --pat-3ds NO se toca (semántica
+     de transacción, no de tema). */
+  --pat-gold:      oklch(0.80 0.085 160);             /* default = A (verde) */
   --pat-gold-soft: oklch(0.80 0.085 160 / 0.14);
   --pat-edge:      oklch(0.80 0.085 160 / 0.28);      /* borde hairline verde */
   --pat-edge-h:    oklch(0.80 0.085 160 / 0.45);      /* borde en hover/foco */
@@ -30,7 +37,6 @@
   --pat-3ds:       oklch(0.82 0.14 85);                /* ÁMBAR preservado — SOLO semántica 3DS (no tema) */
   --pat-3ds-soft:  oklch(0.82 0.14 85 / 0.14);
   --pat-r: 13px;                                      /* radius de la sheet */
-
   /* Tamaño FIJO, sin controles PROPIOS (decisión de Robert, campo 2026-07-09): La
      Pantalla no se arrastra ni se pliega por su cuenta — pero SÍ espeja el alto real
      del panel KPI (.lpanel), que app.js (initLpVResize → apply()) sincroniza en cada
@@ -42,6 +48,57 @@
   left: 0; right: 0; top: 0;
   height: 212px;
   z-index: 40;                    /* sobre el strip, bajo modales/drawer (z alto) */
+}
+
+/* ── Grade-color overrides: data-grade en .pat-wrap (hijo de .pantalla-sheet).
+   Reescriben --pat-gold + derivados. --pat-3ds intacto (semántica 3DS, no tema). */
+.pat-wrap[data-grade="APlus"] {
+  --pat-gold:      oklch(0.78 0.18 152);
+  --pat-gold-soft: oklch(0.78 0.18 152 / 0.14);
+  --pat-edge:      oklch(0.78 0.18 152 / 0.28);
+  --pat-edge-h:    oklch(0.78 0.18 152 / 0.45);
+  --pat-warm:      oklch(0.55 0.14 150);
+  --pat-tint:      oklch(0.78 0.18 152 / 0.10);
+  --pat-tint-2:    oklch(0.55 0.14 150 / 0.06);
+}
+.pat-wrap[data-grade="A"] {
+  /* default — verde h160, ya declarado en .pantalla */
+}
+.pat-wrap[data-grade="B"] {
+  --pat-gold:      oklch(0.80 0.05 235);
+  --pat-gold-soft: oklch(0.80 0.05 235 / 0.14);
+  --pat-edge:      oklch(0.80 0.05 235 / 0.28);
+  --pat-edge-h:    oklch(0.80 0.05 235 / 0.45);
+  --pat-warm:      oklch(0.60 0.04 240);
+  --pat-tint:      oklch(0.80 0.05 235 / 0.10);
+  --pat-tint-2:    oklch(0.60 0.04 240 / 0.06);
+}
+.pat-wrap[data-grade="C"] {
+  --pat-gold:      oklch(0.80 0.16 75);
+  --pat-gold-soft: oklch(0.80 0.16 75 / 0.14);
+  --pat-edge:      oklch(0.80 0.16 75 / 0.28);
+  --pat-edge-h:    oklch(0.80 0.16 75 / 0.45);
+  --pat-warm:      oklch(0.58 0.14 70);
+  --pat-tint:      oklch(0.80 0.16 75 / 0.10);
+  --pat-tint-2:    oklch(0.58 0.14 70 / 0.06);
+}
+.pat-wrap[data-grade="D"] {
+  --pat-gold:      oklch(0.72 0.18 24);
+  --pat-gold-soft: oklch(0.72 0.18 24 / 0.14);
+  --pat-edge:      oklch(0.72 0.18 24 / 0.28);
+  --pat-edge-h:    oklch(0.72 0.18 24 / 0.45);
+  --pat-warm:      oklch(0.48 0.14 20);
+  --pat-tint:      oklch(0.72 0.18 24 / 0.10);
+  --pat-tint-2:    oklch(0.48 0.14 20 / 0.06);
+}
+.pat-wrap[data-grade="U"] {
+  --pat-gold:      oklch(0.80 0.02 95);
+  --pat-gold-soft: oklch(0.80 0.02 95 / 0.12);
+  --pat-edge:      oklch(0.80 0.02 95 / 0.22);
+  --pat-edge-h:    oklch(0.80 0.02 95 / 0.38);
+  --pat-warm:      oklch(0.55 0.01 95);
+  --pat-tint:      oklch(0.80 0.02 95 / 0.08);
+  --pat-tint-2:    oklch(0.55 0.01 95 / 0.05);
 }
 
 /* El atributo [hidden] gana siempre: sin ver, sin interceptar clics. */
@@ -242,14 +299,24 @@
 /* Raíz del detalle: columna que LLENA el alto del strip sin scroll. */
 .pat-wrap { display: flex; flex-direction: column; height: 100%; gap: 9px; min-height: 0; }
 
-/* Barra superior — full width, ÚNICA fila por encima de las 3 columnas. Nombre+edad+
-   grade a la izquierda, controles (Fijar/En uso/Depositar) a la derecha (2026-07-09:
-   suben aquí desde .pat-combo-line — pedido de campo, imagen de referencia: los
-   botones van arriba, a la altura del nombre, no a media pantalla). padding-right
-   reserva el hueco de .pantalla-close (30px + 12px offset = 42px, +8px de aire). */
+/* Barra superior — full width, ÚNICA fila por encima de las 3 columnas. Solo
+   nombre+edad+grade a la izquierda; los controles YA NO viven aquí (bajaron a la
+   esquina inferior derecha, ver .pat-actions). padding-right reserva el hueco de
+   .pantalla-close (30px + 12px offset = 42px, +8px de aire). */
 .pat-topbar { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; padding-right: 50px; }
 .pat-name { font-size: 11.5px; color: var(--text-muted); font-weight: 500; letter-spacing: .3px; }
-.pat-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+/* Controles (Fijar/En uso/Depositar) anclados a la ESQUINA INFERIOR DERECHA dentro
+   de La Pantalla (Robert 2026-07-09, campo: "adentro de la pantalla, pero pegado a
+   la esquina inferior derecha"). Absolutos contra .pantalla-view (position:relative).
+   Cuelgan de .pat-wrap (NO de .pat-topbar): el cuaje líquido deja un transform
+   permanente en .pat-topbar (fill-mode both) que lo volvería contenedor de
+   posicionamiento y anclaría los botones a la fila superior — .pat-wrap no anima,
+   así el ancla es la vista. z-index 6 = sobre el escenario/contenido (z5). La ✕ de
+   cerrar SÍ se queda arriba-derecha (convención de cierre). */
+.pat-actions {
+  position: absolute; right: 18px; bottom: 14px; z-index: 6;
+  display: flex; align-items: center; gap: 6px;
+}
 .pat-act {
   -webkit-appearance: none; appearance: none; cursor: pointer;
   display: inline-flex; align-items: center; gap: 5px;
@@ -336,9 +403,17 @@
 /* Columna 2 — movimientos, COMPACTA (ya no se estira a todo el ancho). Header
    (.pat-txn-h) es hijo DIRECTO de la columna (fijo, arriba) — .pat-txn-col es
    SOLO el área scrolleable de filas, ya no envuelve al header. */
+/* Reparto 2:1 movimientos↔escenario (Robert 2026-07-09, campo): "el espacio de
+   movimientos duplica su espacio a lo ancho hacia la derecha" — la lista toma DOS
+   tercios del área libre (tras la columna de datos) y el escenario UN tercio. Antes
+   txns iba capado a 420px y el stage (flex:1 1 0) se comía TODO el resto → texto
+   apretado/truncado a la izquierda y hueco verde muerto a la derecha. min-width 380
+   = piso para que las descripciones ("Rechazado (banco) · Pago con tarjeta · …")
+   quepan sin elipsis en pantallas normales. El ancho exacto lo fija la proporción
+   contra el ancho real de la sheet, no un px constante. */
 .pat-col-txns {
-  flex: 0 1 420px; display: flex; flex-direction: column;
-  min-width: 260px; min-height: 0; padding-left: 22px;
+  flex: 2 1 0; display: flex; flex-direction: column;
+  min-width: 380px; min-height: 0; padding-left: 22px;
   border-left: 1px solid var(--pat-edge);
   box-shadow: -1px 0 16px -12px var(--pat-gold-soft);
 }
@@ -349,7 +424,7 @@
    el ancho y el monto se iba al borde derecho — ahora quedan compactos y este
    espacio queda libre para el feedback en vivo (pedido de Robert, campo). */
 .pat-col-stage {
-  flex: 1 1 0; min-width: 0; min-height: 0;
+  flex: 1 1 0; min-width: 340px; min-height: 0;
   display: flex; flex-direction: column; justify-content: center;
   padding-left: 22px;
   border-left: 1px solid var(--pat-edge);

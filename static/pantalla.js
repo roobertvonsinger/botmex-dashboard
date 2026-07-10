@@ -240,17 +240,14 @@
     // Controles principales: MISMOS data-* que renderDetail (d-deposit-btn/inuse/det-mark)
     // para reusar la semántica; el cableado lo hace el listener de #pantalla (abajo).
     // 2026-07-09 (pedido de campo, imagen de referencia): barra superior full-width
-    // (nombre+grade | controles) por encima de 3 columnas reales (datos | movimientos
-    // compactos | escenario). El combo baja a ser la 1ª fila de la columna de datos.
+    // (solo nombre+grade) por encima de 3 columnas reales (datos | movimientos amplios
+    // | escenario). El combo es la 1ª fila de la columna de datos. Los controles
+    // (Fijar/En uso/Depositar) van FUERA del topbar, colgados de .pat-wrap y anclados
+    // por CSS a la esquina inferior derecha (ver .pat-actions en pantalla.css).
     return `
       <div class="pat-topbar" style="--i:0">
         ${nombre ? `<span class="pat-name">${nombre}${age != null ? ` · ${age} años` : ''}</span>` : ''}
         ${grade ? `<span class="grade ${gCls}" title="Grade ${g(grade)}">${g(grade)}</span>` : ''}
-        <div class="pat-actions">
-          <button type="button" class="pat-act det-mark" data-mark-email="${g(email)}" title="Fijar"><i class="ph-bold ph-push-pin"></i></button>
-          <button type="button" class="pat-act inuse${locked ? ' on' : ''}" data-inuse="${d.id}" title="En uso (lock 2h) · click de nuevo libera"><i class="ph-bold ph-lock-key"></i></button>
-          <button type="button" class="pat-act pat-act-dep d-deposit-btn" data-acc-id="${d.id}" title="Depositar"><i class="ph-duotone ph-credit-card"></i><span>Depositar</span></button>
-        </div>
       </div>
       <div class="pat-columns">
         <div class="pat-col-ident">
@@ -281,6 +278,11 @@
         </div>
         ${renderPantallaTxns(d)}
         <div class="pat-col-stage" id="patStageSlot"></div>
+      </div>
+      <div class="pat-actions">
+        <button type="button" class="pat-act det-mark" data-mark-email="${g(email)}" title="Fijar"><i class="ph-bold ph-push-pin"></i></button>
+        <button type="button" class="pat-act inuse${locked ? ' on' : ''}" data-inuse="${d.id}" title="En uso (lock 2h) · click de nuevo libera"><i class="ph-bold ph-lock-key"></i></button>
+        <button type="button" class="pat-act pat-act-dep d-deposit-btn" data-acc-id="${d.id}" title="Depositar"><i class="ph-duotone ph-credit-card"></i><span>Depositar</span></button>
       </div>`;
   }
 
@@ -493,7 +495,8 @@
     if (!detail) return false;
     try {
       const liquid = animate ? ' pat-liquid' : '';
-      detail.innerHTML = `<div class="pat-wrap${liquid}">${renderPantallaHead(d)}</div>`;
+      const gVar = (d.grade || 'U').replace('+', 'Plus');
+      detail.innerHTML = `<div class="pat-wrap${liquid}" data-grade="${gVar}">${renderPantallaHead(d)}</div>`;
       _mountStage();               // re-parenta el escenario de depósito a la zona derecha
       return true;
     } catch (e) {

@@ -201,6 +201,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a71b9e8` | feat(grading+ui): aprobación reciente sana→A · combo en una línea con divisor al final |
 | `3d680a0` | chore(gitignore): ignorar reports/ e idea_vaga.txt (datos sensibles de tarjetas) |
 | `6dbfbe6` | feat(grading): rebalanceo M7 + ciclo de vida A+ (3DS→A+, 2 declines de banco→B) |
 | `50ea3cb` | fix(pantalla): combo largo sin espacios desbordaba .pat-col-ident e invadía Movimientos |
@@ -212,7 +213,6 @@ prewarm.py (router)
 | `c7f53e7` | docs(next-session): cierre — bot Telegram candado + auto-reload, listo para retomar KPIs |
 | `6ca0bb6` | feat(frontend): auto-reload por versión + ajuste de vidrio de La Pantalla |
 | `01c334b` | docs(audit): bot Telegram — pasar de redirect a invisibilidad total |
-| `1386a4b` | docs(audit): bitácora — bot Telegram pasa a solo-alimentador + unifica proxy/captcha con dashboard |
 <!-- GEN:end:recientes -->
 
 ---
