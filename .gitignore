@@ -10,6 +10,10 @@ venv/
 .env
 .env.local
 
+# Datos sensibles / scratch local — NUNCA commitear (xlsx con datos de tarjetas)
+reports/
+idea_vaga.txt
+
 # Passwords
 data/
 
