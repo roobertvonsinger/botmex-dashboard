@@ -104,6 +104,60 @@
 /* El atributo [hidden] gana siempre: sin ver, sin interceptar clics. */
 .pantalla[hidden] { display: none; }
 
+/* ── Tinte por GRADE (Robert 2026-07-10, campo): "el color de la pantalla sea el
+   color del grading... sutil". La Pantalla no tiene un color fijo — hereda el hue
+   de la cuenta abierta. MISMO mapeo hue que grade-dot/r-grade-X (style.css): A+152
+   A160 B235 C75 D24 — y MISMA fórmula L/C que el verde default de arriba (sutil =
+   no reinventar saturación por grade, solo rotar hue, así el "peso" visual del
+   tinte es idéntico en los 6 grados). pantalla.js pone data-grade en #pantalla en
+   cada render (renderPantallaHead). A y sin-grade quedan en el verde base (H160,
+   ya declarado arriba) — no hace falta override. */
+.pantalla[data-grade="Aplus"] {
+  --pat-gold:      oklch(0.80 0.085 152);
+  --pat-gold-soft: oklch(0.80 0.085 152 / 0.14);
+  --pat-edge:      oklch(0.80 0.085 152 / 0.28);
+  --pat-edge-h:    oklch(0.80 0.085 152 / 0.45);
+  --pat-warm:      oklch(0.68 0.09 152);
+  --pat-tint:      oklch(0.80 0.085 152 / 0.10);
+  --pat-tint-2:    oklch(0.68 0.09 152 / 0.06);
+}
+.pantalla[data-grade="B"] {
+  --pat-gold:      oklch(0.80 0.085 235);
+  --pat-gold-soft: oklch(0.80 0.085 235 / 0.14);
+  --pat-edge:      oklch(0.80 0.085 235 / 0.28);
+  --pat-edge-h:    oklch(0.80 0.085 235 / 0.45);
+  --pat-warm:      oklch(0.68 0.09 235);
+  --pat-tint:      oklch(0.80 0.085 235 / 0.10);
+  --pat-tint-2:    oklch(0.68 0.09 235 / 0.06);
+}
+.pantalla[data-grade="C"] {
+  --pat-gold:      oklch(0.80 0.085 75);
+  --pat-gold-soft: oklch(0.80 0.085 75 / 0.14);
+  --pat-edge:      oklch(0.80 0.085 75 / 0.28);
+  --pat-edge-h:    oklch(0.80 0.085 75 / 0.45);
+  --pat-warm:      oklch(0.68 0.09 75);
+  --pat-tint:      oklch(0.80 0.085 75 / 0.10);
+  --pat-tint-2:    oklch(0.68 0.09 75 / 0.06);
+}
+.pantalla[data-grade="D"] {
+  --pat-gold:      oklch(0.80 0.085 24);
+  --pat-gold-soft: oklch(0.80 0.085 24 / 0.14);
+  --pat-edge:      oklch(0.80 0.085 24 / 0.28);
+  --pat-edge-h:    oklch(0.80 0.085 24 / 0.45);
+  --pat-warm:      oklch(0.68 0.09 24);
+  --pat-tint:      oklch(0.80 0.085 24 / 0.10);
+  --pat-tint-2:    oklch(0.68 0.09 24 / 0.06);
+}
+.pantalla[data-grade="U"] {
+  --pat-gold:      oklch(0.78 0.015 160);
+  --pat-gold-soft: oklch(0.78 0.015 160 / 0.14);
+  --pat-edge:      oklch(0.78 0.015 160 / 0.28);
+  --pat-edge-h:    oklch(0.78 0.015 160 / 0.45);
+  --pat-warm:      oklch(0.62 0.015 160);
+  --pat-tint:      oklch(0.78 0.015 160 / 0.10);
+  --pat-tint-2:    oklch(0.62 0.015 160 / 0.06);
+}
+
 /* La banda inferior (plegar/desplegar) se ELIMINÓ (2026-07-09, Robert: alto fijo,
    sin drag ni collapse). El único scroll dentro de La Pantalla es .pat-txn-col. */
 

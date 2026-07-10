@@ -3,6 +3,18 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-07-10 (La Pantalla — reparto 2:1, controles a esquina inf-der, tinte por grade)
+
+**Motivo**: bugs de acomodo señalados por Robert sobre el deploy anterior (screenshot con marcas): columna de movimientos apretada, controles pegados al borde superior tapando la zona de animación, y pedido nuevo de que el color de La Pantalla siga el grade de la cuenta.
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Reparto 2:1 movimientos↔escenario** (`pantalla.css` `.pat-col-txns`/`.pat-col-stage`) | `.pat-col-txns` pasa de `flex:0 1 420px` (cap fijo) a `flex:2 1 0` (min-width 380px); `.pat-col-stage` gana `min-width:340px`. La lista de movimientos ocupa 2/3 del ancho libre tras la columna de datos, el escenario de depósito 1/3 — antes el stage (`flex:1 1 0`) se comía todo el resto y dejaba texto apretado. | ✅ implementado | ⚠️ no verificado en navegador — deploy directo a pedido de Robert ("deploya alla lo reviso") |
+| **Controles a esquina inferior derecha** (`pantalla.js` `renderPantallaHead` + `pantalla.css` `.pat-actions`) | Fijar/En uso/Depositar salen de `.pat-topbar` (pegados al borde superior, tapaban el arranque de la zona de animación) y cuelgan de `.pat-wrap` con `position:absolute; right:18px; bottom:14px` — anclados a `.pantalla-view`, no al topbar (el cuaje líquido deja un `transform` permanente en `.pat-topbar` que lo volvería mal ancla). La ✕ de cerrar se queda arriba-derecha (convención). | ✅ implementado | ⚠️ no verificado en navegador |
+| **Tinte de La Pantalla por grade** (`pantalla.js` `renderPantallaHead` + `pantalla.css` `.pantalla[data-grade=...]`) | La superficie retinta bordes/glow/CTA/saldo (`--pat-gold` family) según el grade de la cuenta abierta — mismo mapeo de hue que `grade-dot`/`r-grade-X` en `style.css` (A+152 · A160(default) · B235 · C75 · D24), misma fórmula L/C que el verde base (sutil = solo rota hue, no reinventa saturación). `pantalla.js` pone `data-grade` en `#pantalla` en cada render. | ✅ implementado | ⚠️ no verificado en navegador |
+
+**Escenario de depósito ya migrado** (de sesión previa, confirmado en esta revisión): `#depStage` vive en `index.html` oculto por default, `journeyStart()` (`depos.js`) lo enciende y `_mountStage()` (`pantalla.js`) lo re-parenta a `#patStageSlot` (columna derecha) al abrir/renderizar La Pantalla — el mismo nodo sobrevive al re-render (no se clona). En reposo la zona derecha va vacía a propósito (sin misión corriendo, nada que animar).
+
 ## Captura: 2026-07-06 (Auto-reload por versión — pestañas viejas ya no dependen de Ctrl+Shift+R)
 
 **Motivo**: Robert no sabía si todos los operadores habían dado Ctrl+Shift+R tras deploys recientes; quería forzar que todos vean la interfaz nueva sin depender de que el operador sepa hacerlo.

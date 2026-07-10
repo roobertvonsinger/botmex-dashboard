@@ -235,6 +235,13 @@
     const gCls = (typeof gradeClass === 'function') ? gradeClass(grade) : '';
     const locked = !!d.locked_by;
 
+    // Tinte de La Pantalla por GRADE (Robert 2026-07-10, campo): data-grade en la
+    // raíz retinta bordes/glow/CTA/saldo vía las mismas CSS vars (--pat-gold family),
+    // ver pantalla.css. Se pone en CADA render (cache-hit y fetch fresco) para que
+    // nunca quede desfasado si el grade cambió entre aperturas.
+    const patRoot = $('#pantalla');
+    if (patRoot) patRoot.dataset.grade = gCls || 'U';
+
     // --i = orden de cuaje del bloque (idrow→combo→balance→meta→columnas txns).
     // CSS lo lee para escalonar el reveal líquido; inofensivo cuando no hay .pat-liquid.
     // Controles principales: MISMOS data-* que renderDetail (d-deposit-btn/inuse/det-mark)
