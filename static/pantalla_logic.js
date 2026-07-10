@@ -19,22 +19,38 @@
     acc[s.toUpperCase()] = s;
     return acc;
   }, {});
-  const ABBR_RE = /(B\.?C\.?|Q\.?R\.?|N\.?L\.?|CDMX|EDOMEX)\s*$/i;
+
+  // Abreviaturas POSTALES reales (SEPOMEX) — verificadas 2026-07-10 contra direcciones
+  // reales de campo (prod, `accounts.address`): NO vienen separadas por comas; el
+  // Estado es el ÚLTIMO token del string, en abreviatura postal (no el código CURP de
+  // 2 letras). Ej.: "C MELITON ALBAÑEZ 2145 FRACC PERLA 23040 LA PAZ B.C.S." → BCS.
+  // estadoFrom() vivía roto para el 100% de las cuentas reales: solo soportaba 5
+  // abreviaturas (regex al final del string SIN separar por espacio) y exigía coma
+  // como fallback — las direcciones reales no traen coma en ningún lado.
+  const MX_ABBR = {
+    AGS: 'Aguascalientes', BC: 'Baja California', BCS: 'Baja California Sur',
+    CAMP: 'Campeche', CHIS: 'Chiapas', CHIH: 'Chihuahua',
+    CDMX: 'Ciudad de México', DF: 'Ciudad de México',
+    COAH: 'Coahuila', COL: 'Colima', DGO: 'Durango',
+    MEX: 'Estado de México', EDOMEX: 'Estado de México',
+    GTO: 'Guanajuato', GRO: 'Guerrero', HGO: 'Hidalgo', JAL: 'Jalisco', MICH: 'Michoacán',
+    MOR: 'Morelos', NAY: 'Nayarit', NL: 'Nuevo León', OAX: 'Oaxaca', PUE: 'Puebla',
+    QRO: 'Querétaro', QROO: 'Quintana Roo', QR: 'Quintana Roo', SLP: 'San Luis Potosí',
+    SIN: 'Sinaloa', SON: 'Sonora', TAB: 'Tabasco', TAMPS: 'Tamaulipas', TAM: 'Tamaulipas',
+    TLAX: 'Tlaxcala', VER: 'Veracruz', YUC: 'Yucatán', ZAC: 'Zacatecas',
+  };
 
   function estadoFrom(address) {
     if (!address || !String(address).trim()) return null;
     const addr = String(address).trim();
 
-    const abbrMatch = addr.match(ABBR_RE);
-    if (abbrMatch) {
-      const raw = abbrMatch[1].toUpperCase().replace(/\./g, '');
-      if (raw === 'CDMX') return 'CDMX';
-      if (raw === 'EDOMEX') return 'EDOMEX';
-      if (raw === 'BC') return 'B.C.';
-      if (raw === 'QR') return 'Q.R.';
-      if (raw === 'NL') return 'N.L.';
-    }
+    // Formato real de campo (sin comas): el Estado es el ÚLTIMO token, a veces con
+    // puntos (B.C.S., OAX., GTO.). Se prueba primero — es el formato observado en
+    // el 100% de las direcciones de prod.
+    const lastTok = addr.split(/\s+/).pop().replace(/\./g, '').toUpperCase();
+    if (MX_ABBR[lastTok]) return MX_ABBR[lastTok];
 
+    // Fallback: formato con comas + nombre completo del estado (si alguna vez aparece).
     const lastSegment = addr.split(',').pop().trim();
     const canonical = MX_STATES_BY_UPPER[lastSegment.toUpperCase()];
     if (canonical) return canonical;

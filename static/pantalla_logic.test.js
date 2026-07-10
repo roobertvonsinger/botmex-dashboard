@@ -11,10 +11,19 @@ assert.strictEqual(s.botmexico.length, 2, 'botmexico = source dashboard');
 assert.strictEqual(s.betmexico.length, 1, 'betmexico = el resto');
 assert.strictEqual(s.botmexico[0].amount, 50);
 
-assert.strictEqual(P.estadoFrom('CALLE MAYORCA 107 FRACC LAS CALIFORNIAS 22404 TIJUANA B.C'), 'B.C.');
+// Formato real de campo (sin comas, abreviatura postal al final) — bug 2026-07-10:
+// estadoFrom() nunca matcheaba ninguna dirección real de prod (ver pantalla_logic.js).
+assert.strictEqual(P.estadoFrom('CALLE MAYORCA 107 FRACC LAS CALIFORNIAS 22404 TIJUANA B.C'), 'Baja California');
+assert.strictEqual(P.estadoFrom('C MELITON ALBAÑEZ 2145 FRACC PERLA 23040 LA PAZ B.C.S.'), 'Baja California Sur');
+assert.strictEqual(P.estadoFrom('AV /PINOS S/N COL EUCALIPTOS 68050 OAXACA DE JUAREZ OAX.'), 'Oaxaca');
+assert.strictEqual(P.estadoFrom('C CUARTO SOL 1 - SECCION PARQUES 54720 CUAUTITLAN IZCALLI MEX'), 'Estado de México');
+assert.strictEqual(P.estadoFrom('C POZA RICA 1580 FRACC 18 DE MARZO 44960 GUADALAJARA JAL'), 'Jalisco');
+assert.strictEqual(P.estadoFrom('CAPIZAHUATL 401 FRACC COPORO Y CERRO AZUL I 90401 APIZACO TLAX.'), 'Tlaxcala');
+// Fallback con comas + nombre completo (si alguna vez aparece en ese formato).
 assert.strictEqual(P.estadoFrom('AV JUAREZ 12, GUADALAJARA, JALISCO'), 'Jalisco');
 assert.strictEqual(P.estadoFrom(''), null);
 assert.strictEqual(P.estadoFrom(null), null);
+assert.strictEqual(P.estadoFrom('DIRECCION SIN ESTADO RECONOCIBLE 123'), null);
 
 const h = P.formatHito({ kind: 'deposit', status: 'approved', amount: 50 });
 assert.strictEqual(h.tone, 'ok');

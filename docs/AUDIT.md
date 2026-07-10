@@ -3,6 +3,18 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-07-10b (La Pantalla — reparto de columnas afinado, Estado corregido, saldo más chico, scroll en datos, cristal se difumina al color del grade)
+
+**Motivo**: segunda ronda de ajustes sobre la captura anterior (screenshot con recuadros de color marcando el ancho objetivo de cada zona).
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **`estadoFrom()` — bug real de parseo** (`pantalla_logic.js`) | Las direcciones reales de `accounts.address` NO llevan comas (`"C MELITON ALBAÑEZ 2145 FRACC PERLA 23040 LA PAZ B.C.S."`) — el Estado es el ÚLTIMO token, abreviatura postal SEPOMEX. La función vieja exigía coma + nombre completo → nunca matcheaba NINGUNA dirección real (el Estado nunca se mostraba, no era falta de dato). Se reescribió con tabla de 32 abreviaturas postales reales + fallback al formato con comas. | ✅ implementado | ✅ 10 asserts en `pantalla_logic.test.js` contra direcciones reales de prod (verificadas por `sqlite3` en KVM4) — `node static/pantalla_logic.test.js` OK |
+| **Reparto de columnas afinado** (`pantalla.css`) | `.pat-col-txns: flex 2→1.35`, `.pat-col-ident` padding-right 22→34px (cede espacio a datos personales), `.pat-col-stage` min-width 340→380 (= viewBox real de las escenas SVG del depósito, no inventado). Ratio más parejo (~55:45) según recuadros marcados por Robert — el 2:1 de la ronda anterior dejaba el escenario angosto. | ✅ implementado | ⚠️ no verificado en navegador — deploy directo a pedido de Robert |
+| **Saldo más chico** (`pantalla.css` `.pat-balance`) | 36px→26px — leía como el elemento más grande de la vista, desbalanceaba la columna. | ✅ implementado | ⚠️ no verificado en navegador |
+| **Scroll en datos personales** (`pantalla.css` `.pat-col-ident`) | `overflow-y:auto; min-height:0` (sin overflow-x/max-width — el combo largo NO debe truncarse, regla ya vigente). Antes el contenido que excedía el alto se recortaba en silencio contra `.pantalla-view{overflow:hidden}`. | ✅ implementado | ⚠️ no verificado en navegador |
+| **Cristal se difumina al color del grade** (`pantalla.css` `.pantalla-sheet` background) | 2 capas nuevas en el stack de fondo (no solo bordes/texto): oscurece la izquierda (datos personales, más legible) + diluye hacia `var(--pat-tint)`/`--pat-gold-soft` (dinámicas por grade) hacia la derecha. Reflejo glass diagonal recortado a la mitad de opacidad (pedido: "quita la blancosidad que nubla la vista"). | ✅ implementado | ⚠️ no verificado en navegador |
+
 ## Captura: 2026-07-10 (La Pantalla — reparto 2:1, controles a esquina inf-der, tinte por grade)
 
 **Motivo**: bugs de acomodo señalados por Robert sobre el deploy anterior (screenshot con marcas): columna de movimientos apretada, controles pegados al borde superior tapando la zona de animación, y pedido nuevo de que el color de La Pantalla siga el grade de la cuenta.

@@ -189,9 +189,19 @@
      (gradiente 0.17→0.11) + MESH de manchas verdes suaves (referencia: vecteezy
      abstract-gradation-color, mismo lenguaje que las covers #2/#3 del set: 2-3 tonos
      de un mismo hue difuminándose entre sí) + reflejo glass diagonal. El peso lo da
-     el backdrop-filter, no un fondo sólido. */
+     el backdrop-filter, no un fondo sólido.
+     2026-07-10 (Robert, campo): "que vaya difuminandose el acabado de la pantalla
+     de izquierda a derecha dando pie al color del grading SUTIL... siendo este el
+     tipo de color de ese cristal virtual — no solo que cambies los colores de las
+     letras". El cristal MISMO (no solo bordes/texto) ahora se oscurece a la
+     izquierda (zona de datos personales, más legible) y diluye hacia el tinte del
+     grade (var(--pat-tint)/--pat-gold-soft, dinámicas por data-grade) a la derecha
+     (zona de movimientos/escenario). Además se recorta el brillo diagonal blanquecino
+     (reflejo glass, capa 3) que "nublaba" la lectura — pedido explícito de Robert. */
   background:
-    linear-gradient(133deg, rgba(255,255,255,.05), transparent 24%, transparent 76%, rgba(255,255,255,.02)),   /* reflejo glass */
+    linear-gradient(90deg, oklch(0.04 0.008 160 / 0.42) 0%, oklch(0.04 0.008 160 / 0.20) 26%, transparent 52%),  /* oscurece la izquierda (datos personales) */
+    linear-gradient(90deg, transparent 20%, var(--pat-tint) 62%, var(--pat-gold-soft) 100%),                     /* difumina hacia el color del grade, izq→der */
+    linear-gradient(133deg, rgba(255,255,255,.025), transparent 24%, transparent 76%, rgba(255,255,255,.012)),  /* reflejo glass — brillo recortado a la mitad (pedido: "quita esa blancosidad") */
     radial-gradient(70% 52% at 90% -14%, oklch(0.86 0.03 330 / 0.05), transparent 58%),                        /* PERLA (mate): nácar rosa esq. sup-der */
     radial-gradient(62% 48% at 3% 112%,  oklch(0.85 0.03 200 / 0.04), transparent 58%),                        /* PERLA (mate): nácar cian esq. inf-izq */
     radial-gradient(85% 65% at 14% 4%,  oklch(0.80 0.085 155 / 0.16), transparent 52%),                        /* mancha 1 — mint claro, esq. sup-izq */
@@ -431,13 +441,34 @@
 
 /* Ancho = el del combo en una línea (max-content). El divisor de .pat-col-txns cae
    justo al terminar el combo + el padding-right (aire antes de la línea). No fijo a
-   218px: eso truncaba/encimaba combos largos (bug de campo 2026-07-09). */
-.pat-col-ident { flex: 0 0 auto; width: max-content; display: flex; flex-direction: column; gap: 8px; padding-right: 22px; }
+   218px: eso truncaba/encimaba combos largos (bug de campo 2026-07-09).
+   padding-right 22→34 (Robert 2026-07-10: "dandole levemente mas espacio a los
+   datos personales") — el divisor se corre un poco más a la derecha sin volver a
+   fijar un ancho artificial (seguiría rompiendo combos largos).
+   overflow-y:auto + min-height:0 (Robert: "le falta un scroll como el de las
+   transacciones") — con Estado ahora poblado (ver pantalla_logic.js estadoFrom,
+   bug de parseo corregido) + tarjetas/notas, el contenido puede exceder el alto del
+   strip; antes se recortaba en silencio contra pantalla-view{overflow:hidden}.
+   SIN overflow-x ni max-width: el combo largo NO debe truncarse ni recortarse
+   (regla de campo 2026-07-09/feedback_no_masking) — el ancho sigue siendo
+   max-content puro, solo el alto gana scroll. */
+.pat-col-ident {
+  flex: 0 0 auto; width: max-content;
+  display: flex; flex-direction: column; gap: 7px; padding-right: 34px;
+  overflow-y: auto; min-height: 0;
+}
+.pat-col-ident::-webkit-scrollbar { width: 5px; }
+.pat-col-ident::-webkit-scrollbar-track { background: transparent; }
+.pat-col-ident::-webkit-scrollbar-thumb { background: var(--pat-edge); border-radius: 4px; }
+.pat-col-ident::-webkit-scrollbar-thumb:hover { background: var(--pat-edge-h); }
+/* Saldo: 36px leía como el elemento MÁS grande de toda la vista, desbalanceando la
+   columna de datos (Robert: "el saldo esta muy grande"). 26px lo baja a segundo
+   plano frente al combo/nombre sin perder la lectura rápida del monto. */
 .pat-balance {
   font-family: var(--font-display); font-weight: 700;
-  font-size: 36px; line-height: 1; letter-spacing: .2px;
+  font-size: 26px; line-height: 1.1; letter-spacing: .2px;
   color: var(--pat-gold);
-  text-shadow: 0 0 30px var(--pat-gold-soft), 0 1px 2px rgba(0,0,0,.6), 0 0 2px rgba(0,0,0,.5);
+  text-shadow: 0 0 20px var(--pat-gold-soft), 0 1px 2px rgba(0,0,0,.6), 0 0 2px rgba(0,0,0,.5);
 }
 /* width:0 + min-width:100% = la meta NO contribuye al ancho intrínseco de la columna
    (no empuja el divisor más allá del combo); se estira al ancho ya fijado por el combo
@@ -457,17 +488,16 @@
 /* Columna 2 — movimientos, COMPACTA (ya no se estira a todo el ancho). Header
    (.pat-txn-h) es hijo DIRECTO de la columna (fijo, arriba) — .pat-txn-col es
    SOLO el área scrolleable de filas, ya no envuelve al header. */
-/* Reparto 2:1 movimientos↔escenario (Robert 2026-07-09, campo): "el espacio de
-   movimientos duplica su espacio a lo ancho hacia la derecha" — la lista toma DOS
-   tercios del área libre (tras la columna de datos) y el escenario UN tercio. Antes
-   txns iba capado a 420px y el stage (flex:1 1 0) se comía TODO el resto → texto
-   apretado/truncado a la izquierda y hueco verde muerto a la derecha. min-width 380
-   = piso para que las descripciones ("Rechazado (banco) · Pago con tarjeta · …")
-   quepan sin elipsis en pantallas normales. El ancho exacto lo fija la proporción
-   contra el ancho real de la sheet, no un px constante. */
+/* Reparto de las 3 columnas (Robert 2026-07-10, campo, imagen con recuadros de
+   color marcando el ancho objetivo de cada zona): el 2:1 de la ronda anterior dejó
+   el escenario (verde) angosto y los datos (amarillo) sin aire. Ahora movimientos
+   se RECORRE levemente a la derecha (cede a datos personales, ver .pat-col-ident
+   padding-right) y se ANGOSTA por su derecha (cede al escenario) — el reparto
+   objetivo marcado por Robert es más parejo (~55:45 movimientos:escenario), no 2:1.
+   min-width 340 = piso para que las descripciones no queden en elipsis constante. */
 .pat-col-txns {
-  flex: 2 1 0; display: flex; flex-direction: column;
-  min-width: 380px; min-height: 0; padding-left: 22px;
+  flex: 1.35 1 0; display: flex; flex-direction: column;
+  min-width: 340px; min-height: 0; padding-left: 22px;
   border-left: 1px solid var(--pat-edge);
   box-shadow: -1px 0 16px -12px var(--pat-gold-soft);
 }
@@ -477,8 +507,11 @@
    + estado) cuando corre una misión. Antes los movimientos se estiraban a TODO
    el ancho y el monto se iba al borde derecho — ahora quedan compactos y este
    espacio queda libre para el feedback en vivo (pedido de Robert, campo). */
+/* min-width 380 = viewBox real de las escenas SVG del depósito (ver depos.js
+   #depStage .scene svg viewBox="0 0 380 200") — no un número inventado, es el ancho
+   nativo del arte; por debajo de eso las escenas se ven proporcionalmente apretadas. */
 .pat-col-stage {
-  flex: 1 1 0; min-width: 340px; min-height: 0;
+  flex: 1 1 0; min-width: 380px; min-height: 0;
   display: flex; flex-direction: column; justify-content: center;
   padding-left: 22px;
   border-left: 1px solid var(--pat-edge);
