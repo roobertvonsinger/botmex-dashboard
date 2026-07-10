@@ -512,6 +512,23 @@
     if (slot && stage && stage.parentNode !== slot) slot.appendChild(stage);
   }
 
+  // Ancla --pat-ident-w a la medida REAL (getBoundingClientRect) de .pat-col-ident,
+  // NO a un px inventado (feedback_ui_ancla_medida_no_pixel_inventado). El form de
+  // CURP (data-curp-form) vive fuera de .pat-col-ident (necesita más aire que el
+  // combo para su input+botones) pero Robert pidió que su borde derecho termine
+  // exactamente donde termina esa columna (línea amarilla, campo 2026-07-10) — sin
+  // esto, al ser hijo directo de .pat-wrap (flex-column, stretch) se estiraba al
+  // ancho COMPLETO de la sheet. rAF: mide después de que el layout real asentó.
+  function _syncIdentWidth() {
+    requestAnimationFrame(() => {
+      const wrap = document.querySelector('.pat-wrap');
+      const ident = wrap && wrap.querySelector('.pat-col-ident');
+      if (!wrap || !ident) return;
+      const w = ident.getBoundingClientRect().width;
+      if (w > 0) wrap.style.setProperty('--pat-ident-w', `${Math.round(w)}px`);
+    });
+  }
+
   function _renderDetailView(d, animate) {
     const { detail } = els();
     if (!detail) return false;
@@ -520,6 +537,7 @@
       const gVar = (d.grade || 'U').replace('+', 'Plus');
       detail.innerHTML = `<div class="pat-wrap${liquid}" data-grade="${gVar}">${renderPantallaHead(d)}</div>`;
       _mountStage();               // re-parenta el escenario de depósito a la zona derecha
+      _syncIdentWidth();           // ancla --pat-ident-w a la medida REAL de la columna (form CURP la usa)
       return true;
     } catch (e) {
       console.error('[Pantalla] render failed:', e);

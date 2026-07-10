@@ -201,9 +201,9 @@
   background:
     linear-gradient(90deg, oklch(0.04 0.008 160 / 0.42) 0%, oklch(0.04 0.008 160 / 0.20) 26%, transparent 52%),  /* oscurece la izquierda (datos personales) */
     linear-gradient(90deg, transparent 20%, var(--pat-tint) 62%, var(--pat-gold-soft) 100%),                     /* difumina hacia el color del grade, izq→der */
-    linear-gradient(133deg, rgba(255,255,255,.012), transparent 24%, transparent 76%, rgba(255,255,255,.006)),  /* reflejo glass — Robert 2026-07-10 2ª ronda: "bajarle aun mas lo blancuzco", recortado otra vez a la mitad */
-    radial-gradient(70% 52% at 90% -14%, oklch(0.86 0.03 330 / 0.05), transparent 58%),                        /* PERLA (mate): nácar rosa esq. sup-der */
-    radial-gradient(62% 48% at 3% 112%,  oklch(0.85 0.03 200 / 0.04), transparent 58%),                        /* PERLA (mate): nácar cian esq. inf-izq */
+    linear-gradient(133deg, rgba(255,255,255,.005), transparent 24%, transparent 76%, rgba(255,255,255,.003)),  /* reflejo glass — Robert 2026-07-10 3ª ronda: "menos satinada, mas mate" — recortado otra vez a la mitad (antes .012/.006) */
+    radial-gradient(70% 52% at 90% -14%, oklch(0.86 0.03 330 / 0.03), transparent 58%),                        /* PERLA (mate): nácar rosa esq. sup-der — Robert 2026-07-10 3ª ronda: aun mas mate */
+    radial-gradient(62% 48% at 3% 112%,  oklch(0.85 0.03 200 / 0.025), transparent 58%),                        /* PERLA (mate): nácar cian esq. inf-izq */
     radial-gradient(85% 65% at 14% 4%,  oklch(0.80 0.085 155 / 0.16), transparent 52%),                        /* mancha 1 — mint claro, esq. sup-izq */
     radial-gradient(75% 60% at 88% 30%, oklch(0.60 0.075 165 / 0.11), transparent 55%),                        /* mancha 2 — sage medio, derecha */
     radial-gradient(90% 70% at 30% 108%, oklch(0.32 0.06 170 / 0.20), transparent 58%),                        /* mancha 3 — sombra verde profunda, abajo */
@@ -217,11 +217,11 @@
   box-shadow:
     0 34px 100px -34px rgba(0,0,0,.70),
     0 0 64px -24px var(--pat-gold-soft),                          /* halo verde flotante */
-    inset 0 1px 0 rgba(255,255,255,.10),                          /* filo superior nacarado (perla) */
+    inset 0 1px 0 rgba(255,255,255,.06),                          /* filo superior nacarado (perla) — Robert 2026-07-10 3ª ronda: aun mas mate, antes .10 */
     inset 0 -1px 0 rgba(0,0,0,.25),                               /* filo inferior */
     inset 1px 0 0 rgba(255,255,255,.05),                          /* filo izquierdo — cierra el marco */
     inset -1px 0 0 rgba(0,0,0,.20),                                /* filo derecho — cierra el marco */
-    inset 0 0 40px -24px oklch(0.86 0.025 320 / 0.05),            /* PERLA (mate): halo nácar interno muy tenue, solo en el borde */
+    inset 0 0 40px -24px oklch(0.86 0.025 320 / 0.025),            /* PERLA (mate): halo nácar interno muy tenue, solo en el borde */
     inset 0 0 0 1px var(--pat-edge);                               /* borde interno, color de grade */
   backdrop-filter: blur(34px) saturate(1.2);    /* 2026-07-06: saturate 1.45→1.2 — menos vividez/brillo del fondo filtrado */
   -webkit-backdrop-filter: blur(34px) saturate(1.2);
@@ -685,7 +685,14 @@
 .pat-sv-note:hover .pat-sv-del { opacity: 1; }
 .pat-sv-del:hover { color: oklch(0.68 0.22 24); }
 
-.pat-form { display: flex; flex-direction: column; gap: 5px; margin-top: 2px; }
+/* Ancho = el REAL de .pat-col-ident (--pat-ident-w, medido por JS vía
+   getBoundingClientRect en pantalla.js _syncIdentWidth — no un px inventado).
+   El form vive fuera de esa columna (necesita más aire que el combo), pero
+   Robert pidió (campo 2026-07-10, imagen anotada): "el campo... y los
+   botoncitos se fueron hasta tope a la derecha, debe acabar donde marca la
+   línea amarilla" — la línea amarilla es el borde derecho de .pat-col-ident.
+   Fallback 300px solo por si el JS aún no corrió (primer paint). */
+.pat-form { display: flex; flex-direction: column; gap: 5px; margin-top: 2px; width: var(--pat-ident-w, 300px); box-sizing: border-box; }
 .pat-input, .pat-textarea {
   -webkit-appearance: none; appearance: none; width: 100%; box-sizing: border-box;
   background: oklch(0.20 0.02 160 / 0.35); border: 1px solid var(--pat-edge);
@@ -696,7 +703,7 @@
 .pat-textarea { resize: vertical; min-height: 40px; }
 .pat-input.pat-input-mono { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .5px; }
 .pat-input.pat-input-err { border-color: oklch(0.68 0.22 24 / 0.6); }
-.pat-form-row { display: flex; gap: 6px; justify-content: flex-end; }
+.pat-form-row { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
 .pat-btn {
   -webkit-appearance: none; appearance: none; border: 0; cursor: pointer;
   border-radius: 6px; padding: 4px 10px; font-size: 10.5px; font-weight: 600;

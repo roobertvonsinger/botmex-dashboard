@@ -3,6 +3,15 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-07-10d (La Pantalla — ancho real del form CURP, cristal aun más mate)
+
+**Motivo**: 4ª ronda, cierre de sesión — screenshot con línea amarilla marcando dónde debe terminar el campo/botones de CURP.
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Form CURP (`data-curp-form`) ya no se estira a toda la sheet** | Bug real: al vivir como hijo directo de `.pat-wrap` (flex-column, `align-items:stretch` default), el form heredaba el ancho COMPLETO de la sheet — input+botones "gob.mx/Cancelar/Guardar" terminaban pegados al borde derecho, no donde marca la línea amarilla (borde derecho de `.pat-col-ident`). Fix: `pantalla.js` `_syncIdentWidth()` mide `.pat-col-ident.getBoundingClientRect().width` REAL (rAF post-render, no un px inventado — regla `feedback_ui_ancla_medida_no_pixel_inventado`) y lo escribe como `--pat-ident-w` en `.pat-wrap`; `pantalla.css` `.pat-form[data-curp-form] { width: var(--pat-ident-w, 300px) }`. `.pat-form-row` gana `flex-wrap:wrap` por si el ancho medido queda justo para los 3 botones. | ✅ implementado | ⚠️ no verificado en navegador |
+| **Cristal aun más mate** (`pantalla.css` `.pantalla-sheet` background+box-shadow) | 3ª pasada sobre el mismo pedido ("bajarle lo blancuzco"): reflejo glass diagonal .012/.006→.005/.003; perlas nácar (esq. sup-der/inf-izq) .05/.04→.03/.025; halo nácar interno del marco .05→.025; filo superior nacarado del box-shadow .10→.06. | ✅ implementado | ⚠️ no verificado en navegador |
+
 ## Captura: 2026-07-10c (La Pantalla — meta al topbar, marco completo, fix flicker de apertura)
 
 **Motivo**: 3ª ronda sobre el mismo screenshot anotado — reacomodo final de datos personales + bug real de animación encontrado leyendo el código.
