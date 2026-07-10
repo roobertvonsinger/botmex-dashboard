@@ -91,6 +91,17 @@
     const { root } = els();
     if (!root) return;
 
+    // Robert 2026-07-10, campo: "se abre brusco o parpadea raro". Causa raíz: open()
+    // NO chequeaba si La Pantalla ya estaba visible — al cambiar de cuenta con la
+    // pantalla ya abierta, esto volvía a correr TODA la secuencia de entrada
+    // (agregaba .pantalla-in encima de un elemento que YA tenía .pantalla-on con
+    // backdrop-filter:blur(34px) activo, y el double-rAF togglaba clases otra vez) →
+    // repintado pesado (blur del propio filtro + backdrop-filter compitiendo) en
+    // cada click de fila, no solo en la apertura real. wasHidden distingue apertura
+    // en frío (dispara pat-unfurl/scanline/backdrop) de cambio de cuenta en caliente
+    // (solo actualiza contenido, sin re-togglear clases de animación).
+    const wasHidden = root.hidden;
+
     _currentId = id;
     clearTimeout(_closeTimer);
 
@@ -114,19 +125,21 @@
 
     setMode(mode);
 
-    root.hidden = false;
-    root.setAttribute('aria-hidden', 'false');
-    root.classList.remove('pantalla-out');
-    root.classList.add('pantalla-in');
-    // Con La Pantalla abierta, el panel de depósitos NUNCA comparte su franja (decisión
-    // de Robert, campo: siempre dockeado debajo de la tabla mientras esto está visible).
-    try { window.DeposWindow?._instance?.relayout?.(); } catch (_) {}
-    requestAnimationFrame(() => {
+    if (wasHidden) {
+      root.hidden = false;
+      root.setAttribute('aria-hidden', 'false');
+      root.classList.remove('pantalla-out');
+      root.classList.add('pantalla-in');
+      // Con La Pantalla abierta, el panel de depósitos NUNCA comparte su franja (decisión
+      // de Robert, campo: siempre dockeado debajo de la tabla mientras esto está visible).
+      try { window.DeposWindow?._instance?.relayout?.(); } catch (_) {}
       requestAnimationFrame(() => {
-        root.classList.add('pantalla-on');
-        root.classList.remove('pantalla-in');
+        requestAnimationFrame(() => {
+          root.classList.add('pantalla-on');
+          root.classList.remove('pantalla-in');
+        });
       });
-    });
+    }
 
     // Fetch fresco (siempre, para no mostrar datos viejos por mucho rato) —
     // solo re-renderiza si seguimos mostrando la misma cuenta.
@@ -242,19 +255,39 @@
     const patRoot = $('#pantalla');
     if (patRoot) patRoot.dataset.grade = gCls || 'U';
 
-    // --i = orden de cuaje del bloque (idrow→combo→balance→meta→columnas txns).
+    // --i = orden de cuaje del bloque (idrow→combo→balance→divisor→columnas txns).
     // CSS lo lee para escalonar el reveal líquido; inofensivo cuando no hay .pat-liquid.
     // Controles principales: MISMOS data-* que renderDetail (d-deposit-btn/inuse/det-mark)
     // para reusar la semántica; el cableado lo hace el listener de #pantalla (abajo).
-    // 2026-07-09 (pedido de campo, imagen de referencia): barra superior full-width
-    // (solo nombre+grade) por encima de 3 columnas reales (datos | movimientos amplios
-    // | escenario). El combo es la 1ª fila de la columna de datos. Los controles
-    // (Fijar/En uso/Depositar) van FUERA del topbar, colgados de .pat-wrap y anclados
-    // por CSS a la esquina inferior derecha (ver .pat-actions en pantalla.css).
+    // 2026-07-10 (Robert, campo, 2ª ronda de imagen anotada): Estado/cumpleaños/CURP
+    // SUBEN a la línea del nombre (antes vivían apilados en .pat-col-ident, ocupando
+    // toda la columna) — fluyen hacia la derecha del nombre+grade. El nombre gana un
+    // poco de contraste (antes casi ilegible, mismo tono que el resto de la meta).
+    // La columna de datos queda: combo → saldo → divisor → guardado (tarjetas/notas)
+    // directo bajo el saldo, sin el bloque de meta en medio.
     return `
       <div class="pat-topbar" style="--i:0">
         ${nombre ? `<span class="pat-name">${nombre}${age != null ? ` · ${age} años` : ''}</span>` : ''}
         ${grade ? `<span class="grade ${gCls}" title="Grade ${g(grade)}">${g(grade)}</span>` : ''}
+        <div class="pat-topbar-meta">
+          ${estado ? `<span class="pat-meta-item"><i class="ph-duotone ph-map-pin"></i> ${g(estado)}</span>` : ''}
+          ${bdate ? `<span class="pat-meta-item dim"><i class="ph-duotone ph-cake"></i> ${g(dmy(bdate) || bdate)}</span>` : ''}
+          <span class="pat-meta-item dim"><i class="ph-duotone ph-identification-card"></i>
+            ${curpShown
+              ? `<button type="button" class="pat-curp d-copy" data-copy="${g(curpShown)}" title="Copiar CURP">${g(curpShown)}</button>${curpTag}`
+              : ''}
+            <button type="button" class="pat-curp-add" data-curp-toggle="${g(curpStored || '')}" title="${curpStored ? 'Editar CURP guardado' : 'Guardar CURP validado'}"><i class="ph-bold ${curpStored ? 'ph-pencil-simple' : 'ph-plus'}"></i>${curpStored ? '' : ' CURP'}</button>
+          </span>
+        </div>
+      </div>
+      <div class="pat-form" data-curp-form hidden>
+        <input type="text" class="pat-input pat-input-mono" data-curp-input maxlength="18" placeholder="CURP (18 caracteres, validado en gob.mx)">
+        <div class="pat-form-err" data-curp-err hidden></div>
+        <div class="pat-form-row">
+          <a href="https://www.gob.mx/curp/" target="_blank" rel="noopener" class="pat-btn pat-btn-ghost" title="Abrir validador oficial">gob.mx ↗</a>
+          <button type="button" class="pat-btn pat-btn-ghost" data-curp-cancel>Cancelar</button>
+          <button type="button" class="pat-btn pat-btn-save" data-curp-save>Guardar</button>
+        </div>
       </div>
       <div class="pat-columns">
         <div class="pat-col-ident">
@@ -262,25 +295,7 @@
             <button type="button" class="pat-combo d-copy" data-copy="${g(combo)}" title="Copiar">${g(combo)}</button>
           </div>
           <div class="pat-balance" style="--i:2">${money(balance)}</div>
-          <div class="pat-meta" style="--i:3">
-            ${estado ? `<span class="pat-meta-item"><i class="ph-duotone ph-map-pin"></i> ${g(estado)}</span>` : ''}
-            ${bdate ? `<span class="pat-meta-item dim"><i class="ph-duotone ph-cake"></i> ${g(dmy(bdate) || bdate)}</span>` : ''}
-            <span class="pat-meta-item dim"><i class="ph-duotone ph-identification-card"></i>
-              ${curpShown
-                ? `<button type="button" class="pat-curp d-copy" data-copy="${g(curpShown)}" title="Copiar CURP">${g(curpShown)}</button>${curpTag}`
-                : ''}
-              <button type="button" class="pat-curp-add" data-curp-toggle="${g(curpStored || '')}" title="${curpStored ? 'Editar CURP guardado' : 'Guardar CURP validado'}"><i class="ph-bold ${curpStored ? 'ph-pencil-simple' : 'ph-plus'}"></i>${curpStored ? '' : ' CURP'}</button>
-            </span>
-          </div>
-          <div class="pat-form" data-curp-form hidden>
-            <input type="text" class="pat-input pat-input-mono" data-curp-input maxlength="18" placeholder="CURP (18 caracteres, validado en gob.mx)">
-            <div class="pat-form-err" data-curp-err hidden></div>
-            <div class="pat-form-row">
-              <a href="https://www.gob.mx/curp/" target="_blank" rel="noopener" class="pat-btn pat-btn-ghost" title="Abrir validador oficial">gob.mx ↗</a>
-              <button type="button" class="pat-btn pat-btn-ghost" data-curp-cancel>Cancelar</button>
-              <button type="button" class="pat-btn pat-btn-save" data-curp-save>Guardar</button>
-            </div>
-          </div>
+          <div class="pat-ident-div" style="--i:3"></div>
           ${renderPantallaSaved(d)}
         </div>
         ${renderPantallaTxns(d)}

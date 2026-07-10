@@ -201,21 +201,28 @@
   background:
     linear-gradient(90deg, oklch(0.04 0.008 160 / 0.42) 0%, oklch(0.04 0.008 160 / 0.20) 26%, transparent 52%),  /* oscurece la izquierda (datos personales) */
     linear-gradient(90deg, transparent 20%, var(--pat-tint) 62%, var(--pat-gold-soft) 100%),                     /* difumina hacia el color del grade, izq→der */
-    linear-gradient(133deg, rgba(255,255,255,.025), transparent 24%, transparent 76%, rgba(255,255,255,.012)),  /* reflejo glass — brillo recortado a la mitad (pedido: "quita esa blancosidad") */
+    linear-gradient(133deg, rgba(255,255,255,.012), transparent 24%, transparent 76%, rgba(255,255,255,.006)),  /* reflejo glass — Robert 2026-07-10 2ª ronda: "bajarle aun mas lo blancuzco", recortado otra vez a la mitad */
     radial-gradient(70% 52% at 90% -14%, oklch(0.86 0.03 330 / 0.05), transparent 58%),                        /* PERLA (mate): nácar rosa esq. sup-der */
     radial-gradient(62% 48% at 3% 112%,  oklch(0.85 0.03 200 / 0.04), transparent 58%),                        /* PERLA (mate): nácar cian esq. inf-izq */
     radial-gradient(85% 65% at 14% 4%,  oklch(0.80 0.085 155 / 0.16), transparent 52%),                        /* mancha 1 — mint claro, esq. sup-izq */
     radial-gradient(75% 60% at 88% 30%, oklch(0.60 0.075 165 / 0.11), transparent 55%),                        /* mancha 2 — sage medio, derecha */
     radial-gradient(90% 70% at 30% 108%, oklch(0.32 0.06 170 / 0.20), transparent 58%),                        /* mancha 3 — sombra verde profunda, abajo */
     linear-gradient(180deg, oklch(0.14 0.017 160 / 0.56), oklch(0.09 0.012 160 / 0.72));                       /* vidrio templado oscuro — 2026-07-06: +cuerpo/−brillo (lightness↓, alpha↑), 2 pasadas por pedido de campo */
-  border: 1px solid var(--pat-edge);
+  /* Marco COMPLETO de la sheet entera (Robert 2026-07-10: "marco completo para la
+     pantalla no para el recuadro solamente") — antes solo el filo superior/inferior
+     tenían refuerzo inset; izquierda/derecha dependían solo del border 1px, que se
+     lavaba contra el nuevo overlay oscuro/tinte de grade (ver background arriba).
+     Border sube a --pat-edge-h (más firme) + insets en los 4 lados. */
+  border: 1px solid var(--pat-edge-h);
   box-shadow:
     0 34px 100px -34px rgba(0,0,0,.70),
     0 0 64px -24px var(--pat-gold-soft),                          /* halo verde flotante */
     inset 0 1px 0 rgba(255,255,255,.10),                          /* filo superior nacarado (perla) */
     inset 0 -1px 0 rgba(0,0,0,.25),                               /* filo inferior */
+    inset 1px 0 0 rgba(255,255,255,.05),                          /* filo izquierdo — cierra el marco */
+    inset -1px 0 0 rgba(0,0,0,.20),                                /* filo derecho — cierra el marco */
     inset 0 0 40px -24px oklch(0.86 0.025 320 / 0.05),            /* PERLA (mate): halo nácar interno muy tenue, solo en el borde */
-    inset 0 0 0 1px oklch(0.80 0.085 160 / 0.05);                 /* borde interno verde */
+    inset 0 0 0 1px var(--pat-edge);                               /* borde interno, color de grade */
   backdrop-filter: blur(34px) saturate(1.2);    /* 2026-07-06: saturate 1.45→1.2 — menos vividez/brillo del fondo filtrado */
   -webkit-backdrop-filter: blur(34px) saturate(1.2);
 
@@ -250,20 +257,27 @@
 
 /* ═══════════════ ESTADOS (JS togglea las clases) ═══════════════ */
 
-/* Punto de partida de la animación de entrada: semilla arriba-centro, borrosa. */
+/* Punto de partida de la animación de entrada: semilla arriba-centro, borrosa.
+   2026-07-10 (Robert, campo: "se abre brusco o parpadea raro"): además del fix
+   funcional en pantalla.js (wasHidden — ya no re-dispara esto en cada cambio de
+   cuenta), se recorta el peso del blur propio (14px→9px, 5px→3px): esta sheet YA
+   tiene backdrop-filter:blur(34px) constante — animar un filter:blur() propio
+   ENCIMA de eso duplica el costo de repintado cada frame (causa real de jank en
+   Chromium bajo class-churn, no solo estético). Menos blur propio = misma sensación
+   de "materialización", mitad de costo de GPU. */
 .pantalla-in .pantalla-sheet {
   clip-path: inset(0 42% 92% 42% round var(--pat-r));   /* semilla estrecha arriba */
-  filter: blur(14px);
+  filter: blur(9px);
   opacity: 0;
-  transform: scaleY(0.86);
+  transform: scaleY(0.88);
 }
 
 /* Despliegue de la manta: crece hacia sus bordes, enfoca. NO anima height (reflow). */
 .pantalla-on .pantalla-sheet {
-  animation: pat-unfurl 0.40s var(--ease-curve) both;
+  animation: pat-unfurl 0.38s var(--ease-curve) both;
 }
 .pantalla-on .pantalla-sheet::after {
-  animation: pat-scan 0.62s cubic-bezier(0.4, 0, 0.2, 1) 0.10s both;   /* barrido único */
+  animation: pat-scan 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.08s both;   /* barrido único, un poco más ágil */
 }
 .pantalla-on .pantalla-backdrop,
 .pantalla-in .pantalla-backdrop {
@@ -274,15 +288,15 @@
 }
 
 @keyframes pat-unfurl {
-  0%   { clip-path: inset(0 42% 92% 42% round var(--pat-r)); filter: blur(14px); opacity: 0;   transform: scaleY(0.86); }
-  55%  { clip-path: inset(0 8% 20% 8% round var(--pat-r));   filter: blur(5px);  opacity: 1;   transform: scaleY(1); }
-  100% { clip-path: inset(0 0 0 0 round var(--pat-r));       filter: blur(0);    opacity: 1;   transform: scaleY(1); }
+  0%   { clip-path: inset(0 42% 92% 42% round var(--pat-r)); filter: blur(9px); opacity: 0;   transform: scaleY(0.88); }
+  55%  { clip-path: inset(0 8% 20% 8% round var(--pat-r));   filter: blur(3px); opacity: 1;   transform: scaleY(1); }
+  100% { clip-path: inset(0 0 0 0 round var(--pat-r));       filter: blur(0);   opacity: 1;   transform: scaleY(1); }
 }
 
 @keyframes pat-scan {
   0%   { left: -30%; opacity: 0; }
-  12%  { opacity: 0.9; }
-  88%  { opacity: 0.9; }
+  12%  { opacity: 0.85; }
+  88%  { opacity: 0.85; }
   100% { left: 108%;  opacity: 0; }
 }
 
@@ -363,12 +377,18 @@
 /* Raíz del detalle: columna que LLENA el alto del strip sin scroll. */
 .pat-wrap { display: flex; flex-direction: column; height: 100%; gap: 9px; min-height: 0; }
 
-/* Barra superior — full width, ÚNICA fila por encima de las 3 columnas. Solo
-   nombre+edad+grade a la izquierda; los controles YA NO viven aquí (bajaron a la
-   esquina inferior derecha, ver .pat-actions). padding-right reserva el hueco de
-   .pantalla-close (30px + 12px offset = 42px, +8px de aire). */
+/* Barra superior — full width, ÚNICA fila por encima de las 3 columnas. Nombre+edad+
+   grade a la izquierda; Estado/cumpleaños/CURP (.pat-topbar-meta) fluyen a la derecha
+   del grade (Robert 2026-07-10, 2ª ronda: "subieramos [esos datos] a la linea donde
+   esta el nombre... hacia la derecha"). Los controles de acción (Fijar/En uso/
+   Depositar) siguen FUERA de aquí (esquina inferior derecha, ver .pat-actions).
+   padding-right reserva el hueco de .pantalla-close (30px + 12px offset = 42px, +8px
+   de aire). */
 .pat-topbar { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; padding-right: 50px; }
-.pat-name { font-size: 11.5px; color: var(--text-muted); font-weight: 500; letter-spacing: .3px; }
+/* Nombre: "un poquito mas de contraste" — de --text-muted (apenas legible, mismo
+   tono que la meta secundaria) a --text-dim + peso 600, sin gritar. */
+.pat-name { font-size: 11.5px; color: var(--text-dim); font-weight: 600; letter-spacing: .3px; }
+.pat-topbar-meta { display: flex; align-items: center; gap: 14px; margin-left: 14px; flex-wrap: wrap; }
 /* Controles (Fijar/En uso/Depositar) anclados a la ESQUINA INFERIOR DERECHA dentro
    de La Pantalla (Robert 2026-07-09, campo: "adentro de la pantalla, pero pegado a
    la esquina inferior derecha"). Absolutos contra .pantalla-view (position:relative).
@@ -470,10 +490,13 @@
   color: var(--pat-gold);
   text-shadow: 0 0 20px var(--pat-gold-soft), 0 1px 2px rgba(0,0,0,.6), 0 0 2px rgba(0,0,0,.5);
 }
-/* width:0 + min-width:100% = la meta NO contribuye al ancho intrínseco de la columna
-   (no empuja el divisor más allá del combo); se estira al ancho ya fijado por el combo
-   y su contenido largo (CURP/dirección) se recorta a ese ancho, no lo agranda. */
-.pat-meta { display: flex; flex-direction: column; gap: 5px; width: 0; min-width: 100%; }
+/* Divisor bajo el saldo — separa combo+saldo de guardado (tarjetas/notas), que ahora
+   vive directo debajo (Robert 2026-07-10: "a partir de la linea de division...
+   aparecieran ahi bajo la linea, bajo el saldo"). Reemplaza el margin-top:auto que
+   empujaba .pat-saved al fondo de una columna que ya no tiene espacio muerto en medio
+   (Estado/cumpleaños/CURP subieron al topbar). */
+.pat-ident-div { flex: 0 0 auto; height: 1px; margin: 2px 0 1px; background: var(--hairline); }
+/* Estado/cumpleaños/CURP viven ahora en .pat-topbar-meta (arriba, junto al nombre). */
 .pat-meta-item { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-dim); min-width: 0; }
 .pat-meta-item.dim { color: var(--text-muted); }
 .pat-meta-item i { font-size: 13px; color: var(--pat-gold); opacity: .8; flex: 0 0 auto; }
@@ -604,10 +627,10 @@
 /* ══════════ GUARDADO — tarjetas + notas en pequeño (columna de datos) ══════════
    Pegado al fondo de la columna (margin-top:auto) para no dejar espacio muerto
    entre la meta y el borde inferior. Separado por hairline superior. */
+/* Directo bajo .pat-ident-div (que ya hace de separador) — sin margin-top:auto ni
+   border-top propio (serían 2 líneas divisoras seguidas, redundante). */
 .pat-saved {
-  display: flex; flex-direction: column; gap: 8px;
-  margin-top: auto; padding-top: 9px;
-  border-top: 1px solid var(--hairline); min-width: 0;
+  display: flex; flex-direction: column; gap: 8px; min-width: 0;
 }
 .pat-sv-group { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .pat-sv-h {

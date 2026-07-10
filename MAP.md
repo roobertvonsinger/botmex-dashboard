@@ -201,6 +201,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `f885ec0` | fix(pantalla): Estado roto (parseo de address sin comas) · reparto de columnas afinado · saldo chico · scroll en datos · cristal difumina al color del grade |
 | `14af44c` | fix(pantalla): reparto 2:1 movimientos/escenario · botones a esq inf-der · tinte por grade |
 | `5ef2c19` | docs(next-session): cierre sesion 2026-07-10 (movimientos 2:1, botones abajo, grade-color) |
 | `58c990d` | feat(pantalla): grade-color por cuenta · movimientos 2:1 · botones esquina inf-der |
@@ -212,7 +213,6 @@ prewarm.py (router)
 | `3557086` | docs(next-session): cierre — fix rate-limit no-banco mergeado (falta deploy+migración) + diagnóstico bug saldos desincronizados |
 | `cbe9db5` | fix(deposits): rate-limit (429) ya no se reporta como "Rechazado (banco)" |
 | `9441bd6` | fix(backend): _operator_color crasheaba (500) con locked_by no-numérico |
-| `b8e3d62` | fix(backend): auto-reload por versión era ciego a pantalla.css/js (y a todo asset fuera de app.js+style.css) |
 <!-- GEN:end:recientes -->
 
 ---

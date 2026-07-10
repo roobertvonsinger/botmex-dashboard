@@ -3,6 +3,18 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-07-10c (La Pantalla — meta al topbar, marco completo, fix flicker de apertura)
+
+**Motivo**: 3ª ronda sobre el mismo screenshot anotado — reacomodo final de datos personales + bug real de animación encontrado leyendo el código.
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Estado/cumpleaños/CURP suben al topbar** (`pantalla.js` `renderPantallaHead`) | Antes vivían apilados en `.pat-col-ident` (bloque `.pat-meta`); ahora fluyen en `.pat-topbar-meta`, a la derecha del nombre+grade. La columna de datos queda: combo → saldo → `.pat-ident-div` (divisor) → guardado (tarjetas/notas) directo debajo — reemplaza el `margin-top:auto` que empujaba `.pat-saved` al fondo de una columna que ya no tiene hueco muerto en medio. | ✅ implementado | ⚠️ no verificado en navegador |
+| **Nombre con más contraste** (`pantalla.css` `.pat-name`) | `--text-muted`→`--text-dim` + peso 500→600, "un poquito" (no un cambio agresivo). | ✅ implementado | ⚠️ no verificado en navegador |
+| **Marco completo de LA PANTALLA** (`pantalla.css` `.pantalla-sheet`) | Corrección de alcance: el pedido original era para el recuadro de datos, Robert aclaró que es para la sheet ENTERA. Antes solo el filo superior/inferior tenían refuerzo inset (izq/der dependían solo del `border` 1px, que se lavaba contra el nuevo overlay oscuro/tinte de grade). Ahora: `border` sube a `--pat-edge-h` (más firme) + insets en los 4 lados. | ✅ implementado | ⚠️ no verificado en navegador |
+| **Blanquecino recortado otra vez** (`pantalla.css` reflejo glass) | Segunda pasada: alpha .025/.012 → .012/.006 (mitad de la ronda anterior). | ✅ implementado | ⚠️ no verificado en navegador |
+| **BUG REAL: apertura brusca/parpadeo** (`pantalla.js` `open()`) | Causa raíz encontrada leyendo el código (no reproducida visualmente aquí): `open()` corría TODA la secuencia de entrada (clases `.pantalla-in`→`.pantalla-on` + backdrop + scanline) en CADA click de fila, incluso con La Pantalla YA abierta con `backdrop-filter:blur(34px)` activo — class-churn + doble blur (filter propio animado + backdrop-filter) en cada cambio de cuenta, no solo en la apertura real. Fix: `wasHidden = root.hidden` guarda si es apertura en frío; la secuencia de entrada solo corre si `wasHidden===true`. Validado con skill `design-engineer` (causa raíz + reducción de blur en el keyframe 14px→9px/5px→3px, ya que animar `filter:blur()` propio ENCIMA de un `backdrop-filter:blur(34px)` constante duplica el costo de repintado por frame). | ✅ implementado | ⚠️ no verificado en navegador — requiere operador cambiando de cuenta repetidamente en prod para confirmar que ya no parpadea |
+
 ## Captura: 2026-07-10b (La Pantalla — reparto de columnas afinado, Estado corregido, saldo más chico, scroll en datos, cristal se difumina al color del grade)
 
 **Motivo**: segunda ronda de ajustes sobre la captura anterior (screenshot con recuadros de color marcando el ancho objetivo de cada zona).
