@@ -88,6 +88,32 @@ def test_sin_fails_es_A():
     assert _grade(items) == "A"
 
 
+# ── Regla "aprobación reciente sana → A" (Robert 2026-07-09) ──
+
+def test_aprobacion_reciente_sana_sobre_masacre():
+    # Masacre hace 30d (sería C) PERO la última txn de tarjeta es aprobada (1d) → A.
+    items = [_txn(1, S)] + [_txn(30, F, 0), _txn(30, F, 1), _txn(30, F, 2)]
+    assert _grade(items) == "A"
+
+
+def test_aprobacion_reciente_sana_sobre_fail_reciente():
+    # Fail hace 5d (sería D) pero aprobado hace 1d → A (la pasarela demostró que juega).
+    items = [_txn(1, S), _txn(5, F)]
+    assert _grade(items) == "A"
+
+
+def test_dos_aprobados_recientes_es_A():
+    items = [_txn(1, S, 0), _txn(1, S, 5), _txn(40, F)]
+    assert _grade(items) == "A"
+
+
+def test_fail_reciente_puro_no_lo_salva_exito_viejo():
+    # La regla exige que lo MÁS RECIENTE sea éxito. Un éxito viejo (40d) NO salva un
+    # fail reciente PURO (5d, sesión sin éxito) → sessions[0] es fail → D, no A.
+    items = [_txn(5, F), _txn(40, S)]
+    assert _grade(items) == "D"
+
+
 # ─────────────────────── A+ lifecycle (web_grading) ───────────────────────
 
 def _mk_db(tmp_path, grade="A+", streak=0):

@@ -238,7 +238,9 @@ def _backfill_grades_v10_m7():
     Robert como "los colores no son fiables"!). Corre una sola vez por versión.
     """
     _lg = _logging.getLogger("betmexico.dashboard.grading")
-    VERSION = "v10_m7_2026-07-09"
+    # Bump del marker = re-backfill una vez con las reglas nuevas. m8 agrega
+    # "aprobación reciente sana → A" (Robert 2026-07-09) sobre el m7 (masacre→C).
+    VERSION = "v10_m8_2026-07-09_recent_success"
     try:
         with db(write=True) as c:
             c.execute(

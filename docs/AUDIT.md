@@ -281,7 +281,7 @@ Los 3 puntos del gate anterior fallaron en la primera vuelta (capturas de Robert
 
 | Función | Esperado | Actual | Estado |
 |---|---|---|---|
-| Algoritmo V10 (matriz por reglas) | A = sana (sin fail ≥60d, max 2 fails juntos, total ≤3); B = reparándose; C = masacrada (14-89d con masacre/≥5 fails, o ≥90d descansada); D = fail <14d O ≥3 sesiones machine-gun | ✅ desde 2026-05-22, rebalanceo M7 2026-07-09 | ✅ |
+| Algoritmo V10 (matriz por reglas) | **Aprobación reciente sana → A** (si la última sesión de tarjeta es éxito puro, la pasarela demostró que funciona AHORA — domina sobre fails viejos); A = sana (sin fail ≥60d, max 2 fails juntos, total ≤3); B = reparándose; C = masacrada (14-89d con masacre/≥5 fails, o ≥90d descansada); D = fail <14d O ≥3 sesiones machine-gun | ✅ desde 2026-05-22, rebalanceo M7 + regla "aprobación reciente→A" 2026-07-09 | ✅ |
 | Bug parser microsegundos | `_parse_txn_date` tolera microsegundos de cualquier longitud (BD tiene `.94907` con 5 dígitos que rompía `fromisoformat` en Python <3.11) | ✅ fix V10 | ✅ |
 | Backfill on-demand | `scripts/recalc_grades.py` recorre `accounts`, recalcula desde `account_transactions`, persiste grade+score; salta cuentas `grade='A+'` (override manual) | ✅ ejecutado 2026-05-22: 810/902 cambiaron; protección A+ agregada 2026-07-09 | ✅ |
 | Distribución post-V10 | A:145, B:300, C:142, D:307 (era A:605, B:209, C:78, D:1) | ✅ refleja realidad de pasarelas | ✅ |

@@ -375,7 +375,19 @@ def score_payment_readiness(details: Dict) -> Optional[Dict]:
         if s.get("fail_count", 0) >= 3 and s.get("span_minutes", 0) <= 60
     )
 
-    if days_since_last_fail is None:
+    # ¿Lo MÁS RECIENTE con tarjeta fue una aprobación limpia? (la última sesión de
+    # tarjeta es éxito puro, sin fail). Señal DOMINANTE de recuperación: la pasarela
+    # está demostrando que FUNCIONA AHORA. Robert 2026-07-09: "cada depósito aprobado
+    # con tarjeta (en el dashboard o detectado de BetMexico) sana la percepción; si
+    # las 1-2 txns más recientes son aprobadas, empuja a A" — por encima de fails
+    # viejos. Una sesión = ventana de 60min, así que cubre "1 o 2 aprobados seguidos".
+    recent_pure_success = bool(
+        sessions and sessions[0]["has_success"] and not sessions[0]["has_fail"]
+    )
+
+    if recent_pure_success:
+        grade, _reason = "A", "RECUPERADA_APROBACION_RECIENTE"
+    elif days_since_last_fail is None:
         # Sin pure-fail sessions (puede tener fails mezclados con éxito en misma sesión = ok)
         grade, _reason = "A", "NO_PURE_FAILS"
     elif days_since_last_fail < D_RECENT_FAIL_DAYS:
