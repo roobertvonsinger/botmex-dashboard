@@ -167,7 +167,7 @@ def note_a_plus_outcome(email: str, status: str, db_path: str = "/data/betmexico
                     "WHERE LOWER(email)=LOWER(?)",
                     (b_score, email),
                 )
-                logger.info(f"[grading] {email}: A+ → B (2 rechazos de banco consecutivos)")
+                logger.info(f"[grading] {email}: A+ → B (3 rechazos de banco consecutivos)")
             else:
                 conn.execute(
                     "UPDATE accounts SET a_plus_decline_streak=? WHERE LOWER(email)=LOWER(?)",

@@ -301,10 +301,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_group_into_sessions` | def | L159–L206 |
 | `_pure_fail_penalty` | def | L214–L224 |
 | `_last_success_bonus` | def | L227–L233 |
-| `score_payment_readiness` | def | L247–L432 |
-| `analyze_gateway_ban_pattern` | def | L439–L509 |
-| `generate_payment_analysis_summary` | def | L516–L564 |
-| `generate_payment_ready_txt` | def | L567–L595 |
+| `score_payment_readiness` | def | L247–L430 |
+| `analyze_gateway_ban_pattern` | def | L437–L507 |
+| `generate_payment_analysis_summary` | def | L514–L562 |
+| `generate_payment_ready_txt` | def | L565–L593 |
 
 ### `test_a1_estados.py`
 

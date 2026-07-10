@@ -104,7 +104,7 @@ prewarm.py (router)
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/migrate_status_no_banco.py` | 80 | `—` | _[completar]_ |
 | `scripts/recalc_grades.py` | 136 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
-| `shared/betmexico_payment_analyzer.py` | 595 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
+| `shared/betmexico_payment_analyzer.py` | 593 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
 | `test_account_touch.py` | 51 | `—` | _[completar]_ |
@@ -169,12 +169,12 @@ prewarm.py (router)
 | `TXN_STATUS_FAILED` | `-4` | `shared/betmexico_payment_analyzer.py` |
 | `TXN_TYPE_DEPOSIT` | `1` | `shared/betmexico_payment_analyzer.py` |
 | `GATEWAY_CARD` | `1` | `shared/betmexico_payment_analyzer.py` |
-| `A_NO_FAIL_DAYS_MIN` | `60` | `shared/betmexico_payment_analyzer.py` |
-| `A_MAX_TOTAL_FAILS` | `3` | `shared/betmexico_payment_analyzer.py` |
+| `A_NO_FAIL_DAYS_MIN` | `30` | `shared/betmexico_payment_analyzer.py` |
+| `A_MAX_TOTAL_FAILS` | `2` | `shared/betmexico_payment_analyzer.py` |
 | `A_MAX_BIGFAIL_SESS` | `0` | `shared/betmexico_payment_analyzer.py` |
 | `D_RECENT_FAIL_DAYS` | `14` | `shared/betmexico_payment_analyzer.py` |
 | `D_MASSACRE_COUNT` | `3` | `shared/betmexico_payment_analyzer.py` |
-| `C_DEEP_REST_DAYS` | `90` | `shared/betmexico_payment_analyzer.py` |
+| `C_DEEP_REST_DAYS` | `30` | `shared/betmexico_payment_analyzer.py` |
 | `SCORE_FLOOR` | `{"A": 80, "B": 60, "C": 40, "D": 0}` | `shared/betmexico_payment_analyzer.py` |
 | `SCORE_CEIL` | `{"A": 100, "B": 79, "C": 59, "D": 39}` | `shared/betmexico_payment_analyzer.py` |
 | `SCHEMA` | `"""` | `test_a1_estados.py` |
@@ -201,6 +201,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `6dc7ae3` | docs: formalizar Figma First protocol para diseño UI (MCP html-to-design) |
 | `3ea668b` | fix(pantalla): popover CURP fuera de flujo (no empuja movimientos) · vidrio ligado al glow ambiental de la app |
 | `b9a2fb1` | docs(next-session): registrar 4a ronda (fix ancho CURP + cristal mate) en el cierre |
 | `1fa4219` | fix(pantalla): form CURP con ancho REAL de la columna (no full-width) · cristal aun mas mate |
@@ -212,7 +213,6 @@ prewarm.py (router)
 | `58c990d` | feat(pantalla): grade-color por cuenta · movimientos 2:1 · botones esquina inf-der |
 | `a71b9e8` | feat(grading+ui): aprobación reciente sana→A · combo en una línea con divisor al final |
 | `3d680a0` | chore(gitignore): ignorar reports/ e idea_vaga.txt (datos sensibles de tarjetas) |
-| `6dbfbe6` | feat(grading): rebalanceo M7 + ciclo de vida A+ (3DS→A+, 2 declines de banco→B) |
 <!-- GEN:end:recientes -->
 
 ---
