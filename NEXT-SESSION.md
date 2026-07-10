@@ -4,24 +4,26 @@
 > **Lente rectora de TODO:** ver memoria `feedback_frictionless_norte` + `NORTE.md`. BOTMEXICO = frictionless, a prueba de desmadre, y tiene que GANARLE a entrar directo a BetMexico.
 
 ## 🎯 Objetivo en curso
-Sesión de rediseño de **La Pantalla** (4 iteraciones): (1) fix rate-limit (cerrado); (2) rediseño 3 columnas + escenario + tamaño fijo; (3) ajustes de layout (movimientos 2:1, botones esquina inf-der, min-width escenario); (4) grade-color por cuenta. **`58c990d` deployado a prod (2026-07-10), Robert revisa visualmente.**
+**Cierre de la sesión de La Pantalla** (5ª ronda sobre el mismo hilo de campo, empezó 2026-07-09): reparto de columnas, tinte por grade, meta reubicada al topbar, marco completo, fix de flicker de apertura. `b6f16bb` deployado a prod (2026-07-10), Robert queda de revisar visualmente.
 
 ## ▶ Con qué arrancas
-Robert está validando los cambios de La Pantalla en prod (movimientos 2:1, botones abajo, grade-color). Si reporta ajuste visual, atenderlo primero. Revisar `docs/FRONTEND.md` sección "La Pantalla" antes de tocar nada para no repetir diagnósticos ya hechos.
+Robert explícitamente pidió pivotar: **"ver que onda con los cambios recientes al cálculo del grade"** — la próxima sesión NO es más ajuste visual de La Pantalla (salvo que Robert reporte algo roto primero), es **auditar el algoritmo de grading V10** tras los cambios de la sesión pasada (M7 + A+ lifecycle + regla "aprobación reciente sana→A", commits `a71b9e8`/`58c990d` y ver `reference_analyzer_deploy_path` en memoria). Objetivo: confirmar que la distribución de grades en prod tiene sentido con los datos reales (no solo que los tests pasen) — pedir a Robert qué específicamente le preocupa antes de tocar código.
 
 ## 🧭 Recomendación de approach
-Si no hay pendiente de Pantalla: retomar el **bug de saldos desincronizados** (bloqueado hace 3 sesiones esperando 1 dato de prod que Robert no ha corrido — ver query abajo). Es el hilo más viejo sin cerrar.
+1. Si Robert reporta algo roto de La Pantalla → atenderlo primero (es rápido, ya conocemos el terreno).
+2. Si no: pedirle a Robert que aclare qué le inquieta del grading reciente (¿una cuenta específica gradeó raro? ¿la distribución total? ¿quiere ver ejemplos?) — no adivinar el ángulo, la BANDERA prohíbe estimar sin investigar.
+3. Trae `docs/AUDIT.md` (capturas 2026-07-09/10 sobre grading) y `test_grading_a_plus_m7.py` como punto de partida — ya hay 16 tests y 2 backfills corridos (v10_m7, v10_m8).
 
 ## ⏳ Pendientes próximos
-- [ ] **Robert: correr el `docker exec` de diagnóstico** de la cuenta `ljesus06` (ver bloque abajo) — desbloquea el bug de saldos desincronizados (Panel $0 / Pantalla $1850 / BetMexico $300 + retiros ausentes). Bloqueado desde 2026-07-06.
-- [ ] **Bug saldos:** confirmado en código el síntoma A (staleness — La Pantalla no se refresca tras prewarm; solo el depósito emite `account_refreshed`). B/C (balance/retiros) = hipótesis del checker (monorepo) — NO tocar sin el dato de prod.
+- [ ] **Robert: revisar visualmente en prod** los cambios de La Pantalla de esta sesión (5 rondas: anchos de columna, saldo más chico, Estado corregido, scroll en datos, meta al topbar, marco completo, fix de flicker). Si algo se ve mal, screenshot + anotación como siempre.
+- [ ] **Robert: confirmar que ya no parpadea/abre brusco** al cambiar de cuenta con La Pantalla abierta — el fix (`wasHidden` guard en `pantalla.js` `open()`) es lógicamente sólido (causa raíz confirmada leyendo el código: se re-disparaba toda la animación de entrada en cada click de fila) pero no se pudo probar en un navegador real esta sesión.
+- [ ] **Robert: correr el `docker exec` de diagnóstico** de la cuenta `ljesus06` (ver bloque abajo) — desbloquea el bug de saldos desincronizados (Panel $0 / Pantalla $1850 / BetMexico $300 + retiros ausentes). Bloqueado desde 2026-07-06, sigue sin correr.
 - [ ] **Migrar el bot de Telegram del monorepo a un repo Forgejo aislado** — pendiente de varias sesiones atrás.
-- [ ] **Del cierre 2026-07-05 (sigue abierto):** validar en prod los 4 ajustes del feed KPI Logs + jerarquía combo/nombre de Cuentas a la mano.
 - [ ] **Decisión Robert pendiente:** dedup de `account_touch` — ¿1/(operador,cuenta,día) o 1/cuenta/día?
 - [ ] Reubicar el filtro "en uso" (quedó inaccesible al quitar Pool del strip). · Vista Actividad: `deposit_step`/`account_touch` caen al fallback genérico `·`.
 - [ ] Marquesina "casino" y ositos-avatar — POSPUESTOS, no tocar sin que Robert lo pida.
-- [ ] **Verificar en prod (Robert, cuando pruebe un depósito real):** el escenario migrado (`#depStage`) funciona igual en misión batch/matchmaker (varias cuentas a la vez) — no se probó ese caso, solo depósito único. Si se ve raro, avisar.
-- untracked en raíz (NO commitear a propósito): `idea_vaga.txt` · `reports/` (xlsx con datos de tarjetas = sensible).
+- [ ] **Verificar en prod (Robert, cuando pruebe un depósito real):** el escenario migrado (`#depStage`) funciona igual en misión batch/matchmaker (varias cuentas a la vez) — no se probó ese caso, solo depósito único.
+- [ ] untracked en raíz (NO commitear a propósito): `idea_vaga.txt` · `reports/` (xlsx con datos de tarjetas = sensible).
 
 ### 🔎 Query de diagnóstico del bug de saldos (correr en prod, solo lectura)
 ```bash
@@ -36,29 +38,25 @@ with db() as c:
 ```
 Decide: BD tiene $0 o $1850 (cuál caché) · ¿hay retiros `txn_type=2`? · si el checker trajo saldo/retiros vacíos → bug del bot (monorepo), no del dashboard.
 
-## ✅ Hecho esta sesión (2026-07-09/10)
-- **`cbe9db5`** (rate-limit no-banco, arrastrado de sesión anterior): `app.py`+`deposits.py`+`static/{pantalla,activity_logic}.js`, migración 273 registros reclasificados.
-- **`e42376a`** `feat(pantalla): rediseño 3 columnas + escenario de depósito migrado + tamaño fijo anclado a Sistema`
-  - **Layout**: La Pantalla pasa de 2 zonas (movimientos estirados a todo el ancho, header que se iba con el scroll) a 3 columnas reales — `.pat-topbar` (nombre+acciones, full width) → `.pat-columns` (`.pat-col-ident` | `.pat-col-txns` compacta con header FIJO | `.pat-col-stage`).
-  - **Escenario de depósito migrado**: el progreso (animaciones SVG login/captcha/processing/done + %/sub, antes invisible en la mini-pantallita del panel flotante) se movió a `#depStage`, re-parenteado por JS a la columna derecha de La Pantalla. CSS re-scopeado de `#depos` a `#depStage` (~285 líneas). `depos.js` abre La Pantalla automático si estaba cerrada al arrancar un depósito.
-  - **Tamaño fijo, CERO drag/collapse** (pedido explícito de Robert en 2 rondas): se eliminaron `.lp-vgutter`, `.pantalla-banda`, `KpiPanel.toggle/expand/collapse/applyH`. El alto lo fija `ANCHOR_H` (`app.js`) UNA vez al cargar — fórmula pura `PantallaLogic.anchoredPanelH()` (testeada) que alinea "Sistema" (menú) con "Cuentas" (tabla), verificado con `getBoundingClientRect` real, no a ojo.
-  - Bug encontrado de paso (documentado en `docs/ERRORS.md`): el header "Movimientos" vivía dentro del contenedor scrolleable y desaparecía al bajar la lista.
-  - Docs: `FRONTEND.md` (sección La Pantalla reescrita completa) + `ERRORS.md`. Tests: `pantalla_logic.test.js` +4 casos de `anchoredPanelH`. 5/5 suites JS verdes en cada iteración.
-  - **Deployado y validado parcialmente por Robert en prod** (confirmó que Sistema↔Cuentas quedó alineado).
-- **`58c990d`** `feat(pantalla): grade-color por cuenta · movimientos 2:1 · botones esquina inf-der` — sesión 2026-07-10 (campo continuo):
-  - **Movimientos 2:1**: `.pat-col-txns` pasa de `flex:0 1 420px` a `flex:2 1 0; min-width:380px` — las transacciones toman 2/3 del espacio libre, el escenario 1/3.
-  - **Botones abajo**: `.pat-actions` (Fijar/En uso/Depositar) sacado de `.pat-topbar` y anclado a `position:absolute` esquina inferior derecha (`right:18px; bottom:14px; z-index:6`). Cuelga de `.pat-wrap` (no `.pat-topbar` que tiene transform por cuaje). La ✕ de cerrar se queda arriba-derecha.
-  - **Grade-color**: `renderPantallaHead` setea `data-grade="APlus|A|B|C|D|U"` en `.pat-wrap`. CSS overrides por selector de atributo reescriben `--pat-gold`/derivados. Paleta: A+ h152, A h160, B h235, C h75, D h24, U h95. Mesh de fondo (`.pantalla-sheet`) intocado.
-  - **Escenario**: `min-width:340px` para que el guide de 4 pasos no se apriete.
-  - Deployado + restart + health 200. Robert revisa en prod.
+## ✅ Hecho esta sesión (2026-07-10, continuación de campo sobre `58c990d`)
+- **`14af44c`** `fix(pantalla): reparto 2:1 movimientos/escenario · botones a esq inf-der · tinte por grade`
+  - Fix de acomodo del deploy anterior (screenshot con flechas rojo/amarillo): `.pat-col-txns` a `flex:2 1 0`, `.pat-col-stage` `min-width:340px` (antes el escenario se comía todo el resto y apretaba el texto).
+  - Controles (Fijar/En uso/Depositar) bajan de `.pat-topbar` a esquina inferior derecha, ancla `.pat-wrap` (no `.pat-topbar`, que tiene transform permanente por el cuaje líquido).
+  - Tinte por grade: `data-grade` en `#pantalla`, overrides CSS por atributo reescriben `--pat-gold` family. Mapeo de hue igual al de `grade-dot`/`r-grade-X` en `style.css` (A+152 A160 B235 C75 D24).
+- **`f885ec0`** `fix(pantalla): Estado roto (parseo de address sin comas) · reparto afinado · saldo chico · scroll · cristal difumina al grade`
+  - **Bug real encontrado** (no era "falta el dato"): `estadoFrom()` (`pantalla_logic.js`) exigía direcciones separadas por coma con nombre completo del estado — las direcciones reales de `accounts.address` NO llevan comas (`"...23040 LA PAZ B.C.S."`, abreviatura postal SEPOMEX al final). Nunca matcheaba NINGUNA cuenta real. Reescrito con tabla de 32 abreviaturas + 10 asserts contra direcciones reales verificadas por `sqlite3` en KVM4.
+  - Reparto afinado a ~55:45 (`.pat-col-txns:flex 1.35`, `.pat-col-stage:min-width 380` = viewBox real de las escenas SVG, no inventado). Saldo 36px→26px. Scroll propio en `.pat-col-ident` (antes el contenido se recortaba en silencio).
+  - Cristal de La Pantalla se oscurece a la izquierda (legibilidad) y diluye al color del grade hacia la derecha — antes solo bordes/texto cambiaban, no el cristal. Brillo blanquecino recortado a la mitad.
+- **`b6f16bb`** `fix(pantalla): meta al topbar · marco completo de la sheet · fix flicker de apertura`
+  - Estado/cumpleaños/CURP suben de `.pat-col-ident` a `.pat-topbar-meta` (línea del nombre). Columna de datos: combo→saldo→divisor→guardado directo (sin `margin-top:auto`).
+  - Marco completo de TODA la sheet (Robert corrigió alcance — no solo el recuadro de datos): border sube a `--pat-edge-h` + insets en los 4 lados (antes solo top/bottom).
+  - Blanquecino recortado otra vez a la mitad.
+  - **Bug real encontrado leyendo el código** (causa de "se abre brusco o parpadea raro"): `open()` en `pantalla.js` disparaba TODA la secuencia de entrada (clases + backdrop + scanline) en CADA click de fila, incluso con La Pantalla ya abierta con `backdrop-filter:blur(34px)` activo. Fix: `wasHidden = root.hidden` guarda si es apertura en frío; la secuencia solo corre entonces. Validado con skill `design-engineer` + blur del keyframe recortado (14px→9px, 5px→3px — animar `filter:blur()` propio encima de `backdrop-filter` constante duplicaba el costo de repintado).
+- Los 3 commits: deployados a KVM4 (`betmexico-web`), verificados con `StartedAt` > mtime + health 200 + grep del código nuevo en disco en cada ronda. **Ningún cambio se verificó en navegador real** (Robert pidió deploy directo, "lo reviso allá") — pendiente su confirmación visual.
 
 ## 🔧 Decisiones tomadas
+- **Deploy directo sin verificación en navegador cuando Robert lo pide explícitamente** ("deploya alla lo reviso") — no bloquear la iteración esperando un preview local si él va a revisar en prod de todos modos.
 - **La Pantalla es de tamaño FIJO, sin ningún control de resize** — ni ella ni el panel KPI. No reabrir sin que él lo pida.
-- **El alto se calcula, no se inventa**: `ANCHOR_H` mide el delta real entre el label "Sistema" del menú y el header "Cuentas" de la tabla — cualquier cambio futuro al sidebar o al filterbar recalcula solo, sin tocar código.
-- **`#depStage` se re-parentea, no se duplica**: un solo bloque de escenas SVG, movido por JS entre el panel y La Pantalla según dónde deba pintar.
 - **Botones de acción: esquina inferior derecha, no topbar** — el cuaje líquido deja transform en `.pat-topbar` que lo vuelve contenedor de posicionamiento; `.pat-wrap` no tiene transform → ancla limpia. La ✕ se queda arriba (convención universal de cierre).
-
-## 🖥️ Estado del sistema al cerrar
-- **web** up (reiniciado, último restart limpio con 58c990d) · **bot** up (esperado) · **health** 200 (924 cuentas) · `/api/version` bumpeado
-- **pool** = 202 proxies (200 DataImpulse + 2 NodeMaven) · cero errores en 12h
-- Rama `main` == `58c990d` (pusheado a Forgejo), prod consistente con el repo.
+- **Marco completo = toda la sheet, no un recuadro individual** — Robert corrigió esto explícitamente tras mi primera interpretación (que era sobre `.pat-col-ident`).
+- **Combo SIEMPRE sin truncar/sin max-width** — al agregar scroll a `.pat-col-ident` se evitó a propósito `overflow-x:hidden`/`max-width` para no repetir el bug de truncado ya resuelto en sesión anterior.
