@@ -695,6 +695,7 @@ def list_accounts(
         "a.balance_total, a.balance_real, "
         "a.last_deposit_amount, a.last_deposit_date, a.status, a.grade, "
         "a.locked_by, a.locked_at, a.locked_until, a.last_checked_at, a.check_count, "
+        "a.jwt_expires_at, "
         "COALESCE(a.published_to_pool, 1) AS published_to_pool, "
         "(SELECT COUNT(*) FROM account_cards ac WHERE ac.account_email=a.email) AS cards_count, "
         "(SELECT COUNT(*) FROM account_notes an WHERE an.account_email=a.email "
@@ -733,6 +734,12 @@ def list_accounts(
                         tg_id = u["telegram_id"] if u else None
                 r["locked_by"] = _resolve_operator(op)
                 r["locked_color"] = _auth.USER_COLORS.get(tg_id) if tg_id else None
+                # JWT vivo = reutilizable sin captcha (gentle_login cache-hit exige
+                # exp > now+60s). Alimenta el badge 🟢/🔑 de la lista. Ver jwt_keeper.
+                _exp = r.get("jwt_expires_at")
+                r["jwt_alive"] = bool(
+                    _exp not in (None, "")
+                    and int(_exp) > datetime.now(timezone.utc).timestamp() + 60)
             return rows
     except sqlite3.OperationalError:
         # Si no hay tabla account_assignments todavía
@@ -2167,12 +2174,33 @@ async def _release_watchdog_loop():
         await asyncio.sleep(60)
 
 
+async def _jwt_keepalive_loop():
+    """Mantiene vivos los JWT de sesión (7 días fijos) re-logueando de forma
+    proactiva y ESPACIADA solo las cuentas por expirar/expiradas de mejor grado.
+    Baja el 429: menos JWT muertos = menos logins forzados = menos rate-limit.
+    Config por env JWT_KEEPER_* (ver jwt_keeper.cfg). Tick cada JWT_KEEPER_INTERVAL_SEC."""
+    import jwt_keeper
+    c = jwt_keeper.cfg()
+    if not c["enabled"]:
+        print("[jwt_keeper] deshabilitado (JWT_KEEPER_ENABLED!=1)")
+        return
+    await asyncio.sleep(90)  # dejar que la app + pool de proxies arranquen
+    while True:
+        try:
+            stats = await jwt_keeper.run_keepalive_cycle_from_env()
+            print(f"[jwt_keeper] ciclo: {stats}")
+        except Exception as e:
+            print(f"[jwt_keeper] error de ciclo: {e}")
+        await asyncio.sleep(jwt_keeper.cfg()["interval_sec"])
+
+
 @app.on_event("startup")
 async def _start_bg_tasks():
     asyncio.create_task(_health_loop())
     asyncio.create_task(_janitor_loop())
     asyncio.create_task(_window_watcher_loop())
     asyncio.create_task(_release_watchdog_loop())
+    asyncio.create_task(_jwt_keepalive_loop())
 
 
 class LockRequest(BaseModel):

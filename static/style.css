@@ -1952,6 +1952,17 @@ td.sel-cell:hover { background: rgba(255,255,255,0.04); }
 .lock-chip.op-azure  { color: oklch(0.78 0.16 250); background: oklch(0.62 0.16 250 / 0.14); border-color: oklch(0.62 0.16 250 / 0.34); }
 .lock-chip.expired   { color: var(--danger); background: var(--danger-soft); border-color: oklch(0.66 0.21 24 / 0.40); }
 
+/* Badge de sesión JWT: 🟢 viva (reutilizable sin captcha) · 🔑 expirada (requiere captcha). */
+.jwt-chip {
+  display: inline-flex; align-items: center;
+  margin-left: 6px;
+  font-size: 10px;
+  vertical-align: middle;
+  cursor: help;
+  opacity: 0.9;
+}
+.jwt-chip.jwt-expired { filter: grayscale(0.15); opacity: 0.75; }
+
 /* Borde lateral de operador en la fila (spec chat2) — sobreescribe el grade-bar-cell */
 tr.op-row-warn   .grade-bar-cell { box-shadow: inset 3px 0 0 var(--op-warn);   }
 tr.op-row-purple .grade-bar-cell { box-shadow: inset 3px 0 0 var(--op-purple); }

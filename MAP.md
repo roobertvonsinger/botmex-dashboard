@@ -92,11 +92,12 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 3151 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3179 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `deposits.py` | 2636 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `jwt_keeper.py` | 222 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 392 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 736 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 342 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
@@ -114,6 +115,7 @@ prewarm.py (router)
 | `test_deposit_status_classify.py` | 95 | `—` | _[completar]_ |
 | `test_deposit_step.py` | 132 | `—` | _[completar]_ |
 | `test_grading_a_plus_m7.py` | 184 | `—` | _[completar]_ |
+| `test_jwt_keeper.py` | 103 | `—` | _[completar]_ |
 | `test_marks.py` | 32 | `—` | _[completar]_ |
 | `test_migrate_status_no_banco.py` | 103 | `—` | _[completar]_ |
 | `test_pool_manage.py` | 26 | `—` | _[completar]_ |
@@ -180,6 +182,8 @@ prewarm.py (router)
 | `SCHEMA` | `"""` | `test_a1_estados.py` |
 | `OP_A` | `{"role": "user", "telegram_id": 555, "display": "Lau"}` | `test_account_touch.py` |
 | `OP_B` | `{"role": "user", "telegram_id": 777, "display": "Otro"}` | `test_account_touch.py` |
+| `NOW` | `1_800_000_000` | `test_jwt_keeper.py` |
+| `AHEAD` | `24 * H` | `test_jwt_keeper.py` |
 | `PIPE` | `"4111111111111111|12|30|123"` | `test_unificacion_sp1.py` |
 | `WEB_USERS` | `{k.lower(): v for k, v in WEB_USERS_RAW.items()}` | `web_auth.py` |
 <!-- GEN:end:constantes -->
@@ -201,6 +205,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b17954e` | feat(grading): V10 M9 — revivir cuentas masacradas a B si descansaron 30d, 0 penalty a MACHINE_GUN_2x5m, A+ = 3DS |
 | `6dc7ae3` | docs: formalizar Figma First protocol para diseño UI (MCP html-to-design) |
 | `3ea668b` | fix(pantalla): popover CURP fuera de flujo (no empuja movimientos) · vidrio ligado al glow ambiental de la app |
 | `b9a2fb1` | docs(next-session): registrar 4a ronda (fix ancho CURP + cristal mate) en el cierre |
@@ -212,7 +217,6 @@ prewarm.py (router)
 | `5ef2c19` | docs(next-session): cierre sesion 2026-07-10 (movimientos 2:1, botones abajo, grade-color) |
 | `58c990d` | feat(pantalla): grade-color por cuenta · movimientos 2:1 · botones esquina inf-der |
 | `a71b9e8` | feat(grading+ui): aprobación reciente sana→A · combo en una línea con divisor al final |
-| `3d680a0` | chore(gitignore): ignorar reports/ e idea_vaga.txt (datos sensibles de tarjetas) |
 <!-- GEN:end:recientes -->
 
 ---

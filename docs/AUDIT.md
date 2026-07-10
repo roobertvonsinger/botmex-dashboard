@@ -3,6 +3,18 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-07-11 (JWT keeper — mantener sesiones vivas para bajar el 429)
+
+**Motivo**: rate-limit masivo (49% de intentos en 48h) por 88% de JWT expirados sin refrescar → cada toque forzaba login → 429. Ver `docs/ERRORS.md` §"Rate-limit (429) masivo por JWT expirados".
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **`jwt_keeper.select_refresh_candidates`** (lógica pura) | Filtra cuentas a re-loguear: LIVE, grade en `JWT_KEEPER_GRADES` (A+/A/B), publicada, NO en cooldown, NO lockeada, JWT ya expirado o expira en <`REFRESH_AHEAD` (24h). Ordena por grado (mejor primero) + urgencia (menor exp), corta en `BATCH` (12). NO selecciona JWT con margen (sigue sirviendo). | ✅ implementado | ✅ 13 tests unitarios `test_jwt_keeper.py` verdes |
+| **`jwt_keeper.run_keepalive_cycle`** (ciclo async) | Un pool de captcha para todo el lote; por cuenta `gentle_login(use_cache=False, allow_proxyless=False)` → JWT fresco 7d; gap 20-45s entre logins (anti-ráfaga). RATE_LIMITED → `_set_account_cooldown` (enfría, NO mata); DEAD → deja; RETRY → próximo ciclo. | ✅ implementado | ✅ prod: ciclo real `{'selected':2,'live':2,'rate_limited':0}`, "JWT fresco ✓" en A+; loop auto enfrió quemadas OK |
+| **`app._jwt_keepalive_loop`** (bg-loop) | Patrón `_release_watchdog_loop`: sleep 90s, luego cada `INTERVAL` (1h) corre un ciclo. Registrado en `_start_bg_tasks`. Config env `JWT_KEEPER_*` (enabled/interval/batch/ahead/gap/grades). | ✅ implementado | ✅ prod: arrancó tras restart, sin errores de startup |
+| **`/api/accounts` → `jwt_alive`** (`app.py list_accounts`) | Nuevo campo bool por cuenta (`jwt_expires_at > now+60`) para el badge de sesión. | ✅ implementado | ✅ presente en payload (grep en prod) |
+| **Badge JWT 🟢/🔑** (`static/app.js renderTable` + `.jwt-chip` en `style.css`) | Junto al combo: 🟢 sesión viva (reutilizable sin captcha) · 🔑 expirada (requiere captcha). Ambas vistas (simple/completa). | ✅ implementado | ⚠️ no verificado en navegador — requiere validación visual de Robert |
+
 ## Captura: 2026-07-10d (La Pantalla — ancho real del form CURP, cristal aun más mate)
 
 **Motivo**: 4ª ronda, cierre de sesión — screenshot con línea amarilla marcando dónde debe terminar el campo/botones de CURP.

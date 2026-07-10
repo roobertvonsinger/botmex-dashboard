@@ -608,6 +608,11 @@ function renderTable() {
     const lockChip = r.locked_by
       ? `<span class="lock-chip op-${esc(opCol)} ${until?.expired ? 'expired' : ''}" title="Lockeada por ${esc(r.locked_by)}${until ? ` · ${until.expired ? 'vencido' : `vence en ${until.text}`}` : ''}">🔒 ${esc(r.locked_by)}${until && !until.expired ? ` <span class="lock-chip-time dim">${until.text}</span>` : ''}</span>`
       : '';
+    // Badge JWT: 🟢 sesión viva (reutilizable, sin captcha) · 🔑 expirada (requiere captcha).
+    // El keeper (jwt_keeper.py) refresca proactivo para mantener el 🟢 el mayor tiempo posible.
+    const jwtBadge = r.jwt_alive
+      ? `<span class="jwt-chip jwt-alive" title="Sesión viva — reutilizable sin captcha">🟢</span>`
+      : `<span class="jwt-chip jwt-expired" title="Sesión expirada — el próximo uso requiere resolver captcha">🔑</span>`;
     const isSA = state.user?.role === 'superadmin';
     const trTitle = isSA ? `Grade ${esc(r.grade) || '?'}` : '';
     // Iconos de fila: 💳 (tarjetas), 📝 (notas), siempre + (quick add), 📌 (marcador) + botón Detalles
@@ -634,7 +639,7 @@ function renderTable() {
         <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
         <td class="sel-cell"></td>
         <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-        <td class="combo" title="Click: abrir La Pantalla · Ctrl/Shift+Click: seleccionar"><b>${esc(combo)}</b>${lockChip}</td>
+        <td class="combo" title="Click: abrir La Pantalla · Ctrl/Shift+Click: seleccionar"><b>${esc(combo)}</b>${jwtBadge}${lockChip}</td>
         <td class="dep" title="Último depósito hecho">${dep}</td>
         <td class="ic-col ic-nota-col">${cellNota}</td>
         <td class="ic-col ic-cards-col">${cellCards}</td>
@@ -645,7 +650,7 @@ function renderTable() {
       <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
       <td class="sel-cell"></td>
       <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-      <td class="combo" title="Click: abrir La Pantalla · Ctrl/Shift+Click: seleccionar"><b>${esc(combo)}</b></td>
+      <td class="combo" title="Click: abrir La Pantalla · Ctrl/Shift+Click: seleccionar"><b>${esc(combo)}</b>${jwtBadge}</td>
       <td class="dep" title="Último depósito hecho">${dep}</td>
       <td class="dep dim" title="Cuándo se actualizó por última vez">${fmtAgo(r.last_checked_at)}</td>
       <td class="num" title="Total de veces actualizada">${r.check_count || 0}</td>
