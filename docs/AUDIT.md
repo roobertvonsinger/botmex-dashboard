@@ -281,13 +281,16 @@ Los 3 puntos del gate anterior fallaron en la primera vuelta (capturas de Robert
 
 | Función | Esperado | Actual | Estado |
 |---|---|---|---|
-| Algoritmo V10 (matriz por reglas) | A = sana (sin fail ≥60d, max 2 fails juntos, total ≤3); B = reparándose; C = masacrada hace ≥90d; D = fail <14d O ≥3 sesiones machine-gun | ✅ desde 2026-05-22 | ✅ |
+| Algoritmo V10 (matriz por reglas) | A = sana (sin fail ≥60d, max 2 fails juntos, total ≤3); B = reparándose; C = masacrada (14-89d con masacre/≥5 fails, o ≥90d descansada); D = fail <14d O ≥3 sesiones machine-gun | ✅ desde 2026-05-22, rebalanceo M7 2026-07-09 | ✅ |
 | Bug parser microsegundos | `_parse_txn_date` tolera microsegundos de cualquier longitud (BD tiene `.94907` con 5 dígitos que rompía `fromisoformat` en Python <3.11) | ✅ fix V10 | ✅ |
-| Backfill on-demand | `scripts/recalc_grades.py` recorre `accounts`, recalcula desde `account_transactions`, persiste grade+score | ✅ ejecutado 2026-05-22: 810/902 cambiaron | ✅ |
+| Backfill on-demand | `scripts/recalc_grades.py` recorre `accounts`, recalcula desde `account_transactions`, persiste grade+score; salta cuentas `grade='A+'` (override manual) | ✅ ejecutado 2026-05-22: 810/902 cambiaron; protección A+ agregada 2026-07-09 | ✅ |
 | Distribución post-V10 | A:145, B:300, C:142, D:307 (era A:605, B:209, C:78, D:1) | ✅ refleja realidad de pasarelas | ✅ |
 | **BD viva: deposit hooks** | Login pre-deposit guarda txns + recalc grade; `_persist_final` post-intento recalc grade | ✅ lógica migrada a `deposits.py` (`_run_deposit_with_phases`, `_record_attempt`) | ✅ |
 | **BD viva: prewarm hooks** | `_db_save_txns_and_recalc` guarda txns + recalc grade vía BOT_SCORE_PAYMENT (V10 después del deploy 2026-05-22) | ✅ `prewarm.py:234` | ✅ |
 | BD viva: watchdog | Solo actualiza balance (`fetch_mode=balance_only`). NO trae txns nuevas → grade no se recalcula desde watchdog | ⚠️ por diseño (performance) | ⚠️ |
+| **Grade `A+` (3DS) protegido de recalc de rutina** | `recalc_grade_from_db`/`recalc_grade_from_details` (`web_grading.py`) NUNCA pisan `grade='A+'` con un recalc automático (login/check/depósito/prewarm) — es override manual del matchmaker (3DS), no lo calcula el analyzer. `AND COALESCE(grade,'') != 'A+'` en el UPDATE | ✅ fix 2026-07-09 (antes cualquier toque posterior lo borraba silenciosamente) | ✅ |
+| **Ciclo de vida `A+` → B (2 declines de banco)** | `note_a_plus_outcome` (`web_grading.py`, hook en `_record_attempt`): tras el A+, 2 rechazos REALES de banco (`status='rejected'`) CONSECUTIVOS → baja a B; un aprobado resetea el contador (`a_plus_decline_streak`); ruido no-banco (rate-limit/infra/3DS) no cuenta ni resetea. Regla de Robert 2026-07-09 | ✅ 12 tests verdes (`test_grading_a_plus_m7.py`) — pendiente validar en prod con un depósito real | ⚠️ código listo, sin validar end-to-end en prod |
+| **M7 resuelto: masacre reciente ya no es B** | Cuenta con sesión machine-gun (3+ fails) o ≥5 fails totales cae en C aunque el último fail sea de hace 14-89 días (antes caía en el `else` → B "reparándose", falso positivo de confianza) | ✅ fix 2026-07-09 (`shared/betmexico_payment_analyzer.py`) + backfill automático on-deploy (`app.py _backfill_grades_v10_m7`, marker-gated 1 vez) — ya no requiere correr script a mano | ✅ (pendiente confirmar N cuentas cambiadas en logs tras deploy) |
 | **Conflict 409 si cuenta lockeada por otro** | ✅ rechaza depósito; SA puede override | ✅ desde 2026-05-11 | ✅ |
 | **Watchdog auto-release 27h post-deposit** | ✅ 3 notifs progresivas (T-5min, T+0, T+10min) + auto-release a T+27h | ✅ desde 2026-05-11 | ✅ |
 | **Notifs filtradas por dueño del lock** | ✅ solo el operador (o SA) ve la notif | ✅ vía `target_user` en payload + filtro frontend | ✅ |

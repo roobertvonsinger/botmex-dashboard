@@ -633,6 +633,16 @@ def _record_attempt(
     except Exception as e:
         logger.debug(f"[Deposits] _record_attempt recalc_grade: {e}")
 
+    # ── 3b. Ciclo de vida A+ (3DS) ─────────────────────────────
+    # DESPUÉS del recalc (que salta A+): si la cuenta es A+, 2 rechazos de banco
+    # consecutivos la bajan a B; un aprobado resetea. `status` ya viene clasificado
+    # por classify_deposit_status ("rejected"=banco). Ver web_grading.note_a_plus_outcome.
+    try:
+        from web_grading import note_a_plus_outcome
+        note_a_plus_outcome(email, status)
+    except Exception as e:
+        logger.debug(f"[Deposits] _record_attempt note_a_plus_outcome: {e}")
+
     # ── 4. Broadcast SSE para feed de actividad ────────────────
     try:
         from app import _resolve_who

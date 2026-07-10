@@ -4265,6 +4265,9 @@ function renderDetail(d) {
     addr,
   ].filter(Boolean).join(' · ');
   const nombre = (d.fullname && d.fullname !== 'N/A') ? esc(d.fullname) : '<span class="dim">Sin nombre</span>';
+  // Punto de color del grade (sin letra — Robert: la letra ya se lee en la
+  // barrita de la fila; acá solo se quiere el color como refuerzo visual).
+  const gradeDot = d.grade ? `<span class="grade-dot ${gradeClass(d.grade)}" title="Grade ${esc(d.grade)}"></span>` : '';
 
   // CURP — real de BD o estimado (computeCurp). Copiable al click. Tag "est" si calculado.
   const curpStored = (d.curp && d.curp !== 'N/A') ? d.curp : null;
@@ -4283,7 +4286,7 @@ function renderDetail(d) {
   const datos = `
     <div class="datos">
       <div class="dseg dseg-name">
-        <span class="nm">${nombre}</span>${age != null ? `<span class="nage">· ${age}</span>` : ''}
+        <span class="nm">${nombre}</span>${age != null ? `<span class="nage">· ${age}</span>` : ''}${gradeDot}
       </div>
       <div class="dseg grow">
         <span class="lab">Dirección</span>
