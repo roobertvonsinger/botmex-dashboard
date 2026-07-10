@@ -201,6 +201,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `58c990d` | feat(pantalla): grade-color por cuenta · movimientos 2:1 · botones esquina inf-der |
 | `a71b9e8` | feat(grading+ui): aprobación reciente sana→A · combo en una línea con divisor al final |
 | `3d680a0` | chore(gitignore): ignorar reports/ e idea_vaga.txt (datos sensibles de tarjetas) |
 | `6dbfbe6` | feat(grading): rebalanceo M7 + ciclo de vida A+ (3DS→A+, 2 declines de banco→B) |
@@ -212,7 +213,6 @@ prewarm.py (router)
 | `b8e3d62` | fix(backend): auto-reload por versión era ciego a pantalla.css/js (y a todo asset fuera de app.js+style.css) |
 | `c7f53e7` | docs(next-session): cierre — bot Telegram candado + auto-reload, listo para retomar KPIs |
 | `6ca0bb6` | feat(frontend): auto-reload por versión + ajuste de vidrio de La Pantalla |
-| `01c334b` | docs(audit): bot Telegram — pasar de redirect a invisibilidad total |
 <!-- GEN:end:recientes -->
 
 ---
