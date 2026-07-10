@@ -1466,6 +1466,24 @@ tr.r-grade-C .grade-bar-cell { background: var(--warn);    box-shadow: 0 0 8px v
 tr.r-grade-D .grade-bar-cell { background: var(--danger);  box-shadow: 0 0 8px var(--danger); }
 tr.r-grade-U .grade-bar-cell { background: rgba(255,255,255,0.10); }
 
+/* Punto de grade (solo color, sin letra) — panel de detalle inline.
+   Mismo mapeo de color que la barrita de la fila (arriba), consistencia 1:1. */
+.grade-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-left: 6px;
+  vertical-align: middle;
+  flex: none;
+}
+.grade-dot.Aplus { background: oklch(0.75 0.20 152); box-shadow: 0 0 8px oklch(0.75 0.20 152 / 0.8); }
+.grade-dot.A     { background: var(--grade-a);       box-shadow: 0 0 6px var(--grade-a); }
+.grade-dot.B     { background: oklch(0.70 0.16 235); box-shadow: 0 0 6px oklch(0.70 0.16 235 / 0.5); }
+.grade-dot.C     { background: var(--warn);          box-shadow: 0 0 6px var(--warn); }
+.grade-dot.D     { background: var(--danger);        box-shadow: 0 0 6px var(--danger); }
+.grade-dot.U     { background: rgba(255,255,255,0.20); }
+
 /* Glassy gradient: difumina del grade hacia la derecha, se desvanece ANTES de
    llegar al saldo. */
 tbody tr.r-grade-Aplus {

@@ -76,8 +76,13 @@ def recalc_grade_from_db(email: str, db_path: str = "/data/betmexico_accounts.db
         if not sc:
             conn.close()
             return None
+        # A+ es un override manual (3DS detectado por el matchmaker, no lo calcula
+        # el analyzer V10) — un recalc de rutina (login/check/depósito/prewarm) NUNCA
+        # lo pisa. La ÚNICA vía de salida de A+ es `note_a_plus_outcome` (abajo): 2
+        # rechazos REALES de banco consecutivos → B. Por eso el UPDATE excluye A+.
         conn.execute(
-            "UPDATE accounts SET grade=?, grade_score=? WHERE LOWER(email)=LOWER(?)",
+            "UPDATE accounts SET grade=?, grade_score=? "
+            "WHERE LOWER(email)=LOWER(?) AND COALESCE(grade,'') != 'A+'",
             (sc["grade"], sc["score"], email),
         )
         conn.commit()
@@ -101,8 +106,11 @@ def recalc_grade_from_details(email: str, details: dict, db_path: str = "/data/b
         if not sc:
             return None
         conn = sqlite3.connect(db_path)
+        # Ver nota en recalc_grade_from_db: un recalc de rutina no pisa A+; solo
+        # note_a_plus_outcome (2 declines de banco consecutivas) lo baja a B.
         conn.execute(
-            "UPDATE accounts SET grade=?, grade_score=? WHERE LOWER(email)=LOWER(?)",
+            "UPDATE accounts SET grade=?, grade_score=? "
+            "WHERE LOWER(email)=LOWER(?) AND COALESCE(grade,'') != 'A+'",
             (sc["grade"], sc["score"], email),
         )
         conn.commit()
@@ -111,3 +119,61 @@ def recalc_grade_from_details(email: str, details: dict, db_path: str = "/data/b
     except Exception as e:
         logger.warning(f"[grading] recalc_from_details failed para {email}: {e}")
         return None
+
+
+def note_a_plus_outcome(email: str, status: str, db_path: str = "/data/betmexico_accounts.db") -> None:
+    """
+    Ciclo de vida del grade A+ (override 3DS). Regla de Robert (2026-07-09):
+      - 3DS marca A+ (lo hace el matchmaker/scheduled en `deposits.py`, no aquí).
+      - 2 rechazos REALES de banco CONSECUTIVOS (sin un aprobado en medio) tras el
+        A+ → la cuenta baja a B. Un aprobado resetea el contador (la pasarela
+        sigue jugando, se le perdona el decline aislado).
+      - `status` no-banco (rate_limited/login_lost/gateway_error/timeout/threeds/
+        ambiguous/incomplete) NO cuenta como decline ni resetea — es ruido ajeno a
+        la tarjeta (misma ley que `classify_deposit_status`: solo "rejected" = banco).
+
+    Llamar en `_record_attempt` DESPUÉS de `recalc_grade_from_db` (que salta A+),
+    para que el eventual set a 'B' sea la última palabra del flujo. Si la cuenta no
+    está en A+, es no-op. Tras bajar a B, la cuenta vuelve a reglas V10 normales en
+    su siguiente actividad (ya no está protegida).
+
+    `status` es el que produce `deposits.classify_deposit_status` (approved /
+    rejected / threeds / rate_limited / ...).
+    """
+    if status not in ("approved", "rejected"):
+        return  # no-banco / 3DS → ni incrementa ni resetea el streak
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT COALESCE(grade,'') AS grade, COALESCE(a_plus_decline_streak,0) AS streak "
+            "FROM accounts WHERE LOWER(email)=LOWER(?)",
+            (email,),
+        ).fetchone()
+        if not row or row["grade"] != "A+":
+            conn.close()
+            return
+        if status == "approved":
+            conn.execute(
+                "UPDATE accounts SET a_plus_decline_streak=0 WHERE LOWER(email)=LOWER(?)",
+                (email,),
+            )
+        else:  # "rejected" = rechazo real de banco
+            new_streak = int(row["streak"]) + 1
+            if new_streak >= 2:
+                b_score = _ANALYZER.SCORE_FLOOR.get("B", 60) if _ANALYZER else 60
+                conn.execute(
+                    "UPDATE accounts SET grade='B', grade_score=?, a_plus_decline_streak=0 "
+                    "WHERE LOWER(email)=LOWER(?)",
+                    (b_score, email),
+                )
+                logger.info(f"[grading] {email}: A+ → B (2 rechazos de banco consecutivos)")
+            else:
+                conn.execute(
+                    "UPDATE accounts SET a_plus_decline_streak=? WHERE LOWER(email)=LOWER(?)",
+                    (new_streak, email),
+                )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.warning(f"[grading] note_a_plus_outcome failed para {email}: {e}")

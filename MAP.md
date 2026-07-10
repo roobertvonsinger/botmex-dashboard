@@ -92,19 +92,19 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 3071 | `betmexico.dashboard.sse` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3149 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2626 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2636 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `login_orchestrator.py` | 392 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 736 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 342 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/migrate_status_no_banco.py` | 80 | `—` | _[completar]_ |
-| `scripts/recalc_grades.py` | 131 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
-| `shared/betmexico_payment_analyzer.py` | 578 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
+| `scripts/recalc_grades.py` | 136 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
+| `shared/betmexico_payment_analyzer.py` | 583 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
 | `test_account_touch.py` | 51 | `—` | _[completar]_ |
@@ -113,6 +113,7 @@ prewarm.py (router)
 | `test_at_hand.py` | 73 | `—` | _[completar]_ |
 | `test_deposit_status_classify.py` | 95 | `—` | _[completar]_ |
 | `test_deposit_step.py` | 132 | `—` | _[completar]_ |
+| `test_grading_a_plus_m7.py` | 158 | `—` | _[completar]_ |
 | `test_marks.py` | 32 | `—` | _[completar]_ |
 | `test_migrate_status_no_banco.py` | 103 | `—` | _[completar]_ |
 | `test_pool_manage.py` | 26 | `—` | _[completar]_ |
@@ -121,7 +122,7 @@ prewarm.py (router)
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 55 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
-| `web_grading.py` | 113 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
+| `web_grading.py` | 179 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
 | `web_utils.py` | 265 | `betmexico.web.utils` | Helpers compartidos: _friendly_error, _normalize_ccexp, _build_proxy_url |
 <!-- GEN:end:modulos -->
 
@@ -200,6 +201,8 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `6dbfbe6` | feat(grading): rebalanceo M7 + ciclo de vida A+ (3DS→A+, 2 declines de banco→B) |
+| `50ea3cb` | fix(pantalla): combo largo sin espacios desbordaba .pat-col-ident e invadía Movimientos |
 | `e42376a` | feat(pantalla): rediseño 3 columnas + escenario de depósito migrado + tamaño fijo anclado a Sistema |
 | `3557086` | docs(next-session): cierre — fix rate-limit no-banco mergeado (falta deploy+migración) + diagnóstico bug saldos desincronizados |
 | `cbe9db5` | fix(deposits): rate-limit (429) ya no se reporta como "Rechazado (banco)" |
@@ -210,8 +213,6 @@ prewarm.py (router)
 | `01c334b` | docs(audit): bot Telegram — pasar de redirect a invisibilidad total |
 | `1386a4b` | docs(audit): bitácora — bot Telegram pasa a solo-alimentador + unifica proxy/captcha con dashboard |
 | `a6221f6` | docs(next-session): cierre — pulido feed KPI Logs deployado+mergeado, pendientes de validación en prod |
-| `f0a1797` | feat(frontend): feed KPI Logs — agrupar depósitos, dedup touches, color por operador, matar spam de alertas |
-| `1771bc9` | fix(frontend): KPI Logs cronológico + día + Cuentas a la mano combo protagonista |
 <!-- GEN:end:recientes -->
 
 ---

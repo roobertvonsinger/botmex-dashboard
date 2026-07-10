@@ -160,6 +160,10 @@ def _migrate():
         # entra en "enfriamiento" hasta este epoch (segundos). Los flujos de
         # depósito la saltan mientras `cooldown_until > now`. Migración aditiva.
         ("cooldown_until", "ALTER TABLE accounts ADD COLUMN cooldown_until INTEGER"),
+        # Ciclo de vida A+ (3DS): contador de rechazos REALES de banco CONSECUTIVOS
+        # desde el A+ (Robert 2026-07-09: 3DS→A+; 2 declines de banco seguidas→B; un
+        # aprobado resetea). Lo mantiene `web_grading.note_a_plus_outcome`. Aditiva.
+        ("a_plus_decline_streak", "ALTER TABLE accounts ADD COLUMN a_plus_decline_streak INTEGER DEFAULT 0"),
     ]:
         try:
             with db(write=True) as c:
@@ -219,6 +223,80 @@ def _migrate():
             )
     except sqlite3.OperationalError:
         pass
+
+    _backfill_grades_v10_m7()
+
+
+def _backfill_grades_v10_m7():
+    """
+    One-shot backfill (gateado por marker, NO corre en cada restart): aplica
+    a las cuentas YA existentes el rebalanceo M7 del grading (2026-07-09, ver
+    docs/ERRORS.md "Grade A+ se borraba solo"). Sin esto, una cuenta solo se
+    recalcula en su PRÓXIMO login/check/depósito/prewarm — el fix quedaría
+    invisible para cuentas inactivas hasta que alguien las toque, que en la
+    práctica es "nunca" para el grueso de la BD (¡esto es justo lo que reportó
+    Robert como "los colores no son fiables"!). Corre una sola vez por versión.
+    """
+    _lg = _logging.getLogger("betmexico.dashboard.grading")
+    VERSION = "v10_m7_2026-07-09"
+    try:
+        with db(write=True) as c:
+            c.execute(
+                "CREATE TABLE IF NOT EXISTS grading_backfill_log ("
+                "version TEXT PRIMARY KEY, applied_at TEXT, accounts_changed INTEGER)"
+            )
+            if c.execute(
+                "SELECT 1 FROM grading_backfill_log WHERE version=?", (VERSION,)
+            ).fetchone():
+                return
+    except sqlite3.OperationalError as e:
+        _lg.warning(f"[grading backfill] no pude preparar marker: {e}")
+        return
+
+    try:
+        from web_grading import _ANALYZER
+        if not _ANALYZER:
+            _lg.warning("[grading backfill] analyzer V10 no cargó, salto backfill")
+            return
+        score_fn = _ANALYZER.score_payment_readiness
+    except Exception as e:
+        _lg.warning(f"[grading backfill] no pude importar analyzer: {e}")
+        return
+
+    changed = 0
+    try:
+        with db(write=True) as c:
+            accts = c.execute("SELECT id, email, grade FROM accounts").fetchall()
+            for a in accts:
+                if a["grade"] == "A+":
+                    continue  # override manual (3DS) — nunca se pisa, ni en backfill
+                txns = c.execute(
+                    "SELECT txn_date, status, txn_type, gateway, amount "
+                    "FROM account_transactions WHERE LOWER(account_email)=LOWER(?) "
+                    "ORDER BY txn_date DESC",
+                    (a["email"],),
+                ).fetchall()
+                if not txns:
+                    continue
+                details = {"transactions": {
+                    "fetched": True,
+                    "items": [dict(r) for r in txns],
+                    "total_rows": len(txns),
+                }}
+                sc = score_fn(details)
+                if sc and sc["grade"] != a["grade"]:
+                    c.execute(
+                        "UPDATE accounts SET grade=?, grade_score=? WHERE id=?",
+                        (sc["grade"], sc["score"], a["id"]),
+                    )
+                    changed += 1
+            c.execute(
+                "INSERT INTO grading_backfill_log (version, applied_at, accounts_changed) VALUES (?,?,?)",
+                (VERSION, datetime.now(timezone.utc).isoformat(), changed),
+            )
+        _lg.info(f"[grading backfill] {VERSION}: {changed} cuentas cambiaron de grade")
+    except Exception as e:
+        _lg.error(f"[grading backfill] falló: {e}")
 
 
 _migrate()

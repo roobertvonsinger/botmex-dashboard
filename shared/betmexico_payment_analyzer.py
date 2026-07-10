@@ -386,9 +386,14 @@ def score_payment_readiness(details: Dict) -> Optional[Dict]:
           and total_card_fails <= A_MAX_TOTAL_FAILS
           and bigfail_session_count <= A_MAX_BIGFAIL_SESS):
         grade, _reason = "A", f"SANA_{int(days_since_last_fail)}D"
-    elif days_since_last_fail >= C_DEEP_REST_DAYS and (
-            total_card_fails >= 5 or bigfail_session_count >= 1):
-        grade, _reason = "C", f"MASACRADA_DESCANSADA_{int(days_since_last_fail)}D"
+    elif bigfail_session_count >= 1 or total_card_fails >= 5:
+        # M7: hubo masacre (3+ fails en una sesión) o historial pesado de fails.
+        # NUNCA es B mientras no llegue al piso de descanso profundo (90d) —
+        # antes caía en el "else" y se etiquetaba "reparándose" a los 15-59 días,
+        # cuando en realidad sigue caliente. Ahora C todo el tramo 14-89d, y
+        # C también a partir de 90d (ya era así) — el reason distingue ambos.
+        tag = "DESCANSADA" if days_since_last_fail >= C_DEEP_REST_DAYS else "RECIENTE"
+        grade, _reason = "C", f"MASACRADA_{tag}_{int(days_since_last_fail)}D"
     else:
         grade, _reason = "B", "REPARANDOSE"
 

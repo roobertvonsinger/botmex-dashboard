@@ -73,6 +73,11 @@ def main():
 
     for a in accts:
         grade_before[a["grade"] or "?"] += 1
+        if a["grade"] == "A+":
+            # Override manual (3DS) — el backfill nunca lo pisa, igual que el
+            # recalc en vivo (web_grading.py).
+            grade_after["A+"] += 1
+            continue
         try:
             txns = [dict(r) for r in conn.execute(
                 "SELECT txn_date, status, txn_type, gateway, amount "
