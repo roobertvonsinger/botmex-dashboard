@@ -201,6 +201,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b9a2fb1` | docs(next-session): registrar 4a ronda (fix ancho CURP + cristal mate) en el cierre |
 | `1fa4219` | fix(pantalla): form CURP con ancho REAL de la columna (no full-width) · cristal aun mas mate |
 | `940fdc5` | docs(next-session): cierre sesion 2026-07-10 (5 rondas La Pantalla) — proximo objetivo: auditar cambios recientes de grading |
 | `b6f16bb` | fix(pantalla): meta al topbar · marco completo de la sheet · fix flicker de apertura |
@@ -212,7 +213,6 @@ prewarm.py (router)
 | `3d680a0` | chore(gitignore): ignorar reports/ e idea_vaga.txt (datos sensibles de tarjetas) |
 | `6dbfbe6` | feat(grading): rebalanceo M7 + ciclo de vida A+ (3DS→A+, 2 declines de banco→B) |
 | `50ea3cb` | fix(pantalla): combo largo sin espacios desbordaba .pat-col-ident e invadía Movimientos |
-| `e42376a` | feat(pantalla): rediseño 3 columnas + escenario de depósito migrado + tamaño fijo anclado a Sistema |
 <!-- GEN:end:recientes -->
 
 ---

@@ -272,21 +272,21 @@
         <div class="pat-topbar-meta">
           ${estado ? `<span class="pat-meta-item"><i class="ph-duotone ph-map-pin"></i> ${g(estado)}</span>` : ''}
           ${bdate ? `<span class="pat-meta-item dim"><i class="ph-duotone ph-cake"></i> ${g(dmy(bdate) || bdate)}</span>` : ''}
-          <span class="pat-meta-item dim"><i class="ph-duotone ph-identification-card"></i>
+          <span class="pat-meta-item dim pat-curp-wrap"><i class="ph-duotone ph-identification-card"></i>
             ${curpShown
               ? `<button type="button" class="pat-curp d-copy" data-copy="${g(curpShown)}" title="Copiar CURP">${g(curpShown)}</button>${curpTag}`
               : ''}
             <button type="button" class="pat-curp-add" data-curp-toggle="${g(curpStored || '')}" title="${curpStored ? 'Editar CURP guardado' : 'Guardar CURP validado'}"><i class="ph-bold ${curpStored ? 'ph-pencil-simple' : 'ph-plus'}"></i>${curpStored ? '' : ' CURP'}</button>
+            <div class="pat-form pat-curp-pop" data-curp-form hidden>
+              <input type="text" class="pat-input pat-input-mono" data-curp-input maxlength="18" placeholder="CURP">
+              <div class="pat-form-err" data-curp-err hidden></div>
+              <div class="pat-form-row">
+                <a href="https://www.gob.mx/curp/" target="_blank" rel="noopener" class="pat-btn pat-btn-ghost" title="Abrir validador oficial">gob.mx ↗</a>
+                <button type="button" class="pat-btn pat-btn-ghost" data-curp-cancel>Cancelar</button>
+                <button type="button" class="pat-btn pat-btn-save" data-curp-save>Guardar</button>
+              </div>
+            </div>
           </span>
-        </div>
-      </div>
-      <div class="pat-form" data-curp-form hidden>
-        <input type="text" class="pat-input pat-input-mono" data-curp-input maxlength="18" placeholder="CURP (18 caracteres, validado en gob.mx)">
-        <div class="pat-form-err" data-curp-err hidden></div>
-        <div class="pat-form-row">
-          <a href="https://www.gob.mx/curp/" target="_blank" rel="noopener" class="pat-btn pat-btn-ghost" title="Abrir validador oficial">gob.mx ↗</a>
-          <button type="button" class="pat-btn pat-btn-ghost" data-curp-cancel>Cancelar</button>
-          <button type="button" class="pat-btn pat-btn-save" data-curp-save>Guardar</button>
         </div>
       </div>
       <div class="pat-columns">

@@ -184,30 +184,25 @@
   border-radius: var(--pat-r);
   overflow: hidden;
 
-  /* VIDRIO TEMPLADO SEMI-TRANSLÚCIDO (glassmorphism) — se ven los KPIs difuminados
-     DETRÁS. Un poco más OSCURO que la resina verde: base de vidrio oscuro con cuerpo
-     (gradiente 0.17→0.11) + MESH de manchas verdes suaves (referencia: vecteezy
-     abstract-gradation-color, mismo lenguaje que las covers #2/#3 del set: 2-3 tonos
-     de un mismo hue difuminándose entre sí) + reflejo glass diagonal. El peso lo da
-     el backdrop-filter, no un fondo sólido.
-     2026-07-10 (Robert, campo): "que vaya difuminandose el acabado de la pantalla
-     de izquierda a derecha dando pie al color del grading SUTIL... siendo este el
-     tipo de color de ese cristal virtual — no solo que cambies los colores de las
-     letras". El cristal MISMO (no solo bordes/texto) ahora se oscurece a la
-     izquierda (zona de datos personales, más legible) y diluye hacia el tinte del
-     grade (var(--pat-tint)/--pat-gold-soft, dinámicas por data-grade) a la derecha
-     (zona de movimientos/escenario). Además se recorta el brillo diagonal blanquecino
-     (reflejo glass, capa 3) que "nublaba" la lectura — pedido explícito de Robert. */
+  /* VIDRIO TEMPLADO — MATERIAL, no color flotando (Robert 2026-07-10, 7ª ronda: "sigue
+     sin convencerme ese acabado medio satinado... elige un buen fondo, textura para
+     que se vea integrada y no como un cristal raro que sale de la nada"). Pulir el
+     brillo 3 rondas seguidas ya tocó techo (rendimientos decrecientes) — el problema
+     no era "muy brillante", era que el material no tenía relación con el FONDO real
+     de la app. Fix: la 1ª capa (más al fondo) es el MISMO glow ambiental que usa
+     --bg-accent (style.css, radial 12%/-8%, hue160) — la Pantalla ahora lee como una
+     ventana esmerilada tallada en ese mismo campo de luz, no un vidrio ajeno pegado
+     encima. Se quita el reflejo diagonal (capa satinada) por completo — la textura
+     de grano (::before, abajo) hace ese trabajo con una superficie física, no una
+     capa de brillo. El resto conserva el lenguaje (oscurecer izq/datos, diluir al
+     tinte del grade der/movimientos) con menos capas, más peso por capa. */
   background:
-    linear-gradient(90deg, oklch(0.04 0.008 160 / 0.42) 0%, oklch(0.04 0.008 160 / 0.20) 26%, transparent 52%),  /* oscurece la izquierda (datos personales) */
-    linear-gradient(90deg, transparent 20%, var(--pat-tint) 62%, var(--pat-gold-soft) 100%),                     /* difumina hacia el color del grade, izq→der */
-    linear-gradient(133deg, rgba(255,255,255,.005), transparent 24%, transparent 76%, rgba(255,255,255,.003)),  /* reflejo glass — Robert 2026-07-10 3ª ronda: "menos satinada, mas mate" — recortado otra vez a la mitad (antes .012/.006) */
-    radial-gradient(70% 52% at 90% -14%, oklch(0.86 0.03 330 / 0.03), transparent 58%),                        /* PERLA (mate): nácar rosa esq. sup-der — Robert 2026-07-10 3ª ronda: aun mas mate */
-    radial-gradient(62% 48% at 3% 112%,  oklch(0.85 0.03 200 / 0.025), transparent 58%),                        /* PERLA (mate): nácar cian esq. inf-izq */
-    radial-gradient(85% 65% at 14% 4%,  oklch(0.80 0.085 155 / 0.16), transparent 52%),                        /* mancha 1 — mint claro, esq. sup-izq */
-    radial-gradient(75% 60% at 88% 30%, oklch(0.60 0.075 165 / 0.11), transparent 55%),                        /* mancha 2 — sage medio, derecha */
-    radial-gradient(90% 70% at 30% 108%, oklch(0.32 0.06 170 / 0.20), transparent 58%),                        /* mancha 3 — sombra verde profunda, abajo */
-    linear-gradient(180deg, oklch(0.14 0.017 160 / 0.56), oklch(0.09 0.012 160 / 0.72));                       /* vidrio templado oscuro — 2026-07-06: +cuerpo/−brillo (lightness↓, alpha↑), 2 pasadas por pedido de campo */
+    radial-gradient(ellipse 130% 160% at 10% -18%, oklch(0.34 0.10 160 / 0.16), transparent 56%),   /* mismo glow ambiental que --bg-accent — ancla la sheet al fondo real de la app */
+    linear-gradient(90deg, oklch(0.04 0.008 160 / 0.40) 0%, oklch(0.04 0.008 160 / 0.18) 28%, transparent 54%),  /* oscurece la izquierda (datos personales) */
+    linear-gradient(90deg, transparent 18%, var(--pat-tint) 60%, var(--pat-gold-soft) 100%),                      /* difumina hacia el color del grade, izq→der */
+    radial-gradient(85% 65% at 14% 4%,  oklch(0.80 0.085 155 / 0.14), transparent 52%),                          /* mancha 1 — mint claro, esq. sup-izq */
+    radial-gradient(90% 70% at 30% 112%, oklch(0.30 0.055 170 / 0.22), transparent 60%),                         /* mancha 2 — sombra verde profunda, abajo (ancla al piso) */
+    linear-gradient(180deg, oklch(0.13 0.016 160 / 0.60), oklch(0.08 0.011 160 / 0.76));                         /* cuerpo del vidrio templado — algo más denso, menos "capa de color" */
   /* Marco COMPLETO de la sheet entera (Robert 2026-07-10: "marco completo para la
      pantalla no para el recuadro solamente") — antes solo el filo superior/inferior
      tenían refuerzo inset; izquierda/derecha dependían solo del border 1px, que se
@@ -231,11 +226,16 @@
   will-change: transform, clip-path, filter, opacity;
 }
 
-/* ── Grano premium (patrón .bmx::before recoloreado por overlay) ── */
+/* ── Grano esmerilado (Robert 2026-07-10, 7ª ronda: "elige buen fondo, textura...
+   integrada, no un cristal raro"). Grano más grueso (baseFrequency .9→.55, +1
+   octava) = lee como vidrio ESMERILADO/sandblasted físico, no ruido de pantalla.
+   mix-blend-mode overlay→soft-light: overlay sube el contraste de forma dura (eso
+   es lo que se leía "satinado"/brillante); soft-light integra el grano como
+   textura de superficie sin subir el brillo general. */
 .pantalla-sheet::before {
   content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
-  opacity: .22; mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+  opacity: .30; mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.55' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.6'/%3E%3C/svg%3E");
 }
 
 /* ── Barrido del proyector láser (scanline). Reposa a la izquierda fuera de vista;
@@ -507,6 +507,52 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .pat-curp:hover { color: var(--pat-gold); }
+
+/* ── Popover de CURP (Robert 2026-07-10, 7ª ronda): "que hacer la línea de datos
+   personales mero arriba no haga que se vaya más para abajo los movimientos" — el
+   form ya NO vive en el flujo (antes era hermano de .pat-columns, empujaba todo
+   hacia abajo al abrirse). Ahora cuelga de .pat-curp-wrap (position:relative) como
+   overlay absoluto: abrir/cerrar el form nunca mueve ni una fila de movimientos.
+   Ancho = el REAL de un CURP (18 monospace + cursor, "el tamaño justo de un CURP",
+   no el ancho heredado de .pat-col-ident) vía `ch` (unidad = ancho de un carácter
+   en la fuente actual, exacta en monoespaciada). Recuadro/botones disimulados:
+   fondo casi transparente + hairline tenue en vez del bloque sólido que usa el
+   form de notas (mismo .pat-form base, pero .pat-curp-pop pisa densidad/tamaño). */
+.pat-curp-wrap { position: relative; }
+/* Compound selector (.pat-form.pat-curp-pop) a propósito: .pat-form base (más abajo
+   en el archivo) define `width: var(--pat-ident-w, 300px)` para el form de notas —
+   sin subir especificidad aquí, el orden de cascada lo pisaba y el popover se
+   estiraba a 300px pese al `width:19ch` (bug detectado en harness real). */
+.pat-form.pat-curp-pop {
+  position: absolute; top: calc(100% + 7px); right: 0; z-index: 20;
+  /* Ancho fijo (NO max-content): con max-content, la FILA de botones (gob.mx /
+     Cancelar / Guardar) mide más que el input y estira el contenedor a su ancho
+     (medido: 188px) aunque el input midiera 19ch — max-content toma el hijo más
+     ancho, no el input. Fijar el ancho en `ch` (contra la MISMA fuente/tamaño
+     mono del input, no la sans heredada del meta-item — heredada medía 188px
+     por los ~9.6px/char de esa fuente vs ~6.3px/char de mono) fuerza a la fila
+     de botones a envolver (`.pat-form-row` ya tiene flex-wrap:wrap) DENTRO del
+     ancho justo de un CURP, en vez de estirarlo. */
+  font-family: var(--font-mono); font-size: 11px;
+  width: 19ch;
+  padding: 8px; border-radius: 9px;
+  background: oklch(0.10 0.012 160 / 0.72);
+  border: 1px solid var(--pat-edge);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 10px 28px -12px rgba(0,0,0,.55);
+}
+.pat-curp-pop[hidden] { display: none; }
+.pat-curp-pop .pat-input {
+  width: 19ch; text-align: center; letter-spacing: 1px;
+  background: oklch(0.20 0.02 160 / 0.22); border-color: var(--hairline);
+  padding: 4px 6px; font-size: 10.5px;
+}
+.pat-curp-pop .pat-form-row { justify-content: space-between; gap: 4px; margin-top: 1px; }
+.pat-curp-pop .pat-btn {
+  padding: 3px 7px; font-size: 9.5px; background: transparent; color: var(--text-faint);
+}
+.pat-curp-pop .pat-btn-save { color: var(--pat-gold); }
+.pat-curp-pop .pat-btn:hover { background: var(--pat-gold-soft); color: var(--pat-gold); }
 
 /* Columna 2 — movimientos, COMPACTA (ya no se estira a todo el ancho). Header
    (.pat-txn-h) es hijo DIRECTO de la columna (fijo, arriba) — .pat-txn-col es
