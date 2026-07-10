@@ -276,13 +276,21 @@
 /* COMBO copiable — ahora vive DENTRO de la columna de datos (.pat-col-ident), como
    primera fila de esa columna (2026-07-09: ya no reserva hueco de la X, los
    controles subieron a .pat-topbar). */
-.pat-combo-line { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; line-height: 1; }
+/* min-width:0 en la línea + el botón: sin esto, un combo largo sin espacios
+   (ej. "herma0922@gmail.com:22Septiembre") no tiene punto de quiebre válido para
+   el navegador y el botón crece a su ancho intrínseco completo, desbordando los
+   218px fijos de .pat-col-ident hacia la columna de Movimientos (bug de campo
+   2026-07-09, screenshot Robert). overflow-wrap:anywhere permite partir el string
+   en cualquier punto — el combo se ve COMPLETO en 2 líneas, no se trunca (no
+   masking, feedback_no_masking), solo deja de invadir la columna vecina. */
+.pat-combo-line { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; min-width: 0; line-height: 1.25; }
 .pat-combo {
   -webkit-appearance: none; appearance: none; border: 0; background: transparent;
-  cursor: pointer; text-align: left; padding: 0;
+  cursor: pointer; text-align: left; padding: 0; min-width: 0;
   font-family: var(--font-mono); font-size: 15px; font-weight: 600;
   color: oklch(0.93 0.022 90); letter-spacing: .2px; text-decoration: none;   /* perla nacarada (el amarillo se reserva al saldo) */
   border-bottom: 1px dashed oklch(0.90 0.03 90 / 0.32);
+  overflow-wrap: anywhere; word-break: break-word;
   transition: color var(--ease-fast), border-color var(--ease-fast);
 }
 .pat-combo:hover { color: oklch(0.98 0.015 90); border-bottom-color: oklch(0.92 0.03 90 / 0.7); }

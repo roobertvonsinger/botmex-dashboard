@@ -200,6 +200,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `e42376a` | feat(pantalla): rediseño 3 columnas + escenario de depósito migrado + tamaño fijo anclado a Sistema |
 | `3557086` | docs(next-session): cierre — fix rate-limit no-banco mergeado (falta deploy+migración) + diagnóstico bug saldos desincronizados |
 | `cbe9db5` | fix(deposits): rate-limit (429) ya no se reporta como "Rechazado (banco)" |
 | `9441bd6` | fix(backend): _operator_color crasheaba (500) con locked_by no-numérico |
@@ -211,7 +212,6 @@ prewarm.py (router)
 | `a6221f6` | docs(next-session): cierre — pulido feed KPI Logs deployado+mergeado, pendientes de validación en prod |
 | `f0a1797` | feat(frontend): feed KPI Logs — agrupar depósitos, dedup touches, color por operador, matar spam de alertas |
 | `1771bc9` | fix(frontend): KPI Logs cronológico + día + Cuentas a la mano combo protagonista |
-| `1f793af` | docs(kpis): bitacora Fase 7 + NEXT-SESSION — cierre 2 KPIs deployados |
 <!-- GEN:end:recientes -->
 
 ---

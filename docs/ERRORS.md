@@ -988,6 +988,20 @@ docker logs traefik-traefik-1 2>&1 | grep -i 'letsencrypt\|acme' | tail -20
 
 ---
 
+### Combo largo desborda `.pat-col-ident` e invade la columna de Movimientos
+
+**Síntoma**: en La Pantalla (rediseño 3 columnas, 2026-07-09), con un combo `email:password` largo sin espacios (ej. `herma0922@gmail.com:22Septiembre`), el texto se salía de la columna de identidad (218px fijos) y quedaba encimado sobre el header "Movimientos" de la columna vecina. Reportado por Robert con screenshot (flechas rojo/amarillo marcando el overlap).
+
+**Causa**: `.pat-combo` (botón) no tenía `min-width:0` ni control de wrap. En un flex item, sin `min-width:0` el navegador no lo deja encoger bajo su ancho de contenido mínimo (`min-content`); y como el string no tiene espacios, CSS no encuentra punto de quiebre válido → el botón crece a su ancho intrínseco completo (el string entero en una línea) y se desborda de los 218px de `.pat-col-ident`, invadiendo `.pat-col-txns`.
+
+**Diagnóstico**: reproducido en harness local (`dashroot` en `.claude/launch.json`, sirve el `index.html`/CSS/JS REALES — no un mock aislado) navegando a `/static/index.html`, parcheando `window.fetch` para devolver los datos exactos del screenshot de Robert (mismo email/combo) y llamando `window.Pantalla.open(1,'detail')` desde consola. El overlap se reprodujo idéntico al reporte.
+
+**Fix**: `.pat-combo-line { min-width:0 }` + `.pat-combo { min-width:0; overflow-wrap:anywhere; word-break:break-word }` (`static/pantalla.css`). El combo ahora envuelve a 2+ líneas DENTRO de su columna — sigue mostrándose completo y copiable (no se trunca, respeta `feedback_no_masking`), solo deja de desbordar.
+
+**Histórico**: 2026-07-09, mismo día del rediseño 3-columnas que introdujo `.pat-col-ident` con ancho fijo — el combo antes vivía en `.pat-combo-line` sin restricción de ancho lateral (panel viejo se estiraba), nadie notó que el ancho fijo nuevo lo dejaría sin espacio para strings largos.
+
+---
+
 ## Plantilla para nuevos errores
 
 Agregar al cierre:
