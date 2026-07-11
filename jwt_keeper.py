@@ -52,6 +52,14 @@ def cfg() -> Dict[str, Any]:
         "refresh_ahead_sec": _env_int("JWT_KEEPER_REFRESH_AHEAD_H", 24) * 3600,
         "gap_min": _env_int("JWT_KEEPER_GAP_MIN_SEC", 20),
         "gap_max": _env_int("JWT_KEEPER_GAP_MAX_SEC", 45),
+        # Cooldown que el keeper aplica a una cuenta que le da RATE_LIMITED. DEBE
+        # ser >> interval (1h): si fuera 45min (< 1h) la cuenta quemada volvería a
+        # ser elegible justo cuando el keeper corre de nuevo → BUCLE DE QUEMA
+        # (medido 2026-07-11: 12 selected / 12 rate_limited cada ciclo). El keeper
+        # NO tiene urgencia (el JWT ya expiró, no hay sesión que salvar), así que
+        # una cuenta quemada descansa VARIOS ciclos. Efecto: el keeper se auto-regula
+        # — aparta las quemadas y deja de tocarlas hasta que enfríen de verdad. 6h = 6 ciclos.
+        "rl_cooldown_min": _env_int("JWT_KEEPER_RL_COOLDOWN_MIN", 360),
         "grades": grades or DEFAULT_GRADES,
     }
 
@@ -126,11 +134,12 @@ def _load_candidate_rows() -> List[Dict[str, Any]]:
         return [dict(row) for row in cur.fetchall()]
 
 
-def _set_cooldown(email: str) -> None:
-    """Reusa la MISMA lógica de cooldown de los flujos de depósito (deposits.py)."""
+def _set_cooldown(email: str, minutes: int) -> None:
+    """Reusa el helper de cooldown de depósitos (deposits.py) pero con un cooldown
+    LARGO propio del keeper (ver `rl_cooldown_min` en cfg): rompe el bucle de quema."""
     try:
         from deposits import _set_account_cooldown
-        _set_account_cooldown(email)
+        _set_account_cooldown(email, minutes=minutes)
     except Exception as e:  # pragma: no cover
         logger.warning(f"[jwt_keeper] no pude setear cooldown a {email}: {e}")
 
@@ -143,6 +152,7 @@ async def run_keepalive_cycle(
     grades: Set[str],
     gap_min: int,
     gap_max: int,
+    rl_cooldown_min: int = 360,
 ) -> Dict[str, Any]:
     """Un ciclo: selecciona el lote y re-loguea cada cuenta espaciada (JWT fresco).
 
@@ -198,8 +208,8 @@ async def run_keepalive_cycle(
                 logger.info(f"[jwt_keeper] {email} JWT fresco ✓ (grade {r.get('grade')})")
             elif res.code == "RATE_LIMITED":
                 stats["rate_limited"] += 1
-                await asyncio.to_thread(_set_cooldown, email)
-                logger.info(f"[jwt_keeper] {email} rate-limited → cooldown 45min")
+                await asyncio.to_thread(_set_cooldown, email, rl_cooldown_min)
+                logger.info(f"[jwt_keeper] {email} rate-limited → cooldown {rl_cooldown_min}min (rompe bucle de quema)")
             elif res.account_dead:
                 stats["dead"] += 1
                 # Cuarentena (forense 2026-07-11): persistir DEAD, no solo contar.
@@ -227,4 +237,5 @@ async def run_keepalive_cycle_from_env() -> Dict[str, Any]:
     c = cfg()
     return await run_keepalive_cycle(
         batch_max=c["batch_max"], refresh_ahead_sec=c["refresh_ahead_sec"],
-        grades=c["grades"], gap_min=c["gap_min"], gap_max=c["gap_max"])
+        grades=c["grades"], gap_min=c["gap_min"], gap_max=c["gap_max"],
+        rl_cooldown_min=c["rl_cooldown_min"])

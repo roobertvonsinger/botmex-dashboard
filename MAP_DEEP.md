@@ -196,13 +196,13 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
 | `_env_int` | def | L38–L42 |
-| `cfg` | def | L45–L56 |
-| `select_refresh_candidates` | def | L60–L100 |
-| `_exp_int` | def | L103–L109 |
-| `_load_candidate_rows` | def | L117–L126 |
-| `_set_cooldown` | def | L129–L135 |
-| `run_keepalive_cycle` | def | L139–L223 |
-| `run_keepalive_cycle_from_env` | def | L226–L230 |
+| `cfg` | def | L45–L64 |
+| `select_refresh_candidates` | def | L68–L108 |
+| `_exp_int` | def | L111–L117 |
+| `_load_candidate_rows` | def | L125–L134 |
+| `_set_cooldown` | def | L137–L144 |
+| `run_keepalive_cycle` | def | L148–L233 |
+| `run_keepalive_cycle_from_env` | def | L236–L241 |
 
 ### `login_orchestrator.py`
 
