@@ -118,6 +118,16 @@ Endpoint `/api/prewarm/select` (SSE):
 | `result` | `{email, ok, code, duration_ms, balance, jwt_cached, fail_reason}` | Resultado por cuenta |
 | `done` | `{cap_remaining, cap_used}` | Terminado |
 
+Endpoint `/api/prewarm/refresh-stream` (SSE, "Actualizar visibles"):
+
+| `type` | Payload | Significado |
+|---|---|---|
+| `start` | `{total, cap_remaining, cap_used, capmonster_balance, capmonster_warning}` | Refresh iniciado |
+| `account` | `{data: {fila completa}}` | Cuenta re-logueada OK, fila repintada |
+| `fail` | `{id, email, error}` | Login falló |
+| `skip` | `{id, email, reason, cooldown_min?}` | Cuenta saltada. `reason`: `cap` (tope del operador), `no_password`, **`dead`** (cuarentena: DEAD, no se re-loguea), **`cooldown`** (enfriando tras rate-limit, `cooldown_min` = minutos restantes). `dead`/`cooldown` añadidos 2026-07-11 (cuarentena anti-rate-limit). |
+| `done` | — | Terminado |
+
 ## `deposit_step` — logging paso a paso (Fase 2 KPI Logs, 2026-07-05)
 
 `_wrap_deposit_step(inner_cb, *, email, actor, **ids)` (deposits.py, cerca de `_safe_phase`) envuelve el `phase_cb` de CADA uno de los 3 flujos de depósito. Reglas de diseño:

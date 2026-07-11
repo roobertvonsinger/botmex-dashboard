@@ -1962,6 +1962,9 @@ td.sel-cell:hover { background: rgba(255,255,255,0.04); }
   opacity: 0.9;
 }
 .jwt-chip.jwt-expired { filter: grayscale(0.15); opacity: 0.75; }
+/* Cuarentena (SA-only): ⛔ requiere reset de pass · ⏳ enfriando tras rate-limit */
+.jwt-chip.jwt-reset { opacity: 1; }
+.jwt-chip.jwt-cooldown { opacity: 0.85; }
 
 /* Borde lateral de operador en la fila (spec chat2) — sobreescribe el grade-bar-cell */
 tr.op-row-warn   .grade-bar-cell { box-shadow: inset 3px 0 0 var(--op-warn);   }

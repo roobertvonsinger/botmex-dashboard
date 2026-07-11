@@ -618,13 +618,23 @@ function renderTable() {
     const lockChip = r.locked_by
       ? `<span class="lock-chip op-${esc(opCol)} ${until?.expired ? 'expired' : ''}" title="Lockeada por ${esc(r.locked_by)}${until ? ` · ${until.expired ? 'vencido' : `vence en ${until.text}`}` : ''}">🔒 ${esc(r.locked_by)}${until && !until.expired ? ` <span class="lock-chip-time dim">${until.text}</span>` : ''}</span>`
       : '';
-    // Badge JWT (SA-only): 🟢 sesión viva (reutilizable, sin captcha) · 🔑 expirada.
-    // Backend solo manda `jwt_alive` a superadmin → doble candado (internal, ley capas).
-    const jwtBadge = (state.user?.role === 'superadmin' && r.jwt_alive !== undefined)
-      ? (r.jwt_alive
+    // Badge de acceso (SA-only). Prioridad: cuarentena > sesión JWT. Backend solo
+    // manda estos flags a superadmin → doble candado (internal, ley capas).
+    //   ⛔ needs_reset: cuenta DEAD por login terminal → revive solo con reset de pass.
+    //   ⏳ cooldown_min: LIVE enfriando tras rate-limit → no tocar N min.
+    //   🟢/🔑 jwt_alive: sesión viva reutilizable / expirada (solo en LIVE que no enfría).
+    let jwtBadge = '';
+    if (state.user?.role === 'superadmin') {
+      if (r.needs_reset) {
+        jwtBadge = `<span class="jwt-chip jwt-reset" title="Bloqueada por BetMexico (límite de intentos) — revive solo con reset de contraseña">⛔</span>`;
+      } else if (r.cooldown_min > 0) {
+        jwtBadge = `<span class="jwt-chip jwt-cooldown" title="Enfriando tras rate-limit — no tocar ${r.cooldown_min} min">⏳</span>`;
+      } else if (r.status === 'LIVE' && r.jwt_alive !== undefined) {
+        jwtBadge = r.jwt_alive
           ? `<span class="jwt-chip jwt-alive" title="Sesión viva — reutilizable sin captcha">🟢</span>`
-          : `<span class="jwt-chip jwt-expired" title="Sesión expirada — el próximo uso requiere resolver captcha">🔑</span>`)
-      : '';
+          : `<span class="jwt-chip jwt-expired" title="Sesión expirada — el próximo uso requiere resolver captcha">🔑</span>`;
+      }
+    }
     const isSA = state.user?.role === 'superadmin';
     const trTitle = isSA ? `Grade ${esc(r.grade) || '?'}` : '';
     // Iconos de fila: 💳 (tarjetas), 📝 (notas), siempre + (quick add), 📌 (marcador) + botón Detalles

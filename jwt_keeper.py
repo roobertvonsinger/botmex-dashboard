@@ -48,7 +48,7 @@ def cfg() -> Dict[str, Any]:
     return {
         "enabled": os.environ.get("JWT_KEEPER_ENABLED", "1") == "1",
         "interval_sec": _env_int("JWT_KEEPER_INTERVAL_SEC", 3600),      # 1h
-        "batch_max": _env_int("JWT_KEEPER_BATCH", 12),                  # cuentas/ciclo
+        "batch_max": _env_int("JWT_KEEPER_BATCH", 20),                  # cuentas/ciclo (12→20: drenar backlog de JWT expirados; seguro con el semáforo GLOBAL de login + gap secuencial; las quemadas caen en cooldown y se auto-apartan el próximo ciclo)
         "refresh_ahead_sec": _env_int("JWT_KEEPER_REFRESH_AHEAD_H", 24) * 3600,
         "gap_min": _env_int("JWT_KEEPER_GAP_MIN_SEC", 20),
         "gap_max": _env_int("JWT_KEEPER_GAP_MAX_SEC", 45),
@@ -202,7 +202,15 @@ async def run_keepalive_cycle(
                 logger.info(f"[jwt_keeper] {email} rate-limited → cooldown 45min")
             elif res.account_dead:
                 stats["dead"] += 1
-                logger.info(f"[jwt_keeper] {email} muerta ({res.code}) — no reintentar")
+                # Cuarentena (forense 2026-07-11): persistir DEAD, no solo contar.
+                # Antes se dejaba LIVE → volvía a caer en el lote cada ciclo,
+                # gastando captcha en una cuenta terminal. Reusa el helper de prewarm.
+                try:
+                    from prewarm import _db_mark_dead
+                    await asyncio.to_thread(_db_mark_dead, email, res.code or "LOGIN_DENIED")
+                except Exception as e:  # pragma: no cover
+                    logger.warning(f"[jwt_keeper] no pude marcar DEAD {email}: {e}")
+                logger.info(f"[jwt_keeper] {email} muerta ({res.code}) → cuarentena DEAD")
             else:
                 stats["retry"] += 1  # LOGIN_RETRY_LATER → próximo ciclo
     finally:

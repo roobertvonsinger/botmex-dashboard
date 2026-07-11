@@ -50,7 +50,7 @@ _PREWARM_TASKS: Dict[str, asyncio.Task] = {}
 CAP_PER_OPERATOR_10MIN = 9999  # sin tope práctico — el operador decide
 ACCOUNT_FRESH_MINUTES = 30      # < 30min desde last check → skip con warning
 ACCOUNT_DAILY_LIMIT = 3          # >= 3 prewarms en el día → skip con warning
-REFRESH_PARALLEL = 8            # max logins concurrentes — bajado 15→8 (anti-quemado de IP; gentle_login añade jitter)
+REFRESH_PARALLEL = 2            # max logins concurrentes — 15→8→2 (forense 2026-07-11: la TASA agregada de logins es la causa #1 del rate-limit; ≥45/min ≈65% denial). El cuello REAL ahora es el semáforo GLOBAL de login_orchestrator (LOGIN_MAX_CONCURRENCY); esto es 2ª barrera del bulk.
 CAPMONSTER_MIN_BALANCE = 5.0
 BALANCE_FRESH_SEC = 5 * 60
 TASK_TIMEOUT_SEC = 25
@@ -65,7 +65,7 @@ def _db_get_account(email: str) -> Optional[dict]:
         with db() as c:
             row = c.execute(
                 "SELECT id, email, password, balance_real, balance_total, "
-                "last_checked_at, jwt_token, jwt_expires_at, status "
+                "last_checked_at, jwt_token, jwt_expires_at, status, cooldown_until "
                 "FROM accounts WHERE email=? LIMIT 1",
                 (email,),
             ).fetchone()
@@ -285,6 +285,32 @@ def _db_invalidate_jwt(email: str) -> None:
         pass
 
 
+def _db_mark_dead(email: str, reason: str) -> None:
+    """Cuarentena de cuenta quemada (fix forense 2026-07-11). Marca DEAD +
+    dead_reason SOLO cuando el orquestador devolvió account_dead=True (login
+    terminal: LOGIN_DENIED / KYC_PENDING / AUTOEXCLUSION — regla Robert). Antes
+    el prewarm NUNCA persistía esto → la cuenta seguía LIVE y se re-logueaba en
+    cada ciclo, quemando captcha y alimentando la ráfaga de logins (causa #2 del
+    rate-limit). Ahora sale de la vista LIVE, del pool y de toda selección de
+    login; revive solo por acción manual (ej. reset de contraseña). NO pisa un
+    dead_reason previo (una AUTOEXCLUSION real no se re-etiqueta). Best-effort."""
+    from app import db
+    import sqlite3
+    try:
+        dead_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        with db(write=True) as c:
+            c.execute(
+                "UPDATE accounts SET status='DEAD', "
+                "dead_reason=COALESCE(NULLIF(dead_reason,''), ?), "
+                "dead_at=COALESCE(dead_at, ?) "
+                "WHERE email=? AND status!='DEAD'",
+                (reason, dead_at, email),
+            )
+        logger.warning(f"[Prewarm] {email} CUARENTENA → DEAD ({reason})")
+    except sqlite3.OperationalError:
+        pass
+
+
 def _is_balance_fresh(acc: dict) -> bool:
     last = acc.get("last_checked_at")
     if not last:
@@ -361,15 +387,28 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
         jwt_from_cache = login_res.from_cache  # señal real del orquestador
         used_proxy = login_res.used_proxy
         if not jwt:
-            # LOGIN_RETRY_LATER / LOGIN_DENIED / KYC_PENDING / AUTOEXCLUSION.
-            # En prewarm NO marcamos DEAD (el único punto que escribe DEAD es el
-            # matchmaker; el flujo de depósito real re-clasificará). Solo dejamos
-            # la cuenta para reintento — NUNCA invalidamos nada agresivo aquí.
+            # LOGIN_RETRY_LATER / LOGIN_DENIED / KYC_PENDING / AUTOEXCLUSION / RATE_LIMITED.
+            # CUARENTENA (fix forense 2026-07-11): antes NO persistíamos nada aquí
+            # → 174 cuentas quemadas seguían LIVE y se re-logueaban en cada ciclo,
+            # alimentando la ráfaga (causa #2). Ahora persistimos SOLO las señales
+            # inequívocas del orquestador (no transitorios):
+            #   • account_dead=True (login terminal por regla Robert) → DEAD+reason.
+            #   • RATE_LIMITED (403/429 recuperable) → cooldown_until: la selección
+            #     la salta hasta enfriar, sin martillarla (martillar la hunde más).
+            # LOGIN_RETRY_LATER/TIMEOUT/ERROR (transitorios) → solo last_checked, como antes.
+            quarantined = None
+            if login_res.account_dead:
+                await asyncio.to_thread(_db_mark_dead, email, login_res.code or "LOGIN_DENIED")
+                quarantined = "dead"
+            elif login_res.code == "RATE_LIMITED":
+                from deposits import _set_account_cooldown
+                await asyncio.to_thread(_set_account_cooldown, email)
+                quarantined = "cooldown"
             _db_log_phase(
                 process_id, "no_jwt",
                 {"email": email, "operator_id": operator_id,
                  "status": login_res.code, "attempts": login_res.attempts,
-                 "account_dead": login_res.account_dead},
+                 "account_dead": login_res.account_dead, "quarantined": quarantined},
                 int((time.time() - t0) * 1000),
             )
             await asyncio.to_thread(_db_update_last_checked, email)
@@ -535,6 +574,17 @@ async def prewarm_select(request: Request, user: dict = Depends(require_session)
             skipped_reasons["no_account"] = skipped_reasons.get("no_account", 0) + 1
             continue
 
+        # Cuarentena (forense 2026-07-11): saltar quemadas (DEAD) y en cooldown.
+        if acc.get("status") == "DEAD":
+            skipped += 1
+            skipped_reasons["dead"] = skipped_reasons.get("dead", 0) + 1
+            continue
+        from deposits import _cooldown_active
+        if _cooldown_active(acc.get("cooldown_until")):
+            skipped += 1
+            skipped_reasons["cooldown"] = skipped_reasons.get("cooldown", 0) + 1
+            continue
+
         jwt_cache = await asyncio.to_thread(_db_get_jwt_cache, email)
         # En modo force ignoramos el cache de balance fresh — el operador pidió
         # explícitamente actualizar live (ej. picó 'Actualizar visibles').
@@ -630,7 +680,8 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
     placeholders = ",".join("?" * len(ids))
     with _app_db() as c:
         rows = c.execute(
-            f"SELECT id, email, password, last_checked_at FROM accounts WHERE id IN ({placeholders})",
+            f"SELECT id, email, password, last_checked_at, status, cooldown_until "
+            f"FROM accounts WHERE id IN ({placeholders})",
             ids,
         ).fetchall()
     accs = [dict(r) for r in rows]
@@ -662,6 +713,18 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
                     return
                 if not acc.get("password"):
                     await q.put({"type": "skip", "id": acc["id"], "email": email, "reason": "no_password"})
+                    return
+                # Cuarentena (forense 2026-07-11): NO re-loguear cuentas quemadas.
+                # DEAD = terminal; cooldown activo = enfriando tras rate-limit.
+                # Re-martillarlas quema captcha y alimenta la ráfaga (causa #1+#2).
+                if acc.get("status") == "DEAD":
+                    await q.put({"type": "skip", "id": acc["id"], "email": email, "reason": "dead"})
+                    return
+                from deposits import _cooldown_active, _cooldown_remaining_min
+                if _cooldown_active(acc.get("cooldown_until")):
+                    await q.put({"type": "skip", "id": acc["id"], "email": email,
+                                 "reason": "cooldown",
+                                 "cooldown_min": _cooldown_remaining_min(acc.get("cooldown_until"))})
                     return
                 # Throttle: max N logins concurrentes para no triggear rate-limit
                 async with sem:

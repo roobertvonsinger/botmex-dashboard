@@ -2,6 +2,23 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## [CRÍTICO] Rate-limit real = CONCURRENCIA de logins + cuentas quemadas re-intentadas (forense 2026-07-11, tarde)
+
+- **Síntoma**: Robert seguía viendo rate-limit "demasiado" pese al `jwt_keeper`, y sospechó ruteo de proxies / IP quemada. Además mostró que al entrar directo a BetMexico sale `betmexico.mx/attempt-limit` ("Límite de intentos alcanzado — Restablece tu contraseña"): NO es rate-limit temporal, es **bloqueo terminal que exige reset de password**.
+- **Diagnóstico forense** (subagente Sonnet sobre `process_log`, 18,122 filas). Descarta la hipótesis IP y **corrige el diagnóstico previo de "429 por cuenta"**:
+  - **Proxies OK**: rotan 10/10 IPs MX distintas; sin fuga proxyless en código activo (solo `_legacy/`); reusar una IP 3× = 3 LIVE (no la quema).
+  - **NO hay umbral por-cuenta** (⚠️ esto MATA la teoría de "backoff por cuenta" de la entry de abajo): la muerte no correlaciona con cuántas veces se logueó una cuenta (p50 disperso 4-43 intentos, ventanas de horas a 42 días).
+  - **La CONCURRENCIA de logins es el driver dominante**: tasa de denegación por logins/min → `<30/min`≈28-48% (piso por reputación de pool), `45-74/min`≈65-70%, `≥100/min`=**100%**. Pico histórico **16 logins/segundo** (época `REFRESH_PARALLEL=15`). El servidor tumba al 1er intento porque está saturado de requests concurrentes GLOBALES, no por la cuenta.
+  - **Guardarraíl de cuarentena ausente**: 174 cuentas (3d) / 248 (7d) con evento `RATE_LIMITED`/`LOGIN_DENIED` seguían marcadas `LIVE` y el prewarm las re-logueaba cada ciclo → gastaba captcha y alimentaba la concurrencia.
+  - **Keeper no mordía**: 88.7% de las LIVE sin JWT vivo (590 exp + 150 null vs 94 vivos).
+- **Fix (3 frentes, todo en el repo, sin tocar monorepo)**:
+  1. **Semáforo GLOBAL de login** (`login_orchestrator._LOGIN_SEM`, env `LOGIN_MAX_CONCURRENCY=2`): envuelve SOLO el POST real de `/api/Session/login` (el cache-hit no lo toca). Único cuello por el que pasan TODOS los logins (prewarm/keeper/depósito) — sin importar cuántos operadores/loops disparen, nunca >N concurrentes. `REFRESH_PARALLEL 8→2` como 2ª barrera del bulk.
+  2. **Cuarentena** (`prewarm._db_mark_dead` + hook en `_run_prewarm` no_jwt y en `jwt_keeper.run_keepalive_cycle`): `account_dead=True` (login terminal) → `status='DEAD'`+`dead_reason`; `RATE_LIMITED` → `cooldown_until` (`deposits._set_account_cooldown`). Toda selección de login (`prewarm_select`, `refresh_stream`) salta `status='DEAD'` y `cooldown_until` futuro. Backfill: 12 cuentas LIVE con señal terminal reciente → DEAD (conservador: las 237 RATE_LIMITED recuperables NO se tocan, el flujo en vivo las apartará).
+  3. **Keeper** `JWT_KEEPER_BATCH 12→20` (drenar backlog; seguro con el semáforo global + gap secuencial).
+- **UI (SA-only)**: `/api/accounts` añade `needs_reset` (DEAD por `LOGIN_DENIED`/`ATTEMPT_LIMIT` → revive solo con reset de pass) y `cooldown_min`. Badge ⛔ (bloqueada, requiere reset) / ⏳ (enfriando N min) junto al combo, prioridad sobre 🟢/🔑.
+- **Verificado en prod (2026-07-11)**: `py_compile` + 13 tests keeper verdes; deploy KVM4 + restart + `Application startup complete`; proceso vivo confirma `GLOBAL_LOGIN_CONCURRENCY=2`, `REFRESH_PARALLEL=2`, `batch=20`; backfill aplicado (LIVE 834→822, DEAD 90→102); badge ⛔ renderiza en `danoscene@gmail.com` con tooltip correcto (verificado vía DOM en navegador, combo sin enmascarar).
+- **Limitación conocida**: el bot (monorepo) NO distingue `attempt-limit` de otros `LOGIN_DENIED` en la respuesta cruda — ambos caen en `account_dead=True`. No se puede auto-separar "necesita reset" de "credenciales malas" sin mejorar la firma en `betmexico_login_api` (requiere permiso, monorepo). Por ahora el SA las revisa por el badge ⛔. Piso irreducible de ~30% denegación a baja concurrencia = reputación del pool dataimpulse (frente aparte).
+
 ## [CRÍTICO] Rate-limit (429) masivo por JWT expirados sin refrescar — `jwt_keeper` (2026-07-11)
 
 - **Síntoma**: Robert reportó que el rate-limit "está pasando demasiado". Medido en BD: **20 de 41 intentos de depósito en 48h (49%) morían en `rate_limited`** (`deposit_attempts.status`); 47 eventos `429 → cooldown 45min` en 7d.
@@ -11,7 +28,7 @@
 - **UI**: `/api/accounts` ahora devuelve `jwt_alive` (bool, `jwt_expires_at > now+60`); badge 🟢 (sesión viva, reutilizable sin captcha) / 🔑 (expirada, requiere captcha) junto al combo de cada cuenta (`static/app.js renderTable`, `.jwt-chip` en `style.css`).
 - **Verificado en prod (2026-07-11)**: 13 tests unitarios de selección (`test_jwt_keeper.py`) verdes; deploy a KVM4 + restart + health 200; ciclo real ejecutó `{'selected':2,'live':2,'rate_limited':0}` con "JWT fresco ✓" en cuentas A+, y el loop automático enfrió cuentas quemadas correctamente. Badge presente en assets servidos + `/api/version` bumpeado (auto-reload).
 - **Config env** (todas opcionales, defaults sanos): `JWT_KEEPER_ENABLED=1`, `JWT_KEEPER_INTERVAL_SEC=3600`, `JWT_KEEPER_BATCH=12`, `JWT_KEEPER_REFRESH_AHEAD_H=24`, `JWT_KEEPER_GAP_MIN_SEC=20`, `JWT_KEEPER_GAP_MAX_SEC=45`, `JWT_KEEPER_GRADES=A+,A,B`.
-- **Mejora pendiente (v2)**: backoff por cuenta que da rate-limit repetido (hoy el cooldown de 45min < intervalo de 1h, así que una cuenta quemada se re-intenta cada ciclo hasta ~24/día — acotado por batch, pero un backoff exponencial evitaría el desgaste). Y un lock para evitar solapamiento entre el loop automático y un refresh manual (visto en el smoke: misma cuenta re-logueada 2x al coincidir).
+- **⚠️ Diagnóstico ampliado/corregido (forense 2026-07-11 tarde, ver entry de arriba)**: la premisa "429 POR CUENTA" era parcial — el forense sobre 18k eventos probó que **NO hay umbral por-cuenta**; el driver dominante es la **CONCURRENCIA global de logins** (≥45/min ≈65% denegación). La idea de "backoff por cuenta" de este punto queda descartada. Lo que sí se implementó: semáforo global de login + cuarentena (DEAD/cooldown persistidos + excluidos de la selección) + keeper batch 12→20. El lock loop-vs-manual sigue pendiente pero es menor con el semáforo global ya serializando todo.
 
 ## Header "Movimientos" de La Pantalla desaparecía al hacer scroll (2026-07-09)
 

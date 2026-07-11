@@ -46,6 +46,19 @@ _TOKEN_REUSE_MAX_AGE = 100.0  # seg: < 120s de vida real del v2 (margen seguro)
 # así el login se auto-cura en vez de martillar con un token muerto.
 _TOKEN_MAX_REUSES = 8
 
+# ── Semáforo GLOBAL de logins reales contra BetMexico ────────────────────────
+# CAUSA RAÍZ #1 del rate-limit (forense 2026-07-11 sobre 18k eventos): la TASA
+# agregada de logins concurrentes dispara el antifraude — medido ≥100 logins/min
+# = 100% denial, 45-74/min ≈65%, <30/min ≈28-48% (piso por reputación de IP).
+# El problema NO es la IP (proxies rotan bien) ni por-cuenta (no hay umbral): es
+# cuántos POSTs de /api/Session/login llegan JUNTOS, sin importar qué endpoint,
+# operador o loop los dispare. Este semáforo es el ÚNICO cuello por el que pasan
+# TODOS los logins reales. El cache-hit (reuso de JWT) NO lo toca — no golpea
+# BetMexico. N=2 mantiene la tasa en el borde bajo de la zona segura. Env override.
+import os as _os
+GLOBAL_LOGIN_CONCURRENCY = max(1, int(_os.environ.get("LOGIN_MAX_CONCURRENCY", "2")))
+_LOGIN_SEM = asyncio.Semaphore(GLOBAL_LOGIN_CONCURRENCY)
+
 
 # ── Sticky sessions (NodeMaven) ──────────────────────────────────────────────
 @dataclass
@@ -323,14 +336,19 @@ async def gentle_login(
             await asyncio.sleep(random.uniform(0.1, base))
 
         # 4. Login REUSANDO el token actual. Timeout POR INTENTO.
+        # Semáforo GLOBAL: nunca más de N POSTs de login concurrentes contra
+        # BetMexico, sin importar cuántos operadores/loops/endpoints disparen
+        # (causa raíz #1 del rate-limit, forense 2026-07-11). Se toma SOLO para
+        # el POST real; el jitter/espera de pool quedan fuera para no acaparar.
         try:
-            async with BetmexicoApiChecker(proxy=proxy_url) as checker:
-                login_result = await asyncio.wait_for(
-                    checker.test_login(email, password,
-                                       captcha_token=cur_token, captcha_task_id=cur_task_id,
-                                       fetch_mode="minimal"),
-                    timeout=attempt_timeout,
-                )
+            async with _LOGIN_SEM:
+                async with BetmexicoApiChecker(proxy=proxy_url) as checker:
+                    login_result = await asyncio.wait_for(
+                        checker.test_login(email, password,
+                                           captcha_token=cur_token, captcha_task_id=cur_task_id,
+                                           fetch_mode="minimal"),
+                        timeout=attempt_timeout,
+                    )
         except asyncio.TimeoutError:
             logger.warning(f"[gentle_login] {email} timeout intento {attempts_done+1}")
             streak += 1; attempts_done += 1; token_reuses += 1; last_status = "TIMEOUT"

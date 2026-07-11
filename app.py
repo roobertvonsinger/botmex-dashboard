@@ -695,7 +695,7 @@ def list_accounts(
         "a.balance_total, a.balance_real, "
         "a.last_deposit_amount, a.last_deposit_date, a.status, a.grade, "
         "a.locked_by, a.locked_at, a.locked_until, a.last_checked_at, a.check_count, "
-        "a.jwt_expires_at, "
+        "a.jwt_expires_at, a.dead_reason, a.cooldown_until, "
         "COALESCE(a.published_to_pool, 1) AS published_to_pool, "
         "(SELECT COUNT(*) FROM account_cards ac WHERE ac.account_email=a.email) AS cards_count, "
         "(SELECT COUNT(*) FROM account_notes an WHERE an.account_email=a.email "
@@ -739,10 +739,26 @@ def list_accounts(
                 # SOLO-SA: es un internal operativo → NO se filtra al operador (ley de
                 # capas operador/SA). Se quita SIEMPRE el epoch crudo del payload.
                 _exp = r.pop("jwt_expires_at", None)
+                # Cuarentena (forense 2026-07-11): SOLO-SA. Se quitan SIEMPRE los
+                # crudos del payload (no filtrar internals al operador).
+                _dr = r.pop("dead_reason", None)
+                _cd = r.pop("cooldown_until", None)
                 if role == "superadmin":
                     r["jwt_alive"] = bool(
                         _exp not in (None, "")
                         and int(_exp) > datetime.now(timezone.utc).timestamp() + 60)
+                    # needs_reset: cuenta DEAD por login terminal recuperable con
+                    # reset de contraseña (attempt-limit / credenciales) — la
+                    # distingue de una muerte real (AUTOEXCLUSION / KYC).
+                    r["needs_reset"] = bool(
+                        r.get("status") == "DEAD"
+                        and str(_dr or "") in ("LOGIN_DENIED", "ATTEMPT_LIMIT"))
+                    # cooldown_min: minutos que le faltan para enfriar (0 si no aplica).
+                    _now = datetime.now(timezone.utc).timestamp()
+                    try:
+                        r["cooldown_min"] = max(0, round((int(_cd) - _now) / 60)) if _cd not in (None, "") and int(_cd) > _now else 0
+                    except (TypeError, ValueError):
+                        r["cooldown_min"] = 0
             return rows
     except sqlite3.OperationalError:
         # Si no hay tabla account_assignments todavía
