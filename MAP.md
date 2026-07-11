@@ -205,6 +205,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b6bfcdb` | fix(jwt-keeper): romper bucle de quema — cooldown propio 6h > interval 1h |
 | `1604b61` | fix(rate-limit): semáforo GLOBAL de login + cuarentena de cuentas quemadas |
 | `9ef96d3` | feat(jwt-badge): badge de sesión JWT SOLO-SA + filtro para separar vivas/expiradas |
 | `799bf58` | feat(jwt-keeper): mantener JWT de sesión vivos para bajar el rate-limit (429) |
@@ -216,7 +217,6 @@ prewarm.py (router)
 | `940fdc5` | docs(next-session): cierre sesion 2026-07-10 (5 rondas La Pantalla) — proximo objetivo: auditar cambios recientes de grading |
 | `b6f16bb` | fix(pantalla): meta al topbar · marco completo de la sheet · fix flicker de apertura |
 | `f885ec0` | fix(pantalla): Estado roto (parseo de address sin comas) · reparto de columnas afinado · saldo chico · scroll en datos · cristal difumina al color del grade |
-| `14af44c` | fix(pantalla): reparto 2:1 movimientos/escenario · botones a esq inf-der · tinte por grade |
 <!-- GEN:end:recientes -->
 
 ---

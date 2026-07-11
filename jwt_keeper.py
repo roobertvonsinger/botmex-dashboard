@@ -48,7 +48,7 @@ def cfg() -> Dict[str, Any]:
     return {
         "enabled": os.environ.get("JWT_KEEPER_ENABLED", "1") == "1",
         "interval_sec": _env_int("JWT_KEEPER_INTERVAL_SEC", 3600),      # 1h
-        "batch_max": _env_int("JWT_KEEPER_BATCH", 20),                  # cuentas/ciclo (12→20: drenar backlog de JWT expirados; seguro con el semáforo GLOBAL de login + gap secuencial; las quemadas caen en cooldown y se auto-apartan el próximo ciclo)
+        "batch_max": _env_int("JWT_KEEPER_BATCH", 8),                   # cuentas/ciclo. 12→20→8 (2026-07-11): subirlo a 20 para "drenar backlog" fue error — el backlog resultó ~90% QUEMADO (medido: selected:20/rate_limited:18), así que batch alto solo gasta más captcha en cuentas que dan rate_limited. Con el cooldown de 6h apartando las quemadas, un batch chico toca suave, aparta las quemadas y refresca las pocas sanas sin desperdicio. Sube de nuevo cuando el universo enfríe.
         "refresh_ahead_sec": _env_int("JWT_KEEPER_REFRESH_AHEAD_H", 24) * 3600,
         "gap_min": _env_int("JWT_KEEPER_GAP_MIN_SEC", 20),
         "gap_max": _env_int("JWT_KEEPER_GAP_MAX_SEC", 45),
