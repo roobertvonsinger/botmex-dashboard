@@ -205,6 +205,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `4e80eb0` | fix(jwt-keeper): cuarentena por racha de RATE_LIMITED + pool DataImpulse a 700 puertos + dedup |
 | `bb0033f` | fix(infra): agregar botmexico.net como alias Traefik — DNS de botmexico.com.mx reseteado en Openprovider |
 | `8cfec27` | fix(jwt-keeper): batch 20→8 — el backlog está quemado, no vale drenarlo agresivo |
 | `b6bfcdb` | fix(jwt-keeper): romper bucle de quema — cooldown propio 6h > interval 1h |
@@ -216,7 +217,6 @@ prewarm.py (router)
 | `3ea668b` | fix(pantalla): popover CURP fuera de flujo (no empuja movimientos) · vidrio ligado al glow ambiental de la app |
 | `b9a2fb1` | docs(next-session): registrar 4a ronda (fix ancho CURP + cristal mate) en el cierre |
 | `1fa4219` | fix(pantalla): form CURP con ancho REAL de la columna (no full-width) · cristal aun mas mate |
-| `940fdc5` | docs(next-session): cierre sesion 2026-07-10 (5 rondas La Pantalla) — proximo objetivo: auditar cambios recientes de grading |
 <!-- GEN:end:recientes -->
 
 ---
