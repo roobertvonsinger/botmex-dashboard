@@ -60,6 +60,13 @@ def cfg() -> Dict[str, Any]:
         # una cuenta quemada descansa VARIOS ciclos. Efecto: el keeper se auto-regula
         # — aparta las quemadas y deja de tocarlas hasta que enfríen de verdad. 6h = 6 ciclos.
         "rl_cooldown_min": _env_int("JWT_KEEPER_RL_COOLDOWN_MIN", 360),
+        # Racha de RATE_LIMITED consecutivos (forense 2026-07-11 tarde, ver rl_streak
+        # en app._migrate): a partir de este umbral, la cuenta deja de ser "enfriando"
+        # (transitorio) y pasa a "quemada permanente" (cuarentena larga). Medido en
+        # prod: cuentas con 429 en TODOS sus intentos durante 22h+ pese al cooldown de
+        # 6h — no es cuestión de esperar más, es que BetMexico las tiene bloqueadas.
+        "rl_streak_quarantine_at": _env_int("JWT_KEEPER_RL_STREAK_QUARANTINE_AT", 3),
+        "rl_quarantine_min": _env_int("JWT_KEEPER_RL_QUARANTINE_MIN", 2880),  # 48h
         "grades": grades or DEFAULT_GRADES,
     }
 
@@ -119,7 +126,7 @@ def _exp_int(v: Any) -> int:
 
 # ── I/O de BD (aislado; usa el context manager de app) ────────────────────────
 _SELECT_COLS = ("email", "password", "status", "grade", "jwt_expires_at",
-                "cooldown_until", "locked_by", "published_to_pool")
+                "cooldown_until", "locked_by", "published_to_pool", "rl_streak")
 
 
 def _load_candidate_rows() -> List[Dict[str, Any]]:
@@ -144,6 +151,31 @@ def _set_cooldown(email: str, minutes: int) -> None:
         logger.warning(f"[jwt_keeper] no pude setear cooldown a {email}: {e}")
 
 
+def _bump_rl_streak(email: str) -> int:
+    """Incrementa rl_streak y devuelve el nuevo valor (best-effort, 0 si falla)."""
+    try:
+        import app
+        with app.db(write=True) as c:
+            c.execute(
+                "UPDATE accounts SET rl_streak = COALESCE(rl_streak,0) + 1 WHERE email=?",
+                (email,))
+            row = c.execute(
+                "SELECT rl_streak FROM accounts WHERE email=?", (email,)).fetchone()
+            return int(row["rl_streak"]) if row and row["rl_streak"] is not None else 0
+    except Exception as e:  # pragma: no cover
+        logger.warning(f"[jwt_keeper] no pude incrementar rl_streak {email}: {e}")
+        return 0
+
+
+def _reset_rl_streak(email: str) -> None:
+    try:
+        import app
+        with app.db(write=True) as c:
+            c.execute("UPDATE accounts SET rl_streak=0 WHERE email=?", (email,))
+    except Exception as e:  # pragma: no cover
+        logger.warning(f"[jwt_keeper] no pude resetear rl_streak {email}: {e}")
+
+
 # ── Ciclo (async) ─────────────────────────────────────────────────────────────
 async def run_keepalive_cycle(
     *,
@@ -153,6 +185,8 @@ async def run_keepalive_cycle(
     gap_min: int,
     gap_max: int,
     rl_cooldown_min: int = 360,
+    rl_streak_quarantine_at: int = 3,
+    rl_quarantine_min: int = 2880,
 ) -> Dict[str, Any]:
     """Un ciclo: selecciona el lote y re-loguea cada cuenta espaciada (JWT fresco).
 
@@ -168,6 +202,7 @@ async def run_keepalive_cycle(
     stats: Dict[str, Any] = {
         "universe": len(rows), "selected": len(cands),
         "live": 0, "rate_limited": 0, "retry": 0, "dead": 0, "error": 0,
+        "quarantined": 0,
     }
     if not cands:
         logger.info(f"[jwt_keeper] nada que refrescar (universo={len(rows)})")
@@ -205,11 +240,21 @@ async def run_keepalive_cycle(
 
             if res.ok:
                 stats["live"] += 1
+                if (r.get("rl_streak") or 0) > 0:
+                    await asyncio.to_thread(_reset_rl_streak, email)
                 logger.info(f"[jwt_keeper] {email} JWT fresco ✓ (grade {r.get('grade')})")
             elif res.code == "RATE_LIMITED":
                 stats["rate_limited"] += 1
-                await asyncio.to_thread(_set_cooldown, email, rl_cooldown_min)
-                logger.info(f"[jwt_keeper] {email} rate-limited → cooldown {rl_cooldown_min}min (rompe bucle de quema)")
+                streak = await asyncio.to_thread(_bump_rl_streak, email)
+                if streak >= rl_streak_quarantine_at:
+                    stats["quarantined"] += 1
+                    await asyncio.to_thread(_set_cooldown, email, rl_quarantine_min)
+                    logger.warning(
+                        f"[jwt_keeper] {email} racha={streak} rate-limited SIN éxito → "
+                        f"CUARENTENA {rl_quarantine_min}min (quemada permanente, no transitoria)")
+                else:
+                    await asyncio.to_thread(_set_cooldown, email, rl_cooldown_min)
+                    logger.info(f"[jwt_keeper] {email} rate-limited (racha={streak}) → cooldown {rl_cooldown_min}min")
             elif res.account_dead:
                 stats["dead"] += 1
                 # Cuarentena (forense 2026-07-11): persistir DEAD, no solo contar.
@@ -238,4 +283,6 @@ async def run_keepalive_cycle_from_env() -> Dict[str, Any]:
     return await run_keepalive_cycle(
         batch_max=c["batch_max"], refresh_ahead_sec=c["refresh_ahead_sec"],
         grades=c["grades"], gap_min=c["gap_min"], gap_max=c["gap_max"],
-        rl_cooldown_min=c["rl_cooldown_min"])
+        rl_cooldown_min=c["rl_cooldown_min"],
+        rl_streak_quarantine_at=c["rl_streak_quarantine_at"],
+        rl_quarantine_min=c["rl_quarantine_min"])

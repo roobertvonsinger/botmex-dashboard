@@ -205,6 +205,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `bb0033f` | fix(infra): agregar botmexico.net como alias Traefik — DNS de botmexico.com.mx reseteado en Openprovider |
 | `8cfec27` | fix(jwt-keeper): batch 20→8 — el backlog está quemado, no vale drenarlo agresivo |
 | `b6bfcdb` | fix(jwt-keeper): romper bucle de quema — cooldown propio 6h > interval 1h |
 | `1604b61` | fix(rate-limit): semáforo GLOBAL de login + cuarentena de cuentas quemadas |
@@ -216,7 +217,6 @@ prewarm.py (router)
 | `b9a2fb1` | docs(next-session): registrar 4a ronda (fix ancho CURP + cristal mate) en el cierre |
 | `1fa4219` | fix(pantalla): form CURP con ancho REAL de la columna (no full-width) · cristal aun mas mate |
 | `940fdc5` | docs(next-session): cierre sesion 2026-07-10 (5 rondas La Pantalla) — proximo objetivo: auditar cambios recientes de grading |
-| `b6f16bb` | fix(pantalla): meta al topbar · marco completo de la sheet · fix flicker de apertura |
 <!-- GEN:end:recientes -->
 
 ---

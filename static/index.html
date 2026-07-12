@@ -454,7 +454,11 @@
         </div>
         <button class="seg-btn fb-cards" id="btnCardsOnly" title="Solo cuentas con al menos 1 tarjeta guardada (en account_cards o notas con card)">💳 Con tarjeta</button>
         <button class="seg-btn reset-btn" id="btnResetFilters" title="Restaurar la vista al default: LIVE, sin grade, sin búsqueda, sin orden">↺ Restaurar</button>
-        <button class="seg-btn fb-refresh" id="btnRefreshVisible" title="Login en vivo de las cuentas visibles — verás el progreso">↻ Actualizar visibles</button>
+        <!-- DESHABILITADO 2026-07-11: bucle de quema jwt_keeper activo (mismas 8 cuentas rate_limited cada ciclo).
+             "Actualizar visibles" dispara login masivo (/api/prewarm/refresh-stream) que compite por el mismo
+             semáforo global de login y alimenta la concurrencia que está quemando cuentas. Reactivar cuando
+             el keeper muestre live>0 sostenido. Ver docs/ERRORS.md §rate-limit concurrencia. -->
+        <button class="seg-btn fb-refresh" id="btnRefreshVisible" title="Login en vivo de las cuentas visibles — verás el progreso" style="display:none">↻ Actualizar visibles</button>
       </section>
 
       <section class="tablewrap">

@@ -164,6 +164,13 @@ def _migrate():
         # desde el A+ (Robert 2026-07-09: 3DS→A+; 2 declines de banco seguidas→B; un
         # aprobado resetea). Lo mantiene `web_grading.note_a_plus_outcome`. Aditiva.
         ("a_plus_decline_streak", "ALTER TABLE accounts ADD COLUMN a_plus_decline_streak INTEGER DEFAULT 0"),
+        # jwt_keeper: racha de RATE_LIMITED consecutivos SIN éxito (forense 2026-07-11
+        # tarde: cuentas como retrateriamty@gmail.com dieron 429 en 11/11 intentos a lo
+        # largo de 22h — el cooldown de 6h NUNCA fue el problema, la cuenta está quemada
+        # de forma permanente del lado de BetMexico, no transitoria). Se resetea a 0 en
+        # cualquier login exitoso; a partir de rl_streak>=3 el keeper aplica cuarentena
+        # larga en vez de seguir reintentando cada 6h para siempre. Aditiva.
+        ("rl_streak", "ALTER TABLE accounts ADD COLUMN rl_streak INTEGER DEFAULT 0"),
     ]:
         try:
             with db(write=True) as c:

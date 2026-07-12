@@ -60,20 +60,27 @@ EXTRA_ADMIN_PROXIES: List[Dict[str, str]] = [
 #     mercado (3.9) para el pool base de DataImpulse sin el toggle "IP quality" —
 #     coincide con la degradación medida en prod la semana del 2026-06-24 (tasa de
 #     login exitoso cayendo de ~50%/intento a ~30%/intento).
-#   - 10000..10099 (LOTE NUEVO 2026-07-01, credenciales `506e02a6...`, dado por
-#     Robert) = 100 sesiones STICKY FRESCAS, nunca usadas. Reemplaza el pool 823
-#     como PRIMARIO. Objetivo: recuperar el p≈50%/intento que sí se midió viable en
-#     mayo con sticky fresca (vs. rotativo genérico degradado). Vigilar: si este
-#     lote se empieza a quemar (406/429 subiendo otra vez), la causa mecánica ya
-#     está identificada de antemano — no re-investigar desde cero, ver
-#     docs/plans/login-orchestration-rework.md §6 (StickySessionManager) y pedir
-#     lote nuevo en vez de forzar reuso de sesiones muertas.
+#   - 10000..10699 (LOTE NUEVO 2026-07-01/07-11, credenciales `506e02a6...`, dado
+#     por Robert) = 700 sesiones STICKY, cada una rota de IP sola cada 3 MIN (TTL
+#     del plan, no algo que controlemos por código). Reemplaza el pool 823 como
+#     PRIMARIO. Objetivo: recuperar el p≈50%/intento que sí se midió viable en
+#     mayo con sticky fresca (vs. rotativo genérico degradado).
+#     ⚠️ Diagnóstico 2026-07-11 (forense "masacre de IPs", Robert): con solo 100
+#     puertos (10000-10099) y ~900 cuentas activas, cada IP terminaba autenticando
+#     decenas de emails distintos — patrón que el antifraude de BetMexico marca
+#     independientemente de concurrencia/cooldown (conecta con el bucle de quema
+#     del jwt_keeper, ver docs/ERRORS.md). Ampliar a 700 puertos baja mucho la
+#     razón cuentas-por-IP; el TTL de 3min además da rotación natural: dos cuentas
+#     que caen en el mismo puerto separadas por >3min (típico — el keeper espacía
+#     20-45s entre 8 cuentas, ciclo completo 3-6min) casi siempre pegan IP física
+#     distinta. Si el 406/429 vuelve a subir pese a esto, ya no es el pool — ver
+#     docs/plans/login-orchestration-rework.md §6 (StickySessionManager).
 # El sufijo `__cr.mx` en el username fuerza país México.
 _DATAIMPULSE_HOST = "gw.dataimpulse.com"
 _DATAIMPULSE_USER = "506e02a6444effce62de__cr.mx"
 _DATAIMPULSE_PASS = "59bd44415b7b9c7c"
 _DATAIMPULSE_STICKY_PORT_START = 10000
-_DATAIMPULSE_STICKY_PORT_END = 10099  # 100 sesiones sticky (lote fresco 2026-07-01)
+_DATAIMPULSE_STICKY_PORT_END = 10999  # 1000 sesiones sticky, TTL 3min c/u (plan actual — verificado con curl directo a 10700/10850/10999, los 3 responden 200)
 
 DATAIMPULSE_PROXIES: List[Dict[str, str]] = [
     {
@@ -115,10 +122,25 @@ def _bot_proxies() -> List[Dict[str, str]]:
 def all_proxies() -> List[Dict[str, str]]:
     """Lista completa: bot + extras locales, excluyendo hosts quemados
     (`_EXCLUDED_PROXY_HOSTS`). El filtro se aplica acá para que TODO el
-    pool (failover, random pick, shuffled) herede la exclusión."""
+    pool (failover, random pick, shuffled) herede la exclusión.
+
+    Dedup por (server, username) — el bot (monorepo, `betmexico_config.
+    ADMIN_PROXIES`) y este archivo pueden listar el MISMO puerto DataImpulse
+    dos veces (detectado 2026-07-11: 200 entradas reportadas, 100 servers
+    únicos). Sin dedup, `random.choice`/`shuffled_proxy_urls` pesan doble
+    a los puertos duplicados — sesga la rotación en vez de repartir parejo
+    entre las sesiones sticky reales."""
     combined = _bot_proxies() + EXTRA_ADMIN_PROXIES + DATAIMPULSE_PROXIES
+    seen: set = set()
+    deduped: List[Dict[str, str]] = []
+    for p in combined:
+        key = (p.get("server", ""), p.get("username", ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(p)
     return [
-        p for p in combined
+        p for p in deduped
         if not any(bad in p.get("server", "").lower() for bad in _EXCLUDED_PROXY_HOSTS)
     ]
 
