@@ -1040,6 +1040,22 @@ docker logs traefik-traefik-1 2>&1 | grep -i 'letsencrypt\|acme' | tail -20
 
 ---
 
+### `botmexico.com.mx` inaccesible — DNS a nivel registrador, NO compromiso de la VPS (2026-07-11/12)
+
+**Síntoma**: Robert reporta el dominio inaccesible tras dejar OB2 corriendo toda la noche + CapMonster en $0. Sospecha de VPS/dominio comprometidos.
+
+**Causa**: el registro A de `botmexico.com.mx` (y `www`) en el registrador (Openprovider, NS `ns1/ns2/ns3.openprovider.*`) apuntaba a `35.204.150.5` — el placeholder por defecto de **Webador** (`website-rendering.jouwweb.nl`/`webador.com`), NO a la VPS (`2.24.211.109`). La VPS (Traefik, contenedores, cert Let's Encrypt renovado sin error) estaba sana; `auth.log` solo mostraba bruteforce SSH de bots random (sin éxito) — descartado compromiso de la VPS. Causa raíz del cambio de DNS en Openprovider **no confirmada** (pendiente que Robert revise el panel — expiración/suspensión/acceso no autorizado a la cuenta Openprovider/Webador).
+
+**Diagnóstico**: `nslookup <dominio> 1.1.1.1` vs `8.8.8.8` vs NS autoritativo directo; comparar la IP resuelta contra la IP real de la VPS. Si resuelve a algo tipo `35.204.x.x` con CNAME chain a `webador.com`/`jouwweb.nl`, es el parking default de Openprovider/Webador, no un hackeo.
+
+**Fix aplicado (mitigación, no root-cause)**: Robert tiene un dominio adicional ya en su cuenta Webador — `botmexico.net`. Se apuntó su registro A (en Webador, `/v2/website/8412017/dns/botmexico.net`) a `2.24.211.109`, y se agregó `Host(\`botmexico.net\`)` a la regla del router Traefik (`infra/docker-compose.yml` + `/docker/betmexico/docker-compose.yml` en KVM4, contenedor `web` recreado). Traefik emitió cert Let's Encrypt con SAN `botmexico.com.mx, botmexico.net, www.botmexico.com.mx` automáticamente. Verificado con `openssl s_client` + `/api/health` real sobre HTTPS — 200 OK. **`botmexico.net` es ahora el dominio operativo mientras se resuelve `botmexico.com.mx` en Openprovider.**
+
+**Pendiente**: Robert debe entrar a Openprovider y ver por qué cambió el DNS de `botmexico.com.mx` — root cause real sigue sin confirmar.
+
+**Histórico**: primera vez que se usa `botmexico.net` como dominio operativo — antes solo existía `botmexico.com.mx`. Si se recupera `botmexico.com.mx`, ambos quedan activos en el router Traefik (no hace falta revertir).
+
+---
+
 ## Plantilla para nuevos errores
 
 Agregar al cierre:

@@ -52,7 +52,7 @@ Ambos comparten:
 
 ### Acceso
 
-- **Dashboard (público)**: **`https://botmexico.com.mx`** y `https://www.botmexico.com.mx` (TLS automático vía Traefik + Let's Encrypt)
+- **Dashboard (público)**: **`https://botmexico.com.mx`**, `https://www.botmexico.com.mx` y **`https://botmexico.net`** (alias operativo desde 2026-07-12, ver `docs/ERRORS.md` §"botmexico.com.mx inaccesible") — TLS automático vía Traefik + Let's Encrypt, cert con SAN combinado
 - **Dashboard (Tailscale, debug)**: containers NO exponen 8080 al host. Para debug interno: `docker exec betmexico-web curl http://localhost:8080/api/health` o `docker network inspect betmexico_bmx` y curl al IP interno.
 - **Bot Telegram**: `@betmx_bot` (token en `.env`)
 
@@ -64,7 +64,7 @@ Labels en `docker-compose.yml` del servicio `web`:
 ```yaml
 labels:
   - 'traefik.enable=true'
-  - 'traefik.http.routers.betmexico.rule=Host(`botmexico.com.mx`) || Host(`www.botmexico.com.mx`)'
+  - 'traefik.http.routers.betmexico.rule=Host(`botmexico.com.mx`) || Host(`www.botmexico.com.mx`) || Host(`botmexico.net`)'
   - 'traefik.http.routers.betmexico.entrypoints=websecure'
   - 'traefik.http.routers.betmexico.tls.certresolver=letsencrypt'
   - 'traefik.http.services.betmexico.loadbalancer.server.port=8080'
@@ -207,6 +207,7 @@ docker compose ps
 
 | Fecha | Cambio |
 |---|---|
+| 2026-07-12 | **`botmexico.net` agregado como alias** (Traefik + cert SAN) tras DNS de `botmexico.com.mx` reseteado a placeholder Webador en Openprovider — ver `docs/ERRORS.md` |
 | 2026-05-11 | **Dominio `botmexico.com.mx` activado** con HTTPS + Let's Encrypt vía Traefik |
 | 2026-05-11 | **Migración KVM4** — dockerizado, salimos de VPS Hostinger `187.77.207.90` (caído) |
 | 2026-04-11 | Último deploy en VPS viejo (sesión 80) |

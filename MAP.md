@@ -92,15 +92,15 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 3198 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3205 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `deposits.py` | 2636 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
-| `jwt_keeper.py` | 241 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
+| `jwt_keeper.py` | 288 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 410 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 799 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
-| `proxy_pool.py` | 342 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `proxy_pool.py` | 364 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/migrate_status_no_banco.py` | 80 | `—` | _[completar]_ |
@@ -205,6 +205,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `8cfec27` | fix(jwt-keeper): batch 20→8 — el backlog está quemado, no vale drenarlo agresivo |
 | `b6bfcdb` | fix(jwt-keeper): romper bucle de quema — cooldown propio 6h > interval 1h |
 | `1604b61` | fix(rate-limit): semáforo GLOBAL de login + cuarentena de cuentas quemadas |
 | `9ef96d3` | feat(jwt-badge): badge de sesión JWT SOLO-SA + filtro para separar vivas/expiradas |
@@ -216,7 +217,6 @@ prewarm.py (router)
 | `1fa4219` | fix(pantalla): form CURP con ancho REAL de la columna (no full-width) · cristal aun mas mate |
 | `940fdc5` | docs(next-session): cierre sesion 2026-07-10 (5 rondas La Pantalla) — proximo objetivo: auditar cambios recientes de grading |
 | `b6f16bb` | fix(pantalla): meta al topbar · marco completo de la sheet · fix flicker de apertura |
-| `f885ec0` | fix(pantalla): Estado roto (parseo de address sin comas) · reparto de columnas afinado · saldo chico · scroll en datos · cristal difumina al color del grade |
 <!-- GEN:end:recientes -->
 
 ---

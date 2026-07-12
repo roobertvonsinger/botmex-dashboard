@@ -31,7 +31,7 @@ services:
       - bmx
     labels:
       - 'traefik.enable=true'
-      - 'traefik.http.routers.betmexico.rule=Host(`botmexico.com.mx`) || Host(`www.botmexico.com.mx`)'
+      - 'traefik.http.routers.betmexico.rule=Host(`botmexico.com.mx`) || Host(`www.botmexico.com.mx`) || Host(`botmexico.net`)'
       - 'traefik.http.routers.betmexico.entrypoints=websecure'
       - 'traefik.http.routers.betmexico.tls.certresolver=letsencrypt'
       - 'traefik.http.services.betmexico.loadbalancer.server.port=8080'
