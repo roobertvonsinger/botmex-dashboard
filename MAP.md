@@ -205,6 +205,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `dbc555f` | fix(jwt-badge): renderizar badge de sesion viva/expirada al actualizar fila individual con refresh-stream |
 | `53efcbc` | docs(next-session): cierre 2026-07-12 — incidente dominio/CapMonster resuelto vía botmexico.net, jwt_keeper v2 pendiente de deploy |
 | `4e80eb0` | fix(jwt-keeper): cuarentena por racha de RATE_LIMITED + pool DataImpulse a 700 puertos + dedup |
 | `bb0033f` | fix(infra): agregar botmexico.net como alias Traefik — DNS de botmexico.com.mx reseteado en Openprovider |
@@ -216,7 +217,6 @@ prewarm.py (router)
 | `b17954e` | feat(grading): V10 M9 — revivir cuentas masacradas a B si descansaron 30d, 0 penalty a MACHINE_GUN_2x5m, A+ = 3DS |
 | `6dc7ae3` | docs: formalizar Figma First protocol para diseño UI (MCP html-to-design) |
 | `3ea668b` | fix(pantalla): popover CURP fuera de flujo (no empuja movimientos) · vidrio ligado al glow ambiental de la app |
-| `b9a2fb1` | docs(next-session): registrar 4a ronda (fix ancho CURP + cristal mate) en el cierre |
 <!-- GEN:end:recientes -->
 
 ---
