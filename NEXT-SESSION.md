@@ -7,22 +7,24 @@
 Blindar el dashboard y el bot de Telegram contra abusos operativos (anti-abuso guards). Proteger saldo de CapMonster (0% gasto manual por operadores), visibilizar cuentas en rate-limit, y sellar fugas de datos en Telegram. Plan maestro en `docs/plans/2026-07-15-anti-abuse-guards.md`.
 
 ## ▶ Con qué arrancas
-**Ejecutar Fase 1 (UI) y Fase 2 (Backend Guards)** del plan `2026-07-15-anti-abuse-guards.md` usando los agentes de 9router. 
-- Fase 1: Mover badge 🟢 a la izquierda en `static/app.js` y agregar estilo `.account-cooling` (rita-chat).
-- Fase 2: Bloquear refresh manual en `prewarm.py` si `jwt_alive == False` para operadores (rita-tech).
+**Ejecutar Fase 3 (Bot Telegram)** del plan `docs/plans/2026-07-15-anti-abuse-guards.md`. 
+- Fase 3: Sellar comandos extractivos del bot de Telegram en el monorepo (excepción autorizada).
+- Instrucciones: Bloquear `/buscar`, `/saldo`, `/cuentas`, `/info` para operadores; preservar solo ingestión y match de combos.
 
 ## 🧭 Recomendación de approach
-Usa /Smartexe o delega directamente a los agentes custom de 9router (rita-chat para frontend, rita-tech para backend) siguiendo el plan. Modifica, prueba en local/VPS, y avanza a la siguiente fase. El candado del pool ("desaparecer si está en uso") ya existe a nivel SQL (`locked_by IS NULL`), solo confirma que `published_to_pool=0` se aplique al iniciar depósito si Robert lo desea.
+El bot vive en `Proyectos/BetMexico/Telegram/`. Usa `/Smartexe` para esta última fase asegurando que el ID de Robert (`PERSISTENT_USERS` o hardcode SA) sea el único que responda a comandos informativos. Todo lo demás se ignora silenciosamente. Después, planea la migración del bot a un repo Forgejo aislado.
 
 ## ⏳ Pendientes próximos
-- [ ] **Fase 1:** Mover badge 🟢/🔑 a la izquierda + hacer visible para todos + aplicar estilo `.account-cooling` en la tabla.
-- [ ] **Fase 2:** Bloquear refresh manual de operadores en cuentas sin JWT (`prewarm.py`) + Límite de concurrencia y fallos (`deposits.py`).
 - [ ] **Fase 3:** Sellar comandos extractivos del bot de Telegram en el monorepo (solo SA).
 - [ ] **Robert: correr query `ljesus06`** para destrabar el bug de saldos desincronizados (pendiente viejo).
 - [ ] Observar el jwt_keeper 24-48h más (deployado 07-14).
 - [ ] Migrar el bot de Telegram del monorepo a un repo Forgejo aislado (después de sellarlo).
 
 ## ✅ Hecho esta sesión (2026-07-15)
+- Ejecutadas y deployadas a KVM4 las Fases 1 (Frontend UI) y 2 (Backend Guards) del plan anti-abuso.
+- Badges JWT (🟢/🔑/⛔/⏳) visibles universalmente, a la izquierda, y clase visual `.account-cooling` implementada con barrera JS de click para operadores.
+- Implementado semáforo de max 2 misiones globales (`MISSION_MAX_CONCURRENT`) y freno de 2 declines reales para auto-cooldown (45 min) de cuenta en `deposits.py`.
+- Bloqueado refresh manual (`prewarm.py`) para operadores sin sesión viva (`jwt_alive`) para blindar saldo CapMonster.
 - Creado plan de implementación `docs/plans/2026-07-15-anti-abuse-guards.md` integrando los agentes de 9router (rita-chat, rita-tech, rita-prime).
 - Confirmado que el "candadito" ya restringe visibilidad a otros operadores a nivel DB.
 

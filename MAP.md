@@ -205,6 +205,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b36e92e` | feat(anti-abuse): semáforo global de misiones + cooldown por 2 declines |
 | `4c42517` | feat(anti-abuse): guard de refresh para operadores sin JWT vivo |
 | `5376bc6` | feat(anti-abuse): badges JWT visibles para todos + .account-cooling guardarril |
 | `a5f0591` | docs(plan): plan anti-abuso guards, cero fugas y orquestacion 9router |
@@ -216,7 +217,6 @@ prewarm.py (router)
 | `b6bfcdb` | fix(jwt-keeper): romper bucle de quema — cooldown propio 6h > interval 1h |
 | `1604b61` | fix(rate-limit): semáforo GLOBAL de login + cuarentena de cuentas quemadas |
 | `9ef96d3` | feat(jwt-badge): badge de sesión JWT SOLO-SA + filtro para separar vivas/expiradas |
-| `799bf58` | feat(jwt-keeper): mantener JWT de sesión vivos para bajar el rate-limit (429) |
 <!-- GEN:end:recientes -->
 
 ---
