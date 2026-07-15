@@ -740,6 +740,7 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
                         "SELECT a.id, a.email, a.password, a.balance_total, a.balance_real, "
                         "a.last_deposit_amount, a.last_deposit_date, a.status, a.grade, "
                         "a.locked_by, a.locked_at, a.locked_until, a.last_checked_at, a.check_count, "
+                        "a.jwt_expires_at, a.dead_reason, a.cooldown_until, "
                         "COALESCE(a.published_to_pool,1) AS published_to_pool, "
                         "(SELECT COUNT(*) FROM account_cards ac WHERE ac.account_email=a.email) AS cards_count, "
                         "(SELECT COUNT(*) FROM account_notes an WHERE an.account_email=a.email "
@@ -759,6 +760,23 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
                             row["locked_color"] = USER_COLORS.get(int(raw))
                         except (ValueError, TypeError):
                             row["locked_color"] = None
+
+                    _exp = row.pop("jwt_expires_at", None)
+                    _dr = row.pop("dead_reason", None)
+                    _cd = row.pop("cooldown_until", None)
+                    if is_sa:
+                        row["jwt_alive"] = bool(
+                            _exp not in (None, "")
+                            and int(_exp) > datetime.now(timezone.utc).timestamp() + 60)
+                        row["needs_reset"] = bool(
+                            row.get("status") == "DEAD"
+                            and str(_dr or "") in ("LOGIN_DENIED", "ATTEMPT_LIMIT"))
+                        _now = datetime.now(timezone.utc).timestamp()
+                        try:
+                            row["cooldown_min"] = max(0, round((int(_cd) - _now) / 60)) if _cd not in (None, "") and int(_cd) > _now else 0
+                        except (TypeError, ValueError):
+                            row["cooldown_min"] = 0
+
                     await q.put({"type": "account", "data": row})
                 else:
                     await q.put({"type": "fail", "id": acc["id"], "email": email, "error": "row not found"})
