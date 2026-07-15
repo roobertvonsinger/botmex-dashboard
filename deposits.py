@@ -1713,6 +1713,13 @@ MM_MAX_PAIR_TRANSIENT = 4
 # 2 = 1 reintento externo de gracia (peor caso 4×2=8). Tunable tras medir.
 MM_MAX_LOGIN_RETRIES = 2
 
+# ── Semáforo GLOBAL de misiones ──────────────────────────────────────────────
+# Limita cuántas misiones pesadas (matchmaker + scheduled) corren a la vez.
+# Protege contra operadores que lanzan 5 misiones simultáneas y saturan
+# proxies/captcha/tasa de login. 2 = conservador (Robert puede subir si ve que aguanta).
+MISSION_MAX_CONCURRENT = int(os.environ.get("MISSION_MAX_CONCURRENT", "2"))
+_mission_sem = asyncio.Semaphore(MISSION_MAX_CONCURRENT)
+
 # Runs activos del matchmaker — para soporte de cancelación
 _active_mm_runs: dict[str, asyncio.Event] = {}
 
@@ -1812,11 +1819,20 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
         _auto_lock_for_deposit(a["id"], operator_id, user, hours=AUTOLOCK_HOURS_MULTI)
     cap_key = os.environ.get("CAPMONSTER_KEY", "") or os.environ.get("BMX_CAPMONSTER_KEY", "")
 
+    # Semáforo global de misiones: si ya hay MISSION_MAX_CONCURRENT corriendo,
+    # rechazar de inmediato (no encolar — el operador necesita feedback claro).
+    if _mission_sem.locked() and _mission_sem._value == 0:
+        raise HTTPException(
+            429,
+            f"Ya hay {MISSION_MAX_CONCURRENT} misiones activas. Espera a que terminen."
+        )
+
     run_id = uuid.uuid4().hex[:10]
     cancel_event = asyncio.Event()
     _active_mm_runs[run_id] = cancel_event
 
     async def gen():
+        await _mission_sem.acquire()
         pool = None
         prefetch = None
         # SP-2: sesión por cuenta. La 1ª vez que una cuenta loguea OK guardamos
@@ -2145,6 +2161,9 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                             card["retired"] = True
                         if acct_out:
                             acc["done"] = True
+                            # Anti-abuso: enfriar la cuenta al alcanzar 2 declines
+                            # para que misiones futuras no la martilleen.
+                            _set_account_cooldown(acc["email"], RATE_LIMIT_COOLDOWN_MIN)
                         yield f"data: {json.dumps({'type':'rejected','email':acc['email'],'tail':card['tail'],'code':code,'card_fails':card['fail_count'],'acct_fails':acc['fail_count'],'attempt':n,'card_out':card_out,'acct_out':acct_out})}\n\n"
                     elif _mm_is_ambiguous_charge(code):
                         # CARGO AMBIGUO (SUBMIT_ERROR / UNKNOWN_TXN_STATUS_n): el
@@ -2210,6 +2229,7 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                 except Exception:
                     pass
             _active_mm_runs.pop(run_id, None)
+            _mission_sem.release()
 
     return StreamingResponse(gen(), media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
@@ -2291,6 +2311,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
     _auto_lock_for_deposit(account_id, operator_id, user, hours=AUTOLOCK_HOURS_SCHEDULED)
 
     async def loop():
+        await _mission_sem.acquire()
         pool = None
         try:
             logger.info(f"[Scheduled {sched_id}] loop arrancó — email={email} reps={repetitions} amount={amount}")
@@ -2584,6 +2605,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                 except Exception:
                     pass
             _active_schedules.pop(sched_id, None)
+            _mission_sem.release()
             logger.info(f"[Scheduled {sched_id}] loop terminó — entry removido de _active_schedules")
 
     task = asyncio.create_task(loop())
