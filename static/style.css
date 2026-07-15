@@ -1955,16 +1955,25 @@ td.sel-cell:hover { background: rgba(255,255,255,0.04); }
 /* Badge de sesión JWT: 🟢 viva (reutilizable sin captcha) · 🔑 expirada (requiere captcha). */
 .jwt-chip {
   display: inline-flex; align-items: center;
-  margin-left: 6px;
+  margin-right: 5px;
   font-size: 10px;
   vertical-align: middle;
   cursor: help;
   opacity: 0.9;
 }
 .jwt-chip.jwt-expired { filter: grayscale(0.15); opacity: 0.75; }
-/* Cuarentena (SA-only): ⛔ requiere reset de pass · ⏳ enfriando tras rate-limit */
+/* Cuarentena: ⛔ requiere reset de pass · ⏳ enfriando tras rate-limit */
 .jwt-chip.jwt-reset { opacity: 1; }
 .jwt-chip.jwt-cooldown { opacity: 0.85; }
+
+/* Fila en enfriamiento / DEAD — guardarril visual Frictionless.
+   pointer-events controlado por JS (SA puede interactuar, operador no). */
+.account-cooling {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.account-cooling .row-refresh-one,
+.account-cooling .row-ic { opacity: 0.3; }
 
 /* Borde lateral de operador en la fila (spec chat2) — sobreescribe el grade-bar-cell */
 tr.op-row-warn   .grade-bar-cell { box-shadow: inset 3px 0 0 var(--op-warn);   }

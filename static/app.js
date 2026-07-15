@@ -614,26 +614,25 @@ function renderTable() {
     const opCol = r.locked_color || 'accent';
     const opClass = r.locked_by ? `op-row-${opCol}` : '';
     const trasClass = r.published_to_pool === 0 ? 'row-trastienda' : '';
-    const trClasses = `r-grade-${g} ${lockedCls} ${selCls} ${opClass} ${trasClass}`.trim();
+    const coolingClass = (r.cooldown_min > 0 || r.needs_reset) ? 'account-cooling' : '';
+    const trClasses = `r-grade-${g} ${lockedCls} ${selCls} ${opClass} ${trasClass} ${coolingClass}`.trim();
     const lockChip = r.locked_by
       ? `<span class="lock-chip op-${esc(opCol)} ${until?.expired ? 'expired' : ''}" title="Lockeada por ${esc(r.locked_by)}${until ? ` · ${until.expired ? 'vencido' : `vence en ${until.text}`}` : ''}">🔒 ${esc(r.locked_by)}${until && !until.expired ? ` <span class="lock-chip-time dim">${until.text}</span>` : ''}</span>`
       : '';
-    // Badge de acceso (SA-only). Prioridad: cuarentena > sesión JWT. Backend solo
-    // manda estos flags a superadmin → doble candado (internal, ley capas).
+    // Badge de acceso — visible para TODOS (guardarril Frictionless).
+    // Prioridad: cuarentena > sesión JWT.
     //   ⛔ needs_reset: cuenta DEAD por login terminal → revive solo con reset de pass.
     //   ⏳ cooldown_min: LIVE enfriando tras rate-limit → no tocar N min.
     //   🟢/🔑 jwt_alive: sesión viva reutilizable / expirada (solo en LIVE que no enfría).
     let jwtBadge = '';
-    if (state.user?.role === 'superadmin') {
-      if (r.needs_reset) {
-        jwtBadge = `<span class="jwt-chip jwt-reset" title="Bloqueada por BetMexico (límite de intentos) — revive solo con reset de contraseña">⛔</span>`;
-      } else if (r.cooldown_min > 0) {
-        jwtBadge = `<span class="jwt-chip jwt-cooldown" title="Enfriando tras rate-limit — no tocar ${r.cooldown_min} min">⏳</span>`;
-      } else if (r.status === 'LIVE' && r.jwt_alive !== undefined) {
-        jwtBadge = r.jwt_alive
-          ? `<span class="jwt-chip jwt-alive" title="Sesión viva — reutilizable sin captcha">🟢</span>`
-          : `<span class="jwt-chip jwt-expired" title="Sesión expirada — el próximo uso requiere resolver captcha">🔑</span>`;
-      }
+    if (r.needs_reset) {
+      jwtBadge = `<span class="jwt-chip jwt-reset" title="Bloqueada por BetMexico (límite de intentos) — revive solo con reset de contraseña">⛔</span>`;
+    } else if (r.cooldown_min > 0) {
+      jwtBadge = `<span class="jwt-chip jwt-cooldown" title="Enfriando tras rate-limit — no tocar ${r.cooldown_min} min">⏳</span>`;
+    } else if (r.status === 'LIVE' && r.jwt_alive !== undefined) {
+      jwtBadge = r.jwt_alive
+        ? `<span class="jwt-chip jwt-alive" title="Sesión viva — reutilizable sin captcha">🟢</span>`
+        : `<span class="jwt-chip jwt-expired" title="Sesión expirada — el próximo uso requiere resolver captcha">🔑</span>`;
     }
     const isSA = state.user?.role === 'superadmin';
     const trTitle = isSA ? `Grade ${esc(r.grade) || '?'}` : '';
@@ -661,7 +660,7 @@ function renderTable() {
         <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
         <td class="sel-cell"></td>
         <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-        <td class="combo" title="Click: abrir La Pantalla · Ctrl/Shift+Click: seleccionar"><b>${esc(combo)}</b>${jwtBadge}${lockChip}</td>
+        <td class="combo" title="Click: abrir La Pantalla · Ctrl/Shift+Click: seleccionar">${jwtBadge}<b>${esc(combo)}</b>${lockChip}</td>
         <td class="dep" title="Último depósito hecho">${dep}</td>
         <td class="ic-col ic-nota-col">${cellNota}</td>
         <td class="ic-col ic-cards-col">${cellCards}</td>
@@ -672,7 +671,7 @@ function renderTable() {
       <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
       <td class="sel-cell"></td>
       <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-      <td class="combo" title="Click: abrir La Pantalla · Ctrl/Shift+Click: seleccionar"><b>${esc(combo)}</b>${jwtBadge}</td>
+      <td class="combo" title="Click: abrir La Pantalla · Ctrl/Shift+Click: seleccionar">${jwtBadge}<b>${esc(combo)}</b></td>
       <td class="dep" title="Último depósito hecho">${dep}</td>
       <td class="dep dim" title="Cuándo se actualizó por última vez">${fmtAgo(r.last_checked_at)}</td>
       <td class="num" title="Total de veces actualizada">${r.check_count || 0}</td>
@@ -3274,6 +3273,14 @@ $('#accTable').addEventListener('click', e => {
   // Marquee: si el click viene de soltar un arrastre de selección, ignorarlo
   // (si no, abriría La Pantalla de la última fila tocada al soltar).
   if (_marqueeSuppress) { _marqueeSuppress = false; return; }
+  // Guard Frictionless: operadores no interactúan con filas en cooling/DEAD.
+  // SA las ve opacas pero puede seguir operándolas.
+  const coolingRow = e.target.closest('.account-cooling');
+  if (coolingRow && state.user?.role !== 'superadmin') {
+    e.stopPropagation();
+    toast('❌ Cuenta en enfriamiento. No tocar.', 'error');
+    return;
+  }
   // Clicks DENTRO del panel inline de detalle los maneja su propio listener;
   // este handler de tabla los ignora (si no, toggle-aría la selección de la
   // cuenta al clickear cualquier parte del panel).
