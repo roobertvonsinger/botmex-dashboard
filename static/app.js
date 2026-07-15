@@ -2063,7 +2063,9 @@ async function refreshSingleRow(accId, btnEl) {
           } else if (ev.type === 'fail') {
             failMsg = ev.error || 'fetch falló';
           } else if (ev.type === 'skip') {
-            failMsg = `skip: ${ev.reason}`;
+            failMsg = ev.error || (ev.reason === 'no_jwt'
+              ? 'Cuenta en descanso — espera a que el sistema la recupere'
+              : `skip: ${ev.reason}`);
           }
         } catch {}
       }

@@ -680,7 +680,7 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
     placeholders = ",".join("?" * len(ids))
     with _app_db() as c:
         rows = c.execute(
-            f"SELECT id, email, password, last_checked_at, status, cooldown_until "
+            f"SELECT id, email, password, last_checked_at, status, cooldown_until, jwt_expires_at "
             f"FROM accounts WHERE id IN ({placeholders})",
             ids,
         ).fetchall()
@@ -726,6 +726,20 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
                                  "reason": "cooldown",
                                  "cooldown_min": _cooldown_remaining_min(acc.get("cooldown_until"))})
                     return
+                # Anti-abuso CapMonster: operadores NO pueden refrescar cuentas sin JWT vivo.
+                # Hacerlo forzaría un login fresco (= captcha = gasto). Solo el jwt_keeper
+                # automatizado (SA) debe renovar sesiones muertas. SA puede siempre.
+                if not is_sa:
+                    _jexp = acc.get("jwt_expires_at")
+                    _jwt_alive = (
+                        _jexp not in (None, "")
+                        and int(_jexp) > time.time() + 60
+                    )
+                    if not _jwt_alive:
+                        await q.put({"type": "skip", "id": acc["id"], "email": email,
+                                     "reason": "no_jwt",
+                                     "error": "Cuenta en descanso — espera a que el sistema la recupere"})
+                        return
                 # Throttle: max N logins concurrentes para no triggear rate-limit
                 async with sem:
                     result = await _run_prewarm(operator_id, email, acc["password"])

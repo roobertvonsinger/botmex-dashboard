@@ -99,7 +99,7 @@ prewarm.py (router)
 | `deposits.py` | 2636 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 288 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 410 | `betmexico.dashboard.login_orch` | _[completar]_ |
-| `prewarm.py` | 817 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
+| `prewarm.py` | 831 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 364 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
@@ -205,6 +205,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `5376bc6` | feat(anti-abuse): badges JWT visibles para todos + .account-cooling guardarril |
 | `a5f0591` | docs(plan): plan anti-abuso guards, cero fugas y orquestacion 9router |
 | `dbc555f` | fix(jwt-badge): renderizar badge de sesion viva/expirada al actualizar fila individual con refresh-stream |
 | `53efcbc` | docs(next-session): cierre 2026-07-12 — incidente dominio/CapMonster resuelto vía botmexico.net, jwt_keeper v2 pendiente de deploy |
@@ -216,7 +217,6 @@ prewarm.py (router)
 | `9ef96d3` | feat(jwt-badge): badge de sesión JWT SOLO-SA + filtro para separar vivas/expiradas |
 | `799bf58` | feat(jwt-keeper): mantener JWT de sesión vivos para bajar el rate-limit (429) |
 | `b17954e` | feat(grading): V10 M9 — revivir cuentas masacradas a B si descansaron 30d, 0 penalty a MACHINE_GUN_2x5m, A+ = 3DS |
-| `6dc7ae3` | docs: formalizar Figma First protocol para diseño UI (MCP html-to-design) |
 <!-- GEN:end:recientes -->
 
 ---
