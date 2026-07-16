@@ -703,7 +703,7 @@
   function wireStatic() {
     drawReps();
     const up = qs('#repUp'), dn = qs('#repDn');
-    if (up) up.onclick = () => { _dx.reps = Math.min(15, _dx.reps + 1); drawReps(); refreshMode(); };
+    if (up) up.onclick = () => { _dx.reps = Math.min(20, _dx.reps + 1); drawReps(); refreshMode(); };
     if (dn) dn.onclick = () => { _dx.reps = Math.max(1, _dx.reps - 1); drawReps(); refreshMode(); };
 
     // quitar cuenta (X) -> recalcula modo

@@ -206,6 +206,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `613c394` | fix(depos.css): title deja de forzar overflow en dock minimo — width fijo 268px reemplazado por max-width + min-width:0, medido con DOCK_MINW=320 |
 | `cac2fc5` | fix(prewarm): eximir refresh individual del guard bulk no_jwt — root cause: guard 4c42517 bloqueaba tambien el clic de 1 sola cuenta, no solo bulk |
 | `93f91f0` | fix(pantalla+depos): exclusion mutua real de estado — DeposWindow se retrae si esta flotando cuando abre La Pantalla, en vez de solo relayout ciego |
 | `a8b7042` | docs(plan): 6 frentes anti-abuso Telegram + UX depositos/La Pantalla (F1-F6) — ejecutar con /Smartexe |
@@ -217,7 +218,6 @@ prewarm.py (router)
 | `dbc555f` | fix(jwt-badge): renderizar badge de sesion viva/expirada al actualizar fila individual con refresh-stream |
 | `53efcbc` | docs(next-session): cierre 2026-07-12 — incidente dominio/CapMonster resuelto vía botmexico.net, jwt_keeper v2 pendiente de deploy |
 | `4e80eb0` | fix(jwt-keeper): cuarentena por racha de RATE_LIMITED + pool DataImpulse a 700 puertos + dedup |
-| `bb0033f` | fix(infra): agregar botmexico.net como alias Traefik — DNS de botmexico.com.mx reseteado en Openprovider |
 <!-- GEN:end:recientes -->
 
 ---
