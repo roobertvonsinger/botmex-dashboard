@@ -124,6 +124,7 @@
     var ST = { mode: 'right', section: 'accounts', float: null, dockW: { left: 400, right: 400 }, open: false };
     load();
 
+    var headEl = win.querySelector(titlebarSel);
     var zone = function () { return document.getElementById(zoneId); };
     var rectOf = function (el) {
       var r = el.getBoundingClientRect();
@@ -325,7 +326,12 @@
     function updateCursor(e) {
       if (rz || drag || ST.mode !== 'float') return;
       var ed = Geo.edgesAt(rectOf(win), e.clientX, e.clientY, 8);
-      win.style.cursor = Geo.cursorFor(ed) || '';
+      var cur = Geo.cursorFor(ed) || '';
+      win.style.cursor = cur;
+      // el CSS de .head fija cursor:grab por clase, que gana sobre el inline
+      // style puesto en `win` (ancestro) — replicar el inline directo en .head
+      // para que el cursor de resize sea visible en su franja superior (8px).
+      if (headEl) headEl.style.cursor = cur || '';
     }
     function startResize(e, edges) {
       cancelAnims();
@@ -343,7 +349,7 @@
     function onResizeUp() {
       if (!rz) return;
       rz = null; win.classList.remove('dw-resizing'); document.body.style.userSelect = '';
-      win.style.cursor = ''; save();
+      win.style.cursor = ''; if (headEl) headEl.style.cursor = ''; save();
     }
 
     // ── divisor del dock (recorrer el ancho) ──────────────────────────────────

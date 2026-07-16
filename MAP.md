@@ -206,6 +206,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `db35640` | fix(app.js): restaurar copy-on-click del combo sin romper seleccion multiple — data-copy en la celda + excepcion de modificador en el listener global |
 | `4809d75` | fix(depos.css): dw-hint sobre el panel durante drag — estaba z-index:198 vs panel 200, quedaba oculto en el momento exacto que sirve |
 | `615a265` | fix(depos.js): igualar tope de repeticiones a 20 (backend ya lo soporta, frontend topaba en 15) |
 | `613c394` | fix(depos.css): title deja de forzar overflow en dock minimo — width fijo 268px reemplazado por max-width + min-width:0, medido con DOCK_MINW=320 |
@@ -217,7 +218,6 @@ prewarm.py (router)
 | `4c42517` | feat(anti-abuse): guard de refresh para operadores sin JWT vivo |
 | `5376bc6` | feat(anti-abuse): badges JWT visibles para todos + .account-cooling guardarril |
 | `a5f0591` | docs(plan): plan anti-abuso guards, cero fugas y orquestacion 9router |
-| `dbc555f` | fix(jwt-badge): renderizar badge de sesion viva/expirada al actualizar fila individual con refresh-stream |
 <!-- GEN:end:recientes -->
 
 ---
