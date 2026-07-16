@@ -19,6 +19,7 @@ El bot vive en `Proyectos/BetMexico/Telegram/`. Usa `/Smartexe` para esta últim
 - [ ] **Robert: correr query `ljesus06`** para destrabar el bug de saldos desincronizados (pendiente viejo).
 - [ ] Observar el jwt_keeper 24-48h más (deployado 07-14).
 - [ ] Migrar el bot de Telegram del monorepo a un repo Forgejo aislado (después de sellarlo).
+- [ ] **Migración del bot Telegram a repo Forgejo aislado** (planeada, no ejecutada): crear `Robertvs/betmexico-bot` en Forgejo, `git init` sobre `Proyectos/BetMexico/Telegram/`, filtrar historial con `git filter-repo` igual que se hizo con botmex-dashboard, separar `shared/` (hoy compartido por import directo con el dashboard) en un paquete versionado o duplicado explícito, y actualizar `docs/protocols/deploy-protocol.md` con el nuevo flujo de deploy (ya no `pscp` directo a `/docker/betmexico/code/` sino build+push de imagen). Requiere 1 sesión dedicada — no mezclar con cambios funcionales.
 
 ## ✅ Hecho esta sesión (2026-07-15)
 - Ejecutadas y deployadas a KVM4 las Fases 1 (Frontend UI) y 2 (Backend Guards) del plan anti-abuso.

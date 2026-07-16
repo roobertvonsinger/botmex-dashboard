@@ -206,6 +206,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `065f5ad` | fix(depos.js): eliminar rama muerta cap.total (backend nunca la envia) + unificar pillShow/Hide a classList igual que el resto del componente |
 | `32f7244` | fix(depos.js): fitGreet se invoca en mount inicial, no solo en rotacion de 60s — eliminaba flash de font-size incorrecto en primer paint |
 | `b080909` | fix(depos.css): mov-list ahora scrollea (overflow-y:auto) en vez de recortar filas silenciosamente — scrollbar ya estaba estilizada en CSS pero nunca se activaba |
 | `f32d545` | fix(depos.css): consolidar font-size a escala de 4 pasos (9/11/13/16px) + letter-spacing de .label a 0.8px — 15+ valores puntuales sin ratio, j-bal-to invertia jerarquia (23px > titulo 12px), tracking desproporcionado en micro-labels |
@@ -217,7 +218,6 @@ prewarm.py (router)
 | `613c394` | fix(depos.css): title deja de forzar overflow en dock minimo — width fijo 268px reemplazado por max-width + min-width:0, medido con DOCK_MINW=320 |
 | `cac2fc5` | fix(prewarm): eximir refresh individual del guard bulk no_jwt — root cause: guard 4c42517 bloqueaba tambien el clic de 1 sola cuenta, no solo bulk |
 | `93f91f0` | fix(pantalla+depos): exclusion mutua real de estado — DeposWindow se retrae si esta flotando cuando abre La Pantalla, en vez de solo relayout ciego |
-| `a8b7042` | docs(plan): 6 frentes anti-abuso Telegram + UX depositos/La Pantalla (F1-F6) — ejecutar con /Smartexe |
 <!-- GEN:end:recientes -->
 
 ---
