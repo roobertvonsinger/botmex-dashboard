@@ -654,6 +654,6 @@
 #depos .dw-divider:hover::before,#depos .dw-divider.on::before{background:var(--aqua); height:66px}
 
 /* snap-hint al arrastrar cerca de un lado (vive en body → colores literales) */
-.dw-hint{position:fixed; z-index:198; pointer-events:none; border:2px dashed rgba(0,189,114,.5);
+.dw-hint{position:fixed; z-index:201; pointer-events:none; border:2px dashed rgba(0,189,114,.5);
   background:rgba(0,189,114,.10); border-radius:12px; opacity:0; transition:opacity .16s ease}
 .dw-hint.on{opacity:1}
