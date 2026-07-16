@@ -205,6 +205,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `38b27fe` | docs: actualizar NEXT-SESSION para Fase 3 (Telegram) |
 | `b36e92e` | feat(anti-abuse): semáforo global de misiones + cooldown por 2 declines |
 | `4c42517` | feat(anti-abuse): guard de refresh para operadores sin JWT vivo |
 | `5376bc6` | feat(anti-abuse): badges JWT visibles para todos + .account-cooling guardarril |
@@ -216,7 +217,6 @@ prewarm.py (router)
 | `8cfec27` | fix(jwt-keeper): batch 20→8 — el backlog está quemado, no vale drenarlo agresivo |
 | `b6bfcdb` | fix(jwt-keeper): romper bucle de quema — cooldown propio 6h > interval 1h |
 | `1604b61` | fix(rate-limit): semáforo GLOBAL de login + cuarentena de cuentas quemadas |
-| `9ef96d3` | feat(jwt-badge): badge de sesión JWT SOLO-SA + filtro para separar vivas/expiradas |
 <!-- GEN:end:recientes -->
 
 ---
