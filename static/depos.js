@@ -108,7 +108,7 @@
     if (note) {
       let txt = cfg.note;
       if (_dx.cap) {
-        const used = Number(_dx.cap.used != null ? _dx.cap.used : (_dx.cap.total || 0));
+        const used = Number(_dx.cap.used || 0);
         const max24 = Number(_dx.cap.max_24h || 1499);
         if (used + _dx.amount > max24) txt = '⚠ Excede el tope 24h ($' + max24 + ', usado $' + used + ')';
         else if (used > 0) txt = cfg.note + ' · usado hoy $' + used + ' / $' + max24;
@@ -821,9 +821,9 @@
     _pillEl.querySelector('.dp-tx').textContent = _dx.sched
       ? ('Programado ' + _dx.sched.done + '/' + _dx.sched.total)
       : 'Matchmaker en curso';
-    _pillEl.style.display = 'flex';
+    _pillEl.classList.remove('hide');
   }
-  function pillHide() { if (_pillEl) _pillEl.style.display = 'none'; }
+  function pillHide() { if (_pillEl) _pillEl.classList.add('hide'); }
   function pillReopen() {
     root.classList.remove('hidden');
     root.setAttribute('aria-hidden', 'false');

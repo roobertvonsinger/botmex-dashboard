@@ -10,11 +10,12 @@
 #depos{position:fixed; pointer-events:auto; width:min(440px,calc(100vw - 40px))}
 
 /* pill flotante (misión activa, modal cerrado) */
-.depos-pill{position:fixed; right:18px; bottom:18px; z-index:190; display:none; align-items:center; gap:9px;
+.depos-pill{position:fixed; right:18px; bottom:18px; z-index:190; display:flex; align-items:center; gap:9px;
   padding:9px 14px; border-radius:99px; cursor:pointer; color:#00bd72;
   background:rgba(16,19,26,.92); border:1px solid rgba(0,189,114,.45);
   font-family:'JetBrains Mono',monospace; font-size:11px;
   box-shadow:0 16px 40px -12px #000, 0 0 18px -6px rgba(0,189,114,.5); transition:transform .18s, box-shadow .18s}
+.depos-pill.hide{display:none}
 .depos-pill:hover{transform:translateY(-2px); box-shadow:0 18px 44px -10px #000, 0 0 26px -4px rgba(0,189,114,.7)}
 .depos-pill .dp-go{opacity:.7}
 
