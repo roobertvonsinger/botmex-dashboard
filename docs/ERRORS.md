@@ -2,6 +2,18 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## Guard anti-abuso de Fase 2 bloqueaba también el refresh manual de 1 sola cuenta, no solo el bulk (2026-07-16)
+
+**Síntoma**: tras deployar el guard `jwt_alive` de la Fase 2 anti-abuso (`4c42517`), el botón ↻ individual por fila dejó de actualizar el balance real — el operador veía el toast "Cuenta en descanso" y el número en tabla no cambiaba, incluso con clic explícito e intencional.
+
+**Causa**: `prewarm.py:729` condicionaba el bloqueo `no_jwt` a `if not is_sa:` sin distinguir refresh masivo (bulk, el vector de abuso real) de refresh individual (1 cuenta, acción humana). Como ~88% de las cuentas tiene el JWT de BetMexico expirado en un momento dado (medido en prod, ver entry de jwt_keeper abajo), el guard convertía en no-op silencioso casi cualquier clic de refresh legítimo. El flag `force:true` que el frontend ya mandaba (`app.js` `refreshSingleRow`) no tenía efecto sobre este guard — solo se usaba en otro endpoint (`/select`).
+
+**Diagnóstico**: `superpowers:systematic-debugging` — se leyó el diff exacto de `4c42517`, se trazó el endpoint `/refresh-stream` completo (compartido entre bulk-SA e individual-operador), y se confirmó con un test TDD que reproducía el bloqueo antes de tocar código.
+
+**Fix**: `prewarm.py:732` — `if not is_sa:` → `if not is_sa and len(ids) > 1:`. El guard ahora solo aplica a refresh en lote (>1 cuenta), preservando la protección de saldo CapMonster contra automatización masiva sin restringir el clic individual del operador.
+
+**Histórico**: 2026-07-16, plan `docs/superpowers/plans/2026-07-16-6-frentes-anti-abuso-y-ux.md` (F2). Test de regresión: `test_refresh_single_guard.py`.
+
 ## [CRÍTICO] Rate-limit real = CONCURRENCIA de logins + cuentas quemadas re-intentadas (forense 2026-07-11, tarde)
 
 - **Síntoma**: Robert seguía viendo rate-limit "demasiado" pese al `jwt_keeper`, y sospechó ruteo de proxies / IP quemada. Además mostró que al entrar directo a BetMexico sale `betmexico.mx/attempt-limit` ("Límite de intentos alcanzado — Restablece tu contraseña"): NO es rate-limit temporal, es **bloqueo terminal que exige reset de password**.

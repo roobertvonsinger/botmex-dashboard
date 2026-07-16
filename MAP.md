@@ -206,6 +206,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `6dc9c42` | docs(next-session): plan de migracion bot Telegram a Forgejo (F1.3) — planeada, no ejecutada |
 | `065f5ad` | fix(depos.js): eliminar rama muerta cap.total (backend nunca la envia) + unificar pillShow/Hide a classList igual que el resto del componente |
 | `32f7244` | fix(depos.js): fitGreet se invoca en mount inicial, no solo en rotacion de 60s — eliminaba flash de font-size incorrecto en primer paint |
 | `b080909` | fix(depos.css): mov-list ahora scrollea (overflow-y:auto) en vez de recortar filas silenciosamente — scrollbar ya estaba estilizada en CSS pero nunca se activaba |
@@ -217,7 +218,6 @@ prewarm.py (router)
 | `615a265` | fix(depos.js): igualar tope de repeticiones a 20 (backend ya lo soporta, frontend topaba en 15) |
 | `613c394` | fix(depos.css): title deja de forzar overflow en dock minimo — width fijo 268px reemplazado por max-width + min-width:0, medido con DOCK_MINW=320 |
 | `cac2fc5` | fix(prewarm): eximir refresh individual del guard bulk no_jwt — root cause: guard 4c42517 bloqueaba tambien el clic de 1 sola cuenta, no solo bulk |
-| `93f91f0` | fix(pantalla+depos): exclusion mutua real de estado — DeposWindow se retrae si esta flotando cuando abre La Pantalla, en vez de solo relayout ciego |
 <!-- GEN:end:recientes -->
 
 ---
