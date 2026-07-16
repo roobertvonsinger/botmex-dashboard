@@ -108,7 +108,7 @@
     if (note) {
       let txt = cfg.note;
       if (_dx.cap) {
-        const used = Number(_dx.cap.used != null ? _dx.cap.used : (_dx.cap.total || 0));
+        const used = Number(_dx.cap.used || 0);
         const max24 = Number(_dx.cap.max_24h || 1499);
         if (used + _dx.amount > max24) txt = '⚠ Excede el tope 24h ($' + max24 + ', usado $' + used + ')';
         else if (used > 0) txt = cfg.note + ' · usado hoy $' + used + ' / $' + max24;
@@ -325,7 +325,7 @@
 
   // auto-fit: el recuadro es FIJO; el texto se escala para caber siempre en 1 línea
   function fitGreet(g) {
-    let fs = 12; const min = 8;
+    let fs = 13; const min = 8;  // techo alineado a la escala CSS de .title (F6.6, antes 12px)
     g.style.fontSize = fs + 'px';
     let guard = 40;
     while (g.scrollWidth > g.clientWidth && fs > min && guard-- > 0) { fs -= 0.5; g.style.fontSize = fs + 'px'; }
@@ -703,7 +703,7 @@
   function wireStatic() {
     drawReps();
     const up = qs('#repUp'), dn = qs('#repDn');
-    if (up) up.onclick = () => { _dx.reps = Math.min(15, _dx.reps + 1); drawReps(); refreshMode(); };
+    if (up) up.onclick = () => { _dx.reps = Math.min(20, _dx.reps + 1); drawReps(); refreshMode(); };
     if (dn) dn.onclick = () => { _dx.reps = Math.max(1, _dx.reps - 1); drawReps(); refreshMode(); };
 
     // quitar cuenta (X) -> recalcula modo
@@ -821,9 +821,9 @@
     _pillEl.querySelector('.dp-tx').textContent = _dx.sched
       ? ('Programado ' + _dx.sched.done + '/' + _dx.sched.total)
       : 'Matchmaker en curso';
-    _pillEl.style.display = 'flex';
+    _pillEl.classList.remove('hide');
   }
-  function pillHide() { if (_pillEl) _pillEl.style.display = 'none'; }
+  function pillHide() { if (_pillEl) _pillEl.classList.add('hide'); }
   function pillReopen() {
     root.classList.remove('hidden');
     root.setAttribute('aria-hidden', 'false');

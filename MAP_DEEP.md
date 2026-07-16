@@ -243,7 +243,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `prewarm_select` | def | L534–L615 |
 | `prewarm_cancel` | def | L619–L629 |
 | `prewarm_status` | def | L633–L648 |
-| `prewarm_refresh_stream` | def | L654–L831 |
+| `prewarm_refresh_stream` | def | L654–L834 |
 
 ### `proxy_pool.py`
 
@@ -523,6 +523,13 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_split_sa_only` | def | L2–L7 |
 | `test_publish_moves_accounts` | def | L9–L22 |
 | `test_publish_forbidden_for_operator` | def | L24–L26 |
+
+### `test_refresh_single_guard.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `seed_account_expired_jwt` | def | L16–L37 |
+| `test_single_row_refresh_bypasses_no_jwt_guard` | def | L40–L77 |
 
 ### `test_search.py`
 

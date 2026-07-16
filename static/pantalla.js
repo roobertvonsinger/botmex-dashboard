@@ -79,6 +79,7 @@
   // "Sistema" a la altura de "Cuentas". Aquí solo se muestra/esconde.
 
   let _currentId = null;
+  let _deposAutoHidden = false; // true si La Pantalla retrajo el panel de depósitos flotante (F4) — se restaura al cerrar
   // true mientras el último gesto sobre .pat-txn-col fue un drag-scroll (>6px de
   // movimiento) — el click handler de .pat-mv lo consulta para NO togglear el
   // detalle expandible al soltar tras arrastrar (initTxnScroll, más abajo).
@@ -132,7 +133,14 @@
       root.classList.add('pantalla-in');
       // Con La Pantalla abierta, el panel de depósitos NUNCA comparte su franja (decisión
       // de Robert, campo: siempre dockeado debajo de la tabla mientras esto está visible).
-      try { window.DeposWindow?._instance?.relayout?.(); } catch (_) {}
+      // Exclusión mutua real (no solo relayout ciego, root cause del pisado z-index 200 vs 40):
+      // si el panel está flotando (no dockeado), se retrae — el stage de depósito en curso
+      // sigue visible igual porque #depStage vive reparentado a #patStageSlot dentro de La Pantalla.
+      try {
+        const dw = window.DeposWindow?._instance;
+        if (dw?.isOpen?.() && !dw.isDocked?.()) { dw.hide(); _deposAutoHidden = true; }
+        else { dw?.relayout?.(); }
+      } catch (_) {}
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           root.classList.add('pantalla-on');
@@ -184,7 +192,11 @@
     _currentId = null;
     // Cerrada La Pantalla, el panel de depósitos puede volver a flotar si esa era
     // la preferencia del operador (el forzado a dockeado era solo mientras estaba abierta).
-    try { window.DeposWindow?._instance?.relayout?.(); } catch (_) {}
+    try {
+      const dw = window.DeposWindow?._instance;
+      if (_deposAutoHidden) { dw?.show?.(); _deposAutoHidden = false; }
+      else { dw?.relayout?.(); }
+    } catch (_) {}
   }
 
   function setMode(mode) {

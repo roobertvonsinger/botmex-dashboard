@@ -124,6 +124,7 @@
     var ST = { mode: 'right', section: 'accounts', float: null, dockW: { left: 400, right: 400 }, open: false };
     load();
 
+    var headEl = win.querySelector(titlebarSel);
     var zone = function () { return document.getElementById(zoneId); };
     var rectOf = function (el) {
       var r = el.getBoundingClientRect();
@@ -225,7 +226,7 @@
       win.style.height = Math.round(r.height) + 'px';
     }
 
-    function apply(anim) {
+    function apply(anim, skipSave) {
       win.classList.add('dw-on');
       var em = effectiveMode();
       var docked = em !== 'float';
@@ -250,7 +251,7 @@
         applyRect(ST.float, anim);
       }
       syncBtns();
-      save();
+      if (!skipSave) save();
     }
 
     function syncBtns() {
@@ -325,7 +326,12 @@
     function updateCursor(e) {
       if (rz || drag || ST.mode !== 'float') return;
       var ed = Geo.edgesAt(rectOf(win), e.clientX, e.clientY, 8);
-      win.style.cursor = Geo.cursorFor(ed) || '';
+      var cur = Geo.cursorFor(ed) || '';
+      win.style.cursor = cur;
+      // el CSS de .head fija cursor:grab por clase, que gana sobre el inline
+      // style puesto en `win` (ancestro) — replicar el inline directo en .head
+      // para que el cursor de resize sea visible en su franja superior (8px).
+      if (headEl) headEl.style.cursor = cur || '';
     }
     function startResize(e, edges) {
       cancelAnims();
@@ -343,7 +349,7 @@
     function onResizeUp() {
       if (!rz) return;
       rz = null; win.classList.remove('dw-resizing'); document.body.style.userSelect = '';
-      win.style.cursor = ''; save();
+      win.style.cursor = ''; if (headEl) headEl.style.cursor = ''; save();
     }
 
     // ── divisor del dock (recorrer el ancho) ──────────────────────────────────
@@ -357,7 +363,7 @@
       if (!dv) return;
       var z = zoneRect(); if (!z) return;
       ST.dockW[dv.side] = Geo.dockWidthFromPointer(z, dv.side, e.clientX, DOCK_MINW, DOCK_MAXW);
-      apply(false);
+      apply(false, true); // skip save durante el drag — persiste solo al soltar (onDividerUp)
     }
     function onDividerUp() {
       if (!dv) return; dv = null; document.body.style.userSelect = '';
@@ -411,6 +417,7 @@
       relayout: function () { if (ST.open) apply(false); },
       isDocked: function () { return effectiveMode() !== 'float'; },
       mode: function () { return effectiveMode(); },
+      isOpen: function () { return !!ST.open; },
       // Política por vista/rol (tanda 4). Recibe la sección destino y si el viewer
       // es SA. Decide: visible+dónde, u oculto (sin flotar encima de otra vista).
       reanchorForSection: function (section, isSA) {

@@ -726,10 +726,13 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
                                  "reason": "cooldown",
                                  "cooldown_min": _cooldown_remaining_min(acc.get("cooldown_until"))})
                     return
-                # Anti-abuso CapMonster: operadores NO pueden refrescar cuentas sin JWT vivo.
-                # Hacerlo forzaría un login fresco (= captcha = gasto). Solo el jwt_keeper
-                # automatizado (SA) debe renovar sesiones muertas. SA puede siempre.
-                if not is_sa:
+                # Anti-abuso CapMonster: operadores NO pueden refrescar EN BULK cuentas sin
+                # JWT vivo (login fresco en lote = captcha = gasto). El clic individual (1
+                # cuenta, botón ↻ por fila) es acción humana intencional, no bulk automatizado
+                # — se exime (root cause: este guard, agregado en 4c42517, bloqueaba también
+                # el refresh de 1 sola fila, no solo el masivo). Solo el jwt_keeper
+                # automatizado (SA) debe renovar sesiones muertas en bulk. SA puede siempre.
+                if not is_sa and len(ids) > 1:
                     _jexp = acc.get("jwt_expires_at")
                     _jwt_alive = (
                         _jexp not in (None, "")
