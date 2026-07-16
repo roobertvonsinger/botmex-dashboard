@@ -206,6 +206,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `4809d75` | fix(depos.css): dw-hint sobre el panel durante drag — estaba z-index:198 vs panel 200, quedaba oculto en el momento exacto que sirve |
 | `615a265` | fix(depos.js): igualar tope de repeticiones a 20 (backend ya lo soporta, frontend topaba en 15) |
 | `613c394` | fix(depos.css): title deja de forzar overflow en dock minimo — width fijo 268px reemplazado por max-width + min-width:0, medido con DOCK_MINW=320 |
 | `cac2fc5` | fix(prewarm): eximir refresh individual del guard bulk no_jwt — root cause: guard 4c42517 bloqueaba tambien el clic de 1 sola cuenta, no solo bulk |
@@ -217,7 +218,6 @@ prewarm.py (router)
 | `5376bc6` | feat(anti-abuse): badges JWT visibles para todos + .account-cooling guardarril |
 | `a5f0591` | docs(plan): plan anti-abuso guards, cero fugas y orquestacion 9router |
 | `dbc555f` | fix(jwt-badge): renderizar badge de sesion viva/expirada al actualizar fila individual con refresh-stream |
-| `53efcbc` | docs(next-session): cierre 2026-07-12 — incidente dominio/CapMonster resuelto vía botmexico.net, jwt_keeper v2 pendiente de deploy |
 <!-- GEN:end:recientes -->
 
 ---

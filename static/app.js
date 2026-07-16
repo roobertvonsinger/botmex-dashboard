@@ -660,7 +660,7 @@ function renderTable() {
         <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
         <td class="sel-cell"></td>
         <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-        <td class="combo" title="Click: abrir La Pantalla · Ctrl/Shift+Click: seleccionar">${jwtBadge}<b>${esc(combo)}</b>${lockChip}</td>
+        <td class="combo" data-copy="${esc(combo)}" title="Click: copiar combo · Ctrl/Shift+Click: seleccionar">${jwtBadge}<b>${esc(combo)}</b>${lockChip}</td>
         <td class="dep" title="Último depósito hecho">${dep}</td>
         <td class="ic-col ic-nota-col">${cellNota}</td>
         <td class="ic-col ic-cards-col">${cellCards}</td>
@@ -671,7 +671,7 @@ function renderTable() {
       <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
       <td class="sel-cell"></td>
       <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-      <td class="combo" title="Click: abrir La Pantalla · Ctrl/Shift+Click: seleccionar">${jwtBadge}<b>${esc(combo)}</b></td>
+      <td class="combo" data-copy="${esc(combo)}" title="Click: copiar combo · Ctrl/Shift+Click: seleccionar">${jwtBadge}<b>${esc(combo)}</b></td>
       <td class="dep" title="Último depósito hecho">${dep}</td>
       <td class="dep dim" title="Cuándo se actualizó por última vez">${fmtAgo(r.last_checked_at)}</td>
       <td class="num" title="Total de veces actualizada">${r.check_count || 0}</td>
@@ -3320,13 +3320,15 @@ $('#accTable').addEventListener('click', e => {
   }
   const th = e.target.closest('th.th-sort');
   if (th?.dataset.sort) { sortRows(th.dataset.sort); return; }
-  // Fix (Robert): el combo YA NO copia al click — la celda/combo/fila ABREN La Pantalla.
-  // El copiado del combo vive DENTRO de La Pantalla (botón dedicado .pat-combo). Al
-  // quitarle data-combo a la celda, el click cae directo al row-handler de abajo.
+  // Restaurado (Robert, 2026-07-16): el combo (`td.combo[data-copy]`) vuelve a copiar
+  // al click simple — lo intercepta el listener global de document.body en capture
+  // phase (arriba, ~L4476) y hace stopPropagation, así que nunca llega aquí. Con
+  // Shift/Ctrl/Cmd ese listener deja pasar el evento a propósito, y SÍ cae al
+  // row-handler de abajo para la selección múltiple.
   // Fase B — interacción tipo Excel + La Pantalla en la fila:
-  //   · Click simple    → abre La Pantalla (ver detalle de la cuenta)
-  //   · Ctrl/Cmd+Click  → agrega/quita esa fila de la selección múltiple
-  //   · Shift+Click     → selecciona el rango desde la última fila clickeada (orden visible)
+  //   · Click simple    → abre La Pantalla (ver detalle de la cuenta) — EXCEPTO sobre el combo, que copia
+  //   · Ctrl/Cmd+Click  → agrega/quita esa fila de la selección múltiple (también sobre el combo)
+  //   · Shift+Click     → selecciona el rango desde la última fila clickeada (orden visible, también sobre el combo)
   const tr = e.target.closest('tr[data-id]');
   if (tr && tr.dataset.id) {
     const id = parseInt(tr.dataset.id);
@@ -4476,6 +4478,9 @@ function _copyText(txt) {
 document.body.addEventListener('click', e => {
   const t = e.target.closest('[data-copy], [data-combo]');
   if (!t) return;
+  // Shift/Ctrl/Cmd+Click sobre el combo de la tabla = selección múltiple (row-handler),
+  // NO copiado. Deja pasar el evento sin interceptar (Robert, 2026-07-16).
+  if (e.shiftKey || e.ctrlKey || e.metaKey) return;
   // No interceptar inputs ni botones que NO son d-copy
   if (e.target.closest('input, button:not(.d-copy)') && !t.classList.contains('d-copy')) return;
   // Resolver texto
@@ -4490,8 +4495,8 @@ document.body.addEventListener('click', e => {
   e.stopPropagation();
   _copyText(txt);
   // Recientes/marquesina (data-email) → abrir La Pantalla tras copiar. Los d-copy de
-  // tarjeta/CURP/pipe NO abren detalle (no tienen id/email). El combo de la TABLA ya no
-  // llega aquí (se le quitó data-combo): su click abre La Pantalla vía el row-handler.
+  // tarjeta/CURP/pipe NO abren detalle (no tienen id/email). El combo de la TABLA
+  // (data-copy sin id/email) tampoco abre detalle: solo copia. Restaurado 2026-07-16.
   if (t.dataset.id && window.Pantalla) window.Pantalla.open(parseInt(t.dataset.id));
   else if (t.dataset.email) openAccountByEmail(t.dataset.email);
 }, true);
