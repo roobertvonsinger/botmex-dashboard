@@ -411,6 +411,7 @@
       relayout: function () { if (ST.open) apply(false); },
       isDocked: function () { return effectiveMode() !== 'float'; },
       mode: function () { return effectiveMode(); },
+      isOpen: function () { return !!ST.open; },
       // Política por vista/rol (tanda 4). Recibe la sección destino y si el viewer
       // es SA. Decide: visible+dónde, u oculto (sin flotar encima de otra vista).
       reanchorForSection: function (section, isSA) {

@@ -524,6 +524,13 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_publish_moves_accounts` | def | L9–L22 |
 | `test_publish_forbidden_for_operator` | def | L24–L26 |
 
+### `test_refresh_single_guard.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `seed_account_expired_jwt` | def | L16–L37 |
+| `test_single_row_refresh_bypasses_no_jwt_guard` | def | L40–L77 |
+
 ### `test_search.py`
 
 | Símbolo | Tipo | Líneas |
