@@ -226,7 +226,7 @@
       win.style.height = Math.round(r.height) + 'px';
     }
 
-    function apply(anim) {
+    function apply(anim, skipSave) {
       win.classList.add('dw-on');
       var em = effectiveMode();
       var docked = em !== 'float';
@@ -251,7 +251,7 @@
         applyRect(ST.float, anim);
       }
       syncBtns();
-      save();
+      if (!skipSave) save();
     }
 
     function syncBtns() {
@@ -363,7 +363,7 @@
       if (!dv) return;
       var z = zoneRect(); if (!z) return;
       ST.dockW[dv.side] = Geo.dockWidthFromPointer(z, dv.side, e.clientX, DOCK_MINW, DOCK_MAXW);
-      apply(false);
+      apply(false, true); // skip save durante el drag — persiste solo al soltar (onDividerUp)
     }
     function onDividerUp() {
       if (!dv) return; dv = null; document.body.style.userSelect = '';

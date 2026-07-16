@@ -206,6 +206,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `10a40e6` | fix(depos): cursor de resize visible en borde superior — CSS de .head pisaba el inline style de updateCursor() |
 | `db35640` | fix(app.js): restaurar copy-on-click del combo sin romper seleccion multiple — data-copy en la celda + excepcion de modificador en el listener global |
 | `4809d75` | fix(depos.css): dw-hint sobre el panel durante drag — estaba z-index:198 vs panel 200, quedaba oculto en el momento exacto que sirve |
 | `615a265` | fix(depos.js): igualar tope de repeticiones a 20 (backend ya lo soporta, frontend topaba en 15) |
@@ -217,7 +218,6 @@ prewarm.py (router)
 | `b36e92e` | feat(anti-abuse): semáforo global de misiones + cooldown por 2 declines |
 | `4c42517` | feat(anti-abuse): guard de refresh para operadores sin JWT vivo |
 | `5376bc6` | feat(anti-abuse): badges JWT visibles para todos + .account-cooling guardarril |
-| `a5f0591` | docs(plan): plan anti-abuso guards, cero fugas y orquestacion 9router |
 <!-- GEN:end:recientes -->
 
 ---
