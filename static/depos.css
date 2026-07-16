@@ -68,7 +68,7 @@
 #depos .head-div{width:1px; height:26px; background:var(--line-2)}
 /* greeting = bocadillo de diálogo de TAMAÑO FIJO (no se descuadra al rotar la frase).
    Tipografía folklor (Ranchers) con contorno; el personaje del banner "lo dice". */
-#depos .title{position:relative; flex:0 0 auto; width:268px; height:38px; align-self:flex-start; margin-left:6px;
+#depos .title{position:relative; flex:0 0 auto; max-width:268px; min-width:0; height:38px; align-self:flex-start; margin-left:6px;
   display:block; text-align:center; white-space:nowrap; overflow:hidden;
   font-family:'Ranchers','Bricolage Grotesque',cursive; font-weight:400; font-size:12px; letter-spacing:.4px; line-height:26px;
   color:#f3c77a; -webkit-text-stroke:.5px rgba(0,0,0,.55); paint-order:stroke fill;
