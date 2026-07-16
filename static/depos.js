@@ -325,7 +325,7 @@
 
   // auto-fit: el recuadro es FIJO; el texto se escala para caber siempre en 1 línea
   function fitGreet(g) {
-    let fs = 12; const min = 8;
+    let fs = 13; const min = 8;  // techo alineado a la escala CSS de .title (F6.6, antes 12px)
     g.style.fontSize = fs + 'px';
     let guard = 40;
     while (g.scrollWidth > g.clientWidth && fs > min && guard-- > 0) { fs -= 0.5; g.style.fontSize = fs + 'px'; }
