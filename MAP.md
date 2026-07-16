@@ -99,7 +99,7 @@ prewarm.py (router)
 | `deposits.py` | 2658 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 288 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 410 | `betmexico.dashboard.login_orch` | _[completar]_ |
-| `prewarm.py` | 831 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
+| `prewarm.py` | 834 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 364 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
@@ -206,6 +206,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `93f91f0` | fix(pantalla+depos): exclusion mutua real de estado — DeposWindow se retrae si esta flotando cuando abre La Pantalla, en vez de solo relayout ciego |
 | `a8b7042` | docs(plan): 6 frentes anti-abuso Telegram + UX depositos/La Pantalla (F1-F6) — ejecutar con /Smartexe |
 | `38b27fe` | docs: actualizar NEXT-SESSION para Fase 3 (Telegram) |
 | `b36e92e` | feat(anti-abuse): semáforo global de misiones + cooldown por 2 declines |
@@ -217,7 +218,6 @@ prewarm.py (router)
 | `4e80eb0` | fix(jwt-keeper): cuarentena por racha de RATE_LIMITED + pool DataImpulse a 700 puertos + dedup |
 | `bb0033f` | fix(infra): agregar botmexico.net como alias Traefik — DNS de botmexico.com.mx reseteado en Openprovider |
 | `8cfec27` | fix(jwt-keeper): batch 20→8 — el backlog está quemado, no vale drenarlo agresivo |
-| `b6bfcdb` | fix(jwt-keeper): romper bucle de quema — cooldown propio 6h > interval 1h |
 <!-- GEN:end:recientes -->
 
 ---
