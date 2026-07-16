@@ -587,7 +587,7 @@
 #depos .mov{padding:4px 18px 16px}
 #depos .mov-head{display:flex; align-items:center; gap:8px; margin:6px 0 8px}
 #depos .mov-line{flex:1; height:1px; background:var(--line)}
-#depos .mov-list{display:flex; flex-direction:column; gap:5px; min-height:0; overflow:hidden}
+#depos .mov-list{display:flex; flex-direction:column; gap:5px; min-height:0; overflow-y:auto}
 #depos .mov-row{display:flex; align-items:center; gap:9px; padding:7px 10px; border-radius:10px;
   background:var(--panel); border:1px solid var(--line); font-size:11px; animation:slidein .4s cubic-bezier(.22,.61,.36,1)}
 @keyframes slidein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}

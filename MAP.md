@@ -206,6 +206,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `f32d545` | fix(depos.css): consolidar font-size a escala de 4 pasos (9/11/13/16px) + letter-spacing de .label a 0.8px — 15+ valores puntuales sin ratio, j-bal-to invertia jerarquia (23px > titulo 12px), tracking desproporcionado en micro-labels |
 | `3d7709c` | fix(depos_window): throttle de guardado en drag del divisor — igualado al patron de onResizeMove/onResizeUp, antes escribia a localStorage en cada mousemove |
 | `10a40e6` | fix(depos): cursor de resize visible en borde superior — CSS de .head pisaba el inline style de updateCursor() |
 | `db35640` | fix(app.js): restaurar copy-on-click del combo sin romper seleccion multiple — data-copy en la celda + excepcion de modificador en el listener global |
@@ -217,7 +218,6 @@ prewarm.py (router)
 | `a8b7042` | docs(plan): 6 frentes anti-abuso Telegram + UX depositos/La Pantalla (F1-F6) — ejecutar con /Smartexe |
 | `38b27fe` | docs: actualizar NEXT-SESSION para Fase 3 (Telegram) |
 | `b36e92e` | feat(anti-abuse): semáforo global de misiones + cooldown por 2 declines |
-| `4c42517` | feat(anti-abuse): guard de refresh para operadores sin JWT vivo |
 <!-- GEN:end:recientes -->
 
 ---
