@@ -206,6 +206,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `3d7709c` | fix(depos_window): throttle de guardado en drag del divisor — igualado al patron de onResizeMove/onResizeUp, antes escribia a localStorage en cada mousemove |
 | `10a40e6` | fix(depos): cursor de resize visible en borde superior — CSS de .head pisaba el inline style de updateCursor() |
 | `db35640` | fix(app.js): restaurar copy-on-click del combo sin romper seleccion multiple — data-copy en la celda + excepcion de modificador en el listener global |
 | `4809d75` | fix(depos.css): dw-hint sobre el panel durante drag — estaba z-index:198 vs panel 200, quedaba oculto en el momento exacto que sirve |
@@ -217,7 +218,6 @@ prewarm.py (router)
 | `38b27fe` | docs: actualizar NEXT-SESSION para Fase 3 (Telegram) |
 | `b36e92e` | feat(anti-abuse): semáforo global de misiones + cooldown por 2 declines |
 | `4c42517` | feat(anti-abuse): guard de refresh para operadores sin JWT vivo |
-| `5376bc6` | feat(anti-abuse): badges JWT visibles para todos + .account-cooling guardarril |
 <!-- GEN:end:recientes -->
 
 ---

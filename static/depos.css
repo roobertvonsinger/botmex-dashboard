@@ -13,7 +13,7 @@
 .depos-pill{position:fixed; right:18px; bottom:18px; z-index:190; display:none; align-items:center; gap:9px;
   padding:9px 14px; border-radius:99px; cursor:pointer; color:#00bd72;
   background:rgba(16,19,26,.92); border:1px solid rgba(0,189,114,.45);
-  font-family:'JetBrains Mono',monospace; font-size:12px;
+  font-family:'JetBrains Mono',monospace; font-size:11px;
   box-shadow:0 16px 40px -12px #000, 0 0 18px -6px rgba(0,189,114,.5); transition:transform .18s, box-shadow .18s}
 .depos-pill:hover{transform:translateY(-2px); box-shadow:0 18px 44px -10px #000, 0 0 26px -4px rgba(0,189,114,.7)}
 .depos-pill .dp-go{opacity:.7}
@@ -70,7 +70,7 @@
    Tipografía folklor (Ranchers) con contorno; el personaje del banner "lo dice". */
 #depos .title{position:relative; flex:0 0 auto; max-width:268px; min-width:0; height:38px; align-self:flex-start; margin-left:6px;
   display:block; text-align:center; white-space:nowrap; overflow:hidden;
-  font-family:'Ranchers','Bricolage Grotesque',cursive; font-weight:400; font-size:12px; letter-spacing:.4px; line-height:26px;
+  font-family:'Ranchers','Bricolage Grotesque',cursive; font-weight:400; font-size:13px; letter-spacing:.4px; line-height:26px;
   color:#f3c77a; -webkit-text-stroke:.5px rgba(0,0,0,.55); paint-order:stroke fill;
   background:rgba(18,22,30,.9); border:1px solid var(--line-2); border-radius:13px;
   padding:6px 14px; box-shadow:0 7px 18px -9px rgba(0,0,0,.7); transition:opacity .45s ease}
@@ -79,19 +79,19 @@
   border-left:7px solid transparent; border-right:7px solid transparent; border-bottom:7px solid rgba(18,22,30,.9)}
 #depos .title::before{content:''; position:absolute; top:-8.5px; left:21px; width:0; height:0;
   border-left:8px solid transparent; border-right:8px solid transparent; border-bottom:8px solid var(--line-2)}
-#depos .sub{display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--ink-dim); margin-top:2px}
+#depos .sub{display:flex; align-items:center; gap:7px; font-size:11px; color:var(--ink-dim); margin-top:2px}
 #depos .sub-dot{width:6px;height:6px;border-radius:50%; background:var(--aqua); box-shadow:0 0 10px var(--aqua); animation:breathe 2.6s ease-in-out infinite}
 @keyframes breathe{0%,100%{opacity:.5;transform:scale(.85)}50%{opacity:1;transform:scale(1.15)}}
 
 #depos .newproc{display:flex; align-items:center; gap:7px; height:32px; padding:0 13px; border-radius:10px; cursor:pointer;
   border:1px dashed var(--line-2); background:var(--panel); color:var(--ink-dim);
-  font-family:'Satoshi',sans-serif; font-weight:600; font-size:12px; transition:var(--t-fast)}
+  font-family:'Satoshi',sans-serif; font-weight:600; font-size:11px; transition:var(--t-fast)}
 #depos .newproc:hover{border-color:var(--aqua-line); color:var(--aqua); background:var(--aqua-soft)}
-#depos .newproc .plus{font-size:15px; line-height:1}
+#depos .newproc .plus{font-size:16px; line-height:1}
 
 #depos .controls{padding:14px 18px 6px; display:flex; flex-direction:column; gap:13px}
 #depos .field-head{display:flex; align-items:center; gap:8px; margin-bottom:7px}
-#depos .label{font-size:11px; text-transform:uppercase; letter-spacing:1.4px; color:var(--ink-faint); font-weight:700}
+#depos .label{font-size:11px; text-transform:uppercase; letter-spacing:0.8px; color:var(--ink-faint); font-weight:700}
 #depos .count{margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-dim);
   background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:1px 8px}
 
@@ -112,7 +112,7 @@
 #depos .hdot.a{color:var(--grade-a);background:var(--grade-a)} #depos .hdot.b{color:var(--grade-b);background:var(--grade-b)}
 #depos .hdot.c{color:var(--grade-c);background:var(--grade-c)} #depos .hdot.d{color:var(--grade-d);background:var(--grade-d)}
 /* tachita = zona propia, separada del texto. Hit-area cómoda para que se pueda atinar. */
-#depos .chip-x{margin-left:auto; flex:none; color:var(--ink-faint); cursor:pointer; font-size:14px; line-height:1;
+#depos .chip-x{margin-left:auto; flex:none; color:var(--ink-faint); cursor:pointer; font-size:13px; line-height:1;
   padding:4px 6px; border-radius:7px; transition:var(--t-fast)}
 #depos .chip-x:hover{color:var(--red); background:rgba(255,107,94,.14)}
 #depos .chip-add{border-style:dashed; color:var(--ink-dim); cursor:text; justify-content:center}
@@ -121,7 +121,7 @@
 #depos .row2{display:flex; gap:14px; align-items:flex-start}
 #depos .amt-wrap{flex:1; min-width:0}
 #depos .amt-presets{display:flex; gap:6px; margin-top:8px; justify-content:space-between}
-#depos .amt-preset{padding:6px 12px; border-radius:9px; cursor:pointer; font-family:'JetBrains Mono',monospace; font-size:12px;
+#depos .amt-preset{padding:6px 12px; border-radius:9px; cursor:pointer; font-family:'JetBrains Mono',monospace; font-size:11px;
   background:var(--panel); border:1px solid var(--line-2); color:var(--ink-dim); transition:var(--t-fast)}
 #depos .amt-preset:hover{border-color:var(--aqua-line); color:var(--ink)}
 #depos .amt-preset.on{background:var(--aqua-soft); border-color:var(--aqua-line); color:var(--aqua)}
@@ -130,9 +130,9 @@
   background:var(--void-2); border:1px solid var(--line-2); transition:var(--t-fast)}
 #depos .amt.dis{opacity:.4; pointer-events:none}
 #depos .amt:focus-within{border-color:var(--aqua-line); box-shadow:0 0 0 3px var(--aqua-soft)}
-#depos .amt span{color:var(--ink-faint); font-family:'JetBrains Mono',monospace; font-size:15px}
+#depos .amt span{color:var(--ink-faint); font-family:'JetBrains Mono',monospace; font-size:16px}
 #depos .amt input{flex:1; background:none; border:none; outline:none; color:var(--ink); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:500; width:100%}
-#depos .amt-note{font-size:10px; color:var(--ink-faint); margin-top:5px}
+#depos .amt-note{font-size:9px; color:var(--ink-faint); margin-top:5px}
 
 
 #depos .reps{width:104px; flex:none}
@@ -147,7 +147,7 @@
 #depos .seg-btn{width:22px;height:18px; border-radius:6px; cursor:pointer; display:grid; place-items:center;
   border:1px solid var(--line-2); background:var(--panel); color:var(--ink-dim); font-size:9px; transition:var(--t-fast)}
 #depos .seg-btn:hover{color:var(--aqua); border-color:var(--aqua-line)}
-#depos .reps-x{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--ink-faint); margin-top:5px; text-align:center}
+#depos .reps-x{font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--ink-faint); margin-top:5px; text-align:center}
 #depos .seg-mini{align-items:center; gap:4px}
 #depos .seg-mini .lbl{font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--ink-faint); letter-spacing:.5px; margin-right:2px}
 #depos .seg-mini .seg-d{width:12px; height:19px}
@@ -159,7 +159,7 @@
     linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0) 38%),
     linear-gradient(180deg, rgba(0,189,114,.22), rgba(0,189,114,.05));
   border:1px solid var(--aqua-line); color:#d6fff5; font-family:'Clash Display',sans-serif;
-  font-weight:600; font-size:14px; letter-spacing:.5px; position:relative; overflow:hidden;
+  font-weight:600; font-size:13px; letter-spacing:.5px; position:relative; overflow:hidden;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.22), inset 0 -2px 6px rgba(0,0,0,.4), 0 6px 18px -10px rgba(0,189,114,.5);
   transition:var(--t)}
 #depos .deposit::before{content:""; position:absolute; top:0; left:-60%; width:50%; height:100%;
@@ -210,7 +210,7 @@
 @keyframes pecera{0%,100%{opacity:.08; transform:translate(0,0)} 40%{opacity:.42; transform:translate(2.5%,-2%)} 66%{opacity:.14; transform:translate(-1.5%,1.5%)}}
 #depStage .j-balance{display:flex; align-items:baseline; justify-content:center; gap:10px; margin-bottom:2px; min-height:26px}
 #depStage .j-bal-now{font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--ink-faint)}
-#depStage .j-bal-to{font-family:'Clash Display',sans-serif; font-weight:600; font-size:23px; color:var(--gold); text-shadow:0 0 24px var(--gold-soft); transition:var(--t)}
+#depStage .j-bal-to{font-family:'Clash Display',sans-serif; font-weight:600; font-size:16px; color:var(--gold); text-shadow:0 0 24px var(--gold-soft); transition:var(--t)}
 #depStage .j-bal-arrow{color:var(--ink-faint); font-size:13px}
 #depStage .scene-stage{position:relative; height:172px; margin:2px 0}
 #depStage .scene{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -226,9 +226,9 @@
 #depStage .guide-steps{display:flex; align-items:center; gap:6px}
 #depStage .gstep{display:flex; flex-direction:column; align-items:center; gap:6px; width:74px}
 #depStage .gstep .gi{width:34px;height:34px;border-radius:10px; display:grid; place-items:center; color:var(--aqua);
-  background:var(--aqua-soft); border:1px solid var(--aqua-line); font-size:15px}
-#depStage .gstep .gt{font-size:10.5px; color:var(--ink-dim); text-align:center; line-height:1.25}
-#depStage .garrow{color:var(--ink-faint); font-size:12px}
+  background:var(--aqua-soft); border:1px solid var(--aqua-line); font-size:16px}
+#depStage .gstep .gt{font-size:11px; color:var(--ink-dim); text-align:center; line-height:1.25}
+#depStage .garrow{color:var(--ink-faint); font-size:11px}
 #depStage .guide-hint{font-size:11px; color:var(--ink-faint)}
 
 
@@ -579,8 +579,8 @@
   100%{opacity:0;transform:translateY(-40px) scale(1);}
 }
 #depStage .j-status{display:flex; align-items:center; justify-content:center; gap:10px; margin-top:4px; min-height:20px}
-#depStage .j-pct{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--aqua)}
-#depStage .j-sub{font-size:12px; color:var(--ink-dim); transition:var(--t)}
+#depStage .j-pct{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--aqua)}
+#depStage .j-sub{font-size:11px; color:var(--ink-dim); transition:var(--t)}
 #depStage .j-sub.good{color:var(--gold)}
 #depStage .j-eta{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-faint)}
 
@@ -596,7 +596,7 @@
 #depos .mov-dot.wait{background:var(--gold);box-shadow:0 0 8px var(--gold-soft)}
 #depos .mov-dot.skip{background:var(--ink-dim);box-shadow:none}
 #depos .mov-who{font-family:'JetBrains Mono',monospace; color:var(--ink); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer}
-#depos .mov-tag{font-size:10px; padding:1px 7px; border-radius:20px; font-family:'JetBrains Mono',monospace}
+#depos .mov-tag{font-size:9px; padding:1px 7px; border-radius:20px; font-family:'JetBrains Mono',monospace}
 #depos .mov-tag.ok{color:var(--grade-a); background:var(--aqua-soft)}
 #depos .mov-tag.wait{color:var(--gold); background:var(--gold-soft)}
 #depos .mov-tag.skip{color:var(--ink-dim); background:var(--line-2)}
@@ -605,7 +605,7 @@
 
 #depos .toast{position:fixed; left:50%; bottom:28px; transform:translate(-50%,16px); opacity:0;
   background:#11151c; border:1px solid var(--aqua-line); color:var(--aqua); font-family:'JetBrains Mono',monospace;
-  font-size:12px; padding:8px 14px; border-radius:10px; box-shadow:0 16px 40px -10px #000; pointer-events:none;
+  font-size:11px; padding:8px 14px; border-radius:10px; box-shadow:0 16px 40px -10px #000; pointer-events:none;
   transition:opacity .25s, transform .25s; z-index:50}
 #depos .toast.on{opacity:1; transform:translate(-50%,0)}
 
