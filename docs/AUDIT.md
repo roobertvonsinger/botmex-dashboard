@@ -216,6 +216,7 @@ Los 3 puntos del gate anterior fallaron en la primera vuelta (capturas de Robert
 | **Enfriar y saltar (cooldown_until)** | 429 → `accounts.cooldown_until = now+45min`. Matchmaker salta cuentas enfriando + saca del run (`account_cooling`); scheduled aborta; single avisa | ✅ migración aditiva + helpers `_cooldown_*` | ⚠️ unit cooldown; e2e con 429 real PENDIENTE |
 | **Aplanar anidamiento** | `MM_MAX_LOGIN_RETRIES` 3→2 (peor caso 4×2=8 vs 12) | ✅ | tunable tras medir |
 | **Token reciclado entre cuentas (Capa 2)** | Rediseño matchmaker con token de run circulante | 🔵 NO implementada (Fase 3) | — |
+| **Semáforo de misiones sin leak** | `_mission_sem` (`MISSION_MAX_CONCURRENT=2`) se adquiere DENTRO del `try/finally` de `multi_stream.gen()` con flag `acquired` → se libera SIEMPRE, aun si el cliente aborta la conexión SSE en el `'start'` (GeneratorExit) | ✅ fix 2026-07-17 (antes el acquire fuera del try/finally leakeaba en abort temprano → `429 "misiones activas"` permanente hasta restart, matchmaker caído para operadores) | ✅ `test_mission_sem_leak.py` (leak reproducido + happy path) |
 
 ## Captura: 2026-06-26 (C1 — modal de depósitos unificado v8, frontend)
 

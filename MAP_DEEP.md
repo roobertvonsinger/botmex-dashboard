@@ -185,11 +185,11 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `classify_deposit_status` | def | L1646–L1677 |
 | `_mm_session_get` | def | L1727–L1731 |
 | `_mm_session_update` | def | L1734–L1743 |
-| `multi_stream` | def | L1747–L2235 |
-| `multi_cancel` | def | L2239–L2244 |
-| `scheduled_create` | def | L2257–L2620 |
-| `scheduled_list` | def | L2624–L2646 |
-| `scheduled_cancel` | def | L2650–L2658 |
+| `multi_stream` | def | L1747–L2244 |
+| `multi_cancel` | def | L2248–L2253 |
+| `scheduled_create` | def | L2266–L2629 |
+| `scheduled_list` | def | L2633–L2655 |
+| `scheduled_cancel` | def | L2659–L2667 |
 
 ### `jwt_keeper.py`
 
@@ -515,6 +515,15 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_approved_untouched` | def | L77–L80 |
 | `test_idempotent` | def | L83–L90 |
 | `test_returns_counts_by_category` | def | L93–L103 |
+
+### `test_mission_sem_leak.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `_FakePool` | class | L19–L29 |
+| `_Req` | class | L32–L38 |
+| `test_mission_semaphore_released_on_early_client_abort` | def | L41–L70 |
+| `test_mission_semaphore_released_on_normal_completion` | def | L73–L97 |
 
 ### `test_pool_manage.py`
 

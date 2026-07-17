@@ -1832,7 +1832,7 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
     _active_mm_runs[run_id] = cancel_event
 
     async def gen():
-        await _mission_sem.acquire()
+        acquired = False
         pool = None
         prefetch = None
         # SP-2: sesión por cuenta. La 1ª vez que una cuenta loguea OK guardamos
@@ -1864,8 +1864,6 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                     "data": payload,
                 })
             return cb
-
-        yield f"data: {json.dumps({'type':'start','run_id':run_id,'accounts':len(accounts),'cards':len(cards),'amount':amount})}\n\n"
 
         async def attempt(acc, card, n):
             nonlocal attempts
@@ -1915,6 +1913,16 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
             return r, duration
 
         try:
+            # Semáforo global de misiones: adquirir DENTRO del try para que el
+            # finally SIEMPRE lo libere, aun si el cliente aborta la conexión SSE
+            # durante el 'start' (GeneratorExit). Antes el acquire vivía fuera del
+            # try/finally → un abort temprano leakeaba el permiso y saturaba el pool
+            # de misiones (429 "misiones activas" permanente). Ver docs/ERRORS.md
+            # 2026-07-17. El fast-reject de arriba (L~1824) evita crear misiones de
+            # más; este acquire solo espera si perdió una race con otra misión.
+            await _mission_sem.acquire()
+            acquired = True
+            yield f"data: {json.dumps({'type':'start','run_id':run_id,'accounts':len(accounts),'cards':len(cards),'amount':amount})}\n\n"
             # Init pool INSIDE try so auto_lock is released in finally if start_factory fails
             # M5 (fix 2026-07-02): dimensionar por LOGINS concurrentes (min de cuentas
             # y tarjetas), no por # de tarjetas. Los tokens los consumen los logins, no
@@ -2229,7 +2237,8 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                 except Exception:
                     pass
             _active_mm_runs.pop(run_id, None)
-            _mission_sem.release()
+            if acquired:
+                _mission_sem.release()
 
     return StreamingResponse(gen(), media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

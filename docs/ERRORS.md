@@ -2,6 +2,22 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## [CRÍTICO] Matchmaker muerto para operadores: leak del semáforo global de misiones (2026-07-17)
+
+**Síntoma**: Robert reportó que a **Luisito** (rol `admin`, no SA) "se le detiene el proceso de depósito / matchmaker", mientras que a Robert (SA) sí lo dejaba. Sus `deposit_attempts` no tenían **ni un solo** registro de matchmaker (source `matchmaker`/`multi`) — solo `manual_single` — señal de que la misión moría **antes** de intentar el primer par.
+
+**Causa raíz** (`deposits.py`, `multi_stream` → `gen()`): `await _mission_sem.acquire()` era la **primera línea de `gen()`, FUERA del `try/finally`** que hace `_mission_sem.release()`. El `yield 'start'` también quedaba fuera del try. Cuando la conexión SSE se aborta durante ese `yield 'start'` (cerrar pestaña, red, doble-submit del front, o el `POST /multi/{id}/cancel` que cierra el stream), Starlette llama `gen.aclose()` → `GeneratorExit` **antes** de entrar al `try` → el permiso **nunca se devuelve**. Con `MISSION_MAX_CONCURRENT=2`, **dos** abortos así dejan el semáforo en 0 de forma permanente (hasta el próximo restart) y el chequeo `if _mission_sem.locked() and _mission_sem._value == 0` (L~1824) rebota **todo** matchmaker con `429 "Ya hay 2 misiones activas"`. El SA no lo notaba porque su depósito **single** (`/execute-stream`) no toca este semáforo.
+
+**Diagnóstico** (`superpowers:systematic-debugging`): forense en prod (SSH KVM4). Confirmado **empíricamente** el leak, no solo por lectura: timeline de logs mostró `13:45`/`13:49` → `429` en `/multi/stream` con **0 líneas de actividad de matchmaker viva** en los 15 min previos (`grep -c Matchmaker|BeginDeposit|gentle_login` = 0) — las "2 misiones activas" que reportaba el semáforo eran **permisos fantasma leakeados**. Los proxies se descartaron como causa (test de 20 puertos DataImpulse: 18/20 CONNECT OK).
+
+**Fix** (`deposits.py` `multi_stream`): mover `await _mission_sem.acquire()` + `acquired = True` + `yield 'start'` a ser las **primeras líneas DENTRO del `try`**; inicializar `acquired = False` antes del try; el `finally` ahora hace `if acquired: _mission_sem.release()`. Así el permiso se libera **siempre** que se haya adquirido, sin importar dónde muera el generator (abort temprano incluido); y si el abort ocurre durante el propio `acquire()`, `acquired=False` evita una sobre-liberación. El fast-reject de L~1824 se mantiene.
+
+**Verificado**: TDD — `test_mission_sem_leak.py` (2 tests: RED reproducía el leak ejercitando el generator real + `aclose()`; happy path con cuenta en cooldown → `done` también libera). Suite: 146 passed / 21 pre-existentes (0 regresión). El **deploy incluye restart**, que además resetea el semáforo fantasma que tenía al matchmaker caído para todos.
+
+**Scheduled comparte el semáforo**: `/scheduled/create` → `loop()` usa el MISMO `_mission_sem` (`deposits.py` L~2323 acquire / L~2617 release). Por eso el leak del matchmaker también atascaba los depósitos **programados** nuevos: su `loop()` se quedaba esperando en `acquire()` sin ejecutar ninguna rep (0 logins/`BeginDeposit` en logs — se ve como "el programado no arranca"). El `loop()` del scheduled NO es un generator y no tiene `yield`/`await` entre su `acquire()` y su `try` → no es fuente de leak por sí mismo (en Py3.10 `Semaphore.acquire` devuelve el permiso si lo cancelan tras adquirir; el `finally` de L2610 siempre lo alcanza). Se dejó su patrón intacto a propósito. **⚠️ NO agregar un `await`/`yield` entre ese `acquire()` (L2323) y el `try` (L2325)** o reaparece el mismo leak que en el matchmaker.
+
+**Lección**: un `acquire()`/`lock` de recurso en un async generator DEBE vivir dentro del `try` cuyo `finally` lo libera, con flag `acquired` — nunca en una línea previa a un `yield`, porque `GeneratorExit` en ese yield salta el finally. Mismo patrón de riesgo que un header dentro de `overflow:auto` (invisible-a-futuro): el bug no está donde falla, está en el scope mal elegido.
+
 ## Guard anti-abuso de Fase 2 bloqueaba también el refresh manual de 1 sola cuenta, no solo el bulk (2026-07-16)
 
 **Síntoma**: tras deployar el guard `jwt_alive` de la Fase 2 anti-abuso (`4c42517`), el botón ↻ individual por fila dejó de actualizar el balance real — el operador veía el toast "Cuenta en descanso" y el número en tabla no cambiaba, incluso con clic explícito e intencional.
