@@ -610,8 +610,9 @@
   transition:opacity .25s, transform .25s; z-index:50}
 #depos .toast.on{opacity:1; transform:translate(-50%,0)}
 
-/* ═══════════ VENTANA MANIPULABLE (depos_window.js) ═══════════
-   3 estados: flotante (float) · acoplada izq (dock-left) · acoplada der (dock-right).
+/* ═══════════ PANEL ACOPLADO A LA DERECHA (depos_window.js) ═══════════
+   Robert 2026-07-17: SIEMPRE acoplado a la derecha — no flota, no se mueve, no va a
+   la izquierda ni se desacopla. El único ajuste es ENSANCHAR con el divisor.
    Sin scroll: el cuerpo se reparte por flex; el banner sale para ganar alto. */
 
 #depos.dw-on{transition:left .42s cubic-bezier(.22,.61,.36,1),top .42s cubic-bezier(.22,.61,.36,1),width .42s cubic-bezier(.22,.61,.36,1),height .42s cubic-bezier(.22,.61,.36,1)}
@@ -622,9 +623,9 @@
 #depos.dw-on.dw-docked .bmx{border-radius:12px}
 #depos.dw-on.dw-resizing{transition:none !important}
 
-/* el header (banner/personaje + greeting) ES la zona de arrastre; los controles flotan en la esquina */
-#depos.dw-on .head{cursor:grab; user-select:none; position:relative; flex:none}
-#depos.dw-grabbing,#depos.dw-grabbing .head{cursor:grabbing}
+/* el header (banner/personaje + greeting); los controles flotan en la esquina.
+   Ya NO es zona de arrastre (el panel es fijo) — sin cursor:grab. */
+#depos.dw-on .head{user-select:none; position:relative; flex:none}
 #depos .dw-ctl{position:absolute; top:7px; right:8px; z-index:8; display:flex; align-items:center; gap:2px;
   background:rgba(10,13,18,.5); border-radius:9px; padding:2px; backdrop-filter:blur(6px)}
 #depos .dw-btn{background:none; border:none; color:var(--ink-dim); cursor:pointer; width:25px; height:25px;
@@ -648,6 +649,12 @@
    es el elemento elástico: llena el alto que dejó el escenario en vez de un hueco
    muerto. Antes flex:none + max-height:32% dejaba ~134px vacíos al fondo. */
 #depos.dw-on .mov{flex:1 1 auto; min-height:96px; display:flex; flex-direction:column; overflow:hidden; padding:2px 16px 12px}
+
+/* Drop zone: arrastrar cuentas SELECCIONADAS de la tabla al panel (app.js emite el
+   drag; depos.js las suma a la misión). Invitación sutil mientras se arrastra;
+   realce claro al pasar por encima. */
+body.dragging-acc #depos.dw-on{outline:1.5px dashed var(--aqua-soft); outline-offset:-4px; transition:outline .16s, box-shadow .16s}
+#depos.dw-drop-hot{outline:2px dashed var(--aqua); outline-offset:-4px; box-shadow:inset 0 0 0 3px var(--aqua-soft)}
 
 /* divisor del dock — recorrer el ancho del split */
 #depos .dw-divider{display:none; position:absolute; top:0; bottom:0; width:11px; z-index:7; cursor:ew-resize}

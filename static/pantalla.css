@@ -196,13 +196,17 @@
      de grano (::before, abajo) hace ese trabajo con una superficie física, no una
      capa de brillo. El resto conserva el lenguaje (oscurecer izq/datos, diluir al
      tinte del grade der/movimientos) con menos capas, más peso por capa. */
+  /* Vidrio OSCURO UNIFORME en toda la sheet (Robert 2026-07-17: "que toda la pantalla
+     tuviera ese acabado oscuro y de vidrio transparente de la izquierda, que no se
+     fuera a gradiente con más luz"). Se quitó la capa que aclaraba izq→der hacia el
+     tinte del grade y la que oscurecía SOLO la izquierda; ahora el oscurecido es plano
+     (mismo tono a lo ancho). El grade sigue tiñendo bordes/CTA (border + box-shadow),
+     no el fondo. */
   background:
-    radial-gradient(ellipse 130% 160% at 10% -18%, oklch(0.34 0.10 160 / 0.16), transparent 56%),   /* mismo glow ambiental que --bg-accent — ancla la sheet al fondo real de la app */
-    linear-gradient(90deg, oklch(0.04 0.008 160 / 0.40) 0%, oklch(0.04 0.008 160 / 0.18) 28%, transparent 54%),  /* oscurece la izquierda (datos personales) */
-    linear-gradient(90deg, transparent 18%, var(--pat-tint) 60%, var(--pat-gold-soft) 100%),                      /* difumina hacia el color del grade, izq→der */
-    radial-gradient(85% 65% at 14% 4%,  oklch(0.80 0.085 155 / 0.14), transparent 52%),                          /* mancha 1 — mint claro, esq. sup-izq */
-    radial-gradient(90% 70% at 30% 112%, oklch(0.30 0.055 170 / 0.22), transparent 60%),                         /* mancha 2 — sombra verde profunda, abajo (ancla al piso) */
-    linear-gradient(180deg, oklch(0.13 0.016 160 / 0.60), oklch(0.08 0.011 160 / 0.76));                         /* cuerpo del vidrio templado — algo más denso, menos "capa de color" */
+    radial-gradient(ellipse 130% 160% at 10% -18%, oklch(0.34 0.10 160 / 0.14), transparent 58%),   /* glow ambiental sutil — ancla la sheet al fondo real de la app */
+    linear-gradient(90deg, oklch(0.04 0.008 160 / 0.34), oklch(0.04 0.008 160 / 0.34)),              /* oscurecido UNIFORME a lo ancho (sin gradiente a más luz) */
+    radial-gradient(90% 70% at 30% 112%, oklch(0.28 0.05 170 / 0.20), transparent 60%),              /* sombra verde profunda abajo (ancla al piso) */
+    linear-gradient(180deg, oklch(0.12 0.015 160 / 0.66), oklch(0.075 0.010 160 / 0.80));            /* cuerpo del vidrio templado, denso y parejo */
   /* Marco COMPLETO de la sheet entera (Robert 2026-07-10: "marco completo para la
      pantalla no para el recuadro solamente") — antes solo el filo superior/inferior
      tenían refuerzo inset; izquierda/derecha dependían solo del border 1px, que se
@@ -423,6 +427,10 @@
   background: oklch(0.86 0.09 160); color: #08090c;
   box-shadow: 0 0 20px -3px var(--pat-gold), 0 1px 2px oklch(0 0 0 / 0.25);
 }
+/* Con el panel de depósitos abierto, La Pantalla oculta SU botón "Depositar" — no debe
+   haber dos botones de depósito a la vez (Robert 2026-07-17). Reaparece al cerrar el
+   panel (efecto "se movió del detalle al panel"). */
+body.depos-open .pat-act-dep { display: none; }
 
 /* COMBO copiable — ahora vive DENTRO de la columna de datos (.pat-col-ident), como
    primera fila de esa columna (2026-07-09: ya no reserva hueco de la X, los

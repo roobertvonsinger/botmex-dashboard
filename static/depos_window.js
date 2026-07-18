@@ -58,9 +58,14 @@
     },
 
     // Rect del panel acoplado dentro de la zona (header Cuentas .. paginador).
-    dockRect: function (zone, side, dockW) {
+    // `inset` = respiro horizontal contra el borde de la zona (margen a la derecha,
+    // entre el scroll de la tabla y el panel — Robert 2026-07-17: "esta mal
+    // incrustado"). Coincide con el margen de .pantalla-sheet para que ambos paneles
+    // lean el mismo borde vertical.
+    dockRect: function (zone, side, dockW, inset) {
+      inset = inset || 0;
       return {
-        left: side === 'right' ? zone.left + zone.width - dockW : zone.left,
+        left: side === 'right' ? zone.left + zone.width - dockW - inset : zone.left + inset,
         top: zone.top,
         width: dockW,
         height: zone.height,
@@ -85,16 +90,17 @@
     },
 
     // Política de visibilidad del panel de depósitos por vista y rol (tanda 4).
-    // - accounts: SIEMPRE visible, en la zona de la tabla (donde el usuario lo dejó).
-    // - logs/activity: visible SOLO para SA, acoplado a la IZQUIERDA de esa vista
-    //   ("sin estorbar"); su zona de dock es la sección misma.
+    // - accounts: SIEMPRE visible, acoplado a la DERECHA de la tabla.
+    // - logs/activity: visible SOLO para SA, acoplado a la DERECHA de esa vista
+    //   (Robert 2026-07-17: el panel SIEMPRE va a la derecha; "que me siga" al ir a
+    //   logs, sin cambiar de lado). Su zona de dock es la sección misma.
     // - cualquier otra vista: OCULTO (nunca flotando encima — ese era el bug).
-    // 'scope' guía el wiring: 'accounts' usa la preferencia del usuario; 'docked-left'
-    // fuerza izquierda sin pisar esa preferencia; 'hidden' esconde el panel.
+    // 'scope' guía el wiring: 'accounts'/'docked-right' anclan a la derecha de la zona
+    // correspondiente; 'hidden' esconde el panel.
     sectionDock: function (section, isSA) {
       if (section === 'accounts') return { visible: true, scope: 'accounts', zoneId: 'accDockZone' };
       if (isSA && (section === 'logs' || section === 'activity'))
-        return { visible: true, scope: 'docked-left', zoneId: section === 'logs' ? 'logsMain' : 'activityMain' };
+        return { visible: true, scope: 'docked-right', zoneId: section === 'logs' ? 'logsMain' : 'activityMain' };
       return { visible: false, scope: 'hidden', zoneId: null };
     },
   };
@@ -107,6 +113,10 @@
 
   // ── Wiring DOM ───────────────────────────────────────────────────────────────
   var MINW = 360, MINH = 500, DOCK_MINW = 320, DOCK_MAXW = 560, DOCK_GAP = 14;
+  // Respiro contra el borde derecho de la zona (entre el scroll de la tabla y el
+  // panel). Mismo valor que el margen lateral de .pantalla-sheet (pantalla.css:182,
+  // right:20px) para que el panel de depósitos y La Pantalla lean el MISMO borde.
+  var RIGHT_INSET = 20;
 
   function DeposWindow() {}
 
@@ -119,8 +129,9 @@
     var dividerSel = opts.divider || '.dw-divider';
     var minW = opts.minW || MINW, minH = opts.minH || MINH;
 
-    // Default 'right': el panel encaja a la derecha de la tabla (el espacio que
-    // Robert reservó en la maqueta). `section` rige el modo efectivo por vista.
+    // El panel SIEMPRE va acoplado a la derecha (Robert 2026-07-17: ya no se mueve,
+    // no flota, no se acopla a la izquierda ni se desacopla — solo se ensancha con el
+    // divisor). `mode` queda fijo en 'right'; solo el ANCHO es preferencia del usuario.
     var ST = { mode: 'right', section: 'accounts', float: null, dockW: { left: 400, right: 400 }, open: false };
     load();
 
@@ -185,7 +196,10 @@
       var z = zone(); if (!z) return;
       z.classList.toggle('dock-l', side === 'left');
       z.classList.toggle('dock-r', side === 'right');
-      z.style.setProperty('--dock-w', (w + DOCK_GAP) + 'px');
+      // La tabla reserva: ancho del panel + gap contra el panel + respiro derecho
+      // (RIGHT_INSET) para que su scroll no quede pegado al panel ni al borde.
+      var pad = w + DOCK_GAP + (side === 'right' ? RIGHT_INSET : 0);
+      z.style.setProperty('--dock-w', pad + 'px');
       if (!side) { z.classList.remove('dock-l', 'dock-r'); z.style.removeProperty('--dock-w'); }
     }
 
@@ -198,23 +212,13 @@
       });
     }
 
-    // Modo efectivo según la sección: en logs/activity (SA) el panel se ancla a la
-    // izquierda sin sobreescribir la preferencia de accounts (ST.mode).
-    function pantallaAbierta() {
-      var p = document.getElementById('pantalla');
-      return !!p && !p.hidden;
-    }
-    function effectiveMode() {
-      if (ST.section === 'logs' || ST.section === 'activity') return 'left';
-      // Decisión de Robert (campo): con La Pantalla desplegada, el panel de depósitos
-      // SIEMPRE queda debajo (dockeado a #accDockZone, que en el DOM vive después del
-      // strip de La Pantalla) — nunca comparte su franja aunque el operador prefiera
-      // flotante. Al cerrarse, vuelve a la preferencia guardada (ST.mode intacto).
-      if (ST.mode === 'float' && pantallaAbierta()) return 'right';
-      return ST.mode;
-    }
-    // En esas vistas el panel queda fijo (no se arrastra/redimensiona por el header).
-    function sectionLocked() { return ST.section === 'logs' || ST.section === 'activity'; }
+    // Modo efectivo: SIEMPRE 'right'. El panel ya no flota ni se acopla a la izquierda
+    // en ninguna vista (Robert 2026-07-17). Se conserva la función por si algún caller
+    // la consulta, pero devuelve una constante.
+    function effectiveMode() { return 'right'; }
+    // El panel nunca se arrastra por el header en ninguna vista (solo se ensancha con
+    // el divisor). Antes esto solo aplicaba a logs/activity.
+    function sectionLocked() { return true; }
 
     function applyRect(r, anim) {
       win.style.transition = anim
@@ -233,23 +237,13 @@
       win.classList.toggle('dw-docked', docked);
       win.classList.toggle('dw-dock-left', em === 'left');
       win.classList.toggle('dw-dock-right', em === 'right');
-      if (docked) {
-        var z = zoneRect();
-        if (!z) {
-          // zona sin geometría (su sección está oculta). En accounts caemos a
-          // flotante; en logs/activity NO flotamos encima de la vista → no-op.
-          if (!sectionLocked()) { ST.mode = 'float'; return apply(anim); }
-          return;
-        }
-        var w = ST.dockW[em] = Geo.clamp(ST.dockW[em], DOCK_MINW, Math.min(DOCK_MAXW, z.width - 240));
-        applyRect(Geo.dockRect(z, em, w), anim);
-        setZonePad(em, w);
-      } else {
-        if (!ST.float) ST.float = defaultFloat();
-        ST.float = clampFloat(ST.float);
-        setZonePad(null);
-        applyRect(ST.float, anim);
-      }
+      // Siempre acoplado a la derecha. Si la zona no tiene geometría (su sección está
+      // oculta) simplemente no reubicamos — nunca flotamos encima de otra vista.
+      var z = zoneRect();
+      if (!z) { syncBtns(); return; }
+      var w = ST.dockW[em] = Geo.clamp(ST.dockW[em], DOCK_MINW, Math.min(DOCK_MAXW, z.width - 240 - RIGHT_INSET));
+      applyRect(Geo.dockRect(z, em, w, RIGHT_INSET), anim);
+      setZonePad(em, w);
       syncBtns();
       if (!skipSave) save();
     }
@@ -266,7 +260,9 @@
     function load() {
       try {
         var s = JSON.parse(localStorage.getItem(storageKey) || 'null');
-        if (s && s.mode) { ST.mode = s.mode; ST.float = s.float || null; ST.dockW = s.dockW || ST.dockW; }
+        // Solo el ANCHO es preferencia; el modo es SIEMPRE 'right' (ignora 'float'/'left'
+        // de sesiones viejas guardadas en localStorage).
+        if (s && s.dockW) ST.dockW = s.dockW;
       } catch (_) {}
     }
 
@@ -383,7 +379,7 @@
       if (rz || drag || dv) return;
       if (e.target.closest('.dw-btn')) return;            // controles: su propio handler
       if (e.target.closest(dividerSel)) return;           // divisor: su propio handler
-      if (sectionLocked()) return;                        // logs/activity: panel fijo a la izquierda
+      if (sectionLocked()) return;                        // panel SIEMPRE fijo: sin drag ni resize por bordes (solo el divisor ensancha)
       if (ST.mode === 'float') {
         var ed = Geo.edgesAt(rectOf(win), e.clientX, e.clientY, 8);
         if (ed.l || ed.r || ed.t || ed.b) { startResize(e, ed); return; }

@@ -55,6 +55,8 @@ ok(rr.left >= 0 && rr.top >= 0, 'resize no sale del viewport (origen)');
 let zone = { left: 200, top: 120, width: 800, height: 500 };
 eq(G.dockRect(zone, 'right', 400), { left: 600, top: 120, width: 400, height: 500 }, 'dockRect derecha');
 eq(G.dockRect(zone, 'left', 400), { left: 200, top: 120, width: 400, height: 500 }, 'dockRect izquierda');
+// inset = respiro contra el borde (margen derecho entre scroll y panel)
+eq(G.dockRect(zone, 'right', 400, 20), { left: 580, top: 120, width: 400, height: 500 }, 'dockRect derecha con inset 20');
 
 // dockWidthFromPointer — deja espacio a la tabla
 let w = G.dockWidthFromPointer(zone, 'right', 700, 320, 560, 240);
@@ -76,9 +78,10 @@ eq(G.snapZone(z, 950, 9000, 0.32), null, 'snap nulo si la ventana está muy abaj
 // accounts: visible para ambos roles, zona de la tabla
 eq(G.sectionDock('accounts', true), { visible: true, scope: 'accounts', zoneId: 'accDockZone' }, 'accounts SA → visible tabla');
 eq(G.sectionDock('accounts', false), { visible: true, scope: 'accounts', zoneId: 'accDockZone' }, 'accounts operador → visible tabla');
-// logs/activity: SOLO SA, acoplado a la izquierda de esa vista
-eq(G.sectionDock('logs', true), { visible: true, scope: 'docked-left', zoneId: 'logsMain' }, 'logs SA → dock izq logsMain');
-eq(G.sectionDock('activity', true), { visible: true, scope: 'docked-left', zoneId: 'activityMain' }, 'activity SA → dock izq activityMain');
+// logs/activity: SOLO SA, acoplado a la DERECHA de esa vista (Robert 2026-07-17:
+// el panel SIEMPRE va a la derecha, también al seguir a logs/activity)
+eq(G.sectionDock('logs', true), { visible: true, scope: 'docked-right', zoneId: 'logsMain' }, 'logs SA → dock der logsMain');
+eq(G.sectionDock('activity', true), { visible: true, scope: 'docked-right', zoneId: 'activityMain' }, 'activity SA → dock der activityMain');
 eq(G.sectionDock('logs', false), { visible: false, scope: 'hidden', zoneId: null }, 'logs operador → oculto');
 eq(G.sectionDock('activity', false), { visible: false, scope: 'hidden', zoneId: null }, 'activity operador → oculto');
 // resto de vistas: oculto para ambos

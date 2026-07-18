@@ -509,10 +509,22 @@ Ver `docs/SSE_EVENTS.md` para tabla maestra de `kind` y su handler.
 
 **Historial scrolleable + detalle expandible (2026-07-04):** `.pat-txn-col` pasó de `overflow:hidden` + cap fijo de 12 filas (`+N más`) a `overflow-y:auto` (rueda nativa) + click-y-jala delegado en `#pantalla` (el nodo se re-renderiza en cada refresh de detalle; un listener directo se perdería) — umbral de 6px para distinguir drag de click (mismo patrón que la selección tipo Explorer). Cap subido a 400 (solo backstop). Cada fila `.pat-mv` togglea un detalle expandible al click (`grid-template-rows: 0fr↔1fr`, 180ms) con operador/tarjeta completa SIN enmascarar (copiable, `.pat-mv-exp-copy`)/motivo — solo hay sustancia real en movimientos nativos (`m.who`/`m.card_pipe`); el eco de BetMexico muestra "sin detalle interno". `_mvDragged` (module-level flag) evita que soltar un drag-scroll también togglee la fila.
 
+## Rework de interacción 2026-07-17 (Robert, campo — panel fijo, combo, cierre, drag, tarjetas, vidrio)
+
+Tanda de correcciones de interacción/estética pedidas operando en prod:
+
+- **Combo de la tabla — solo el TEXTO copia:** `data-copy`/`d-copy` se movió del `<td class="combo">` al `<b class="combo-txt d-copy">` interno (`app.js` `renderTable`). Click sobre el texto del combo → copia (handler global capture, `stopPropagation`, NO abre detalle). Click en el resto de la celda (padding, badge JWT 🟢, lock-chip) → abre La Pantalla, igual que cualquier otra celda. Ctrl/Shift+Click sobre el texto sigue seleccionando (el handler global deja pasar el modificador al row-handler).
+- **Panel de depósitos — SIEMPRE dockeado a la DERECHA, solo se ensancha** (`depos_window.js`): se eliminaron los modos `float` y `left`, el drag por el header y el resize por bordes. `effectiveMode()` devuelve constante `'right'`; `sectionLocked()` siempre `true`. El único ajuste es el divisor (`.dw-divider`) que recorre el ancho. `load()` ignora `mode`/`float` de localStorage (solo restaura el ancho). Se agregó `RIGHT_INSET=20` (respiro contra el borde derecho, mismo margen que `.pantalla-sheet`) aplicado en `Geo.dockRect(zone, side, dockW, inset)` y reservado en `setZonePad`. En **logs/activity** el panel ahora dockea a la **derecha** (antes izquierda): `Geo.sectionDock` → `scope:'docked-right'`. Botones `.dw-dock-l`/`.dw-dock-r` eliminados de `injectWindow` (`depos.js`); solo queda `.dw-close`. CSS: `.head` sin `cursor:grab`.
+- **La Pantalla cierra SOLO por backdrop o X** (`pantalla.js`): se quitó la rama que cerraba al click en "espacio limpio" dentro del `.pantalla-sheet` (sacaba al operador a media interacción). Ahora solo cierra `[data-close]` (backdrop = click fuera del sheet, o botón ✕) y `Esc`.
+- **Pegar VARIAS tarjetas de golpe** (`depos.js` `startAddCard`): el input de "+ agregar tarjeta" acepta multi-paste (separadas por línea/espacio/coma/`;`). Mete las válidas sin caerse por las inválidas (reporta `✓ N · M inválidas`). Pegar 1 sola cae al flujo normal (Enter/blur).
+- **Drag de filas SELECCIONADAS → panel** (`app.js` + `depos.js`): solo las filas con `row-sel` son `draggable` (así no choca con el marquee, que arranca sobre filas NO seleccionadas). `dragstart` empaqueta `application/x-bmx-accounts` (ids+email+grade de toda la selección); el panel (`#depos`) es drop-zone (`dragover`/`drop`) y llama `window.Depos.addAccounts(list)` → suma a `_dx.accounts` (dedup), resuelve password/grade en background. Feedback visual: `body.dragging-acc` (invitación) + `#depos.dw-drop-hot` (realce).
+- **Un solo botón "Depositar"** (`depos.js` + `pantalla.css`): al abrir el panel se marca `body.depos-open`, que oculta `.pat-act-dep` en La Pantalla (no dos botones a la vez). Reaparece al cerrar el panel.
+- **Vidrio oscuro UNIFORME** (`pantalla.css` `.pantalla-sheet`): se quitaron las capas que oscurecían solo la izquierda y la que aclaraba izq→der hacia el tinte del grade; el oscurecido ahora es plano a lo ancho. El grade sigue tiñendo bordes/CTA, no el fondo.
+
 ## Convenciones
 
 - **`data-copy`** en cualquier elemento → click izquierdo copia el valor. Handler global en app.js:2715.
-- **Combo de la tabla (`td.combo`)** → click abre La Pantalla (se le quitó `data-combo`/`d-copy` el 2026-07-03; ya no copia en la tabla). El copiado del combo vive en La Pantalla (`.pat-combo`, botón dedicado).
+- **Combo de la tabla** → el **texto** (`b.combo-txt.d-copy[data-copy]`) copia al click; el **resto de la celda** (`td.combo`) abre La Pantalla (2026-07-17). El copiado del combo también vive en La Pantalla (`.pat-combo`, botón dedicado).
 - **`.d-copy`** clase utilitaria para elementos copiables (estilo + handler).
 - **Cache-bust** en `index.html` con `?v=<timestamp>` para forzar refresh tras deploy (no requiere Ctrl+F5 normalmente).
 

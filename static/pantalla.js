@@ -565,15 +565,14 @@
   // (`window.Pantalla.open`). Ctrl/Shift+Click hacen selección tipo Excel. Ya no se
   // usa contextmenu (click derecho).
 
-  // Cierre: (a) click en [data-close] (backdrop + botón X); (b) click en espacio
-  // LIMPIO dentro del sheet (no sobre un control/texto/fila). Click en cualquier
-  // OTRA parte del dashboard NO cierra (Robert: se queda abierta y solo cambia
-  // de cuenta al seleccionar otra fila).
-  const _INTERACTIVE = 'button, a, input, textarea, .pat-mv, .pat-combo, .pat-curp, .pat-sv-card, .pat-sv-note, [data-copy]';
+  // Cierre: SOLO (a) click en [data-close] = backdrop (clic FUERA del sheet, sobre
+  // el vidrio difuminado alrededor) o el botón X de la esquina. Click DENTRO del
+  // sheet ya nunca cierra — antes un click en espacio "limpio" del sheet lo cerraba
+  // y sacaba al operador a media interacción (Robert 2026-07-17: "que se cierre
+  // solamente al click fuera de la pantalla o en la tachita"). Click en otra parte
+  // del dashboard (p.ej. otra fila) tampoco cierra: solo cambia de cuenta.
   document.addEventListener('click', e => {
-    if (e.target.closest('[data-close]')) { close(); return; }
-    const sheet = e.target.closest('.pantalla-sheet');
-    if (sheet && !e.target.closest(_INTERACTIVE)) close();   // espacio limpio del sheet
+    if (e.target.closest('[data-close]')) close();
   });
 
   // Combo copiable tipo liga: el copiado real lo hace el handler global (.d-copy);

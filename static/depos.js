@@ -172,21 +172,60 @@
   function startAddCard(addEl) {
     const inp = document.createElement('input');
     inp.className = 'chip';
-    inp.placeholder = 'NNNN|MM|YY|CVV';
+    inp.placeholder = 'NNNN|MM|YY|CVV · pega varias';
     inp.style.minWidth = '0';
     addEl.replaceWith(inp);
     inp.focus();
     let done = false;
+
+    // Divide un texto en candidatos de tarjeta (una por línea / espacio / coma / ;).
+    // Un pipe NNNN|MM|YY|CVV no tiene espacios internos → separar así es seguro.
+    const splitCards = (raw) => String(raw || '').split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean);
+
+    // Mete N candidatos SIN cortar en el primer error: entran los válidos, se cuentan
+    // los inválidos (frictionless — pegar 20 y que entren los 18 buenos, no que se
+    // caiga todo por 2 malos). Devuelve {added, bad}.
+    const addMany = (list) => {
+      let added = 0, bad = 0;
+      for (const v of list) {
+        if (D.validatePipe(v)) { bad++; continue; }
+        const canon = D.canonicalPipe(v); // formato único NNNN|MM|YYYY|CVV
+        if (_dx.cards.indexOf(canon) < 0) { _dx.cards.push(canon); added++; }
+      }
+      return { added, bad };
+    };
+    const reportMulti = (added, bad) => {
+      if (!bad) return;
+      showToast(added ? ('✓ ' + added + ' · ' + bad + ' inválida' + (bad > 1 ? 's' : '')) : 'Sin tarjetas válidas');
+    };
+
     const commit = () => {
       if (done) return; done = true;
-      const v = inp.value.trim();
-      if (!v) { renderCards(); return; }
-      const err = D.validatePipe(v);
-      if (err) { showToast(err); done = false; inp.focus(); return; }
-      const canon = D.canonicalPipe(v); // formato único NNNN|MM|YYYY|CVV
-      if (_dx.cards.indexOf(canon) < 0) _dx.cards.push(canon);
+      const list = splitCards(inp.value);
+      if (!list.length) { renderCards(); return; }
+      // Una sola y con formato malo → mantener el input abierto para corregir.
+      if (list.length === 1) {
+        const err = D.validatePipe(list[0]);
+        if (err) { showToast(err); done = false; inp.focus(); return; }
+      }
+      const { added, bad } = addMany(list);
+      reportMulti(added, bad);
       renderCards();
     };
+
+    // Pegar varias de golpe: si el portapapeles trae >1 tarjeta, commitea al instante
+    // (el input se reemplaza por los chips). Pegar una sola cae al flujo normal.
+    inp.addEventListener('paste', (e) => {
+      const txt = ((e.clipboardData || window.clipboardData) && (e.clipboardData || window.clipboardData).getData('text')) || '';
+      const list = splitCards(txt);
+      if (list.length > 1) {
+        e.preventDefault();
+        done = true;
+        const { added, bad } = addMany(list);
+        reportMulti(added, bad);
+        renderCards();
+      }
+    });
     inp.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); commit(); }
       else if (e.key === 'Escape') { done = true; renderCards(); }
@@ -227,6 +266,27 @@
       const r = await fetch('/api/deposits/cap-status/' + _dx.accounts[0].id);
       if (r.ok) _dx.cap = await r.json();
     } catch (e) { /* degradar */ }
+  }
+
+  // ── agregar cuentas arrastradas desde la tabla (drag→panel, app.js) ──
+  // Suma a la misión activa SIN re-abrir el modal (Robert 2026-07-17: reponer cuentas
+  // arrastrando la selección de la tabla al panel). Dedup por id; resuelve
+  // password/grade contra el backend en background (no bloquea el render).
+  async function addAccounts(list) {
+    if (!Array.isArray(list) || !list.length) return;
+    let changed = false;
+    list.forEach((a) => {
+      const id = a && a.id;
+      if (!id || _dx.accounts.some((x) => x.id === id)) return;   // ya está en la misión
+      _dx.accounts.push({ id: id, email: (a.email || ('cuenta#' + id)), password: '', grade: (a.grade || '') });
+      changed = true;
+    });
+    if (!changed) { showToast('Ya estaban en la misión'); return; }
+    renderAccounts(); refreshMode();
+    showToast('✓ ' + _dx.accounts.length + ' cuenta' + (_dx.accounts.length > 1 ? 's' : '') + ' en la misión');
+    await resolveAccounts(); renderAccounts(); refreshMode();
+    // 1 sola cuenta → carga tarjetas guardadas + cap; varias → matchmaker (sin cap por-cuenta).
+    if (_dx.accounts.length === 1) { await loadSavedCards(); await refreshCap(); refreshMode(); }
   }
 
   // ── journey: escenas, %, sub, movimientos ──
@@ -676,11 +736,9 @@
     if (bmx && !bmx.querySelector('.dw-ctl')) {
       const ctl = document.createElement('div');
       ctl.className = 'dw-ctl';
+      // Solo la tachita de cerrar: el panel ya no se acopla a la izquierda ni se
+      // desacopla (Robert 2026-07-17). El único ajuste es ensanchar con el divisor.
       ctl.innerHTML =
-        '<button class="dw-btn dw-dock-l" title="Acoplar a la izquierda de la tabla" aria-label="Acoplar a la izquierda">' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="3" y="5" width="8" height="14" rx="1.5" fill="currentColor" stroke="none"/></svg></button>' +
-        '<button class="dw-btn dw-dock-r" title="Acoplar a la derecha de la tabla" aria-label="Acoplar a la derecha">' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="13" y="5" width="8" height="14" rx="1.5" fill="currentColor" stroke="none"/></svg></button>' +
         '<button class="dw-btn dw-close" title="Cerrar (Esc)" aria-label="Cerrar">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
       bmx.appendChild(ctl);
@@ -740,6 +798,29 @@
       }
     });
 
+    // ── drop de cuentas arrastradas desde la tabla → suma a la misión ──
+    // (dragstart lo emite app.js con el type custom; en dragover solo se pueden leer
+    // los `types`, el payload real se lee en `drop`).
+    const DND_TYPE = 'application/x-bmx-accounts';
+    const hasAccPayload = (dt) => !!dt && Array.prototype.indexOf.call(dt.types || [], DND_TYPE) >= 0;
+    el.addEventListener('dragover', (e) => {
+      if (!hasAccPayload(e.dataTransfer)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      el.classList.add('dw-drop-hot');
+    });
+    el.addEventListener('dragleave', (e) => {
+      if (!el.contains(e.relatedTarget)) el.classList.remove('dw-drop-hot');
+    });
+    el.addEventListener('drop', (e) => {
+      el.classList.remove('dw-drop-hot');
+      const raw = e.dataTransfer && e.dataTransfer.getData(DND_TYPE);
+      if (!raw) return;
+      e.preventDefault();
+      let list; try { list = JSON.parse(raw); } catch (_) { return; }
+      addAccounts(list);
+    });
+
     // monto manual
     const inp = qs('#amtInput');
     if (inp) inp.addEventListener('input', (e) => {
@@ -765,6 +846,9 @@
   // ── open/close ──
   function onEsc(e) { if (e.key === 'Escape') window.closeDepos(); }
 
+  // API pública mínima (drag→panel desde app.js).
+  window.Depos = { addAccounts: addAccounts };
+
   window.openDepos = async function (opts) {
     opts = opts || {};
     mount();
@@ -783,7 +867,10 @@
     renderAccounts(); renderCards(); refreshMode();
     root.classList.remove('hidden');
     root.setAttribute('aria-hidden', 'false');
-    if (_win) _win.show();   // aplica estado/posición/tamaño guardados (float o dock)
+    // Con el panel abierto, La Pantalla oculta SU botón "Depositar" (evita dos botones
+    // de depósito a la vez — Robert 2026-07-17). El CSS lo apaga vía body.depos-open.
+    document.body.classList.add('depos-open');
+    if (_win) _win.show();   // aplica tamaño/ancho guardados (dock derecho)
     _dx.open = true;
     document.removeEventListener('keydown', onEsc); // evita listener duplicado si ya estaba abierto
     document.addEventListener('keydown', onEsc);
@@ -797,6 +884,7 @@
   window.closeDepos = function () {
     root.classList.add('hidden');
     root.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('depos-open');   // La Pantalla recupera su botón "Depositar"
     if (_win) _win.hide();   // suelta la compresión del dashboard (conserva el estado)
     _dx.open = false;
     document.removeEventListener('keydown', onEsc);
