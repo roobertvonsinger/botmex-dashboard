@@ -930,21 +930,6 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
   .lp-dot.live, .lp-pulse { animation: none !important; }
 }
 
-/* ─── Focus visible global ─── */
-:focus:not(:focus-visible) { outline: none; }
-*:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-.ico-btn:focus-visible, .nav:focus-visible, .pg-btn:focus-visible, .pat-act:focus-visible,
-.sb-collapse:focus-visible, .lp-head-clickable:focus-visible, .grade:focus-visible,
-.lock-chip:focus-visible, .jwt-chip:focus-visible,
-input:focus-visible, select:focus-visible, textarea:focus-visible,
-button:focus-visible, [role="button"]:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
 /* ─── Selection checkbox (entre grade-bar y saldo, comprimido) ─── */
 .sel-cell {
   width: 15px !important; min-width: 15px !important; max-width: 15px !important;
@@ -4227,6 +4212,30 @@ body::after {
 
 /* Profundidad en las cajas del sidebar (status / online / usuario). */
 .sb-status, .sb-online { box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), inset 0 0 16px rgba(0,0,0,0.22); }
+
+/* ─── Focus visible global (al final del archivo a propósito: gana el empate de
+   especificidad contra los ":focus{outline:none}" declarados arriba en inputs
+   sueltos — misma especificidad, gana el orden de cascada). ─── */
+:focus:not(:focus-visible) { outline: none; }
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ico-btn:focus-visible, .nav:focus-visible, .pg-btn:focus-visible, .pat-act:focus-visible,
+.sb-collapse:focus-visible, .lp-head-clickable:focus-visible, .grade:focus-visible,
+.lock-chip:focus-visible, .jwt-chip:focus-visible,
+input:focus-visible, select:focus-visible, textarea:focus-visible,
+button:focus-visible, [role="button"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Overrides puntuales: estos selectores tienen "outline:0" incondicional (no
+   ligado a :focus) con especificidad mayor a *:focus-visible — sin este empate
+   explícito el link quedaba SIN indicador de foco (detectado con Tab real). */
+.cenefa a:focus-visible, .sb-brand a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .sb-user { box-shadow: inset 0 1px 0 var(--hairline), 0 2px 9px rgba(0,0,0,0.26); }
 
 /* Filtros/segmentos: realce vivo del estado activo + sheen al hover. */

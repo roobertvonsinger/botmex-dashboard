@@ -207,6 +207,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `5c0cab3` | fix(a11y): F0 auditoria visual — contraste WCAG AA + focus visible + reduced-motion |
 | `44e0a18` | docs(next-session): cierre 2026-07-18 — plan auditoria visual listo para /Smartexe |
 | `7be4866` | docs(plan): auditoria visual/UX/a11y perfeccionada — 1 sesion Sonnet, ejecutable |
 | `e5b9419` | fix(lock): un solo lock — quita candadito de La Pantalla + sacar a trastienda libera RESERVADA_SA |
@@ -218,7 +219,6 @@ prewarm.py (router)
 | `065f5ad` | fix(depos.js): eliminar rama muerta cap.total (backend nunca la envia) + unificar pillShow/Hide a classList igual que el resto del componente |
 | `32f7244` | fix(depos.js): fitGreet se invoca en mount inicial, no solo en rotacion de 60s — eliminaba flash de font-size incorrecto en primer paint |
 | `b080909` | fix(depos.css): mov-list ahora scrollea (overflow-y:auto) en vez de recortar filas silenciosamente — scrollbar ya estaba estilizada en CSS pero nunca se activaba |
-| `f32d545` | fix(depos.css): consolidar font-size a escala de 4 pasos (9/11/13/16px) + letter-spacing de .label a 0.8px — 15+ valores puntuales sin ratio, j-bal-to invertia jerarquia (23px > titulo 12px), tracking desproporcionado en micro-labels |
 <!-- GEN:end:recientes -->
 
 ---
