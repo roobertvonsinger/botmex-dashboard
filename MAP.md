@@ -207,6 +207,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `e5b9419` | fix(lock): un solo lock — quita candadito de La Pantalla + sacar a trastienda libera RESERVADA_SA |
 | `3eed4c8` | feat(ui): panel depósitos fijo-derecha + combo/cierre/tarjetas/drag + vidrio uniforme |
 | `6ebdd4a` | fix(ui): 3 bugs de layout — panel hueco, escenario desbordado, feed ilegible |
 | `d623fec` | fix(deposits): mission_sem leak — matchmaker/scheduled caían con 429 permanente |
@@ -218,7 +219,6 @@ prewarm.py (router)
 | `f32d545` | fix(depos.css): consolidar font-size a escala de 4 pasos (9/11/13/16px) + letter-spacing de .label a 0.8px — 15+ valores puntuales sin ratio, j-bal-to invertia jerarquia (23px > titulo 12px), tracking desproporcionado en micro-labels |
 | `3d7709c` | fix(depos_window): throttle de guardado en drag del divisor — igualado al patron de onResizeMove/onResizeUp, antes escribia a localStorage en cada mousemove |
 | `10a40e6` | fix(depos): cursor de resize visible en borde superior — CSS de .head pisaba el inline style de updateCursor() |
-| `db35640` | fix(app.js): restaurar copy-on-click del combo sin romper seleccion multiple — data-copy en la celda + excepcion de modificador en el listener global |
 <!-- GEN:end:recientes -->
 
 ---
