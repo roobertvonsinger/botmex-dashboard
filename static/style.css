@@ -596,19 +596,36 @@ thead th.num { text-align: right; }
 #accTable col.c-saldo  { width: 108px; }
 #accTable col.c-cuenta { width: 100%; }
 #accTable col.c-dep    { width: 150px; }
-#accTable col.c-check  { width: 96px; }
-#accTable col.c-checks { width: 80px; }
-#accTable col.c-nota   { width: 84px; }
-#accTable col.c-cards  { width: 46px; }
-#accTable col.c-pin    { width: 40px; }
+#accTable col.c-check    { width: 176px; }
+#accTable col.c-acciones { width: 170px; }
 tbody tr { border-bottom: 1px solid var(--hairline); transition: background var(--ease-fast); }
 tbody tr:hover { background: rgba(255,255,255,0.025); }
+/* Glow fila-fuente ↔ La Pantalla abierta (Task 1.4, feature semilla de Robert:
+   "la cuenta en vista de detalles debería brillar"). Semántica distinta de
+   row-sel (selección múltiple): esto es "la que veo ahorita", solo 1 a la vez,
+   borde-izq en vez de fondo lleno para no pelear visualmente con row-sel. */
+.pantalla-source > td { position: relative; }
+.pantalla-source > td:first-child::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 3px;
+  background: var(--accent); box-shadow: var(--neon-sm); border-radius: 0 2px 2px 0;
+}
+.pantalla-source { background: var(--accent-soft); }
+@media (prefers-reduced-motion: no-preference) {
+  .pantalla-source { transition: background var(--ease-fast); }
+}
 tbody td { height: 30px; padding: 0 10px; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 tbody td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
 tbody td.combo { overflow: visible; }      /* el lock-chip nunca se corta */
-/* iconos en 3 columnas (Nota | tarjetas | pin) — agrupadas a la derecha */
+/* Auditoría 2026-07-18 — Nota/tarjetas/pin compactados de 3 columnas a 1 (carga
+   cognitiva, ver plan auditoria-visual): mismos botones, misma info, agrupados
+   en una sola celda con .row-ic ya inline-flex (se acomodan solos, sin CSS nuevo
+   de layout). Ancho de columna = suma medida de las 3 anteriores (84+46+40). */
 tbody td.ic-col { overflow: visible; white-space: nowrap; padding: 0 2px; text-align: center; }
-tbody td.ic-nota-col { text-align: right; padding-right: 4px; }
+tbody td.acciones-col { text-align: right; padding-right: 4px; }
+tbody td.acciones-col .row-ic + .row-ic { margin-left: 3px; }
+/* Últ. check + Checks compactados a 1 columna (mismo patrón que .dep: métrica
+   principal + secundaria en una celda). Ancho = suma medida (96+80). */
+tbody td.check-cell .check-cnt { margin-left: 5px; font-family: var(--font-mono); font-size: 10.5px; }
 thead th.ic-col-th { padding: 0; }
 tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); }
 

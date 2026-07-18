@@ -207,6 +207,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `9ed457b` | fix(a11y): mover focus-visible al final de style.css + cerrar gap real en cenefa/logo |
 | `5c0cab3` | fix(a11y): F0 auditoria visual — contraste WCAG AA + focus visible + reduced-motion |
 | `44e0a18` | docs(next-session): cierre 2026-07-18 — plan auditoria visual listo para /Smartexe |
 | `7be4866` | docs(plan): auditoria visual/UX/a11y perfeccionada — 1 sesion Sonnet, ejecutable |
@@ -218,7 +219,6 @@ prewarm.py (router)
 | `6dc9c42` | docs(next-session): plan de migracion bot Telegram a Forgejo (F1.3) — planeada, no ejecutada |
 | `065f5ad` | fix(depos.js): eliminar rama muerta cap.total (backend nunca la envia) + unificar pillShow/Hide a classList igual que el resto del componente |
 | `32f7244` | fix(depos.js): fitGreet se invoca en mount inicial, no solo en rotacion de 60s — eliminaba flash de font-size incorrecto en primer paint |
-| `b080909` | fix(depos.css): mov-list ahora scrollea (overflow-y:auto) en vez de recortar filas silenciosamente — scrollbar ya estaba estilizada en CSS pero nunca se activaba |
 <!-- GEN:end:recientes -->
 
 ---

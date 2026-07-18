@@ -540,6 +540,39 @@ Plan: `docs/superpowers/plans/2026-07-18-auditoria-visual-dashboard.md` (ejecuta
   - `depos.css` (al final): `.sub-dot` (breathe), `#depStage .jglass::after` (pecera), `#depStage #scene-retry.on .rt-head` (rt-breathe) → `animation:none`.
   - `pantalla.css:838-871` ya tenía reduced-motion (`pat-cuaje-rm` fade 0.2s) — solo se verificó, no se tocó.
 
+## Auditoría visual/UX/a11y 2026-07-18 — F1 Tabla (carga cognitiva + glow fila↔detalle)
+
+**Decisión de arquitectura (desvío del plan, con criterio de Robert "resuélvelo tú"):** el plan original pedía un
+chevron que abriera un "peek" reutilizando el acordeón inline viejo (`openDetailModal`/`.acc-detail-row`/
+`expandedAccountId`). Verificado contra el código real: ese acordeón **es código muerto en producción** — solo
+corre si `window.Pantalla` no existe (siempre existe), y el propio plan lo llama *"split-brain legacy...
+superseded por pantalla.js"* en su sección "Fuera de alcance", agendado para BORRAR en Apéndice B (sesión aparte).
+Construir una feature nueva sobre código marcado para borrar en la próxima pasada era exactamente el split-brain
+que el plan decía evitar. **Se descartó el chevron/peek** — F1 se resolvió con:
+
+- **Carga cognitiva 10→7 columnas** (vista `detail`, la única que existe — el toggle Simple/Detallada ya se había
+  matado): `renderTable()` (`app.js:554`) compacta Nota+Tarjetas+Pin (3 `<td class="ic-col">` → 1
+  `<td class="ic-col acciones-col">`, mismos botones `.row-ic` ya `inline-flex`, se acomodan solos) y Últ.check+Checks
+  (2 `<td>` → 1 `<td class="check-cell">`, mismo patrón que `.dep` que ya mergea monto+antigüedad). Vista `simple`
+  (legacy, casi sin uso): 8→6 `<td>`. Anchos de columna = **suma medida** de las columnas que reemplazan (170px =
+  84+46+40 nota/cards/pin; 176px = 96+80 check/checks) — no son px inventados, son la suma real de lo que ya estaba
+  medido. Cero cambio al modelo de interacción (plain-click→La Pantalla, Ctrl/Shift→selección, texto del combo→copia
+  se preservan intactos, no se tocó ese handler).
+- **Glow fila-fuente ↔ La Pantalla abierta** (Task 1.4, feature semilla de Robert: *"la cuenta en vista de detalles
+  debería brillar"*): `window.Pantalla` (`pantalla.js`) expone `get currentId()`. `open(id)` llama `_markSourceRow(id)`
+  (toggle imperativo instantáneo, `.pantalla-source` en `#accTable tbody tr[data-id]`); `_finishClose()` llama
+  `_clearSourceRow()`. Para sobrevivir re-renders (SSE/sort/filtro reconstruyen el tbody), `renderTable()` también
+  recalcula `pantalla-source` en cada `trClasses` desde `window.Pantalla.currentId` — mismo patrón dual
+  (imperativo + recalculado) que ya usa `row-sel`. CSS: borde-izq 3px `var(--accent)` + `box-shadow: var(--neon-sm)`
+  + fondo `var(--accent-soft)` — semántica distinta de `row-sel` (esto es "la que veo", una sola, no la selección
+  múltiple). Verificado con datos inyectados en `state.rows` + `renderTable()` real (sin backend local): abre → fila
+  marca `pantalla-source` (bg `oklch(0.5 0.11 160 / 0.14)`, `::before` 3px `oklch(0.5 0.11 160)`); sobrevive
+  `renderTable()` forzado; cambia de cuenta (`open(2)` con `open(1)` activo) → solo la fila 2 queda marcada; `close()`
+  → limpia tras la animación (verificado a los 500ms).
+- **Cache-bust bump** (`index.html`): `style.css`/`depos.css`/`app.js`/`pantalla.js` → `?v=20260718a` (el navegador
+  cacheaba agresivamente la versión anterior incluso con `location.reload(true)`; solo un query-string nuevo forzó
+  el refresh real durante la verificación).
+
 ## Convenciones
 
 - **`data-copy`** en cualquier elemento → click izquierdo copia el valor. Handler global en app.js:2715.

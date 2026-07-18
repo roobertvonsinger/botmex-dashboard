@@ -568,8 +568,8 @@ function renderTable() {
   let colg = t.querySelector('colgroup');
   if (!colg) { colg = document.createElement('colgroup'); t.insertBefore(colg, t.querySelector('thead')); }
   colg.innerHTML = state.view === 'simple'
-    ? '<col class="c-grade"><col class="c-sel"><col class="c-saldo"><col class="c-cuenta"><col class="c-dep"><col class="c-nota"><col class="c-cards"><col class="c-pin">'
-    : '<col class="c-grade"><col class="c-sel"><col class="c-saldo"><col class="c-cuenta"><col class="c-dep"><col class="c-check"><col class="c-checks"><col class="c-nota"><col class="c-cards"><col class="c-pin">';
+    ? '<col class="c-grade"><col class="c-sel"><col class="c-saldo"><col class="c-cuenta"><col class="c-dep"><col class="c-acciones">'
+    : '<col class="c-grade"><col class="c-sel"><col class="c-saldo"><col class="c-cuenta"><col class="c-dep"><col class="c-check"><col class="c-acciones">';
   const _th = (col, label, cls = '') => {
     const on = _sortCol === col;
     const ic = on ? (_sortDir === 1 ? ' ↑' : ' ↓') : '';
@@ -581,15 +581,15 @@ function renderTable() {
         <th class="sel-cell"></th>
         ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
         ${_th('last_deposit_date','Últ. depósito')}
-        <th class="ic-col-th"></th><th class="ic-col-th"></th><th class="ic-col-th"></th>
+        <th class="ic-col-th" aria-label="Acciones"></th>
       </tr>`
     : `<tr>
         <th class="grade-bar-th"></th>
         <th class="sel-cell"></th>
         ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
         ${_th('last_deposit_date','Últ. depósito')}
-        ${_th('last_checked_at','Últ. check')}${_th('check_count','Checks','num')}
-        <th class="ic-col-th"></th><th class="ic-col-th"></th><th class="ic-col-th"></th>
+        ${_th('last_checked_at','Últ. check')}
+        <th class="ic-col-th" aria-label="Acciones"></th>
       </tr>`;
   const thead = t.querySelector('thead');
   thead.innerHTML = cols;
@@ -601,7 +601,7 @@ function renderTable() {
     });
   });
 
-  const colspan = state.view === 'simple' ? 6 : 8;
+  const colspan = state.view === 'simple' ? 6 : 7;
   const rowsHtml = visible.map(r => {
     const g = gradeClass(r.grade);
     const until = r.locked_by ? fmtUntil(r.locked_until) : null;
@@ -619,7 +619,11 @@ function renderTable() {
     const opClass = r.locked_by ? `op-row-${opCol}` : '';
     const trasClass = r.published_to_pool === 0 ? 'row-trastienda' : '';
     const coolingClass = (r.cooldown_min > 0 || r.needs_reset) ? 'account-cooling' : '';
-    const trClasses = `r-grade-${g} ${lockedCls} ${selCls} ${opClass} ${trasClass} ${coolingClass}`.trim();
+    // Glow "la que veo" (Task 1.4, feature semilla de Robert) — recalculado en
+    // cada render desde window.Pantalla.currentId, así sobrevive SSE/sort/filtro
+    // igual que row-sel. El toggle instantáneo al abrir/cerrar vive en pantalla.js.
+    const pantallaSrcClass = (window.Pantalla && window.Pantalla.currentId === r.id) ? 'pantalla-source' : '';
+    const trClasses = `r-grade-${g} ${lockedCls} ${selCls} ${opClass} ${trasClass} ${coolingClass} ${pantallaSrcClass}`.trim();
     const lockChip = r.locked_by
       ? `<span class="lock-chip op-${esc(opCol)} ${until?.expired ? 'expired' : ''}" title="Lockeada por ${esc(r.locked_by)}${until ? ` · ${until.expired ? 'vencido' : `vence en ${until.text}`}` : ''}">🔒 ${esc(r.locked_by)}${until && !until.expired ? ` <span class="lock-chip-time dim">${until.text}</span>` : ''}</span>`
       : '';
@@ -659,6 +663,10 @@ function renderTable() {
 
     // Botón ↻ por fila — actualiza SOLO esta cuenta al instante
     const refreshOneBtn = `<button class="row-refresh-one" data-id="${r.id}" title="Actualizar SOLO esta cuenta (login fresh + fetch live)">↻</button>`;
+    // Auditoría 2026-07-18 — carga cognitiva: nota/tarjetas/pin en 1 celda
+    // (antes 3 columnas), últ.check+checks en 1 celda (antes 2). Mismos botones,
+    // misma info, menos columnas compitiendo por atención (Cowan 4±1).
+    const cellAcciones = `<td class="ic-col acciones-col">${cellNota}${cellCards}${cellPin}</td>`;
     if (state.view === 'simple') {
       return `<tr class="${trClasses}" data-id="${r.id}"${selDrag} title="${trTitle || ''}">
         <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
@@ -666,9 +674,7 @@ function renderTable() {
         <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
         <td class="combo" title="Click: ver detalle · Ctrl/Shift+Click: seleccionar">${jwtBadge}<b class="combo-txt d-copy" data-copy="${esc(combo)}" title="Click: copiar combo">${esc(combo)}</b>${lockChip}</td>
         <td class="dep" title="Último depósito hecho">${dep}</td>
-        <td class="ic-col ic-nota-col">${cellNota}</td>
-        <td class="ic-col ic-cards-col">${cellCards}</td>
-        <td class="ic-col ic-pin-col">${cellPin}</td>
+        ${cellAcciones}
       </tr>`;
     }
     return `<tr class="${trClasses}" data-id="${r.id}"${selDrag} title="${trTitle || ''}">
@@ -677,11 +683,8 @@ function renderTable() {
       <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
       <td class="combo" title="Click: ver detalle · Ctrl/Shift+Click: seleccionar">${jwtBadge}<b class="combo-txt d-copy" data-copy="${esc(combo)}" title="Click: copiar combo">${esc(combo)}</b></td>
       <td class="dep" title="Último depósito hecho">${dep}</td>
-      <td class="dep dim" title="Cuándo se actualizó por última vez">${fmtAgo(r.last_checked_at)}</td>
-      <td class="num" title="Total de veces actualizada">${r.check_count || 0}</td>
-      <td class="ic-col ic-nota-col">${cellNota}</td>
-      <td class="ic-col ic-cards-col">${cellCards}</td>
-      <td class="ic-col ic-pin-col">${cellPin}</td>
+      <td class="dep dim check-cell" title="Última actualización · total de checks">${fmtAgo(r.last_checked_at)}<span class="check-cnt">· ${r.check_count || 0}</span></td>
+      ${cellAcciones}
     </tr>`;
   }).join('');
 

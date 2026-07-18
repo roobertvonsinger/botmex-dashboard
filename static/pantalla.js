@@ -105,6 +105,7 @@
 
     _currentId = id;
     clearTimeout(_closeTimer);
+    _markSourceRow(id);
 
     _ensureGooFilter();     // idempotente: el filtro #pat-goo debe existir antes de animar
 
@@ -172,6 +173,19 @@
       });
   }
 
+  // Glow fila-fuente ↔ detalle abierto (Robert, campo: "la cuenta en vista de
+  // detalles debería brillar para que se sepa que esa es la seleccionada").
+  // Distinta semántica de .row-sel (selección múltiple): esto es "la que veo",
+  // una sola a la vez, se mueve con open() al cambiar de cuenta en caliente.
+  function _markSourceRow(id) {
+    document.querySelectorAll('.pantalla-source').forEach(el => el.classList.remove('pantalla-source'));
+    const srcTr = document.querySelector(`#accTable tbody tr[data-id="${id}"]`);
+    if (srcTr) srcTr.classList.add('pantalla-source');
+  }
+  function _clearSourceRow() {
+    document.querySelectorAll('.pantalla-source').forEach(el => el.classList.remove('pantalla-source'));
+  }
+
   function close() {
     const { root } = els();
     if (!root || root.hidden) return;
@@ -190,6 +204,7 @@
     root.setAttribute('aria-hidden', 'true');
     root.classList.remove('pantalla-out');
     _currentId = null;
+    _clearSourceRow();
     // Cerrada La Pantalla, el panel de depósitos puede volver a flotar si esa era
     // la preferencia del operador (el forzado a dockeado era solo mientras estaba abierta).
     try {
@@ -787,5 +802,8 @@
   // debería haber drag/collapse ni de los KPI ni de la pantalla, se quedan fijos").
   // El alto es fijo (ANCHOR_H, app.js) — nada que togglear.
 
-  window.Pantalla = { open, close, showTxn, back };
+  // currentId expuesto para que renderTable() (app.js) pueda re-aplicar el glow
+  // fila-fuente en cada re-render (SSE/sort/filtro reconstruyen el tbody y
+  // borrarían la clase imperativa si no se recalcula desde acá).
+  window.Pantalla = { open, close, showTxn, back, get currentId() { return _currentId; } };
 })();
