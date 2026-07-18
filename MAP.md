@@ -207,6 +207,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `33efe01` | feat(ui): F3 auditoria visual — mobile responsive La Pantalla + verificacion de secuencia |
 | `bf102c2` | feat(ui): F2 auditoria visual — sidebar en 3 grupos colapsables |
 | `22beaba` | feat(ui): F1 auditoria visual — tabla 10 a 7 columnas + glow fila-fuente |
 | `9ed457b` | fix(a11y): mover focus-visible al final de style.css + cerrar gap real en cenefa/logo |
@@ -218,7 +219,6 @@ prewarm.py (router)
 | `6ebdd4a` | fix(ui): 3 bugs de layout — panel hueco, escenario desbordado, feed ilegible |
 | `d623fec` | fix(deposits): mission_sem leak — matchmaker/scheduled caían con 429 permanente |
 | `4de6b1d` | docs: cierre de sesion 2026-07-16 — NEXT-SESSION + entry de ERRORS.md para el fix de refresh guard |
-| `6dc9c42` | docs(next-session): plan de migracion bot Telegram a Forgejo (F1.3) — planeada, no ejecutada |
 <!-- GEN:end:recientes -->
 
 ---

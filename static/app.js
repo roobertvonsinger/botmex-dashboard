@@ -4153,9 +4153,9 @@ function _expandedDetailCell() {
 }
 
 // Cuenta el número real de <td> de una fila de cuenta (para el colspan del
-// panel). La vista simple tiene 7 <td>; la detail, 9. Se cuenta del DOM para
-// no depender de constantes desincronizadas (app.js declara colspan 6/8 pero
-// genera 7/9 <td>).
+// panel). La vista simple tiene 6 <td>; la detail, 7 (auditoría 2026-07-18,
+// carga cognitiva). Se cuenta del DOM para no depender de una constante que
+// se desincronice si vuelve a cambiar el número de columnas.
 function _detailColspan() {
   const anyRow = document.querySelector('#accTable tbody tr[data-id]');
   if (anyRow) return anyRow.querySelectorAll('td').length;
