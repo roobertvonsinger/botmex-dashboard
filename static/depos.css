@@ -668,3 +668,7 @@ body.dragging-acc #depos.dw-on{outline:1.5px dashed var(--aqua-soft); outline-of
 .dw-hint{position:fixed; z-index:201; pointer-events:none; border:2px dashed rgba(0,189,114,.5);
   background:rgba(0,189,114,.10); border-radius:12px; opacity:0; transition:opacity .16s ease}
 .dw-hint.on{opacity:1}
+
+@media (prefers-reduced-motion: reduce) {
+  .sub-dot, #depStage .jglass::after, #depStage #scene-retry.on .rt-head { animation: none !important; }
+}

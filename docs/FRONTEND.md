@@ -522,6 +522,20 @@ Tanda de correcciones de interacción/estética pedidas operando en prod:
 - **Candadito "En uso" eliminado de La Pantalla** (`pantalla.js` + backend `app.py`): el botón `.pat-act.inuse` (lock manual) se quitó — era un 2º control del MISMO lock, redundante con el auto-lock al depositar, y como SA creaba RESERVADA_SA perpetua que trababa "sacar del pool → trastienda". El lock ahora es UNO solo (el de trabajo). Sacar a trastienda (SA) libera la RESERVADA_SA perpetua y respeta el lock temporal de operador activo. Ver `docs/ERRORS.md` §"El candadito En uso…".
 - **Vidrio oscuro UNIFORME** (`pantalla.css` `.pantalla-sheet`): se quitaron las capas que oscurecían solo la izquierda y la que aclaraba izq→der hacia el tinte del grade; el oscurecido ahora es plano a lo ancho. El grade sigue tiñendo bordes/CTA, no el fondo.
 
+## Auditoría visual/UX/a11y 2026-07-18 — F0 Fundación (tokens + contraste + focus + reduced-motion)
+
+Plan: `docs/superpowers/plans/2026-07-18-auditoria-visual-dashboard.md` (ejecutado con `/Smartexe`, rama `feat/auditoria-visual-2026-07-18`).
+
+- **Contraste WCAG AA** (`style.css` `:root`): `--text-muted` 0.34→0.52 alpha (2.1:1→4.5:1), `--text-dim` 0.58→0.72 (7.8:1), `--text-faint` 0.18→0.28 (solo decorativo, nunca texto), `--hairline` 0.06→0.12 (1.3:1→3.2:1), `--hairline-h` 0.10→0.20. Se agregó escala tipográfica (`--fs-9`…`--fs-28`), espaciado base 4px (`--space-1`…`--space-10`), radios, sombras (`--shadow-sm`…`--shadow-xl`) y z-index (`--z-dropdown`…`--z-coachmark`) — antes no existían como tokens.
+  - 9 usos hardcoded de `rgba(255,255,255,0.06)` fuera de `:root` (badges, hovers, keyframe `rowSkip`, bin-chart border, sb-user shadow) migrados a `var(--hairline)`/`var(--hairline-h)`.
+  - `depos.css`/`pantalla.css` **NO se tocaron** en sus sistemas de tokens locales escopados (`#depos{--gold:...}`, `#depStage{--gold:...}`): son universos self-contained (`--void`/`--ink`/`--aqua`/`--gold` hex) que NO heredan `:root` por diseño (comentario propio del archivo: "scoped bajo #depos para no colisionar con style.css"). El choque de nombre `--gold` NO es colisión real en cascada CSS (custom properties están scoped al selector que las declara); tocar esos valores hardcoded arriesgaba romper el look calibrado sin beneficio de contraste (son acentos decorativos, no texto). Decisión no-bloqueante, documentada.
+  - Done: `grep -rnE "rgba\(255,255,255,0\.06\)|rgba\(238,240,243,0\.(34|18)\)" static/style.css static/pantalla.css static/depos.css` → 0 matches.
+- **Focus visible global** (`style.css`, tras el primer `@media (prefers-reduced-motion)` existente): `*:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }` + selectores explícitos para `.ico-btn`, `.nav`, `.pg-btn`, `.pat-act`, `.sb-collapse`, `.lp-head-clickable`, `.grade`, `.lock-chip`, `.jwt-chip`, inputs/selects/botones.
+- **Reduced-motion completo**: el plan original listaba selectores basados en NOMBRES DE KEYFRAME (`.bellPulse`, `.mmBusy`, `.pecera`, `.breathe`, `.depSchedAppear`, `.depSchedShimmer`, `.dep-scheduled-row`) que **no existen como clases** en el DOM — eran nombres de `@keyframes`, no de selector. Corregido contra el código real:
+  - `style.css` (junto a `.dep-spinner`): `.dep-spinner, .bell .badge, .mm-card.mm-busy, .mm-acct.mm-busy, .dep-sched-bar-fill::after` → `animation:none`; `#actTable tbody tr.act-row-new` y `.dep-sched-run` → `animation:none; opacity:1; transform:none` (eran one-shot, no infinitas, pero igual se respetan bajo reduce); `.mm-feed-row` (`mmFeedIn` 280ms) → idem.
+  - `depos.css` (al final): `.sub-dot` (breathe), `#depStage .jglass::after` (pecera), `#depStage #scene-retry.on .rt-head` (rt-breathe) → `animation:none`.
+  - `pantalla.css:838-871` ya tenía reduced-motion (`pat-cuaje-rm` fade 0.2s) — solo se verificó, no se tocó.
+
 ## Convenciones
 
 - **`data-copy`** en cualquier elemento → click izquierdo copia el valor. Handler global en app.js:2715.
