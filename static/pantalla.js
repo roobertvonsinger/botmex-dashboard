@@ -258,7 +258,6 @@
     const balance = d.balance_total != null ? d.balance_total : (d.balance_real || 0);
     const grade = d.grade || null;
     const gCls = (typeof gradeClass === 'function') ? gradeClass(grade) : '';
-    const locked = !!d.locked_by;
 
     // Tinte de La Pantalla por GRADE (Robert 2026-07-10, campo): data-grade en la
     // raíz retinta bordes/glow/CTA/saldo vía las mismas CSS vars (--pat-gold family),
@@ -315,9 +314,13 @@
       </div>
       <div class="pat-actions">
         <button type="button" class="pat-act det-mark" data-mark-email="${g(email)}" title="Fijar"><i class="ph-bold ph-push-pin"></i></button>
-        <button type="button" class="pat-act inuse${locked ? ' on' : ''}" data-inuse="${d.id}" title="En uso (lock 2h) · click de nuevo libera"><i class="ph-bold ph-lock-key"></i></button>
         <button type="button" class="pat-act pat-act-dep d-deposit-btn" data-acc-id="${d.id}" title="Depositar"><i class="ph-duotone ph-credit-card"></i><span>Depositar</span></button>
       </div>`;
+      // Candadito "En uso" (lock manual) ELIMINADO de La Pantalla (Robert 2026-07-17):
+      // era un 2º control de lock, redundante con el auto-lock que ya se pone al
+      // DEPOSITAR (deposits.py _auto_lock_for_deposit). Como SA creaba RESERVADA_SA
+      // perpetua que además trababa "sacar del pool → trastienda". Ahora el lock es UNO
+      // solo (el de trabajo real) y sacar a trastienda lo libera (app.py publish).
   }
 
   // ── Guardado: tarjetas + notas en pequeño (columna de datos, bajo la meta) ──
@@ -584,10 +587,10 @@
     setTimeout(() => combo.classList.remove('copied'), 900);
   });
 
-  // ── Controles principales dentro de La Pantalla (Depositar / Fijar / En uso) ──
+  // ── Controles principales dentro de La Pantalla (Depositar / Fijar) ──
   // Los handlers de app.js están delegados en #accTable y NO capturan dentro de
   // #pantalla; aquí cableamos reusando las funciones GLOBALES (openDepositModal,
-  // toggleMark) y replicando el lock/unlock. En uso pide confirmación al LIBERAR.
+  // toggleMark). El candadito "En uso" se eliminó (lock único = auto-lock al depositar).
   const _patRoot = $('#pantalla');
   if (_patRoot) _patRoot.addEventListener('click', async e => {
     // Click en una fila de movimiento → toggle del detalle expandible (quién,
@@ -611,35 +614,9 @@
       if (typeof window.toggleMark === 'function') window.toggleMark(mark.dataset.markEmail, mark);
       return;
     }
-    const inuse = e.target.closest('.inuse');
-    if (inuse && inuse.dataset.inuse) {
-      e.preventDefault();
-      const accId = parseInt(inuse.dataset.inuse);
-      const turningOn = !inuse.classList.contains('on');
-      if (!turningOn && !confirm('¿Liberar esta cuenta del uso?')) return;   // confirmación al liberar
-      inuse.classList.toggle('on', turningOn);
-      const cache = _pat().detailDataCache;
-      try {
-        if (turningOn) {
-          const op = (window.state && state.user && state.user.username) || 'op';
-          const r = await fetch(`/api/accounts/${accId}/lock`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ operator: op, hours: 2 }) });
-          const data = await r.json().catch(() => ({}));
-          if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
-          if (cache && cache[accId]) { cache[accId].locked_by = data.locked_by; cache[accId].locked_until = data.locked_until; }
-          if (window.toast) toast('🔖 En uso (lock 2h)', 'success');
-        } else {
-          const r = await fetch(`/api/accounts/${accId}/unlock`, { method: 'POST' });
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          if (cache && cache[accId]) { cache[accId].locked_by = null; cache[accId].locked_until = null; }
-          if (window.toast) toast('🔓 Liberada', '');
-        }
-        if (typeof window._liveReload === 'function') window._liveReload();
-      } catch (err) {
-        inuse.classList.toggle('on', !turningOn);   // revert optimista
-        if (window.toast) toast(`Error: ${err.message}`, 'error');
-      }
-      return;
-    }
+    // Candadito "En uso" ELIMINADO de La Pantalla (Robert 2026-07-17) — su handler se
+    // quitó con el botón. El lock ahora es UNO solo: el auto-lock al depositar. Ver
+    // renderPantallaHead + app.py (sacar a trastienda libera la RESERVADA_SA).
 
     // ── Notas: agregar/borrar (portado del acordeón viejo — mismos endpoints) ──
     if (e.target.closest('[data-add-note]')) {

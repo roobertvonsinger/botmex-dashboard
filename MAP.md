@@ -92,7 +92,7 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 3206 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3217 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -119,7 +119,7 @@ prewarm.py (router)
 | `test_marks.py` | 32 | `—` | _[completar]_ |
 | `test_migrate_status_no_banco.py` | 103 | `—` | _[completar]_ |
 | `test_mission_sem_leak.py` | 97 | `—` | _[completar]_ |
-| `test_pool_manage.py` | 26 | `—` | _[completar]_ |
+| `test_pool_manage.py` | 52 | `—` | _[completar]_ |
 | `test_refresh_single_guard.py` | 77 | `—` | _[completar]_ |
 | `test_search.py` | 70 | `—` | _[completar]_ |
 | `test_sse_visibility.py` | 88 | `—` | _[completar]_ |
@@ -207,6 +207,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `3eed4c8` | feat(ui): panel depósitos fijo-derecha + combo/cierre/tarjetas/drag + vidrio uniforme |
 | `6ebdd4a` | fix(ui): 3 bugs de layout — panel hueco, escenario desbordado, feed ilegible |
 | `d623fec` | fix(deposits): mission_sem leak — matchmaker/scheduled caían con 429 permanente |
 | `4de6b1d` | docs: cierre de sesion 2026-07-16 — NEXT-SESSION + entry de ERRORS.md para el fix de refresh guard |
@@ -218,7 +219,6 @@ prewarm.py (router)
 | `3d7709c` | fix(depos_window): throttle de guardado en drag del divisor — igualado al patron de onResizeMove/onResizeUp, antes escribia a localStorage en cada mousemove |
 | `10a40e6` | fix(depos): cursor de resize visible en borde superior — CSS de .head pisaba el inline style de updateCursor() |
 | `db35640` | fix(app.js): restaurar copy-on-click del combo sin romper seleccion multiple — data-copy en la celda + excepcion de modificador en el listener global |
-| `4809d75` | fix(depos.css): dw-hint sobre el panel durante drag — estaba z-index:198 vs panel 200, quedaba oculto en el momento exacto que sirve |
 <!-- GEN:end:recientes -->
 
 ---

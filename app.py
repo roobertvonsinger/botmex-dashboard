@@ -2299,11 +2299,17 @@ def publish_accounts(req: PublishRequest, user: dict = Depends(require_session))
                 [*req.ids],
             )
         else:
-            # A1 guardrail: NO ocultar cuentas EN_USO (locked_by NOT NULL) — quedarían fantasma
-            # (published=0 + lock) e invisibles para todos al liberarse.
+            # Sacar a trastienda (SA) LIBERA de paso la RESERVADA_SA perpetua
+            # (locked_until IS NULL) — el auto-lock del propio SA al depositar dejaba la
+            # cuenta pegada al pool y este guardrail la saltaba en silencio (Robert
+            # 2026-07-17: "no puedo sacar las cuentas del pool hacia trastienda"). Los
+            # locks TEMPORALES de operador (locked_until NOT NULL = trabajo activo) SÍ se
+            # respetan: esas NO se ocultan (evita el fantasma published=0 + lock ajeno).
             cur = c.execute(
-                f"UPDATE accounts SET published_to_pool=0 "
-                f"WHERE id IN ({placeholders}) AND locked_by IS NULL",
+                f"UPDATE accounts SET published_to_pool=0, "
+                f"locked_by=NULL, locked_at=NULL, locked_until=NULL "
+                f"WHERE id IN ({placeholders}) "
+                f"AND (locked_by IS NULL OR locked_until IS NULL)",
                 [*req.ids],
             )
         changed = cur.rowcount
@@ -2318,9 +2324,12 @@ def hide_all_accounts(user: dict = Depends(require_session)):
         raise HTTPException(403, "Solo superadmin")
     with db(write=True) as c:
         cur = c.execute(
-            "UPDATE accounts SET published_to_pool=0 "
+            "UPDATE accounts SET published_to_pool=0, "
+            "locked_by=NULL, locked_at=NULL, locked_until=NULL "
             "WHERE status='LIVE' AND COALESCE(published_to_pool,1)=1 "
-            "AND locked_by IS NULL"   # A1 guardrail: no ocultar cuentas EN_USO/RESERVADA_SA
+            # libera la RESERVADA_SA perpetua al ocultar (Robert 2026-07-17); respeta el
+            # lock temporal de operador activo (locked_until NOT NULL → no se oculta).
+            "AND (locked_by IS NULL OR locked_until IS NULL)"
         )
         changed = cur.rowcount
     return {"hidden": changed}
@@ -2383,13 +2392,15 @@ def api_pool_publish(payload: dict, user: dict = Depends(require_session)):
                 (*emails,),
             )
         else:
-            # M2 (fix 2026-07-02): al OCULTAR del pool NO tocar cuentas lockeadas /
-            # RESERVADA_SA (locked_by NOT NULL). Sin este guardrail quedaban fantasma
-            # (published=0 + locked) e invisibles para todos hasta republicar —
-            # mismo guardrail A1 que /accounts/publish y /accounts/hide-all.
+            # Al OCULTAR del pool se LIBERA la RESERVADA_SA perpetua (locked_until IS NULL)
+            # y se oculta; el lock TEMPORAL de operador activo (locked_until NOT NULL) se
+            # respeta (no se oculta). Antes se saltaba TODO lock, dejando la cuenta pegada
+            # al pool (Robert 2026-07-17). Mismo criterio que /accounts/publish y /hide-all.
             c.execute(
-                f"UPDATE accounts SET published_to_pool=0 "
-                f"WHERE email IN ({qmarks}) AND locked_by IS NULL",
+                f"UPDATE accounts SET published_to_pool=0, "
+                f"locked_by=NULL, locked_at=NULL, locked_until=NULL "
+                f"WHERE email IN ({qmarks}) "
+                f"AND (locked_by IS NULL OR locked_until IS NULL)",
                 (*emails,),
             )
         moved = c.execute("SELECT changes()").fetchone()[0]

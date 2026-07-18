@@ -89,29 +89,29 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `LockRequest` | class | L2233–L2235 |
 | `lock_account` | def | L2239–L2278 |
 | `PublishRequest` | class | L2281–L2283 |
-| `publish_accounts` | def | L2287–L2310 |
-| `hide_all_accounts` | def | L2314–L2326 |
-| `pool_accounts` | def | L2330–L2348 |
-| `api_pool_split` | def | L2352–L2366 |
-| `api_pool_publish` | def | L2370–L2402 |
-| `unlock_account` | def | L2406–L2424 |
-| `_sse_generator` | def | L2427–L2453 |
-| `events` | def | L2457–L2467 |
-| `account_cards_pipe` | def | L2471–L2497 |
-| `account_notes_summary` | def | L2501–L2526 |
-| `account_details` | def | L2530–L2831 |
-| `NoteCreate` | class | L2834–L2835 |
-| `create_note` | def | L2839–L2868 |
-| `CurpUpdate` | class | L2871–L2872 |
-| `update_curp` | def | L2876–L2887 |
-| `delete_note` | def | L2891–L2903 |
-| `CombosRequest` | class | L2906–L2907 |
-| `accounts_combos` | def | L2911–L2924 |
-| `accounts_pass_map` | def | L2928–L2933 |
-| `list_all_cards` | def | L2937–L3012 |
-| `activity_feed` | def | L3016–L3137 |
-| `list_deposits` | def | L3141–L3170 |
-| `deposits_stats` | def | L3174–L3199 |
+| `publish_accounts` | def | L2287–L2316 |
+| `hide_all_accounts` | def | L2320–L2335 |
+| `pool_accounts` | def | L2339–L2357 |
+| `api_pool_split` | def | L2361–L2375 |
+| `api_pool_publish` | def | L2379–L2413 |
+| `unlock_account` | def | L2417–L2435 |
+| `_sse_generator` | def | L2438–L2464 |
+| `events` | def | L2468–L2478 |
+| `account_cards_pipe` | def | L2482–L2508 |
+| `account_notes_summary` | def | L2512–L2537 |
+| `account_details` | def | L2541–L2842 |
+| `NoteCreate` | class | L2845–L2846 |
+| `create_note` | def | L2850–L2879 |
+| `CurpUpdate` | class | L2882–L2883 |
+| `update_curp` | def | L2887–L2898 |
+| `delete_note` | def | L2902–L2914 |
+| `CombosRequest` | class | L2917–L2918 |
+| `accounts_combos` | def | L2922–L2935 |
+| `accounts_pass_map` | def | L2939–L2944 |
+| `list_all_cards` | def | L2948–L3023 |
+| `activity_feed` | def | L3027–L3148 |
+| `list_deposits` | def | L3152–L3181 |
+| `deposits_stats` | def | L3185–L3210 |
 
 ### `auth.py`
 
@@ -532,6 +532,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_split_sa_only` | def | L2–L7 |
 | `test_publish_moves_accounts` | def | L9–L22 |
 | `test_publish_forbidden_for_operator` | def | L24–L26 |
+| `test_hide_releases_sa_lock_but_protects_operator_lock` | def | L29–L52 |
 
 ### `test_refresh_single_guard.py`
 

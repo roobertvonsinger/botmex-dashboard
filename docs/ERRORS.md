@@ -1094,6 +1094,22 @@ docker logs traefik-traefik-1 2>&1 | grep -i 'letsencrypt\|acme' | tail -20
 
 ---
 
+## El candadito "En uso" (RESERVADA_SA) trababa "sacar del pool → trastienda" (2026-07-17)
+
+**Síntoma**: Robert (SA) no podía mover cuentas del pool a la trastienda — "no puedo sacar las cuentas del pool hacia trastienda y ni siquiera se nota si está bloqueada". Además el botón candadito de La Pantalla "me da dolores de cabeza, no sé ni cómo funciona ni por qué está ahí".
+
+**Causa**: había DOS superficies para el MISMO lock (`locked_by`): (1) el auto-lock legítimo al **depositar** (`deposits.py:_auto_lock_for_deposit`) y (2) un botón manual "En uso" (`.pat-act.inuse`) en La Pantalla que llamaba `/api/accounts/{id}/lock`. Como SA, **ambos** crean `locked_until=NULL` = **RESERVADA_SA perpetua**. Los 3 endpoints de ocultar (`/accounts/publish`, `/pool/publish`, `/hide-all`) tenían guardrail `AND locked_by IS NULL` → **saltaban en silencio** cualquier cuenta lockeada. Resultado: cada cuenta que el SA tocaba/depositaba quedaba pegada al pool sin forma clara de sacarla.
+
+**Diagnóstico**: `SELECT email, locked_by, locked_until FROM accounts WHERE published_to_pool=1 AND locked_by IS NOT NULL` — las que Robert no podía ocultar salían con `locked_until` NULL (RESERVADA_SA).
+
+**Fix**:
+- **Front** (`static/pantalla.js`): eliminado el candadito "En uso" de La Pantalla (botón + handler). El lock queda UNO solo: el auto-lock al depositar.
+- **Back** (`app.py`, los 3 endpoints de ocultar): al sacar a trastienda ahora se **libera** la RESERVADA_SA perpetua (`SET published_to_pool=0, locked_by=NULL, locked_at=NULL, locked_until=NULL WHERE ... AND (locked_by IS NULL OR locked_until IS NULL)`). Los locks **temporales de operador activo** (`locked_until` NOT NULL) se respetan: esas NO se ocultan (sin fantasma). Test: `test_pool_manage.py::test_hide_releases_sa_lock_but_protects_operator_lock`.
+
+**Histórico**: el candadito manual venía del spec de bloqueo diferenciado (SA reserva perpetua); en campo resultó redundante y chocaba con el pool. Regla nueva: el lock lo pone el TRABAJO (depósito), no un toggle manual; sacar a trastienda = liberar.
+
+---
+
 ## Plantilla para nuevos errores
 
 Agregar al cierre:
