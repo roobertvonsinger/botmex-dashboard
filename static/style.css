@@ -256,6 +256,34 @@ body.dep-drawer-pushing { padding-right: 420px; }
 }
 .nav .b.warn { background: var(--danger-soft); color: var(--danger); border-color: oklch(0.66 0.21 24 / 0.22); }
 
+/* ─── Grupos colapsables del sidebar (F2 auditoría 2026-07-18) — Operación /
+   Monitoreo / Administración. Reemplazan los .sb-section fijos "Principal"/
+   "Sistema" por headers clicables con estado persistente (localStorage). ─── */
+.sb-group-header {
+  appearance: none; border: none; background: transparent; width: 100%;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 24px 3px; margin: 0; cursor: pointer;
+  font-size: 9px; font-weight: 700; color: var(--text-muted);
+  letter-spacing: 1.6px; text-transform: uppercase; font-family: var(--font-mono);
+  transition: color var(--ease-fast);
+}
+.sb-group-header:hover { color: var(--text-dim); }
+.sb-group-chevron {
+  width: 10px; height: 10px; flex-shrink: 0;
+  transition: transform var(--ease-fast);
+}
+.sb-group-header[aria-expanded="false"] .sb-group-chevron { transform: rotate(-90deg); }
+.sb-group-body {
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  transition: max-height var(--ease-fast), opacity var(--ease-fast);
+}
+.sb-group-body[hidden] { display: none; }
+/* Rail colapsado (icon-only, sidebarToggle): los grupos se ignoran — todos los
+   iconos visibles siempre, sin headers (mismo trato que .sb-section ya tenía). */
+body.sidebar-collapsed .sb-group-header { display: none; }
+body.sidebar-collapsed .sb-group-body[hidden] { display: flex; }
+
 /* Bloque de fondo: Online + status encajados como un par cohesivo, empujado
    al fondo por el .grow de arriba (Robert: "que encajen, baja el Online"). */
 .sb-bottom {

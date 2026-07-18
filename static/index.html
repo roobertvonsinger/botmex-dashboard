@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/duotone/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
-<link rel="stylesheet" href="/static/style.css?v=20260718a">
+<link rel="stylesheet" href="/static/style.css?v=20260718b">
 <link rel="stylesheet" href="/static/depos.css?v=20260718a">
 <link rel="stylesheet" href="/static/pantalla.css?v=20260706a">
 </head>
@@ -43,16 +43,41 @@
       <div>Hola, <b id="sbGreetName">…</b> <span class="mono dim">· <span id="sbDate"></span> · <span id="sbTime"></span></span></div>
       <div class="sb-frase"><span class="emoji">💛</span><span id="fraseTxt">…</span></div>
     </div>
-    <div class="sb-section">Principal</div>
-    <button class="nav on" data-section="accounts" title="Tu chamba diaria — todas las cuentas vivas"><span class="i">▦</span>Cuentas<span class="b" id="navCount">…</span></button>
-    <button class="nav" data-section="pool" id="navPool" title="Las que ven los operadores ahorita"><span class="i">◈</span>Pool<span class="b" id="navPoolCount">…</span></button>
-    <button class="nav" data-section="activity" title="Quién hizo qué y cuándo — la chismografía"><span class="i">⚡</span>Actividad<span class="b" id="navActivityBadge"></span></button>
-    <div class="sb-section" id="sbSectionSistema">Sistema</div>
-    <button class="nav" data-section="notifications" title="Lo que pasó mientras no veías"><span class="i">◔</span>Notificaciones<span class="b warn hidden" id="navNotifBadge">·</span></button>
-    <button class="nav" data-section="logs" id="navLogs" title="Tripas en vivo del servidor"><span class="i">▤</span>Logs<span class="b" id="navLogsBadge"></span></button>
-    <button class="nav" data-section="health" id="navHealth" title="¿Está vivo todo? Aquí lo dice"><span class="i">◉</span>Salud<span class="b ok hidden" id="navHealthBadge">✓</span></button>
-    <button class="nav" data-section="admin" id="navAdmin" title="Botones rojos peligrosos — usa con criterio"><span class="i">⚙</span>Controles</button>
-    <button class="nav" data-section="bin-stats" id="navBinStats" title="Inteligencia de BINes — tasa de aprobación por tarjeta sobre todos los intentos"><span class="i">▣</span>BINes</button>
+    <div class="sb-group" data-group="operacion">
+      <button class="sb-group-header" aria-expanded="true" aria-controls="sbGroupOperacion">
+        <span class="sb-group-label">Operación</span>
+        <svg class="sb-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="sb-group-body" id="sbGroupOperacion" role="group">
+        <button class="nav on" data-section="accounts" title="Tu chamba diaria — todas las cuentas vivas"><span class="i">▦</span>Cuentas<span class="b" id="navCount">…</span></button>
+        <button class="nav" data-section="pool" id="navPool" title="Las que ven los operadores ahorita"><span class="i">◈</span>Pool<span class="b" id="navPoolCount">…</span></button>
+      </div>
+    </div>
+    <div class="sb-group" data-group="monitoreo">
+      <!-- id sbSectionSistema preservado a propósito: app.js computeAnchorH() (L2893)
+           mide este elemento para alinear el alto del panel KPI con "Cuentas" — ancla
+           medida de Robert (2026-07-09), NO renombrar sin actualizar ese anclaje. -->
+      <button class="sb-group-header" id="sbSectionSistema" aria-expanded="true" aria-controls="sbGroupMonitoreo">
+        <span class="sb-group-label">Monitoreo</span>
+        <svg class="sb-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="sb-group-body" id="sbGroupMonitoreo" role="group">
+        <button class="nav" data-section="activity" title="Quién hizo qué y cuándo — la chismografía"><span class="i">⚡</span>Actividad<span class="b" id="navActivityBadge"></span></button>
+        <button class="nav" data-section="notifications" title="Lo que pasó mientras no veías"><span class="i">◔</span>Notificaciones<span class="b warn hidden" id="navNotifBadge">·</span></button>
+        <button class="nav" data-section="logs" id="navLogs" title="Tripas en vivo del servidor"><span class="i">▤</span>Logs<span class="b" id="navLogsBadge"></span></button>
+        <button class="nav" data-section="health" id="navHealth" title="¿Está vivo todo? Aquí lo dice"><span class="i">◉</span>Salud<span class="b ok hidden" id="navHealthBadge">✓</span></button>
+      </div>
+    </div>
+    <div class="sb-group" data-group="admin" id="sbGroupAdminWrap">
+      <button class="sb-group-header" aria-expanded="false" aria-controls="sbGroupAdmin">
+        <span class="sb-group-label">Administración</span>
+        <svg class="sb-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="sb-group-body" id="sbGroupAdmin" role="group" hidden>
+        <button class="nav" data-section="admin" id="navAdmin" title="Botones rojos peligrosos — usa con criterio"><span class="i">⚙</span>Controles</button>
+        <button class="nav" data-section="bin-stats" id="navBinStats" title="Inteligencia de BINes — tasa de aprobación por tarjeta sobre todos los intentos"><span class="i">▣</span>BINes</button>
+      </div>
+    </div>
     <div class="grow"></div>
     <div class="sb-bottom">
       <div class="sb-online">
@@ -1025,7 +1050,7 @@
 <script src="/static/activity_logic.js?v=20260629b"></script>
 <script src="/static/pantalla_logic.js?v=20260702a"></script>
 <script src="/static/strip_logic.js?v=20260630a"></script>
-<script src="/static/app.js?v=20260718a"></script>
+<script src="/static/app.js?v=20260718b"></script>
 <script src="/static/depos_logic.js?v=20260628e"></script>
 <script src="/static/depos_window.js?v=20260630a"></script>
 <script src="/static/depos.js?v=20260628e"></script>

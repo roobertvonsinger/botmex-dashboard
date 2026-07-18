@@ -481,6 +481,12 @@ async function loadMe() {
     const np = $('#navPool'); if (np) np.style.display = 'none';
     const na = $('#navAdmin'); if (na) na.style.display = 'none';
   }
+  // Grupo "Administración" del sidebar (F2): sus 2 botones (Controles/BINes) ya
+  // son SA-only individualmente; ocultar el grupo COMPLETO (header incluido)
+  // para no-SA, si no queda un header colapsable sin nada adentro.
+  if (!isSuper) {
+    const ga = document.getElementById('sbGroupAdminWrap'); if (ga) ga.hidden = true;
+  }
   // Liberar (asignar a otros) solo superadmin — el "admin" NO debe verlo (vista secreta)
   if (!isSuper) {
     $('#cmdRelease').closest('.cmd-release-wrap').style.display = 'none';
@@ -2954,6 +2960,37 @@ $$('.seg').forEach(seg => {
     on = !document.body.classList.contains('sidebar-collapsed');
     apply(on);
     try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (_) {}
+  });
+})();
+
+// Grupos colapsables del sidebar (F2, auditoría 2026-07-18): Operación /
+// Monitoreo / Administración. Estado persistente por navegador; Administración
+// se oculta por completo para no-SA en loadMe() (arriba), no acá.
+(function initSidebarGroups() {
+  const KEY = 'sbGroups';
+  const DEFAULT_GROUPS = { operacion: true, monitoreo: true, admin: false };
+  let groups = { ...DEFAULT_GROUPS };
+  try { groups = { ...DEFAULT_GROUPS, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch (_) {}
+
+  function apply(name, expanded) {
+    const wrap = document.querySelector(`.sb-group[data-group="${name}"]`);
+    if (!wrap) return;
+    const header = wrap.querySelector('.sb-group-header');
+    const body = wrap.querySelector('.sb-group-body');
+    if (header) header.setAttribute('aria-expanded', String(!!expanded));
+    if (body) body.hidden = !expanded;
+  }
+  Object.keys(groups).forEach(name => apply(name, groups[name]));
+
+  document.querySelectorAll('.sb-group-header').forEach(header => {
+    header.addEventListener('click', () => {
+      const name = header.closest('.sb-group')?.dataset.group;
+      if (!name) return;
+      const wasExpanded = header.getAttribute('aria-expanded') === 'true';
+      groups[name] = !wasExpanded;
+      apply(name, groups[name]);
+      try { localStorage.setItem(KEY, JSON.stringify(groups)); } catch (_) {}
+    });
   });
 })();
 

@@ -573,6 +573,28 @@ que el plan decía evitar. **Se descartó el chevron/peek** — F1 se resolvió 
   cacheaba agresivamente la versión anterior incluso con `location.reload(true)`; solo un query-string nuevo forzó
   el refresh real durante la verificación).
 
+## Auditoría visual/UX/a11y 2026-07-18 — F2 Sidebar (3 grupos colapsables)
+
+Reagrupados los `.nav` existentes (sin inventar secciones) en 3 grupos semánticos, mapeados contra el ROL real
+(no el esquema genérico del plan — `Depósitos` no es un nav item, vive en el panel dockeado; los reales son
+Cuentas/Pool/Actividad/Notificaciones/Logs/Salud/Controles/BINes):
+
+- **Operación**: Cuentas, Pool.
+- **Monitoreo**: Actividad, Notificaciones, Logs, Salud.
+- **Administración**: Controles, BINes — grupo colapsado por default, y **oculto completo** (`#sbGroupAdminWrap.hidden`)
+  para no-SA en `loadMe()` (`app.js`), porque sus 2 botones ya eran SA-only individualmente (`navPool`/`navAdmin`/
+  `navLogs`/`navHealth`/`navBinStats` seguían con su propio `style.display='none'` por rol — el agrupado NO tocó esa
+  lógica, solo la envuelve).
+- **Anclaje preservado**: `#sbSectionSistema` (usado por `computeAnchorH()` en `app.js:2893` para alinear el alto
+  del panel KPI con `.filterbar-accounts` — ancla medida de Robert, 2026-07-09) se movió al `<button
+  class="sb-group-header">` de **Monitoreo** (el reemplazo semántico más cercano a la vieja etiqueta "Sistema").
+  Como `computeAnchorH()` mide `getBoundingClientRect()` en vivo (no un píxel fijo), se auto-ajusta al nuevo layout.
+- **Estado persistente**: `localStorage['sbGroups']` `{operacion, monitoreo, admin}` (default `{true,true,false}`),
+  `initSidebarGroups()` (`app.js`, junto a `initSidebarCollapse`). Rail colapsado (`body.sidebar-collapsed`) ignora
+  el estado de grupo — headers ocultos, todos los iconos visibles, igual que `.sb-section` antes.
+- Verificado: 3 grupos con conteo correcto de `.nav` (2/4/2), toggle+persistencia en `localStorage`, gate SA/operador
+  simulado, Tab real → ring de foco visible en `.sb-group-header` y en los `.nav` dentro.
+
 ## Convenciones
 
 - **`data-copy`** en cualquier elemento → click izquierdo copia el valor. Handler global en app.js:2715.
