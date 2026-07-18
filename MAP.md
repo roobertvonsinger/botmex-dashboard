@@ -207,6 +207,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d623fec` | fix(deposits): mission_sem leak — matchmaker/scheduled caían con 429 permanente |
 | `4de6b1d` | docs: cierre de sesion 2026-07-16 — NEXT-SESSION + entry de ERRORS.md para el fix de refresh guard |
 | `6dc9c42` | docs(next-session): plan de migracion bot Telegram a Forgejo (F1.3) — planeada, no ejecutada |
 | `065f5ad` | fix(depos.js): eliminar rama muerta cap.total (backend nunca la envia) + unificar pillShow/Hide a classList igual que el resto del componente |
@@ -218,7 +219,6 @@ prewarm.py (router)
 | `db35640` | fix(app.js): restaurar copy-on-click del combo sin romper seleccion multiple — data-copy en la celda + excepcion de modificador en el listener global |
 | `4809d75` | fix(depos.css): dw-hint sobre el panel durante drag — estaba z-index:198 vs panel 200, quedaba oculto en el momento exacto que sirve |
 | `615a265` | fix(depos.js): igualar tope de repeticiones a 20 (backend ya lo soporta, frontend topaba en 15) |
-| `613c394` | fix(depos.css): title deja de forzar overflow en dock minimo — width fijo 268px reemplazado por max-width + min-width:0, medido con DOCK_MINW=320 |
 <!-- GEN:end:recientes -->
 
 ---

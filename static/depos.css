@@ -588,7 +588,7 @@
 #depos .mov{padding:4px 18px 16px}
 #depos .mov-head{display:flex; align-items:center; gap:8px; margin:6px 0 8px}
 #depos .mov-line{flex:1; height:1px; background:var(--line)}
-#depos .mov-list{display:flex; flex-direction:column; gap:5px; min-height:0; overflow-y:auto}
+#depos .mov-list{display:flex; flex-direction:column; gap:5px; flex:1 1 auto; min-height:0; overflow-y:auto}
 #depos .mov-row{display:flex; align-items:center; gap:9px; padding:7px 10px; border-radius:10px;
   background:var(--panel); border:1px solid var(--line); font-size:11px; animation:slidein .4s cubic-bezier(.22,.61,.36,1)}
 @keyframes slidein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -644,7 +644,10 @@
 #depos.dw-on .duo .col:last-child{padding-left:12px}
 #depos.dw-on .journey{flex:1 1 auto; min-height:0; display:flex; flex-direction:column; margin:5px 12px 4px; padding:10px; overflow:hidden}
 #depos.dw-on .scene-stage{flex:1 1 auto; min-height:100px; height:auto}
-#depos.dw-on .mov{flex:none; max-height:32%; display:flex; flex-direction:column; min-height:0; overflow:hidden; padding:2px 16px 12px}
+/* Sin escenario en el panel (migrado a La Pantalla), la bitácora de movimientos
+   es el elemento elástico: llena el alto que dejó el escenario en vez de un hueco
+   muerto. Antes flex:none + max-height:32% dejaba ~134px vacíos al fondo. */
+#depos.dw-on .mov{flex:1 1 auto; min-height:96px; display:flex; flex-direction:column; overflow:hidden; padding:2px 16px 12px}
 
 /* divisor del dock — recorrer el ancho del split */
 #depos .dw-divider{display:none; position:absolute; top:0; bottom:0; width:11px; z-index:7; cursor:ew-resize}

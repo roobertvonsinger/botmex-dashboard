@@ -2,6 +2,16 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## 3 bugs de layout (panel depósitos, escenario en La Pantalla, feed de logs) (2026-07-17)
+
+Diagnóstico por medición en prod (getBoundingClientRect en el navegador, no a ojo), no por asumir.
+
+**1. Panel de depósitos — hueco muerto de ~134px al fondo** (`static/depos.css`). Cuando el escenario de depósito se migró del panel a La Pantalla (`#patStageSlot`), se llevó el único hijo con `flex:1 1 auto` (`.journey`/`.scene-stage`). En modo ventana (`dw-on`), `.head`+`.controls`+`.mov` quedaron todos `flex:0 0 auto` → nada absorbía el alto → el panel (685px) mostraba su contenido hasta 918px y dejaba ~134px vacíos abajo, con `.mov-list` colapsada a altura 0. **Fix**: `#depos.dw-on .mov{flex:1 1 auto; min-height:96px}` + `.mov-list{flex:1 1 auto}` — la bitácora de movimientos es ahora el elemento elástico (lo lógico sin escenario: controles arriba, bitácora llenando el resto).
+
+**2. Escenario de animación se sale de su slot en La Pantalla** (`static/pantalla.css`). `#depStage` mide ~254px (`.scene-stage` con `height:172px` FIJO heredado del panel viejo + balance + status), pero `#patStageSlot` da ~199px → se desbordaba 55px (27 por arriba + 28 por abajo, al estar `justify-content:center`). **Fix**: en el contexto del slot, `#patStageSlot #depStage .scene-stage{height:auto; flex:1 1 auto; min-height:0}` + journey a `height:100%` — el arte SVG (viewBox 380×200) escala proporcional solo y el escenario llena su caja sin rebasar.
+
+**3. Feed de logs (📋 LOGS, `#lpActivity`) ilegible cronológicamente** (`static/style.css`). La hora de cada evento vivía al FINAL de la fila (`.lp-feed-time`), tras texto de ancho variable → imposible escanear "cuándo pasó qué" en una bitácora. **Fix**: `.lp-feed-time{order:-1; min-width:38px; text-align:left; font-variant-numeric:tabular-nums}` — la hora pasa a columna fija a la izquierda (sin tocar el markup/DOM, solo `order`), el feed se lee como timeline. El `_whoDot` (● color por operador) y el emoji de estado se conservan.
+
 ## [CRÍTICO] Matchmaker muerto para operadores: leak del semáforo global de misiones (2026-07-17)
 
 **Síntoma**: Robert reportó que a **Luisito** (rol `admin`, no SA) "se le detiene el proceso de depósito / matchmaker", mientras que a Robert (SA) sí lo dejaba. Sus `deposit_attempts` no tenían **ni un solo** registro de matchmaker (source `matchmaker`/`multi`) — solo `manual_single` — señal de que la misión moría **antes** de intentar el primer par.

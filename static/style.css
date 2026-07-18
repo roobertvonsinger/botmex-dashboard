@@ -817,7 +817,10 @@ tbody td.loading { text-align: center; padding: 40px; color: var(--text-muted); 
 .lp-feed-who { font-weight: 600; flex-shrink: 0; }
 .lp-feed-target { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lp-feed-amt { font-weight: 600; }
-.lp-feed-time { font-size: 9.5px; flex-shrink: 0; }
+/* La hora va a la IZQUIERDA como columna fija tabular — una bitácora se escanea por
+   CUÁNDO pasó cada cosa; al final (tras texto de ancho variable) era ilegible en el
+   tiempo. order:-1 la reubica visualmente sin tocar el orden del markup/DOM. */
+.lp-feed-time { font-size: 10px; flex-shrink: 0; order: -1; min-width: 38px; text-align: left; color: var(--text-dim); opacity: .95; font-variant-numeric: tabular-nums; }
 /* Color del monto / icono según resultado: verde solo si fue éxito */
 .lp-feed-row.lp-feed-ok .lp-feed-amt   { color: var(--accent); }
 .lp-feed-row.lp-feed-fail .lp-feed-amt { color: var(--text-muted); text-decoration: line-through; }
