@@ -869,3 +869,22 @@ body.depos-open .pat-act-dep { display: none; }
     to   { opacity: 1; }
   }
 }
+
+/* ═══════════════ RESPONSIVE MOBILE (F3, auditoría 2026-07-18) ═══════════════
+   .pat-columns es flex-row con .pat-col-ident (max-content) + .pat-txn-col
+   (flex:1) + .pat-col-stage (min-width:380px) — desborda garantizado bajo
+   ~768px (solo el stage ya pide 380px). Fix: apilar a 1 columna, ocultar el
+   escenario de depósito (misión activa en mobile → modal aparte, fuera de
+   alcance esta sesión, ver plan §Riesgos) y subir los botones de acción a
+   touch target ≥44px (eran 26px). */
+@media (max-width: 767px) {
+  .pantalla-sheet { left: 8px; right: 8px; top: 10px; bottom: 8px; }
+  .pat-columns { flex-direction: column; overflow-y: auto; gap: 10px; }
+  .pat-col-ident { width: 100%; padding-right: 0; overflow-y: visible; }
+  .pat-col-stage { display: none; }
+  .pat-txn-col { flex: 1 1 auto; min-width: 0; }
+  .pat-topbar { padding-right: 44px; flex-wrap: wrap; }
+  .pat-actions { position: static; margin-top: 8px; flex-wrap: wrap; }
+  .pat-act { height: 44px; padding: 0 14px; }
+  .pantalla-close { width: 44px; height: 44px; }
+}

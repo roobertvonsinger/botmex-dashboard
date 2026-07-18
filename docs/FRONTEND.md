@@ -595,6 +595,29 @@ Cuentas/Pool/Actividad/Notificaciones/Logs/Salud/Controles/BINes):
 - Verificado: 3 grupos con conteo correcto de `.nav` (2/4/2), toggle+persistencia en `localStorage`, gate SA/operador
   simulado, Tab real → ring de foco visible en `.sb-group-header` y en los `.nav` dentro.
 
+## Auditoría visual/UX/a11y 2026-07-18 — F3 La Pantalla (secuencia GPU + mobile)
+
+- **Task 3.1 (secuencia unfurl→scanline→cuaje):** verificado contra código — **ya estaba implementado**, no era un
+  anclaje roto como F1. `pantalla.css:280-284` ya encadena `pat-unfurl` (0-380ms) y `pat-scan` (delay 80ms, 500ms)
+  vía `animation-delay` puro CSS (una sola clase `.pantalla-on`, sin JS de por medio); `pantalla.css:816-825` ya
+  escalona `pat-cuaje` por bloque con `animation-delay: calc(var(--i,0) * 0.062s)` — **el mismo valor de stagger
+  (62ms) que el plan proponía**, ya tuneado en una pasada previa (comentarios fechados 2026-07-06/07-10 documentan
+  reducciones de blur para bajar costo de GPU). **No se tocó** — reescribir algo ya correcto sin medir viola la
+  misma ley que el plan invoca ("no estimación asumida").
+  - **Bloqueado: no se pudo medir con DevTools Performance.** El panel de navegador de este entorno corre con
+    `document.visibilityState === 'hidden'` incluso "fronteado" — `requestAnimationFrame` nunca dispara (confirmado:
+    un rAF encadenado se colgó 30s). Sin rAF no hay animación real que perfilar. Pendiente: que Robert confirme
+    "0 frame drops" con DevTools en un Chrome real si quiere el done-criterion exacto del plan.
+- **Task 3.2 (responsive mobile):** `.pat-columns` es flex-row (`.pat-col-ident` max-content + `.pat-txn-col` flex:1
+  + `.pat-col-stage` min-width:380px) — desbordaba garantizado bajo ~768px (el stage solo ya pide 380px). Nuevo
+  `@media (max-width:767px)` en `pantalla.css`: columnas a stack vertical, `.pat-col-stage` oculto (misión activa en
+  mobile → modal aparte, fuera de alcance esta sesión, ya documentado en el plan), `.pat-act`/`.pantalla-close` a
+  44px (touch target, eran 26px/30px). Verificado con `resize_window` a 375×812 + estado forzado a `.pantalla-on`
+  (rAF no corre en este entorno, ver arriba): `document.documentElement.scrollWidth === window.innerWidth === 375`
+  (0 overflow horizontal), `flexDirection:"column"`, `stage display:"none"`, `.pat-act` height `"44px"`.
+- **Task 3.3 (reduced-motion):** ya existente (`pantalla.css:838-871`, fade 200ms sin scanline/cuaje/blur) — solo
+  se confirmó por lectura, no se tocó.
+
 ## Convenciones
 
 - **`data-copy`** en cualquier elemento → click izquierdo copia el valor. Handler global en app.js:2715.
