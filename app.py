@@ -2221,6 +2221,27 @@ async def _jwt_keepalive_loop():
         await asyncio.sleep(jwt_keeper.cfg()["interval_sec"])
 
 
+async def _account_refresh_loop():
+    """Refresca balance/movimientos de cuentas con JWT VIGENTE (opuesto a
+    jwt_keeper: esas cuentas no necesitan login, solo un fetch reusando el
+    JWT — sin captcha, sin rate-limit). Mantiene el dashboard actualizado
+    sin intervención del operador. Config por env ACCOUNT_REFRESH_*
+    (ver account_refresh.cfg). Tick cada ACCOUNT_REFRESH_INTERVAL_SEC."""
+    import account_refresh
+    c = account_refresh.cfg()
+    if not c["enabled"]:
+        print("[account_refresh] deshabilitado (ACCOUNT_REFRESH_ENABLED!=1)")
+        return
+    await asyncio.sleep(120)  # arrancar después del jwt_keeper (90s)
+    while True:
+        try:
+            stats = await account_refresh.run_refresh_cycle_from_env()
+            print(f"[account_refresh] ciclo: {stats}")
+        except Exception as e:
+            print(f"[account_refresh] error de ciclo: {e}")
+        await asyncio.sleep(account_refresh.cfg()["interval_sec"])
+
+
 @app.on_event("startup")
 async def _start_bg_tasks():
     asyncio.create_task(_health_loop())
@@ -2228,6 +2249,7 @@ async def _start_bg_tasks():
     asyncio.create_task(_window_watcher_loop())
     asyncio.create_task(_release_watchdog_loop())
     asyncio.create_task(_jwt_keepalive_loop())
+    asyncio.create_task(_account_refresh_loop())
 
 
 class LockRequest(BaseModel):

@@ -210,6 +210,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `ad12074` | fix(pantalla): rescata #depStage antes del innerHTML que lo huerfanaba |
 | `a053733` | docs: corrige comentario desactualizado de _detailColspan tras F1 |
 | `33efe01` | feat(ui): F3 auditoria visual — mobile responsive La Pantalla + verificacion de secuencia |
 | `bf102c2` | feat(ui): F2 auditoria visual — sidebar en 3 grupos colapsables |
@@ -221,7 +222,6 @@ prewarm.py (router)
 | `e5b9419` | fix(lock): un solo lock — quita candadito de La Pantalla + sacar a trastienda libera RESERVADA_SA |
 | `3eed4c8` | feat(ui): panel depósitos fijo-derecha + combo/cierre/tarjetas/drag + vidrio uniforme |
 | `6ebdd4a` | fix(ui): 3 bugs de layout — panel hueco, escenario desbordado, feed ilegible |
-| `d623fec` | fix(deposits): mission_sem leak — matchmaker/scheduled caían con 429 permanente |
 <!-- GEN:end:recientes -->
 
 ---
