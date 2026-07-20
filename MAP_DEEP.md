@@ -13,6 +13,18 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 <!-- GEN:start:simbolos -->
 
+### `account_refresh.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `_env_int` | def | L36–L40 |
+| `cfg` | def | L43–L53 |
+| `select_refresh_candidates_healthy` | def | L57–L89 |
+| `_exp_int` | def | L92–L98 |
+| `_load_candidate_rows` | def | L106–L116 |
+| `run_refresh_cycle` | def | L120–L216 |
+| `run_refresh_cycle_from_env` | def | L219–L223 |
+
 ### `app.py`
 
 | Símbolo | Tipo | Líneas |
@@ -85,33 +97,34 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_release_watchdog_tick` | def | L2091–L2190 |
 | `_release_watchdog_loop` | def | L2193–L2201 |
 | `_jwt_keepalive_loop` | def | L2204–L2221 |
-| `_start_bg_tasks` | def | L2225–L2230 |
-| `LockRequest` | class | L2233–L2235 |
-| `lock_account` | def | L2239–L2278 |
-| `PublishRequest` | class | L2281–L2283 |
-| `publish_accounts` | def | L2287–L2316 |
-| `hide_all_accounts` | def | L2320–L2335 |
-| `pool_accounts` | def | L2339–L2357 |
-| `api_pool_split` | def | L2361–L2375 |
-| `api_pool_publish` | def | L2379–L2413 |
-| `unlock_account` | def | L2417–L2435 |
-| `_sse_generator` | def | L2438–L2464 |
-| `events` | def | L2468–L2478 |
-| `account_cards_pipe` | def | L2482–L2508 |
-| `account_notes_summary` | def | L2512–L2537 |
-| `account_details` | def | L2541–L2842 |
-| `NoteCreate` | class | L2845–L2846 |
-| `create_note` | def | L2850–L2879 |
-| `CurpUpdate` | class | L2882–L2883 |
-| `update_curp` | def | L2887–L2898 |
-| `delete_note` | def | L2902–L2914 |
-| `CombosRequest` | class | L2917–L2918 |
-| `accounts_combos` | def | L2922–L2935 |
-| `accounts_pass_map` | def | L2939–L2944 |
-| `list_all_cards` | def | L2948–L3023 |
-| `activity_feed` | def | L3027–L3148 |
-| `list_deposits` | def | L3152–L3181 |
-| `deposits_stats` | def | L3185–L3210 |
+| `_account_refresh_loop` | def | L2224–L2242 |
+| `_start_bg_tasks` | def | L2246–L2252 |
+| `LockRequest` | class | L2255–L2257 |
+| `lock_account` | def | L2261–L2300 |
+| `PublishRequest` | class | L2303–L2305 |
+| `publish_accounts` | def | L2309–L2338 |
+| `hide_all_accounts` | def | L2342–L2357 |
+| `pool_accounts` | def | L2361–L2379 |
+| `api_pool_split` | def | L2383–L2397 |
+| `api_pool_publish` | def | L2401–L2435 |
+| `unlock_account` | def | L2439–L2457 |
+| `_sse_generator` | def | L2460–L2486 |
+| `events` | def | L2490–L2500 |
+| `account_cards_pipe` | def | L2504–L2530 |
+| `account_notes_summary` | def | L2534–L2559 |
+| `account_details` | def | L2563–L2864 |
+| `NoteCreate` | class | L2867–L2868 |
+| `create_note` | def | L2872–L2901 |
+| `CurpUpdate` | class | L2904–L2905 |
+| `update_curp` | def | L2909–L2920 |
+| `delete_note` | def | L2924–L2936 |
+| `CombosRequest` | class | L2939–L2940 |
+| `accounts_combos` | def | L2944–L2957 |
+| `accounts_pass_map` | def | L2961–L2966 |
+| `list_all_cards` | def | L2970–L3045 |
+| `activity_feed` | def | L3049–L3170 |
+| `list_deposits` | def | L3174–L3203 |
+| `deposits_stats` | def | L3207–L3232 |
 
 ### `auth.py`
 
@@ -354,6 +367,24 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_combos_operator_cannot_get_foreign` | def | L39–L43 |
 | `test_deposits_operator_only_own` | def | L47–L52 |
 | `test_deposits_sa_sees_all` | def | L54–L57 |
+
+### `test_account_refresh.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `_acc` | def | L14–L20 |
+| `_run` | def | L23–L25 |
+| `test_jwt_vigente_es_candidata` | def | L28–L30 |
+| `test_jwt_expirado_no_es_candidata` | def | L33–L35 |
+| `test_jwt_nulo_no_es_candidata` | def | L38–L40 |
+| `test_jwt_vence_ahora_mismo_no_es_candidata` | def | L43–L45 |
+| `test_lockeada_por_operador_se_excluye` | def | L48–L50 |
+| `test_grade_no_util_se_excluye` | def | L53–L56 |
+| `test_no_live_se_excluye` | def | L59–L61 |
+| `test_no_publicada_se_excluye` | def | L64–L66 |
+| `test_orden_por_last_checked_ascendente` | def | L69–L77 |
+| `test_batch_max_limita` | def | L80–L83 |
+| `test_grades_configurable` | def | L86–L89 |
 
 ### `test_account_touch.py`
 
@@ -714,6 +745,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | Logger | Módulo |
 |--------|--------|
 | `betmexico.dashboard` | `app.py` |
+| `betmexico.dashboard.account_refresh` | `account_refresh.py` |
 | `betmexico.dashboard.autoexclusion` | `autoexclusion.py` |
 | `betmexico.dashboard.deposits` | `deposits.py` |
 | `betmexico.dashboard.grading` | `app.py` |

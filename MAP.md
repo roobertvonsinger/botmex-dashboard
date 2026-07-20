@@ -92,7 +92,8 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `app.py` | 3217 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `account_refresh.py` | 223 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
+| `app.py` | 3239 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -108,6 +109,7 @@ prewarm.py (router)
 | `shared/betmexico_payment_analyzer.py` | 593 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
+| `test_account_refresh.py` | 89 | `—` | _[completar]_ |
 | `test_account_touch.py` | 51 | `—` | _[completar]_ |
 | `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
 | `test_anti_rate_limit.py` | 271 | `—` | _[completar]_ |
@@ -182,6 +184,7 @@ prewarm.py (router)
 | `SCORE_FLOOR` | `{"A": 80, "B": 60, "C": 40, "D": 0}` | `shared/betmexico_payment_analyzer.py` |
 | `SCORE_CEIL` | `{"A": 100, "B": 79, "C": 59, "D": 39}` | `shared/betmexico_payment_analyzer.py` |
 | `SCHEMA` | `"""` | `test_a1_estados.py` |
+| `NOW` | `1_800_000_000` | `test_account_refresh.py` |
 | `OP_A` | `{"role": "user", "telegram_id": 555, "display": "Lau"}` | `test_account_touch.py` |
 | `OP_B` | `{"role": "user", "telegram_id": 777, "display": "Otro"}` | `test_account_touch.py` |
 | `NOW` | `1_800_000_000` | `test_jwt_keeper.py` |
@@ -207,6 +210,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a053733` | docs: corrige comentario desactualizado de _detailColspan tras F1 |
 | `33efe01` | feat(ui): F3 auditoria visual — mobile responsive La Pantalla + verificacion de secuencia |
 | `bf102c2` | feat(ui): F2 auditoria visual — sidebar en 3 grupos colapsables |
 | `22beaba` | feat(ui): F1 auditoria visual — tabla 10 a 7 columnas + glow fila-fuente |
@@ -218,7 +222,6 @@ prewarm.py (router)
 | `3eed4c8` | feat(ui): panel depósitos fijo-derecha + combo/cierre/tarjetas/drag + vidrio uniforme |
 | `6ebdd4a` | fix(ui): 3 bugs de layout — panel hueco, escenario desbordado, feed ilegible |
 | `d623fec` | fix(deposits): mission_sem leak — matchmaker/scheduled caían con 429 permanente |
-| `4de6b1d` | docs: cierre de sesion 2026-07-16 — NEXT-SESSION + entry de ERRORS.md para el fix de refresh guard |
 <!-- GEN:end:recientes -->
 
 ---

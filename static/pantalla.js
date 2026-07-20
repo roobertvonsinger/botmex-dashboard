@@ -532,10 +532,19 @@
   // render fallido; si no, al reabrir con datos ya buenos nunca se ve el
   // cuaje líquido (la bandera quedó puesta sobre un render que nunca ocurrió).
   // Monta (re-parenta) el ESCENARIO de depósito #depStage en su zona derecha
-  // (#patStageSlot). El slot se recrea en cada render del detalle (innerHTML), pero
-  // #depStage es el MISMO nodo (movido del panel, no clonado) → una animación en curso
-  // sobrevive al re-render. En reposo #depStage va hidden (zona derecha vacía); una
-  // misión de depósito lo enciende (depos.js).
+  // (#patStageSlot). El slot se recrea en cada render del detalle (innerHTML) —
+  // #depStage sobrevive SOLO porque _renderDetailView llama _rescueStage() ANTES
+  // de ese innerHTML (si no, el innerHTML= desconecta #depStage del documento —
+  // como era hijo del slot viejo — y getElementById('depStage') ya no lo
+  // encuentra: root cause de "la animación del depósito a veces no sale", campo
+  // 2026-07-19. Bastaba con que CUALQUIER cuenta se re-renderizara una 2ª vez
+  // con el escenario ya montado adentro para que quedara huérfano el resto de
+  // la sesión). En reposo #depStage va hidden (zona derecha vacía); una misión
+  // de depósito lo enciende (depos.js).
+  function _rescueStage(detail) {
+    const stage = document.getElementById('depStage');
+    if (stage && detail.contains(stage)) document.body.appendChild(stage);
+  }
   function _mountStage() {
     const slot = document.getElementById('patStageSlot');
     const stage = document.getElementById('depStage');
@@ -563,6 +572,7 @@
     const { detail } = els();
     if (!detail) return false;
     try {
+      _rescueStage(detail);        // saca #depStage de `detail` ANTES del wipe de abajo (ver _rescueStage)
       const liquid = animate ? ' pat-liquid' : '';
       const gVar = (d.grade || 'U').replace('+', 'Plus');
       detail.innerHTML = `<div class="pat-wrap${liquid}" data-grade="${gVar}">${renderPantallaHead(d)}</div>`;
