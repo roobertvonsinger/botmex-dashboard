@@ -108,6 +108,13 @@ function sortRows(col) {
   });
   state.page = 1;
   renderTable();
+  // Actualizar clases de sort en headers
+  const sortDirClass = _sortDir === 1 ? 'sorted-asc' : 'sorted-desc';
+  document.querySelectorAll('th[data-sort]').forEach(th => {
+    th.classList.remove('sorted-asc', 'sorted-desc');
+    if (th.dataset.sort === _sortCol) th.classList.add(sortDirClass);
+  });
+  _updateActiveFiltersBadge();
 }
 
 const $ = sel => document.querySelector(sel);
@@ -576,26 +583,27 @@ function renderTable() {
   colg.innerHTML = state.view === 'simple'
     ? '<col class="c-grade"><col class="c-sel"><col class="c-saldo"><col class="c-cuenta"><col class="c-dep"><col class="c-acciones">'
     : '<col class="c-grade"><col class="c-sel"><col class="c-saldo"><col class="c-cuenta"><col class="c-dep"><col class="c-check"><col class="c-acciones">';
-  const _th = (col, label, cls = '') => {
+  const _th = (col, label, cls = '', tooltip = '') => {
     const on = _sortCol === col;
-    const ic = on ? (_sortDir === 1 ? ' ↑' : ' ↓') : '';
-    return `<th class="th-sort${on ? ' sort-on' : ''} ${cls}" data-sort="${col}">${label}${ic}</th>`;
+    const sortIcon = on ? (_sortDir === 1 ? ' ↑' : ' ↓') : ' ↕';
+    const titleAttr = tooltip ? ` title="${tooltip} | Click para ordenar"` : ' title="Click para ordenar"';
+    return `<th class="th-sort${on ? ' sort-on' : ''} ${cls}" data-sort="${col}"${titleAttr}>${label}<span class="sort-icon" aria-hidden="true">${sortIcon}</span></th>`;
   };
   const cols = state.view === 'simple'
     ? `<tr>
-        <th class="grade-bar-th"></th>
-        <th class="sel-cell"></th>
-        ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
-        ${_th('last_deposit_date','Últ. depósito')}
-        <th class="ic-col-th" aria-label="Acciones"></th>
+        <th class="grade-bar-th" title="Grade de la pasarela: A=🟢 Excelente, B=🔵 Buena, C=🟡 Cuidado, D=🔴 Quemada, U=⚪ Desconocido"></th>
+        <th class="sel-cell" title="Seleccionar cuenta (Ctrl+Click = múltiples, Shift+Click = rango)"></th>
+        ${_th('balance_total','Saldo','num','Click para ordenar por saldo')}${_th('email','Cuenta','','Click para ordenar por email')}
+        ${_th('last_deposit_date','Últ. depósito','','Click para ordenar por fecha de último depósito')}
+        <th class="ic-col-th" aria-label="Acciones" title="Acciones rápidas para esta cuenta"></th>
       </tr>`
     : `<tr>
-        <th class="grade-bar-th"></th>
-        <th class="sel-cell"></th>
-        ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
-        ${_th('last_deposit_date','Últ. depósito')}
-        ${_th('last_checked_at','Últ. check')}
-        <th class="ic-col-th" aria-label="Acciones"></th>
+        <th class="grade-bar-th" title="Grade de la pasarela: A=🟢 Excelente, B=🔵 Buena, C=🟡 Cuidado, D=🔴 Quemada, U=⚪ Desconocido"></th>
+        <th class="sel-cell" title="Seleccionar cuenta (Ctrl+Click = múltiples, Shift+Click = rango)"></th>
+        ${_th('balance_total','Saldo','num','Click para ordenar por saldo')}${_th('email','Cuenta','','Click para ordenar por email')}
+        ${_th('last_deposit_date','Últ. depósito','','Click para ordenar por fecha de último depósito')}
+        ${_th('last_checked_at','Últ. check','','Click para ordenar por fecha de último check')}
+        <th class="ic-col-th" aria-label="Acciones" title="Acciones rápidas para esta cuenta"></th>
       </tr>`;
   const thead = t.querySelector('thead');
   thead.innerHTML = cols;
@@ -630,6 +638,7 @@ function renderTable() {
     // igual que row-sel. El toggle instantáneo al abrir/cerrar vive en pantalla.js.
     const pantallaSrcClass = (window.Pantalla && window.Pantalla.currentId === r.id) ? 'pantalla-source' : '';
     const trClasses = `r-grade-${g} ${lockedCls} ${selCls} ${opClass} ${trasClass} ${coolingClass} ${pantallaSrcClass}`.trim();
+    const rowTooltip = 'Click: ver detalle · Ctrl+Click: seleccionar · Shift+Click: rango';
     const lockChip = r.locked_by
       ? `<span class="lock-chip op-${esc(opCol)} ${until?.expired ? 'expired' : ''}" title="Lockeada por ${esc(r.locked_by)}${until ? ` · ${until.expired ? 'vencido' : `vence en ${until.text}`}` : ''}">🔒 ${esc(r.locked_by)}${until && !until.expired ? ` <span class="lock-chip-time dim">${until.text}</span>` : ''}</span>`
       : '';
@@ -640,13 +649,13 @@ function renderTable() {
     //   🟢/🔑 jwt_alive: sesión viva reutilizable / expirada (solo en LIVE que no enfría).
     let jwtBadge = '';
     if (r.needs_reset) {
-      jwtBadge = `<span class="jwt-chip jwt-reset" title="Bloqueada por BetMexico (límite de intentos) — revive solo con reset de contraseña">⛔</span>`;
+      jwtBadge = `<span class="jwt-chip jwt-reset" title="⛔ BLOQUEADA — BetMexico bloqueó esta cuenta por límite de intentos. Solo revive con reset de contraseña manual.">⛔</span>`;
     } else if (r.cooldown_min > 0) {
-      jwtBadge = `<span class="jwt-chip jwt-cooldown" title="Enfriando tras rate-limit — no tocar ${r.cooldown_min} min">⏳</span>`;
+      jwtBadge = `<span class="jwt-chip jwt-cooldown" title="⏳ ENFRIANDO — Rate-limit activo. No tocar durante ${r.cooldown_min} min.">⏳</span>`;
     } else if (r.status === 'LIVE' && r.jwt_alive !== undefined) {
       jwtBadge = r.jwt_alive
-        ? `<span class="jwt-chip jwt-alive" title="Sesión viva — reutilizable sin captcha">🟢</span>`
-        : `<span class="jwt-chip jwt-expired" title="Sesión expirada — el próximo uso requiere resolver captcha">🔑</span>`;
+        ? `<span class="jwt-chip jwt-alive" title="🟢 SESIÓN VIVA — JWT válido. Reutilizable sin captcha.">🟢</span>`
+        : `<span class="jwt-chip jwt-expired" title="🔑 SESIÓN EXPIRADA — JWT vencido. El próximo uso requiere resolver captcha.">🔑</span>`;
     }
     const isSA = state.user?.role === 'superadmin';
     const trTitle = isSA ? `Grade ${esc(r.grade) || '?'}` : '';
@@ -657,33 +666,33 @@ function renderTable() {
     // Iconos en 3 columnas separadas — orden Robert: Nota | tarjetas | pin
     // (alineadas a la derecha; tarjetas/pin quedan vacíos si no aplican).
     const cellNota =
-      `<button class="row-ic ic-add" data-id="${r.id}" data-email="${esc(r.email)}" title="Añadir nota rápida">+ Nota</button>` +
-      (hasNotes ? `<button class="row-ic ic-notes" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.notes_count} nota${r.notes_count>1?'s':''}">📝<sup>${r.notes_count}</sup></button>` : '');
+      `<button class="row-ic ic-add" data-id="${r.id}" data-email="${esc(r.email)}" title="Añadir nota rápida a esta cuenta">+ Nota</button>` +
+      (hasNotes ? `<button class="row-ic ic-notes" data-id="${r.id}" data-email="${esc(r.email)}" title="Ver ${r.notes_count} nota${r.notes_count>1?'s':''} de esta cuenta">📝<sup>${r.notes_count}</sup></button>` : '');
     const cellCards = hasCards
-      ? `<button class="row-ic ic-cards" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.cards_count} tarjeta${r.cards_count>1?'s':''}">💳<sup>${r.cards_count}</sup></button>`
+      ? `<button class="row-ic ic-cards" data-id="${r.id}" data-email="${esc(r.email)}" title="Ver ${r.cards_count} tarjeta${r.cards_count>1?'s':''} guardadas">💳<sup>${r.cards_count}</sup></button>`
       : '';
-    const cellPin = `<button class="row-ic ic-mark${isMarked?' on':''}" data-mark-email="${esc(r.email)}" title="${isMarked?'Quitar marca':'Fijar para después'}">📌</button>`;
+    const cellPin = `<button class="row-ic ic-mark${isMarked?' on':''}" data-mark-email="${esc(r.email)}" title="${isMarked?'Quitar de Cuentas a la mano':'Fijar cuenta para acceso rápido'}">📌</button>`;
 
     // Detalle (acordeón) ahora se abre/cierra con CLICK DERECHO en la fila (P7).
     // Se eliminó la columna "Detalles"; los iconos 💳/📝 también abren el detalle.
 
     // Botón ↻ por fila — actualiza SOLO esta cuenta al instante
-    const refreshOneBtn = `<button class="row-refresh-one" data-id="${r.id}" title="Actualizar SOLO esta cuenta (login fresh + fetch live)">↻</button>`;
+    const refreshOneBtn = `<button class="row-refresh-one" data-id="${r.id}" title="Actualizar SOLO esta cuenta — hace login fresh y trae datos en vivo">↻</button>`;
     // Auditoría 2026-07-18 — carga cognitiva: nota/tarjetas/pin en 1 celda
     // (antes 3 columnas), últ.check+checks en 1 celda (antes 2). Mismos botones,
     // misma info, menos columnas compitiendo por atención (Cowan 4±1).
     const cellAcciones = `<td class="ic-col acciones-col">${cellNota}${cellCards}${cellPin}</td>`;
     if (state.view === 'simple') {
-      return `<tr class="${trClasses}" data-id="${r.id}"${selDrag} title="${trTitle || ''}">
+      return `<tr class="${trClasses}" data-id="${r.id}"${selDrag} title="${trTitle || ''}" data-tooltip="${esc(rowTooltip)}">
         <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
         <td class="sel-cell"></td>
         <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-        <td class="combo" title="Click: ver detalle · Ctrl/Shift+Click: seleccionar">${jwtBadge}<b class="combo-txt d-copy" data-copy="${esc(combo)}" title="Click: copiar combo">${esc(combo)}</b>${lockChip}</td>
+        <td class="combo" title="Click: ver detalle · Ctrl+Click: seleccionar · Shift+Click: rango">${jwtBadge}<b class="combo-txt d-copy" data-copy="${esc(combo)}" title="Click para copiar combo al portapapeles">${esc(combo)}</b>${lockChip}</td>
         <td class="dep" title="Último depósito hecho">${dep}</td>
         ${cellAcciones}
       </tr>`;
     }
-    return `<tr class="${trClasses}" data-id="${r.id}"${selDrag} title="${trTitle || ''}">
+    return `<tr class="${trClasses}" data-id="${r.id}"${selDrag} title="${trTitle || ''}" data-tooltip="${esc(rowTooltip)}">
       <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
       <td class="sel-cell"></td>
       <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
@@ -760,6 +769,8 @@ function updateCmdBar() {
     _depAccountIds = [...selectedIds].slice(0, 5);
     try { renderMultiAccounts(); } catch {}
   }
+  // Toggle has-selection en tbody para jerarquía visual (dim filas no seleccionadas)
+  $('#accTable tbody')?.classList.toggle('has-selection', n > 0);
   if (n === 0) { bar?.classList.remove('has-sel'); return; }
   bar?.classList.add('has-sel');
 
@@ -787,6 +798,27 @@ function updateCmdBar() {
       tBtn.classList.remove('cmd-btn-hl');
     }
   }
+}
+
+async function refreshSelectedAccounts() {
+  if (selectedIds.size === 0) { toast('Nada seleccionado', 'error'); return; }
+  const selRows = state.rows.filter(r => selectedIds.has(r.id));
+
+  // Filtrar cuentas que están en descanso (cooldown_min > 0 o needs_reset)
+  const eligibleRows = selRows.filter(r => !(r.cooldown_min > 0) && !r.needs_reset);
+  const skippedCount = selRows.length - eligibleRows.length;
+
+  if (eligibleRows.length === 0) {
+    toast(`⚠️ Las ${selRows.length} cuentas seleccionadas están en descanso por rate-limit`, 'error');
+    return;
+  }
+
+  if (skippedCount > 0) {
+    toast(`ℹ️ Se omitieron ${skippedCount} cuenta(s) en descanso. Refrescando ${eligibleRows.length}…`, 'info');
+  }
+
+  const ids = eligibleRows.map(r => r.id);
+  await refreshVisible({ ids, force: true });
 }
 
 async function copySelectedCombos() {
@@ -2396,6 +2428,7 @@ function _clearSearch() {
   state.page = 1;
   _reflectSearchUI();
   reload();
+  _updateActiveFiltersBadge();
   si?.focus();   // el foco se queda en la interacción activa (la búsqueda)
 }
 $('#searchInput').addEventListener('input', e => {
@@ -2403,7 +2436,10 @@ $('#searchInput').addEventListener('input', e => {
   state.page = 1;
   _reflectSearchUI();
   if (_searchTimer) clearTimeout(_searchTimer);
-  _searchTimer = setTimeout(() => reload(), 300);
+  _searchTimer = setTimeout(() => {
+    reload();
+    _updateActiveFiltersBadge();
+  }, 300);
 });
 $('#searchInput').addEventListener('keydown', e => {
   if (e.key === 'Escape' && e.target.value) { e.preventDefault(); _clearSearch(); }
@@ -2437,6 +2473,25 @@ function _isFiltersDefault() {
       && state.filterJwt === ''
       && _sortCol === null;
 }
+function _updateActiveFiltersBadge() {
+  const filters = [];
+  if (state.status !== 'LIVE') filters.push(`Estado: ${state.status}`);
+  if (state.grade) filters.push(`Grade: ${state.grade}`);
+  if (state.filterJwt) filters.push(`JWT: ${state.filterJwt === 'alive' ? 'Viva' : 'Expirada'}`);
+  if (state.cardsOnly) filters.push('Con tarjeta');
+  if (searchQuery) filters.push('Búsqueda');
+  if (_sortCol) filters.push(`Orden: ${_sortCol}${_sortDir === 1 ? ' ↑' : ' ↓'}`);
+
+  const badge = document.getElementById('activeFiltersBadge');
+  const text = document.getElementById('activeFiltersText');
+
+  if (filters.length > 0) {
+    text.textContent = filters.join(' · ');
+    badge.style.display = 'inline-flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
 function _updateResetBtn() {
   const btn = $('#btnResetFilters');
   if (!btn) return;
@@ -2466,7 +2521,31 @@ $('#btnResetFilters')?.addEventListener('click', () => {
   const lpInUse = $('#lpInUse'); if (lpInUse) lpInUse.classList.remove('lp-stat-active');
   $('#btnCardsOnly')?.classList.remove('on');
   reload();
+  _updateActiveFiltersBadge();
   toast('↺ Filtros restaurados', 'success');
+});
+
+// Botón limpiar todos los filtros (badge)
+$('#btnClearAllFilters')?.addEventListener('click', () => {
+  state.status = 'LIVE';
+  state.grade = '';
+  searchQuery = '';
+  state.filterInUse = false;
+  state.filterJwt = '';
+  state.cardsOnly = false;
+  state.page = 1;
+  _sortCol = null;
+  _sortDir = -1;
+  document.querySelectorAll('.seg[data-seg="status"] button').forEach(b => b.classList.toggle('on', b.dataset.v === 'LIVE'));
+  document.querySelectorAll('.seg[data-seg="grade"] button').forEach(b => b.classList.toggle('on', b.dataset.v === ''));
+  document.querySelectorAll('.seg[data-seg="jwt"] button').forEach(b => b.classList.toggle('on', b.dataset.v === ''));
+  $('#searchInput').value = '';
+  _reflectSearchUI();
+  const lpInUse = $('#lpInUse'); if (lpInUse) lpInUse.classList.remove('lp-stat-active');
+  $('#btnCardsOnly')?.classList.remove('on');
+  reload();
+  _updateActiveFiltersBadge();
+  toast('↺ Filtros limpiados', 'success');
 });
 
 // Filtro: solo cuentas con tarjeta
@@ -2475,6 +2554,7 @@ $('#btnCardsOnly')?.addEventListener('click', () => {
   state.page = 1;
   $('#btnCardsOnly').classList.toggle('on', state.cardsOnly);
   reload();
+  _updateActiveFiltersBadge();
   toast(state.cardsOnly ? '💳 Filtro: solo cuentas con tarjeta' : '↺ Filtro tarjetas removido', 'success');
 });
 
@@ -2747,6 +2827,7 @@ $$('.seg').forEach(seg => {
       state[key] = btn.dataset.v;
       state.page = 1;
       await reload();
+      _updateActiveFiltersBadge();
     });
   });
 });
@@ -4591,6 +4672,8 @@ let _depMmAbort = null;         // AbortController del SSE fetch
 function setDepMode(mode) {
   _depMode = mode;
   $$('#depModeSeg .dep-drawer-tab').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+  // Sync radios en avanzado
+  $$('#depModeRadios input[name="depMode"]').forEach(r => r.checked = r.value === mode);
 
   const isSingle = mode === 'single';
   const isMulti  = mode === 'multi';
@@ -4616,22 +4699,27 @@ function setDepMode(mode) {
                             : isMulti ? '🎯 Lanzar Matchmaker'
                             : '⏰ Programar misión';
 
-  // Matchmaker: solo $10 / $50 (su único objetivo es buscar match con monto pequeño)
-  const amts = $$('#depAmounts .dep-amt');
-  amts.forEach(b => {
-    const v = b.dataset.v;
-    const allowedInMulti = (v === '10' || v === '50');
-    if (isMulti) {
-      b.style.display = allowedInMulti ? '' : 'none';
-      if (!allowedInMulti && b.classList.contains('on')) {
-        b.classList.remove('on');
-        amts.forEach(x => { if (x.dataset.v === '50') x.classList.add('on'); });
-        _depAmount = 50;
+  // Amount select: limitar opciones en multi
+  const select = $('#depAmountSelect');
+  if (select) {
+    Array.from(select.options).forEach(opt => {
+      const v = opt.value;
+      const allowedInMulti = (v === '10' || v === '50');
+      if (isMulti) {
+        opt.hidden = !allowedInMulti;
+        if (!allowedInMulti && opt.selected) {
+          select.value = '50';
+          _depAmount = 50;
+        }
+      } else {
+        opt.hidden = false;
       }
-    } else {
-      b.style.display = '';
+    });
+    if (isMulti && select.value !== '10' && select.value !== '50') {
+      select.value = '50';
+      _depAmount = 50;
     }
-  });
+  }
 
   // Banner de instrucciones según modo
   renderDepHelpBanner(mode);
@@ -4763,30 +4851,9 @@ async function openDepositModal(accountId, opts = {}) {
     return;
   }
 
-  // ── C1: modal v8 por DEFAULT (2026-06-28) ──
-  // Antes era opt-IN por flag (`localStorage.deposV8==='1'`). Como el flag es
-  // POR NAVEGADOR, los demás operadores (y cualquier otro navegador) caían al
-  // drawer viejo aunque el v8 ya estuviera deployado → "ven interfaz vieja".
-  // Ahora v8 es el DEFAULT; opt-OUT explícito con `localStorage.deposV8='0'`
-  // (escape hatch si algo truena). Fallback seguro al drawer viejo si por lo que
-  // sea `openDepos` no cargó.
-  // Pasamos las cuentas completas (email/password/grade/balance) desde state.rows → el v8
-  // evita un fetch extra y pinta grado + balance reales.
-  if (localStorage.getItem('deposV8') !== '0' && window.openDepos) {
-    const accounts = _ids.map((id) => {
-      const r = (state.rows || []).find((x) => x.id === id) || {};
-      return {
-        id,
-        email: r.email || '',
-        password: r.password || '',
-        grade: (r.grade || '').toLowerCase(),
-        balance: r.balance_total || 0,
-      };
-    });
-    return window.openDepos({ accounts });
-  }
-
-  _depAccountIds = _ids;
+  // ── Depósito: drawer unificado (Fase 2) ──
+  // El drawer simplificado (#depDrawer) es la ÚNICA interfaz de depósitos.
+  // Se eliminó el modal v8 legacy (#deposTpl, #deposRoot, depos.js).
 
   _depAmount = 50;
   _depReps = 5;
@@ -4800,7 +4867,8 @@ async function openDepositModal(accountId, opts = {}) {
   $('#depFeed').innerHTML = '';
   $('#depCustomAmount').value = '';
   $('#depCustomAmount').classList.add('hidden');
-  $$('#depAmounts .dep-amt').forEach(b => b.classList.toggle('on', b.dataset.v === '50'));
+  // Select de monto: resetear a $50
+  $('#depAmountSelect').value = '50';
   $('#depRepsVal').textContent = '5';
   $('#depExec').disabled = false;
   $('#depCancel').classList.add('hidden');
@@ -6090,28 +6158,126 @@ $('#depModeSeg').addEventListener('click', e => {
   if (_depBusy) { toast('Espera a que termine', 'error'); return; }
   setDepMode(btn.dataset.mode);
 });
-$('#depAmounts').addEventListener('click', e => {
-  const btn = e.target.closest('.dep-amt');
-  if (!btn) return;
-  $$('#depAmounts .dep-amt').forEach(b => b.classList.remove('on'));
-  btn.classList.add('on');
-  _depAmount = btn.dataset.v === 'custom' ? 'custom' : parseFloat(btn.dataset.v);
-  const cust = $('#depCustomAmount');
-  if (btn.dataset.v === 'custom') { cust.classList.remove('hidden'); setTimeout(() => cust.focus(), 30); }
-  else cust.classList.add('hidden');
+
+// Select de monto (nuevo)
+$('#depAmountSelect')?.addEventListener('change', e => {
+  const val = e.target.value;
+  if (val === 'custom') {
+    $('#depCustomAmount').classList.remove('hidden');
+    setTimeout(() => $('#depCustomAmount').focus(), 30);
+  } else {
+    $('#depCustomAmount').classList.add('hidden');
+    _depAmount = parseFloat(val);
+  }
 });
+
+// Radio buttons de modo (en "Más opciones")
+$('#depModeRadios')?.addEventListener('change', e => {
+  const radio = e.target.closest('input[name="depMode"]');
+  if (!radio) return;
+  if (_depBusy) { toast('Espera a que termine', 'error'); radio.checked = false; return; }
+  setDepMode(radio.value);
+});
+
+// Tabs de modo también sincronizan los radios
+function setDepMode(mode) {
+  _depMode = mode;
+  $$('#depModeSeg .dep-drawer-tab').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+  $$('#depModeRadios input[name="depMode"]').forEach(r => r.checked = r.value === mode);
+
+  const isSingle = mode === 'single';
+  const isMulti  = mode === 'multi';
+  const isSched  = mode === 'schedule';
+
+  // visibilidades
+  $('#depTargetBlock').classList.toggle('hidden', isMulti);
+  $('#depMultiAccts').classList.toggle('hidden', !isMulti);
+  $('#depCardSection').classList.toggle('hidden', isMulti);
+  $('#depMultiCards').classList.toggle('hidden', !isMulti);
+  $('#depScheduleBlock').classList.toggle('hidden', !isSched);
+  // Phase stepper solo aplica a single — ocultar al cambiar de modo
+  const _ps = $('#depStepper'); if (_ps) _ps.classList.add('hidden');
+  // Vista live de schedule solo aplica a programado — ocultar y limpiar
+  if (!isSched) { try { _schedReset(); } catch {} }
+
+  // título
+  $('#depDrawerTitle').textContent = isSingle ? 'Depositar' : isMulti ? 'Multicuenta' : 'Programado';
+  $('#depAmountHint').textContent = isMulti ? '— por intento (max $50)' : isSched ? '— cada repetición' : '';
+
+  // botón principal
+  $('#depExec').textContent = isSingle ? '🚀 Ejecutar depósito'
+                            : isMulti ? '🎯 Lanzar Matchmaker'
+                            : '⏰ Programar misión';
+
+  // Matchmaker: solo $10 / $50 (su único objetivo es buscar match con monto pequeño)
+  const amts = $$('#depAmountSelect option');
+  amts.forEach(opt => {
+    const v = opt.value;
+    const allowedInMulti = (v === '10' || v === '50');
+    if (isMulti) {
+      opt.style.display = allowedInMulti ? '' : 'none';
+      if (!allowedInMulti && opt.selected) {
+        opt.selected = false;
+        amts.forEach(x => { if (x.value === '50') x.selected = true; });
+        _depAmount = 50;
+      }
+    } else {
+      opt.style.display = '';
+    }
+  });
+
+  // Banner de instrucciones según modo
+  renderDepHelpBanner(mode);
+
+  // tarjetas guardadas solo aplica en single (1 cuenta) y schedule
+  refreshSavedCards();
+  // multi: refrescar el panel de cuentas
+  if (isMulti) renderMultiAccounts();
+}
 $('#depExec').addEventListener('click', executeDeposit);
 $('#depCancel').addEventListener('click', cancelMatchmaker);
 $('#depSchedCancel')?.addEventListener('click', cancelScheduled);
-$('#depCardPipe').addEventListener('input', () => {
-  $('#depCardErr').classList.add('hidden');
+
+// Validación en tiempo real para input de tarjeta
+function validateCardPipe(value) {
+  // Formato: NUMBER|MM|YY|CVV o NUMBER|MM|YY
+  const pipeRegex = /^(\d{13,19})\|(\d{1,2})\|(\d{2,4})(\|(\d{3,4}))?$/;
+  return pipeRegex.test(value);
+}
+
+const cardInput = $('#depCardPipe');
+const cardErr = $('#depCardErr');
+cardInput?.addEventListener('input', (e) => {
+  const value = e.target.value.trim();
+  if (value === '') {
+    cardErr.textContent = '';
+    cardErr.classList.add('hidden');
+    cardInput.classList.remove('valid', 'invalid');
+    return;
+  }
+
+  if (validateCardPipe(value)) {
+    cardInput.classList.remove('invalid');
+    cardInput.classList.add('valid');
+    cardErr.textContent = '';
+    cardErr.classList.add('hidden');
+  } else {
+    cardInput.classList.remove('valid');
+    cardInput.classList.add('invalid');
+    cardErr.textContent = 'Formato: 4242424242424242|MM|YY|CVV';
+    cardErr.classList.remove('hidden');
+  }
 });
+
 $('#depCardChips').addEventListener('click', e => {
   const chip = e.target.closest('.dep-chip');
   if (!chip) return;
   $('#depCardPipe').value = chip.dataset.pipe;
   $('#depCardPipe').focus();
+  // Validar al seleccionar chip
+  cardInput.dispatchEvent(new Event('input'));
 });
+
 $('#depMultiPool').addEventListener('input', () => {
   const lines = $('#depMultiPool').value.split('\n').map(l => l.trim()).filter(Boolean);
   $('#depPoolCount').textContent = `${lines.length} tarjeta${lines.length !== 1 ? 's' : ''}`;
@@ -6151,6 +6317,8 @@ $('#cmdDeposit').addEventListener('click', () => {
 });
 
 $('#cmdCopy')?.addEventListener('click', copySelectedCombos);
+$('#cmdCopyCombos')?.addEventListener('click', copySelectedCombos);
+$('#cmdRefreshSelected')?.addEventListener('click', refreshSelectedAccounts);
 $('#cmdTrastienda')?.addEventListener('click', bulkTrastienda);
 $('#cmdLock').addEventListener('click', bulkLock);
 $('#cmdUnlock')?.addEventListener('click', bulkUnlock);
@@ -6189,6 +6357,7 @@ $('#lpInUse')?.addEventListener('click', () => {
   $('#lpInUse').classList.toggle('lp-stat-active', state.filterInUse);
   showSection('accounts');
   renderTable();
+  _updateActiveFiltersBadge();
   toast(state.filterInUse ? '🎣 Filtro: solo en uso' : '↺ Filtro removido', 'success');
 });
 // Click en "Pool" → quita filtros, muestra todas
@@ -6211,6 +6380,7 @@ document.querySelector('.seg[data-seg="jwt"]')?.addEventListener('click', e => {
   state.filterJwt = b.dataset.v || '';
   state.page = 1;
   renderTable();
+  _updateActiveFiltersBadge();
 });
 
 // Click en avatar de la L invertida → filtra activity por ese operador

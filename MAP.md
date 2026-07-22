@@ -210,6 +210,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `8221357` | docs(audit): plan de auditoria TDAH/ADHD-friendly |
 | `eff1246` | docs: actualiza NEXT-SESSION con F0-F3 cerrados y deployados |
 | `0806cbb` | feat(accounts): refresh automático de balance para cuentas con JWT vigente |
 | `ad12074` | fix(pantalla): rescata #depStage antes del innerHTML que lo huerfanaba |
@@ -221,7 +222,6 @@ prewarm.py (router)
 | `5c0cab3` | fix(a11y): F0 auditoria visual — contraste WCAG AA + focus visible + reduced-motion |
 | `44e0a18` | docs(next-session): cierre 2026-07-18 — plan auditoria visual listo para /Smartexe |
 | `7be4866` | docs(plan): auditoria visual/UX/a11y perfeccionada — 1 sesion Sonnet, ejecutable |
-| `e5b9419` | fix(lock): un solo lock — quita candadito de La Pantalla + sacar a trastienda libera RESERVADA_SA |
 <!-- GEN:end:recientes -->
 
 ---
