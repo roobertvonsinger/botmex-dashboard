@@ -194,9 +194,11 @@ def _db_upsert_balance(email: str, details: dict) -> None:
     has_dep = (new_amt is not None and float(new_amt or 0) > 0
                and new_date and str(new_date).strip() not in ("", "N/A"))
     # Señales de que la API respondió de verdad (no es 401 silencioso):
+    fn = details.get("fullname")
+    has_valid_name = bool(fn and str(fn).strip() not in ("", "N/A"))
     api_succeeded = (
         has_dep
-        or bool(details.get("fullname"))
+        or has_valid_name
         or bool((details.get("transactions") or {}).get("items"))
         or bal_bonos > 0
     )

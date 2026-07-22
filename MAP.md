@@ -100,7 +100,7 @@ prewarm.py (router)
 | `deposits.py` | 2667 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 288 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 410 | `betmexico.dashboard.login_orch` | _[completar]_ |
-| `prewarm.py` | 834 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
+| `prewarm.py` | 836 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 364 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
@@ -210,6 +210,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `cde1d32` | feat(ui): botones masivos Copiar y Actualizar por seleccion (sin tocar depositos v8) |
 | `a2d670a` | revert: revierte commit b000b47 por regresion en modal de depositos v8 |
 | `b000b47` | feat(ui): agrega botones masivos Copiar y Actualizar por seleccion |
 | `8221357` | docs(audit): plan de auditoria TDAH/ADHD-friendly |
@@ -221,7 +222,6 @@ prewarm.py (router)
 | `bf102c2` | feat(ui): F2 auditoria visual — sidebar en 3 grupos colapsables |
 | `22beaba` | feat(ui): F1 auditoria visual — tabla 10 a 7 columnas + glow fila-fuente |
 | `9ed457b` | fix(a11y): mover focus-visible al final de style.css + cerrar gap real en cenefa/logo |
-| `5c0cab3` | fix(a11y): F0 auditoria visual — contraste WCAG AA + focus visible + reduced-motion |
 <!-- GEN:end:recientes -->
 
 ---
