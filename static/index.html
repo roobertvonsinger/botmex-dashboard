@@ -44,7 +44,7 @@
       <div class="sb-frase"><span class="emoji">💛</span><span id="fraseTxt">…</span></div>
     </div>
     <div class="sb-group" data-group="operacion">
-      <button class="sb-group-header" aria-expanded="true" aria-controls="sbGroupOperacion" title="Operación — cuentas, pool y depósitos">
+      <button class="sb-group-header" aria-expanded="true" aria-controls="sbGroupOperacion">
         <span class="sb-group-label">Operación</span>
         <svg class="sb-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
       </button>
@@ -57,7 +57,7 @@
       <!-- id sbSectionSistema preservado a propósito: app.js computeAnchorH() (L2893)
            mide este elemento para alinear el alto del panel KPI con "Cuentas" — ancla
            medida de Robert (2026-07-09), NO renombrar sin actualizar ese anclaje. -->
-      <button class="sb-group-header" id="sbSectionSistema" aria-expanded="true" aria-controls="sbGroupMonitoreo" title="Monitoreo — actividad, notificaciones, logs y salud del sistema">
+      <button class="sb-group-header" id="sbSectionSistema" aria-expanded="true" aria-controls="sbGroupMonitoreo">
         <span class="sb-group-label">Monitoreo</span>
         <svg class="sb-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
       </button>
@@ -69,7 +69,7 @@
       </div>
     </div>
     <div class="sb-group" data-group="admin" id="sbGroupAdminWrap">
-      <button class="sb-group-header" aria-expanded="false" aria-controls="sbGroupAdmin" title="Administración — controles del sistema y estadísticas de BINes (solo SA)">
+      <button class="sb-group-header" aria-expanded="false" aria-controls="sbGroupAdmin">
         <span class="sb-group-label">Administración</span>
         <svg class="sb-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
       </button>
@@ -454,13 +454,6 @@
       <div id="accDockZone">
       <section class="filterbar filterbar-accounts">
         <h2>Cuentas <span class="dim mono" id="countLabel">— / —</span></h2>
-
-        <!-- Badge de filtros activos -->
-        <div class="active-filters" id="activeFiltersBadge" style="display:none" title="Filtros aplicados">
-          <span class="filter-badge" id="activeFiltersText"></span>
-          <button class="filter-clear-btn" id="btnClearAllFilters" title="Limpiar todos los filtros">×</button>
-        </div>
-
         <div class="search filterbar-search" title="Busca lo que sea: email, tarjeta, nombre, nota… (Ctrl+K) · la búsqueda corre sobre TODOS los registros, ignora los filtros">
           <span class="ico">⌕</span>
           <input id="searchInput" placeholder="Buscar email, tarjeta, nombre, notas…" autocomplete="off">
@@ -468,24 +461,24 @@
           <kbd>Ctrl K</kbd>
         </div>
         <div class="seg" data-seg="status" title="Vivas, todas, o muertitas">
-          <button data-v="LIVE" class="on" title="LIVE — Solo cuentas activas que funcionan">LIVE</button>
+          <button data-v="LIVE" class="on" title="Solo cuentas que jalan">LIVE</button>
           <button data-v="all" title="Todas, sin filtrar">Todos</button>
-          <button data-v="DEAD" title="DEAD — Cuentas bloqueadas o inutilizables">DEAD</button>
+          <button data-v="DEAD" title="Las que ya descansan en paz">DEAD</button>
         </div>
         <div class="seg" data-seg="grade" title="Filtra por salud de la pasarela">
-          <button data-v="" class="on" title="Sin filtrar por grade — muestra todas">Todos</button>
-          <button data-v="A" title="🟢 Grade A — Pasarela sana, alta tasa de aprobación">A</button>
-          <button data-v="B" title="🔵 Grade B — Buena, probabilidad media de éxito">B</button>
-          <button data-v="C" title="🟡 Grade C — Cuidado, señales de problemas">C</button>
-          <button data-v="D" title="🔴 Grade D — Pasarela quemada, evitar uso">D</button>
+          <button data-v="" class="on" title="Sin filtrar grado">Todos</button>
+          <button data-v="A" title="🟢 Pasarela sana — dale con confianza">A</button>
+          <button data-v="B" title="🔵 Buena — alta prob. de éxito">B</button>
+          <button data-v="C" title="🟡 Cuidado — señales raras">C</button>
+          <button data-v="D" title="🔴 Pasarela quemada, no pierdas tiempo">D</button>
         </div>
-        <div class="seg" data-seg="jwt" id="segJwt" title="Filtra por estado de sesión JWT — solo visible para SA">
-          <button data-v="" class="on" title="Sin filtrar por JWT — muestra todas las cuentas">Sesión</button>
-          <button data-v="alive" title="🟢 JWT VIVO — Sesión activa, reutilizable sin captcha">🟢</button>
-          <button data-v="expired" title="🔑 JWT EXPIRADO — Sesión vencida, requiere resolver captcha">🔑</button>
+        <div class="seg" data-seg="jwt" id="segJwt" title="Separar por sesión (JWT): viva vs expirada — solo tú lo ves">
+          <button data-v="" class="on" title="Sin filtrar por sesión">Sesión</button>
+          <button data-v="alive" title="🟢 Sesión viva — reutilizable sin captcha">🟢</button>
+          <button data-v="expired" title="🔑 Sesión expirada — requiere resolver captcha">🔑</button>
         </div>
-        <button class="seg-btn fb-cards" id="btnCardsOnly" title="Solo cuentas con al menos 1 tarjeta guardada">💳 Con tarjeta</button>
-        <button class="seg-btn reset-btn" id="btnResetFilters" title="Restaurar filtros a default: LIVE, sin grade, sin búsqueda">↺ Restaurar</button>
+        <button class="seg-btn fb-cards" id="btnCardsOnly" title="Solo cuentas con al menos 1 tarjeta guardada (en account_cards o notas con card)">💳 Con tarjeta</button>
+        <button class="seg-btn reset-btn" id="btnResetFilters" title="Restaurar la vista al default: LIVE, sin grade, sin búsqueda, sin orden">↺ Restaurar</button>
         <!-- DESHABILITADO 2026-07-11: bucle de quema jwt_keeper activo (mismas 8 cuentas rate_limited cada ciclo).
              "Actualizar visibles" dispara login masivo (/api/prewarm/refresh-stream) que compite por el mismo
              semáforo global de login y alimenta la concurrencia que está quemando cuentas. Reactivar cuando
@@ -510,9 +503,7 @@
           <span class="pb-count mono" id="pbVisibleCount"></span>
           <div class="pb-actions" role="toolbar" aria-label="Acciones de la selección">
             <span class="pb-selinfo"><b id="cmdSelCount">0</b> sel · <span class="sum mono" id="cmdStats"></span></span>
-            <button class="act act-primary" id="cmdDeposit" title="Abrir panel de depósitos — 1 cuenta o multi (máx 5). Si hay selección, usa esas cuentas."><span class="i">💳</span>Depositar</button>
-            <button class="act" id="cmdCopyCombos" title="Copiar combos (email:password, 1 por línea) de las cuentas seleccionadas"><span class="i">📋</span>Copiar</button>
-            <button class="act" id="cmdRefreshSelected" title="Actualizar en vivo las cuentas seleccionadas (omite las que están en descanso por rate limit)"><span class="i">↻</span>Actualizar</button>
+            <button class="act act-primary" id="cmdDeposit" title="Abrir / cerrar el panel de depósitos — 1 cuenta o multi (máx 5)"><span class="i">💳</span>Depositar</button>
             <div class="cmd-lock-wrap">
               <button class="act" id="cmdLock" title="Aparta las cuentas para ti — nadie más las toca"><span class="i">🔒</span>Lock <span class="kbd" id="cmdLockHours" title="Click para cambiar duración">2h</span></button>
               <div id="lockHoursPopup" class="lock-hours-popup hidden">
@@ -523,12 +514,12 @@
                 <button class="lh-btn" data-h="24" title="Día entero">24h</button>
               </div>
             </div>
-            <button class="act" id="cmdTrastienda" title="Publicar cuentas seleccionadas al pool común — visibles para TODOS los operadores"><span class="i">🌐</span>Publicar a Pool</button>
+            <button class="act" id="cmdTrastienda" title="Soltar al pool común — visibles para TODOS los operadores"><span class="i">🌐</span>Publicar a Pool</button>
             <div class="cmd-release-wrap">
-              <button class="act" id="cmdRelease" title="Asignar cuentas seleccionadas a UN operador específico — solo SA"><span class="i">🎯</span>Asignar</button>
+              <button class="act" id="cmdRelease" title="Asignar las seleccionadas a UN operador específico"><span class="i">🎯</span>Asignar</button>
               <div id="releasePopup" class="release-popup hidden"></div>
             </div>
-            <button class="act act-ghost" id="cmdDeselect" title="Quitar la selección de todas las cuentas (Esc)">Deseleccionar</button>
+            <button class="act act-ghost" id="cmdDeselect" title="Quitar la selección de todas (Esc)">Borrar</button>
           </div>
         </div>
         <div class="pb-center" id="pbPages"></div>
@@ -558,13 +549,13 @@
         <div class="pool-col" id="poolColOutside">
           <div class="pool-col-head"><span class="pool-col-title">Fuera del pool</span><span class="dim mono" id="poolOutCount">—</span></div>
           <input class="pool-search" id="poolSearchOut" placeholder="Buscar email/combo…" autocomplete="off">
-          <div class="pool-col-actions"><button class="seg-btn pool-bulk-expose" id="poolBtnExpose" disabled title="Manda las cuentas seleccionadas al pool — las verán todos los operadores">Mandar al pool →</button></div>
+          <div class="pool-col-actions"><button class="seg-btn pool-bulk-expose" id="poolBtnExpose" disabled>Mandar al pool →</button></div>
           <div class="pool-list" id="poolOutside"></div>
         </div>
         <div class="pool-col" id="poolColInside">
           <div class="pool-col-head"><span class="pool-col-title">En el pool</span><span class="dim mono" id="poolInCount">—</span></div>
           <input class="pool-search" id="poolSearchIn" placeholder="Buscar email/combo…" autocomplete="off">
-          <div class="pool-col-actions"><button class="seg-btn pool-bulk-hide" id="poolBtnHide" disabled title="Saca las cuentas seleccionadas del pool — dejan de verlas los operadores">← Sacar del pool</button></div>
+          <div class="pool-col-actions"><button class="seg-btn pool-bulk-hide" id="poolBtnHide" disabled>← Sacar del pool</button></div>
           <div class="pool-list" id="poolInside"></div>
         </div>
       </section>
@@ -764,7 +755,7 @@
       <section class="filterbar">
         <h2>Notificaciones <span class="dim mono" id="notifCountLabel">—</span></h2>
         <div class="grow"></div>
-        <button class="seg-btn" id="btnClearNotif" title="Limpiar todas las notificaciones">Limpiar</button>
+        <button class="seg-btn" id="btnClearNotif">Limpiar</button>
       </section>
       <section class="tablewrap">
         <div id="notifList" class="notif-list">
@@ -801,11 +792,11 @@
       <span>💳</span>
       <span id="depDrawerTitle">Depositar</span>
     </div>
-    <!-- Tabs de modo: siempre visibles arriba, ágiles -->
+    <!-- Tabs de modo: siempre visibles arriba, agiles -->
     <div class="dep-drawer-tabs" id="depModeSeg">
       <button class="dep-drawer-tab on" data-mode="single" title="Una tarjeta a una cuenta — rápido y al punto">⚡ Una</button>
       <button class="dep-drawer-tab" data-mode="multi" title="Pool de tarjetas vs varias cuentas — empareja la que pase">👥 Multi</button>
-      <button class="dep-drawer-tab" data-mode="schedule" title="Goteo automático: N intentos cada 1 minuto">⏰ Prog.</button>
+      <button class="dep-drawer-tab" data-mode="schedule" title="Goteo automático: N intentos cada 1 min">⏰ Prog.</button>
     </div>
     <button class="dep-drawer-collapse-btn" id="depDrawerCollapseBtn" title="Colapsar panel (queda como rail). Click otra vez para expandir.">»</button>
     <button class="dep-drawer-close" id="depDrawerClose" title="Cerrar (Esc). Si hay misión activa, queda un pill flotante.">×</button>
@@ -814,47 +805,38 @@
       <!-- Banner de instrucciones del modo activo -->
       <div id="depHelpBanner" class="dep-help-banner"></div>
 
-      <!-- ═══ SECCIÓN 1: CUENTA (siempre visible) ═══ -->
-      <div class="dep-section dep-section-main" id="depTargetBlock">
-        <label class="dep-label">💳 Cuenta</label>
+      <!-- Cuentas (target) -->
+      <div class="dep-target" id="depTargetBlock">
         <div class="dep-target-row">
-          <b id="depTargetEmail" class="d-copy" title="Click para copiar combo">—</b>
+          <span class="dep-target-label" id="depTargetLabel">Combo</span>
+          <b id="depTargetEmail" title="Click para copiar">—</b>
         </div>
-        <div class="dep-target-row">
-          <span class="dep-target-label">Saldo</span>
+        <div class="dep-target-row" id="depTargetBalanceRow">
+          <span class="dep-target-label">Saldo actual</span>
           <span id="depTargetBalance" class="mono">—</span>
         </div>
       </div>
 
-      <!-- Cuentas multi (lista) — se muestra solo en modo multi -->
+      <!-- Lista de cuentas (modo multi) -->
       <div class="dep-section hidden" id="depMultiAccts">
         <label class="dep-label">Cuentas seleccionadas <span class="dim" id="depMultiAcctsCount">0/5</span></label>
         <div class="dep-multi-list" id="depMultiList"></div>
       </div>
 
-      <!-- ═══ SECCIÓN 2: MONTO (siempre visible) ═══ -->
-      <div class="dep-section dep-section-main">
-        <label class="dep-label">💰 Monto <span class="dim" id="depAmountHint">— máx $499/intento</span></label>
-        <select id="depAmountSelect" class="dep-select" title="Monto por intento (máx $499)">
-          <option value="10">$10 — prueba</option>
-          <option value="50" selected>$50 — default seguro</option>
-          <option value="100">$100 — serio</option>
-          <option value="200">$200 — ambicioso</option>
-          <option value="400">$400 — high roller</option>
-          <option value="custom">Otro…</option>
-        </select>
-        <input type="number" id="depCustomAmount" class="dep-input hidden" placeholder="1 a 499…" step="1" min="1" max="499" title="Max $499 — más dispara 3DS">
-      </div>
-
-      <!-- ═══ SECCIÓN 3: TARJETA (siempre visible) ═══ -->
-      <div class="dep-section dep-section-main" id="depCardSection">
-        <label class="dep-label">💳 Tarjeta <span class="dim">— pipe format</span></label>
-        <input type="text" id="depCardPipe" class="dep-input card-input" placeholder="4242424242424242|MM|YY|CVV" autocomplete="off" spellcheck="false" title="Formato: 4242424242424242|MM|YY|CVV (máx $499/intento)">
-        <div id="depCardErr" class="dep-err hidden"></div>
+      <!-- Tarjetas guardadas (chips) -->
+      <div class="dep-section hidden" id="depSavedCards">
+        <label class="dep-label">💳 Tarjetas guardadas <span class="dim">— click para usar</span></label>
         <div class="dep-chips" id="depCardChips"></div>
       </div>
 
-      <!-- Pool tarjetas (modo multi) — se muestra solo en modo multi -->
+      <!-- Input tarjeta (modo single + schedule) -->
+      <div class="dep-section" id="depCardSection">
+        <label class="dep-label">Tarjeta <span class="dim">— pipe format</span></label>
+        <input type="text" id="depCardPipe" class="dep-input" placeholder="4242424242424242|1228|123" autocomplete="off" spellcheck="false">
+        <div id="depCardErr" class="dep-err hidden"></div>
+      </div>
+
+      <!-- Pool tarjetas (modo multi) -->
       <div class="dep-section hidden" id="depMultiCards">
         <label class="dep-label">Pool de tarjetas <span class="dim">— una por línea (max 10)</span></label>
         <textarea id="depMultiPool" class="dep-textarea" rows="4" placeholder="4242424242424242|1228|123&#10;5555555555554444|0627|456" spellcheck="false"></textarea>
@@ -871,33 +853,29 @@
         </div>
       </div>
 
-      <!-- ═══ MÁS OPCIONES (collapsable) ═══ -->
-      <details class="dep-advanced" id="depAdvanced">
-        <summary class="dep-advanced-summary">⚙ Más opciones</summary>
-        <div class="dep-advanced-content">
-
-          <!-- Modo (radios en lugar de tabs para avanzado) -->
-          <div class="dep-section">
-            <label class="dep-label">Modo</label>
-            <div class="dep-mode-radios" id="depModeRadios">
-              <label><input type="radio" name="depMode" value="single" checked> ⚡ Single — una tarjeta, una cuenta</label>
-              <label><input type="radio" name="depMode" value="multi"> 👥 Multi — pool tarjetas vs cuentas</label>
-              <label><input type="radio" name="depMode" value="schedule"> ⏰ Programado — goteo cada 1 min</label>
-            </div>
-          </div>
-
-          <!-- Repeticiones (modo schedule) -->
-          <div class="dep-section hidden" id="depScheduleBlock">
-            <label class="dep-label">Repeticiones <span class="dim">— cada 1 min, máx 20</span></label>
-            <div class="dep-stepper" title="Cuántas veces se repite el depósito automático">
-              <button class="dep-step-btn" data-d="-1" title="−1">−</button>
-              <span class="dep-step-val mono" id="depRepsVal">5</span>
-              <button class="dep-step-btn" data-d="1" title="+1">+</button>
-            </div>
-          </div>
-
+      <!-- Monto -->
+      <div class="dep-section">
+        <label class="dep-label">Monto <span class="dim" id="depAmountHint">— máx $499/intento</span></label>
+        <div class="dep-amounts" id="depAmounts">
+          <button class="dep-amt" data-v="10" title="Tantito — para probar la pasarela">$10</button>
+          <button class="dep-amt on" data-v="50" title="Default seguro">$50</button>
+          <button class="dep-amt" data-v="100" title="Ya vas en serio">$100</button>
+          <button class="dep-amt" data-v="200" title="El ambicioso">$200</button>
+          <button class="dep-amt" data-v="400" title="High roller — al límite del cap">$400</button>
+          <button class="dep-amt" data-v="custom" title="Tu monto, tus reglas (max $499)">Otro</button>
         </div>
-      </details>
+        <input type="number" id="depCustomAmount" class="dep-input hidden" placeholder="1 a 499…" step="1" min="1" max="499" title="Max $499 — más dispara 3DS">
+      </div>
+
+      <!-- Repeticiones (modo schedule) -->
+      <div class="dep-section hidden" id="depScheduleBlock">
+        <label class="dep-label">Repeticiones <span class="dim">— cada 1 min, máx 20</span></label>
+        <div class="dep-stepper" title="Cuántas veces se repite el depósito automático">
+          <button class="dep-step-btn" data-d="-1" title="−1">−</button>
+          <span class="dep-step-val mono" id="depRepsVal">5</span>
+          <button class="dep-step-btn" data-d="1" title="+1">+</button>
+        </div>
+      </div>
 
       <!-- Phase stepper (single mode, live SSE) -->
       <div id="depStepper" class="dep-phase-stepper hidden">
@@ -978,7 +956,7 @@
 
   </div><!-- /dep-drawer-body -->
   <footer class="dep-drawer-footer">
-    <button id="depExec" class="dep-exec" title="Lanza el depósito o misión con la configuración actual">🚀 Ejecutar</button>
+    <button id="depExec" class="dep-exec" title="Lanza el depósito o misión">🚀 Ejecutar</button>
     <button id="depCancel" class="dep-exec dep-exec-cancel hidden" title="Cancela el matchmaker en curso">⏹ Detener</button>
     <button id="depSchedCancel" class="dep-exec dep-exec-cancel hidden" title="Cancela la misión programada. Los intentos ya enviados quedan en BD.">⏹ Cancelar misión</button>
   </footer>
@@ -992,15 +970,90 @@
   <button id="depPillReopen" title="Reabrir drawer">↗</button>
 </div>
 
+<!-- Modal Depósitos v8 (C1) — markup inerte en <template>, clonado por depos.js -->
+<template id="deposTpl">
+<div id="depos">
+<aside class="bmx" role="dialog" aria-label="Depositar">
+
+    <header class="head">
+      <img class="depos-banner" src="/static/assets/depositos-banner.jpg?v=20260627k" alt="BOTMEXICO — Depósitos" />
+      <div class="head-row">
+        <div class="title" id="greet">Que el banco afloje</div>
+        <button class="newproc" title="Abrir otro depósito en paralelo"><span class="plus">+</span> Otro depósito</button>
+      </div>
+    </header>
+
+    <section class="controls">
+      <div class="duo">
+        <div class="col">
+          <div class="field-head"><span class="label">Cuentas</span><span class="count" id="accCount">3</span></div>
+          <div class="chips" id="accChips">
+            <span class="chip"><span class="hdot a"></span><span class="txt copyable" data-copy="olimpo.flor@betmex.mx:Zp9flor!">olimpo.flor@betmex.mx:Zp9flor!</span><span class="chip-x" title="Quitar de esta misión (no se borra de la cuenta)">×</span></span>
+            <span class="chip"><span class="hdot b"></span><span class="txt copyable" data-copy="zeus.mara@betmex.mx:Mar4zeus">zeus.mara@betmex.mx:Mar4zeus</span><span class="chip-x" title="Quitar de esta misión (no se borra de la cuenta)">×</span></span>
+            <span class="chip"><span class="hdot c"></span><span class="txt copyable" data-copy="hera.lux@betmex.mx:Lux8hera">hera.lux@betmex.mx:Lux8hera</span><span class="chip-x" title="Quitar de esta misión (no se borra de la cuenta)">×</span></span>
+          </div>
+        </div>
+        <div class="col">
+          <div class="field-head"><span class="label">Tarjetas</span><span class="count">2</span></div>
+          <div class="chips">
+            <span class="chip"><span class="txt copyable" data-copy="4111111111111111|12|2030|123">4111111111111111|12|2030|123</span><span class="chip-x" title="Quitar de esta misión (no se borra de la cuenta)">×</span></span>
+            <span class="chip"><span class="txt copyable" data-copy="5454545454545454|09|2029|456">5454545454545454|09|2029|456</span><span class="chip-x" title="Quitar de esta misión (no se borra de la cuenta)">×</span></span>
+            <span class="chip chip-add">+ agregar tarjeta</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="amt-wrap">
+          <div class="field-head"><span class="label">Monto</span></div>
+          <div class="amt dis" id="amtManual"><span>$</span><input id="amtInput" value="50" inputmode="numeric" aria-label="Monto manual" /></div>
+          <div class="amt-presets" id="amtPresets"></div>
+          <div class="amt-note" id="amtNote">Montos fijos para varias cuentas  $490 = monto alto (tope $499)</div>
+        </div>
+        <div class="reps hide" id="repsBox">
+          <div class="field-head"><span class="label">Reps</span></div>
+          <div class="seg-wrap">
+            <div class="seg-disp" id="segDisp"></div>
+            <div class="seg-btns">
+              <button class="seg-btn" id="repUp" aria-label="Subir">&#9650;</button>
+              <button class="seg-btn" id="repDn" aria-label="Bajar">&#9660;</button>
+            </div>
+          </div>
+          <div class="reps-x" id="repsNote">máx 15</div>
+        </div>
+      </div>
+
+      <div class="depbar">
+        <button class="deposit" id="dep">Depositar</button>
+        <div class="runrow" id="runrow">
+          <button class="runbtn pause" id="pause" data-tip="Pausar la mision">&#10073;&#10073;&nbsp; Pausar</button>
+          <button class="runbtn abort" id="abort" data-tip="Abortar la mision">&#10005;</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- escenario de depósito movido a #depStage (La Pantalla) -->
+
+        <section class="mov">
+      <div class="mov-head"><span class="label">Movimientos</span><span class="mov-line"></span></div>
+      <div class="mov-list" id="mov"></div>
+    </section>
+
+  </aside>
+</div>
+</template>
+<div id="deposRoot" class="depos-root hidden" aria-hidden="true"></div>
+
 <!-- Toast -->
 <div id="toast" class="toast hidden"></div>
 
 <script src="/static/activity_logic.js?v=20260629b"></script>
 <script src="/static/pantalla_logic.js?v=20260702a"></script>
 <script src="/static/strip_logic.js?v=20260630a"></script>
-<script src="/static/app.js?v=20260722a"></script>
+<script src="/static/app.js?v=20260718b"></script>
 <script src="/static/depos_logic.js?v=20260628e"></script>
 <script src="/static/depos_window.js?v=20260630a"></script>
+<script src="/static/depos.js?v=20260628e"></script>
 <script src="/static/pantalla.js?v=20260718a" defer></script>
 </body>
 </html>
