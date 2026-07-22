@@ -22,8 +22,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `select_refresh_candidates_healthy` | def | L57–L89 |
 | `_exp_int` | def | L92–L98 |
 | `_load_candidate_rows` | def | L106–L116 |
-| `run_refresh_cycle` | def | L120–L216 |
-| `run_refresh_cycle_from_env` | def | L219–L223 |
+| `run_refresh_cycle` | def | L120–L230 |
+| `run_refresh_cycle_from_env` | def | L233–L237 |
 
 ### `app.py`
 
@@ -187,22 +187,22 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_deposit_step_payload` | def | L705–L713 |
 | `_wrap_deposit_step` | def | L716–L735 |
 | `_build_admin_proxy_url` | def | L738–L742 |
-| `_refresh_account_after_deposit` | def | L745–L792 |
-| `_should_relogin_after_401` | def | L795–L799 |
-| `_acquire_session_and_begin` | def | L802–L1050 |
-| `_run_deposit_with_phases` | def | L1053–L1367 |
-| `deposit_execute_stream` | def | L1371–L1571 |
-| `cap_status` | def | L1575–L1587 |
-| `_mm_is_real_decline` | def | L1624–L1630 |
-| `_mm_is_ambiguous_charge` | def | L1633–L1643 |
-| `classify_deposit_status` | def | L1646–L1677 |
-| `_mm_session_get` | def | L1727–L1731 |
-| `_mm_session_update` | def | L1734–L1743 |
-| `multi_stream` | def | L1747–L2244 |
-| `multi_cancel` | def | L2248–L2253 |
-| `scheduled_create` | def | L2266–L2629 |
-| `scheduled_list` | def | L2633–L2655 |
-| `scheduled_cancel` | def | L2659–L2667 |
+| `_refresh_account_after_deposit` | def | L745–L804 |
+| `_should_relogin_after_401` | def | L807–L811 |
+| `_acquire_session_and_begin` | def | L814–L1062 |
+| `_run_deposit_with_phases` | def | L1065–L1379 |
+| `deposit_execute_stream` | def | L1383–L1583 |
+| `cap_status` | def | L1587–L1599 |
+| `_mm_is_real_decline` | def | L1636–L1642 |
+| `_mm_is_ambiguous_charge` | def | L1645–L1655 |
+| `classify_deposit_status` | def | L1658–L1689 |
+| `_mm_session_get` | def | L1739–L1743 |
+| `_mm_session_update` | def | L1746–L1755 |
+| `multi_stream` | def | L1759–L2256 |
+| `multi_cancel` | def | L2260–L2265 |
+| `scheduled_create` | def | L2278–L2641 |
+| `scheduled_list` | def | L2645–L2667 |
+| `scheduled_cancel` | def | L2671–L2679 |
 
 ### `jwt_keeper.py`
 
@@ -245,18 +245,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_db_account_prewarms_today` | def | L130–L145 |
 | `_account_minutes_since_check` | def | L148–L157 |
 | `_db_get_recent_log` | def | L160–L175 |
-| `_db_upsert_balance` | def | L178–L233 |
-| `_db_save_txns_and_recalc` | def | L236–L258 |
-| `_db_update_last_checked` | def | L261–L273 |
-| `_db_invalidate_jwt` | def | L276–L287 |
-| `_db_mark_dead` | def | L290–L313 |
-| `_is_balance_fresh` | def | L316–L324 |
-| `_capmonster_balance` | def | L329–L345 |
-| `_run_prewarm` | def | L350–L530 |
-| `prewarm_select` | def | L536–L617 |
-| `prewarm_cancel` | def | L621–L631 |
-| `prewarm_status` | def | L635–L650 |
-| `prewarm_refresh_stream` | def | L656–L836 |
+| `_fetch_looks_empty` | def | L178–L204 |
+| `_db_upsert_balance` | def | L207–L262 |
+| `_db_save_txns_and_recalc` | def | L265–L287 |
+| `_db_update_last_checked` | def | L290–L302 |
+| `_db_invalidate_jwt` | def | L305–L316 |
+| `_db_mark_dead` | def | L319–L342 |
+| `_is_balance_fresh` | def | L345–L353 |
+| `_capmonster_balance` | def | L358–L374 |
+| `_run_prewarm` | def | L379–L564 |
+| `prewarm_select` | def | L570–L651 |
+| `prewarm_cancel` | def | L655–L665 |
+| `prewarm_status` | def | L669–L684 |
+| `prewarm_refresh_stream` | def | L690–L870 |
 
 ### `proxy_pool.py`
 

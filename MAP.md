@@ -92,15 +92,15 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `account_refresh.py` | 223 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
+| `account_refresh.py` | 237 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
 | `app.py` | 3239 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2667 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2679 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 288 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 410 | `betmexico.dashboard.login_orch` | _[completar]_ |
-| `prewarm.py` | 836 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
+| `prewarm.py` | 870 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 364 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
@@ -210,6 +210,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a8df3f5` | fix(balance): no sobreescribir saldo real a $0 en refresh balance_only |
 | `cde1d32` | feat(ui): botones masivos Copiar y Actualizar por seleccion (sin tocar depositos v8) |
 | `a2d670a` | revert: revierte commit b000b47 por regresion en modal de depositos v8 |
 | `b000b47` | feat(ui): agrega botones masivos Copiar y Actualizar por seleccion |
@@ -221,7 +222,6 @@ prewarm.py (router)
 | `33efe01` | feat(ui): F3 auditoria visual — mobile responsive La Pantalla + verificacion de secuencia |
 | `bf102c2` | feat(ui): F2 auditoria visual — sidebar en 3 grupos colapsables |
 | `22beaba` | feat(ui): F1 auditoria visual — tabla 10 a 7 columnas + glow fila-fuente |
-| `9ed457b` | fix(a11y): mover focus-visible al final de style.css + cerrar gap real en cenefa/logo |
 <!-- GEN:end:recientes -->
 
 ---
