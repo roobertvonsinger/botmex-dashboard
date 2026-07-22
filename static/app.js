@@ -789,6 +789,22 @@ function updateCmdBar() {
   }
 }
 
+async function refreshSelectedAccounts() {
+  if (selectedIds.size === 0) { toast('Nada seleccionado', 'error'); return; }
+  const selRows = state.rows.filter(r => selectedIds.has(r.id));
+  const eligibleRows = selRows.filter(r => !(r.cooldown_min > 0) && !r.needs_reset);
+  const skippedCount = selRows.length - eligibleRows.length;
+  if (eligibleRows.length === 0) {
+    toast(`⚠️ Las ${selRows.length} cuentas seleccionadas están en descanso por rate-limit`, 'error');
+    return;
+  }
+  if (skippedCount > 0) {
+    toast(`ℹ️ Se omitieron ${skippedCount} cuenta(s) en descanso. Refrescando ${eligibleRows.length}…`, 'info');
+  }
+  const ids = eligibleRows.map(r => r.id);
+  await refreshVisible({ ids, force: true });
+}
+
 async function copySelectedCombos() {
   if (selectedIds.size === 0) { toast('Nada seleccionado', 'error'); return; }
   try {
@@ -6155,6 +6171,8 @@ $('#cmdTrastienda')?.addEventListener('click', bulkTrastienda);
 $('#cmdLock').addEventListener('click', bulkLock);
 $('#cmdUnlock')?.addEventListener('click', bulkUnlock);
 $('#cmdDeselect').addEventListener('click', deselectAll);
+$('#cmdCopyCombos')?.addEventListener('click', copySelectedCombos);
+$('#cmdRefreshSelected')?.addEventListener('click', refreshSelectedAccounts);
 
 // Click en el chip "2h" del botón Lock abre el selector
 $('#cmdLockHours')?.addEventListener('click', e => {

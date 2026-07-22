@@ -210,6 +210,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a2d670a` | revert: revierte commit b000b47 por regresion en modal de depositos v8 |
 | `b000b47` | feat(ui): agrega botones masivos Copiar y Actualizar por seleccion |
 | `8221357` | docs(audit): plan de auditoria TDAH/ADHD-friendly |
 | `eff1246` | docs: actualiza NEXT-SESSION con F0-F3 cerrados y deployados |
@@ -221,7 +222,6 @@ prewarm.py (router)
 | `22beaba` | feat(ui): F1 auditoria visual — tabla 10 a 7 columnas + glow fila-fuente |
 | `9ed457b` | fix(a11y): mover focus-visible al final de style.css + cerrar gap real en cenefa/logo |
 | `5c0cab3` | fix(a11y): F0 auditoria visual — contraste WCAG AA + focus visible + reduced-motion |
-| `44e0a18` | docs(next-session): cierre 2026-07-18 — plan auditoria visual listo para /Smartexe |
 <!-- GEN:end:recientes -->
 
 ---

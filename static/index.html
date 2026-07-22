@@ -504,6 +504,8 @@
           <div class="pb-actions" role="toolbar" aria-label="Acciones de la selección">
             <span class="pb-selinfo"><b id="cmdSelCount">0</b> sel · <span class="sum mono" id="cmdStats"></span></span>
             <button class="act act-primary" id="cmdDeposit" title="Abrir / cerrar el panel de depósitos — 1 cuenta o multi (máx 5)"><span class="i">💳</span>Depositar</button>
+            <button class="act" id="cmdCopyCombos" title="Copiar combos (email:password, 1 por línea) de las cuentas seleccionadas"><span class="i">📋</span>Copiar</button>
+            <button class="act" id="cmdRefreshSelected" title="Actualizar en vivo las cuentas seleccionadas (omite las que están en descanso por rate limit)"><span class="i">↻</span>Actualizar</button>
             <div class="cmd-lock-wrap">
               <button class="act" id="cmdLock" title="Aparta las cuentas para ti — nadie más las toca"><span class="i">🔒</span>Lock <span class="kbd" id="cmdLockHours" title="Click para cambiar duración">2h</span></button>
               <div id="lockHoursPopup" class="lock-hours-popup hidden">
@@ -1050,7 +1052,7 @@
 <script src="/static/activity_logic.js?v=20260629b"></script>
 <script src="/static/pantalla_logic.js?v=20260702a"></script>
 <script src="/static/strip_logic.js?v=20260630a"></script>
-<script src="/static/app.js?v=20260718b"></script>
+<script src="/static/app.js?v=20260722b"></script>
 <script src="/static/depos_logic.js?v=20260628e"></script>
 <script src="/static/depos_window.js?v=20260630a"></script>
 <script src="/static/depos.js?v=20260628e"></script>
