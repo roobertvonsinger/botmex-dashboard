@@ -250,6 +250,31 @@ def _migrate():
     except sqlite3.OperationalError:
         pass
 
+    # Tabla de bitácora de retiros automáticos (botón SA en La Pantalla).
+    # UNIQUE(transaction_id) garantiza idempotencia. Aditiva.
+    # Ver withdrawals.py + docs/superpowers/specs/2026-07-24-boton-retiro-automatico-design.md.
+    try:
+        with db(write=True) as c:
+            c.execute(
+                "CREATE TABLE IF NOT EXISTS account_withdrawals ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "account_id INTEGER NOT NULL, "
+                "account_email TEXT, "
+                "transaction_id TEXT UNIQUE NOT NULL, "
+                "reference TEXT, "
+                "amount REAL NOT NULL, "
+                "account_digits TEXT, "
+                "institution_name TEXT, "
+                "status_api INTEGER, "
+                "status_description TEXT, "
+                "gateway INTEGER, "
+                "last_modified_utc TEXT, "
+                "disparado_por INTEGER, "
+                "created_at TEXT NOT NULL)"
+            )
+    except sqlite3.OperationalError:
+        pass
+
     _backfill_grades_v10_m7()
 
 

@@ -93,7 +93,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 237 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 3306 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3331 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
@@ -128,6 +128,7 @@ prewarm.py (router)
 | `test_sse_visibility.py` | 88 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 55 | `—` | _[completar]_ |
+| `test_withdrawals_migrate.py` | 46 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
 | `web_grading.py` | 179 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
 | `web_utils.py` | 265 | `betmexico.web.utils` | Helpers compartidos: _friendly_error, _normalize_ccexp, _build_proxy_url |
@@ -213,6 +214,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `24e8e57` | docs(plan): plan botón retiro automático |
 | `fe21d73` | docs: NEXT-SESSION cierre — plan botón retiro listo para /Smartexe |
 | `bbb14d8` | feat(recon): spec botón retiro automático + herramientas CDP/bmx_call |
 | `bf185ac` | feat(clabes): panel SPEI NVIO/STP persistido en BD + endpoints |
@@ -224,7 +226,6 @@ prewarm.py (router)
 | `a2d670a` | revert: revierte commit b000b47 por regresion en modal de depositos v8 |
 | `b000b47` | feat(ui): agrega botones masivos Copiar y Actualizar por seleccion |
 | `8221357` | docs(audit): plan de auditoria TDAH/ADHD-friendly |
-| `eff1246` | docs: actualiza NEXT-SESSION con F0-F3 cerrados y deployados |
 <!-- GEN:end:recientes -->
 
 ---
