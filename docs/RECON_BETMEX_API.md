@@ -1,7 +1,39 @@
 # RECON — API de BetMexico (mapeo del frontend)
 
-> Reverse engineering autorizado (testing propio). Generado 2026-07-22.
-> Fuente: bundle SPA Vue `bmx-prod-v26.7.43` (build más nuevo que el v26.5.25 documentado en `docs/ERRORS.md`).
+> Reverse engineering autorizado (testing propio). Generado 2026-07-22, actualizado 2026-07-24.
+> Fuente: bundle SPA Vue `bmx-prod-v26.7.47` (build más nuevo que el v26.5.25 documentado en `docs/ERRORS.md`).
+
+## ⚠️ Separación QUIRÚRGICA: Depósitos vs Retiros (no confundir)
+
+**Dos families de endpoints distintos. NUNCA mezclar.** Confundirlos ya costó sesiones.
+
+### DEPÓSITOS (el usuario envía dinero A BetMexico)
+| Endpoint | Qué hace |
+|---|---|
+| `POST /api/wallet/deposit/BeginDepositWithCard` | Tarjeta (lo que USA el bot). body `{amount, theme:1}` → processorpay |
+| `POST /api/stp/BeginDeposit` | SPEI MX. **SIN body** → `{reference, userId, accounts:[{account, blocked, order, integration}]}`. Devuelve las CLABES de depósito (NVIO order 1 + STP order 3). |
+| `POST /api/BankTransfer/BeginDeposit` | SPEI canónico con body `{...e}` |
+| `POST /api/DigitalWallet/BeginDeposit` | Wallet digital |
+| `GET /api/stp/...` status | Estado del depósito |
+
+> **Las clabes que devuelve `BeginDeposit` son las CUENTAS DONDE EL USUARIO DEPOSITA** (NVIO/STP). Son internas de BetMexico. NO son la cuenta de retiro del usuario.
+
+### RETIROS (BetMexico envía dinero AL usuario)
+| Endpoint | Qué hace |
+|---|---|
+| `POST /api/stp/BeginWithdrawal` | Retiro SPEI MX (body `e`). Rail principal. |
+| `POST /api/card/beginwithdrawal` | Retiro a TARJETA (body `e`) |
+| `POST /api/bankTransfer/beginWithdrawal` | Retiro bank transfer (body `e`) |
+| `POST /api/pix/BeginWithdrawal` | Retiro Pix (Brasil) |
+| `POST /api/DigitalWallet/BeginWithdrawal` | Retiro wallet digital |
+| `GET /api/User/PendingWithdrawal` / `/api/wallet/PendingWithdrawal` | Retiro pendiente actual → `{reference, transactionStatus}` |
+| `GET /api/user/LastWithdrawalDetail` | Detalle último retiro |
+| `POST /api/Card/CardTransactionStatus` | Estado transacción tarjeta |
+
+> **La cuenta de retiro** del usuario se lee con `GET /api/User/BankAccounts` (MX) y va en el body `e` del `BeginWithdrawal` (`accountId`, `account`=clabe del usuario, `institutionName`, `bankName`). **BetMexico retira al ÚLTIMO método de depósito usado** (si depositó con tarjeta → retira a tarjeta; un depósito SPEI rellena la cuenta de retiro en automático).
+
+### Regla de oro
+`BeginDeposit` = entra dinero a BetMexico + devuelve clabes internas. `BeginWithdrawal` = sale dinero de BetMexico + usa la clabe/cuenta del USUARIO. **Mismo verbo `Begin`, familias opuestas.** El `priority-provider: [3,1]` del `payments-maintenance.json` se refiere a **proveedores SPEI backend** (orden de intento), NO a cuentas internas de depósito ni a métodos de retiro — es backend, no está en el JS (no-determinado).
 
 ## Método
 betmexico.mx es **SPA Vue** (rolldown/Vite). WebFetch NO sirve (renderiza con JS). Flujo verificado:
@@ -251,5 +283,25 @@ Mutación → POST/PUT/PATCH /api/wallet/BankAccounts
 1. **Login fresco de diagnóstico msaidrzz** — ver si `/api/Session/login` devuelve el gate de PIN/verify-email o login normal. Toca el semáforo → decisión de Robert.
 2. **Clabes reales msaidrzz** — `GET /api/User/BankAccounts` con su JWT fresco.
 3. **Probar liberación de cuarentena** — `/api/Users/Validate/PIN/` con el código leído del correo.
+
+## ★★ OBJETIVO OPERATIVO ACTIVO (2026-07-24) — retiro en cuenta cuarentenada
+
+**El objetivo que NO se debe diluir:** Lograr un retiro en la cuenta que está con la pantalla en `/verify-email` (cuarentena rate-limit) y que **tiene dinero real** (depositamos desde el dashboard).
+
+- **Cuenta sana de referencia (para mapear el flujo con datos reales):** `espinoza.arellano.alberto.205@gmail.com:ALBERTOcr7` (id BD 1497, userId `28f2d949-9617-4523-b289-5f55aaaa2911`, balance $1,300, KYC ok).
+- **Cuenta cuarentenada con dinero:** `msaidrzz@gmail.com:Mm2025srz21` (id 637, balance $1,450.01 REAL, atorada en `/verify-email`).
+- **Estado de la sesión viva (espinoza):** JWT en `localStorage["bet4:token"]`, válido hasta 2026-07-31, status `Active`. Claims .NET: `emailaddress`=email, `name`=username, `sid`=userId. **Sesión logueada viva en Chrome con CDP** (puerto 9222). Tab confirmado en `/casino/slots`.
+- **Dato de calleo confirmado:** las llamadas API reales van a `paymentsapi.betmexico.mx` (wallet/user/BankAccounts/withdrawal) y a `betmexico.mx/api/` (Session/Users/Giveaway). `betmexico.mx/api/Users/UserInfo` NO existe ahí (sirve SPA fallback HTML) — usar `paymentsapi`.
+
+### Calleo pendiente (siguiente sesión, con capturador CDP escuchando)
+Con la sesión espinoza viva y el capturador `tools/cdp_capture.py` corriendo (CDP puerto 9222), navegar el tab a:
+1. `/withdrawal` → captura `GET /api/User/BankAccounts` (o `paymentsapi`) → schema real de las clabes/cuentas de retiro de espinoza + `accountStatus` (debe ser APPROVED=2).
+2. `GET /api/User/PendingWithdrawal` / `paymentsapi.betmexico.mx/api/wallet/PendingWithdrawal` → si hay retiro pendiente.
+3. `GET /api/user/LastWithdrawalDetail` → historial de retiros (espinoza tiene los casos de bug de prioridad tarjeta-vs-cuenta).
+4. Si Robert dispara un retiro real → capturar el body `e` de `POST /api/stp/BeginWithdrawal` o `/api/card/beginwithdrawal` + la respuesta `{reference, transactionStatus}`.
+5. **Medir el cambio de prioridad:** tras enviar un SPEI a la cuenta (BeginDeposit), ver si el siguiente retiro cambia a cuenta bancaria instantáneo o hay delay (bug de BetMexico: a veces sale a tarjeta, a veces 2-3 a cuenta y de repente uno a tarjeta).
+
+### Método de captura — CANONICAL = CDP (NO requiere MCP ni reiniciar sesión)
+`tools/cdp_capture.py` (o `~/.agents/skills/rgate-investigate/scripts/cdp_capture.py`, versión robusta) se conecta a `ws://localhost:9222`, habilita `Network.enable`, captura todas las requests `/api/` + betmexico con **bodies, postData, timestamps ISO** a `tools/captured.jsonl`. Chrome arrancado con `--remote-debugging-port=9222 --user-data-dir=<perfil>`. Robert navega/loguea, el script atrapa el tráfico en vivo (mismo origen → sin CORS, el JWT viaja en el header del interceptor axios). Ver skill `rgate-investigate` (método CDP canonical, HAR como fallback).
 
 Ver `memory/reference_betmex_api_endpoints_frontend.md`, `memory/project_verify_email_cuarentena_betmexico.md`, `memory/project_clabes_spei_begin_deposit.md`.
