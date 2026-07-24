@@ -97,7 +97,7 @@ prewarm.py (router)
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
-| `conftest.py` | 130 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
+| `conftest.py` | 131 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `deposits.py` | 2679 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 288 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 410 | `betmexico.dashboard.login_orch` | _[completar]_ |
@@ -218,6 +218,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d40434e` | docs: NEXT-SESSION cierre — Task C código listo, fix bug schema test pendiente |
 | `0b8d499` | feat(api): endpoints withdraw + status con guardarrails bug#1/#2/#3 |
 | `5a7779b` | feat(withdrawals): módulo retiro TDD con guardarrails bug#1/#3 |
 | `c360b9e` | feat(db): tabla account_withdrawals (bitácora idempotente de retiros) |
@@ -229,7 +230,6 @@ prewarm.py (router)
 | `b7cb21c` | feat(recon): mapeo API retiros/depósitos BetMexico + capturador CDP |
 | `a5b5411` | docs: actualiza ERRORS.md y NEXT-SESSION con auditoria de regresion 24h |
 | `a8df3f5` | fix(balance): no sobreescribir saldo real a $0 en refresh balance_only |
-| `cde1d32` | feat(ui): botones masivos Copiar y Actualizar por seleccion (sin tocar depositos v8) |
 <!-- GEN:end:recientes -->
 
 ---

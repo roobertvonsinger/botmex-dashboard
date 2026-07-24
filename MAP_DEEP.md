@@ -173,10 +173,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `seed_db` | def | L8–L94 |
-| `client` | def | L97–L101 |
-| `make_client` | def | L104–L116 |
-| `mock_bmx_transport` | def | L120–L130 |
+| `seed_db` | def | L8–L95 |
+| `client` | def | L98–L102 |
+| `make_client` | def | L105–L117 |
+| `mock_bmx_transport` | def | L121–L131 |
 
 ### `deposits.py`
 

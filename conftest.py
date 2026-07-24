@@ -16,6 +16,7 @@ def seed_db(tmp_path, monkeypatch):
             CREATE TABLE accounts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 email TEXT NOT NULL, password TEXT NOT NULL,
+                fullname TEXT, curp TEXT, phone TEXT,
                 balance_real REAL DEFAULT 0, balance_bonos REAL DEFAULT 0, balance_total REAL DEFAULT 0,
                 last_deposit_amount REAL DEFAULT 0, last_deposit_date TEXT DEFAULT 'N/A',
                 status TEXT DEFAULT 'LIVE',
