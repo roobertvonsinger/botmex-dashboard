@@ -44,3 +44,7 @@ Thumbs.db
 .playwright-mcp/
 .claude/launch.json
 static/_depos_preview.html
+
+# CDP capture — tráfico real con JWTs/clabes, NUNCA commitear (solo scripts .py)
+tools/*.jsonl
+tools/*.log

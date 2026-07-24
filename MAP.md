@@ -210,6 +210,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a5b5411` | docs: actualiza ERRORS.md y NEXT-SESSION con auditoria de regresion 24h |
 | `a8df3f5` | fix(balance): no sobreescribir saldo real a $0 en refresh balance_only |
 | `cde1d32` | feat(ui): botones masivos Copiar y Actualizar por seleccion (sin tocar depositos v8) |
 | `a2d670a` | revert: revierte commit b000b47 por regresion en modal de depositos v8 |
@@ -221,7 +222,6 @@ prewarm.py (router)
 | `a053733` | docs: corrige comentario desactualizado de _detailColspan tras F1 |
 | `33efe01` | feat(ui): F3 auditoria visual — mobile responsive La Pantalla + verificacion de secuencia |
 | `bf102c2` | feat(ui): F2 auditoria visual — sidebar en 3 grupos colapsables |
-| `22beaba` | feat(ui): F1 auditoria visual — tabla 10 a 7 columnas + glow fila-fuente |
 <!-- GEN:end:recientes -->
 
 ---
