@@ -170,9 +170,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `seed_db` | def | L7–L93 |
-| `client` | def | L96–L100 |
-| `make_client` | def | L103–L115 |
+| `seed_db` | def | L8–L94 |
+| `client` | def | L97–L101 |
+| `make_client` | def | L104–L116 |
+| `mock_bmx_transport` | def | L120–L130 |
 
 ### `deposits.py`
 
@@ -638,6 +639,42 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_update_invalidates_on_bare_401` | def | L44–L48 |
 | `test_update_invalidates_on_redirectlogin` | def | L51–L55 |
 
+### `test_withdrawals.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `_json_response` | def | L11–L12 |
+| `test_get_bank_accounts_happy_one_approved` | def | L17–L27 |
+| `test_get_bank_accounts_filters_non_approved` | def | L30–L40 |
+| `test_get_bank_accounts_empty_aborts` | def | L43–L48 |
+| `test_get_bank_accounts_multiple_approved_bug1` | def | L51–L66 |
+| `test_get_bank_accounts_non200_raises` | def | L69–L74 |
+| `test_get_bank_accounts_uses_proxy_and_canonical_headers` | def | L77–L87 |
+| `test_get_bank_accounts_timeout_raises` | def | L90–L95 |
+| `test_get_real_balance_happy` | def | L100–L105 |
+| `test_get_real_balance_non200_raises` | def | L108–L113 |
+| `test_get_real_balance_missing_real_key` | def | L116–L121 |
+| `test_begin_withdrawal_happy_minimal_body` | def | L126–L135 |
+| `test_begin_withdrawal_amount_is_float_not_string` | def | L138–L144 |
+| `test_begin_withdrawal_400_concurrent_pending` | def | L147–L154 |
+| `test_begin_withdrawal_401_jwt_dead` | def | L157–L162 |
+| `test_begin_withdrawal_500_unexpected` | def | L165–L170 |
+| `test_begin_withdrawal_no_transaction_id_in_200` | def | L173–L178 |
+| `test_begin_withdrawal_sends_canonical_headers` | def | L181–L189 |
+| `test_begin_withdrawal_does_not_retry_on_proxy_error` | def | L192–L198 |
+| `test_get_pending_withdrawal_happy` | def | L203–L209 |
+| `test_get_pending_withdrawal_none_when_no_pending` | def | L212–L217 |
+| `test_get_pending_withdrawal_status6_returns_dict` | def | L220–L226 |
+| `test_get_pending_withdrawal_non200_raises` | def | L229–L234 |
+| `test_get_bank_transaction_happy` | def | L239–L250 |
+| `test_get_bank_transaction_gateway2_spei_ok` | def | L253–L259 |
+| `test_get_bank_transaction_gateway1_card_alert_bug3` | def | L262–L267 |
+| `test_get_bank_transaction_digits_mismatch_alert_bug1` | def | L270–L279 |
+| `test_get_bank_transaction_non200_raises` | def | L282–L287 |
+| `test_execute_withdrawal_full_flow_mocked` | def | L292–L323 |
+| `test_execute_withdrawal_insufficient_balance` | def | L326–L343 |
+| `test_execute_withdrawal_jwt_expired_no_api_call` | def | L346–L361 |
+
 ### `test_withdrawals_migrate.py`
 
 | Símbolo | Tipo | Líneas |
@@ -680,6 +717,25 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_extract_user_from_message` | def | L179–L198 |
 | `_categorize_event` | def | L201–L221 |
 | `_parse_log_entry` | def | L224–L265 |
+
+### `withdrawals.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `WithdrawalError` | class | L44–L45 |
+| `JwtExpired` | class | L48–L49 |
+| `NoApprovedWithdrawalAccount` | class | L52–L53 |
+| `MultipleApprovedAccounts` | class | L56–L57 |
+| `InsufficientBalance` | class | L60–L61 |
+| `ConcurrentWithdrawalPending` | class | L64–L65 |
+| `_auth_headers` | def | L70–L71 |
+| `_client_kwargs` | def | L74–L78 |
+| `get_bank_accounts` | def | L83–L126 |
+| `get_real_balance` | def | L131–L158 |
+| `begin_withdrawal` | def | L163–L221 |
+| `get_pending_withdrawal` | def | L226–L255 |
+| `get_bank_transaction` | def | L260–L312 |
+| `execute_withdrawal` | def | L317–L388 |
 <!-- GEN:end:simbolos -->
 
 ---
@@ -778,6 +834,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `betmexico.dashboard.login_orch` | `login_orchestrator.py` |
 | `betmexico.dashboard.prewarm` | `prewarm.py` |
 | `betmexico.dashboard.sse` | `app.py` |
+| `betmexico.dashboard.withdrawals` | `withdrawals.py` |
 | `betmexico.web.auth` | `web_auth.py` |
 | `betmexico.web.grading` | `web_grading.py` |
 | `betmexico.web.utils` | `web_utils.py` |

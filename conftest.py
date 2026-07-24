@@ -2,6 +2,7 @@
 import sqlite3, tempfile, os, pytest
 from pathlib import Path
 from fastapi.testclient import TestClient
+import httpx
 
 @pytest.fixture
 def seed_db(tmp_path, monkeypatch):
@@ -113,3 +114,17 @@ def make_client(seed_db):
         return TestClient(app_mod.app)
     yield _make
     app_mod.app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def mock_bmx_transport():
+    """Factory: retorna (httpx.MockTransport, received_requests_dict).
+    Uso: transport, reqs = mock_bmx_transport(handler); await fn(..., transport=transport)."""
+    def make(handler):
+        reqs = {"calls": []}
+        def wrap(request):
+            reqs["calls"].append({"method": request.method, "url": str(request.url),
+                                   "headers": dict(request.headers), "body": request.content})
+            return handler(request)
+        return httpx.MockTransport(wrap), reqs
+    return make

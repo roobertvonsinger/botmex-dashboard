@@ -97,7 +97,7 @@ prewarm.py (router)
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
-| `conftest.py` | 115 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
+| `conftest.py` | 130 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `deposits.py` | 2679 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 288 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 410 | `betmexico.dashboard.login_orch` | _[completar]_ |
@@ -128,10 +128,12 @@ prewarm.py (router)
 | `test_sse_visibility.py` | 88 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 55 | `—` | _[completar]_ |
+| `test_withdrawals.py` | 361 | `—` | _[completar]_ |
 | `test_withdrawals_migrate.py` | 46 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
 | `web_grading.py` | 179 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
 | `web_utils.py` | 265 | `betmexico.web.utils` | Helpers compartidos: _friendly_error, _normalize_ccexp, _build_proxy_url |
+| `withdrawals.py` | 388 | `betmexico.dashboard.withdrawals` | _[completar]_ |
 <!-- GEN:end:modulos -->
 
 ---
@@ -195,6 +197,7 @@ prewarm.py (router)
 | `AHEAD` | `24 * H` | `test_jwt_keeper.py` |
 | `PIPE` | `"4111111111111111|12|30|123"` | `test_unificacion_sp1.py` |
 | `WEB_USERS` | `{k.lower(): v for k, v in WEB_USERS_RAW.items()}` | `web_auth.py` |
+| `PAYMENTS_API` | `"https://paymentsapi.betmexico.mx"` | `withdrawals.py` |
 <!-- GEN:end:constantes -->
 
 ---
@@ -214,6 +217,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c360b9e` | feat(db): tabla account_withdrawals (bitácora idempotente de retiros) |
 | `24e8e57` | docs(plan): plan botón retiro automático |
 | `fe21d73` | docs: NEXT-SESSION cierre — plan botón retiro listo para /Smartexe |
 | `bbb14d8` | feat(recon): spec botón retiro automático + herramientas CDP/bmx_call |
@@ -225,7 +229,6 @@ prewarm.py (router)
 | `cde1d32` | feat(ui): botones masivos Copiar y Actualizar por seleccion (sin tocar depositos v8) |
 | `a2d670a` | revert: revierte commit b000b47 por regresion en modal de depositos v8 |
 | `b000b47` | feat(ui): agrega botones masivos Copiar y Actualizar por seleccion |
-| `8221357` | docs(audit): plan de auditoria TDAH/ADHD-friendly |
 <!-- GEN:end:recientes -->
 
 ---
