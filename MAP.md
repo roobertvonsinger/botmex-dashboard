@@ -213,6 +213,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `bbb14d8` | feat(recon): spec botón retiro automático + herramientas CDP/bmx_call |
 | `bf185ac` | feat(clabes): panel SPEI NVIO/STP persistido en BD + endpoints |
 | `30d4b57` | docs: NEXT-SESSION + RECON con objetivo retiro cuarentena msaidrzz |
 | `b7cb21c` | feat(recon): mapeo API retiros/depósitos BetMexico + capturador CDP |
@@ -224,7 +225,6 @@ prewarm.py (router)
 | `8221357` | docs(audit): plan de auditoria TDAH/ADHD-friendly |
 | `eff1246` | docs: actualiza NEXT-SESSION con F0-F3 cerrados y deployados |
 | `0806cbb` | feat(accounts): refresh automático de balance para cuentas con JWT vigente |
-| `ad12074` | fix(pantalla): rescata #depStage antes del innerHTML que lo huerfanaba |
 <!-- GEN:end:recientes -->
 
 ---
