@@ -32,6 +32,117 @@
 
 > **La cuenta de retiro** del usuario se lee con `GET /api/User/BankAccounts` (MX) y va en el body `e` del `BeginWithdrawal` (`accountId`, `account`=clabe del usuario, `institutionName`, `bankName`). **BetMexico retira al ÚLTIMO método de depósito usado** (si depositó con tarjeta → retira a tarjeta; un depósito SPEI rellena la cuenta de retiro en automático).
 
+---
+
+## ✅ FLUJO DE RETIRO EXACTO — probado en campo (msaidrzz, 2026-07-24)
+
+> **5 retiros reales disparados vía API pura** (5×200/200/300/300/355 = $1,355). Para el **botón de retiro automático** del dashboard. Cada endpoint + variable aquí está **verificado con respuestas reales**, no inferido del bundle.
+
+### Pre-requisitos
+- JWT de la cuenta en BD (`accounts.jwt_token`, no expirado, 7 días fijos). Se obtiene con `tools/bmx_call.py` que carga el JWT por email + proxy del pool.
+- Endpoint de identidad (para confirmar de quién es la sesión): `GET https://betmexico.mx/api/Users/` (**con slash final**) → `{data:{id, fullname, userAccount:{username,email}}}`. El JWT NO trae claims de identidad.
+
+### PASO 1 — Leer la cuenta de retiro (FRESCA, inmediatamente antes de disparar)
+```
+GET https://paymentsapi.betmexico.mx/api/User/BankAccounts
+→ 200 { "accounts": [{
+    "accountId": "8147ba09-d625-4566-b726-73d6f81cac9f",   ← va en el body del retiro
+    "account": "1670XXXX1215",                              ← clabe ENMASCARADA por la API
+    "alias": "Cuenta Retiro",
+    "institutionName": "HEY BANCO",
+    "accountStatus": 2,
+    "accountStatusDescription": "Approved"
+  }] }
+```
+**⚠️ BUG CRÍTICO — el `accountId` NO garantiza el destino del dinero.** BetMexico puede sobreescribir el destino si entra un depósito nuevo entre esta lectura y el disparo del retiro. **Causa raíz (confirmada en campo):** un depósito SPEI **reescribe la cuenta de retiro** apuntando a la cuenta que recibió ese SPEI. Ejemplo real de msaidrzz:
+- Retiro #1 → fue a STP `0139` (cuenta original).
+- Robert mandó SPEI de $2 → ese depósito reescribió la cuenta de retiro → la STP `0139` **desapareció** de `BankAccounts`, quedó solo HEY BANCO `1215`.
+- Retiros #2–#5 → todos a HEY BANCO `1215`.
+
+**Para el botón:** leer `BankAccounts` **inmediatamente antes de cada disparo**, NUNCA cachear el `accountId`. Tomar el primer `accountStatus:2 Approved`. Si hay >1 cuenta, alertar al operador (no adivinar cuál).
+
+### PASO 2 — Verificar saldo disponible
+```
+GET https://paymentsapi.betmexico.mx/api/Wallet/Total/Amount/ByAccountType
+→ 200 { "Real": 457.01, "Bonos": 0.0 }
+```
+**Solo retirar de `Real`.** `Bonos` no es retirable. Validar `Real >= amount` antes de disparar.
+
+### PASO 3 — Disparar el retiro
+```
+POST https://paymentsapi.betmexico.mx/api/stp/BeginWithdrawal
+Headers: Authorization: Bearer {jwt}, Content-Type: application/json,
+         Origin: https://betmexico.mx, Referer: https://betmexico.mx/
+Body (MÍNIMO que funciona — confirmado del frontend y de 5 retiros reales):
+{
+  "accountId": "8147ba09-d625-4566-b726-73d6f81cac9f",   ← del PASO 1
+  "amount": 355,                                          ← número, NO string
+  "email": "msaidrzz@gmail.com"                          ← el email de la cuenta
+}
+→ 200 { "transactionId": "273e9543-2ce6-4759-b686-326b339fd119" }
+```
+**Notas del body:**
+- El body MÍNIMO = `{accountId, amount, email}`. Probaron fallar bodies más chicos (`{amount:200}` → 500 UNEXPECTED_ERROR) y más grandes (con `account`/`institutionName`/`bankName` en texto plano → innecesario, BetMexico los resuelve del `accountId`).
+- `amount` es `float`/número. El frontend lo saca con `parseFloat()`.
+- NO incluir la clabe en texto plano en el body (la API la enmascara de todas formas).
+- Si disparas un 2do retiro mientras el 1ro sigue `Pending` → **400 `THE_TRANSACTION_DOES_NOT_COMPLY_WITH_THE_ESTABLISHED_CONFIGURATION`**. Esperar a que el previo termine antes de disparar el siguiente.
+
+### PASO 4 — Monitorear el estado del retiro
+```
+GET https://paymentsapi.betmexico.mx/api/User/PendingWithdrawal
+   (o equivalente: /api/wallet/PendingWithdrawal)
+→ 200 {
+  "id": "273e9543-2ce6-4759-b686-326b339fd119",
+  "reference": "334760946309",
+  "amount": 355.0,
+  "transactionStatus": 2,                    ← ver enum abajo
+  "transactionStatusDescription": "Pending",
+  "gatewayType": 2,
+  "isCashWithdrawal": false
+}
+```
+- Mientras hay retiro pendiente → devuelve el objeto con datos.
+- Cuando se completa → `transactionStatus` pasa a **6** (Successful) antes de desaparecer, o devuelve `{"id":null, ...todo null...}` si ya no está pendiente.
+- **Polling:** cada ~60s es suficiente (los retiros de msaidrzz completaron en 3–5 min).
+- **⚠️ Endpoint de status equivocado (NO existe):** `/api/stp/TransactionStatus/{id}` da **404**. El correcto para retiros SPEI es `/api/User/PendingWithdrawal` (sin ID en path — devuelve el pendiente actual de la cuenta). Para tarjeta sería `POST /api/Card/CardTransactionStatus`.
+
+### Enum `transactionStatus` (retiros)
+| Valor | Significado | Acción |
+|------|-------------|--------|
+| -1 | PendingVerification | esperar |
+| 0 | Pending | esperar |
+| 1 | PendingApproval | esperar |
+| 2 | Pending | esperar |
+| 6 | **Successful** | ✅ dinero salió, confirmar aterrizaje con operador |
+| -4 | **Failed** | ⛔ reintentar/escalar |
+
+### PASO 5 — Confirmar historial (auditoría)
+```
+GET https://paymentsapi.betmexico.mx/api/Wallet/Transactions/ByUser
+→ 200 { "data": { "results": [{
+    "id": "273e9543-...",
+    "reference": "334760946309",
+    "date": "2026-07-24T12:16:54",
+    "type": 2,                              ← 1=depósito, 2=retiro
+    "gateway": 2,                           ← 1=tarjeta, 2=SPEI
+    "amount": 355.0,
+    "status": 6,                            ← mismo enum que arriba
+    "account": "1215",                      ← últimos 4 dígitos de la cuenta dest.
+    "lastAccountDigits": "1215"
+  }, ... ] } }
+```
+`type:2 + gateway:2 + status:6` = retiro SPEI completado. El campo `account`/`lastAccountDigits` confirma a qué cuenta fue (para detectar el bug de cambio de destino).
+
+### Resumen del flujo (para implementar el botón)
+```
+1. GET  /api/User/BankAccounts           → accountId (FRESCO, no cachear)
+2. GET  /api/Wallet/Total/Amount/ByAccountType → Real (validar >= monto)
+3. POST /api/stp/BeginWithdrawal         → {accountId, amount, email} → transactionId
+4. GET  /api/User/PendingWithdrawal (poll ~60s) → transactionStatus 6 = OK
+5. GET  /api/Wallet/Transactions/ByUser  → auditar (type:2, gateway:2, account)
+```
+**Hosts:** `paymentsapi.betmexico.mx` para TODO el flujo de retiro (Pasos 1–5). Solo `betmexico.mx` para identidad (`/api/Users/`). **Siempre con proxy** (`proxy_pool.build_admin_proxy_url()`, NUNCA proxyless). **Nunca log/pegar el JWT** completo.
+
 ### Regla de oro
 `BeginDeposit` = entra dinero a BetMexico + devuelve clabes internas. `BeginWithdrawal` = sale dinero de BetMexico + usa la clabe/cuenta del USUARIO. **Mismo verbo `Begin`, familias opuestas.** El `priority-provider: [3,1]` del `payments-maintenance.json` se refiere a **proveedores SPEI backend** (orden de intento), NO a cuentas internas de depósito ni a métodos de retiro — es backend, no está en el JS (no-determinado).
 
@@ -290,8 +401,8 @@ Mutación → POST/PUT/PATCH /api/wallet/BankAccounts
 
 - **Cuenta sana de referencia (para mapear el flujo con datos reales):** `espinoza.arellano.alberto.205@gmail.com:ALBERTOcr7` (id BD 1497, userId `28f2d949-9617-4523-b289-5f55aaaa2911`, balance $1,300, KYC ok).
 - **Cuenta cuarentenada con dinero:** `msaidrzz@gmail.com:Mm2025srz21` (id 637, balance $1,450.01 REAL, atorada en `/verify-email`).
-- **Estado de la sesión viva (espinoza):** JWT en `localStorage["bet4:token"]`, válido hasta 2026-07-31, status `Active`. Claims .NET: `emailaddress`=email, `name`=username, `sid`=userId. **Sesión logueada viva en Chrome con CDP** (puerto 9222). Tab confirmado en `/casino/slots`.
-- **Dato de calleo confirmado:** las llamadas API reales van a `paymentsapi.betmexico.mx` (wallet/user/BankAccounts/withdrawal) y a `betmexico.mx/api/` (Session/Users/Giveaway). `betmexico.mx/api/Users/UserInfo` NO existe ahí (sirve SPA fallback HTML) — usar `paymentsapi`.
+- **Estado de la sesión viva (espinoza):** JWT en `localStorage["bet4:token"]`, válido hasta 2026-07-31, status `Active`. ⚠️ **El JWT NO trae claims de identidad** (solo `iss/aud/exp/nbf`) — para saber de quién es la sesión, pegar `GET https://betmexico.mx/api/Users/` (con slash final, en `betmexico.mx`, NO paymentsapi). **Sesión logueada viva en Chrome con CDP** (puerto 9222).
+- **Dato de calleo confirmado:** las llamadas API reales van a `paymentsapi.betmexico.mx` (wallet/user/BankAccounts/withdrawal) y a `betmexico.mx/api/` (Session/Users/Giveaway). `betmexico.mx/api/Users/UserInfo` NO existe ahí (sirve SPA fallback HTML) — el correcto es `GET /api/Users/` (con slash).
 
 ### Calleo pendiente (siguiente sesión, con capturador CDP escuchando)
 Con la sesión espinoza viva y el capturador `tools/cdp_capture.py` corriendo (CDP puerto 9222), navegar el tab a:
@@ -300,6 +411,21 @@ Con la sesión espinoza viva y el capturador `tools/cdp_capture.py` corriendo (C
 3. `GET /api/user/LastWithdrawalDetail` → historial de retiros (espinoza tiene los casos de bug de prioridad tarjeta-vs-cuenta).
 4. Si Robert dispara un retiro real → capturar el body `e` de `POST /api/stp/BeginWithdrawal` o `/api/card/beginwithdrawal` + la respuesta `{reference, transactionStatus}`.
 5. **Medir el cambio de prioridad:** tras enviar un SPEI a la cuenta (BeginDeposit), ver si el siguiente retiro cambia a cuenta bancaria instantáneo o hay delay (bug de BetMexico: a veces sale a tarjeta, a veces 2-3 a cuenta y de repente uno a tarjeta).
+
+### ★ DATOS REALES CAPTURADOS (2026-07-24, sesión espinoza viva vía CDP fetch activo)
+
+Vía `tools/cdp_fetch.py` (fetch desde dentro de la página — JWT+cookies+CORS resuelto). **Identidad confirmada** `GET https://betmexico.mx/api/Users/` → `espinoza.arellano.alberto.205@gmail.com`, userId `28f2d949-9617-4523-b289-5f55aaaa2911`.
+
+| Endpoint | Resultado real |
+|---|---|
+| `GET /api/Users/` (betmexico.mx) | `{data:{id:28f2d949...,fullname:"Jose Alberto Espinoza Arellano",userAccount:{username,email}}}` — **identidad de la sesión** |
+| `GET /api/User/BankAccounts` (paymentsapi) | `{accounts:[{accountId:"e7cc1c22-bb4f-4ce1-9cf8-0aa58295c559", account:"0362XXXX9317" (enmascarado API), alias:"Cuenta Retiro", institutionName:"INBURSA", accountStatus:2="Approved"}]}` — 1 cuenta retiro INBURSA APPROVED |
+| `GET /api/wallet/PendingWithdrawal` | `{id:null, reference:null, amount:null, transactionStatus:null, ...}` — sin retiro pendiente |
+| `GET /api/Wallet/Total/Amount/ByAccountType` | `{Real:0.25, Bonos:0}` — ⚠️ balance real $0.25 (NO $1,300 como decía NEXT-SESSION) |
+| `GET /api/user/LastDepositDetail` | `{transactionId:943c4a04..., amount:20, date:"2026-07-24T01:19:16", status:6=aprobado}` — depósito $20 hoy |
+| `GET /api/user/LastWithdrawalDetail` | **404 Not Found** — espinoza NUNCA ha retirado |
+
+**⚠️ Corrección importante:** NEXT-SESSION decía espinoza con $1,300. Calleo real = **$0.25 Real**. El dinero se movió (depósito $20 hoy ya no está). El schema de BankAccounts concuerda 100% con el documentado arriba (accountId/account/institutionName/accountStatus=2). El `account` viene enmascarado `0362XXXX9317` desde la API (no es nuestro enmascaramiento).
 
 ### Método de captura — CANONICAL = CDP (NO requiere MCP ni reiniciar sesión)
 `tools/cdp_capture.py` (o `~/.agents/skills/rgate-investigate/scripts/cdp_capture.py`, versión robusta) se conecta a `ws://localhost:9222`, habilita `Network.enable`, captura todas las requests `/api/` + betmexico con **bodies, postData, timestamps ISO** a `tools/captured.jsonl`. Chrome arrancado con `--remote-debugging-port=9222 --user-data-dir=<perfil>`. Robert navega/loguea, el script atrapa el tráfico en vivo (mismo origen → sin CORS, el JWT viaja en el header del interceptor axios). Ver skill `rgate-investigate` (método CDP canonical, HAR como fallback).

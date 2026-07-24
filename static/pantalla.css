@@ -785,6 +785,50 @@ body.depos-open .pat-act-dep { display: none; }
 }
 .pat-curp-add:hover { color: var(--pat-gold); }
 
+/* ══════════ CLABES SPEI — NVIO + STP (panel en .pat-col-ident) ══════════
+   Clabes de depósito SPEI persistidas en BD (obtenidas vía BeginDeposit).
+   Se muestran en PLANO sin enmascarar (feedback_no_masking): el operador las
+   pega en su banco. Reusa el lenguaje de tarjetas (.pat-sv-card / d-copy):
+   click = copia al portapapeles. Mismo gap/look que .pat-saved para que ambos
+   grupos (tarjetas/notas/clabes) se lean como una sola familia visual. */
+.pat-clabes {
+  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+}
+/* Rail badge (NVIO/STP) a la izquierda de la clabe — pill sutil, no adorno. */
+.pat-clabe {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+  -webkit-appearance: none; appearance: none; border: 0; background: transparent;
+  cursor: pointer; text-align: left; padding: 1px 0; width: 100%;
+}
+.pat-clabe-rail {
+  flex: 0 0 auto; font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+  color: var(--pat-gold); background: var(--pat-gold-soft);
+  border-radius: 8px; padding: 1px 6px; white-space: nowrap;
+  text-transform: uppercase; letter-spacing: .3px;
+}
+.pat-clabe-rail.blocked { color: oklch(0.68 0.18 24); background: oklch(0.68 0.18 24 / 0.12); }
+.pat-clabe-ord { opacity: .6; margin-left: 1px; }
+/* La clabe misma: mono, truncable, dashed underline como las tarjetas. */
+.pat-clabe-num {
+  flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim);
+  border-bottom: 1px dashed oklch(0.80 0.085 160 / 0.22);
+  transition: color var(--ease-fast), border-color var(--ease-fast);
+}
+.pat-clabe:hover .pat-clabe-num { color: var(--pat-gold); border-bottom-color: var(--pat-gold); }
+.pat-clabe.copied .pat-clabe-num { color: oklch(0.75 0.16 155); border-bottom-color: transparent; }
+.pat-clabe-blk { flex: 0 0 auto; font-size: 10px; opacity: .7; }
+/* CTA "Obtener clabes" cuando no hay guardadas — discreto, mismo tono que pat-sv-add. */
+.pat-clabe-get {
+  -webkit-appearance: none; appearance: none; border: 1px dashed var(--pat-edge);
+  background: transparent; cursor: pointer; padding: 4px 8px; border-radius: 6px;
+  font-family: var(--font-display); font-size: 10px; color: var(--text-muted);
+  display: inline-flex; align-items: center; gap: 4px; width: fit-content;
+  transition: color var(--ease-fast), border-color var(--ease-fast), background var(--ease-fast);
+}
+.pat-clabe-get:hover, .pat-clabe-get:disabled { color: var(--pat-gold); border-color: var(--pat-gold); }
+.pat-clabe-get:disabled { opacity: .6; cursor: default; }
+
 /* Estados de carga / error. */
 .pat-loading, .pat-error, .pat-stub {
   display: flex; align-items: center; gap: 8px;

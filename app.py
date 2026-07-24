@@ -230,6 +230,25 @@ def _migrate():
             )
     except sqlite3.OperationalError:
         pass
+    # Clabes de depósito SPEI (NVIO + STP) por cuenta. Se obtienen vía
+    # POST /api/stp/BeginDeposit con JWT+proxy y son FIJAS por usuario → se
+    # persisten UNA vez y se muestran desde BD (no se taladra la cuenta en cada
+    # refresh — alimentaría el rate-limit de BetMexico). UNIQUE(account_id, clabe)
+    # para idempotencia. Aditiva. Ver clabe_fetch.py + docs/RECON_BETMEX_API.md.
+    try:
+        with db(write=True) as c:
+            c.execute(
+                "CREATE TABLE IF NOT EXISTS account_deposit_clabes ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "account_id INTEGER NOT NULL, account_email TEXT NOT NULL, "
+                "reference TEXT, user_id TEXT, full_name TEXT, "
+                "clabe TEXT NOT NULL, integration TEXT, "
+                "clabe_order INTEGER, blocked INTEGER DEFAULT 0, "
+                "fetched_at TEXT, "
+                "UNIQUE(account_id, clabe))"
+            )
+    except sqlite3.OperationalError:
+        pass
 
     _backfill_grades_v10_m7()
 
@@ -2861,6 +2880,21 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
         except sqlite3.OperationalError:
             pass
 
+        # Clabes de depósito SPEI (NVIO + STP) persistidas en BD. Se muestran en
+        # La Pantalla sin enmascarar (feedback_no_masking). NO se taladra la cuenta
+        # aquí: solo se lee lo guardado; el fetch manual vive en POST .../clabes/refresh.
+        try:
+            rows = c.execute(
+                "SELECT clabe, integration, clabe_order, blocked, fetched_at, "
+                "reference, user_id, full_name "
+                "FROM account_deposit_clabes WHERE account_id=? "
+                "ORDER BY clabe_order ASC",
+                (account_id,),
+            ).fetchall()
+            result["clabes"] = [dict(r) for r in rows]
+        except sqlite3.OperationalError:
+            result["clabes"] = []
+
     return result
 
 
@@ -2918,6 +2952,39 @@ def update_curp(account_id: int, req: CurpUpdate, _user: dict = Depends(require_
         if cur.rowcount == 0:
             raise HTTPException(404, "Cuenta no encontrada")
     return {"id": account_id, "curp": curp}
+
+
+# ── Clabes de depósito SPEI (NVIO + STP) ──────────────────────────────────────
+# Lectura desde BD (lo guardado por BeginDeposit). Accionable: el operador ve
+# las clabes en La Pantalla sin enmascarar, copiables con un click. El fetch
+# manual (POST .../clabes/refresh) lo dispara a propósito el operador — NUNCA se
+# llama BeginDeposit en cada refresh (alimentaría el rate-limit de BetMexico;
+# las clabes son FIJAS por usuario). Ver clabe_fetch.py + docs/RECON_BETMEX_API.md.
+@app.get("/api/accounts/{account_id}/clabes")
+def get_clabes(account_id: int, _user: dict = Depends(require_session)):
+    with db() as c:
+        rows = c.execute(
+            "SELECT clabe, integration, clabe_order, blocked, fetched_at, "
+            "reference, user_id, full_name "
+            "FROM account_deposit_clabes WHERE account_id=? "
+            "ORDER BY clabe_order ASC",
+            (account_id,),
+        ).fetchall()
+        return {"clabes": [dict(r) for r in rows]}
+
+
+@app.post("/api/accounts/{account_id}/clabes/refresh")
+async def refresh_clabes(account_id: int, _user: dict = Depends(require_session)):
+    """Dispara BeginDeposit con JWT+proxy y persiste las clabes en BD.
+    Acción manual del operador (no automática en cada refresh)."""
+    try:
+        import clabe_fetch as _cf
+        result = await _cf.refresh_clabes_for_account(str(DB_PATH), account_id)
+    except Exception as e:
+        raise HTTPException(500, f"Error obteniendo clabes: {e}")
+    if not result.get("ok"):
+        raise HTTPException(409, result.get("error") or "No se pudieron obtener las clabes")
+    return result
 
 
 @app.delete("/api/accounts/{account_id}/notes/{note_id}")

@@ -323,6 +323,7 @@
           <div class="pat-balance" style="--i:2">${money(balance)}</div>
           <div class="pat-ident-div" style="--i:3"></div>
           ${renderPantallaSaved(d)}
+          ${renderPantallaClabes(d)}
         </div>
         ${renderPantallaTxns(d)}
         <div class="pat-col-stage" id="patStageSlot"></div>
@@ -410,6 +411,44 @@
     </div>`;
 
     return `<div class="pat-saved" style="--i:6">${cardHtml}${noteHtml}</div>`;
+  }
+
+  // ── Clabes de depósito SPEI (NVIO + STP) — persistidas en BD, mostradas en
+  // PLANO sin enmascarar (feedback_no_masking: el operador las pega en su banco).
+  // Reusa el lenguaje visual de tarjetas (.pat-sv-card / d-copy): click = copia.
+  // Si no hay clabes guardadas → botón "Obtener clabes" (dispara BeginDeposit vía
+  // POST /clabes/refresh). Si ya están → las muestra + botón sutil para refrescar.
+  // NUNCA se taladra la cuenta en cada refresh: las clabes son FIJAS por usuario.
+  function renderPantallaClabes(d) {
+    const g = window.esc || (s => s);
+    const clabes = Array.isArray(d.clabes) ? d.clabes : [];
+    const accId = d.id;
+    // Integración legible: NVIO (prioridad 1) + STP (order 2/3). Badge por rail.
+    const intLabel = (it) => {
+      const v = String(it.integration || '').toUpperCase();
+      if (v === 'NVIO') return 'NVIO';
+      if (v === 'STP') return 'STP';
+      return v || 'SPEI';
+    };
+    const rows = clabes.map(c => {
+      const clabe = String(c.clabe || '');
+      const blocked = c.blocked;
+      const order = c.clabe_order;
+      return `<button type="button" class="pat-sv-line pat-sv-card pat-clabe d-copy" data-copy="${g(clabe)}" title="Copiar clabe">
+        <span class="pat-clabe-rail ${blocked ? 'blocked' : ''}">${g(intLabel(c))}${order ? `<span class="pat-clabe-ord">·${g(order)}</span>` : ''}</span>
+        <span class="pat-sv-pipe pat-clabe-num">${g(clabe)}</span>
+        ${blocked ? '<span class="pat-clabe-blk" title="Bloqueada">⛔</span>' : ''}
+      </button>`;
+    }).join('');
+    const have = clabes.length > 0;
+    // Botón refrescar: discreto (mismo tono que pat-sv-add). data-clabe-refresh.
+    const refreshBtn = have
+      ? `<button type="button" class="pat-sv-add" data-clabe-refresh="${g(accId)}" title="Volver a obtener clabes (BeginDeposit)"><i class="ph-bold ph-arrows-clockwise"></i></button>`
+      : '';
+    return `<div class="pat-clabes" style="--i:7">
+      <span class="pat-sv-h"><span class="pat-sv-emo">🏦</span> Clabes SPEI${have ? `<span class="pat-sv-cnt">${clabes.length}</span>` : ''}${refreshBtn}</span>
+      ${have ? rows : `<button type="button" class="pat-clabe-get" data-clabe-refresh="${g(accId)}"><i class="ph-bold ph-download-simple"></i> Obtener clabes</button>`}
+    </div>`;
   }
 
   // ── Transacciones: UN historial cronológico (más reciente primero), fuentes
@@ -702,6 +741,35 @@
         if (window.toast) toast('Nota borrada', '');
       } catch (err) {
         if (window.toast) toast(`Error: ${err.message}`, 'error');
+      }
+      return;
+    }
+
+    // ── Clabes: refrescar manualmente (BeginDeposit vía POST /clabes/refresh) ──
+    // El operador lo dispara a propósito. NO automático en cada refresh de cuenta
+    // (alimentaría el rate-limit de BetMexico; las clabes son FIJAS por usuario).
+    const clabeRefresh = e.target.closest('[data-clabe-refresh]');
+    if (clabeRefresh) {
+      e.preventDefault();
+      const accId = parseInt(clabeRefresh.dataset.clabeRefresh) || _currentId;
+      if (!accId) return;
+      // Deshabilita el botón + feedback de carga (evita doble-click).
+      const btn = clabeRefresh.closest('button') || clabeRefresh;
+      const orig = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="dep-spinner"></span>';
+      try {
+        const r = await fetch(`/api/accounts/${accId}/clabes/refresh`, { method: 'POST' });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+        const cache = _cacheGet(accId);
+        if (cache) { cache.clabes = data.clabes || []; _renderDetailView(cache, false); }
+        if (window.toast) toast(`🏦 ${(data.clabes || []).length} clabes obtenidas`, 'success');
+      } catch (err) {
+        if (window.toast) toast(`Clabes: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = orig;
       }
       return;
     }
