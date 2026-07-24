@@ -2935,6 +2935,20 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
         except sqlite3.OperationalError:
             result["clabes"] = []
 
+        # Retiro más reciente (SA-only en frontend; el dato en sí no es sensible).
+        # Permite reabrir La Pantalla y ver/retomar el estado sin re-disparar.
+        try:
+            wd = c.execute(
+                "SELECT transaction_id, reference, amount, account_digits, "
+                "institution_name, status_api, gateway, last_modified_utc, created_at "
+                "FROM account_withdrawals WHERE account_id=? "
+                "ORDER BY id DESC LIMIT 1",
+                (account_id,),
+            ).fetchone()
+            result["last_withdrawal"] = dict(wd) if wd else None
+        except sqlite3.OperationalError:
+            result["last_withdrawal"] = None
+
     return result
 
 

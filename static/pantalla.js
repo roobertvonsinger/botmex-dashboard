@@ -80,6 +80,9 @@
 
   let _currentId = null;
   let _deposAutoHidden = false; // true si La Pantalla retrajo el panel de depósitos flotante (F4) — se restaura al cerrar
+  // Polling de estado de retiro: 1 interval activo por cuenta (accId -> {timer, txId}).
+  // 60s fijo (guardarrail: nunca menos, no alimentar rate-limit de BetMexico).
+  const _wdPolls = {};
   // true mientras el último gesto sobre .pat-txn-col fue un drag-scroll (>6px de
   // movimiento) — el click handler de .pat-mv lo consulta para NO togglear el
   // detalle expandible al soltar tras arrastrar (initTxnScroll, más abajo).
@@ -205,6 +208,8 @@
     root.classList.remove('pantalla-out');
     _currentId = null;
     _clearSourceRow();
+    // Cerrada La Pantalla, ningún polling de retiro debe seguir vivo en background.
+    Object.keys(_wdPolls).forEach(_stopWithdrawPoll);
     // Cerrada La Pantalla, el panel de depósitos puede volver a flotar si esa era
     // la preferencia del operador (el forzado a dockeado era solo mientras estaba abierta).
     try {
@@ -324,6 +329,7 @@
           <div class="pat-ident-div" style="--i:3"></div>
           ${renderPantallaSaved(d)}
           ${renderPantallaClabes(d)}
+          ${renderPantallaWithdraw(d)}
         </div>
         ${renderPantallaTxns(d)}
         <div class="pat-col-stage" id="patStageSlot"></div>
@@ -449,6 +455,128 @@
       <span class="pat-sv-h"><span class="pat-sv-emo">🏦</span> Clabes SPEI${have ? `<span class="pat-sv-cnt">${clabes.length}</span>` : ''}${refreshBtn}</span>
       ${have ? rows : `<button type="button" class="pat-clabe-get" data-clabe-refresh="${g(accId)}"><i class="ph-bold ph-download-simple"></i> Obtener clabes</button>`}
     </div>`;
+  }
+
+  // ── Retiro automático SA-only (Task F/G) ──────────────────────────────────
+  // Botón + monto + estado 2-fases. bug#2: status:6 de BetMexico != aterrizó en
+  // el banco — el copy SIEMPRE dice "confirma en tu banco", nunca "entregado".
+  // bug#3/bug#1: alertas si el rail salió a tarjeta o a dígitos distintos a los
+  // esperados. Invisible para no-SA (feedback_deshabilitar_invisible_no_redirect).
+  const WD_TERMINAL = new Set(['successful', 'completed', 'failed']);
+
+  // Convierte la fila cruda de account_withdrawals (último retiro conocido,
+  // servido por /details) al mismo shape que devuelve GET /withdraw/status —
+  // pinta algo de inmediato al reabrir La Pantalla, antes de que el poll fresco
+  // confirme el estado real (nunca inventa alerts: quedan en false hasta refetch).
+  function _wdStatusFromRow(row) {
+    if (!row) return null;
+    let status;
+    if (row.status_api === 6) status = 'completed';
+    else if (row.status_api != null && row.status_api < 0) status = 'failed';
+    else status = 'idle';
+    return {
+      transactionId: row.transaction_id, reference: row.reference, amount: row.amount,
+      accountDigits: row.account_digits, transactionStatus: row.status_api,
+      gateway: row.gateway, lastModifiedUtc: row.last_modified_utc,
+      status, phase: status,
+      alerts: { gatewayMismatch: false, digitsMismatch: false },
+    };
+  }
+
+  function _withdrawStatusHtml(st) {
+    if (!st) return '';
+    const g = window.esc || (s => s);
+    const money = window.fmtMoney || (v => `$${(v || 0).toFixed(2)}`);
+    const ref = st.reference ? g(st.reference) : '';
+    let line;
+    if (st.status === 'successful' || st.status === 'completed') {
+      line = `<span class="pat-wd-line pat-wd-ok"><i class="ph-bold ph-check-circle"></i> BetMexico procesó el retiro${ref ? ` (ref ${ref})` : ''}. Confirma en tu banco.</span>`;
+    } else if (st.status === 'failed') {
+      line = `<span class="pat-wd-line pat-wd-fail"><i class="ph-bold ph-x-circle"></i> Retiro fallido${ref ? ` (ref ${ref})` : ''}.</span>`;
+    } else {
+      line = `<span class="pat-wd-line"><span class="dep-spinner"></span> Retiro en proceso${ref ? ` (ref ${ref})` : ''}…</span>`;
+    }
+    const alerts = st.alerts || {};
+    let alertHtml = '';
+    if (alerts.gatewayMismatch) {
+      alertHtml += `<div class="pat-wd-alert">⚠️ BetMexico mandó el retiro a TARJETA, no a SPEI.</div>`;
+    }
+    if (alerts.digitsMismatch) {
+      alertHtml += `<div class="pat-wd-alert">⚠️ El retiro fue a dígitos distintos a la cuenta esperada (${g(st.accountDigits || '?')}).</div>`;
+    }
+    return `<div class="pat-wd-row"><span class="pat-wd-amt">${money(st.amount)}</span>${line}</div>${alertHtml}`;
+  }
+
+  function renderPantallaWithdraw(d) {
+    const u = (window.state && state.user) || {};
+    if (u.role !== 'superadmin') return ''; // invisible para no-SA, no un candado
+    const g = window.esc || (s => s);
+    const st = _wdStatusFromRow(d.last_withdrawal);
+    const pending = !!st && !WD_TERMINAL.has(st.status);
+    return `<div class="pat-wd${pending ? ' pending' : ''}" data-acc="${d.id}">
+      <span class="pat-sv-h"><span class="pat-sv-emo">🏧</span> Retiro (SA)</span>
+      <div class="pat-form">
+        <input class="pat-input pat-wd-amount" type="number" min="100" step="0.01" placeholder="monto (min $100)"${pending ? ' disabled' : ''}>
+        <div class="pat-form-row">
+          <button type="button" class="pat-btn pat-btn-save d-withdraw-fire"${pending ? ' disabled' : ''}>Disparar retiro</button>
+        </div>
+      </div>
+      <div class="pat-wd-status">${st ? _withdrawStatusHtml(st) : ''}</div>
+    </div>`;
+  }
+
+  function _stopWithdrawPoll(accId) {
+    const p = _wdPolls[accId];
+    if (p) { clearInterval(p.timer); delete _wdPolls[accId]; }
+  }
+
+  async function _fetchWithdrawStatus(accId, txId) {
+    const wrap = document.querySelector(`.pat-wd[data-acc="${accId}"]`);
+    try {
+      const r = await fetch(`/api/accounts/${accId}/withdraw/status/${txId}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const st = await r.json();
+      if (wrap) {
+        const statusEl = wrap.querySelector('.pat-wd-status');
+        if (statusEl) statusEl.innerHTML = _withdrawStatusHtml(st);
+        wrap.classList.toggle('alert', !!(st.alerts && (st.alerts.gatewayMismatch || st.alerts.digitsMismatch)));
+        const done = WD_TERMINAL.has(st.status);
+        wrap.classList.toggle('pending', !done);
+        const input = wrap.querySelector('.pat-wd-amount');
+        const btn = wrap.querySelector('.d-withdraw-fire');
+        if (input) input.disabled = !done;
+        if (btn) btn.disabled = !done;
+        if (done) _stopWithdrawPoll(accId);
+      }
+      const cache = _cacheGet(accId);
+      if (cache) {
+        cache.last_withdrawal = { ...(cache.last_withdrawal || {}), status_api: st.transactionStatus, gateway: st.gateway, last_modified_utc: st.lastModifiedUtc };
+      }
+    } catch (err) {
+      // Silencioso: el próximo tick reintenta. No spamear toasts cada 60s.
+      console.warn('[Pantalla] withdraw poll falló:', err.message);
+    }
+  }
+
+  // 60s fijo — guardarrail explícito del plan (nunca menos, no alimentar rate-limit).
+  const WD_POLL_MS = 60000;
+
+  function _startWithdrawPoll(accId, txId) {
+    _stopWithdrawPoll(accId); // 1 solo interval activo por cuenta
+    _fetchWithdrawStatus(accId, txId); // primer chequeo inmediato, no esperar 60s
+    const timer = setInterval(() => _fetchWithdrawStatus(accId, txId), WD_POLL_MS);
+    _wdPolls[accId] = { timer, txId };
+  }
+
+  // Reanuda el polling si La Pantalla se reabre con un retiro no-terminal (p.ej.
+  // otro operador la cerró a medio proceso, o hubo reload de página).
+  function _resumeWithdrawPollIfPending(d) {
+    const wd = d && d.last_withdrawal;
+    if (!wd || !wd.transaction_id) return;
+    const st = _wdStatusFromRow(wd);
+    if (st && !WD_TERMINAL.has(st.status) && !_wdPolls[d.id]) {
+      _startWithdrawPoll(d.id, wd.transaction_id);
+    }
   }
 
   // ── Transacciones: UN historial cronológico (más reciente primero), fuentes
@@ -617,6 +745,7 @@
       detail.innerHTML = `<div class="pat-wrap${liquid}" data-grade="${gVar}">${renderPantallaHead(d)}</div>`;
       _mountStage();               // re-parenta el escenario de depósito a la zona derecha
       _syncIdentWidth();           // ancla --pat-ident-w a la medida REAL de la columna (form CURP la usa)
+      _resumeWithdrawPollIfPending(d);
       return true;
     } catch (e) {
       console.error('[Pantalla] render failed:', e);
@@ -770,6 +899,52 @@
       } finally {
         btn.disabled = false;
         btn.innerHTML = orig;
+      }
+      return;
+    }
+
+    // ── Retiro automático (SA-only): dispara withdrawals.py vía POST /withdraw,
+    // luego monitorea con polling 60s (G1). Bloquea el botón mientras hay uno en
+    // curso (guardarrail concurrencia — bug de campo: 2do disparo puede duplicar). ──
+    const wdFire = e.target.closest('.d-withdraw-fire');
+    if (wdFire) {
+      e.preventDefault();
+      const wrap = wdFire.closest('.pat-wd');
+      const accId = wrap ? parseInt(wrap.dataset.acc) : _currentId;
+      const input = wrap && wrap.querySelector('.pat-wd-amount');
+      const amount = input ? parseFloat(input.value) : NaN;
+      if (!accId || wdFire.disabled) return;
+      if (!amount || isNaN(amount) || amount < 100) {
+        if (window.toast) toast('Monto mínimo $100', 'error');
+        return;
+      }
+      wdFire.disabled = true;
+      if (input) input.disabled = true;
+      const statusEl = wrap && wrap.querySelector('.pat-wd-status');
+      if (statusEl) statusEl.innerHTML = `<div class="pat-wd-row"><span class="dep-spinner"></span> Disparando retiro…</div>`;
+      try {
+        const r = await fetch(`/api/accounts/${accId}/withdraw`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+        const cache = _cacheGet(accId);
+        if (cache) {
+          cache.last_withdrawal = {
+            transaction_id: data.transactionId, reference: data.reference, amount: data.amount,
+            account_digits: data.accountDigits, institution_name: data.institutionName,
+            status_api: null, gateway: null, last_modified_utc: null,
+          };
+          if (_currentId === accId) _renderDetailView(cache, false);
+        }
+        if (window.toast) toast('🏧 Retiro disparado', 'success');
+        _startWithdrawPoll(accId, data.transactionId);
+      } catch (err) {
+        if (window.toast) toast(`Retiro: ${err.message}`, 'error');
+        wdFire.disabled = false;
+        if (input) input.disabled = false;
+        if (statusEl) statusEl.innerHTML = '';
       }
       return;
     }

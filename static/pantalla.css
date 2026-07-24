@@ -829,6 +829,27 @@ body.depos-open .pat-act-dep { display: none; }
 .pat-clabe-get:hover, .pat-clabe-get:disabled { color: var(--pat-gold); border-color: var(--pat-gold); }
 .pat-clabe-get:disabled { opacity: .6; cursor: default; }
 
+/* ══════════ RETIRO AUTOMÁTICO — SA-only (Task F/G, 2026-07-24) ══════════
+   Botón + monto + estado 2-fases. Mismo lenguaje visual que .pat-clabes/.pat-form
+   (gap/tamaño consistentes). .pending = hay un retiro en curso (botón bloqueado,
+   guardarrail anti-duplicado). .alert = bug#1/#3 detectados (borde rojo, no ámbar
+   — es una alerta de dinero, no un aviso suave). */
+.pat-wd { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pat-wd .pat-form { gap: 4px; }
+.pat-wd.pending .pat-input, .pat-wd.pending .pat-btn-save { opacity: .7; }
+.pat-wd-status:empty { display: none; }
+.pat-wd-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+.pat-wd-amt { font-family: var(--font-mono); font-size: 10.5px; color: var(--pat-gold); font-weight: 600; }
+.pat-wd-line { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--text-dim); }
+.pat-wd-line i { font-size: 12px; }
+.pat-wd-line.pat-wd-ok i { color: oklch(0.75 0.16 155); }
+.pat-wd-line.pat-wd-fail i { color: var(--danger); }
+.pat-wd-alert {
+  margin-top: 3px; padding: 4px 7px; border-radius: 6px; font-size: 10px; line-height: 1.35;
+  color: oklch(0.85 0.12 24); background: var(--danger-soft); border: 1px solid oklch(0.66 0.21 24 / 0.35);
+}
+.pat-wd.alert { border-radius: 8px; box-shadow: 0 0 0 1px oklch(0.66 0.21 24 / 0.3); }
+
 /* Estados de carga / error. */
 .pat-loading, .pat-error, .pat-stub {
   display: flex; align-items: center; gap: 8px;

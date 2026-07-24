@@ -112,24 +112,24 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `events` | def | L2549–L2559 |
 | `account_cards_pipe` | def | L2563–L2589 |
 | `account_notes_summary` | def | L2593–L2618 |
-| `account_details` | def | L2622–L2938 |
-| `NoteCreate` | class | L2941–L2942 |
-| `create_note` | def | L2946–L2975 |
-| `CurpUpdate` | class | L2978–L2979 |
-| `update_curp` | def | L2983–L2994 |
-| `get_clabes` | def | L3004–L3013 |
-| `refresh_clabes` | def | L3017–L3027 |
-| `_persist_withdrawal` | def | L3036–L3055 |
-| `withdraw` | def | L3059–L3092 |
-| `withdraw_status` | def | L3096–L3187 |
-| `delete_note` | def | L3191–L3203 |
-| `CombosRequest` | class | L3206–L3207 |
-| `accounts_combos` | def | L3211–L3224 |
-| `accounts_pass_map` | def | L3228–L3233 |
-| `list_all_cards` | def | L3237–L3312 |
-| `activity_feed` | def | L3316–L3437 |
-| `list_deposits` | def | L3441–L3470 |
-| `deposits_stats` | def | L3474–L3499 |
+| `account_details` | def | L2622–L2952 |
+| `NoteCreate` | class | L2955–L2956 |
+| `create_note` | def | L2960–L2989 |
+| `CurpUpdate` | class | L2992–L2993 |
+| `update_curp` | def | L2997–L3008 |
+| `get_clabes` | def | L3018–L3027 |
+| `refresh_clabes` | def | L3031–L3041 |
+| `_persist_withdrawal` | def | L3050–L3069 |
+| `withdraw` | def | L3073–L3106 |
+| `withdraw_status` | def | L3110–L3201 |
+| `delete_note` | def | L3205–L3217 |
+| `CombosRequest` | class | L3220–L3221 |
+| `accounts_combos` | def | L3225–L3238 |
+| `accounts_pass_map` | def | L3242–L3247 |
+| `list_all_cards` | def | L3251–L3326 |
+| `activity_feed` | def | L3330–L3451 |
+| `list_deposits` | def | L3455–L3484 |
+| `deposits_stats` | def | L3488–L3513 |
 
 ### `auth.py`
 

@@ -888,6 +888,7 @@ function actionLabel(kind) {
   if (kind === 'lock') return '🔒 Lock';
   if (kind === 'unlock') return '🔓 Unlock';
   if (kind === 'note') return '📝 Nota';
+  if (kind === 'withdrawal') return '🏧 Retiro';
   if (kind === 'scheduled') return '⏱️ Scheduled';
   if (kind === 'scheduled_phase') return '⏳ Fase';
   if (kind === 'scheduled_aborted') return '⏱️ Abortado';
@@ -929,6 +930,7 @@ function statusPill(e) {
   if (e.kind === 'lock') return `<span class="dim">activo</span>`;
   if (e.kind === 'unlock') return `<span class="dim">liberado</span>`;
   if (e.kind === 'note') return `<span class="dim mono" title="${esc(e.text || '')}">${esc((e.text || '').slice(0, 60))}</span>`;
+  if (e.kind === 'withdrawal') return `<span class="dim mono">${fmtMoney(e.amount)}${e.transactionId ? ` · ${esc(String(e.transactionId).slice(0, 12))}` : ''}</span>`;
   if (e.kind === 'scheduled') {
     const ok = !!e.success;
     const col = ok ? 'var(--accent)' : 'var(--danger)';
@@ -1903,6 +1905,15 @@ function connectSSE() {
           const isSA = state.user?.role === 'superadmin';
           if (isMine || isSA) {
             pushNotif({ icon: '📝', msg: `${ev.who} anotó en ${ev.target}: ${(ev.text || '').slice(0, 60)}` });
+          }
+        } else if (ev.kind === 'withdrawal') {
+          pushNotif({ icon: '🏧', msg: `${ev.who} disparó retiro de ${fmtMoney(ev.amount)} en ${ev.target}` });
+          loadRecientes();
+          // Si otro operador (u otra pestaña) ya tiene La Pantalla de esta MISMA
+          // cuenta abierta, re-fetch para que vea el estado en vivo sin re-clickear
+          // (Task G2 — antes solo el que dispara veía el polling de su propio fetch).
+          if (window.Pantalla && window.Pantalla.currentId === ev.id) {
+            window.Pantalla.open(ev.id);
           }
         }
         // prewarm_*: silencioso — auditoría interna, sin notif ruidosa

@@ -93,7 +93,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 237 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 3506 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3520 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
@@ -218,6 +218,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `3a11788` | test: fix schema conftest.py — fullname/curp/phone faltantes en accounts |
 | `d40434e` | docs: NEXT-SESSION cierre — Task C código listo, fix bug schema test pendiente |
 | `0b8d499` | feat(api): endpoints withdraw + status con guardarrails bug#1/#2/#3 |
 | `5a7779b` | feat(withdrawals): módulo retiro TDD con guardarrails bug#1/#3 |
@@ -229,7 +230,6 @@ prewarm.py (router)
 | `30d4b57` | docs: NEXT-SESSION + RECON con objetivo retiro cuarentena msaidrzz |
 | `b7cb21c` | feat(recon): mapeo API retiros/depósitos BetMexico + capturador CDP |
 | `a5b5411` | docs: actualiza ERRORS.md y NEXT-SESSION con auditoria de regresion 24h |
-| `a8df3f5` | fix(balance): no sobreescribir saldo real a $0 en refresh balance_only |
 <!-- GEN:end:recientes -->
 
 ---
