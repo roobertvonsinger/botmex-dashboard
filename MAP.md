@@ -213,6 +213,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `fe21d73` | docs: NEXT-SESSION cierre — plan botón retiro listo para /Smartexe |
 | `bbb14d8` | feat(recon): spec botón retiro automático + herramientas CDP/bmx_call |
 | `bf185ac` | feat(clabes): panel SPEI NVIO/STP persistido en BD + endpoints |
 | `30d4b57` | docs: NEXT-SESSION + RECON con objetivo retiro cuarentena msaidrzz |
@@ -224,7 +225,6 @@ prewarm.py (router)
 | `b000b47` | feat(ui): agrega botones masivos Copiar y Actualizar por seleccion |
 | `8221357` | docs(audit): plan de auditoria TDAH/ADHD-friendly |
 | `eff1246` | docs: actualiza NEXT-SESSION con F0-F3 cerrados y deployados |
-| `0806cbb` | feat(accounts): refresh automático de balance para cuentas con JWT vigente |
 <!-- GEN:end:recientes -->
 
 ---
