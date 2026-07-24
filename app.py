@@ -102,6 +102,16 @@ import auth as _auth
 from auth import require_session
 from prewarm import router as _prewarm_router
 from deposits import router as _deposits_router
+from withdrawals import (
+    execute_withdrawal,
+    get_pending_withdrawal,
+    get_bank_transaction,
+    NoApprovedWithdrawalAccount,
+    MultipleApprovedAccounts,
+    ConcurrentWithdrawalPending,
+    InsufficientBalance,
+    JwtExpired,
+)
 
 ROOT = Path(__file__).parent
 STATIC = ROOT / "static"
@@ -171,6 +181,11 @@ def _migrate():
         # cualquier login exitoso; a partir de rl_streak>=3 el keeper aplica cuarentena
         # larga en vez de seguir reintentando cada 6h para siempre. Aditiva.
         ("rl_streak", "ALTER TABLE accounts ADD COLUMN rl_streak INTEGER DEFAULT 0"),
+        # jwt_token/jwt_expires_at: en prod ya existen (BD compartida con el bot,
+        # que las migra). Aditivo aquí solo para que BD de test/local las tenga
+        # (withdrawals.py y clabe_fetch.py las consumen para retiro/clabes).
+        ("jwt_token", "ALTER TABLE accounts ADD COLUMN jwt_token TEXT"),
+        ("jwt_expires_at", "ALTER TABLE accounts ADD COLUMN jwt_expires_at INTEGER"),
     ]:
         try:
             with db(write=True) as c:
@@ -3010,6 +3025,166 @@ async def refresh_clabes(account_id: int, _user: dict = Depends(require_session)
     if not result.get("ok"):
         raise HTTPException(409, result.get("error") or "No se pudieron obtener las clabes")
     return result
+
+
+# ── Retiro automático (botón SA en La Pantalla) ───────────────────────────────
+# 5 pasos vía withdrawals.py. bug#1: cuenta de retiro puede cambiar por depósito
+# SPEI reciente (NUNCA cachear). bug#2: status:6 de BetMexico != aterrizó en el
+# banco (reportar 2 fases). bug#3: puede aterrizar en tarjeta en vez de SPEI.
+# Ver docs/superpowers/specs/2026-07-24-boton-retiro-automatico-design.md.
+
+def _persist_withdrawal(account_id: int, disparado_por, result: dict) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    with db(write=True) as c:
+        c.execute(
+            "INSERT OR IGNORE INTO account_withdrawals "
+            "(account_id, account_email, transaction_id, reference, amount, "
+            " account_digits, institution_name, disparado_por, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (
+                account_id,
+                result.get("account_email"),
+                result["transactionId"],
+                result.get("reference"),
+                result["amount"],
+                result.get("accountDigits"),
+                result.get("institutionName"),
+                int(disparado_por) if disparado_por is not None else None,
+                now,
+            ),
+        )
+
+
+@app.post("/api/accounts/{account_id}/withdraw")
+async def withdraw(account_id: int, payload: dict, user: dict = Depends(require_session)):
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Solo superadmin")
+    with db() as c:
+        acc = c.execute("SELECT id FROM accounts WHERE id=?", (account_id,)).fetchone()
+    if not acc:
+        raise HTTPException(404, "Cuenta no encontrada")
+    try:
+        amount = float(payload.get("amount"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "amount inválido")
+    if amount <= 0:
+        raise HTTPException(400, "amount debe ser > 0")
+    try:
+        result = await execute_withdrawal(str(DB_PATH), account_id, amount)
+    except JwtExpired:
+        raise HTTPException(409, "JWT expirado, requiere refresh")
+    except InsufficientBalance as e:
+        raise HTTPException(409, str(e))
+    except NoApprovedWithdrawalAccount:
+        raise HTTPException(409, "Sin cuenta de retiro aprobada: requiere SPEI de depósito primero")
+    except MultipleApprovedAccounts as e:
+        raise HTTPException(409, str(e))
+    except ConcurrentWithdrawalPending:
+        raise HTTPException(409, "Ya hay un retiro pendiente en esta cuenta")
+    _persist_withdrawal(account_id, user.get("telegram_id"), result)
+    _broadcast({
+        "type": "activity", "kind": "withdrawal",
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "target": result.get("account_email"), "id": account_id,
+        "amount": amount, "transactionId": result["transactionId"],
+        **_resolve_who(user.get("telegram_id")),
+    })
+    return result
+
+
+@app.get("/api/accounts/{account_id}/withdraw/status/{tx_id}")
+async def withdraw_status(account_id: int, tx_id: str, user: dict = Depends(require_session)):
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Solo superadmin")
+    with db() as c:
+        acc = c.execute(
+            "SELECT id, jwt_token FROM accounts WHERE id=?", (account_id,)
+        ).fetchone()
+        row = c.execute(
+            "SELECT * FROM account_withdrawals WHERE transaction_id=?", (tx_id,)
+        ).fetchone()
+    if not acc or not row:
+        raise HTTPException(404, "Retiro no encontrado")
+
+    jwt = acc["jwt_token"]
+    proxy_url = None
+    try:
+        import proxy_pool as _pp
+        proxy_url = _pp.build_admin_proxy_url()
+    except Exception:
+        pass
+
+    expected_digits = row["account_digits"]
+    pending = None
+    if jwt:
+        try:
+            pending = await get_pending_withdrawal(jwt, proxy_url)
+        except Exception:
+            pending = None
+
+    out = {
+        "transactionId": tx_id,
+        "accountDigits": expected_digits,
+        "alerts": {"gatewayMismatch": False, "digitsMismatch": False},
+    }
+
+    if pending is not None:
+        status_api = pending.get("transactionStatus")
+        out["transactionStatus"] = status_api
+        if status_api == 6:
+            # bug#2: status:6 = BetMexico lo ejecutó, NO que aterrizó en el banco.
+            # Confirmar rail externo vía PASO5 antes de reportar "delivered".
+            bank_tx = None
+            if jwt:
+                try:
+                    bank_tx = await get_bank_transaction(
+                        jwt, proxy_url, tx_id, expected_digits=expected_digits
+                    )
+                except Exception:
+                    bank_tx = None
+            out["status"] = "successful"
+            out["phase"] = "executed"
+            out["description"] = "Ejecutado por BetMexico — confirma en tu banco"
+            if bank_tx is not None:
+                out["lastModifiedUtc"] = bank_tx.get("lastModifiedUtc")
+                out["gateway"] = bank_tx.get("gateway")
+                out["alerts"]["gatewayMismatch"] = bool(bank_tx.get("gateway_mismatch"))
+                out["alerts"]["digitsMismatch"] = bool(bank_tx.get("digits_mismatch"))
+                with db(write=True) as c:
+                    c.execute(
+                        "UPDATE account_withdrawals SET status_api=?, gateway=?, "
+                        "last_modified_utc=? WHERE transaction_id=?",
+                        (status_api, bank_tx.get("gateway"), bank_tx.get("lastModifiedUtc"), tx_id),
+                    )
+            else:
+                with db(write=True) as c:
+                    c.execute(
+                        "UPDATE account_withdrawals SET status_api=? WHERE transaction_id=?",
+                        (status_api, tx_id),
+                    )
+        else:
+            out["status"] = "pending"
+            out["phase"] = "pending"
+            out["description"] = pending.get("transactionStatusDescription") or "Pendiente"
+            with db(write=True) as c:
+                c.execute(
+                    "UPDATE account_withdrawals SET status_api=? WHERE transaction_id=?",
+                    (status_api, tx_id),
+                )
+    else:
+        prev_status = row["status_api"]
+        if prev_status == 6:
+            out["status"] = "completed"
+        elif prev_status is not None and prev_status < 0:
+            out["status"] = "failed"
+        else:
+            out["status"] = "idle"
+        out["phase"] = out["status"]
+        out["transactionStatus"] = prev_status
+        out["lastModifiedUtc"] = row["last_modified_utc"]
+        out["gateway"] = row["gateway"]
+
+    return out
 
 
 @app.delete("/api/accounts/{account_id}/notes/{note_id}")

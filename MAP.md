@@ -93,7 +93,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 237 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 3331 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3506 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
@@ -129,6 +129,7 @@ prewarm.py (router)
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 55 | `—` | _[completar]_ |
 | `test_withdrawals.py` | 361 | `—` | _[completar]_ |
+| `test_withdrawals_endpoints.py` | 412 | `—` | _[completar]_ |
 | `test_withdrawals_migrate.py` | 46 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
 | `web_grading.py` | 179 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
@@ -217,6 +218,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `5a7779b` | feat(withdrawals): módulo retiro TDD con guardarrails bug#1/#3 |
 | `c360b9e` | feat(db): tabla account_withdrawals (bitácora idempotente de retiros) |
 | `24e8e57` | docs(plan): plan botón retiro automático |
 | `fe21d73` | docs: NEXT-SESSION cierre — plan botón retiro listo para /Smartexe |
@@ -228,7 +230,6 @@ prewarm.py (router)
 | `a8df3f5` | fix(balance): no sobreescribir saldo real a $0 en refresh balance_only |
 | `cde1d32` | feat(ui): botones masivos Copiar y Actualizar por seleccion (sin tocar depositos v8) |
 | `a2d670a` | revert: revierte commit b000b47 por regresion en modal de depositos v8 |
-| `b000b47` | feat(ui): agrega botones masivos Copiar y Actualizar por seleccion |
 <!-- GEN:end:recientes -->
 
 ---

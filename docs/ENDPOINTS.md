@@ -53,6 +53,17 @@
 | POST | `/api/accounts/{account_id}/curp` | Guardar CURP validado | require_session | `{curp}` | `{ok}` | `app.py:1694` |
 | POST | `/api/accounts/combos` | Devolver `email:password` de IDs (para copy masivo) | require_session | `{ids}` | `{combos: [{id, email, password}]}` | `app.py:1729` |
 
+## Retiros (botón de retiro automático — Task C, EN CURSO)
+
+> `withdrawals.py` módulo aislado (5 pasos API BetMexico), tabla `account_withdrawals` (bitácora idempotente). Ver `docs/RECON_BETMEX_API.md` §"FLUJO DE RETIRO EXACTO" y guardarrails bug#1 (cuenta de retiro puede cambiar por depósito SPEI — nunca cachear), bug#2 (status:6 ≠ aterrizó en banco, reportar 2 fases), bug#3 (puede aterrizar en tarjeta en vez de SPEI).
+
+| Método | Path | Función | Auth | Body / Query | Respuesta | File:line |
+|---|---|---|---|---|---|---|
+| POST | `/api/accounts/{account_id}/withdraw` | Dispara retiro real (PASO0-3 vía `withdrawals.execute_withdrawal`, single-shot) | superadmin | `{amount}` | `{transactionId, reference, accountId, accountDigits, institutionName, amount, warnings}` / 409 con detail específico (JWT expirado, sin cuenta aprobada, múltiples cuentas aprobadas, saldo insuficiente, retiro concurrente pendiente) | `app.py:3058` |
+| GET | `/api/accounts/{account_id}/withdraw/status/{tx_id}` | Estado del retiro (PASO4 + PASO5 si status==6, guardarrails bug#1/#2/#3) | superadmin | — | `{status: idle\|pending\|successful, phase?, transactionStatus, description, lastModifiedUtc, alerts:{gatewayMismatch, digitsMismatch}}` | `app.py:3095` |
+
+**⚠️ EN CURSO — NO desplegado, tests propios en rojo (17/20 `test_withdrawals_endpoints.py`).** Bug de test harness descubierto (no de producción): `_acc_id()` en el test file pega a `GET /api/accounts?status=all`, que internamente falla por columnas `fullname/curp/phone` ausentes en el schema sintético de `conftest.py` — `list_accounts()` traga el `sqlite3.OperationalError` y devuelve `[]`. Fix pendiente: agregar esas columnas al `CREATE TABLE accounts` de `conftest.py`, o cambiar `_acc_id()` a `SELECT id FROM accounts WHERE email=...` directo (patrón ya usado en `test_refresh_single_guard.py`).
+
 ## Pool
 
 | Método | Path | Función | Auth | Body / Query | Respuesta | File:line |
