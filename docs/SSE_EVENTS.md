@@ -29,6 +29,7 @@
 | `activity` | `unlock_auto` | Window watcher (24h auto-release) | `{ts, target}` | `pushActivityEvent()` |
 | `activity` | `note` | `create_note()` en `app.py` | `{ts, who, target, text_snippet}` | `pushActivityEvent()` |
 | `activity` | `bulk` | Operaciones masivas (publish, hide-all) | `{ts, who, action, count}` | `pushActivityEvent()` |
+| `activity` | `withdrawal` | `POST /api/accounts/{id}/withdraw` en `app.py` (tras persistir en `account_withdrawals`) | `{ts, who, who_color, who_id, target, id, amount, transactionId}` | `pushActivityEvent()` · `actionLabel`/`statusPill` (`app.js`) · si `window.Pantalla.currentId === id`, re-fetch de `/details` (`pantalla.js`, para que OTRO operador con La Pantalla abierta en la misma cuenta vea el retiro en vivo sin polling propio) · filtrado server-side SA-only vía `_event_visible_to` (mismo trato que `account_touch` — el disparo de OTRO operador no es visible para un operador normal) |
 | `notification` | `capmonster_low` | Health monitor (CapMonster < $5) | `{severity:'danger', msg, balance}` | `pushNotif({icon:'💸', ...})` |
 | `notification` | `proxy_down` | Health monitor (proxy MX fail) | `{severity:'danger', msg}` | `pushNotif({icon:'🔌', ...})` |
 | `notification` | `prewarm_errors` | Prewarm bulk fail rate alto | `{severity:'warn', msg, count}` | `pushNotif({icon:'🔥', ...})` |

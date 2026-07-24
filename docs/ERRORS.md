@@ -2,6 +2,16 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## `clabe_fetch.py` nunca se había deployado a KVM4 — crash-loop al deployar `withdrawals.py` (2026-07-24)
+
+**Síntoma**: al deployar el botón de retiro automático (`app.py` + `withdrawals.py` + frontend) y hacer `docker compose restart web`, el container entró en crash-loop: `ModuleNotFoundError: No module named 'clabe_fetch'` en cada intento de arranque (`withdrawals.py:23` hace `from clabe_fetch import _load_jwt_for_account, _get_admin_proxy_url`).
+
+**Causa raíz**: `clabe_fetch.py` se creó y commiteó en el commit `bf185ac` ("feat(clabes): panel SPEI NVIO/STP persistido en BD + endpoints"), pero esa sesión **nunca lo subió a KVM4** — el deploy de ese commit solo tocó `app.py`/frontend, no el módulo nuevo. La feature de clabes SPEI estuvo **muerta en producción desde que se creó** (silenciosa: `app.py` la importa con `import clabe_fetch as _cf` INLINE dentro del handler, no al top del archivo, así que el resto de la app arrancaba bien y nadie lo notó hasta que `withdrawals.py` la importó al TOP del archivo — ahí sí tumba el proceso entero al boot).
+
+**Fix**: `scp` de `clabe_fetch.py` a `/docker/betmexico/code/web/` + restart. Confirmado con `docker exec betmexico-web python3 -c "import withdrawals"` y `StartedAt > mtime` de los 3 módulos nuevos.
+
+**Lección**: un import **inline dentro de una función** (`import X as _x` en el cuerpo de un handler) oculta un módulo faltante — solo truena cuando ESE endpoint se llama, no al boot. Un import al TOP del archivo lo habría detectado en el primer restart post-deploy de `bf185ac`. Antes de deployar un módulo nuevo, verificar con `ls` en el server que TODOS sus imports (`grep '^from \|^import '`) ya existen ahí, no asumir por el `git log` local.
+
 ## [CRÍTICO] Regresión por invalidación de JWT e incompatibilidad `_fetch_looks_empty` con `balance_only` (2026-07-22)
 
 **Síntoma**: Durante un intento de mejora en el backend de cuentas, el saldo real de varias cuentas se sobreescribía a $0 en refrescos o se generaban bucles infinitos de re-login que agotaban captchas, proxies y levantaban bloqueos 429/406.

@@ -509,6 +509,21 @@ Ver `docs/SSE_EVENTS.md` para tabla maestra de `kind` y su handler.
 
 **Historial scrolleable + detalle expandible (2026-07-04):** `.pat-txn-col` pasó de `overflow:hidden` + cap fijo de 12 filas (`+N más`) a `overflow-y:auto` (rueda nativa) + click-y-jala delegado en `#pantalla` (el nodo se re-renderiza en cada refresh de detalle; un listener directo se perdería) — umbral de 6px para distinguir drag de click (mismo patrón que la selección tipo Explorer). Cap subido a 400 (solo backstop). Cada fila `.pat-mv` togglea un detalle expandible al click (`grid-template-rows: 0fr↔1fr`, 180ms) con operador/tarjeta completa SIN enmascarar (copiable, `.pat-mv-exp-copy`)/motivo — solo hay sustancia real en movimientos nativos (`m.who`/`m.card_pipe`); el eco de BetMexico muestra "sin detalle interno". `_mvDragged` (module-level flag) evita que soltar un drag-scroll también togglee la fila.
 
+### Retiro automático SA-only (`.pat-wd`, 2026-07-24)
+
+> Botón de retiro dentro de `.pat-col-ident`, bajo `.pat-clabes` (`renderPantallaWithdraw(d)`, `pantalla.js`). Backend: `docs/ENDPOINTS.md` §"Retiros".
+
+- **Invisible para no-SA** (no un candado — `feedback_deshabilitar_invisible_no_redirect`): `renderPantallaWithdraw` devuelve `''` si `state.user.role !== 'superadmin'`.
+- **Markup:** input monto (`min=100`) + botón `.d-withdraw-fire` + `.pat-wd-status` (zona de estado). Mismo lenguaje visual que `.pat-clabes`/`.pat-form` (`.pat-input`/`.pat-btn-save`).
+- **Disparo (handler delegado en `#pantalla`):** `POST /api/accounts/{id}/withdraw {amount}` → bloquea input+botón, arranca `_startWithdrawPoll(accId, transactionId)`. 409/4xx → toast de error, desbloquea.
+- **Polling fijo 60s** (`_startWithdrawPoll`/`_wdPolls`, guardarrail explícito del plan — nunca menos, no alimentar rate-limit BetMexico): 1 solo `setInterval` activo por cuenta, con chequeo inmediato al disparar (no espera el primer tick). Se detiene solo (`_stopWithdrawPoll`) al llegar a estado terminal (`successful|completed|failed`) o al cerrar La Pantalla (`_finishClose` limpia TODOS los polls activos).
+- **Resume al reabrir** (`_resumeWithdrawPollIfPending`, llamado desde `_renderDetailView`): si `d.last_withdrawal` (nuevo campo de `/details`, ver `docs/ENDPOINTS.md`) tiene un estado no-terminal, retoma el polling sin que el operador tenga que re-disparar.
+- **Copy 2-fases (bug#2 — `feedback_status6_no_garantiza_aterrizaje`):** `transactionStatus==6` → **"BetMexico procesó el retiro… Confirma en tu banco."**, NUNCA "entregado"/"llegó".
+- **Alertas (bug#1/#3):** `alerts.digitsMismatch` → borde+aviso rojo "dígitos distintos a la cuenta esperada"; `alerts.gatewayMismatch` → "mandó el retiro a TARJETA, no a SPEI". Clase `.pat-wd.alert` (borde rojo, NO ámbar — es alerta de dinero).
+- **Multi-operador vía SSE:** `app.js connectSSE` escucha `kind:'withdrawal'` — si `window.Pantalla.currentId` coincide con la cuenta del evento, reabre (`Pantalla.open(id)`) para refrescar sin que ese operador tenga su propio poll corriendo (ver `docs/SSE_EVENTS.md`).
+- **CSS:** bloque `.pat-wd*` en `pantalla.css`, reusa `--pat-gold`/`--danger`/`--danger-soft` ya declarados (mismo tema por-grade que el resto de La Pantalla).
+- **Pendiente:** verificación visual (`getBoundingClientRect`, encaje sin overflow en `.pat-col-ident`) — no se pudo hacer en la sesión de implementación (extensión Chrome no conectada). Ver `NEXT-SESSION.md`.
+
 ## Rework de interacción 2026-07-17 (Robert, campo — panel fijo, combo, cierre, drag, tarjetas, vidrio)
 
 Tanda de correcciones de interacción/estética pedidas operando en prod:
