@@ -4,41 +4,44 @@
 > **Lente rectora:** ver `feedback_frictionless_norte` + `NORTE.md`. BOTMEXICO = frictionless, a prueba de desmadre, le GANA a BetMexico directo.
 
 ## 🎯 Objetivo en curso — NO se diluye
-**Implementar el BOTÓN DE RETIRO AUTOMÁTICO en La Pantalla.** Plan TDD completo listo para ejecutar: `~/.claude/plans/vale-armamos-un-smartplan-abundant-emerson.md` (9 tasks A→I, modelos por subagente asignados, guardarrails bug#1/#2/#3 con tests). Spec fuente: `docs/superpowers/specs/2026-07-24-boton-retiro-automatico-design.md`. Flujo probado en campo (5 retiros reales, msaidrzz, $1,355) en `docs/RECON_BETMEX_API.md` §"FLUJO DE RETIRO EXACTO".
-
-**Logrado y CERRADO:** los 5 retiros de msaidrzz llegaron COMPLETOS ($1,355). El "faltante de $300" era un retiro atorado en el banco (retardo de procesamiento), no bug. Quedan ~$102 en la cuenta para el smoke del botón. Lección clave: `status:6` en API BetMexico = ejecutado del lado de ellos, NO garantiza aterrizaje en banco.
+**Implementar el BOTÓN DE RETIRO AUTOMÁTICO en La Pantalla.** Plan TDD de 9 tasks A→I. Ya hechas: A (migración `account_withdrawals`), B (módulo `withdrawals.py`, 28 tests verdes), y el código de **C** (endpoints `POST /withdraw` + `GET /withdraw/status/{tx_id}` en `app.py`, con guardarrails bug#1/#2/#3). Falta: los 20 tests de endpoint pasar en verde, luego D→I (frontend, deploy, smoke real).
 
 ## ▶ Con qué arrancas (PRIMERA acción del próximo turno)
-**`/Smartexe` sobre el plan.** Primer paso: copiar el plan de `~/.claude/plans/vale-armamos-un-smartplan-abundant-emerson.md` a `docs/superpowers/plans/2026-07-24-boton-retiro-automatico.md` + crear rama `feat/boton-retiro-automatico` desde `feat/auditoria-tdah-2026-07-20`. Luego Task A (migración tabla `account_withdrawals`) → Task B (módulo `withdrawals.py` TDD) → ... → Task I (retiro real $100).
+**Arreglar `test_withdrawals_endpoints.py` (17/20 fallando) y commitear Task C como verde.** Causa raíz YA DIAGNOSTICADA (no re-investigar):
+
+`_acc_id()` en el test file pega a `GET /api/accounts?status=all` para resolver el id de la cuenta seed. Ese endpoint (`list_accounts()`, `app.py:715+`) hace `SELECT ... a.fullname, a.curp, a.phone ...` (línea 760) — columnas que **no existen** en el `CREATE TABLE accounts` sintético de `conftest.py` (líneas 15-27). El error `sqlite3.OperationalError` se traga en silencio (`except: return []`, líneas 788-832) y el endpoint devuelve `[]` → `_acc_id()` revienta con `StopIteration` en 17 de los 20 tests.
+
+**Fix (elegir uno, no hace falta decidir de antemano — evaluar cuál es menos invasivo):**
+- **Opción A** — agregar `fullname TEXT`, `curp TEXT`, `phone TEXT` al schema `accounts` de `conftest.py` (más fiel al schema real de prod, arregla el bug para TODOS los tests futuros que usen el endpoint HTTP).
+- **Opción B** — cambiar `_acc_id()` en `test_withdrawals_endpoints.py` a SQL directo (`SELECT id FROM accounts WHERE email=?`), como ya hace `test_refresh_single_guard.py`. Más rápido pero no arregla el bug de fondo (sigue latente para el próximo test que use `/api/accounts`).
+
+Tras el fix: `python -m pytest test_withdrawals_endpoints.py -v` debe dar 20/20. Luego commit (`test: fix schema conftest.py — X passing` o similar) y seguir con Task D (frontend: botón + modal en La Pantalla).
 
 ## 🧭 Recomendación de approach
-**Backend primero (Tasks A→E), todo TDD con `httpx.MockTransport`**, luego frontend (F→G), luego smoke HTTP sin dinero (H, amount=99999→409), y **el retiro real $100 lo dispara Robert con click en la UI** (Task I, NO subagente a ciegas — dinero real). Decisiones técnicas ya tomadas en el plan: módulo `withdrawals.py` aislado (no en app.py de 3306L); PASO0 reusa `clabe_fetch._load_jwt_for_account` (NO `tools/bmx_call.py`, es CLI-only); `begin_withdrawal` **single-shot** (no `call_with_proxy_failover` — un retry duplica el retiro; los GET sí fallover). Smoke corregido: **$100 no $1** (BetMexico mínimo $100).
+Opción A es la correcta de fondo (el bug de schema es preexistente y afecta cualquier test futuro que llame `/api/accounts`), pero si el tiempo aprieta, Opción B desbloquea Task C sin tocar el fixture compartido. Backend ya completo (A+B+C-código); lo que falta de C es solo destrabar el harness de test. Después: Tasks D→G frontend, H deploy+smoke HTTP (amount=99999→409), **I retiro real $100 lo dispara Robert con click en la UI** (NO subagente a ciegas — dinero real, ~$102 disponibles en msaidrzz).
 
 ## ⏳ Pendientes próximos
-- [ ] **Ejecutar el plan via `/Smartexe`** (9 tasks A→I, ver `~/.claude/plans/vale-armamos-un-smartplan-abundant-emerson.md`).
-- [ ] **Smoke real $100 msaidrzz** (Task I) — 1 sola oportunidad real, lo dispara Robert con click. Verificar 3 guardarrails: gateway==2 (bug#3), lastAccountDigits coincide (bug#1), 2-fases no "entregado" (bug#2).
-- [ ] **Limpieza backend congelado** (`account_refresh.py`, `prewarm.py`, `deposits.py`): cambios `_fetch_looks_empty` de auditoría 2026-07-22 — resolver `float("N/A")` ValueError y falso positivo `balance_only` con TDD. **NO commitear hasta resolver.** Siguen modified sin commitear (intencional).
-- [ ] **Deploy tras implementar** (Task H): pscp + restart + smoke HTTP + `StartedAt > mtime`.
+- [ ] **Fix bug de schema `fullname/curp/phone`** en `conftest.py` o `_acc_id()` (ver arriba) → 20/20 verde → commit.
+- [ ] **Tasks D→I** del plan (frontend botón/modal, deploy, smoke $100 real disparado por Robert).
+- [ ] **Push de la rama `feat/boton-retiro-automatico`** a Forgejo — sigue 100% local (4 commits: `24e8e57`, `c360b9e`, `5a7779b`, `0b8d499`), no pusheada porque los tests de Task C aún están en rojo. Push cuando esté verde y estable.
+- [ ] **Limpieza backend congelado** (`account_refresh.py`, `prewarm.py`, `deposits.py`): cambios `_fetch_looks_empty` de auditoría 2026-07-22 — resolver `float("N/A")` ValueError y falso positivo `balance_only` con TDD. **NO commitear hasta resolver.** Siguen modified sin commitear (intencional, arrastrados de sesiones previas).
 
-## ✅ Hecho esta sesión (2026-07-24, tarde)
-- **Plan TDD del botón de retiro** completo (9 tasks, modelos por subagente Opus/Sonnet/Haiku, vigilancia anti-cuelgue). Fuera del repo en `~/.claude/plans/`.
-- Anclajes verificados con 3 Explore en paralelo: backend `app.py`, `clabe_fetch.py`+`proxy_pool.py`+RECON, frontend `pantalla.js/css`.
-- 1 Plan agent validó arquitectura + produjo tests TDD concretos (28 tests módulo + 20 endpoints).
-- **Commits de la sesión pasada, estabilizados esta sesión:**
-  - `bf185ac` — `feat(clabes): panel SPEI NVIO/STP persistido en BD + endpoints` (tabla `account_deposit_clabes`, `clabe_fetch.py`, GET/POST `/clabes`, UI).
-  - `bbb14d8` — `feat(recon): spec botón retiro automático + herramientas CDP/bmx_call` (spec, `tools/bmx_call.py`, `tools/cdp_*`).
+## ✅ Hecho esta sesión (2026-07-24, noche)
+- **Task C (código):** `POST /api/accounts/{id}/withdraw` + `GET /api/accounts/{id}/withdraw/status/{tx_id}` en `app.py` — 403/404/409 mapeados por excepción, persistencia idempotente `account_withdrawals`, broadcast SSE `kind=withdrawal`, reporte 2-fases (bug#2), alertas `gatewayMismatch`/`digitsMismatch` (bug#1/#3).
+- `test_withdrawals_endpoints.py` escrito (20 tests) — **17 fallan** por bug de harness diagnosticado (ver arriba), no por el código de `app.py`.
+- `docs/ENDPOINTS.md` — sección nueva "Retiros" documentando los 2 endpoints + el bug de test conocido.
+- **Commit:** `0b8d499` — `feat(api): endpoints withdraw + status con guardarrails bug#1/#2/#3` (app.py + docs/ENDPOINTS.md + test_withdrawals_endpoints.py). Local, no pusheado.
 
 ## 🔧 Decisiones tomadas
-- **`withdrawals.py` módulo aislado** (raíz, async, importable) — NO en `app.py` inline. Motivo: `app.py` ya tiene 3306L; el patrón del repo es que llamadas a BetMexico vivan en módulos dedicados (`clabe_fetch.py`, `autoexclusion.py`, `deposits.py`); módulo aislado = TDD con MockTransport sin levantar FastAPI.
-- **PASO0 reusa `clabe_fetch._load_jwt_for_account(db, id)`** (clabe_fetch.py:37) — ya valida expiración. NO reimplementar, NO usar `tools/bmx_call.py` (CLI-only, no importable; su `load_jwt` busca por email LIKE). Corrige el spec §4 que decía "reusar load_jwt de bmx_call.py".
-- **`begin_withdrawal` single-shot** (NO `call_with_proxy_failover`): un retry por proxy-fail podría duplicar el retiro (a diferencia de `BeginDeposit` que es idempotente). Los GET (PASO1/2/4/5) sí fallover. Trade-off documentado en el plan.
-- **Smoke $100 no $1:** BetMexico no permite retiros <$100. 1 sola oportunidad real en msaidrzz (~$102). Disparado por Robert (click), no subagente.
-- **Plan vive fuera del repo** (`~/.claude/plans/`) — se copia a `docs/superpowers/plans/` como 1er paso de `/Smartexe`.
-- **CDP > chrome-devtools-mcp** para captura (sesión pasada).
-- **Capturas con JWTs (`tools/*.jsonl|log`) NO commitean** (.gitignore línea 49-50).
+- **`withdrawals.py` módulo aislado** (raíz, async, importable) — NO en `app.py` inline.
+- **PASO0 reusa `clabe_fetch._load_jwt_for_account(db, id)`** — NO `tools/bmx_call.py` (CLI-only).
+- **`begin_withdrawal` single-shot** (NO `call_with_proxy_failover`): un retry podría duplicar el retiro.
+- **Smoke $100 no $1:** BetMexico no permite retiros <$100. Disparado por Robert (click), no subagente.
+- **Test file de Task C se commiteó en rojo, con el bug documentado en el mensaje de commit y en docs/ENDPOINTS.md** — decisión de esta sesión: el código de `app.py` está completo y es correcto; lo que falla es el fixture de test, no la lógica del endpoint. Preferible dejar rastro explícito del bug conocido a dejar el trabajo sin commitear.
+- **NO push de la rama** — tests en rojo, no cumple el criterio "estable" del protocolo de cierre.
 
 ## 🖥️ Estado del sistema al cerrar
-- **KVM4:** web ✓ Up 46h · bot ✓ Up 3d (vivo, no Exited) · health ✓ 200 (937 cuentas) · pool = 1001 proxies (1000 dataimpulse + 1 nodemaven) · cero errores 406/504/Traceback en 12h (solo polls KPIs).
-- **Repo:** rama `feat/auditoria-tdah-2026-07-20`, 2 commits nuevos (`bf185ac` clabes + `bbb14d8` recon/spec/tools). **NO pusheados a Forgejo** todavía (la rama ya estaba pusheada hasta `30d4b57`; estos 2 commits son locales — push pendiente, decisión de Robert/estabilidad).
-- **Congelados sin commitear (intencional):** `account_refresh.py`, `prewarm.py`, `deposits.py` (auditoría 07-22). `.agents/`, `AGENTS.md` ajenos, no tocar.
-- **CDP/Chrome local:** Chrome 150 con `--remote-debugging-port=9222`, sesión espinoza logueada viva (JWT válido hasta 2026-07-31) — para calleo de verificación posterior (bug#3 reembolso a tarjeta), NO bloquea la implementación del botón.
+- **KVM4:** sin cambios esta sesión (no se tocó deploy). Último estado verificado (sesión previa): web ✓, bot ✓, health ✓ (937 cuentas), pool 1001 proxies, 0 errores 12h.
+- **Repo:** rama `feat/boton-retiro-automatico` (creada desde `feat/auditoria-tdah-2026-07-20`), 4 commits locales, ninguno pusheado.
+- **Congelados sin commitear (intencional, arrastrados):** `account_refresh.py`, `prewarm.py`, `deposits.py` (auditoría 07-22).
+- **Ajenos, no tocar:** `.agents/`, `AGENTS.md` (otra herramienta, "ZCode").

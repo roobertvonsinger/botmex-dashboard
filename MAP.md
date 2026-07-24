@@ -218,6 +218,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `0b8d499` | feat(api): endpoints withdraw + status con guardarrails bug#1/#2/#3 |
 | `5a7779b` | feat(withdrawals): módulo retiro TDD con guardarrails bug#1/#3 |
 | `c360b9e` | feat(db): tabla account_withdrawals (bitácora idempotente de retiros) |
 | `24e8e57` | docs(plan): plan botón retiro automático |
@@ -229,7 +230,6 @@ prewarm.py (router)
 | `a5b5411` | docs: actualiza ERRORS.md y NEXT-SESSION con auditoria de regresion 24h |
 | `a8df3f5` | fix(balance): no sobreescribir saldo real a $0 en refresh balance_only |
 | `cde1d32` | feat(ui): botones masivos Copiar y Actualizar por seleccion (sin tocar depositos v8) |
-| `a2d670a` | revert: revierte commit b000b47 por regresion en modal de depositos v8 |
 <!-- GEN:end:recientes -->
 
 ---
