@@ -154,10 +154,17 @@
     }
 
     // Fetch fresco (siempre, para no mostrar datos viejos por mucho rato) —
-    // solo re-renderiza si seguimos mostrando la misma cuenta.
-    fetch(`/api/accounts/${id}/details`)
+    // solo re-renderiza si seguimos mostrando la misma cuenta. Timeout explícito
+    // (AbortController): sin esto, un fetch que nunca resuelve (hang de red/proxy,
+    // reportado por Robert 2026-07-25: "de repente, con cualquier cuenta") deja el
+    // spinner "Cargando…" pegado para siempre — nada más lo reemplaza. Con timeout,
+    // al menos degrada a un error visible + reintento en vez de colgarse mudo.
+    const _fetchAc = new AbortController();
+    const _fetchTimeout = setTimeout(() => _fetchAc.abort(), 15000);
+    fetch(`/api/accounts/${id}/details`, { signal: _fetchAc.signal })
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then(data => {
+        clearTimeout(_fetchTimeout);
         _cacheSet(id, data);
         if (_currentId === id && !root.hidden) {
           // Anima solo si aún no se cuajó esta cuenta (caso sin cache: el spinner
@@ -168,10 +175,12 @@
         }
       })
       .catch(err => {
+        clearTimeout(_fetchTimeout);
         if (_currentId !== id || root.hidden) return;
+        if (err && err.name === 'AbortError') err = new Error('Sin respuesta del servidor (15s) — reintenta');
         if (!cached) {
           const { detail } = els();
-          if (detail) detail.innerHTML = `<div class="pat-error">Error: ${window.esc ? esc(err.message) : err.message}</div>`;
+          if (detail) detail.innerHTML = `<div class="pat-error">Error: ${window.esc ? esc(err.message) : err.message} <button type="button" class="pat-btn pat-btn-ghost" data-wd-retry-open="${id}">Reintentar</button></div>`;
         }
       });
   }
@@ -799,6 +808,8 @@
   // del dashboard (p.ej. otra fila) tampoco cierra: solo cambia de cuenta.
   document.addEventListener('click', e => {
     if (e.target.closest('[data-close]')) close();
+    const retryBtn = e.target.closest('[data-wd-retry-open]');
+    if (retryBtn) open(parseInt(retryBtn.dataset.wdRetryOpen));
   });
 
   // Combo copiable tipo liga: el copiado real lo hace el handler global (.d-copy);
@@ -959,6 +970,15 @@
         });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+        // BetMexico ya ejecutó el retiro real llegado aquí (200) — persisted:false es
+        // un caso raro (lock de BD) donde SÍ salió pero no quedó guardado localmente.
+        // NO es el mismo caso que un error: no lo pintamos como falla, avisamos aparte
+        // para que el operador anote el transactionId a mano (bug de campo 2026-07-25).
+        if (data.persisted === false) {
+          if (window.toast) toast(`⚠️ Retiro SÍ salió (ref ${data.transactionId}) pero no se guardó local — anótalo`, 'error');
+          if (statusEl) statusEl.innerHTML = `<div class="pat-wd-row pat-wd-fail"><i class="ph-bold ph-warning"></i> Retiro ejecutado, transactionId ${window.esc ? esc(data.transactionId) : data.transactionId} — no se pudo guardar, anótalo</div>`;
+          return;
+        }
         const cache = _cacheGet(accId);
         if (cache) {
           cache.last_withdrawal = {

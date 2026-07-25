@@ -3,7 +3,7 @@
 # Lee betmexico_accounts.db (la misma que el bot TG). Sin lógica de polling.
 
 from __future__ import annotations
-import sqlite3, os, re, sys
+import sqlite3, os, re, sys, time
 import asyncio
 import json as _json
 import logging as _logging
@@ -3048,25 +3048,52 @@ async def refresh_clabes(account_id: int, _user: dict = Depends(require_session)
 # Ver docs/superpowers/specs/2026-07-24-boton-retiro-automatico-design.md.
 
 def _persist_withdrawal(account_id: int, disparado_por, result: dict) -> None:
+    # Robert, campo 2026-07-25: BetMexico YA ejecutó el retiro real (execute_withdrawal,
+    # arriba en withdraw()) antes de que esta función corra — este INSERT es el ÚNICO
+    # rastro local de un movimiento de dinero real. Un "database is locked" transitorio
+    # aquí (el connect-level timeout=10s de db() ya expiró una vez en prod, ver
+    # docs/ERRORS.md) NO puede tirar el registro silenciosamente: perderíamos la
+    # trazabilidad de un retiro que sí salió, dejando al operador viendo un 500 sin
+    # saber si el dinero se movió. Retry con backoff — cada intento abre su propia
+    # conexión (su propio timeout=10s), dándole varios intentos de 10s a un writer
+    # que sostiene el lock más tiempo del normal, en vez de rendirse a la primera.
     now = datetime.now(timezone.utc).isoformat()
-    with db(write=True) as c:
-        c.execute(
-            "INSERT OR IGNORE INTO account_withdrawals "
-            "(account_id, account_email, transaction_id, reference, amount, "
-            " account_digits, institution_name, disparado_por, created_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?)",
-            (
-                account_id,
-                result.get("account_email"),
-                result["transactionId"],
-                result.get("reference"),
-                result["amount"],
-                result.get("accountDigits"),
-                result.get("institutionName"),
-                int(disparado_por) if disparado_por is not None else None,
-                now,
-            ),
-        )
+    _lg = _logging.getLogger("betmexico.dashboard.withdrawals")
+    attempts = 5
+    for attempt in range(1, attempts + 1):
+        try:
+            with db(write=True) as c:
+                c.execute(
+                    "INSERT OR IGNORE INTO account_withdrawals "
+                    "(account_id, account_email, transaction_id, reference, amount, "
+                    " account_digits, institution_name, disparado_por, created_at) "
+                    "VALUES (?,?,?,?,?,?,?,?,?)",
+                    (
+                        account_id,
+                        result.get("account_email"),
+                        result["transactionId"],
+                        result.get("reference"),
+                        result["amount"],
+                        result.get("accountDigits"),
+                        result.get("institutionName"),
+                        int(disparado_por) if disparado_por is not None else None,
+                        now,
+                    ),
+                )
+            return
+        except sqlite3.OperationalError as e:
+            if "database is locked" not in str(e) or attempt == attempts:
+                _lg.error(
+                    f"[withdraw] PERSIST FAILED tras {attempt} intento(s) — retiro real "
+                    f"transactionId={result.get('transactionId')} amount={result.get('amount')} "
+                    f"account_id={account_id} SIN registrar en account_withdrawals: {e}"
+                )
+                raise
+            _lg.warning(
+                f"[withdraw] persist intento {attempt}/{attempts} chocó con lock, "
+                f"reintentando en {attempt}s — transactionId={result.get('transactionId')}"
+            )
+            time.sleep(attempt)
 
 
 @app.post("/api/accounts/{account_id}/withdraw")
@@ -3095,15 +3122,27 @@ async def withdraw(account_id: int, payload: dict, user: dict = Depends(require_
         raise HTTPException(409, str(e))
     except ConcurrentWithdrawalPending:
         raise HTTPException(409, "Ya hay un retiro pendiente en esta cuenta")
-    _persist_withdrawal(account_id, user.get("telegram_id"), result)
-    _broadcast({
-        "type": "activity", "kind": "withdrawal",
-        "ts": datetime.now(timezone.utc).isoformat(),
-        "target": result.get("account_email"), "id": account_id,
-        "amount": amount, "transactionId": result["transactionId"],
-        **_resolve_who(user.get("telegram_id")),
-    })
-    return result
+    # A partir de aquí el retiro YA SE EJECUTÓ de verdad en BetMexico (execute_withdrawal
+    # ya corrió) — lo que sigue es solo nuestro registro local. Si _persist_withdrawal
+    # agota sus reintentos (bug de campo 2026-07-25: "database is locked" tumbó el INSERT
+    # y el operador vio un 500 sin saber si el dinero se movió), NO devolvemos un 500
+    # genérico que lee como "el retiro falló" — el retiro SÍ salió. Devolvemos 200 con
+    # persisted:false + el transactionId real para que el operador pueda reconciliar a
+    # mano, en vez de dejarlo a ciegas.
+    persisted = True
+    try:
+        _persist_withdrawal(account_id, user.get("telegram_id"), result)
+    except sqlite3.OperationalError:
+        persisted = False
+    if persisted:
+        _broadcast({
+            "type": "activity", "kind": "withdrawal",
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "target": result.get("account_email"), "id": account_id,
+            "amount": amount, "transactionId": result["transactionId"],
+            **_resolve_who(user.get("telegram_id")),
+        })
+    return {**result, "persisted": persisted}
 
 
 @app.get("/api/accounts/{account_id}/withdraw/status/{tx_id}")
