@@ -33,6 +33,31 @@ logger = logging.getLogger("betmexico.dashboard.account_refresh")
 DEFAULT_GRADES: Set[str] = {"A+", "A", "B"}
 
 
+def _sa_lock_tokens() -> List[str]:
+    """Tokens que identifican un lock del super-admin en `accounts.locked_by`.
+
+    El campo guarda formatos mixtos: `lock_account` (vía UI) persiste el
+    `username` del SA ('RobertVS'), `_auto_lock_for_deposit` persiste su
+    `telegram_id` numérico ('1341812706'). Para identificar RESERVADA_SA
+    correctamente hay que aceptar ambos. Se resuelve dinámicamente desde
+    `auth.USERS` por rol 'superadmin' — si auth no está disponible, fallback
+    al token histórico (solo numérico) para no romper el ciclo.
+    """
+    try:
+        import auth
+        tokens: List[str] = []
+        for uname, info in auth.USERS.items():
+            if info.get("role") == "superadmin":
+                tokens.append(uname.lower())  # formato username
+                tg = info.get("telegram_id")
+                if tg is not None:
+                    tokens.append(str(tg))  # formato telegram_id
+        return tokens or ["1341812706"]
+    except Exception as e:
+        logger.warning(f"[account_refresh] auth.USERS no disponible, fallback SA token: {e}")
+        return ["1341812706"]
+
+
 def _env_int(name: str, default: int) -> int:
     try:
         return int(os.environ.get(name, default))
@@ -60,6 +85,7 @@ def select_refresh_candidates_healthy(
     *,
     batch_max: int,
     grades: Set[str],
+    sa_tokens: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """Filtra + ordena + limita las cuentas a refrescar este ciclo.
 
@@ -68,7 +94,13 @@ def select_refresh_candidates_healthy(
     esas cuentas se consultan sin login; las por expirar las re-loguea el
     keeper). Orden: `last_checked_at` ascendente (la más desactualizada
     primero) — evita re-tocar una cuenta que un depósito acaba de refrescar.
+
+    Excepción: las RESERVADA_SA (`published_to_pool=0 + locked_by` del SA)
+    SÍ son candidatas — el SA las usa y necesita su balance al día.
+    `sa_tokens` lista los valores que identifican al SA en `locked_by`
+    (cubre formatos username y telegram_id, ver `_sa_lock_tokens`).
     """
+    sa_tokens = set(sa_tokens or [])
     out: List[Dict[str, Any]] = []
     for r in rows:
         if (r.get("status") or "") != "LIVE":
@@ -76,14 +108,25 @@ def select_refresh_candidates_healthy(
         grade = r.get("grade") or ""
         if grade not in grades:
             continue
-        if not r.get("published_to_pool"):
-            continue
-        if r.get("locked_by") is not None:
-            continue
+        locked_by = r.get("locked_by")
+        # RESERVADA_SA: pool=0 + locked_by del SA → candidata.
+        is_sa_reserved = (
+            not r.get("published_to_pool")
+            and str(locked_by).lower() in sa_tokens
+        )
+        if not is_sa_reserved:
+            # cuenta pública y libre: ok
+            if not r.get("published_to_pool"):
+                continue
+            if locked_by is not None:
+                continue
         exp = _exp_int(r.get("jwt_expires_at"))
         if exp <= now:
             continue  # sin JWT vigente → no es candidata (la toca jwt_keeper)
         out.append(r)
+
+    out.sort(key=lambda r: (r.get("last_checked_at") or ""))
+    return out[:batch_max]
 
     out.sort(key=lambda r: (r.get("last_checked_at") or ""))
     return out[:batch_max]
@@ -104,15 +147,34 @@ _SELECT_COLS = ("email", "status", "grade", "jwt_expires_at",
 
 
 def _load_candidate_rows() -> List[Dict[str, Any]]:
-    """Trae de la BD el universo grueso (LIVE + publicadas) para que la lógica
+    """Trae de la BD el universo grueso (LIVE + útiles) para que la lógica
     pura afine. Filtra en SQL lo barato; el resto lo decide
-    `select_refresh_candidates_healthy`."""
+    `select_refresh_candidates_healthy`.
+
+    Universo: cuentas LIVE publicadas al pool (published_to_pool=1) **más**
+    las RESERVADA_SA (published_to_pool=0 + locked_by del SA) — el SA las usa
+    y necesita su balance al día como a cualquier otra cuenta pública.
+    Los tokens del SA se resuelven vía `_sa_lock_tokens` (formatos username
+    y telegram_id).
+    """
     import app  # lazy: evita ciclo de import
+    sa_tokens = _sa_lock_tokens()
     with app.db() as conn:
-        cur = conn.execute(
-            f"SELECT {', '.join(_SELECT_COLS)} FROM accounts "
-            "WHERE status='LIVE' AND published_to_pool=1"
-        )
+        if sa_tokens:
+            placeholders = ",".join("?" for _ in sa_tokens)
+            cur = conn.execute(
+                f"SELECT {', '.join(_SELECT_COLS)} FROM accounts "
+                "WHERE status='LIVE' "
+                f"AND (published_to_pool=1 "
+                f"OR (published_to_pool=0 AND lower(locked_by) IN ({placeholders})))",
+                [t.lower() for t in sa_tokens],
+            )
+        else:
+            # sin SA tokens (auth caído + sin fallback) → solo pool público
+            cur = conn.execute(
+                f"SELECT {', '.join(_SELECT_COLS)} FROM accounts "
+                "WHERE status='LIVE' AND published_to_pool=1"
+            )
         return [dict(row) for row in cur.fetchall()]
 
 
@@ -128,8 +190,9 @@ async def run_refresh_cycle(
     su JWT vigente (sin captcha, sin login, sin tocar _LOGIN_SEM)."""
     now = int(time.time())
     rows = await asyncio.to_thread(_load_candidate_rows)
+    sa_tokens = _sa_lock_tokens()
     cands = select_refresh_candidates_healthy(
-        rows, now, batch_max=batch_max, grades=grades)
+        rows, now, batch_max=batch_max, grades=grades, sa_tokens=sa_tokens)
     stats: Dict[str, Any] = {
         "universe": len(rows), "selected": len(cands),
         "refreshed": 0, "skipped_no_jwt": 0, "skipped_no_proxy": 0, "failed": 0,
@@ -187,6 +250,20 @@ async def run_refresh_cycle(
             # cuando expire localmente. Solo se cuenta como fallo del ciclo.
             stats["failed"] += 1
             logger.info(f"[account_refresh] {email} fetch vacío (posible JWT muerto server-side)")
+            continue
+
+        # `fetch_account_details_parallel` SIEMPRE devuelve un dict truthy
+        # (defaults N/A/0.00). Si TODO quedó en default, el JWT está muerto
+        # server-side (401 redirectLogin) — invalidar cache para que el
+        # próximo ciclo haga login REAL en vez de reusar el JWT muerto.
+        from prewarm import _fetch_looks_empty, _db_invalidate_jwt
+        if _fetch_looks_empty(details):
+            stats["failed"] += 1
+            logger.info(f"[account_refresh] {email} fetch vacío (JWT muerto server-side) — invalidando cache")
+            try:
+                await asyncio.to_thread(_db_invalidate_jwt, email)
+            except Exception:
+                pass
             continue
 
         try:

@@ -771,6 +771,18 @@ async def _refresh_account_after_deposit(
             return
         # Reusa los persisters probados del prewarm (balance + txns + grade).
         from prewarm import _db_upsert_balance, _db_save_txns_and_recalc
+        # `fetch_account_details_parallel` siempre devuelve dict truthy con
+        # defaults; si quedó todo vacío el JWT murió server-side (401). No
+        # persistir (pisaría saldo) — invalidar JWT y salir. El próximo
+        # depósito/refresh hará login real.
+        from prewarm import _fetch_looks_empty, _db_invalidate_jwt
+        if _fetch_looks_empty(details):
+            logger.info(f"[Deposits/phases] refresh post-depósito {email} vacío (JWT muerto) — cache invalidado")
+            try:
+                await asyncio.to_thread(_db_invalidate_jwt, email)
+            except Exception:
+                pass
+            return
         await asyncio.to_thread(_db_upsert_balance, email, details)
         await asyncio.to_thread(_db_save_txns_and_recalc, email, details, operator_id)
         logger.info(f"[Deposits/phases] refresh post-depósito OK {email} "

@@ -79,6 +79,7 @@ def select_refresh_candidates(
     batch_max: int,
     refresh_ahead_sec: int,
     grades: Set[str],
+    sa_tokens: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """Filtra + ordena + limita las cuentas a re-loguear este ciclo.
 
@@ -86,9 +87,15 @@ def select_refresh_candidates(
     por un operador, y con JWT que ya expiró / expira dentro de `refresh_ahead_sec`
     (las que aún tienen margen se dejan — su JWT sigue sirviendo).
 
+    Excepción: las RESERVADA_SA (`published_to_pool=0 + locked_by` del SA) SÍ son
+    candidatas — el SA las usa y necesita su JWT vivo para que el refresh reciba
+    datos reales y no default. `sa_tokens` lista los valores que identifican al
+    SA en `locked_by` (ver `account_refresh._sa_lock_tokens`).
+
     Orden: mejor grado primero; dentro del grado, la más urgente (menor `exp`, con
     expiradas/nulas —exp=0— al frente). Corta en `batch_max` para no hacer ráfaga.
     """
+    sa_tokens = set(sa_tokens or [])
     out: List[Dict[str, Any]] = []
     for r in rows:
         if (r.get("status") or "") != "LIVE":
@@ -96,10 +103,17 @@ def select_refresh_candidates(
         grade = r.get("grade") or ""
         if grade not in grades:
             continue
-        if not r.get("published_to_pool"):
-            continue
-        if r.get("locked_by") is not None:
-            continue
+        locked_by = r.get("locked_by")
+        # RESERVADA_SA (pool=0 + locked_by del SA) → candidata.
+        is_sa_reserved = (
+            not r.get("published_to_pool")
+            and str(locked_by).lower() in sa_tokens
+        )
+        if not is_sa_reserved:
+            if not r.get("published_to_pool"):
+                continue
+            if locked_by is not None:
+                continue
         cd = r.get("cooldown_until")
         if cd not in (None, "") and int(cd) > now:
             continue
@@ -130,14 +144,32 @@ _SELECT_COLS = ("email", "password", "status", "grade", "jwt_expires_at",
 
 
 def _load_candidate_rows() -> List[Dict[str, Any]]:
-    """Trae de la BD el universo grueso (LIVE + publicadas) para que la lógica pura
-    afine. Filtra en SQL lo barato; el resto lo decide `select_refresh_candidates`."""
+    """Trae de la BD el universo grueso (LIVE + útiles) para que la lógica pura
+    afine. Filtra en SQL lo barato; el resto lo decide `select_refresh_candidates`.
+
+    Universo: cuentas LIVE publicadas al pool (published_to_pool=1) **más** las
+    RESERVADA_SA (published_to_pool=0 + locked_by del SA) — sin esto, el JWT
+    muerto server-side de una cuenta en uso nunca se renueva y el refresh
+    siempre recibe default del server.
+    """
     import app  # lazy: evita ciclo de import
+    from account_refresh import _sa_lock_tokens
+    sa_tokens = _sa_lock_tokens()
     with app.db() as conn:
-        cur = conn.execute(
-            f"SELECT {', '.join(_SELECT_COLS)} FROM accounts "
-            "WHERE status='LIVE' AND published_to_pool=1"
-        )
+        if sa_tokens:
+            placeholders = ",".join("?" for _ in sa_tokens)
+            cur = conn.execute(
+                f"SELECT {', '.join(_SELECT_COLS)} FROM accounts "
+                "WHERE status='LIVE' "
+                f"AND (published_to_pool=1 "
+                f"OR (published_to_pool=0 AND lower(locked_by) IN ({placeholders})))",
+                [t.lower() for t in sa_tokens],
+            )
+        else:
+            cur = conn.execute(
+                f"SELECT {', '.join(_SELECT_COLS)} FROM accounts "
+                "WHERE status='LIVE' AND published_to_pool=1"
+            )
         return [dict(row) for row in cur.fetchall()]
 
 
@@ -196,9 +228,12 @@ async def run_keepalive_cycle(
     """
     now = int(time.time())
     rows = await asyncio.to_thread(_load_candidate_rows)
+    from account_refresh import _sa_lock_tokens
+    sa_tokens = _sa_lock_tokens()
     cands = select_refresh_candidates(
         rows, now, batch_max=batch_max,
-        refresh_ahead_sec=refresh_ahead_sec, grades=grades)
+        refresh_ahead_sec=refresh_ahead_sec, grades=grades,
+        sa_tokens=sa_tokens)
     stats: Dict[str, Any] = {
         "universe": len(rows), "selected": len(cands),
         "live": 0, "rate_limited": 0, "retry": 0, "dead": 0, "error": 0,

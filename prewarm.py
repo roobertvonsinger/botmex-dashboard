@@ -175,6 +175,35 @@ def _db_get_recent_log(operator_id: int, minutes: int) -> list:
         return []
 
 
+def _fetch_looks_empty(details: Optional[dict]) -> bool:
+    """Detecta un fetch vacío causado por JWT muerto / 401 silencioso.
+
+    `fetch_account_details_parallel` SIEMPRE devuelve un dict truthy lleno
+    de defaults ("N/A", 0.00, 0 txns, verified=False). Cuando TODO queda en
+    default, la API no respondió datos reales → el JWT está muerto
+    server-side (verificado con probe directo: wallet+txn devuelven 401
+    `redirectLogin:true`). Usado para invalidar el JWT de cache y forzar
+    un re-login real la próxima vez — rompe el bucle
+    cache-HIT → 401 → fetch vacío → no-invalida → repites.
+
+    Falso positivo teórico: una cuenta LIVE recién creada con $0.00, sin
+    txns y sin nombre poblado. Inexistente en operación (toda LIVE
+    publicada tiene saldo o actividad), y el costo es bajo: solo fuerza un
+    re-login la próxima vez. No pierde datos.
+    """
+    if not details:
+        return True
+    fn = details.get("fullname")
+    has_name = bool(fn and str(fn).strip() not in ("", "N/A"))
+    txns = details.get("transactions") or {}
+    has_txns = bool(txns.get("items")) or int(txns.get("total_rows", 0) or 0) > 0
+    bal_bonos = float(details.get("balance_bonos", 0) or 0)
+    bal_real = float(details.get("balance_real", 0) or 0)
+    new_amt = details.get("last_deposit_amount")
+    has_dep = bool(new_amt and float(new_amt) > 0)
+    return not (has_name or has_txns or bal_bonos > 0 or bal_real > 0 or has_dep)
+
+
 def _db_upsert_balance(email: str, details: dict) -> None:
     """Persiste balance + último depósito.
     - balance_total = balance_real + balance_bonos (el dict de details NO trae
@@ -476,7 +505,12 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
                 checker.fetch_account_details_parallel(jwt, fetch_mode="balance_only"),
                 timeout=12.0,
             )
-        if details:
+        # `details` es SIEMPRE truthy (dict con defaults N/A/0.00). Un fetch
+        # realmente vacío (JWT muerto → 401 redirectLogin) se detecta con
+        # `_fetch_looks_empty`: TODO en default. En ese caso tomar la rama
+        # `else` (invalidar JWT) para romper el bucle cache-HIT→401→vacío.
+        fetch_empty = _fetch_looks_empty(details)
+        if details and not fetch_empty:
             await asyncio.to_thread(_db_upsert_balance, email, details)
             # Guarda txns frescas + recalcula grade (oportunidad gratuita)
             await asyncio.to_thread(_db_save_txns_and_recalc, email, details, operator_id)
@@ -486,7 +520,7 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
             # JWT silenció datos (401 silencioso) — invalidar siempre para forzar login real la próxima vez
             await asyncio.to_thread(_db_invalidate_jwt, email)
 
-        phase = "complete" if details else "no_details"
+        phase = "complete" if (details and not fetch_empty) else "no_details"
         _db_log_phase(
             process_id, phase,
             {"email": email, "operator_id": operator_id,

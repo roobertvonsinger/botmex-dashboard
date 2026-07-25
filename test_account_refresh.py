@@ -20,9 +20,10 @@ def _acc(email, *, status="LIVE", grade="B", jwt_exp=None, locked_by=None,
     }
 
 
-def _run(rows, *, batch_max=40, grades=DEFAULT_GRADES):
+def _run(rows, *, batch_max=40, grades=DEFAULT_GRADES, sa_tokens=None):
+    sa_tokens = sa_tokens if sa_tokens is not None else ["robertvs", "1341812706"]
     return select_refresh_candidates_healthy(
-        rows, NOW, batch_max=batch_max, grades=grades)
+        rows, NOW, batch_max=batch_max, grades=grades, sa_tokens=sa_tokens)
 
 
 def test_jwt_vigente_es_candidata():
@@ -87,3 +88,35 @@ def test_grades_configurable():
     rows = [_acc("c@x.com", grade="C", jwt_exp=NOW + H)]
     got = _run(rows, grades={"C"})
     assert len(got) == 1
+
+
+def test_reservada_sa_con_jwt_vigente_es_candidata():
+    """Cuenta RESERVADA_SA (published=0, locked_by=SA) con JWT vivo
+    DEBE ser candidata — el refresh automático la alcanza."""
+    got = _run([_acc("espinoza@x.com", jwt_exp=NOW + H, published=0,
+                     locked_by="1341812706")])
+    assert len(got) == 1
+    assert got[0]["email"] == "espinoza@x.com"
+
+
+def test_reservada_sa_locked_by_username_es_candidata():
+    """Cuenta con locked_by='RobertVS' (formato username, como lo manda el
+    frontend bulkLock) DEBE ser candidata también — cubre el caso real de
+    prod (espinoza id 1497)."""
+    got = _run([_acc("espinoza@x.com", jwt_exp=NOW + H, published=0,
+                     locked_by="RobertVS")])
+    assert len(got) == 1
+    assert got[0]["email"] == "espinoza@x.com"
+
+
+def test_reservada_no_sa_no_es_candidata():
+    """Cuenta publicada=0 pero lockeada por operador (no SA) sigue fuera."""
+    got = _run([_acc("op@x.com", jwt_exp=NOW + H, published=0,
+                     locked_by="555")])
+    assert got == []
+
+
+def test_no_publicada_no_lockeada_no_es_candidata():
+    """Cuenta pool=0 sin lock explícito → fuera."""
+    got = _run([_acc("floater@x.com", jwt_exp=NOW + H, published=0)])
+    assert got == []

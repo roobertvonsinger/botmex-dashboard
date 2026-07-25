@@ -17,13 +17,14 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `_env_int` | def | L36–L40 |
-| `cfg` | def | L43–L53 |
-| `select_refresh_candidates_healthy` | def | L57–L89 |
-| `_exp_int` | def | L92–L98 |
-| `_load_candidate_rows` | def | L106–L116 |
-| `run_refresh_cycle` | def | L120–L230 |
-| `run_refresh_cycle_from_env` | def | L233–L237 |
+| `_sa_lock_tokens` | def | L36–L58 |
+| `_env_int` | def | L61–L65 |
+| `cfg` | def | L68–L78 |
+| `select_refresh_candidates_healthy` | def | L82–L132 |
+| `_exp_int` | def | L135–L141 |
+| `_load_candidate_rows` | def | L149–L178 |
+| `run_refresh_cycle` | def | L182–L293 |
+| `run_refresh_cycle_from_env` | def | L296–L300 |
 
 ### `app.py`
 
@@ -227,14 +228,14 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 |---------|------|--------|
 | `_env_int` | def | L38–L42 |
 | `cfg` | def | L45–L71 |
-| `select_refresh_candidates` | def | L75–L115 |
-| `_exp_int` | def | L118–L124 |
-| `_load_candidate_rows` | def | L132–L141 |
-| `_set_cooldown` | def | L144–L151 |
-| `_bump_rl_streak` | def | L154–L167 |
-| `_reset_rl_streak` | def | L170–L176 |
-| `run_keepalive_cycle` | def | L180–L278 |
-| `run_keepalive_cycle_from_env` | def | L281–L288 |
+| `select_refresh_candidates` | def | L75–L129 |
+| `_exp_int` | def | L132–L138 |
+| `_load_candidate_rows` | def | L146–L173 |
+| `_set_cooldown` | def | L176–L183 |
+| `_bump_rl_streak` | def | L186–L199 |
+| `_reset_rl_streak` | def | L202–L208 |
+| `run_keepalive_cycle` | def | L212–L313 |
+| `run_keepalive_cycle_from_env` | def | L316–L323 |
 
 ### `login_orchestrator.py`
 
@@ -391,18 +392,22 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
 | `_acc` | def | L14–L20 |
-| `_run` | def | L23–L25 |
-| `test_jwt_vigente_es_candidata` | def | L28–L30 |
-| `test_jwt_expirado_no_es_candidata` | def | L33–L35 |
-| `test_jwt_nulo_no_es_candidata` | def | L38–L40 |
-| `test_jwt_vence_ahora_mismo_no_es_candidata` | def | L43–L45 |
-| `test_lockeada_por_operador_se_excluye` | def | L48–L50 |
-| `test_grade_no_util_se_excluye` | def | L53–L56 |
-| `test_no_live_se_excluye` | def | L59–L61 |
-| `test_no_publicada_se_excluye` | def | L64–L66 |
-| `test_orden_por_last_checked_ascendente` | def | L69–L77 |
-| `test_batch_max_limita` | def | L80–L83 |
-| `test_grades_configurable` | def | L86–L89 |
+| `_run` | def | L23–L26 |
+| `test_jwt_vigente_es_candidata` | def | L29–L31 |
+| `test_jwt_expirado_no_es_candidata` | def | L34–L36 |
+| `test_jwt_nulo_no_es_candidata` | def | L39–L41 |
+| `test_jwt_vence_ahora_mismo_no_es_candidata` | def | L44–L46 |
+| `test_lockeada_por_operador_se_excluye` | def | L49–L51 |
+| `test_grade_no_util_se_excluye` | def | L54–L57 |
+| `test_no_live_se_excluye` | def | L60–L62 |
+| `test_no_publicada_se_excluye` | def | L65–L67 |
+| `test_orden_por_last_checked_ascendente` | def | L70–L78 |
+| `test_batch_max_limita` | def | L81–L84 |
+| `test_grades_configurable` | def | L87–L90 |
+| `test_reservada_sa_con_jwt_vigente_es_candidata` | def | L93–L99 |
+| `test_reservada_sa_locked_by_username_es_candidata` | def | L102–L109 |
+| `test_reservada_no_sa_no_es_candidata` | def | L112–L116 |
+| `test_no_publicada_no_lockeada_no_es_candidata` | def | L119–L122 |
 
 ### `test_account_touch.py`
 
@@ -526,20 +531,24 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
 | `_acc` | def | L16–L22 |
-| `_run` | def | L25–L27 |
-| `test_jwt_expirado_es_candidata` | def | L30–L32 |
-| `test_jwt_nulo_es_candidata` | def | L35–L37 |
-| `test_jwt_vigente_con_margen_no_es_candidata` | def | L40–L43 |
-| `test_jwt_por_expirar_dentro_de_ventana_si_es_candidata` | def | L46–L48 |
-| `test_en_cooldown_se_excluye` | def | L51–L53 |
-| `test_cooldown_vencido_no_excluye` | def | L56–L58 |
-| `test_lockeada_por_operador_se_excluye` | def | L61–L63 |
-| `test_grade_no_util_se_excluye` | def | L66–L69 |
-| `test_no_live_se_excluye` | def | L72–L74 |
-| `test_no_publicada_se_excluye` | def | L77–L79 |
-| `test_orden_por_grado_luego_urgencia` | def | L82–L91 |
-| `test_batch_max_limita` | def | L94–L97 |
-| `test_grades_configurable` | def | L100–L103 |
+| `_run` | def | L25–L29 |
+| `test_jwt_expirado_es_candidata` | def | L32–L34 |
+| `test_jwt_nulo_es_candidata` | def | L37–L39 |
+| `test_jwt_vigente_con_margen_no_es_candidata` | def | L42–L45 |
+| `test_jwt_por_expirar_dentro_de_ventana_si_es_candidata` | def | L48–L50 |
+| `test_en_cooldown_se_excluye` | def | L53–L55 |
+| `test_cooldown_vencido_no_excluye` | def | L58–L60 |
+| `test_lockeada_por_operador_se_excluye` | def | L63–L65 |
+| `test_grade_no_util_se_excluye` | def | L68–L71 |
+| `test_no_live_se_excluye` | def | L74–L76 |
+| `test_no_publicada_se_excluye` | def | L79–L81 |
+| `test_orden_por_grado_luego_urgencia` | def | L84–L93 |
+| `test_batch_max_limita` | def | L96–L99 |
+| `test_grades_configurable` | def | L102–L105 |
+| `test_reservada_sa_jwt_expirado_es_candidata` | def | L108–L115 |
+| `test_reservada_sa_locked_by_username_es_candidata` | def | L118–L122 |
+| `test_reservada_sa_jwt_vigente_no_es_candidata` | def | L125–L129 |
+| `test_reservada_no_sa_no_es_candidata` | def | L132–L136 |
 
 ### `test_marks.py`
 

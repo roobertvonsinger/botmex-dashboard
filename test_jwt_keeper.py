@@ -22,9 +22,11 @@ def _acc(email, *, status="LIVE", grade="B", jwt_exp=None, cooldown=None,
     }
 
 
-def _run(rows, *, batch_max=12, ahead=AHEAD, grades=DEFAULT_GRADES):
+def _run(rows, *, batch_max=12, ahead=AHEAD, grades=DEFAULT_GRADES, sa_tokens=None):
+    sa_tokens = sa_tokens if sa_tokens is not None else ["robertvs", "1341812706"]
     return select_refresh_candidates(
-        rows, NOW, batch_max=batch_max, refresh_ahead_sec=ahead, grades=grades)
+        rows, NOW, batch_max=batch_max, refresh_ahead_sec=ahead, grades=grades,
+        sa_tokens=sa_tokens)
 
 
 def test_jwt_expirado_es_candidata():
@@ -101,3 +103,34 @@ def test_grades_configurable():
     rows = [_acc("c@x.com", grade="C", jwt_exp=NOW - H)]
     got = _run(rows, grades={"C"})
     assert len(got) == 1
+
+
+def test_reservada_sa_jwt_expirado_es_candidata():
+    """RESERVADA_SA (pool=0, locked_by=SA) con JWT expirado DEBE ser
+    candidata — sin esto, su JWT muerto nunca se renueva y el refresh
+    siempre recibe default del server. Caso real: espinoza id 1497."""
+    got = _run([_acc("espinoza@x.com", grade="A", jwt_exp=NOW - H,
+                     published=0, locked_by="1341812706")])
+    assert len(got) == 1
+    assert got[0]["email"] == "espinoza@x.com"
+
+
+def test_reservada_sa_locked_by_username_es_candidata():
+    """Formato username ('RobertVS' como lo manda bulkLock) también cuenta."""
+    got = _run([_acc("espinoza@x.com", grade="A", jwt_exp=NOW - H,
+                     published=0, locked_by="RobertVS")])
+    assert len(got) == 1
+
+
+def test_reservada_sa_jwt_vigente_no_es_candidata():
+    """RESERVADA_SA con JWT todavía con margen → no re-loguear (igual que pool)."""
+    got = _run([_acc("espinoza@x.com", grade="A", jwt_exp=NOW + 48 * H,
+                     published=0, locked_by="RobertVS")])
+    assert got == []
+
+
+def test_reservada_no_sa_no_es_candidata():
+    """pool=0 locked_by operador (no SA) → sigue fuera."""
+    got = _run([_acc("op@x.com", grade="A", jwt_exp=NOW - H,
+                     published=0, locked_by="555")])
+    assert got == []
