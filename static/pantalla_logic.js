@@ -100,7 +100,19 @@
     return Math.max(minH, Math.round(currentPanelH + delta));
   }
 
-  const api = { splitTransactions, estadoFrom, formatHito, panelReserve, panelMaxH, toggleTarget, anchoredPanelH };
+  // ── _withdrawBtnState: estado del botón/panel de retiro dedicado (lógica pura) ──
+  // d.balance_real = saldo Real; d._wd_pending = true si hay retiro no-terminal (lo calcula
+  // el render de pantalla.js vía _wdStatusFromRow antes de llamar esta función — desacopla
+  // la lógica pura del DOM-dependent).
+  function _withdrawBtnState(d, role) {
+    if (role !== 'superadmin') return { render: false, disabled: true, tooltip: '' };
+    const balance = parseFloat((d && d.balance_real) || 0) || 0;
+    if (balance < 100) return { render: true, disabled: true, tooltip: 'Saldo < $100' };
+    if (d && d._wd_pending) return { render: true, disabled: false, tooltip: 'Retiro en curso…' };
+    return { render: true, disabled: false, tooltip: 'Retirar' };
+  }
+
+  const api = { splitTransactions, estadoFrom, formatHito, panelReserve, panelMaxH, toggleTarget, anchoredPanelH, _withdrawBtnState };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PantallaLogic = api;
 })(typeof window !== 'undefined' ? window : globalThis);

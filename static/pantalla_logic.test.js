@@ -62,4 +62,24 @@ assert.strictEqual(
   300, 'ya alineado (delta=0) → sin cambio'
 );
 
+// ── _withdrawBtnState: estado del botón/panel de retiro dedicado (lógica pura) ──
+const { _withdrawBtnState } = P;
+const _acc = (balance, pending) => ({ balance_real: balance, _wd_pending: !!pending });
+
+assert.strictEqual(_withdrawBtnState(_acc(500, false), 'user').render, false, 'no-SA no renderiza');
+assert.strictEqual(_withdrawBtnState(_acc(500, false), 'user').disabled, true);
+
+assert.strictEqual(_withdrawBtnState(_acc(500, false), 'superadmin').render, true, 'SA saldo ok renderiza');
+assert.strictEqual(_withdrawBtnState(_acc(500, false), 'superadmin').disabled, false);
+assert.strictEqual(_withdrawBtnState(_acc(500, false), 'superadmin').tooltip, 'Retirar');
+
+assert.strictEqual(_withdrawBtnState(_acc(99.99, false), 'superadmin').disabled, true, 'saldo<100 disabled');
+assert.strictEqual(_withdrawBtnState(_acc(99.99, false), 'superadmin').tooltip, 'Saldo < $100');
+assert.strictEqual(_withdrawBtnState(_acc(0, false), 'superadmin').tooltip, 'Saldo < $100');
+
+assert.strictEqual(_withdrawBtnState(_acc(500, true), 'superadmin').disabled, false, 'pendiente no disabled (botón activo)');
+assert.strictEqual(_withdrawBtnState(_acc(500, true), 'superadmin').tooltip, 'Retiro en curso…');
+
+assert.strictEqual(_withdrawBtnState(_acc(500, false), 'superadmin').tooltip, 'Retirar', 'sin pendiente = Retirar');
+
 console.log('OK pantalla_logic');
