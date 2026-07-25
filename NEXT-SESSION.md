@@ -4,33 +4,65 @@
 > **Lente rectora:** ver `feedback_frictionless_norte` + `NORTE.md`. BOTMEXICO = frictionless, a prueba de desmadre, le GANA a BetMexico directo.
 
 ## 🎯 Objetivo en curso — NO se diluye
-**Botón de retiro automático en La Pantalla.** Plan TDD A→I. Backend (A+B+C) y frontend (F+G) **completos, deployados y smoke-testeados en KVM4**. Falta: verificación visual del bloque (D), y Task I — el retiro real de $100 que dispara Robert con un click.
+**Botón de retiro dedicado + panel de monto en col 3 — Task 5 pendiente: validación visual + smoke funcional $1.** Implementación COMPLETA y deployada (5 commits `72d1863`..`60c5361` + spec/plan `207b29d`/`eb9a9bb`/`d5107f8`). El botón "Retirar" vive en `.pat-actions`, el panel de monto+estado vive en col 3 (`.pat-col-stage#patStageSlot`), coexistencia con `#depStage` vía CSS `:has()`. **Falta que Robert vea la pantalla** y dispare un retiro $1 de prueba.
+
+### ✅ CIERRE PREVIO (sesión 2026-07-25 tardía) — Fix RESERVADA_SA RESUELTO
+La regresión "saldos no actualizan" quedó **cerrada y verificada en prod** (ver `docs/ERRORS.md` y commits `ba540e9`): `account_refresh.py` + `jwt_keeper.py` con `_sa_lock_tokens()` (RESERVADA_SA `pool=0 + locked_by` del SA entra al universo de refresh). Caso real: `espinoza` $0→$401.52, 32/32 tests verdes.
 
 ## ▶ Con qué arrancas (PRIMERA acción del próximo turno)
-1. **Verificación visual `.pat-wd`** — BLOQUEADA de nuevo esta sesión: el Browser pane (`mcp__Claude_Browser__navigate`) rechazó la navegación a `botmexico.com.mx` incluso tras aprobación explícita de Robert (`navOk:false`, sin permission-card visible). Puede ser glitch de sesión — reintentar al abrir; si persiste, pedirle a Robert un screenshot manual de La Pantalla de `msaidrzz@gmail.com` (id 637) o usar `claude-in-chrome` (Chrome real) en vez del Browser pane. Objetivo cuando funcione: `getBoundingClientRect` confirma que el bloque de retiro encaja en `.pat-col-ident` sin overflow (comparar contra `.pat-clabes`, mismo patrón).
-2. **PIN de Robert — mapear decisión de destino del retiro** (ver memoria `project_pin_mapeo_decision_destino_retiro`): en qué momento/dónde decide BetMexico la cuenta/rail de un retiro, si hay flag pre-flight, si el marcador `priority-provider:[3,1]` que sospecha Robert tiene algo que ver (spoiler: no directamente — es ruteo de proveedor SPEI backend, no cuenta destino; ver la memoria para el detalle ya mapeado y lo que falta).
-3. Con ambos resueltos → **Task I**: Robert dispara el retiro real de $100 en `msaidrzz` desde la UI, verificar los 3 guardarrails (gateway==2, dígitos coinciden, copy 2-fases sin "entregado").
+**Validación visual del panel de retiro en col 3 + smoke funcional $1.** Pasos:
+1. Robert abre La Pantalla de una cuenta con saldo ≥ $100 (SA) en `botmexico.net` — checa botón "Retirar" (dorado, `ph-bank`) en `.pat-actions` + panel en col 3 con saldo Real + input monto.
+2. Medir `getBoundingClientRect` en consola (ver §"Validación visual" abajo) — `overflow ≤ 0`.
+3. Abrir cuenta saldo < $100 → botón gris/disabled + input disabled.
+4. Smoke funcional: retiro de **$1** (no $100) en cuenta de prueba → validar 3 guardarrails + 2-fases + bitácora.
+
+> **NO automatizar** el click del retiro real. Robert lo dispara. Solo preparamos y monitoreamos.
+> Si hay errores visuales/funcionales, se ven en limpio y se ajusta el CSS/lógica.
 
 ## 🧭 Recomendación de approach
-El botón ya está en producción y probado sin dinero real (smoke 409 con amount=99999 llegó a PASO2 contra BetMexico real y se detuvo antes de PASO3). Lo único que falta antes de Task I es un ojo humano o browser-driven en el layout — no hay más código pendiente para eso. Si el Browser pane sigue fallando al abrir la sesión, probar `claude-in-chrome` primero (Chrome real del usuario) antes de insistir con el pane. El PIN de destino-de-retiro es una investigación aparte (no bloquea Task I, pero Robert quiere mapearlo antes de confiarle más retiros reales sin supervisión) — atacarlo releyendo `docs/RECON_BETMEX_API.md` (ya tiene 80% del contexto), no re-investigar desde cero.
+Cerrar el Task 5 con la validación visual de Robert primero (es la parte cualitativa que solo él emite). Si el panel se ve mal colocado o rebasa, ajustar CSS medido (`getBoundingClientRect`, memoria `feedback_ui_ancla_medida_no_pixel_inventado`) — máximo 3 ciclos. Si cuaja, smoke $1 end-to-end (botón → endpoint → API BetMexico → bitácora → SSE → UI). El feature cierra ahí.
 
 ## ⏳ Pendientes próximos
-- [ ] Verificación visual `.pat-wd` en navegador (getBoundingClientRect) — Browser pane fallando, ver punto 1 arriba.
-- [ ] PIN: mapear momento/lugar de la decisión de destino del retiro (ver memoria, requiere posiblemente un depósito de prueba — coordinar con Robert, dinero real).
-- [ ] **Task I — retiro real $100 en `msaidrzz`** (Robert, click en UI, NO automatizar).
-- [ ] **Limpieza backend congelado** (`account_refresh.py`, `prewarm.py`, `deposits.py`): cambios `_fetch_looks_empty` de auditoría 2026-07-22 sin commitear — resolver con TDD antes de commitear (arrastrado de varias sesiones, sigue intencional, sin tocar esta sesión).
-- [ ] Actualizar `docs/AUDIT.md` con el estado del botón de retiro si se decide llevar tracking ahí (no se forzó esta sesión, no había sección previa).
+- [ ] **Task 5 — validación visual + smoke funcional $1:** Robert ve la pantalla, mide `getBoundingClientRect`, dispara retiro $1. Cierra el ciclo del botón.
+- [ ] **Watchdog de retiro pendiente + notificación al usuario** (anotado por Robert): "mientras este pendiente el retiro me gustaria que hubiera un watchdog... para avisar con una notificacion". Pospuesto post-botón-funcional.
+- [ ] **Auto-obtener clabes al actualizar:** aparte (decisión Robert: "No, tocar clabes aparte").
+- [ ] **Deuda técnica — `locked_by` formatos mixtos:** `_sa_lock_tokens()` los tolera vía lookup en `auth.USERS`, pero el campo guarda `'RobertVS'` (username) y `'1341812706'` (telegram_id). Normalizar a un solo formato — NO bloqueante.
+- [ ] **Deuda técnica — copia duplicada en server:** `/app/account_refresh.py` y `/app/web/account_refresh.py` coexisten en KVM4. Se resuelve con Dockerfile rebuild.
+- [ ] **Síntoma 2 (database is locked esporádico):** vigilancia pasiva. Rearmar monitor vivo si reaparece.
 
-## ✅ Hecho esta sesión (2026-07-24, sesión 2)
-- **Fix operativo KVM4 — token bot Telegram rotado:** Robert removió el token viejo y olvidó poner el nuevo (`8516175452:AAHd...`) → `betmexico-bot` estaba en crash-loop (`InvalidToken`, token viejo `AAEFechK...`). Actualizado `BMX_BOT_TOKEN` en `/docker/betmexico/.env` (con backup previo `.env.bak.<timestamp>`) y recreado el contenedor (`docker compose up -d bot` — el nombre de servicio es `bot`, no `betmexico-bot`). Verificado: `betmexico-bot` up, "🚀 Bot iniciado (Polling...)" + "✅ Comandos registrados" sin errores.
-- **Verificación visual `.pat-wd` intentada y bloqueada:** Browser pane (`mcp__Claude_Browser`) rechazó navegar a `botmexico.com.mx` (`navOk:false`) pese a permiso explícito de Robert — no llegó tarjeta de aprobación visible. Probado con tab nuevo y `force:true`, mismo resultado. Sin código tocado, sin cambios en el repo esta sesión.
+## ✅ Hecho esta sesión (2026-07-25)
+- **Spec v2 + plan reescritos** (commits `eb9a9bb` + `d5107f8`/`207b29d`): rediseño del popup flotante → panel en col 3. El panel llena el espacio que antes quedaba vacío (donde va `#depStage`), coexistencia vía CSS `:has()`.
+- **Implementación TDD completa** (4 commits, cada uno con review clean spec✅/quality Approved):
+  - `72d1863` `_withdrawBtnState(d, role)` — lógica pura en `pantalla_logic.js` (exportable), tests RED→GREEN (`OK pantalla_logic`).
+  - `8283867` `renderPantallaWithdrawButton()` + `renderPantallaWithdrawStage()` + `#wdStage` en col 3 + elimina `renderPantallaWithdraw`.
+  - `50412f7` handler `d-withdraw-fire` + `_fetchWithdrawStatus` migrados a `[data-wd-stage]` (fix robusto: botón rehabilitado por `data-acc-id` porque es hermano del panel, no hijo).
+  - `60c5361` CSS `.pat-act-wd` (dorado, gris si disabled) + `.pat-wd-stage` + regla `:has()` coexistencia.
+- **Deploy a KVM4** (scp 3 archivos + restart `betmexico-web`): md5 local == md5 prod (`botmexico.net`) verificado para los 3. Health 200, 937 cuentas. Clases nuevas servidas (7 grep matches), función vieja eliminada (0).
+- **Orquestación SDD:** subagent-driven-development, 1 implementer + 1 reviewer por task, ledger en `.superpowers/sdd/2026-07-25-boton-retiro-dedicado/progress.md`.
 
-## 🔧 Decisiones tomadas (sesión anterior, 2026-07-24 sesión 1 — vigentes)
-- Schema fix: Opción A (columnas reales en `conftest.py`), no el parche de `_acc_id()` — arregla el bug de fondo para cualquier test futuro que use `/api/accounts`.
-- SSE multi-operador: reusar `window.Pantalla.open(id)` (ya idempotente en re-apertura) en vez de exponer un método `refresh()` nuevo — mismo resultado, menos superficie.
-- Polling: 1 solo `setInterval` por cuenta (`_wdPolls`), nunca <60s, se detiene en terminal o al cerrar La Pantalla — guardarrail explícito del plan, no negociable.
-- No se forzó un push a `main` ni PR — la rama sigue en `feat/boton-retiro-automatico`, decisión de merge queda para cuando Task I cierre el ciclo completo.
+## 🔧 Decisiones tomadas (sesión 2026-07-25)
+- **Panel en col 3, NO popup flotante:** Robert vio el espacio derecho (col 3, donde van las animaciones de depósito) desperdiciado en reposo. Rediseñé: el panel de retiro vive ahí, visible en reposo para SA. Invita a transaccionar (frictionless).
+- **Coexistencia `#wdStage`↔`#depStage` vía CSS `:has()`:** `.pat-col-stage:has(#depStage:not([hidden])) .pat-wd-stage { display:none }`. `depos.js` intacto — depósito tiene prioridad visual. Una cuenta no se deposita y retira a la vez (lock 2h lo impide).
+- **Botón dispara directo (sin popup):** `d-withdraw-fire` en el botón de `.pat-actions`, monto del input de col 3. 1 click = retiro.
+- **`_withdrawBtnState` desacoplado:** vive en `pantalla_logic.js` (exportable, testeable en Node), recibe `d._wd_pending` precalculado por el render (porque `_wdStatusFromRow`/`WD_TERMINAL` viven en la IIFE de `pantalla.js`, no exportables).
+- **Merge a main** (feedback_merge_en_checkpoints): el feature está estable (4/5 tasks review clean, smoke HTTP verde, deploy servido). Task 5 (validación visual de Robert) no bloquea el merge — el código ya vive en prod desde la rama.
+- **`botmexico.com.mx` NO es el dominio del dashboard** (memoria `project_dominio_botmexico_net_alias`): apunta a placeholder de Webador. Smoke HTTP va por `botmexico.net`.
+
+## 🔍 Evidencia clave del deploy (para no re-investigar)
+- **md5 servido == repo (vía `botmexico.net`):** `pantalla.js` `30a38aa2...`, `pantalla.css` `7e80158b...`, `pantalla_logic.js` `66febf32...`.
+- **Clases nuevas en JS servido:** 7 grep matches de `pat-act-wd|renderPantallaWithdrawStage|data-wd-stage`. Función vieja `renderPantallaWithdraw`: 0.
+- **Ledger SDD:** `.superpowers/sdd/2026-07-25-boton-retiro-dedicado/progress.md` (5 tasks, 4 complete + 1 pendiente).
+
+### Validación visual (correr en consola del navegador, memoria `feedback_ui_ancla_medida_no_pixel_inventado`)
+```js
+const s=document.querySelector('[data-wd-stage]');const r=s.getBoundingClientRect();
+const sh=document.querySelector('.pantalla-sheet').getBoundingClientRect();
+console.log({bottom:r.bottom,sheetBottom:sh.bottom,overflow:r.bottom-sh.bottom});
+```
+`overflow` debe ser ≤ 0 (panel no rebasa la sheet hacia abajo).
 
 ## 🖥️ Estado del sistema al cerrar
-- **KVM4:** web ✓ (up ~1h, health 200, 937 cuentas) · bot ✓ (recreado con token nuevo, polling activo, "Up 10 minutes" al cierre) · pool 1001 proxies (1000 dataimpulse + 1 nodemaven) · 0 errores nuevos.
-- **Repo:** rama `feat/boton-retiro-automatico`, sin commits nuevos esta sesión (nada de código tocado). Congelados sin commitear (intencional, arrastrado): `account_refresh.py`, `prewarm.py`, `deposits.py`. Ajenos, no tocar: `.agents/`, `AGENTS.md`.
+- **KVM4:** web ✓ Up · health 200 · 937 cuentas · bot ✓ Up (esperado). Contenedor `betmexico-web` reiniciado limpio tras deploy.
+- **Repo:** rama `feat/boton-retiro-automatico` mergeada a `main` (fast-forward `ba540e9`..`60c5361`). Deploy servido desde la rama antes del merge — md5 verificado.
+- **Deploy:** 3 archivos (`pantalla.js`, `pantalla.css`, `pantalla_logic.js`) en KVM4 `/docker/betmexico/code/web/static/`, md5 verificado vía `botmexico.net`.
+- **SDD workspace:** `.superpowers/sdd/2026-07-25-boton-retiro-dedicado/` (ledger + briefs + reports + review packages). Se borra cuando el feature cierre limpio.
