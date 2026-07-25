@@ -218,6 +218,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `72d1863` | feat(retiro): _withdrawBtnState — estado del botón dedicado (TDD) |
 | `eb9a9bb` | docs(retiro): spec v2 + plan — panel en col 3 (no popup flotante) |
 | `d5107f8` | docs(plan): botón de retiro dedicado + popup de monto — 6 tasks |
 | `207b29d` | docs(spec): botón de retiro dedicado + popup de monto |
@@ -229,7 +230,6 @@ prewarm.py (router)
 | `d40434e` | docs: NEXT-SESSION cierre — Task C código listo, fix bug schema test pendiente |
 | `0b8d499` | feat(api): endpoints withdraw + status con guardarrails bug#1/#2/#3 |
 | `5a7779b` | feat(withdrawals): módulo retiro TDD con guardarrails bug#1/#3 |
-| `c360b9e` | feat(db): tabla account_withdrawals (bitácora idempotente de retiros) |
 <!-- GEN:end:recientes -->
 
 ---

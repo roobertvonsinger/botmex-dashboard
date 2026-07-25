@@ -329,14 +329,17 @@
           <div class="pat-ident-div" style="--i:3"></div>
           ${renderPantallaSaved(d)}
           ${renderPantallaClabes(d)}
-          ${renderPantallaWithdraw(d)}
         </div>
         ${renderPantallaTxns(d)}
-        <div class="pat-col-stage" id="patStageSlot"></div>
+        <div class="pat-col-stage">
+          ${renderPantallaWithdrawStage(d)}
+          <div id="patStageSlot"></div>
+        </div>
       </div>
       <div class="pat-actions">
         <button type="button" class="pat-act det-mark" data-mark-email="${g(email)}" title="Fijar"><i class="ph-bold ph-push-pin"></i></button>
         <button type="button" class="pat-act pat-act-dep d-deposit-btn" data-acc-id="${d.id}" title="Depositar"><i class="ph-duotone ph-credit-card"></i><span>Depositar</span></button>
+        ${renderPantallaWithdrawButton(d)}
       </div>`;
       // Candadito "En uso" (lock manual) ELIMINADO de La Pantalla (Robert 2026-07-17):
       // era un 2º control de lock, redundante con el auto-lock que ya se pone al
@@ -507,22 +510,42 @@
     return `<div class="pat-wd-row"><span class="pat-wd-amt">${money(st.amount)}</span>${line}</div>${alertHtml}`;
   }
 
-  function renderPantallaWithdraw(d) {
-    const u = (window.state && state.user) || {};
-    if (u.role !== 'superadmin') return ''; // invisible para no-SA, no un candado
+  // Botón de retiro dedicado en .pat-actions (derecha de Depositar). Dispara directo
+  // con el monto del input de col 3 — no abre popup. Gris/disabled si saldo < $100.
+  function renderPantallaWithdrawButton(d) {
+    const L = window.PantallaLogic || {};
+    const st_ = L._withdrawBtnState ? L._withdrawBtnState(d, ((window.state || {}).user || {}).role)
+      : { render: false, disabled: true, tooltip: '' };
+    // el render de pantalla.js calcula _wd_pending aquí mismo (desacopla de la lógica pura):
+    const st = _wdStatusFromRow(d && d.last_withdrawal);
+    d && (d._wd_pending = !!(st && !WD_TERMINAL.has(st.status)));
+    const s2 = L._withdrawBtnState ? L._withdrawBtnState(d, ((window.state || {}).user || {}).role) : st_;
+    if (!s2.render) return '';
     const g = window.esc || (s => s);
-    const st = _wdStatusFromRow(d.last_withdrawal);
-    const pending = !!st && !WD_TERMINAL.has(st.status);
-    return `<div class="pat-wd${pending ? ' pending' : ''}" data-acc="${d.id}">
-      <span class="pat-sv-h"><span class="pat-sv-emo">🏧</span> Retiro (SA)</span>
-      <div class="pat-form">
-        <input class="pat-input pat-wd-amount" type="number" min="100" step="0.01" placeholder="monto (min $100)"${pending ? ' disabled' : ''}>
-        <div class="pat-form-row">
-          <button type="button" class="pat-btn pat-btn-save d-withdraw-fire"${pending ? ' disabled' : ''}>Disparar retiro</button>
-        </div>
-      </div>
-      <div class="pat-wd-status">${st ? _withdrawStatusHtml(st) : ''}</div>
-    </div>`;
+    return `<button type="button" class="pat-act pat-act-wd d-withdraw-fire" data-acc-id="${g(d.id)}"${s2.disabled ? ' disabled' : ''} title="${g(s2.tooltip)}"><i class="ph-duotone ph-bank"></i><span>Retirar</span></button>`;
+  }
+
+  // Panel de monto + estado 2-fases en col 3 (.pat-col-stage). Visible en reposo para SA
+  // (llena el espacio que antes quedaba vacío). Si hay misión de depósito (#depStage visible),
+  // CSS :has() lo oculta — depos.js intacto.
+  function renderPantallaWithdrawStage(d) {
+    const L = window.PantallaLogic || {};
+    const role = ((window.state || {}).user || {}).role;
+    const st = _wdStatusFromRow(d && d.last_withdrawal);
+    d && (d._wd_pending = !!(st && !WD_TERMINAL.has(st.status)));
+    const s2 = L._withdrawBtnState ? L._withdrawBtnState(d, role) : { render: false, disabled: true, tooltip: '' };
+    if (!s2.render) return '';
+    const g = window.esc || (s => s);
+    const money = window.fmtMoney || (v => `$${(v || 0).toFixed(2)}`);
+    const statusHtml = st ? _withdrawStatusHtml(st) : '';
+    const inputDisabled = s2.disabled || (d && d._wd_pending) ? ' disabled' : '';
+    return `<div class="pat-wd-stage" data-wd-stage>
+    <span class="pat-wd-head"><span class="pat-sv-emo">🏧</span> Retirar — <span class="pat-wd-email">${g(d.email || '')}</span></span>
+    <div class="pat-wd-balance">Saldo Real: <b class="pat-wd-balance-v">${money(d.balance_real || 0)}</b></div>
+    <input class="pat-input pat-wd-amount" type="number" min="100" step="0.01" placeholder="monto (min $100)" data-wd-amount${inputDisabled}>
+    <div class="pat-form-err" data-wd-err hidden></div>
+    <div class="pat-wd-status">${statusHtml}</div>
+  </div>`;
   }
 
   function _stopWithdrawPoll(accId) {
