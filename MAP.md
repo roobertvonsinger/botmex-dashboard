@@ -218,6 +218,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `207b29d` | docs(spec): botón de retiro dedicado + popup de monto |
 | `ba540e9` | fix(saldos): RESERVADA_SA + invalidación JWT muerto server-side |
 | `74e46b5` | docs: cierre de sesión — token bot Telegram rotado en KVM4, .pat-wd sigue bloqueado |
 | `c578a8b` | docs: cierre de sesión — retiro automático deployado, PIN destino-retiro |
@@ -229,7 +230,6 @@ prewarm.py (router)
 | `c360b9e` | feat(db): tabla account_withdrawals (bitácora idempotente de retiros) |
 | `24e8e57` | docs(plan): plan botón retiro automático |
 | `fe21d73` | docs: NEXT-SESSION cierre — plan botón retiro listo para /Smartexe |
-| `bbb14d8` | feat(recon): spec botón retiro automático + herramientas CDP/bmx_call |
 <!-- GEN:end:recientes -->
 
 ---
