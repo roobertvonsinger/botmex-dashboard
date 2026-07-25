@@ -218,6 +218,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `8283867` | feat(retiro): botón en .pat-actions + panel #wdStage en col 3 |
 | `72d1863` | feat(retiro): _withdrawBtnState — estado del botón dedicado (TDD) |
 | `eb9a9bb` | docs(retiro): spec v2 + plan — panel en col 3 (no popup flotante) |
 | `d5107f8` | docs(plan): botón de retiro dedicado + popup de monto — 6 tasks |
@@ -229,7 +230,6 @@ prewarm.py (router)
 | `3a11788` | test: fix schema conftest.py — fullname/curp/phone faltantes en accounts |
 | `d40434e` | docs: NEXT-SESSION cierre — Task C código listo, fix bug schema test pendiente |
 | `0b8d499` | feat(api): endpoints withdraw + status con guardarrails bug#1/#2/#3 |
-| `5a7779b` | feat(withdrawals): módulo retiro TDD con guardarrails bug#1/#3 |
 <!-- GEN:end:recientes -->
 
 ---

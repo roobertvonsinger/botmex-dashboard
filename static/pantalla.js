@@ -554,7 +554,7 @@
   }
 
   async function _fetchWithdrawStatus(accId, txId) {
-    const wrap = document.querySelector(`.pat-wd[data-acc="${accId}"]`);
+    const wrap = document.querySelector('[data-wd-stage]');
     try {
       const r = await fetch(`/api/accounts/${accId}/withdraw/status/${txId}`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -565,8 +565,10 @@
         wrap.classList.toggle('alert', !!(st.alerts && (st.alerts.gatewayMismatch || st.alerts.digitsMismatch)));
         const done = WD_TERMINAL.has(st.status);
         wrap.classList.toggle('pending', !done);
-        const input = wrap.querySelector('.pat-wd-amount');
-        const btn = wrap.querySelector('.d-withdraw-fire');
+        const input = wrap.querySelector('[data-wd-amount]');
+        // El botón d-withdraw-fire vive en .pat-actions (hermano de .pat-col-stage),
+        // no dentro de [data-wd-stage]. Se resuelve por data-acc-id en todo el documento.
+        const btn = document.querySelector(`.d-withdraw-fire[data-acc-id="${accId}"]`);
         if (input) input.disabled = !done;
         if (btn) btn.disabled = !done;
         if (done) _stopWithdrawPoll(accId);
@@ -932,9 +934,9 @@
     const wdFire = e.target.closest('.d-withdraw-fire');
     if (wdFire) {
       e.preventDefault();
-      const wrap = wdFire.closest('.pat-wd');
-      const accId = wrap ? parseInt(wrap.dataset.acc) : _currentId;
-      const input = wrap && wrap.querySelector('.pat-wd-amount');
+      const wrap = document.querySelector('[data-wd-stage]');
+      const accId = parseInt(wdFire.dataset.accId) || _currentId;
+      const input = wrap && wrap.querySelector('[data-wd-amount]');
       const amount = input ? parseFloat(input.value) : NaN;
       if (!accId || wdFire.disabled) return;
       if (!amount || isNaN(amount) || amount < 100) {
