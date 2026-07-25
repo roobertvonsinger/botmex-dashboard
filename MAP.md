@@ -218,6 +218,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `50412f7` | fix(retiro): handler fire + polling operan sobre el panel [data-wd-stage] |
 | `8283867` | feat(retiro): botón en .pat-actions + panel #wdStage en col 3 |
 | `72d1863` | feat(retiro): _withdrawBtnState — estado del botón dedicado (TDD) |
 | `eb9a9bb` | docs(retiro): spec v2 + plan — panel en col 3 (no popup flotante) |
@@ -229,7 +230,6 @@ prewarm.py (router)
 | `de77328` | feat(ui): botón de retiro SA + polling 60s + SSE en vivo en La Pantalla |
 | `3a11788` | test: fix schema conftest.py — fullname/curp/phone faltantes en accounts |
 | `d40434e` | docs: NEXT-SESSION cierre — Task C código listo, fix bug schema test pendiente |
-| `0b8d499` | feat(api): endpoints withdraw + status con guardarrails bug#1/#2/#3 |
 <!-- GEN:end:recientes -->
 
 ---

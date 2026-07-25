@@ -427,6 +427,13 @@
   background: oklch(0.86 0.09 160); color: #08090c;
   box-shadow: 0 0 20px -3px var(--pat-gold), 0 1px 2px oklch(0 0 0 / 0.25);
 }
+.pat-act-wd {
+  color: #08090c; background: var(--pat-gold); border-color: transparent;
+  box-shadow: 0 0 12px -6px var(--pat-gold), 0 1px 2px oklch(0 0 0 / 0.25);
+}
+.pat-act-wd:hover:not(:disabled) { filter: brightness(1.08); }
+.pat-act-wd:disabled { opacity: .4; cursor: not-allowed; background: var(--pat-edge); color: var(--text-dim); box-shadow: none; }
+.pat-act-wd:disabled:hover { transform: none; filter: none; }
 /* Con el panel de depósitos abierto, La Pantalla oculta SU botón "Depositar" — no debe
    haber dos botones de depósito a la vez (Robert 2026-07-17). Reaparece al cerrar el
    panel (efecto "se movió del detalle al panel"). */
@@ -550,6 +557,23 @@ body.depos-open .pat-act-dep { display: none; }
   box-shadow: 0 10px 28px -12px rgba(0,0,0,.55);
 }
 .pat-curp-pop[hidden] { display: none; }
+/* Panel de retiro en col 3 — llena el espacio vacío en reposo (SA). Glassmorphism
+   lo envuelve .pantalla-sheet; aquí solo estructura + tipografía. */
+.pat-wd-stage {
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 14px 4px 4px 0;
+  color: var(--text);
+}
+/* Coexistencia: si hay misión de depósito activa (#depStage visible en #patStageSlot),
+   oculta el panel de retiro. depos.js intacto — la prioridad visual la resuelve el CSS. */
+.pat-col-stage:has(#depStage:not([hidden])) .pat-wd-stage { display: none; }
+.pat-wd-head { font-size: 12px; font-weight: 600; display: flex; gap: 5px; align-items: center; }
+.pat-wd-email { color: var(--text-dim); font-weight: 400; }
+.pat-wd-balance { font-size: 10.5px; color: var(--text-dim); }
+.pat-wd-balance-v, .pat-wd-balance b { color: var(--pat-gold); font-family: var(--font-mono); }
+.pat-wd-stage .pat-input { width: 100%; }
+.pat-wd-status { margin-top: 4px; }
+.pat-wd-status:empty { display: none; }
 .pat-curp-pop .pat-input {
   width: 19ch; text-align: center; letter-spacing: 1px;
   background: oklch(0.20 0.02 160 / 0.22); border-color: var(--hairline);
