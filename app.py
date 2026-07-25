@@ -3,7 +3,7 @@
 # Lee betmexico_accounts.db (la misma que el bot TG). Sin lógica de polling.
 
 from __future__ import annotations
-import sqlite3, os, re, sys, time
+import sqlite3, os, re, sys, time, traceback
 import asyncio
 import json as _json
 import logging as _logging
@@ -130,21 +130,64 @@ if _env_file.exists():
 DB_PATH = Path(os.environ.get("BETMEX_DB", str(ROOT.parent / "betmexico_accounts.db")))
 
 
+# Instrumentación temporal (Robert, campo 2026-07-25: 2 retiros reales chocaron con
+# "database is locked" sostenido en <20min, "no debe pasar" — necesitamos la causa
+# raíz, no otro parche). Registro de writes activos + stack de apertura: si un write
+# tarda de más o choca con lock, logueamos QUIÉN más estaba escribiendo al mismo
+# tiempo y desde dónde. Costo ínfimo (dict + lock), quitar cuando se identifique
+# y arregle el culpable real.
+_db_write_registry: dict = {}
+_db_write_registry_lock = threading.Lock()
+_db_write_counter = 0
+
+
 @contextmanager
 def db(write: bool = False):
+    global _db_write_counter
     conn = sqlite3.connect(str(DB_PATH), timeout=10)
     conn.row_factory = sqlite3.Row
+    entry_id = None
+    stack = None
+    t0 = time.time()
     if write:
+        with _db_write_registry_lock:
+            _db_write_counter += 1
+            entry_id = _db_write_counter
+            stack = "".join(traceback.format_stack()[:-1])
+            _db_write_registry[entry_id] = (t0, stack)
         conn.execute("PRAGMA journal_mode=WAL")
     try:
         yield conn
         if write:
             conn.commit()
-    except Exception:
+    except Exception as e:
         if write:
             conn.rollback()
+            if isinstance(e, sqlite3.OperationalError) and "locked" in str(e):
+                with _db_write_registry_lock:
+                    others = {k: v for k, v in _db_write_registry.items() if k != entry_id}
+                _dblg = _logging.getLogger("betmexico.dashboard.db")
+                if others:
+                    held = "\n---\n".join(
+                        f"[write#{k} abierto hace {time.time() - t:.1f}s, origen:]\n{s}"
+                        for k, (t, s) in others.items()
+                    )
+                    _dblg.error(f"[db] LOCK — {len(others)} write(s) activos simultáneos AHORA:\n{held}")
+                else:
+                    _dblg.error(
+                        f"[db] LOCK sin otro write registrado en este proceso — el lock viene de "
+                        f"fuera del registro (conexión huérfana o proceso externo). Origen de este write:\n{stack}"
+                    )
         raise
     finally:
+        dt = time.time() - t0
+        if write:
+            with _db_write_registry_lock:
+                _db_write_registry.pop(entry_id, None)
+            if dt > 2.0:
+                _logging.getLogger("betmexico.dashboard.db").warning(
+                    f"[db] write#{entry_id} tardó {dt:.1f}s sosteniendo el writer global de SQLite — origen:\n{stack}"
+                )
         conn.close()
 
 

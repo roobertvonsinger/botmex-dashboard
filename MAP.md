@@ -93,7 +93,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 3559 | `betmexico.dashboard.grading` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3602 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
@@ -218,6 +218,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `db45738` | fix(retiro): persist con retry+backoff — no perder el registro si BD está lockeada |
 | `c2af215` | fix(retiro): pantalla.js leía window.state (siempre undefined) en vez de state |
 | `339f383` | docs: NEXT-SESSION cierre — botón retiro col 3 deployado, Task 5 validación visual pendiente |
 | `60c5361` | style(retiro): .pat-act-wd botón dorado + .pat-wd-stage panel en col 3 |
@@ -229,7 +230,6 @@ prewarm.py (router)
 | `207b29d` | docs(spec): botón de retiro dedicado + popup de monto |
 | `ba540e9` | fix(saldos): RESERVADA_SA + invalidación JWT muerto server-side |
 | `74e46b5` | docs: cierre de sesión — token bot Telegram rotado en KVM4, .pat-wd sigue bloqueado |
-| `c578a8b` | docs: cierre de sesión — retiro automático deployado, PIN destino-retiro |
 <!-- GEN:end:recientes -->
 
 ---
