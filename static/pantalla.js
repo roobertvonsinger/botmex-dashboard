@@ -358,7 +358,12 @@
   const CARD_CAP = 2, NOTE_CAP = 2;
 
   function _isNoteOwner(n) {
-    const u = (window.state && state.user) || null;
+    // `state` es un const top-level de app.js (script clásico, NO módulo): vive en el
+    // scope léxico compartido entre <script> del documento, pero NUNCA cuelga de
+    // `window` (eso es solo para top-level `var`). `window.state` es SIEMPRE undefined
+    // — el guard con window.state hacía que esto (y _withdrawBtnState más abajo)
+    // fallara para TODOS los roles, incluido superadmin. Bug de campo 2026-07-25.
+    const u = state.user || null;
     if (!u) return false;
     if (u.role === 'superadmin') return true;
     return !!(n.created_by && Number(n.created_by) === Number(u.telegram_id));
@@ -514,12 +519,12 @@
   // con el monto del input de col 3 — no abre popup. Gris/disabled si saldo < $100.
   function renderPantallaWithdrawButton(d) {
     const L = window.PantallaLogic || {};
-    const st_ = L._withdrawBtnState ? L._withdrawBtnState(d, ((window.state || {}).user || {}).role)
+    const st_ = L._withdrawBtnState ? L._withdrawBtnState(d, (state.user || {}).role)
       : { render: false, disabled: true, tooltip: '' };
     // el render de pantalla.js calcula _wd_pending aquí mismo (desacopla de la lógica pura):
     const st = _wdStatusFromRow(d && d.last_withdrawal);
     d && (d._wd_pending = !!(st && !WD_TERMINAL.has(st.status)));
-    const s2 = L._withdrawBtnState ? L._withdrawBtnState(d, ((window.state || {}).user || {}).role) : st_;
+    const s2 = L._withdrawBtnState ? L._withdrawBtnState(d, (state.user || {}).role) : st_;
     if (!s2.render) return '';
     const g = window.esc || (s => s);
     return `<button type="button" class="pat-act pat-act-wd d-withdraw-fire" data-acc-id="${g(d.id)}"${s2.disabled ? ' disabled' : ''} title="${g(s2.tooltip)}"><i class="ph-duotone ph-bank"></i><span>Retirar</span></button>`;
@@ -530,7 +535,7 @@
   // CSS :has() lo oculta — depos.js intacto.
   function renderPantallaWithdrawStage(d) {
     const L = window.PantallaLogic || {};
-    const role = ((window.state || {}).user || {}).role;
+    const role = (state.user || {}).role;
     const st = _wdStatusFromRow(d && d.last_withdrawal);
     d && (d._wd_pending = !!(st && !WD_TERMINAL.has(st.status)));
     const s2 = L._withdrawBtnState ? L._withdrawBtnState(d, role) : { render: false, disabled: true, tooltip: '' };
@@ -864,7 +869,7 @@
         if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
         const cache = _cacheGet(accId);
         if (cache) {
-          const u = (window.state && state.user) || {};
+          const u = state.user || {};
           const note = { id: data.id, note_text: text, created_by: u.telegram_id, created_by_name: u.display || u.username || '?', created_at: data.created_at };
           cache.notes = [note, ...(Array.isArray(cache.notes) ? cache.notes : [])];
           _renderDetailView(cache, false);

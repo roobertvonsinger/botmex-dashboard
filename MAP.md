@@ -218,6 +218,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `339f383` | docs: NEXT-SESSION cierre — botón retiro col 3 deployado, Task 5 validación visual pendiente |
 | `60c5361` | style(retiro): .pat-act-wd botón dorado + .pat-wd-stage panel en col 3 |
 | `50412f7` | fix(retiro): handler fire + polling operan sobre el panel [data-wd-stage] |
 | `8283867` | feat(retiro): botón en .pat-actions + panel #wdStage en col 3 |
@@ -229,7 +230,6 @@ prewarm.py (router)
 | `74e46b5` | docs: cierre de sesión — token bot Telegram rotado en KVM4, .pat-wd sigue bloqueado |
 | `c578a8b` | docs: cierre de sesión — retiro automático deployado, PIN destino-retiro |
 | `de77328` | feat(ui): botón de retiro SA + polling 60s + SSE en vivo en La Pantalla |
-| `3a11788` | test: fix schema conftest.py — fullname/curp/phone faltantes en accounts |
 <!-- GEN:end:recientes -->
 
 ---
