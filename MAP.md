@@ -218,6 +218,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d5107f8` | docs(plan): botón de retiro dedicado + popup de monto — 6 tasks |
 | `207b29d` | docs(spec): botón de retiro dedicado + popup de monto |
 | `ba540e9` | fix(saldos): RESERVADA_SA + invalidación JWT muerto server-side |
 | `74e46b5` | docs: cierre de sesión — token bot Telegram rotado en KVM4, .pat-wd sigue bloqueado |
@@ -229,7 +230,6 @@ prewarm.py (router)
 | `5a7779b` | feat(withdrawals): módulo retiro TDD con guardarrails bug#1/#3 |
 | `c360b9e` | feat(db): tabla account_withdrawals (bitácora idempotente de retiros) |
 | `24e8e57` | docs(plan): plan botón retiro automático |
-| `fe21d73` | docs: NEXT-SESSION cierre — plan botón retiro listo para /Smartexe |
 <!-- GEN:end:recientes -->
 
 ---

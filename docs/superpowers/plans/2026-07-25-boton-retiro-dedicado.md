@@ -1,51 +1,56 @@
-# Botón de Retiro Dedicado + Popup de Monto — Implementation Plan
+# Botón de Retiro Dedicado + Panel de Monto en Col 3 — Implementation Plan
 
 > **Para ejecutar con `/Smartexe`** sobre este plan. Pasos con checkbox `- [ ]`.
 > Spec de origen: `docs/superpowers/specs/2026-07-25-boton-retiro-dedicado-design.md` (leer COMPLETO — es el contrato).
+> **Revisión v2 (2026-07-25):** el panel de monto NO es popup flotante — vive en col 3 (`.pat-col-stage#patStageSlot`), que en reposo está vacía. Llena el espacio desperdiciado.
 
-**Goal:** Migrar el botón de retiro de su ubicación escondida (bloque anidado en `.pat-col-ident`) a un botón dedicado visible en `.pat-actions` (derecha de Depositar), gris/disabled si saldo < $100, que al click abre un popup pidiendo monto → dispara retiro → feedback en vivo.
+**Goal:** Migrar el botón de retiro de su ubicación escondida (bloque anidado en `.pat-col-ident`) a un botón dedicado visible en `.pat-actions` (derecha de Depositar), gris/disabled si saldo < $100, que al click dispara el retiro con el monto del input que vive en la col 3 (zona de feedback en vivo, antes vacía en reposo).
 
-**Architecture:** Frontend puro. Botón nuevo en la barra de acciones + popup inline (patrón `hidden` toggle, igual que el popup de CURP existente) con input de monto + estado 2-fases. La lógica de polling/status/alerts de retiro se conserva intacta — solo cambian los selectores del `wrap` (de `.pat-wd` al popup). Backend sin cambios (endpoints `/withdraw` + `/withdraw/status` ya existen con guardarrails bug#1/#2/#3).
+**Architecture:** Frontend puro. Botón nuevo en la barra de acciones dispara directo (sin popup). El panel de monto + estado 2-fases vive en col 3 como `#wdStage`, coexistiendo con `#depStage` (animación de depósito) vía CSS `:has()` puro — depósito tiene prioridad visual. La lógica de polling/status/alerts de retiro se conserva intacta — solo cambian los selectores del `wrap` (de `.pat-wd` a `[data-wd-stage]`). Backend sin cambios.
 
-**Tech Stack:** JS vanilla (sin framework), CSS con variables `oklch`, pytest para tests de lógica pura en `pantalla_logic.test.js` (Node `assert`/`require`), deploy Docker a KVM4.
+**Tech Stack:** JS vanilla (IIFE en `pantalla.js`, sin `module.exports` — los tests de lógica pura viven en `pantalla_logic.test.js` que requiere `pantalla_logic.js` separado), CSS con variables `oklch`, deploy Docker a KVM4.
 
-## Global Constraints (verbatim del spec + verificación)
+## Global Constraints (verbatim del spec + verificación de anclajes)
 
-- **SA-only:** el botón no se renderiza para `role !== 'superadmin'` (memoria `feedback_deshabilitar_invisible_no_redirect`).
+- **SA-only:** el botón y el panel no se renderizan para `role !== 'superadmin'` (memoria `feedback_deshabilitar_invisible_no_redirect`).
 - **Gris/disabled si `balance_real < 100`** (tooltip "Saldo < $100").
-- **Patrón popup:** `<div class="pat-form pat-wd-pop" hidden>` con toggle de atributo `hidden` — **NO `<dialog>` nativo** (corrección del spec tras verificar anclajes: el popup de CURP L311-319 usa `hidden` toggle, no `showModal`; se reusa el patrón existente, `feedback_no_falsos_tradeoffs`).
-- **Sin variable `--pat-bg-glass`:** no existe. Glassmorphism inline con `backdrop-filter: blur(16px)` (igual que `.pat-curp-pop` L549) + background multicapa `oklch` copiado de `.pantalla-sheet` L205-209.
+- **Panel en col 3, NO popup flotante:** `#wdStage` vive dentro de `.pat-col-stage` (junto a `#patStageSlot`), visible en reposo para SA. Llena el espacio que antes quedaba vacío.
+- **Coexistencia `#wdStage` ↔ `#depStage` vía CSS `:has()`:** `#patStageSlot:has(#depStage:not([hidden]))` oculta `#wdStage`. **`depos.js` intacto** (no se toca).
+- **Sin variable `--pat-bg-glass`:** no existe. El panel hereda el slot (flex child), glassmorphism de `.pantalla-sheet` ya envuelve todo.
 - **Variables CSS disponibles:** `--pat-gold` (L30), `--pat-edge` (L32), `--pat-edge-h` (L33), `--text`, `--text-dim`, `--font-mono`.
-- **Reusa data-class `d-withdraw-fire`** en el botón del popup (el handler existe en L909, solo cambia el `wrap`).
-- **Polling 60s fijo** (`WD_POLL_MS`, L562) — nunca menos, no alimentar rate-limit (guardarrail concurrencia).
-- **Backend NO se toca.** Bot Telegram (monorepo) NO se toca (`feedback_no_monorepo`).
+- **`money()`** (`pantalla.js:257,489,649`): `window.fmtMoney || (v => \`$${(v||0).toFixed(2)}\`)`. Disponible en scope de `renderPantallaHead`.
+- **Reusa data-class `d-withdraw-fire`** en el botón de `.pat-actions` (el handler existe en L909, solo cambia el `wrap`).
+- **Polling 60s fijo** (`WD_POLL_MS`, L562) — nunca menos, no alimentar rate-limit.
+- **Backend NO se toca.** `depos.js` NO se toca. Bot Telegram (monorepo) NO se toca (`feedback_no_monorepo`).
 - **Monto mínimo $100** (validación frontend, ya en handler L917).
 - **2-fases, no "entregado"** con `status:6` (guardarrail bug#2, ya en `_withdrawStatusHtml` L493).
+- **Tests de lógica pura:** `pantalla_logic.test.js` requiere `pantalla_logic.js` (archivo SEPARADO de `pantalla.js`, que es una IIFE sin exports). La función `_withdrawBtnState` se añade a `pantalla_logic.js` y se exporta, Y se referencia desde `pantalla.js` vía `window.PantallaLogic` (patrón existente, ver cabecera de `pantalla.js`: "Reusa SIEMPRE... `window.PantallaLogic`").
 
 ## File Structure
 
 | Archivo | Responsabilidad | Cambio |
 |---|---|---|
-| `static/pantalla.js` | Render de La Pantalla + handlers | + función botón, + popup inline, + handler abrir, adaptar `d-withdraw-fire`/`_fetchWithdrawStatus`. Eliminar `renderPantallaWithdraw`. |
-| `static/pantalla.css` | Estilos de La Pantalla | + `.pat-act-wd`, `.pat-wd-pop`, `.pat-wd-head/balance`. Reusa `.pat-wd-row/amt/line/alert` existentes. |
-| `static/pantalla_logic.test.js` | Tests de lógica pura (Node assert) | + tests de `_withdrawBtnState(d, role)`. |
+| `static/pantalla_logic.js` | Lógica pura testeable (Node `require`) | + `_withdrawBtnState(d, role)` + export. |
+| `static/pantalla_logic.test.js` | Tests de lógica pura (Node `assert`) | + tests de `_withdrawBtnState`. |
+| `static/pantalla.js` | Render de La Pantalla + handlers (IIFE) | + `renderPantallaWithdrawButton()` + `renderPantallaWithdrawStage()` + `#wdStage` en col 3 + adaptar `d-withdraw-fire`/`_fetchWithdrawStatus`. Eliminar `renderPantallaWithdraw`. Referencia `_withdrawBtnState` vía `window.PantallaLogic`. |
+| `static/pantalla.css` | Estilos de La Pantalla | + `.pat-act-wd`, `.pat-wd-stage`, `.pat-wd-head/balance`, regla `:has()`. Reusa `.pat-wd-row/amt/line/alert` existentes. |
 
 ---
 
 ## ORQUESTACIÓN (ley `feedback_planes_orquestacion`)
 
 ### Modelos por subagente
-- **Sonnet 5** (`claude-sonnet-5`) — Tasks 1-5: implementación JS+CSS (patrones ya establecidos, lógica clara). Default.
-- **Haiku 4.5** (`claude-haiku-4-5-20251001`) — Task 6: deploy + smoke HTTP (md5) + smoke funcional + medición `getBoundingClientRect`. Mecánico. `[modelo: Haiku]`.
+- **Sonnet 5** (`claude-sonnet-5`) — Tasks 1-4: implementación JS+CSS (patrones ya establecidos, lógica clara). Default.
+- **Haiku 4.5** (`claude-haiku-4-5-20251001`) — Task 5: deploy + smoke HTTP (md5) + smoke funcional + medición `getBoundingClientRect`. Mecánico. `[modelo: Haiku]`.
 - **Opus** — NO requerido (no hay decisiones arquitectónicas difíciles; el diseño ya está cerrado en el spec).
 
 ### Goals medibles
-- Task 1: `_withdrawBtnState` cubre 4 estados (render/no-render, disabled/activo, 3 tooltips) → tests GREEN.
-- Task 6: botón "Retirar" visible en `.pat-actions` (screenshot), gris si < $100, `getBoundingClientRect` del popup sin overflow, retiro de $1 end-to-end con 3 guardarrails verificados.
+- Task 1: `_withdrawBtnState` cubre 4 estados (render/no-render, disabled/activo, 3 tooltips) → tests GREEN (5+ tests nuevos).
+- Task 5: botón "Retirar" visible en `.pat-actions` (screenshot), gris si < $100, `getBoundingClientRect` del panel en col 3 sin overflow vertical, retiro de $1 end-to-end con 3 guardarrails verificados.
 
 ### Loops con condición de salida
-- **TDD RED→GREEN** (Task 1): test falla (función no existe) → implemento → test pasa. Salida: `pytest pantalla_logic.test.js` verde.
-- **Deploy→verify→measure** (Task 6): md5 servido == repo (salida: coinciden) → `getBoundingClientRect` popup sin overflow vertical (salida: `bottom ≤ sheet.bottom`).
+- **TDD RED→GREEN** (Task 1): test falla (función no existe) → implemento → test pasa. Salida: `node static/pantalla_logic.test.js` verde (imprime "OK pantalla_logic").
+- **Deploy→verify→measure** (Task 5): md5 servido == repo (salida: coinciden) → `getBoundingClientRect` panel sin overflow vertical (salida: `bottom ≤ sheet.bottom`).
 
 ### Vigilancia anti-cuelgue
 - **TDD:** al 2º fallo de un test → `superpowers:systematic-debugging` (root cause, no re-parchar).
@@ -57,10 +62,10 @@
 
 ## Task 1: TDD — función pura `_withdrawBtnState(d, role)` [modelo: Sonnet]
 
-**Lógica testeable:** decide si el botón se renderiza, si está disabled, y qué tooltip mostrar. Extraída del render para testear sin DOM.
+**Lógica testeable:** decide si el botón/panel se renderiza, si está disabled, y qué tooltip mostrar. Extraída del render para testear sin DOM.
 
 **Files:**
-- Modify: `static/pantalla.js` (añadir función cerca de `WD_TERMINAL`, L465)
+- Modify: `static/pantalla_logic.js` (añadir función + export)
 - Test: `static/pantalla_logic.test.js`
 
 **Interfaces:**
@@ -73,119 +78,144 @@
     - `balance_real < 100` → `{ render: true, disabled: true, tooltip: 'Saldo < $100' }`
     - retiro pendiente (last_withdrawal no terminal) → `{ render: true, disabled: false, tooltip: 'Retiro en curso…' }`
     - else → `{ render: true, disabled: false, tooltip: 'Retirar' }`
+  - **NOTA sobre `_wdStatusFromRow`:** esta función vive en `pantalla.js` (IIFE, no exportable). Para testear `_withdrawBtnState` en aislamiento, la lógica de "pendiente" se replica como helper local del test (no se importa `pantalla.js`). En `pantalla_logic.js`, `_withdrawBtnState` toma `d` con un campo precomputado `d._wd_pending` (boolean) que el render de `pantalla.js` le inyecta tras llamar `_wdStatusFromRow`. Esto desacopla la lógica pura del DOM-dependent.
+
+**Interfaces (refinada):**
+- Produces: `function _withdrawBtnState(d, role)` donde `d = { balance_real, _wd_pending }` (el render de `pantalla.js` calcula `_wd_pending` vía `_wdStatusFromRow` antes de llamarla).
+  - `role !== 'superadmin'` → `{ render: false, disabled: true, tooltip: '' }`
+  - `balance_real < 100` → `{ render: true, disabled: true, tooltip: 'Saldo < $100' }`
+  - `_wd_pending === true` → `{ render: true, disabled: false, tooltip: 'Retiro en curso…' }`
+  - else → `{ render: true, disabled: false, tooltip: 'Retirar' }`
 
 - [ ] **Step 1: Escribir tests que fallan**
 
-Añadir al final de `static/pantalla_logic.test.js` (tras el último test, antes del cierre del módulo si lo hay):
+Añadir al final de `static/pantalla_logic.test.js` (tras la línea `console.log('OK pantalla_logic');` NO — antes, para que el OK final cubra todo):
 
 ```js
-const { _withdrawBtnState, WD_TERMINAL } = require('./pantalla.js');
+// ── _withdrawBtnState: estado del botón/panel de retiro dedicado (lógica pura) ──
+const { _withdrawBtnState } = P;
+const _acc = (balance, pending) => ({ balance_real: balance, _wd_pending: !!pending });
 
-function _wdRow(status) {
-  return status == null ? null : { status_api: status, gateway: null, last_modified_utc: null };
-}
+assert.strictEqual(_withdrawBtnState(_acc(500, false), 'user').render, false, 'no-SA no renderiza');
+assert.strictEqual(_withdrawBtnState(_acc(500, false), 'user').disabled, true);
 
-// Helper: cuenta con saldo y last_withdrawal opcional
-function _acc(balance, lastWd) {
-  return { balance_real: balance, last_withdrawal: lastWd };
-}
+assert.strictEqual(_withdrawBtnState(_acc(500, false), 'superadmin').render, true, 'SA saldo ok renderiza');
+assert.strictEqual(_withdrawBtnState(_acc(500, false), 'superadmin').disabled, false);
+assert.strictEqual(_withdrawBtnState(_acc(500, false), 'superadmin').tooltip, 'Retirar');
 
-test('no-SA: no renderiza botón', () => {
-  const s = _withdrawBtnState(_acc(500, null), 'user');
-  assert.strictEqual(s.render, false);
-  assert.strictEqual(s.disabled, true);
-});
+assert.strictEqual(_withdrawBtnState(_acc(99.99, false), 'superadmin').disabled, true, 'saldo<100 disabled');
+assert.strictEqual(_withdrawBtnState(_acc(99.99, false), 'superadmin').tooltip, 'Saldo < $100');
+assert.strictEqual(_withdrawBtnState(_acc(0, false), 'superadmin').tooltip, 'Saldo < $100');
 
-test('SA saldo >= 100 sin retiro: botón activo, tooltip Retirar', () => {
-  const s = _withdrawBtnState(_acc(500, null), 'superadmin');
-  assert.strictEqual(s.render, true);
-  assert.strictEqual(s.disabled, false);
-  assert.strictEqual(s.tooltip, 'Retirar');
-});
+assert.strictEqual(_withdrawBtnState(_acc(500, true), 'superadmin').disabled, false, 'pendiente no disabled (botón activo)');
+assert.strictEqual(_withdrawBtnState(_acc(500, true), 'superadmin').tooltip, 'Retiro en curso…');
 
-test('SA saldo < 100: botón gris/disabled, tooltip Saldo < $100', () => {
-  assert.strictEqual(_withdrawBtnState(_acc(99.99, null), 'superadmin').disabled, true);
-  assert.strictEqual(_withdrawBtnState(_acc(99.99, null), 'superadmin').tooltip, 'Saldo < $100');
-  assert.strictEqual(_withdrawBtnState(_acc(0, null), 'superadmin').tooltip, 'Saldo < $100');
-});
-
-test('SA saldo >= 100 con retiro pendiente: tooltip Retiro en curso', () => {
-  const s = _withdrawBtnState(_acc(500, _wdRow('pending')), 'superadmin');
-  assert.strictEqual(s.disabled, false);
-  assert.strictEqual(s.tooltip, 'Retiro en curso…');
-});
-
-test('SA saldo >= 100 con retiro terminal: tooltip Retirar (no en curso)', () => {
-  const s = _withdrawBtnState(_acc(500, _wdRow('successful')), 'superadmin');
-  assert.strictEqual(s.tooltip, 'Retirar');
-});
+assert.strictEqual(_withdrawBtnState(_acc(500, false), 'superadmin').tooltip, 'Retirar', 'sin pendiente = Retirar');
 ```
 
 - [ ] **Step 2: Correr tests para verificar que fallan**
 
-Run: `node --test static/pantalla_logic.test.js` (o `pytest` si el repo lo orquesta; verificar cómo corren los tests `.test.js` existentes con `grep -rn "pantalla_logic" package.json conftest.py` primero).
-Expected: FAIL — `_withdrawBtnState is not a function` (la función no existe aún).
+Run: `node static/pantalla_logic.test.js`
+Expected: FAIL — `_withdrawBtnState is not a function` o `Cannot destructure property '_withdrawBtnState' of 'P'` (la función no está exportada aún).
 
-- [ ] **Step 3: Implementar `_withdrawBtnState` en `static/pantalla.js`**
+- [ ] **Step 3: Implementar `_withdrawBtnState` en `static/pantalla_logic.js`**
 
-Insertar tras `WD_TERMINAL` (L465), antes de `_wdStatusFromRow` (L471):
+Añadir al final de `pantalla_logic.js` (antes del `module.exports` final, o añadiéndola al objeto exportado):
 
 ```js
-// Estado del botón de retiro dedicado (lógica pura testeable, sin DOM).
-// Devuelve {render, disabled, tooltip} para que renderPantallaWithdrawButton
-// solo arme el HTML; la decisión vive acá testeable.
+// ── _withdrawBtnState: estado del botón/panel de retiro dedicado (lógica pura) ──
+// d.balance_real = saldo Real; d._wd_pending = true si hay retiro no-terminal (lo calcula
+// el render de pantalla.js vía _wdStatusFromRow antes de llamar esta función — desacopla
+// la lógica pura del DOM-dependent).
 function _withdrawBtnState(d, role) {
   if (role !== 'superadmin') return { render: false, disabled: true, tooltip: '' };
-  const balance = parseFloat(d && d.balance_real || 0) || 0;
+  const balance = parseFloat((d && d.balance_real) || 0) || 0;
   if (balance < 100) return { render: true, disabled: true, tooltip: 'Saldo < $100' };
-  const st = _wdStatusFromRow(d && d.last_withdrawal);
-  const pending = !!st && !WD_TERMINAL.has(st.status);
-  return { render: true, disabled: false, tooltip: pending ? 'Retiro en curso…' : 'Retirar' };
+  if (d && d._wd_pending) return { render: true, disabled: false, tooltip: 'Retiro en curso…' };
+  return { render: true, disabled: false, tooltip: 'Retirar' };
 }
 ```
 
+Y añadir `_withdrawBtnState` al `module.exports` de `pantalla_logic.js` (junto a `splitTransactions`, `estadoFrom`, etc.).
+
 - [ ] **Step 4: Correr tests para verificar que pasan**
 
-Run: mismo comando del Step 2.
-Expected: PASS — 5 tests nuevos verdes.
+Run: `node static/pantalla_logic.test.js`
+Expected: PASS — imprime `OK pantalla_logic` (los 8 asserts nuevos + los existentes).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add static/pantalla.js static/pantalla_logic.test.js
+git add static/pantalla_logic.js static/pantalla_logic.test.js
 git commit -m "feat(retiro): _withdrawBtnState — estado del botón dedicado (TDD)
 
 Lógica pura testeable: render/disabled/tooltip según role, saldo y
-retiro pendiente. Extraída del render para testear sin DOM."
+retiro pendiente. Extraída del render para testear sin DOM. Vive en
+pantalla_logic.js (exportable), no en pantalla.js (IIFE)."
 ```
 
 ---
 
-## Task 2: Botón dedicado en `.pat-actions` + eliminar bloque anidado [modelo: Sonnet]
+## Task 2: Botón en `.pat-actions` + panel `#wdStage` en col 3 + eliminar bloque anidado [modelo: Sonnet]
 
 **Files:**
-- Modify: `static/pantalla.js` L332 (eliminar llamada), L510-526 (eliminar función), L337-340 (agregar botón)
+- Modify: `static/pantalla.js` — L332 (eliminar llamada), L510-526 (eliminar función `renderPantallaWithdraw`), L337-340 (agregar botón), L323-336 (agregar `#wdStage` en col 3).
 
 **Interfaces:**
-- Consumes: `_withdrawBtnState(d, role)` (Task 1), `window.state.user`, `g()` (escaper), `d.id`.
-- Produces: `renderPantallaWithdrawButton(d)` — devuelve string HTML del botón.
+- Consumes: `_withdrawBtnState(d, role)` vía `window.PantallaLogic` (Task 1), `window.state.user`, `g()` (escaper), `d.id`, `d.email`, `d.balance_real`, `d.last_withdrawal`, `money()`, `_wdStatusFromRow`, `_withdrawStatusHtml`, `WD_TERMINAL`.
+- Produces: `renderPantallaWithdrawButton(d)` — string HTML del botón. `renderPantallaWithdrawStage(d)` — string HTML del panel en col 3.
 
-- [ ] **Step 1: Escribir `renderPantallaWithdrawButton(d)`**
+- [ ] **Step 1: Escribir `renderPantallaWithdrawButton(d)` en `pantalla.js`**
 
-Reemplazar la función `renderPantallaWithdraw(d)` (L510-526) completa por:
+Reemplazar la función `renderPantallaWithdraw(d)` (L510-526) completa por DOS funciones. Insertar tras `WD_TERMINAL` (L465) o junto a las funciones de retiro existentes:
 
 ```js
+// Botón de retiro dedicado en .pat-actions (derecha de Depositar). Dispara directo
+// con el monto del input de col 3 — no abre popup. Gris/disabled si saldo < $100.
 function renderPantallaWithdrawButton(d) {
-  const u = (window.state && state.user) || {};
-  const st_ = _withdrawBtnState(d, u.role);
-  if (!st_.render) return '';
+  const L = window.PantallaLogic || {};
+  const st_ = L._withdrawBtnState ? L._withdrawBtnState(d, ((window.state || {}).user || {}).role)
+    : { render: false, disabled: true, tooltip: '' };
+  // el render de pantalla.js calcula _wd_pending aquí mismo (desacopla de la lógica pura):
+  const st = _wdStatusFromRow(d && d.last_withdrawal);
+  d && (d._wd_pending = !!(st && !WD_TERMINAL.has(st.status)));
+  const s2 = L._withdrawBtnState ? L._withdrawBtnState(d, ((window.state || {}).user || {}).role) : st_;
+  if (!s2.render) return '';
   const g = window.esc || (s => s);
-  const dis = st_.disabled ? ' disabled' : '';
-  return `<button type="button" class="pat-act pat-act-wd d-withdraw-open" data-acc-id="${g(d.id)}" title="${g(st_.tooltip)}"${dis}><i class="ph-duotone ph-bank"></i><span>Retirar</span></button>`;
+  return `<button type="button" class="pat-act pat-act-wd d-withdraw-fire" data-acc-id="${g(d.id)}"${s2.disabled ? ' disabled' : ''} title="${g(s2.tooltip)}"><i class="ph-duotone ph-bank"></i><span>Retirar</span></button>`;
 }
 ```
 
-- [ ] **Step 2: Agregar el botón en `.pat-actions` (L339-340)**
+- [ ] **Step 2: Escribir `renderPantallaWithdrawStage(d)` (panel en col 3)**
+
+Junto a `renderPantallaWithdrawButton`:
+
+```js
+// Panel de monto + estado 2-fases en col 3 (.pat-col-stage). Visible en reposo para SA
+// (llena el espacio que antes quedaba vacío). Si hay misión de depósito (#depStage visible),
+// CSS :has() lo oculta — depos.js intacto.
+function renderPantallaWithdrawStage(d) {
+  const L = window.PantallaLogic || {};
+  const role = ((window.state || {}).user || {}).role;
+  const st = _wdStatusFromRow(d && d.last_withdrawal);
+  d && (d._wd_pending = !!(st && !WD_TERMINAL.has(st.status)));
+  const s2 = L._withdrawBtnState ? L._withdrawBtnState(d, role) : { render: false, disabled: true, tooltip: '' };
+  if (!s2.render) return '';
+  const g = window.esc || (s => s);
+  const money = window.fmtMoney || (v => `$${(v || 0).toFixed(2)}`);
+  const statusHtml = st ? _withdrawStatusHtml(st) : '';
+  const inputDisabled = s2.disabled || (d && d._wd_pending) ? ' disabled' : '';
+  return `<div class="pat-wd-stage" data-wd-stage>
+    <span class="pat-wd-head"><span class="pat-sv-emo">🏧</span> Retirar — <span class="pat-wd-email">${g(d.email || '')}</span></span>
+    <div class="pat-wd-balance">Saldo Real: <b class="pat-wd-balance-v">${money(d.balance_real || 0)}</b></div>
+    <input class="pat-input pat-wd-amount" type="number" min="100" step="0.01" placeholder="monto (min $100)" data-wd-amount${inputDisabled}>
+    <div class="pat-form-err" data-wd-err hidden></div>
+    <div class="pat-wd-status">${statusHtml}</div>
+  </div>`;
+}
+```
+
+- [ ] **Step 3: Agregar el botón en `.pat-actions` (L337-340)**
 
 En `renderPantallaHead`, reemplazar el cierre de `.pat-actions` (L337-340):
 
@@ -197,155 +227,67 @@ En `renderPantallaHead`, reemplazar el cierre de `.pat-actions` (L337-340):
       </div>`;
 ```
 
-- [ ] **Step 3: Eliminar la llamada al bloque anidado (L332)**
+- [ ] **Step 4: Agregar `#wdStage` en col 3 (L335) + eliminar bloque anidado (L332)**
 
-Borrar la línea `${renderPantallaWithdraw(d)}` de `.pat-col-ident` (L332). Queda:
+En `renderPantallaHead`, reemplazar el bloque `.pat-columns` (L323-336):
 
 ```js
+      <div class="pat-columns">
+        <div class="pat-col-ident">
+          <div class="pat-combo-line" style="--i:1">
+            <button type="button" class="pat-combo d-copy" data-copy="${g(combo)}" title="Copiar">${g(combo)}</button>
+          </div>
+          <div class="pat-balance" style="--i:2">${money(balance)}</div>
+          <div class="pat-ident-div" style="--i:3"></div>
           ${renderPantallaSaved(d)}
           ${renderPantallaClabes(d)}
         </div>
-```
-
-- [ ] **Step 4: Verificar que no quedan referencias al bloque viejo**
-
-Run: `grep -n "renderPantallaWithdraw\b" static/pantalla.js` (sin `Button`).
-Expected: sin resultados (la función vieja fue reemplazada por `renderPantallaWithdrawButton` en Step 1).
-
-- [ ] **Step 5: Smoke de carga (sin deploy)**
-
-Run: `node -e "const m=require('./static/pantalla.js')"` (o el mecanismo del repo; si `pantalla.js` no es módulo Node puro, saltar y validar en Task 6 con deploy).
-Expected: sin errores de sintaxis.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add static/pantalla.js
-git commit -m "feat(retiro): botón dedicado en .pat-actions, elimina bloque anidado
-
-El botón de retiro deja de vivir escondido en .pat-col-ident; ahora es
-un botón visible junto al de depósito. Usa _withdrawBtnState para el
-estado disabled/tooltip."
-```
-
----
-
-## Task 3: Popup inline `.pat-wd-pop` + handler abrir [modelo: Sonnet]
-
-**Files:**
-- Modify: `static/pantalla.js` — popup en `renderPantallaHead` (cerca de L340, tras `.pat-actions`), nueva función `_openWithdrawPopup`, handler `d-withdraw-open` en listener L788+.
-
-**Interfaces:**
-- Consumes: `_cacheGet(accId)`, `_currentId`, `money()` (app.js), `_wdStatusFromRow`, `_withdrawStatusHtml`, `_startWithdrawPoll`, `_currentId`.
-- Produces: `<div class="pat-form pat-wd-pop" data-wd-pop hidden>` en el DOM de La Pantalla; `_openWithdrawPopup(accId, cache)`.
-
-- [ ] **Step 1: Añadir el popup inline al template de `renderPantallaHead`**
-
-Tras el cierre de `.pat-actions` (L340), dentro del template devuelto, añadir:
-
-```js
-      <div class="pat-form pat-wd-pop" data-wd-pop hidden>
-        <span class="pat-wd-head"><span class="pat-sv-emo">🏧</span> Retirar — <span data-wd-email></span></span>
-        <div class="pat-wd-balance">Saldo Real: <b data-wd-balance></b></div>
-        <input class="pat-input pat-wd-amount" type="number" min="100" step="0.01" placeholder="monto (min $100)" data-wd-amount>
-        <div class="pat-form-err" data-wd-err hidden></div>
-        <div class="pat-wd-status"></div>
-        <div class="pat-form-row">
-          <button type="button" class="pat-btn pat-btn-ghost" data-wd-cancel>Cancelar</button>
-          <button type="button" class="pat-btn pat-btn-save d-withdraw-fire" data-wd-fire>Retirar</button>
+        ${renderPantallaTxns(d)}
+        <div class="pat-col-stage">
+          ${renderPantallaWithdrawStage(d)}
+          <div id="patStageSlot"></div>
         </div>
-      </div>`;
+      </div>
 ```
 
-- [ ] **Step 2: Escribir `_openWithdrawPopup(accId, cache)`**
+(Se eliminó la línea `${renderPantallaWithdraw(d)}` de `.pat-col-ident`, y `#patStageSlot` ahora convive con `renderPantallaWithdrawStage(d)` dentro de `.pat-col-stage`.)
 
-Insertar cerca de `_resumeWithdrawPollIfPending` (L573-580):
+- [ ] **Step 5: Verificar que no quedan referencias al bloque viejo**
 
-```js
-function _openWithdrawPopup(accId, cache) {
-  const pop = document.querySelector('[data-wd-pop]');
-  if (!pop) return;
-  const g = window.esc || (s => s);
-  const emailEl = pop.querySelector('[data-wd-email]');
-  const balEl = pop.querySelector('[data-wd-balance]');
-  const amtEl = pop.querySelector('[data-wd-amount]');
-  const errEl = pop.querySelector('[data-wd-err]');
-  const statusEl = pop.querySelector('.pat-wd-status');
-  if (emailEl && cache) emailEl.textContent = cache.email || '';
-  if (balEl && cache) balEl.textContent = money(cache.balance_real || 0);
-  if (amtEl) { amtEl.value = ''; amtEl.disabled = false; }
-  if (errEl) errEl.hidden = true;
-  if (statusEl) {
-    const st = _wdStatusFromRow(cache && cache.last_withdrawal);
-    statusEl.innerHTML = st ? _withdrawStatusHtml(st) : '';
-    if (st && !WD_TERMINAL.has(st.status) && !_wdPolls[accId]) {
-      _startWithdrawPoll(accId, cache.last_withdrawal.transaction_id);
-    }
-  }
-  pop.hidden = false;
-  if (amtEl) amtEl.focus();
-}
-```
+Run: `grep -n "renderPantallaWithdraw\b" static/pantalla.js` (sin `Button` ni `Stage`).
+Expected: sin resultados (la función vieja fue eliminada en Step 1).
 
-- [ ] **Step 3: Escribir `_closeWithdrawPopup()`**
+- [ ] **Step 6: Smoke de carga (sin deploy) — verificar sintaxis**
 
-Junto a `_openWithdrawPopup`:
+Run: `node -e "const fs=require('fs');const s=fs.readFileSync('static/pantalla.js','utf8');new Function(s);console.log('sintaxis OK')"`
+Expected: `sintaxis OK` (la IIFE no se ejecuta sin DOM, pero `new Function` parsea sin error de sintaxis).
 
-```js
-function _closeWithdrawPopup() {
-  const pop = document.querySelector('[data-wd-pop]');
-  if (pop) pop.hidden = true;
-}
-```
-
-- [ ] **Step 4: Añadir handler `d-withdraw-open` en el listener de `#pantalla`**
-
-Tras el bloque `d-deposit-btn` (L803), antes de `det-mark`:
-
-```js
-    const wdOpen = e.target.closest('.d-withdraw-open');
-    if (wdOpen && !wdOpen.disabled) {
-      e.preventDefault();
-      const accId = parseInt(wdOpen.dataset.accId) || _currentId;
-      const cache = _cacheGet(accId);
-      _openWithdrawPopup(accId, cache);
-      return;
-    }
-    const wdCancel = e.target.closest('[data-wd-cancel]');
-    if (wdCancel) {
-      e.preventDefault();
-      _closeWithdrawPopup();
-      return;
-    }
-```
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add static/pantalla.js
-git commit -m "feat(retiro): popup de monto .pat-wd-pop + handler abrir/cerrar
+git commit -m "feat(retiro): botón en .pat-actions + panel #wdStage en col 3
 
-Popup inline con hidden toggle (patrón CURP). Pide monto escrito, muestra
-saldo Real + estado 2-fases. Se abre con .d-withdraw-open, cierra con
-Cancelar/ESC (listener exists)."
+El retiro deja de vivir escondido en .pat-col-ident: botón visible junto
+al de depósito + panel de monto en col 3 (llena el espacio vacío en
+reposo). Coexistencia con #depStage vía CSS :has() (depos.js intacto)."
 ```
 
 ---
 
-## Task 4: Adaptar handler `d-withdraw-fire` + `_fetchWithdrawStatus` al popup [modelo: Sonnet]
+## Task 3: Adaptar handler `d-withdraw-fire` + `_fetchWithdrawStatus` al panel `[data-wd-stage]` [modelo: Sonnet]
 
 **Files:**
 - Modify: `static/pantalla.js` L909-950 (handler fire), L533-559 (`_fetchWithdrawStatus`).
 
 **Interfaces:**
-- Consumes: `[data-wd-pop]` (popup del Task 3), `cache.last_withdrawal`, `transaction_id`.
-- Cambio: `wrap` antes era `.pat-wd[data-acc]`, ahora es `[data-wd-pop]`.
+- Consumes: `[data-wd-stage]` (panel del Task 2), `cache.last_withdrawal`, `transaction_id`.
+- Cambio: `wrap` antes era `.pat-wd[data-acc]`, ahora es `[data-wd-stage]`.
 
 - [ ] **Step 1: Adaptar handler `d-withdraw-fire` (L909-950)**
 
-El handler actual hace `const wrap = wdFire.closest('.pat-wd')`. Cambiar para resolver el popup:
+El handler actual hace `const wrap = wdFire.closest('.pat-wd')`. Cambiar para resolver el panel de col 3. Localizar (L909-916 aprox.):
 
-Localizar (L909-916):
 ```js
     const wdFire = e.target.closest('.d-withdraw-fire');
     if (wdFire) {
@@ -356,81 +298,72 @@ Localizar (L909-916):
 ```
 
 Reemplazar por:
+
 ```js
     const wdFire = e.target.closest('.d-withdraw-fire');
     if (wdFire) {
       e.preventDefault();
-      const wrap = document.querySelector('[data-wd-pop]');
-      const accId = _currentId;
+      const wrap = document.querySelector('[data-wd-stage]');
+      const accId = parseInt(wdFire.dataset.accId) || _currentId;
       const input = wrap && wrap.querySelector('[data-wd-amount]');
 ```
 
-El resto del handler (L917-950) se conserva: validación monto ≥ 100, `wdFire.disabled = true`, `input.disabled = true`, `statusEl.innerHTML`, `fetch POST /api/accounts/${accId}/withdraw`, actualización de `cache.last_withdrawal`, `_renderDetailView(cache, false)` (NOTA: al re-renderizar el popup se resetea a `hidden` — ver Step 2), `toast`, `_startWithdrawPoll`.
+El resto del handler (L917-950) se conserva: validación monto ≥ 100, `wdFire.disabled = true`, `input.disabled = true`, `statusEl.innerHTML`, `fetch POST /api/accounts/${accId}/withdraw`, actualización de `cache.last_withdrawal`, `_renderDetailView(cache, false)` (el re-render repuebla el panel con estado pendiente), `toast`, `_startWithdrawPoll`.
+- **Nota sobre `statusEl`:** si el handler actual lo resolvía como `wrap.querySelector('.pat-wd-status')`, el selector sigue válido (`[data-wd-stage]` contiene `.pat-wd-status`). Verificar tras el cambio.
 
-- [ ] **Step 2: Evitar que el re-render cierre el popup tras disparar**
+- [ ] **Step 2: Eliminar la lógica de "re-abrir popup" (ya no aplica)**
 
-El handler actual llama `_renderDetailView(cache, false)` (L939) tras actualizar el cache. Eso re-monta el popup con `hidden` por default (lo cierra). Para que el usuario vea el estado "en proceso", tras el re-render re-abrir el popup:
-
-Localizar (L932-942 aprox.):
-```js
-        const cache = _cacheGet(accId);
-        if (cache) {
-          cache.last_withdrawal = {
-            transaction_id: data.transactionId, reference: data.reference, amount: data.amount,
-            account_digits: data.accountDigits, institution_name: data.institutionName,
-            status_api: null, gateway: null, last_modified_utc: null,
-          };
-          if (_currentId === accId) _renderDetailView(cache, false);
-        }
-```
-
-Añadir tras el `_renderDetailView` (antes del toast):
-```js
-          _openWithdrawPopup(accId, cache);
-```
+El plan anterior (popup flotante) añadía `_openWithdrawPopup(accId, cache)` tras el `_renderDetailView`. **NO aplica aquí** — el panel `#wdStage` vive en el template, el re-render del detalle lo repuebla con estado fresco (input disabled + status 2-fases). Si el handler actual (L932-942) actualiza `cache.last_withdrawal` y llama `_renderDetailView(cache, false)`, eso ya repuebla el panel correctamente. **No añadir nada nuevo.** Solo verificar que `_renderDetailView` tras el disparo deja el panel visible (no lo oculta).
 
 - [ ] **Step 3: Adaptar `_fetchWithdrawStatus` (L533-559)**
 
-Localizar la resolución de `wrap` (L534):
+Localizar la resolución de `wrap` (L534 aprox.):
+
 ```js
   async function _fetchWithdrawStatus(accId, txId) {
     const wrap = document.querySelector(`.pat-wd[data-acc="${accId}"]`);
 ```
 
 Reemplazar por:
+
 ```js
   async function _fetchWithdrawStatus(accId, txId) {
-    const wrap = document.querySelector('[data-wd-pop]');
+    const wrap = document.querySelector('[data-wd-stage]');
 ```
 
-El resto (L535-558) se conserva: `statusEl`, `st`, toggle `alert`/`pending`, `done`, rehabilitar `input`/`btn`, `_stopWithdrawPoll`, actualizar `cache.last_withdrawal`.
+El resto (L535-558) se conserva: `statusEl`, `st`, toggle `alert`/`pending`, `done`, rehabilitar `input`/`btn`, `_stopWithdrawPoll`, actualizar `cache.last_withdrawal`. Verificar que `input`/`btn` se resuelven con los nuevos selectores (`[data-wd-amount]` / `.d-withdraw-fire`) si el handler los usa.
 
 - [ ] **Step 4: Verificar consistencia de selectores**
 
-Run: `grep -n "\.pat-wd\b\|\[data-acc=" static/pantalla.js | grep -v "pat-wd-"`
-Expected: sin referencias a `.pat-wd[data-acc]` (todas migradas a `[data-wd-pop]`).
+Run: `grep -n "\.pat-wd\b\|\[data-acc=" static/pantalla.js | grep -v "pat-wd-" | grep -v "pat-wd_stage\|data-wd-stage"`
+Expected: sin referencias a `.pat-wd[data-acc]` (todas migradas a `[data-wd-stage]`). Las clases `.pat-wd-row/.pat-wd-amt/.pat-wd-line/.pat-wd-alert` (status HTML) se conservan.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Smoke de carga**
+
+Run: `node -e "const fs=require('fs');const s=fs.readFileSync('static/pantalla.js','utf8');new Function(s);console.log('sintaxis OK')"`
+Expected: `sintaxis OK`.
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add static/pantalla.js
-git commit -m "fix(retiro): handler fire + polling operan sobre el popup .pat-wd-pop
+git commit -m "fix(retiro): handler fire + polling operan sobre el panel [data-wd-stage]
 
-Migración de selectores: wrap ahora es [data-wd-pop] (no .pat-wd).
-Tras disparar, re-abre el popup para mostrar estado en proceso en vez
-de cerrarlo al re-renderizar."
+Migración de selectores: wrap ahora es [data-wd-stage] (panel en col 3),
+no .pat-wd. Sin lógica de re-abrir popup — el panel ya está visible y el
+re-render del detalle lo repuebla con estado fresco."
 ```
 
 ---
 
-## Task 5: CSS — `.pat-act-wd` + `.pat-wd-pop` [modelo: Sonnet]
+## Task 4: CSS — `.pat-act-wd` + `.pat-wd-stage` + regla `:has()` [modelo: Sonnet]
 
 **Files:**
-- Modify: `static/pantalla.css` — tras `.pat-act-dep:hover` (L426) para el botón; tras `.pat-curp-pop[hidden]` (L552) para el popup.
+- Modify: `static/pantalla.css` — tras `.pat-act-dep:hover` (L426) para el botón; tras `.pat-curp-pop[hidden]` (L552) para el panel.
 
 **Interfaces:**
-- Consumes: `--pat-gold`, `--pat-edge`, `--text`, `--text-dim`, `--font-mono`, patrón `.pat-form` base.
-- Reusa: `.pat-wd-row`, `.pat-wd-amt`, `.pat-wd-line`, `.pat-wd-alert` (L841-851, ya existen).
+- Consumes: `--pat-gold`, `--pat-edge`, `--text`, `--text-dim`, `--font-mono`, patrón `.pat-input` base.
+- Reusa: `.pat-wd-row`, `.pat-wd-amt`, `.pat-wd-line`, `.pat-wd-alert` (L841-851, ya existen — los genera `_withdrawStatusHtml`).
 
 - [ ] **Step 1: Añadir `.pat-act-wd` tras `.pat-act-dep:hover` (L426)**
 
@@ -439,61 +372,52 @@ de cerrarlo al re-renderizar."
   color: #08090c; background: var(--pat-gold); border-color: transparent;
   box-shadow: 0 0 12px -6px var(--pat-gold), 0 1px 2px oklch(0 0 0 / 0.25);
 }
-.pat-act-wd:hover:not(:disabled) {
-  filter: brightness(1.08);
-}
-.pat-act-wd:disabled {
-  opacity: .4; cursor: not-allowed; background: var(--pat-edge); color: var(--text-dim);
-  box-shadow: none;
-}
+.pat-act-wd:hover:not(:disabled) { filter: brightness(1.08); }
+.pat-act-wd:disabled { opacity: .4; cursor: not-allowed; background: var(--pat-edge); color: var(--text-dim); box-shadow: none; }
 .pat-act-wd:disabled:hover { transform: none; filter: none; }
 ```
 
-- [ ] **Step 2: Añadir `.pat-wd-pop` y sub-reglas tras `.pat-curp-pop[hidden]` (L552)**
+- [ ] **Step 2: Añadir `.pat-wd-stage` y sub-reglas tras `.pat-curp-pop[hidden]` (L552)**
 
 ```css
-/* Popup de retiro — variant de .pat-curp-pop, glassmorphism de La Pantalla */
-.pat-wd-pop[hidden] { display: none; }
-.pat-wd-pop {
-  position: absolute; right: 18px; bottom: 58px; z-index: 7;
-  min-width: 240px;
-  display: flex; flex-direction: column; gap: 6px;
-  padding: 14px 16px;
-  border: 1px solid var(--pat-edge);
-  border-radius: 12px;
-  background: linear-gradient(oklch(0.04 0.015 160 / 0.34), oklch(0.12 0.015 160 / 0.66));
-  backdrop-filter: blur(16px) saturate(1.2);
-  -webkit-backdrop-filter: blur(16px) saturate(1.2);
-  box-shadow: 0 8px 32px -8px oklch(0 0 0 / 0.5);
+/* Panel de retiro en col 3 — llena el espacio vacío en reposo (SA). Glassmorphism
+   lo envuelve .pantalla-sheet; aquí solo estructura + tipografía. */
+.pat-wd-stage {
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 14px 4px 4px 0;
   color: var(--text);
 }
+/* Coexistencia: si hay misión de depósito activa (#depStage visible en #patStageSlot),
+   oculta el panel de retiro. depos.js intacto — la prioridad visual la resuelve el CSS. */
+.pat-col-stage:has(#depStage:not([hidden])) .pat-wd-stage { display: none; }
 .pat-wd-head { font-size: 12px; font-weight: 600; display: flex; gap: 5px; align-items: center; }
+.pat-wd-email { color: var(--text-dim); font-weight: 400; }
 .pat-wd-balance { font-size: 10.5px; color: var(--text-dim); }
-.pat-wd-balance b { color: var(--pat-gold); font-family: var(--font-mono); }
-.pat-wd-pop .pat-input { width: 100%; }
+.pat-wd-balance-v, .pat-wd-balance b { color: var(--pat-gold); font-family: var(--font-mono); }
+.pat-wd-stage .pat-input { width: 100%; }
 .pat-wd-status { margin-top: 4px; }
 .pat-wd-status:empty { display: none; }
 ```
 
 - [ ] **Step 3: Verificar que no hay colisiones**
 
-Run: `grep -n "^\.pat-wd-pop\|^\.pat-act-wd" static/pantalla.css`
-Expected: 1 ocurrencia de `.pat-act-wd` y 1 de `.pat-wd-pop[hidden]` + 1 de `.pat-wd-pop {`.
+Run: `grep -n "^\.pat-wd-stage\|^\.pat-act-wd" static/pantalla.css`
+Expected: 1 `.pat-act-wd` + 1 `.pat-act-wd:hover` + 1 `.pat-act-wd:disabled` + 1 `.pat-act-wd:disabled:hover` + 1 `.pat-wd-stage` + 1 `.pat-col-stage:has(...) .pat-wd-stage`.
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add static/pantalla.css
-git commit -m "style(retiro): .pat-act-wd botón dorado + .pat-wd-pop popup glass
+git commit -m "style(retiro): .pat-act-wd botón dorado + .pat-wd-stage panel en col 3
 
 Botón mismo lenguaje que .pat-act-dep (dorado, glow), gris si disabled.
-Popup glassmorphism (blur 16px) consistente con La Pantalla, anclado
-sobre la barra de acciones."
+Panel en col 3 llena el slot (flex child), coexistencia con #depStage vía
+CSS :has() — depos.js intacto."
 ```
 
 ---
 
-## Task 6: Deploy + smoke HTTP + funcional + validación visual [modelo: Haiku]
+## Task 5: Deploy + smoke HTTP + funcional + validación visual [modelo: Haiku]
 
 **Files:**
 - Sin cambios de código (verificación + deploy).
@@ -505,7 +429,7 @@ sobre la barra de acciones."
 
 ```bash
 KEY="C:\Users\rober\Dropbox\TESTING DEV\SSH KEYS\kvm4_hostinger"; HOST="root@100.77.154.31"
-scp -i "$KEY" static/pantalla.js static/pantalla.css $HOST:/docker/betmexico/code/web/static/
+scp -i "$KEY" static/pantalla.js static/pantalla.css static/pantalla_logic.js $HOST:/docker/betmexico/code/web/static/
 ssh -i "$KEY" $HOST 'docker restart betmexico-web'
 ```
 
@@ -513,49 +437,53 @@ ssh -i "$KEY" $HOST 'docker restart betmexico-web'
 
 ```bash
 # md5 local
-md5sum static/pantalla.js static/pantalla.css
+md5sum static/pantalla.js static/pantalla.css static/pantalla_logic.js
 # md5 prod (vía Traefik, el puerto 8080 no está publicado)
 curl -s https://botmexico.com.mx/static/pantalla.js | md5sum
 curl -s https://botmexico.com.mx/static/pantalla.css | md5sum
+curl -s https://botmexico.com.mx/static/pantalla_logic.js | md5sum
 # confirmar proceso vivo
 ssh -i "$KEY" $HOST 'docker inspect -f "{{.State.StartedAt}}" betmexico-web'
 ```
-Expected: md5 local == md5 prod para ambos archivos. `StartedAt` > mtime del deploy.
+Expected: md5 local == md5 prod para los 3 archivos. `StartedAt` > mtime del deploy.
 
-- [ ] **Step 3: Verificar que el botón aparece en el HTML servido**
+- [ ] **Step 3: Verificar que el botón + panel aparecen en el JS servido**
 
 ```bash
-curl -s https://botmexico.com.mx/static/pantalla.js | grep -c "pat-act-wd\|d-withdraw-open\|pat-wd-pop"
+curl -s https://botmexico.com.mx/static/pantalla.js | grep -c "pat-act-wd\|renderPantallaWithdrawStage\|data-wd-stage"
+curl -s https://botmexico.com.mx/static/pantalla.js | grep -c "renderPantallaWithdraw\b"  # debe dar 0 (eliminado)
 ```
-Expected: ≥ 3 (botón + handler + popup presentes en el bundle servido).
+Expected: primero ≥ 3 (botón + panel + selector); segundo = 0 (la función vieja no existe).
 
 - [ ] **Step 4: Validación visual (screenshot anotado por Robert)**
 
 Pedir a Robert screenshot de La Pantalla de una cuenta con saldo ≥ $100 (ej. `msaidrzz`) logueado como SA. Verificar:
 - Botón "Retirar" visible a la derecha de "Depositar" en `.pat-actions`.
-- Click abre el popup `.pat-wd-pop` con input de monto + saldo Real + botón "Retirar".
-- Medir `getBoundingClientRect` del popup en consola del navegador:
+- Panel `#wdStage` visible en col 3 (zona derecha) con saldo Real + input de monto + (vacío si sin retiro).
+- Click en "Retirar" con input vacío → muestra error "monto mínimo $100" (no dispara).
+- Medir `getBoundingClientRect` del panel en consola del navegador:
   ```js
-  const pop = document.querySelector('[data-wd-pop]'); pop.hidden=false;
-  const r = pop.getBoundingClientRect(); const sheet = document.querySelector('.pantalla-sheet').getBoundingClientRect();
-  console.log('popup.bottom', r.bottom, 'sheet.bottom', sheet.bottom, 'overflow', r.bottom - sheet.bottom);
+  const pop = document.querySelector('[data-wd-stage]'); const r = pop.getBoundingClientRect();
+  const sheet = document.querySelector('.pantalla-sheet').getBoundingClientRect();
+  console.log('stage.bottom', r.bottom, 'sheet.bottom', sheet.bottom, 'overflow', r.bottom - sheet.bottom);
   ```
-  Expected: `overflow ≤ 0` (popup no rebasa la sheet hacia abajo).
+  Expected: `overflow ≤ 0` (panel no rebasa la sheet hacia abajo).
 
 - [ ] **Step 5: Verificar gris si saldo < $100**
 
 Abrir La Pantalla de una cuenta con saldo < $100 (o pedir a Robert cual cumple). Verificar:
 - Botón "Retirar" renderizado con `disabled` + estilo gris.
-- Click no abre popup.
-- Tooltip "Saldo < $100" al hover.
+- Panel `#wdStage` con input disabled (gris).
+- Click no dispara.
+- Tooltip "Saldo < $100" al hover del botón.
 
 - [ ] **Step 6: Smoke funcional — retiro de $1 en cuenta de prueba**
 
 > **NO $100.** Usar monto $1 para validar el flujo end-to-end sin riesgo grande (decisión del spec §9). Coordinar con Robert para elegir cuenta de prueba.
 
 1. Abrir La Pantalla de la cuenta de prueba (SA, saldo ≥ $1).
-2. Click "Retirar" → escribir `1` → "Retirar".
-3. Verificar en el popup: "Disparando…" → polling → estado terminal.
+2. Escribir `1` en el input de col 3 → click "Retirar" en `.pat-actions`.
+3. Verificar en col 3: input + botón se disablean → "Disparando…" → polling → estado terminal.
 4. Verificar los 3 guardarrails:
    - `gateway == 2` (SPEI, no tarjeta) — si `gateway:1` → alerta crítica bug#3.
    - `lastAccountDigits` coincide con `accountId` — si difieren → alerta bug#1.
@@ -569,7 +497,7 @@ Abrir La Pantalla de una cuenta con saldo < $100 (o pedir a Robert cual cumple).
 - [ ] **Step 7: Commit final + merge a main (memoria `feedback_merge_en_checkpoints`)**
 
 ```bash
-git log --oneline -6  # confirmar los commits de Tasks 1-5
+git log --oneline -6  # confirmar los commits de Tasks 1-4
 git push origin feat/boton-retiro-automatico
 git fetch origin main
 git merge-base --is-ancestor origin/main HEAD && \
@@ -581,7 +509,8 @@ Expected: fast-forward limpio a main.
 
 Reportar a Robert:
 - Sistema: web ✓/✗ · bot ✓/⛔ · health ✓/✗.
-- Botón: visible ✓/✗ · gris si < $100 ✓/✗ · popup abre ✓/✗.
+- Botón: visible ✓/✗ · gris si < $100 ✓/✗.
+- Panel col 3: visible ✓/✗ · llena el slot sin overflow ✓/✗.
 - Smoke $1: disparado ✓/✗ · 3 guardarrails ✓/✗ · bitácora ✓/✗.
 - Merge: main en `<hash>`.
 
@@ -590,33 +519,34 @@ Reportar a Robert:
 ## Self-Review del plan
 
 **Cobertura del spec:**
-- §1 Objetivo (botón dedicado + popup monto) → Tasks 2-3. ✓
-- §2.1 Botón en `.pat-actions` derecha de Depositar + ph-bank → Task 2 Step 2. ✓
-- §2.1 Gris si < $100 → Task 1 (`_withdrawBtnState`) + Task 5 (`.pat-act-wd:disabled`). ✓
+- §1 Objetivo (botón dedicado + panel col 3) → Tasks 2-3. ✓
+- §2.1 Botón en `.pat-actions` derecha de Depositar + ph-bank → Task 2 Step 3. ✓
+- §2.1 Gris si < $100 → Task 1 (`_withdrawBtnState`) + Task 4 (`.pat-act-wd:disabled`). ✓
 - §2.1 No-SA no renderiza → Task 1 (`render:false`). ✓
-- §2.2 `<dialog>` nativo → **CORREGIDO** a `hidden` toggle (Task 3, anclaje verificado: CURP no es dialog nativo). Documentado en Global Constraints.
-- §2.2 Header email + saldo + input + estado + alerts → Task 3 Step 1. ✓
-- §2.3 Handler `d-withdraw-open` → Task 3 Step 4. ✓
-- §2.4 Handler `d-withdraw-fire` reusa data-class → Task 4 Step 1. ✓
-- §2.5 Polling dentro del popup → Task 4 Step 3. ✓
-- §2.6 Eliminar `renderPantallaWithdraw` → Task 2 Steps 1,3. ✓
-- §5 CSS `.pat-act-wd` + `.pat-wd-dialog` → Task 5 (renombrado `.pat-wd-pop` por corrección de patrón). ✓
-- §6 Estados del botón → Task 1 (tabla de estados en tests). ✓
-- §7 Flujo retiro → Tasks 3-4 + smoke Task 6. ✓
+- §2.2 Panel `#wdStage` en col 3 (NO popup) → Task 2 Step 4. ✓
+- §2.2 Coexistencia `#wdStage`↔`#depStage` vía `:has()` → Task 4 Step 2. ✓
+- §2.2 Header email + saldo + input + estado + alerts → Task 2 Step 2. ✓
+- §4.3 Handler `d-withdraw-fire` dispara directo → Task 3 Step 1. ✓
+- §4.4 Polling sobre `#wdStage` → Task 3 Step 3. ✓
+- §4.5 Eliminar `renderPantallaWithdraw` → Task 2 Steps 1,4. ✓
+- §5 CSS `.pat-act-wd` + `.pat-wd-stage` + `:has()` → Task 4. ✓
+- §6 Estados del botón + col 3 → Task 1 (tabla de estados en tests) + Task 2. ✓
+- §7 Flujo retiro → Tasks 2-3 + smoke Task 5. ✓
 - §8 Guardarrails (backend, no tocar) → Global Constraints. ✓
-- §9 Pruebas → Task 1 (TDD) + Task 6 (smoke HTTP, funcional, visual). ✓
-- §10 No-go (clabes, watchdog, backend, monorepo, multi-cuenta) → Global Constraints. ✓
+- §9 Pruebas → Task 1 (TDD) + Task 5 (smoke HTTP, funcional, visual). ✓
+- §10 No-go (clabes, watchdog, backend, depos.js, monorepo, multi-cuenta) → Global Constraints. ✓
 
 **Placeholder scan:** sin TBD/TODO/"manejar errores apropiadamente". Cada step tiene código o comando real. ✓
 
 **Consistencia de tipos/nombres:**
-- `_withdrawBtnState(d, role)` — mismo nombre en Task 1 (def) y Task 2 (consume). ✓
-- `renderPantallaWithdrawButton(d)` — Task 2 def + uso en `.pat-actions`. ✓
-- `[data-wd-pop]` selector — Task 3 (popup) + Task 4 (handlers fire/poll). ✓
-- `_openWithdrawPopup(accId, cache)` / `_closeWithdrawPopup()` — Task 3 def + Task 4 Step 2 (uso). ✓
-- `d.withdraw-fire` data-class — conservado del código existente, no renombrado. ✓
-- `money()` (app.js) — asumido existente (usado ya en `renderPantallaHead` L328 para balance). ✓
+- `_withdrawBtnState(d, role)` — Task 1 (def en `pantalla_logic.js`) + Task 2 (consume vía `window.PantallaLogic`). ✓
+- `d._wd_pending` — Task 1 (doc) + Task 2 (lo calcula el render antes de llamar `_withdrawBtnState`). ✓
+- `renderPantallaWithdrawButton(d)` / `renderPantallaWithdrawStage(d)` — Task 2 def + uso en template. ✓
+- `[data-wd-stage]` selector — Task 2 (panel) + Task 3 (handlers fire/poll). ✓
+- `d-withdraw-fire` data-class — conservado del código existente, en el botón de `.pat-actions`. ✓
+- `money()` — asumido existente (usado ya en `renderPantallaHead` L328 para balance). ✓
+- `window.PantallaLogic` — patrón existente (cabecera de `pantalla.js` lo documenta). ✓
 
-**Alcance:** un solo plan ejecutable (frontend puro, ~6 tasks). No requiere partirse. ✓
+**Alcance:** un solo plan ejecutable (frontend puro, 5 tasks). No requiere partirse. ✓
 
-**Nota:** el `_resumeWithdrawPollIfPending` (L573-580) existente sigue llamándose en `_renderDetailView` (L745) — al re-renderizar tras disparar, reanuda el polling si hay pendiente. Consistente con Task 4 Step 2 (re-abrir popup). No se toca.
+**Riesgo identificado:** `_withdrawBtnState` vive en `pantalla_logic.js` (exportable) pero el render en `pantalla.js` (IIFE) necesita `_wdStatusFromRow` (que vive en `pantalla.js`) para calcular `d._wd_pending`. El plan resuelve esto: el render calcula `_wd_pending` antes de llamar `_withdrawBtnState`, desacoplando la lógica pura del DOM-dependent. Si `pantalla_logic.js` no expone `_withdrawBtnState` correctamente, Task 2 fallará — vigilancia: verificar el `module.exports` en Task 1 Step 3.
