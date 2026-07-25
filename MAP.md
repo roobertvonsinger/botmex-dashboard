@@ -218,6 +218,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c578a8b` | docs: cierre de sesión — retiro automático deployado, PIN destino-retiro |
 | `de77328` | feat(ui): botón de retiro SA + polling 60s + SSE en vivo en La Pantalla |
 | `3a11788` | test: fix schema conftest.py — fullname/curp/phone faltantes en accounts |
 | `d40434e` | docs: NEXT-SESSION cierre — Task C código listo, fix bug schema test pendiente |
@@ -229,7 +230,6 @@ prewarm.py (router)
 | `bbb14d8` | feat(recon): spec botón retiro automático + herramientas CDP/bmx_call |
 | `bf185ac` | feat(clabes): panel SPEI NVIO/STP persistido en BD + endpoints |
 | `30d4b57` | docs: NEXT-SESSION + RECON con objetivo retiro cuarentena msaidrzz |
-| `b7cb21c` | feat(recon): mapeo API retiros/depósitos BetMexico + capturador CDP |
 <!-- GEN:end:recientes -->
 
 ---
