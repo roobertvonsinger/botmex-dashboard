@@ -1258,6 +1258,14 @@ async function loadActivityMarquee() {
 // Traduce un `code` técnico de deposit_step/deposit al idioma llano del
 // operador. Extiende _humanizeCritical (misma familia de traducciones).
 // Si no hay traducción conocida, degrada elegante devolviendo el code crudo.
+// 2026-07-26: status de depósito que NO son rechazo de banco — transitorio
+// de nuestro lado (gateway, login, timeout, rate-limit, error genérico).
+// Para decidir: notificación al operador (reintentar vs rechazo real).
+const _DEPOSIT_TRANSIENT = new Set([
+  'incomplete', 'gateway_error', 'timeout', 'rate_limited',
+  'login_lost', 'ambiguous',
+]);
+
 const _DEPOSIT_CODE_HUMANO = {
   BANK_REJECTED: 'el banco rechazó tu tarjeta',
   'E-RED': 'error de red, intenta de nuevo',
@@ -1795,10 +1803,15 @@ function connectSSE() {
           loadRecientes();
         } else if (ev.kind === 'deposit') {
           const ok = ev.status === 'approved';
-          pushNotif({
-            icon: ok ? '✅' : '❌',
-            msg: `${ev.who} depositó ${fmtMoney(ev.amount)} en ${ev.target} → ${ev.status}`,
-          });
+          // 2026-07-26: solo notificar aprobaciones desde el feed global.
+          // Fallos/pendientes ya los notifica el handler del modal deposit
+          // con mensaje humanizado (transitorio vs rechazo real).
+          if (ok) {
+            pushNotif({
+              icon: '✅',
+              msg: `${ev.who} depositó ${fmtMoney(ev.amount)} en ${ev.target} → aprobado`,
+            });
+          }
           if (ok) _liveReload();
           loadRecientes();
         } else if (ev.kind === 'scheduled_started') {
@@ -5103,8 +5116,15 @@ function _handleExecStreamEvent(ev, amount) {
     } else {
       res.className = 'dep-result error';
       const detail = ev.error || ev.result_code || 'Sin detalle';
-      res.innerHTML = `<b>✗ Rechazado</b><br><span class="mono">${esc(detail)}</span>`;
-      pushNotif({ icon: '⚠️', msg: `Depósito rechazado: ${detail}` });
+      const rc = (ev.result_code || '').toUpperCase();
+      const isTransient = _DEPOSIT_TRANSIENT.has(ev.result_code) || _DEPOSIT_TRANSIENT.has(rc);
+      if (isTransient) {
+        res.innerHTML = `<b>✗ No procesado</b><br><span class="mono">${esc(detail)}</span><br><span class="dim">No se procesó con el banco — inténtalo de nuevo</span>`;
+        pushNotif({ icon: '⚠️', msg: `Depósito no procesado (${detail.split(' — ')[0]}). Reintentar.` });
+      } else {
+        res.innerHTML = `<b>✗ Rechazado</b><br><span class="mono">${esc(detail)}</span>`;
+        pushNotif({ icon: '❌', msg: `Depósito rechazado por el banco: ${detail.split(' — ')[0]}` });
+      }
     }
   }
 }
