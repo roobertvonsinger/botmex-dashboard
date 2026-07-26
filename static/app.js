@@ -4714,6 +4714,18 @@ async function openDepositModal(accountId, opts = {}) {
     return;
   }
 
+  // La cuenta ya está abierta en La Pantalla → el panel compacto de col 3 es la UI
+  // vigente para ella (no abrir el popup flotante encima). El multi-select bulk (2+
+  // ids) nunca cae aquí: _ids.length===1 lo descarta de inmediato.
+  if (_ids.length === 1 && window.Pantalla && window.Pantalla.currentId === _ids[0]) {
+    const stage = document.querySelector('.pat-dep-stage');
+    if (stage) {
+      stage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      toast('Usa el panel de depósito de La Pantalla', '');
+      return;
+    }
+  }
+
   // ── C1: modal v8 por DEFAULT (2026-06-28) ──
   // Antes era opt-IN por flag (`localStorage.deposV8==='1'`). Como el flag es
   // POR NAVEGADOR, los demás operadores (y cualquier otro navegador) caían al

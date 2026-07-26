@@ -93,7 +93,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 3732 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3734 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
@@ -219,6 +219,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b357bbd` | @ revert: deshacer fix "Declined" false positive (no solicitado) |
 | `2dde979` | Revert "@" |
 | `1192193` | Revert "@" |
 | `7a66eb6` | @ fix(ui): mapear "Declined" a "error de pasarela, reintenta" |
@@ -230,7 +231,6 @@ prewarm.py (router)
 | `83f8abb` | refactor(depos): _dx.target decide el destino de render (float/compact) sin cambiar comportamiento |
 | `d68cb5d` | feat(depos): template+CSS del panel de depósito compacto en col 3 (inerte, sin JS aún) |
 | `c423902` | refactor(logs): síntesis de feeds — filtrar ruido, unificar renderers, chips de nivel |
-| `6c68b27` | docs(plan): implementación depósito compacto col 3 — 7 tareas, doble destino de render en depos.js |
 <!-- GEN:end:recientes -->
 
 ---
