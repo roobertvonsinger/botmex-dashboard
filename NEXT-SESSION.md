@@ -132,10 +132,19 @@ esta sesión, en `app.py`/`static/activity_logic.js`/`static/app.js`/`static/ind
 rendering + iconos SSE) que persiste intacto (Task 6 lo protegió con `git stash`/`pop` para no mezclarlo en su commit).
 **No tocar ni commitear ese WIP** — es de Robert, ajeno a este feature.
 
-### 🔴 Pendiente — Task 7 (deploy + verificación, requiere autorización de Robert)
-1. Deploy a KVM4 de `index.html`, `pantalla.js`, `pantalla.css`, `depos.js`, `app.js` — **pendiente de "sí, autorizado"**.
-2. Verificación visual REAL (navegador de Robert, no el pane headless — rAF no corre ahí): ambos paneles (retiro +
-   depósito) visibles y apilados en reposo; disparo del botón "Depositar" sin popup; multi-select bulk de tabla
-   sigue abriendo el popup viejo sin cambios.
-3. Smoke funcional — **depósito real de $10** desde el panel compacto (acción con dinero real, la ejecuta Robert).
-4. Tras Task 7: revisión final de rama completa (`superpowers:subagent-driven-development`'s final review) + merge a main.
+### ✅ Task 7 — deploy + revisión final completados (autorizado por Robert)
+1. Deploy a KVM4 hecho (index.html, pantalla.js, pantalla.css, depos.js, app.js + WIP preservado: app.py,
+   activity_logic.js, style.css). Restart OK, health 200/937 cuentas.
+2. **Revisión final de rama completa** (`superpowers:subagent-driven-development`) encontró 2 Críticos + 2
+   Importantes: (1) race real de depósito a cuenta equivocada — `fireCompact()` no verificaba que `_dx` siguiera
+   apuntando a la cuenta del botón clickeado, y `openDepos()` reseteaba `_dx` sin chequear misión en curso; (2)
+   tests rotos por un revert incompleto ajeno (`test_deposit_status_classify.py`, nada que ver con este feature);
+   (3) `#depStage` no se re-ocultaba tras una misión flotante, dejando AMBOS paneles compactos ocultos para
+   siempre; (4) botón "Depositar" no se deshabilitaba durante una misión flotante ajena. **Fix wave** (commit
+   `d01894e`): los 4 corregidos en 1 pase, re-review escopeado confirmó los 4 ADDRESSED sin breakage nuevo.
+   **REDEPLOY crítico**: el fix llegó después del deploy original — `depos.js`/`pantalla.js` corregidos
+   redesplegados y verificados servidos (`expectedAccId` presente en el archivo en KVM4).
+3. **Pendiente de Robert** (no delegable): verificación visual REAL en su navegador (rAF no corre en el pane
+   headless usado para verificar) — ambos paneles apilados en reposo, disparo sin popup, multi-select bulk de
+   tabla intacto — y el smoke funcional de un **depósito real de $10** desde el panel compacto.
+4. Rama `feature/depos-compacto-col3` con revisión final limpia — mergeada a main (ver commit de merge).
