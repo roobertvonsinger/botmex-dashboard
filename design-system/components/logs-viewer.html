@@ -1,0 +1,59 @@
+<!-- @dsCard group="Components" subtitle="Structured log line parsing, level colors, details highlight" -->
+<!-- Botmexico Design System — Log Viewer -->
+<style>
+  .ds-logs { display: flex; flex-direction: column; gap: 16px; padding: 16px; background: #08090c; border-radius: 12px; font-family: 'Inter', system-ui, sans-serif; color: #eef0f3; }
+  .ds-section { font-size: 9px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(238,240,243,0.34); font-family: 'JetBrains Mono', monospace; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  /* logs-view container (matches static/style.css .logs-view) */
+  .ds-logs-view { background: rgba(18,20,24,0.60); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 10px 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.65; color: rgba(238,240,243,0.72); }
+  /* Log line parsed components — 1:1 con .log-line / .log-ts / .log-level / .log-logger / .log-msg de static/style.css */
+  .ds-log-line { display: block; padding: 1px 0; }
+  .ds-log-ts { font-size: 10px; opacity: .55; margin-right: 4px; }
+  .ds-log-level { font-weight: 700; font-size: 9.5px; padding: 0 5px; border-radius: 3px; margin: 0 3px; vertical-align: middle; }
+  .ds-log-err  { color: oklch(0.66 0.21 24); background: oklch(0.66 0.21 24 / 0.12); }
+  .ds-log-warn { color: oklch(0.80 0.16 75); background: oklch(0.80 0.16 75 / 0.12); }
+  .ds-log-info { color: oklch(0.50 0.11 160); }
+  .ds-log-crit { color: #fff; background: oklch(0.66 0.21 24); }
+  .ds-log-debug { color: rgba(238,240,243,0.72); opacity: .45; }
+  .ds-log-logger { font-size: 10px; opacity: .5; margin-right: 6px; }
+  .ds-log-msg { color: #eef0f3; }
+  /* [DETAILS] highlight */
+  .ds-log-line.ds-log-details { background: oklch(0.25 0.05 75); padding: 2px 4px; border-radius: 4px; margin-bottom: 2px; }
+  .ds-log-line.ds-log-details .ds-log-msg { color: #fff; }
+  .ds-log-balance { font-weight: 700; text-decoration: underline; text-decoration-color: oklch(0.50 0.11 160); text-underline-offset: 2px; }
+  /* Header level counts */
+  .ds-log-counts { font-size: 11px; margin-left: 8px; }
+  .ds-log-counts .lc-e { color: oklch(0.66 0.21 24); font-weight: 600; }
+  .ds-log-counts .lc-w { color: oklch(0.80 0.16 75); font-weight: 600; }
+  .ds-logs-head { display: flex; align-items: center; gap: 6px; font-size: 11px; font-family: 'Space Grotesk', sans-serif; font-weight: 600; margin-bottom: 6px; color: rgba(238,240,243,0.72); }
+</style>
+<div class="ds-logs">
+  <div class="ds-section">Logs View — Header con contador de niveles</div>
+  <div class="ds-logs-head">
+    📋 Logs <span class="ds-log-counts"><span class="lc-e">✗3</span> <span class="lc-w">⚠7</span></span>
+  </div>
+
+  <div class="ds-section">Líneas parseadas por nivel</div>
+  <div class="ds-logs-view">
+    <span class="ds-log-line"><span class="ds-log-ts">14:32:07</span><span class="ds-log-level ds-log-info">INFO</span><span class="ds-log-logger">dashboard</span><span class="ds-log-msg">Depósito aprobado ✔️ $500 → garcia@gmail.com</span></span>
+    <span class="ds-log-line"><span class="ds-log-ts">14:32:11</span><span class="ds-log-level ds-log-warn">WARNING</span><span class="ds-log-logger">jwt_keeper</span><span class="ds-log-msg">Token cerca de expirar (2h restantes)</span></span>
+    <span class="ds-log-line"><span class="ds-log-ts">14:33:02</span><span class="ds-log-level ds-log-err">ERROR</span><span class="ds-log-logger">deposits</span><span class="ds-log-msg">Timeout esperando confirmación de BetMexico</span></span>
+    <span class="ds-log-line"><span class="ds-log-ts">14:33:05</span><span class="ds-log-level ds-log-err">CRITICAL</span><span class="ds-log-logger">db</span><span class="ds-log-msg">database is locked — reintentando</span></span>
+    <span class="ds-log-line"><span class="ds-log-ts">14:33:09</span><span class="ds-log-level ds-log-debug">DEBUG</span><span class="ds-log-logger">proxy</span><span class="ds-log-msg">rotando IP residencial MX</span></span>
+  </div>
+  <div style="font-size:9px;color:rgba(238,240,243,0.34);font-family:'JetBrains Mono',monospace">
+    Formato crudo: <code>YYYY-MM-DD HH:MM:SS,ms [LEVEL] [logger] mensaje</code>. Timestamp se acorta a HH:MM:SS, logger se acorta a su último segmento (<code>betmexico.dashboard.db</code> → <code>db</code>). ERROR y CRITICAL comparten <code>.log-err</code> en el parser actual (<code>.log-crit</code> existe en CSS pero no está cableado a un nivel distinto).
+  </div>
+
+  <div class="ds-section">Línea [DETAILS] destacada (balance subrayado)</div>
+  <div class="ds-logs-view">
+    <span class="ds-log-line ds-log-details"><span class="ds-log-ts">14:33:20</span><span class="ds-log-level ds-log-info">INFO</span><span class="ds-log-logger">betmexico</span><span class="ds-log-msg">Cuenta activa — <span class="ds-log-balance">Balance: 1,245.00</span></span></span>
+  </div>
+  <div style="font-size:9px;color:rgba(238,240,243,0.34);font-family:'JetBrains Mono',monospace">
+    Líneas con <code>[DETAILS]</code> (BetMexico) reemplazan el prefijo por fondo ámbar tenue + texto blanco; el monto de balance queda subrayado en acento. Los ✅ del mensaje crudo se aplastan a ✔️ para no confundirse con status real de depósito.
+  </div>
+
+  <div class="ds-section">Filtro de ruido (backend)</div>
+  <div style="font-size:10.5px;color:rgba(238,240,243,0.72);max-width:520px">
+    El backend (<code>app.py</code>) descarta patrones <code>[KYC ...]</code> conocidos como ruido antes de exponerlos a <code>/api/logs</code> — la vista de logs solo recibe señal relevante, no relleno repetitivo.
+  </div>
+</div>

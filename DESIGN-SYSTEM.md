@@ -234,10 +234,19 @@ Body base: 13px. Rendering: `-webkit-font-smoothing: antialiased`.
 - **Animación entrada:** clip-path inset expanding (semilla arriba-centro → full) + blur fade, 380ms
 - **Escritura líquida:** contenido "cuaja" de gotas borrosas — stagger por bloque (62ms step), blur→nítido
 - **Layout 3 columnas:** identidad (max-content) | movimientos (flex:1.35) | escenario (flex:1)
-- **Grade-color:** tinte de vidrio rota hue según grade (A+/A/B/C/D/U), NO el fondo
+- **Grade-color:** tinte de vidrio rota hue según grade (A+/A/B/C/D/U), NO el fondo. Tokens locales (scoped a `.pantalla-sheet`, reescritos por `[data-grade]`):
+  ```css
+  --pat-gold:      oklch(0.80 0.085 160);   /* default = A; ver pantalla.css para B/C/D/U */
+  --pat-gold-soft: oklch(0.80 0.085 160 / 0.14);
+  --pat-edge:      oklch(0.80 0.085 160 / 0.28);
+  --pat-edge-h:    oklch(0.80 0.085 160 / 0.45);
+  ```
 - **Columna identidad:** combo copiable (15px mono nacarado) + saldo (26px display dorado) + guardado (tarjetas/notas/clabes)
 - **Columna movimientos:** filas compactas con borde lateral de color por resultado (verde/rojo/ámbar/tenue)
-- **Columna escenario:** vacía en reposo; deposit.js re-parenta aquí el bloque de escenas
+- **Columna escenario (en reposo):** apila 2 paneles compactos dorados uno debajo del otro — retiro (`.pat-wd-stage`, solo SA, gateado por `_withdrawBtnState(d, role)`) arriba, depósito (`.pat-dep-stage`, todos los roles) abajo separado por hairline (`border-top: 1px solid var(--pat-edge)`). Mismo lenguaje visual dorado que el resto de La Pantalla, NO el look verde del panel de depósitos viejo (`depos.css`) — el compacto reusa el motor JS (`Depos.mountCompact`, monta `#deposCompactTpl` en `#patDepSlot`) pero re-skinnea `chip`/`chip-x`/`amt-preset` scoped a `.pat-dep-stage` sin tocar `depos.css`.
+- **Columna escenario (misión activa):** deposit.js re-parenta aquí el bloque de escenas (`#depStage`, montado en `#patStageSlot`). Coexistencia por CSS puro: `.pat-col-stage:has(#depStage:not([hidden])) .pat-wd-stage, .pat-col-stage:has(#depStage:not([hidden])) .pat-dep-stage { display: none; }` — depos.js queda intacto, la prioridad visual la resuelve el `:has()`.
+- **CTA deshabilitado durante misión:** `.pat-act-dep:disabled` / `.pat-act-wd:disabled` — `opacity:.4`, `cursor:not-allowed`, fondo `var(--pat-edge)`, color `var(--text-dim)`, sin glow ni transform en hover. Evita doble-disparo de depósito/retiro mientras ya corre una misión.
+- **Ancho medio "cramped":** cuando las 3 columnas no caben lado a lado (`.pat-col-ident` max-content + `.pat-col-txns` min 340px + `.pat-col-stage` min 380px superan el ancho disponible), `pantalla.js` (`_syncColumnsFit`) mide `scrollWidth` real de `.pat-columns` vs su `clientWidth` — NO un breakpoint px inventado — y marca `.pat-cramped`: las columnas se apilan verticalmente con scroll. A diferencia de mobile (≤767px), el escenario NO se oculta, solo cambia de eje.
 - **Responsive:** mobile ≤767px apila a 1 columna, oculta escenario, botones 44px touch target
 
 ### 3.6 Panel de Depósitos
@@ -249,6 +258,7 @@ Body base: 13px. Rendering: `-webkit-font-smoothing: antialiased`.
 - **CTA:** Clash Display bold, gradiente accent, sheen animation al hover
 - **Journey/scenes:** SVG animado (login→form→processing→retry→done), re-parentado a La Pantalla en col 3
 - **Bitácora:** movimientos en vivo, filas con dot de color por estado
+- **Variante compacta (La Pantalla, col 3):** `.pat-dep-stage` — mismo motor JS (`Depos.mountCompact`/`#deposCompactTpl`), controles reducidos (chips cuenta/tarjetas, presets de monto, repeticiones `.pat-dep-reps`, botón "nuevo proceso" `.pat-dep-newproc`) re-skinneados en dorado (`--pat-gold`) en vez del verde del panel dock/modal. Ver 3.5.
 
 ### 3.7 Modal
 
@@ -279,9 +289,11 @@ Body base: 13px. Rendering: `-webkit-font-smoothing: antialiased`.
 | `.ico-btn` | Icono | 24px, round 6px |
 | `.nav` | Sidebar | Accent bar on active, translateX hover |
 | `.pat-act` | La Pantalla | 26px, borde hairline, accent on hover |
-| `.pat-act-dep` | Depósito CTA | Relleno sólido accent + glow permanente |
+| `.pat-act-dep` | Depósito CTA | Relleno `var(--pat-gold)` (tinte por grado) + glow permanente. `:disabled` durante misión activa |
+| `.pat-act-wd` | Retiro CTA (SA) | Relleno `var(--pat-gold)`, mismo lenguaje que `.pat-act-dep`. `:disabled` durante misión o si retiro no procede (`_withdrawBtnState`) |
 
 **Regla:** TODO botón tiene `transition: var(--ease-fast)` en background, color, border-color, box-shadow, transform.
+**Estado disabled (misión en curso):** `.pat-act-dep:disabled` / `.pat-act-wd:disabled` — `opacity:.4`, `cursor:not-allowed`, fondo `var(--pat-edge)`, color `var(--text-dim)`, `box-shadow:none`; hover no hace nada (`filter:none`/sin `transform`).
 
 ### 3.10 Inputs
 
@@ -312,6 +324,26 @@ Body base: 13px. Rendering: `-webkit-font-smoothing: antialiased`.
 - **Entrada:** slide + blur + spring bounce, 380ms
 - **Target glow:** outline pulsante verde en el elemento referenciado
 - **Dismiss:** "no mostrar de nuevo" con checkbox
+
+### 3.14 Log Viewer (vista Logs)
+
+Parseo estructurado de líneas de log crudo (`app.js`, formato `YYYY-MM-DD HH:MM:SS,ms [LEVEL] [logger] mensaje`) en componentes con color por severidad, en vez de texto plano monocromático.
+
+- **`.log-line`:** contenedor por línea, `display:block`, padding vertical mínimo (1px)
+- **`.log-ts`:** timestamp corto (HH:MM:SS, sin fecha), 10px, `opacity:.55`
+- **`.log-level`:** badge de nivel — 9.5px bold, padding `0 5px`, radius 3px
+  - `.log-err` → `color: var(--danger)` + `background: var(--danger-soft)` (ERROR/CRITICAL)
+  - `.log-warn` → `color: var(--warn)` + fondo `oklch(0.80 0.16 75 / 0.12)` (WARNING)
+  - `.log-info` → `color: var(--accent)` (INFO, default)
+  - `.log-crit` → `color:#fff` + `background: var(--danger)` (uso reservado, ver nota abajo)
+  - `.log-debug` → `color: var(--text-dim)`, `opacity:.45`
+- **`.log-logger`:** último segmento del logger (`betmexico.dashboard.db` → `db`), 10px, `opacity:.5`
+- **`.log-msg`:** color `var(--text)`; los ✅ del texto crudo se aplastan a ✔️ para no confundir con status real de depósito
+- **`.log-details` (línea completa):** resalta líneas `[DETAILS]` de BetMexico — fondo `oklch(0.25 0.05 75)` (ámbar tenue), `.log-msg` en `#fff`, con `.log-balance` (monto) en bold + subrayado `var(--accent)`
+- **`.log-level-counts` (header):** contador de errores/warnings — `.lc-e` (✗N, `var(--danger)` bold) y `.lc-w` (⚠N, `var(--warn)` bold)
+- **Filtro de ruido:** el backend (`app.py`) descarta patrones `[KYC ...]` conocidos como ruido antes de exponerlos a `/api/logs` — la vista solo recibe señal, no relleno.
+
+Nota: ERROR y CRITICAL comparten `.log-err` en el parser actual (`_renderLogLine`); `.log-crit` existe en CSS pero no está cableado a un nivel distinto todavía.
 
 ---
 
@@ -469,6 +501,25 @@ Cualquier elemento con `[data-copy]` o `[data-combo]`:
 - **Emoji:** indicadores semánticos (🔴 verde, 🟡 ámbar, 🟣 púrpura, 💳 tarjeta, 📝 nota, 📌 pin, ⚡ actividad)
 - **Unicode:** flechas, búsqueda, multiplicación
 
+### 7.1 Iconos de Actividad (unificados, `activity_logic.js`)
+
+Antes mezclaban 💰/✗/⏸/🔓 con semántica inconsistente entre depósito, retiro y lock (2026-07-26: unificado para que ✅/❌ signifiquen SIEMPRE éxito/fallo real, sin importar el tipo de evento).
+
+| Icono | Evento | `cls` (color en `.lp-feed-*`) |
+|-------|--------|-------------------------------|
+| ✅ | Depósito aprobado / retiro exitoso o completado | `ok` → `.lp-feed-ok .lp-feed-amt` en `var(--accent)` |
+| ❌ | Depósito rechazado por banco (REAL) / retiro fallido | `fail` → `.lp-feed-fail .lp-feed-amt` tachado + `.lp-feed-ic` en `var(--danger)` |
+| ⚠️ | Depósito no aplicado (transitorio, no es rechazo de banco) / cuenta en cooldown | `warn` |
+| 🚨 | Error crítico de conexión (`critical_error`) | `fail` |
+| 🔐 | 3DS requerido | `neutral` |
+| 🏧 | Retiro iniciado (`withdrawal`, sin status terminal aún) | `neutral` |
+| 🔒 | Cuenta tomada (`lock`) | `neutral` |
+| ✔️ | Cuenta liberada (`unlock`/`unlock_auto`) | `neutral` |
+| 📌 | Cuenta fijada (`mark`) | `neutral` |
+| ↘ / ↗ | Cuenta retirada del pool / expuesta al pool (`pool_move`) | `neutral` |
+
+Nota: `cls: 'warn'` es nuevo en el JS pero `.lp-feed-warn` todavía no tiene regla CSS dedicada en `style.css` — cae al estilo base de `.lp-feed-row` hasta que se agregue.
+
 ---
 
 ## 8. Recomendaciones para Nuevos Componentes
@@ -503,12 +554,14 @@ Cualquier elemento con `[data-copy]` o `[data-combo]`:
 
 | Archivo | Líneas | Contenido |
 |---------|--------|-----------|
-| `static/style.css` | 4333 | Tokens + layout + todos los componentes |
-| `static/depos.css` | 675 | Panel depósitos + escenas SVG |
-| `static/pantalla.css` | 1005 | La Pantalla overlay + contenido |
-| `static/index.html` | ~350 | Estructura HTML shell |
+| `static/style.css` | 4353 | Tokens + layout + todos los componentes + log viewer |
+| `static/depos.css` | 674 | Panel depósitos (dock/modal) + escenas SVG |
+| `static/pantalla.css` | 1045 | La Pantalla overlay + contenido + paneles compactos retiro/depósito |
+| `static/index.html` | 1099 | Estructura HTML shell |
+| `static/activity_logic.js` | 47 | Formato de eventos de actividad (iconos unificados, dedupe) |
 | `docs/FRONTEND.md` | 650+ | Arquitectura frontend |
 
 ---
 
 *Generado 2026-07-26. Fuente: extracción directa de los CSS del dashboard.*
+*Actualizado 2026-07-26 (sesión posterior): paneles compactos de retiro/depósito en La Pantalla col 3, `.pat-cramped`, iconos de actividad unificados, log viewer estructurado.*

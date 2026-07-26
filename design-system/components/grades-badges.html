@@ -41,6 +41,15 @@
   .ds-status.st-fail { background: oklch(0.66 0.21 24 / 0.12); color: oklch(0.66 0.21 24); }
   /* Badge count */
   .ds-badge { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: oklch(0.66 0.21 24); color: #fff; font-size: 9.5px; font-weight: 700; font-family: 'JetBrains Mono', monospace; display: inline-flex; align-items: center; justify-content: center; border: 2px solid #101216; }
+  /* Activity feed icons (activity_logic.js, unificados 2026-07-26) — cls: ok/fail/warn/neutral */
+  .ds-act-row { display: flex; align-items: center; gap: 7px; font-size: 11.5px; padding: 3px 0; }
+  .ds-act-ic { font-size: 12px; flex: 0 0 auto; }
+  .ds-act-row.ok .ds-act-amt { color: oklch(0.50 0.11 160); font-weight: 600; }
+  .ds-act-row.fail { opacity: .72; }
+  .ds-act-row.fail .ds-act-amt { color: rgba(238,240,243,0.52); text-decoration: line-through; font-weight: 600; }
+  .ds-act-row.fail .ds-act-ic { color: oklch(0.66 0.21 24); opacity: .7; }
+  .ds-act-row.warn .ds-act-amt { color: oklch(0.80 0.16 75); font-weight: 600; }
+  .ds-act-row.neutral .ds-act-amt { color: rgba(238,240,243,0.72); }
 </style>
 <div class="ds-grades">
   <div class="ds-section">Grade Badges (pill)</div>
@@ -94,5 +103,19 @@
     <span class="ds-badge">3</span>
     <span class="ds-badge" style="min-width:20px">12</span>
     <span class="ds-badge" style="background:oklch(0.80 0.16 75);animation:bellPulse 1.6s ease-in-out infinite">5</span>
+  </div>
+
+  <div class="ds-section">Activity Feed Icons (unificados, activity_logic.js)</div>
+  <div style="display:flex;flex-direction:column;gap:0;max-width:420px">
+    <div class="ds-act-row ok"><span class="ds-act-ic">✅</span><span style="flex:1">robert depositó $500 a garcia@ — aprobado</span><span class="ds-act-amt">$500</span></div>
+    <div class="ds-act-row fail"><span class="ds-act-ic">❌</span><span style="flex:1">robert intentó $1,000 a lopez@ — rechazado (banco)</span><span class="ds-act-amt">$1,000</span></div>
+    <div class="ds-act-row warn"><span class="ds-act-ic">⚠️</span><span style="flex:1">robert $300 a perez@ — no aplicado (timeout)</span></div>
+    <div class="ds-act-row fail"><span class="ds-act-ic">🚨</span><span style="flex:1">Problema de conexión</span></div>
+    <div class="ds-act-row neutral"><span class="ds-act-ic">🏧</span><span style="flex:1">robert inició retiro $200 de garcia@</span></div>
+    <div class="ds-act-row neutral"><span class="ds-act-ic">🔒</span><span style="flex:1">carlos tomó perez@</span></div>
+    <div class="ds-act-row neutral"><span class="ds-act-ic">✔️</span><span style="flex:1">perez@ liberada</span></div>
+  </div>
+  <div style="font-size:9px;color:rgba(238,240,243,0.34);font-family:'JetBrains Mono',monospace;margin-top:2px">
+    Antes: 💰/✗/⏸/🔓 mezclados con semántica inconsistente. Ahora ✅/❌ = SIEMPRE éxito/fallo real (depósito Y retiro), ⚠️ = transitorio/no terminal, 🚨 = error crítico. `cls:'warn'` es nuevo en el JS — `.lp-feed-warn` (real, en style.css) aún no tiene regla CSS dedicada, el color de arriba es orientativo (token `--warn`).
   </div>
 </div>

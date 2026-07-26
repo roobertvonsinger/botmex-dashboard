@@ -45,7 +45,24 @@
   .ds-pat-act:hover { color: oklch(0.80 0.085 160); border-color: oklch(0.80 0.085 160 / 0.28); background: oklch(0.80 0.085 160 / 0.14); }
   .ds-pat-dep { color: #08090c; background: oklch(0.80 0.085 160); border-color: transparent; box-shadow: 0 0 14px -5px oklch(0.80 0.085 160); }
   .ds-pat-dep:hover { background: oklch(0.86 0.09 160); }
+  .ds-pat-dep:disabled, .ds-pat-gold:disabled { opacity: .4; cursor: not-allowed; background: oklch(0.80 0.085 160 / 0.28); color: rgba(238,240,243,0.72); box-shadow: none; }
   .ds-stage-placeholder { width: 100%; height: 120px; border-radius: 8px; background: oklch(0.06 0.008 160 / 0.40); border: 1px dashed oklch(0.80 0.085 160 / 0.20); display: flex; align-items: center; justify-content: center; font-size: 11px; color: rgba(238,240,243,0.34); font-family: 'JetBrains Mono', monospace; }
+  /* Paneles compactos de col-stage (retiro + depósito) — en reposo llenan el espacio
+     que antes quedaba vacío. Dorado (--pat-gold), NO el verde del panel viejo. */
+  .ds-wd-panel, .ds-dep-panel { display: flex; flex-direction: column; gap: 6px; width: 100%; font-size: 11px; }
+  .ds-dep-panel { padding-top: 8px; margin-top: 2px; border-top: 1px solid oklch(0.80 0.085 160 / 0.28); }
+  .ds-panel-head { font-size: 12px; font-weight: 600; display: flex; gap: 5px; align-items: center; }
+  .ds-panel-dim { color: rgba(238,240,243,0.72); font-weight: 400; }
+  .ds-panel-mode { font-weight: 400; color: rgba(238,240,243,0.72); font-size: 10px; margin-left: auto; }
+  .ds-panel-sub { font-size: 10.5px; color: rgba(238,240,243,0.72); }
+  .ds-panel-sub b { color: oklch(0.80 0.085 160); font-family: 'JetBrains Mono', monospace; }
+  .ds-panel-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .ds-panel-input { width: 100%; background: oklch(0.06 0.008 160 / 0.40); border: 1px solid oklch(0.80 0.085 160 / 0.28); border-radius: 6px; padding: 4px 8px; color: #eef0f3; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .ds-pat-gold { color: #08090c; background: oklch(0.80 0.085 160); border-color: transparent; box-shadow: 0 0 12px -6px oklch(0.80 0.085 160); }
+  .ds-dep-chip { background: oklch(0.80 0.085 160 / 0.08); border: 1px solid oklch(0.80 0.085 160 / 0.28); border-radius: 20px; padding: 2px 8px; font-size: 10px; display: inline-flex; align-items: center; gap: 4px; }
+  .ds-dep-chip .x { cursor: pointer; opacity: .6; }
+  .ds-amt-preset { border: 1px solid oklch(0.80 0.085 160 / 0.28); border-radius: 6px; padding: 2px 8px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; cursor: pointer; color: rgba(238,240,243,0.72); }
+  .ds-amt-preset.on { background: oklch(0.80 0.085 160 / 0.14); color: oklch(0.80 0.085 160); border-color: oklch(0.80 0.085 160 / 0.45); }
 </style>
 <div class="ds-pantalla">
   <div class="ds-section">La Pantalla — Tempered Glass (Grade A, green tint)</div>
@@ -73,7 +90,25 @@
           <div class="ds-mv fail"><span style="font-size:12px;flex:0 0 auto">💳</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(238,240,243,0.34);white-space:nowrap">12:48</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(238,240,243,0.72)">Depósito $1000 visa</span><span class="ds-mv-a">$1,000</span></div>
         </div>
         <div class="ds-col ds-col-stage">
-          <div class="ds-stage-placeholder">escenario de depósito<br>(vacío en reposo)</div>
+          <div class="ds-wd-panel">
+            <div class="ds-panel-head">🏧 Retirar — <span class="ds-panel-dim">robert@gmail.com</span></div>
+            <div class="ds-panel-sub">Saldo Real: <b>$1,245.00</b></div>
+            <div class="ds-panel-row">
+              <input class="ds-panel-input" value="500.00">
+              <button class="ds-pat-act ds-pat-gold">Retirar</button>
+            </div>
+          </div>
+          <div class="ds-dep-panel">
+            <div class="ds-panel-head">⚡ Depositar <span class="ds-panel-mode">compacto</span></div>
+            <div class="ds-panel-row">
+              <span class="ds-dep-chip">robert@gmail.com <span class="x">×</span></span>
+            </div>
+            <div class="ds-panel-row">
+              <div class="ds-amt-preset on">$500</div>
+              <div class="ds-amt-preset">$1,000</div>
+              <div class="ds-amt-preset">$1,500</div>
+            </div>
+          </div>
         </div>
       </div>
       <!-- Actions bottom-right -->
@@ -83,5 +118,31 @@
   </div>
   <div style="font-size:9px;color:rgba(238,240,243,0.34);font-family:'JetBrains Mono',monospace;margin-top:4px">
     Glass: backdrop-blur 34px + grain overlay + scanline + multi-layer box-shadow. Grade tint rotates hue. Actions bottom-right.
+  </div>
+
+  <div class="ds-section">Col-Stage — En Reposo (SA): Retiro + Depósito Compactos</div>
+  <div style="font-size:9px;color:rgba(238,240,243,0.34);font-family:'JetBrains Mono',monospace">
+    `.pat-wd-stage` (solo SA, gateado por rol) apilado sobre `.pat-dep-stage` (todos los roles), separados por hairline dorado. Mismo `--pat-gold` que el resto de La Pantalla — NO el verde del panel de depósitos viejo (dock/modal). Si hay misión activa, `#depStage` los reemplaza vía CSS `:has()` — depos.js intacto.
+  </div>
+
+  <div class="ds-section">CTA Dorado — Estado Disabled (misión en curso)</div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="ds-pat-act ds-pat-gold">Retirar</button>
+    <button class="ds-pat-act ds-pat-gold" disabled>Retirar</button>
+    <button class="ds-pat-act ds-pat-dep">⚡ Depositar</button>
+    <button class="ds-pat-act ds-pat-dep" disabled>⚡ Depositar</button>
+    <span style="font-size:9px;color:rgba(238,240,243,0.34);font-family:'JetBrains Mono',monospace;margin-left:4px">← disabled: opacity .4, sin glow, cursor not-allowed</span>
+  </div>
+
+  <div class="ds-section">.pat-cramped — Columnas Apiladas (ancho medio, ~768–1530px)</div>
+  <div class="ds-sheet" style="padding:2px">
+    <div class="ds-sheet-content" style="display:flex;flex-direction:column;gap:10px;padding:12px 16px">
+      <div style="border-bottom:1px solid oklch(0.80 0.085 160 / 0.28);padding-bottom:8px;font-size:11px;color:rgba(238,240,243,0.72)">↕ identidad</div>
+      <div style="border-bottom:1px solid oklch(0.80 0.085 160 / 0.28);padding-bottom:8px;font-size:11px;color:rgba(238,240,243,0.72)">↕ movimientos</div>
+      <div style="font-size:11px;color:rgba(238,240,243,0.72)">↕ escenario (NO se oculta, solo apila con ancho completo)</div>
+    </div>
+  </div>
+  <div style="font-size:9px;color:rgba(238,240,243,0.34);font-family:'JetBrains Mono',monospace">
+    `pantalla.js` (`_syncColumnsFit`) mide `scrollWidth` real de `.pat-columns` vs `clientWidth` — no un breakpoint px inventado. Distinto de mobile (≤767px), donde el escenario SÍ se oculta.
   </div>
 </div>
