@@ -736,6 +736,116 @@
     _mounted = true;
   }
 
+  // ── montaje del panel COMPACTO (dentro de La Pantalla) ──
+  // Clona #deposCompactTpl UNA sola vez (persiste igual que #depStage — se re-parenta,
+  // nunca se re-clona). Reseed de _dx SOLO si no hay misión corriendo Y la cuenta visible
+  // cambió: evita pisar una misión activa (bulk float o compacta) a medio camino.
+  function mountCompact(d) {
+    if (!d || !d.id) return;
+    const slot = document.getElementById('patDepSlot');
+    if (!slot) return;
+    if (!elC) {
+      const tplC = document.getElementById('deposCompactTpl');
+      if (!tplC) return;
+      slot.appendChild(tplC.content.cloneNode(true));
+      elC = document.getElementById('depCompact');
+      if (!elC) return;
+      wireCompactStatic();
+      _mountedC = true;
+    } else if (elC.parentNode !== slot) {
+      slot.appendChild(elC);
+    }
+    const needsReseed = !_dx.running && (_dx.target !== 'compact' || !_dx.accounts.length || _dx.accounts[0].id !== d.id);
+    if (needsReseed) {
+      _dx.target = 'compact';
+      _dx.accounts = [{ id: d.id, email: d.email || '', password: d.password || '', grade: (d.grade || '').toLowerCase() }];
+      _dx.cards = []; _dx.reps = 1; _dx.amount = 50; _dx.cap = null;
+      _dx.sched = null; _dx.mm = null; _dx.cancelled = false; _dx.balRefreshed = false;
+      renderAccounts(); renderCards(); refreshMode(); drawReps();
+      resolveAccounts().then(() => { renderAccounts(); refreshMode(); });
+      loadSavedCards();
+      refreshCap().then(refreshMode);
+    } else if (_dx.target === 'compact') {
+      // misma cuenta, solo re-pintar (p.ej. La Pantalla se re-renderizó por otro motivo)
+      renderAccounts(); renderCards(); refreshMode(); drawReps();
+    }
+  }
+
+  // Rescata elC de `detail` ANTES de que pantalla.js haga innerHTML= (mismo patrón que
+  // _rescueStage en pantalla.js para #depStage) — si no, el wipe lo desconecta del DOM.
+  function rescueCompact(detail) {
+    if (elC && detail && detail.contains(elC)) document.body.appendChild(elC);
+  }
+
+  // Listeners del panel COMPACTO — subconjunto de wireStatic() (sin #dep: el disparo
+  // vive en .pat-actions vía window.Depos.fireCompact; sin greet/drag-window/pause:
+  // no aplican a un panel inline). Reusa las MISMAS funciones (renderAccounts,
+  // renderCards, startAddCard, addAccounts) — cero lógica duplicada.
+  function wireCompactStatic() {
+    if (!elC) return;
+    const up = elC.querySelector('#repUp'), dn = elC.querySelector('#repDn');
+    if (up) up.onclick = () => { _dx.reps = Math.min(20, _dx.reps + 1); drawReps(); refreshMode(); };
+    if (dn) dn.onclick = () => { _dx.reps = Math.max(1, _dx.reps - 1); drawReps(); refreshMode(); };
+
+    const accBox = elC.querySelector('#accChips');
+    if (accBox) accBox.addEventListener('click', (e) => {
+      if (e.target.classList.contains('chip-x')) {
+        const chip = e.target.closest('.chip');
+        const txt = chip && chip.querySelector('.txt[data-copy]');
+        const combo = (txt && txt.getAttribute('data-copy')) || '';
+        const email = combo.split(':')[0];
+        _dx.accounts = _dx.accounts.filter((a) => a.email !== email);
+        renderAccounts(); refreshMode();
+      }
+    });
+
+    const cardBox = elC.querySelector('#cardChips');
+    if (cardBox) cardBox.addEventListener('click', (e) => {
+      if (e.target.classList.contains('chip-add')) { startAddCard(e.target); return; }
+      if (e.target.classList.contains('chip-x')) {
+        const idx = parseInt(e.target.getAttribute('data-idx'), 10);
+        if (!isNaN(idx)) { _dx.cards.splice(idx, 1); renderCards(); }
+      }
+    });
+
+    elC.addEventListener('click', (e) => {
+      const c = e.target.closest('.copyable');
+      if (c && !e.target.classList.contains('chip-x')) {
+        const v = c.getAttribute('data-copy');
+        if (navigator.clipboard && v) navigator.clipboard.writeText(v);
+        showToast('copiado');
+      }
+    });
+
+    // drop de cuentas arrastradas desde la tabla (mismo mecanismo que el flotante)
+    const DND_TYPE = 'application/x-bmx-accounts';
+    const hasAccPayload = (dt) => !!dt && Array.prototype.indexOf.call(dt.types || [], DND_TYPE) >= 0;
+    elC.addEventListener('dragover', (e) => {
+      if (!hasAccPayload(e.dataTransfer)) return;
+      e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
+      elC.classList.add('dw-drop-hot');
+    });
+    elC.addEventListener('dragleave', (e) => {
+      if (!elC.contains(e.relatedTarget)) elC.classList.remove('dw-drop-hot');
+    });
+    elC.addEventListener('drop', (e) => {
+      elC.classList.remove('dw-drop-hot');
+      const raw = e.dataTransfer && e.dataTransfer.getData(DND_TYPE);
+      if (!raw) return;
+      e.preventDefault();
+      let list; try { list = JSON.parse(raw); } catch (_) { return; }
+      if (_dx.target === 'compact') addAccounts(list);
+    });
+
+    const inp = elC.querySelector('#amtInput');
+    if (inp) inp.addEventListener('input', (e) => {
+      const v = parseInt(e.target.value, 10);
+      if (!isNaN(v)) _dx.amount = v;
+    });
+
+    const ab = elC.querySelector('#abort'); if (ab) ab.onclick = onAbort;
+  }
+
   // El header (banner/personaje + greeting) es la zona de arrastre; los controles
   // (dock izq/der, cerrar) flotan en la esquina superior derecha. + divisor del dock.
   function injectWindow() {
@@ -853,8 +963,13 @@
   // ── open/close ──
   function onEsc(e) { if (e.key === 'Escape') window.closeDepos(); }
 
-  // API pública mínima (drag→panel desde app.js).
-  window.Depos = { addAccounts: addAccounts };
+  // API pública (drag→panel desde app.js + montaje/disparo del panel compacto desde pantalla.js).
+  window.Depos = {
+    addAccounts: addAccounts,
+    mountCompact: mountCompact,
+    rescueCompact: rescueCompact,
+    fireCompact: () => onDeposit(),
+  };
 
   window.openDepos = async function (opts) {
     opts = opts || {};

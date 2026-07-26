@@ -219,6 +219,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `83f8abb` | refactor(depos): _dx.target decide el destino de render (float/compact) sin cambiar comportamiento |
 | `d68cb5d` | feat(depos): template+CSS del panel de depósito compacto en col 3 (inerte, sin JS aún) |
 | `c423902` | refactor(logs): síntesis de feeds — filtrar ruido, unificar renderers, chips de nivel |
 | `6c68b27` | docs(plan): implementación depósito compacto col 3 — 7 tareas, doble destino de render en depos.js |
@@ -230,7 +231,6 @@ prewarm.py (router)
 | `3e369ce` | fix(db): reescribir callers web para no usar singleton betmexico_db |
 | `67c2488` | fix(db): cerrar conexiones sqlite3 crudas en web_grading (causa raíz del lock SOSTENIDO) |
 | `862e3e6` | fix(db): retry+backoff a writes del keeper/cooldown/auto_lock — depósito no se detiene |
-| `1577e91` | fix(db): touch de auditoría fuera del path síncrono de account_details |
 <!-- GEN:end:recientes -->
 
 ---
