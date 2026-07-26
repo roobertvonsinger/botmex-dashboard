@@ -752,9 +752,9 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
 | `_load_analyzer` | def | L27–L35 |
-| `recalc_grade_from_db` | def | L47–L93 |
-| `recalc_grade_from_details` | def | L96–L121 |
-| `note_a_plus_outcome` | def | L124–L179 |
+| `recalc_grade_from_db` | def | L47–L102 |
+| `recalc_grade_from_details` | def | L105–L136 |
+| `note_a_plus_outcome` | def | L139–L197 |
 
 ### `web_utils.py`
 

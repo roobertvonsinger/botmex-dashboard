@@ -133,7 +133,7 @@ prewarm.py (router)
 | `test_withdrawals_endpoints.py` | 412 | `—` | _[completar]_ |
 | `test_withdrawals_migrate.py` | 46 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
-| `web_grading.py` | 179 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
+| `web_grading.py` | 197 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
 | `web_utils.py` | 265 | `betmexico.web.utils` | Helpers compartidos: _friendly_error, _normalize_ccexp, _build_proxy_url |
 | `withdrawals.py` | 388 | `betmexico.dashboard.withdrawals` | _[completar]_ |
 <!-- GEN:end:modulos -->
@@ -219,6 +219,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `862e3e6` | fix(db): retry+backoff a writes del keeper/cooldown/auto_lock — depósito no se detiene |
 | `1577e91` | fix(db): touch de auditoría fuera del path síncrono de account_details |
 | `3b59fe7` | diag(db): instrumentar db(write=True) para cazar el lock sostenido en vivo |
 | `db45738` | fix(retiro): persist con retry+backoff — no perder el registro si BD está lockeada |
@@ -230,7 +231,6 @@ prewarm.py (router)
 | `72d1863` | feat(retiro): _withdrawBtnState — estado del botón dedicado (TDD) |
 | `eb9a9bb` | docs(retiro): spec v2 + plan — panel en col 3 (no popup flotante) |
 | `d5107f8` | docs(plan): botón de retiro dedicado + popup de monto — 6 tasks |
-| `207b29d` | docs(spec): botón de retiro dedicado + popup de monto |
 <!-- GEN:end:recientes -->
 
 ---

@@ -55,8 +55,17 @@ def recalc_grade_from_db(email: str, db_path: str = "/data/betmexico_accounts.db
     """
     if not score_payment_readiness:
         return None
+    # CAUSA RAÍZ del `database is locked` SOSTENIDO (2026-07-25, caza Haiku):
+    # antes `conn = sqlite3.connect(db_path)` sin timeout y sin try/finally; si el
+    # execute/commit chocaba con un lock y lanzaba, el except tragaba la excepción
+    # PERO conn.close() nunca corría → la conexión quedaba abierta con transacción
+    # implícita sin commit/rollback → sostenía el writer lock INDEFINIDAMENTE
+    # (solo docker restart lo liberaba). Cada depósito que fallaba fugaba otra.
+    # Fix: try/finally garantiza close (que rollbackea la transacción pendiente) +
+    # timeout=10 para coincidir con el context manager `db()` de app.py.
+    conn = None
     try:
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(db_path, timeout=10)
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             "SELECT txn_date, status, txn_type, gateway, amount "
@@ -65,7 +74,6 @@ def recalc_grade_from_db(email: str, db_path: str = "/data/betmexico_accounts.db
             (email,),
         ).fetchall()
         if not rows:
-            conn.close()
             return None
         details = {"transactions": {
             "fetched": True,
@@ -74,7 +82,6 @@ def recalc_grade_from_db(email: str, db_path: str = "/data/betmexico_accounts.db
         }}
         sc = score_payment_readiness(details)
         if not sc:
-            conn.close()
             return None
         # A+ es un override manual (3DS detectado por el matchmaker, no lo calcula
         # el analyzer V10) — un recalc de rutina (login/check/depósito/prewarm) NUNCA
@@ -86,11 +93,13 @@ def recalc_grade_from_db(email: str, db_path: str = "/data/betmexico_accounts.db
             (sc["grade"], sc["score"], email),
         )
         conn.commit()
-        conn.close()
         return sc
     except Exception as e:
         logger.warning(f"[grading] recalc failed para {email}: {e}")
         return None
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def recalc_grade_from_details(email: str, details: dict, db_path: str = "/data/betmexico_accounts.db") -> Optional[dict]:
@@ -101,24 +110,30 @@ def recalc_grade_from_details(email: str, details: dict, db_path: str = "/data/b
     """
     if not score_payment_readiness:
         return None
+    sc = score_payment_readiness(details)
+    if not sc:
+        return None
+    # Mismo fix de fuga que recalc_grade_from_db (ver nota ahí): try/finally garantiza
+    # close + timeout=10. El except anterior NO cerraba conn → transacción abierta
+    # sostenía el writer lock indefinidamente bajo contención.
+    conn = None
     try:
-        sc = score_payment_readiness(details)
-        if not sc:
-            return None
-        conn = sqlite3.connect(db_path)
         # Ver nota en recalc_grade_from_db: un recalc de rutina no pisa A+; solo
         # note_a_plus_outcome (2 declines de banco consecutivas) lo baja a B.
+        conn = sqlite3.connect(db_path, timeout=10)
         conn.execute(
             "UPDATE accounts SET grade=?, grade_score=? "
             "WHERE LOWER(email)=LOWER(?) AND COALESCE(grade,'') != 'A+'",
             (sc["grade"], sc["score"], email),
         )
         conn.commit()
-        conn.close()
         return sc
     except Exception as e:
         logger.warning(f"[grading] recalc_from_details failed para {email}: {e}")
         return None
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def note_a_plus_outcome(email: str, status: str, db_path: str = "/data/betmexico_accounts.db") -> None:
@@ -142,8 +157,10 @@ def note_a_plus_outcome(email: str, status: str, db_path: str = "/data/betmexico
     """
     if status not in ("approved", "rejected"):
         return  # no-banco / 3DS → ni incrementa ni resetea el streak
+    # Mismo fix de fuga que recalc_grade_from_db: try/finally + timeout=10.
+    conn = None
     try:
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(db_path, timeout=10)
         conn.row_factory = sqlite3.Row
         row = conn.execute(
             "SELECT COALESCE(grade,'') AS grade, COALESCE(a_plus_decline_streak,0) AS streak "
@@ -151,7 +168,6 @@ def note_a_plus_outcome(email: str, status: str, db_path: str = "/data/betmexico
             (email,),
         ).fetchone()
         if not row or row["grade"] != "A+":
-            conn.close()
             return
         if status == "approved":
             conn.execute(
@@ -174,6 +190,8 @@ def note_a_plus_outcome(email: str, status: str, db_path: str = "/data/betmexico
                     (new_streak, email),
                 )
         conn.commit()
-        conn.close()
     except Exception as e:
         logger.warning(f"[grading] note_a_plus_outcome failed para {email}: {e}")
+    finally:
+        if conn is not None:
+            conn.close()
