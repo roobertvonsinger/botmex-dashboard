@@ -219,6 +219,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `86c589d` | fix(retiro): withdraw_status nunca resolvía a terminal cuando BetMexico ya sacó el retiro de pendientes |
 | `fd385d7` | fix(retiro): panel col3 invisible en ancho medio — overflow horizontal nunca chequeado |
 | `3485718` | @ docs: NEXT-SESSION cierre sesión 2026-07-26 — monitor retiro + clabes |
 | `deccd2d` | @ fix(retiro): monitor notificación + poll dinámico + SSE broadcast + auto-clabes |
@@ -230,7 +231,6 @@ prewarm.py (router)
 | `db45738` | fix(retiro): persist con retry+backoff — no perder el registro si BD está lockeada |
 | `c2af215` | fix(retiro): pantalla.js leía window.state (siempre undefined) en vez de state |
 | `339f383` | docs: NEXT-SESSION cierre — botón retiro col 3 deployado, Task 5 validación visual pendiente |
-| `60c5361` | style(retiro): .pat-act-wd botón dorado + .pat-wd-stage panel en col 3 |
 <!-- GEN:end:recientes -->
 
 ---
