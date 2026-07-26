@@ -134,7 +134,7 @@ prewarm.py (router)
 | `test_withdrawals_migrate.py` | 46 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
 | `web_grading.py` | 197 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
-| `web_utils.py` | 265 | `betmexico.web.utils` | Helpers compartidos: _friendly_error, _normalize_ccexp, _build_proxy_url |
+| `web_utils.py` | 266 | `betmexico.web.utils` | Helpers compartidos: _friendly_error, _normalize_ccexp, _build_proxy_url |
 | `withdrawals.py` | 388 | `betmexico.dashboard.withdrawals` | _[completar]_ |
 <!-- GEN:end:modulos -->
 
@@ -219,6 +219,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `7578933` | @ fix(ui): notif depósito transitorio = "no procesado, reintentar" ≠ "rechazado" |
 | `c190fa2` | feat(pantalla): boton Depositar dispara directo al panel compacto (sin popup), rescata/monta el slot |
 | `bd431c4` | fix(depos): re-oculta #depStage al terminar mision compacta (evita panel muerto tras el 1er deposito) |
 | `0dc2609` | @ fix(deposits): "Declined" genérico NO es rechazo real de banco |
@@ -230,7 +231,6 @@ prewarm.py (router)
 | `4ef172d` | docs(spec): diseño depósito compacto conviviendo con retiro en col 3 |
 | `86c589d` | fix(retiro): withdraw_status nunca resolvía a terminal cuando BetMexico ya sacó el retiro de pendientes |
 | `fd385d7` | fix(retiro): panel col3 invisible en ancho medio — overflow horizontal nunca chequeado |
-| `3485718` | @ docs: NEXT-SESSION cierre sesión 2026-07-26 — monitor retiro + clabes |
 <!-- GEN:end:recientes -->
 
 ---

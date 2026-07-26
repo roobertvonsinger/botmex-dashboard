@@ -1268,6 +1268,7 @@ const _DEPOSIT_TRANSIENT = new Set([
 
 const _DEPOSIT_CODE_HUMANO = {
   BANK_REJECTED: 'el banco rechazó tu tarjeta',
+  Declined: 'error de pasarela, reintenta',
   'E-RED': 'error de red, intenta de nuevo',
   '3DS_REQUIRED': 'pidió verificación 3DS',
   RATE_LIMITED: 'la cuenta entró en enfriamiento',
