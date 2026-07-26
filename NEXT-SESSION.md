@@ -4,13 +4,20 @@
 > **Lente rectora:** ver `feedback_frictionless_norte` + `NORTE.md`. BOTMEXICO = frictionless, a prueba de desmadre, le GANA a BetMexico directo.
 
 ## 🎯 Objetivo en curso — NO se diluye
-**Botón de retiro dedicado + panel de monto en col 3 — Task 5 pendiente: validación visual + smoke funcional $1.** Implementación COMPLETA y deployada (5 commits `72d1863`..`60c5361` + spec/plan `207b29d`/`eb9a9bb`/`d5107f8`). El botón "Retirar" vive en `.pat-actions`, el panel de monto+estado vive en col 3 (`.pat-col-stage#patStageSlot`), coexistencia con `#depStage` vía CSS `:has()`. **Falta que Robert vea la pantalla** y dispare un retiro $1 de prueba.
+**Retiro end-to-end completo: monitor + poll + clabes + notificación.** Deployado `deccd2d` (2026-07-26). 4 fixes: (1) toast ✅/❌ al completar/fallar retiro, (2) SSE broadcast en `withdraw_status` para tiempo real, (3) poll 15s→60s dinámico + refresh cuenta al completar, (4) auto-fetch clabes SPEI al abrir La Pantalla. **Siguiente: smoke funcional $1 + Task 5 validación visual.**
 
 ### ✅ CIERRE PREVIO (sesión 2026-07-25 tardía) — Fix RESERVADA_SA RESUELTO
 La regresión "saldos no actualizan" quedó **cerrada y verificada en prod** (ver `docs/ERRORS.md` y commits `ba540e9`): `account_refresh.py` + `jwt_keeper.py` con `_sa_lock_tokens()` (RESERVADA_SA `pool=0 + locked_by` del SA entra al universo de refresh). Caso real: `espinoza` $0→$401.52, 32/32 tests verdes.
 
 ### ✅ CIERRE PREVIO (sesión 2026-07-25 noche) — Lock en `account_details:2952` RESUELTO
 La instrumentación `3b59fe7` cazó el lock sostenido: los 3 writes `#335/#336/#337` del 18:10 tenían origen `account_details:2952` — el `INSERT OR IGNORE INTO account_touches` (auditoría de quién abrió La Pantalla) vivía **síncrono en el path de read** bajo `with db(write=True)`. Bajo contención bot↔web (BD compartida), el touch esperaba hasta el `timeout=10s` → `database is locked` sostenido. **Fix:** `_record_account_touch()` extraída + despachada fire-and-forget en `threading.Thread(daemon=True)`. El request de `account_details` ya NO abre `db(write=True)`; el touch corre fuera del path síncrono (traga `OperationalError` en silencio — perder un toque de bitácora es aceptable, bloquear La Pantalla no). 5/5 tests nuevos + 55/55 pre-existentes verdes. Deployado: md5 `55f3b9c8...` servido en `botmexico.net`, health 200. **Instrumentación `3b59fe7` sigue corriendo** — vigilancia pasiva para confirmar que el lock no reaparece en otro sitio.
+
+### ✅ CIERRE (sesión 2026-07-26) — Monitor retiro + clabes auto-fetch
+4 fixes en `deccd2d`, deployados a KVM4 (health 200, 937 cuentas):
+- **Toast notificación** (`pantalla.js`): ✅/❌ visible al operador cuando retiro llega a terminal.
+- **SSE broadcast** (`app.py:withdraw_status`): `_broadcast()` cuando status cambia a terminal → otros clientes/tabs ven el cambio en tiempo real.
+- **Poll dinámico** (`pantalla.js`): 15s durante retiro activo (primeros 5min), degrada a 60s después. Al completar: refresh de la cuenta (saldo actualizado) + re-render.
+- **Auto-fetch clabes SPEI** (`pantalla.js`): al abrir La Pantalla con clabes vacías, dispara `POST /clabes/refresh` una sola vez por cuenta. BeginDeposit es idempotente (las clabes son FIJAS por usuario).
 
 ## ▶ Con qué arrancas (PRIMERA acción del próximo turno)
 **Validación visual del panel de retiro en col 3 + smoke funcional $1.** Pasos:
@@ -26,9 +33,9 @@ La instrumentación `3b59fe7` cazó el lock sostenido: los 3 writes `#335/#336/#
 Cerrar el Task 5 con la validación visual de Robert primero (es la parte cualitativa que solo él emite). Si el panel se ve mal colocado o rebasa, ajustar CSS medido (`getBoundingClientRect`, memoria `feedback_ui_ancla_medida_no_pixel_inventado`) — máximo 3 ciclos. Si cuaja, smoke $1 end-to-end (botón → endpoint → API BetMexico → bitácora → SSE → UI). El feature cierra ahí.
 
 ## ⏳ Pendientes próximos
-- [ ] **Task 5 — validación visual + smoke funcional $1:** Robert ve la pantalla, mide `getBoundingClientRect`, dispara retiro $1. Cierra el ciclo del botón.
-- [ ] **Watchdog de retiro pendiente + notificación al usuario** (anotado por Robert): "mientras este pendiente el retiro me gustaria que hubiera un watchdog... para avisar con una notificacion". Pospuesto post-botón-funcional.
-- [ ] **Auto-obtener clabes al actualizar:** aparte (decisión Robert: "No, tocar clabes aparte").
+- [ ] **Task 5 — validación visual + smoke funcional $1:** Robert ve la pantalla, dispara retiro $1. Cierra el ciclo del botón.
+- [ ] ~~Watchdog de retiro + notificación~~ ✅ HECHO (`deccd2d`): toast al completar/fallar + SSE broadcast + poll dinámico 15s→60s.
+- [ ] ~~Auto-obtener clabes~~ ✅ HECHO (`deccd2d`): auto-fetch al abrir La Pantalla si no existen.
 - [ ] **Deuda técnica — `locked_by` formatos mixtos:** `_sa_lock_tokens()` los tolera vía lookup en `auth.USERS`, pero el campo guarda `'RobertVS'` (username) y `'1341812706'` (telegram_id). Normalizar a un solo formato — NO bloqueante.
 - [ ] **Deuda técnica — copia duplicada en server:** `/app/account_refresh.py` y `/app/web/account_refresh.py` coexisten en KVM4. Se resuelve con Dockerfile rebuild.
 - [ ] **Síntoma 2 (database is locked esporádico):** vigilancia pasiva. Rearmar monitor vivo si reaparece.
