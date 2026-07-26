@@ -804,6 +804,33 @@
     });
   }
 
+  // Detecta si las 3 columnas caben lado a lado midiendo el ancho REAL
+  // (scrollWidth vs clientWidth de .pat-columns), no un breakpoint px inventado
+  // (feedback_ui_ancla_medida_no_pixel_inventado). Sin esto, entre mobile (≤767px)
+  // y desktop ancho el stage se desbordaba y quedaba invisible, clippeado por
+  // overflow:hidden de .pantalla-sheet (bug de campo 2026-07-26, ver pantalla.css
+  // §.pat-cramped). Se re-mide en cada render Y en cada resize de ventana —
+  // el mismo ancho de ventana puede caber o no según qué tan largo sea el combo
+  // de la cuenta abierta (.pat-col-ident es max-content).
+  function _syncColumnsFit() {
+    requestAnimationFrame(() => {
+      const wrap = document.querySelector('.pat-wrap');
+      const cols = wrap && wrap.querySelector('.pat-columns');
+      if (!wrap || !cols) return;
+      const cramped = cols.scrollWidth > cols.clientWidth + 1;
+      wrap.classList.toggle('pat-cramped', cramped);
+    });
+  }
+
+  let _columnsFitResizeWired = false;
+  function _wireColumnsFitResize() {
+    if (_columnsFitResizeWired) return;
+    _columnsFitResizeWired = true;
+    window.addEventListener('resize', () => {
+      if (document.querySelector('.pat-wrap')) _syncColumnsFit();
+    });
+  }
+
   function _renderDetailView(d, animate) {
     const { detail } = els();
     if (!detail) return false;
@@ -814,6 +841,8 @@
       detail.innerHTML = `<div class="pat-wrap${liquid}" data-grade="${gVar}">${renderPantallaHead(d)}</div>`;
       _mountStage();               // re-parenta el escenario de depósito a la zona derecha
       _syncIdentWidth();           // ancla --pat-ident-w a la medida REAL de la columna (form CURP la usa)
+      _syncColumnsFit();           // marca .pat-cramped si las 3 columnas no caben lado a lado
+      _wireColumnsFitResize();     // re-mide al redimensionar la ventana
       _resumeWithdrawPollIfPending(d);
       // Auto-fetch clabes SPEI si no existen (Task #14): una sola vez por cuenta.
       // Las clabes son FIJAS por usuario — BeginDeposit no duplica, solo devuelve

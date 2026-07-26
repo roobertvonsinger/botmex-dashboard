@@ -633,6 +633,35 @@ Cuentas/Pool/Actividad/Notificaciones/Logs/Salud/Controles/BINes):
 - **Task 3.3 (reduced-motion):** ya existente (`pantalla.css:838-871`, fade 200ms sin scanline/cuaje/blur) — solo
   se confirmó por lectura, no se tocó.
 
+## Fix — columna de retiro invisible en ancho medio (2026-07-26)
+
+- **Síntoma**: la Task 5 del botón de retiro (`.pat-wd-stage` en `.pat-col-stage`, col 3) pasaba la validación
+  visual prescrita (`getBoundingClientRect` overflow vertical ≤0, ver `NEXT-SESSION.md`) pero en la práctica podía
+  quedar **mayormente invisible** en ventanas de navegador comunes.
+- **Causa raíz** (medida, no supuesta): F3 (arriba) solo cubrió el breakpoint mobile `≤767px` (oculta el escenario
+  deliberadamente). Entre ese punto y el desktop ancho NO había breakpoint intermedio — `.pat-col-ident` (max-content,
+  depende del combo de la cuenta) + `.pat-col-txns` (min 340px) + `.pat-col-stage` (min 380px) pueden sumar más ancho
+  del que da `.pat-columns`, y `.pat-col-stage` se desbordaba HORIZONTAL, clippeado invisible por `overflow:hidden`
+  de `.pantalla-sheet`. Medido en vivo (cuenta con combo largo, `espinoza.arellano.alberto.205@gmail.com`): overflow
+  presente en viewport 1280px y 1440px (colsScrollWidth 1219 vs colsClientWidth 1138 @1440px), desaparece en 1536px+.
+  Rango real de fallo varía según el largo del combo de cada cuenta — **no es un breakpoint fijo**, es contenido vs
+  espacio disponible.
+- **Por qué el checklist no lo agarró**: el script de validación de `NEXT-SESSION.md` solo mide overflow VERTICAL
+  (`rect.bottom` vs `sheetBottom`) — nunca chequeó el eje horizontal.
+- **Fix** (`pantalla.css` §`.pat-cramped`, `pantalla.js` `_syncColumnsFit`/`_wireColumnsFitResize`): mismo patrón ya
+  usado para `--pat-ident-w` (medida REAL vía JS, no un breakpoint px inventado — `feedback_ui_ancla_medida_no_pixel_inventado`).
+  JS mide `pat-columns.scrollWidth > clientWidth` en cada render y en cada resize de ventana; si no caben, marca
+  `.pat-wrap.pat-cramped` → CSS apila las 3 columnas en vertical con scroll — **a diferencia de mobile, NO oculta
+  `.pat-col-stage`** (con este ancho medio sobra aire vertical para mostrarlo completo debajo).
+- **Verificación**: confirmado por lectura de código + medición manual en vivo (`botmexico.net`, KVM4 deployado). El
+  toggle de clase en sí se confirmó correcto forzándolo manualmente (el panel queda 100% dentro de la sheet). La
+  ejecución AUTOMÁTICA vía `requestAnimationFrame` no se pudo observar en este entorno de verificación por la misma
+  limitación ya documentada arriba (rAF no dispara sin compositing) — probado con `setTimeout` equivalente, que sí
+  corrió y aplicó la clase correctamente. `_syncIdentWidth` (mismo patrón rAF) ya está en producción hace semanas,
+  así que en un navegador real de un operador debería comportarse igual. **Pendiente**: que Robert confirme visual
+  en su propio navegador con la ventana en un ancho medio (ej. 1366×768 o 1440×900) — el `overflow ≤0` del checklist
+  original ya no es suficiente, agregar chequeo horizontal a futuras validaciones de este panel.
+
 ## Convenciones
 
 - **`data-copy`** en cualquier elemento → click izquierdo copia el valor. Handler global en app.js:2715.

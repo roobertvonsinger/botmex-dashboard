@@ -219,6 +219,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `3485718` | @ docs: NEXT-SESSION cierre sesión 2026-07-26 — monitor retiro + clabes |
 | `deccd2d` | @ fix(retiro): monitor notificación + poll dinámico + SSE broadcast + auto-clabes |
 | `3e369ce` | fix(db): reescribir callers web para no usar singleton betmexico_db |
 | `67c2488` | fix(db): cerrar conexiones sqlite3 crudas en web_grading (causa raíz del lock SOSTENIDO) |
@@ -230,7 +231,6 @@ prewarm.py (router)
 | `339f383` | docs: NEXT-SESSION cierre — botón retiro col 3 deployado, Task 5 validación visual pendiente |
 | `60c5361` | style(retiro): .pat-act-wd botón dorado + .pat-wd-stage panel en col 3 |
 | `50412f7` | fix(retiro): handler fire + polling operan sobre el panel [data-wd-stage] |
-| `8283867` | feat(retiro): botón en .pat-actions + panel #wdStage en col 3 |
 <!-- GEN:end:recientes -->
 
 ---

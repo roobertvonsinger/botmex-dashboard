@@ -619,6 +619,31 @@ body.depos-open .pat-act-dep { display: none; }
   box-shadow: -1px 0 16px -12px var(--pat-gold-soft);
 }
 .pat-col-stage[hidden] { display: none; }
+
+/* Ancho medio (variable según el combo, típicamente ~768–1530px): las 3 columnas
+   (.pat-col-ident max-content + .pat-col-txns min 340 + .pat-col-stage min 380 +
+   paddings/bordes) pueden sumar más ancho del que da .pat-columns, y no había
+   breakpoint entre el mobile (≤767px, aparte oculta el escenario) y el desktop
+   ancho — el stage se desbordaba HORIZONTAL y quedaba invisible, clippeado por
+   `overflow:hidden` de .pantalla-sheet (medido en campo 2026-07-26: la validación
+   de overflow VERTICAL del panel de retiro pasaba igual, porque nunca chequeaba
+   el eje horizontal). `.pat-cramped` lo marca `pantalla.js` (_syncColumnsFit)
+   midiendo scrollWidth real de .pat-columns vs su clientWidth — no un breakpoint
+   px inventado (feedback_ui_ancla_medida_no_pixel_inventado). A diferencia de
+   mobile, acá el escenario NO se oculta (apila abajo con su ancho completo,
+   sigue habiendo aire vertical de sobra). */
+.pat-wrap.pat-cramped .pat-columns {
+  flex-direction: column;
+  overflow-y: auto;
+  gap: 14px;
+}
+.pat-wrap.pat-cramped .pat-col-ident { width: 100%; padding-right: 0; }
+.pat-wrap.pat-cramped .pat-col-txns,
+.pat-wrap.pat-cramped .pat-col-stage {
+  border-left: none; padding-left: 0;
+  border-top: 1px solid var(--pat-edge); padding-top: 14px;
+}
+
 /* El escenario (#depStage, re-parentado por depos.js) trae del panel viejo un
    .scene-stage de 172px FIJO + balance + status ≈ 254px, pero este slot da ~199px
    → se desbordaba 55px por arriba y abajo (medido en prod 2026-07-17). Que el

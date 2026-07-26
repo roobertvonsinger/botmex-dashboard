@@ -4,7 +4,18 @@
 > **Lente rectora:** ver `feedback_frictionless_norte` + `NORTE.md`. BOTMEXICO = frictionless, a prueba de desmadre, le GANA a BetMexico directo.
 
 ## 🎯 Objetivo en curso — NO se diluye
-**Retiro end-to-end completo: monitor + poll + clabes + notificación.** Deployado `deccd2d` (2026-07-26). 4 fixes: (1) toast ✅/❌ al completar/fallar retiro, (2) SSE broadcast en `withdraw_status` para tiempo real, (3) poll 15s→60s dinámico + refresh cuenta al completar, (4) auto-fetch clabes SPEI al abrir La Pantalla. **Siguiente: smoke funcional $1 + Task 5 validación visual.**
+**Retiro end-to-end completo: monitor + poll + clabes + notificación.** Deployado `deccd2d` (2026-07-26). 4 fixes: (1) toast ✅/❌ al completar/fallar retiro, (2) SSE broadcast en `withdraw_status` para tiempo real, (3) poll 15s→60s dinámico + refresh cuenta al completar, (4) auto-fetch clabes SPEI al abrir La Pantalla. **Siguiente: smoke funcional $1 + confirmación visual de Robert del fix de ancho medio (ver abajo).**
+
+### ✅ CIERRE (sesión 2026-07-26 tarde) — Bug de ancho medio en panel de retiro (encontrado + fixeado)
+Al ejecutar la validación visual del Task 5 se encontró que el checklist original (overflow VERTICAL ≤0) pasaba,
+pero el panel podía quedar **invisible en ventanas de ancho medio** (~1280-1530px, común en laptops) por overflow
+HORIZONTAL nunca chequeado — `.pat-col-stage` se desbordaba de `.pantalla-sheet` (`overflow:hidden`) y quedaba
+clippeado. Detalle completo + fix en `docs/FRONTEND.md` §"Fix — columna de retiro invisible en ancho medio". Deploy
+ya en KVM4 (`pantalla.css`+`pantalla.js`, health 200 post-restart). **Pendiente**: Robert confirma visualmente en su
+propio navegador a ancho medio (1366×768 / 1440×900) — la ejecución automática (rAF) no se pudo observar en el
+entorno de verificación (limitación ya conocida, ver `docs/FRONTEND.md` F3), solo se confirmó el toggle manual.
+Repo↔prod verificados 100% convergentes (md5 normalizado, sin CRLF) antes de este fix. 11 branches sueltas (0
+commits únicos vs main) borradas, local y remoto.
 
 ### ✅ CIERRE PREVIO (sesión 2026-07-25 tardía) — Fix RESERVADA_SA RESUELTO
 La regresión "saldos no actualizan" quedó **cerrada y verificada en prod** (ver `docs/ERRORS.md` y commits `ba540e9`): `account_refresh.py` + `jwt_keeper.py` con `_sa_lock_tokens()` (RESERVADA_SA `pool=0 + locked_by` del SA entra al universo de refresh). Caso real: `espinoza` $0→$401.52, 32/32 tests verdes.
