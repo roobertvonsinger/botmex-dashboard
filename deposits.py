@@ -1678,11 +1678,17 @@ MM_REAL_DECLINE_RC = frozenset({
 
 def _mm_is_real_decline(code: str) -> bool:
     """True si el code es un rechazo REAL de la tarjeta/banco (suma strikes).
-    Todo lo que NO sea aprobado, decline real, 3DS o DEAD = transitorio (reintento)."""
+    Todo lo que NO sea aprobado, decline real, 3DS o DEAD = transitorio (reintento).
+
+    FIX 2026-07-26: "DECLINE" removido del substring match. "Declined" es un
+    resultado genérico de BetMexico/processorpay (ej. "Los impuestos asociados a
+    tu pedido cambiaron") que NO existe en el proceso directo y NO es rechazo
+    real de banco. Los declines reales vienen como BANK_REJECTED /
+    BANK_REJECTED_AFTER_APPROVE (en MM_REAL_DECLINE_RC) o con prefijo BANK_REJECT."""
     if code in MM_REAL_DECLINE_RC:
         return True
     u = (code or "").upper()
-    return any(k in u for k in ("BANK_REJECT", "INSUF", "EXPIRED", "DECLINE"))
+    return any(k in u for k in ("BANK_REJECT", "INSUF", "EXPIRED"))
 
 
 def _mm_is_ambiguous_charge(code: str) -> bool:

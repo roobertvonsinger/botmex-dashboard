@@ -98,7 +98,7 @@ prewarm.py (router)
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 131 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2722 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2728 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 325 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 410 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 901 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -116,7 +116,7 @@ prewarm.py (router)
 | `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
 | `test_anti_rate_limit.py` | 271 | `—` | _[completar]_ |
 | `test_at_hand.py` | 73 | `—` | _[completar]_ |
-| `test_deposit_status_classify.py` | 95 | `—` | _[completar]_ |
+| `test_deposit_status_classify.py` | 102 | `—` | _[completar]_ |
 | `test_deposit_step.py` | 132 | `—` | _[completar]_ |
 | `test_grading_a_plus_m7.py` | 184 | `—` | _[completar]_ |
 | `test_jwt_keeper.py` | 136 | `—` | _[completar]_ |
@@ -219,6 +219,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c6e9f68` | feat(depos): mountCompact/wireCompactStatic — panel de depósito montable en La Pantalla |
 | `83f8abb` | refactor(depos): _dx.target decide el destino de render (float/compact) sin cambiar comportamiento |
 | `d68cb5d` | feat(depos): template+CSS del panel de depósito compacto en col 3 (inerte, sin JS aún) |
 | `c423902` | refactor(logs): síntesis de feeds — filtrar ruido, unificar renderers, chips de nivel |
@@ -230,7 +231,6 @@ prewarm.py (router)
 | `deccd2d` | @ fix(retiro): monitor notificación + poll dinámico + SSE broadcast + auto-clabes |
 | `3e369ce` | fix(db): reescribir callers web para no usar singleton betmexico_db |
 | `67c2488` | fix(db): cerrar conexiones sqlite3 crudas en web_grading (causa raíz del lock SOSTENIDO) |
-| `862e3e6` | fix(db): retry+backoff a writes del keeper/cooldown/auto_lock — depósito no se detiene |
 <!-- GEN:end:recientes -->
 
 ---

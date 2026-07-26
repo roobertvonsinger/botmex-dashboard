@@ -214,16 +214,16 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_run_deposit_with_phases` | def | L1108–L1422 |
 | `deposit_execute_stream` | def | L1426–L1626 |
 | `cap_status` | def | L1630–L1642 |
-| `_mm_is_real_decline` | def | L1679–L1685 |
-| `_mm_is_ambiguous_charge` | def | L1688–L1698 |
-| `classify_deposit_status` | def | L1701–L1732 |
-| `_mm_session_get` | def | L1782–L1786 |
-| `_mm_session_update` | def | L1789–L1798 |
-| `multi_stream` | def | L1802–L2299 |
-| `multi_cancel` | def | L2303–L2308 |
-| `scheduled_create` | def | L2321–L2684 |
-| `scheduled_list` | def | L2688–L2710 |
-| `scheduled_cancel` | def | L2714–L2722 |
+| `_mm_is_real_decline` | def | L1679–L1691 |
+| `_mm_is_ambiguous_charge` | def | L1694–L1704 |
+| `classify_deposit_status` | def | L1707–L1738 |
+| `_mm_session_get` | def | L1788–L1792 |
+| `_mm_session_update` | def | L1795–L1804 |
+| `multi_stream` | def | L1808–L2305 |
+| `multi_cancel` | def | L2309–L2314 |
+| `scheduled_create` | def | L2327–L2690 |
+| `scheduled_list` | def | L2694–L2716 |
+| `scheduled_cancel` | def | L2720–L2728 |
 
 ### `jwt_keeper.py`
 
@@ -493,16 +493,17 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_bank_rejected_after_approve_is_rejected` | def | L21–L22 |
 | `test_pending_not_applied_is_rejected` | def | L25–L27 |
 | `test_substring_declines_are_rejected` | def | L30–L32 |
-| `test_rate_limited_is_not_rejected` | def | L36–L37 |
-| `test_dead_account_codes_are_account_dead` | def | L41–L43 |
-| `test_login_codes_are_login_lost` | def | L47–L49 |
-| `test_gateway_codes_are_gateway_error` | def | L52–L54 |
-| `test_timeout_is_timeout` | def | L57–L58 |
-| `test_ambiguous_charge_codes` | def | L62–L64 |
-| `test_unknown_codes_are_incomplete_not_rejected` | def | L68–L72 |
-| `test_success_is_approved` | def | L76–L78 |
-| `test_3ds_is_threeds` | def | L82–L83 |
-| `test_invariant_only_real_bank_declines_are_rejected` | def | L87–L95 |
+| `test_declined_generic_is_not_rejected` | def | L35–L38 |
+| `test_rate_limited_is_not_rejected` | def | L42–L43 |
+| `test_dead_account_codes_are_account_dead` | def | L47–L49 |
+| `test_login_codes_are_login_lost` | def | L53–L55 |
+| `test_gateway_codes_are_gateway_error` | def | L58–L60 |
+| `test_timeout_is_timeout` | def | L63–L64 |
+| `test_ambiguous_charge_codes` | def | L68–L70 |
+| `test_unknown_codes_are_incomplete_not_rejected` | def | L74–L78 |
+| `test_success_is_approved` | def | L82–L84 |
+| `test_3ds_is_threeds` | def | L88–L89 |
+| `test_invariant_only_real_bank_declines_are_rejected` | def | L93–L102 |
 
 ### `test_deposit_step.py`
 
