@@ -2,6 +2,36 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## [CRÍTICO] Retiro se queda "en proceso" para siempre — `withdraw_status` nunca resolvía a terminal (2026-07-26)
+
+- **Síntoma**: Robert reportó que el panel de retiro col 3 muestra "🔄 Retiro en proceso…" indefinidamente — nunca
+  cambia a completado, aunque el retiro sí se haya ejecutado en BetMexico. Además el balance en la tabla y en el
+  detalle no se actualizaban en tiempo real durante/después del retiro.
+- **Causa raíz #1** (medida con la tx real atorada `232b8814-f327-41da-b212-f24b5d664a61`, cuenta 1497): `GET
+  /api/accounts/{id}/withdraw/status/{tx_id}` (`app.py`) solo confirma el estado final vía PASO5
+  (`get_bank_transaction`, el rail externo) cuando PASO4 (`get_pending_withdrawal`) TODAVÍA reporta el retiro como
+  pendiente con `transactionStatus:6`. Pero BetMexico saca el retiro de la lista de pendientes (PASO4→`None`) en
+  cuanto se resuelve — mucho antes de que el operador vuelva a pollear. Cuando PASO4 ya no lo reporta, el código caía
+  a un `else` que solo miraba el `status_api` viejo guardado en BD (pegado al último valor intermedio que PASO4
+  reportó mientras aún aparecía ahí, ej. `2`) y lo dejaba en `"idle"` — que el frontend (`WD_TERMINAL` en
+  `pantalla.js`) nunca trata como terminal. **Verificado en vivo**: para esa tx, PASO4 ya devolvía `None`, pero PASO5
+  (llamado manualmente) confirmaba `transactionStatus:6, "Successful", ref 274346194511` — el retiro SÍ se completó,
+  el endpoint simplemente nunca volvió a preguntarle al rail externo.
+- **Causa raíz #2**: el broadcast SSE `withdrawal_status` (emitido cuando el status pasa a terminal) existía, pero
+  `app.js` no tenía NINGÚN handler para ese `kind` — a diferencia de `account_refreshed`. Otras pestañas/operadores
+  (y la tabla principal) nunca se enteraban del cambio; solo la pestaña que hizo el poll local (`pantalla.js`) veía
+  algo, y solo si la causa raíz #1 no lo hubiera dejado atorado en `idle` primero.
+- **Fix**: `app.py` — el `else` (PASO4 sin match) ahora SIEMPRE intenta PASO5 antes de rendirse a `"idle"`, igual que
+  ya hacía la rama `status_api==6`; solo cae a `"idle"` si ni PASO4 ni PASO5 confirman nada (no inventa un desenlace
+  sin evidencia). `app.js` — nuevo handler para `withdrawal_status` (ver `docs/SSE_EVENTS.md`), reusa
+  `_onAccountRefreshed` para repintar tabla + detalle abierto, más un `pushNotif` ✅/❌.
+- **Verificado en prod**: llamado directo a PASO5 confirmó el desenlace real antes del fix; tras el deploy, el mismo
+  endpoint devolvió `{"status":"completed","transactionStatus":6,...}` para la tx atorada, y el DB quedó con
+  `status_api=6`. El panel en vivo (browser) pasó de spinner a "✓ BetMexico procesó el retiro. Confirma en tu banco."
+  con el input/botón re-habilitados.
+- **Pendiente**: confirmar con Robert que el toast ✅/❌ y el refresco de tabla/detalle se ven bien en un retiro
+  fresco end-to-end (no solo en el atorado histórico que este fix resolvió retroactivamente).
+
 ## `clabe_fetch.py` nunca se había deployado a KVM4 — crash-loop al deployar `withdrawals.py` (2026-07-24)
 
 **Síntoma**: al deployar el botón de retiro automático (`app.py` + `withdrawals.py` + frontend) y hacer `docker compose restart web`, el container entró en crash-loop: `ModuleNotFoundError: No module named 'clabe_fetch'` en cada intento de arranque (`withdrawals.py:23` hace `from clabe_fetch import _load_jwt_for_account, _get_admin_proxy_url`).

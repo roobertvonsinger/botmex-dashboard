@@ -124,15 +124,15 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `refresh_clabes` | def | L3139–L3149 |
 | `_persist_withdrawal` | def | L3158–L3204 |
 | `withdraw` | def | L3208–L3253 |
-| `withdraw_status` | def | L3257–L3363 |
-| `delete_note` | def | L3367–L3379 |
-| `CombosRequest` | class | L3382–L3383 |
-| `accounts_combos` | def | L3387–L3400 |
-| `accounts_pass_map` | def | L3404–L3409 |
-| `list_all_cards` | def | L3413–L3488 |
-| `activity_feed` | def | L3492–L3613 |
-| `list_deposits` | def | L3617–L3646 |
-| `deposits_stats` | def | L3650–L3675 |
+| `withdraw_status` | def | L3257–L3414 |
+| `delete_note` | def | L3418–L3430 |
+| `CombosRequest` | class | L3433–L3434 |
+| `accounts_combos` | def | L3438–L3451 |
+| `accounts_pass_map` | def | L3455–L3460 |
+| `list_all_cards` | def | L3464–L3539 |
+| `activity_feed` | def | L3543–L3664 |
+| `list_deposits` | def | L3668–L3697 |
+| `deposits_stats` | def | L3701–L3726 |
 
 ### `auth.py`
 

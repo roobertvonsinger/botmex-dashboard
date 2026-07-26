@@ -4,7 +4,27 @@
 > **Lente rectora:** ver `feedback_frictionless_norte` + `NORTE.md`. BOTMEXICO = frictionless, a prueba de desmadre, le GANA a BetMexico directo.
 
 ## 🎯 Objetivo en curso — NO se diluye
-**Retiro end-to-end completo: monitor + poll + clabes + notificación.** Deployado `deccd2d` (2026-07-26). 4 fixes: (1) toast ✅/❌ al completar/fallar retiro, (2) SSE broadcast en `withdraw_status` para tiempo real, (3) poll 15s→60s dinámico + refresh cuenta al completar, (4) auto-fetch clabes SPEI al abrir La Pantalla. **Siguiente: smoke funcional $1 + confirmación visual de Robert del fix de ancho medio (ver abajo).**
+**Retiro end-to-end completo: monitor + poll + clabes + notificación.** Deployado `deccd2d` (2026-07-26). 4 fixes: (1) toast ✅/❌ al completar/fallar retiro, (2) SSE broadcast en `withdraw_status` para tiempo real, (3) poll 15s→60s dinámico + refresh cuenta al completar, (4) auto-fetch clabes SPEI al abrir La Pantalla. **Siguiente: smoke funcional $1 fresco (end-to-end) + diseño de convivencia depósito/retiro en col 3 (ver abajo).**
+
+### ✅ CIERRE (sesión 2026-07-26 noche) — Retiro atorado en "en proceso" para siempre RESUELTO
+Robert probó el panel real y el status nunca resolvía a completado (+ balance de tabla/detalle sin refrescar en vivo).
+Root cause doble, medido con la tx real atorada `232b8814...` (cuenta 1497): (1) `withdraw_status` en `app.py` solo
+confirmaba el desenlace vía PASO5 (rail externo) cuando PASO4 aún reportaba pendiente — en cuanto BetMexico saca el
+retiro de la lista de pendientes (lo normal al completarse), el código caía a `"idle"` para siempre sin volver a
+preguntarle al rail; (2) el broadcast SSE `withdrawal_status` existía pero `app.js` no tenía handler, así que ni la
+tabla ni otras pestañas se enteraban. Fix: `else` ahora siempre intenta PASO5 antes de rendirse a idle; nuevo handler
+en `app.js` reusa `_onAccountRefreshed` + toast ✅/❌. Verificado en prod: la tx atorada resolvió a `completed`
+(`status_api` 2→6 en BD), panel pasó de spinner a "✓ procesado". Detalle en `docs/ERRORS.md` §"Retiro se queda 'en
+proceso' para siempre". **Pendiente**: confirmar con un retiro FRESCO (no el atorado histórico) que el flujo completo
+se ve bien de punta a punta.
+
+### 🎨 Pedido de diseño (2026-07-26 noche) — Depósito y retiro conviviendo en col 3
+Robert: le gustó cómo se ve el retiro en col 3 y quiere que el panel de depósito (`#depStage`, hoy vive oculto tras
+CSS `:has()` cuando hay retiro) **conviva ahí mismo, compacto**, en vez de excluirse mutuamente. El panel de depósito
+actual "se ve horrible pero funciona bien" — labor es de **diseño/recorte visual respetando la lógica y controles
+existentes**, no reescribir el motor de depósitos. Pidió "criterio real", no una pregunta técnica de vuelta. Sin
+tocar aún — requiere brainstorming/spec antes de meterle código (ver `superpowers:brainstorming`), dado el tamaño y
+que es la pieza central del "espacio ganado" en La Pantalla.
 
 ### ✅ CIERRE (sesión 2026-07-26 tarde) — Bug de ancho medio en panel de retiro (encontrado + fixeado)
 Al ejecutar la validación visual del Task 5 se encontró que el checklist original (overflow VERTICAL ≤0) pasaba,

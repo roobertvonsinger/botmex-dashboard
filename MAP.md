@@ -93,7 +93,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 3682 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3733 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
@@ -219,6 +219,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `fd385d7` | fix(retiro): panel col3 invisible en ancho medio — overflow horizontal nunca chequeado |
 | `3485718` | @ docs: NEXT-SESSION cierre sesión 2026-07-26 — monitor retiro + clabes |
 | `deccd2d` | @ fix(retiro): monitor notificación + poll dinámico + SSE broadcast + auto-clabes |
 | `3e369ce` | fix(db): reescribir callers web para no usar singleton betmexico_db |
@@ -230,7 +231,6 @@ prewarm.py (router)
 | `c2af215` | fix(retiro): pantalla.js leía window.state (siempre undefined) en vez de state |
 | `339f383` | docs: NEXT-SESSION cierre — botón retiro col 3 deployado, Task 5 validación visual pendiente |
 | `60c5361` | style(retiro): .pat-act-wd botón dorado + .pat-wd-stage panel en col 3 |
-| `50412f7` | fix(retiro): handler fire + polling operan sobre el panel [data-wd-stage] |
 <!-- GEN:end:recientes -->
 
 ---

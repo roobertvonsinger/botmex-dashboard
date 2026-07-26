@@ -1863,6 +1863,21 @@ function connectSSE() {
         // account_refreshed: refresco de cuenta post-depósito (balance+movimientos).
         // No va al feed (sería ruido) — solo repinta tabla/detalle.
         if (ev.kind === 'account_refreshed') { _onAccountRefreshed(ev); return; }
+        // withdrawal_status: SOLO se emite cuando el retiro llega a terminal
+        // (ver app.py withdraw_status). Root cause 2026-07-26: sin este handler,
+        // la tabla y el detalle en OTRAS pestañas/operadores nunca se enteraban
+        // del saldo actualizado tras un retiro — solo la pestaña que sondeaba
+        // (poll local en pantalla.js) lo veía. Reusa el mismo refresco de tabla
+        // + detalle que account_refreshed.
+        if (ev.kind === 'withdrawal_status') {
+          _onAccountRefreshed({ email: ev.target });
+          const ok = ev.status === 'successful' || ev.status === 'completed';
+          pushNotif({
+            icon: ok ? '✅' : '❌',
+            msg: `Retiro de ${fmtMoney(ev.amount)} en ${ev.target} → ${ok ? 'completado' : 'fallido'}`,
+          });
+          return;
+        }
         // Feed de Actividad
         pushActivityEvent(ev);
         // Notificaciones para acciones que importan
