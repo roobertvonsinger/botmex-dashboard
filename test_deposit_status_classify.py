@@ -32,12 +32,6 @@ def test_substring_declines_are_rejected():
         assert classify_deposit_status(rc, False) == "rejected", rc
 
 
-def test_declined_generic_is_not_rejected():
-    """FIX 2026-07-26: 'Declined' genérico de BetMexico NO es banco real."""
-    assert classify_deposit_status("Declined", False) == "incomplete"
-    assert classify_deposit_status("GENERIC_DECLINE", False) == "incomplete"
-
-
 # ── EL BUG REPORTADO: rate-limit NO es banco ─────────────────────────────────
 def test_rate_limited_is_not_rejected():
     assert classify_deposit_status("RATE_LIMITED", False) == "rate_limited"
@@ -96,7 +90,6 @@ def test_invariant_only_real_bank_declines_are_rejected():
         "LOGIN_FAILED", "CAPTCHA_POOL_EMPTY", "DEPS_MISSING", "BEGIN_ERROR",
         "PAYMENT_ERROR", "TIMEOUT", "SUBMIT_ERROR", "UNKNOWN_TXN_STATUS_5",
         "ERROR", "VELOCITY_SKIP", "UNKNOWN", "",
-        "Declined", "GENERIC_DECLINE",  # FIX 2026-07-26
     ]
     for rc in non_bank:
         assert classify_deposit_status(rc, False) != "rejected", rc

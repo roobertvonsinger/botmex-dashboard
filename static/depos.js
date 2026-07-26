@@ -360,20 +360,15 @@
     const js = sqs('#jstatus'); if (js) js.style.visibility = 'visible';
     const dep = qs('#dep'); if (dep) dep.style.display = 'none';
     const rr = qs('#runrow'); if (rr) rr.classList.add('on');
-    if (_dx.target === 'compact') {
-      const fireBtn = document.querySelector('.d-deposit-btn'); if (fireBtn) fireBtn.disabled = true;
-    }
+    const fireBtn = document.querySelector('.d-deposit-btn'); if (fireBtn) fireBtn.disabled = true;
   }
   function journeyEnd() {
     const dep = qs('#dep'); if (dep) dep.style.display = '';
     const rr = qs('#runrow'); if (rr) rr.classList.remove('on');
-    // Misión COMPACTA: openDepos() nunca corre para re-ocultar #depStage (eso solo pasa
-    // al abrir el popup flotante) — sin esto, #depStage se queda visible para siempre
-    // tras el primer depósito compacto y :has() oculta el panel compacto de por vida.
-    if (_dx.target === 'compact') {
-      const stg = document.getElementById('depStage'); if (stg) stg.hidden = true;
-      const fireBtn = document.querySelector('.d-deposit-btn'); if (fireBtn) fireBtn.disabled = false;
-    }
+    // #depStage se re-oculta SIEMPRE (misión float o compact) — si no, se queda visible
+    // para siempre tras una misión float y :has() oculta el panel compacto de por vida.
+    const stg = document.getElementById('depStage'); if (stg) stg.hidden = true;
+    const fireBtn = document.querySelector('.d-deposit-btn'); if (fireBtn) fireBtn.disabled = false;
   }
 
   // lee un stream SSE-NL (data: {json}\n\n) y llama onEvent por cada evento
@@ -978,11 +973,22 @@
     addAccounts: addAccounts,
     mountCompact: mountCompact,
     rescueCompact: rescueCompact,
-    fireCompact: () => onDeposit(),
+    fireCompact: (expectedAccId) => {
+      const acc = _dx.accounts[0];
+      if (_dx.target !== 'compact' || !acc || Number(acc.id) !== Number(expectedAccId)) {
+        showToast('El panel no está listo para esta cuenta — vuelve a abrirla');
+        return;
+      }
+      return onDeposit();
+    },
   };
 
   window.openDepos = async function (opts) {
     opts = opts || {};
+    if (_dx.running) {
+      showToast('Hay una misión de depósito en curso — espera a que termine');
+      return;
+    }
     _dx.target = 'float';   // el operador abrió el popup flotante EXPLÍCITAMENTE: reclama el render
     mount();
     // reset COMPLETO de estado entre aperturas (evita movimientos/misiones stale)
@@ -1000,8 +1006,8 @@
     renderAccounts(); renderCards(); refreshMode();
     root.classList.remove('hidden');
     root.setAttribute('aria-hidden', 'false');
-    // Con el panel abierto, La Pantalla oculta SU botón "Depositar" (evita dos botones
-    // de depósito a la vez — Robert 2026-07-17). El CSS lo apaga vía body.depos-open.
+    // Con el panel abierto, La Pantalla deshabilita SU botón "Depositar" mientras dura
+    // la misión (ver journeyStart/journeyEnd) — ya no vía CSS body.depos-open (removida).
     document.body.classList.add('depos-open');
     if (_win) _win.show();   // aplica tamaño/ancho guardados (dock derecho)
     _dx.open = true;

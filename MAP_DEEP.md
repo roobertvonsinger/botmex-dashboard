@@ -493,17 +493,16 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_bank_rejected_after_approve_is_rejected` | def | L21–L22 |
 | `test_pending_not_applied_is_rejected` | def | L25–L27 |
 | `test_substring_declines_are_rejected` | def | L30–L32 |
-| `test_declined_generic_is_not_rejected` | def | L35–L38 |
-| `test_rate_limited_is_not_rejected` | def | L42–L43 |
-| `test_dead_account_codes_are_account_dead` | def | L47–L49 |
-| `test_login_codes_are_login_lost` | def | L53–L55 |
-| `test_gateway_codes_are_gateway_error` | def | L58–L60 |
-| `test_timeout_is_timeout` | def | L63–L64 |
-| `test_ambiguous_charge_codes` | def | L68–L70 |
-| `test_unknown_codes_are_incomplete_not_rejected` | def | L74–L78 |
-| `test_success_is_approved` | def | L82–L84 |
-| `test_3ds_is_threeds` | def | L88–L89 |
-| `test_invariant_only_real_bank_declines_are_rejected` | def | L93–L102 |
+| `test_rate_limited_is_not_rejected` | def | L36–L37 |
+| `test_dead_account_codes_are_account_dead` | def | L41–L43 |
+| `test_login_codes_are_login_lost` | def | L47–L49 |
+| `test_gateway_codes_are_gateway_error` | def | L52–L54 |
+| `test_timeout_is_timeout` | def | L57–L58 |
+| `test_ambiguous_charge_codes` | def | L62–L64 |
+| `test_unknown_codes_are_incomplete_not_rejected` | def | L68–L72 |
+| `test_success_is_approved` | def | L76–L78 |
+| `test_3ds_is_threeds` | def | L82–L83 |
+| `test_invariant_only_real_bank_declines_are_rejected` | def | L87–L95 |
 
 ### `test_deposit_step.py`
 

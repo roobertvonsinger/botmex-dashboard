@@ -919,7 +919,7 @@
     const dep = e.target.closest('.d-deposit-btn');
     if (dep && dep.dataset.accId && !dep.disabled) {
       e.preventDefault();
-      if (window.Depos && typeof window.Depos.fireCompact === 'function') window.Depos.fireCompact();
+      if (window.Depos && typeof window.Depos.fireCompact === 'function') window.Depos.fireCompact(parseInt(dep.dataset.accId));
       return;
     }
     const mark = e.target.closest('.det-mark');
