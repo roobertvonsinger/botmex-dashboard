@@ -1,0 +1,50 @@
+<!-- @dsCard group="Components" subtitle="Primary / secondary / ghost, multiple sizes" -->
+<!-- Botmexico Design System — Buttons -->
+<style>
+  .ds-btns { display: flex; flex-direction: column; gap: 16px; padding: 16px; background: #08090c; border-radius: 12px; font-family: 'Inter', system-ui, sans-serif; }
+  .ds-btn-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .ds-section { font-size: 9px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(238,240,243,0.34); font-family: 'JetBrains Mono', monospace; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  /* Botmexico buttons */
+  .bm-seg-btn { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.10); color: rgba(238,240,243,0.72); padding: 6px 12px; border-radius: 6px; font: 500 11px/1 'JetBrains Mono', monospace; cursor: pointer; transition: all 0.18s cubic-bezier(0.4,0,0.2,1); }
+  .bm-seg-btn:hover { color: #eef0f3; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.20); }
+  .bm-seg-btn.on { background: oklch(0.50 0.11 160 / 0.26); border-color: oklch(0.50 0.11 160 / 0.45); color: oklch(0.50 0.11 160); }
+  .bm-act { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.20); color: #eef0f3; padding: 5px 11px; border-radius: 8px; font: 600 11.5px/1 'Inter', sans-serif; cursor: pointer; transition: all 0.18s; box-shadow: inset 0 1px 0 rgba(255,255,255,0.04); }
+  .bm-act:hover { transform: translateY(-1px); background: rgba(255,255,255,0.08); border-color: oklch(0.50 0.11 160 / 0.26); }
+  .bm-act-primary { background: linear-gradient(180deg, oklch(0.50 0.11 160) 0%, oklch(0.40 0.10 160) 100%); border-color: transparent; color: #eafff5; font-weight: 700; box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 0 4px oklch(0.68 0.14 160 / 0.65), 0 0 10px oklch(0.58 0.13 160 / 0.32); }
+  .bm-act-primary:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 0 6px oklch(0.72 0.14 160 / 0.75), 0 0 14px oklch(0.62 0.13 160 / 0.45), 0 0 24px oklch(0.50 0.11 160 / 0.22); }
+  .bm-act-ghost { background: transparent; border-color: transparent; color: rgba(238,240,243,0.52); box-shadow: none; }
+  .bm-act-ghost:hover { background: rgba(255,255,255,0.05); color: #eef0f3; }
+  .bm-exec { width: 100%; background: linear-gradient(180deg, oklch(0.50 0.11 160) 0%, oklch(0.40 0.10 160) 100%); color: #f0fff8; text-shadow: 0 1px 0 rgba(0,0,0,0.40); border: 0; border-radius: 10px; padding: 13px 14px; font: 800 13.5px/1 'Clash Display', sans-serif; cursor: pointer; letter-spacing: 0.5px; position: relative; overflow: hidden; box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 0 rgba(0,0,0,0.20), 0 0 6px oklch(0.72 0.14 160 / 0.75), 0 0 14px oklch(0.62 0.13 160 / 0.45), 0 0 24px oklch(0.50 0.11 160 / 0.22); transition: all 0.18s; }
+  .bm-exec::before { content: ''; position: absolute; top: 0; left: -60%; width: 50%; height: 100%; background: linear-gradient(100deg, transparent, rgba(255,255,255,0.18), transparent); transform: skewX(-18deg); transition: left 0.6s; }
+  .bm-exec:hover { filter: brightness(1.08); transform: translateY(-1px); }
+  .bm-exec:hover::before { left: 130%; }
+  .bm-danger { background: oklch(0.66 0.21 24 / 0.12); border: 1px solid oklch(0.66 0.21 24); color: oklch(0.66 0.21 24); }
+  .bm-danger:hover { background: oklch(0.66 0.21 24); color: white; }
+  .bm-ico-btn { appearance: none; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: rgba(238,240,243,0.72); cursor: pointer; transition: all 0.18s; font-size: 12px; }
+  .bm-ico-btn:hover { background: rgba(255,255,255,0.04); color: #eef0f3; }
+</style>
+<div class="ds-btns">
+  <div class="ds-section">Segmented (Ghost)</div>
+  <div class="ds-btn-row">
+    <button class="bm-seg-btn">Default</button>
+    <button class="bm-seg-btn on">Active</button>
+    <button class="bm-seg-btn" disabled style="opacity:0.4;cursor:not-allowed">Disabled</button>
+  </div>
+
+  <div class="ds-section">Action Buttons</div>
+  <div class="ds-btn-row">
+    <button class="bm-act">Default</button>
+    <button class="bm-act bm-act-primary">Primary</button>
+    <button class="bm-act bm-act-ghost">Ghost</button>
+    <button class="bm-ico-btn">⚙</button>
+  </div>
+
+  <div class="ds-section">CTA (Deposit)</div>
+  <button class="bm-exec">⚡ DEPOSITAR AHORA</button>
+
+  <div class="ds-section">Danger</div>
+  <div class="ds-btn-row">
+    <button class="bm-seg-btn bm-danger">Ocultar todas</button>
+    <button class="bm-act" style="background:oklch(0.66 0.21 24 / 0.10);border-color:oklch(0.66 0.21 24 / 0.40);color:oklch(0.66 0.21 24)">Abortar</button>
+  </div>
+</div>

@@ -1,0 +1,52 @@
+<!-- @dsCard group="Components" subtitle="Text fields, search, amount input" -->
+<!-- Botmexico Design System — Inputs -->
+<style>
+  .ds-inputs { display: flex; flex-direction: column; gap: 16px; padding: 16px; background: #08090c; border-radius: 12px; font-family: 'Inter', system-ui, sans-serif; color: #eef0f3; }
+  .ds-input-group { display: flex; flex-direction: column; gap: 4px; }
+  .ds-input-label { font-size: 10px; font-weight: 600; color: rgba(238,240,243,0.52); margin-bottom: 2px; letter-spacing: 0.5px; text-transform: uppercase; font-family: 'JetBrains Mono', monospace; }
+  .ds-input { width: 100%; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 10px 14px; color: #eef0f3; font: inherit; font-size: 13px; outline: none; transition: border-color 0.18s, box-shadow 0.18s; }
+  .ds-input:focus { border-color: oklch(0.50 0.11 160 / 0.45); box-shadow: 0 0 0 3px oklch(0.50 0.11 160 / 0.14); }
+  .ds-input::placeholder { color: rgba(238,240,243,0.34); }
+  .ds-input-mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.3px; }
+  .ds-amount-wrap { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px; background: #0a0c11; border: 1px solid rgba(255,255,255,0.10); transition: border-color 0.18s, box-shadow 0.18s; }
+  .ds-amount-wrap:focus-within { border-color: oklch(0.50 0.11 160 / 0.45); box-shadow: 0 0 0 3px oklch(0.50 0.11 160 / 0.14); }
+  .ds-amount-prefix { color: rgba(238,240,243,0.34); font-family: 'JetBrains Mono', monospace; font-size: 16px; }
+  .ds-amount-input { flex: 1; background: none; border: none; outline: none; color: #eef0f3; font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 500; width: 100%; }
+  .ds-presets { display: flex; gap: 6px; margin-top: 8px; justify-content: space-between; }
+  .ds-preset { padding: 6px 12px; border-radius: 9px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 11px; background: rgba(20,24,32,0.55); border: 1px solid rgba(255,255,255,0.10); color: rgba(238,240,243,0.72); transition: all 0.18s; }
+  .ds-preset:hover { border-color: rgba(0,189,114,0.45); color: #eef0f3; }
+  .ds-preset.on { background: rgba(0,189,114,0.16); border-color: rgba(0,189,114,0.45); color: #00bd72; }
+  .ds-section { font-size: 9px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(238,240,243,0.34); font-family: 'JetBrains Mono', monospace; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+</style>
+<div class="ds-inputs">
+  <div class="ds-section">Text Input</div>
+  <div class="ds-input-group">
+    <div class="ds-input-label">Email</div>
+    <input class="ds-input" type="text" placeholder="usuario@ejemplo.com" value="robert@gmail.com">
+  </div>
+  <div class="ds-input-group">
+    <div class="ds-input-label">CURP</div>
+    <input class="ds-input ds-input-mono" type="text" placeholder="XXXX000000XXXXXXXXXX" value="GARC850101MDFRRR01" style="text-transform:uppercase;letter-spacing:1px">
+  </div>
+
+  <div class="ds-section">Search</div>
+  <div style="display:flex;align-items:center;gap:10px;padding:9px 16px;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.20);border-radius:10px;box-shadow:inset 0 1px 2px rgba(0,0,0,0.4),0 0 0 3px oklch(0.50 0.11 160 / 0.14),0 0 18px oklch(0.50 0.11 160 / 0.14)">
+    <span style="color:oklch(0.50 0.11 160);font-size:15px">⌕</span>
+    <input style="flex:1;background:transparent;border:none;outline:none;color:#eef0f3;font-size:13px;font-family:inherit" placeholder="Buscar cuentas..." value="robert@">
+    <span style="font-size:9px;font-family:'JetBrains Mono',monospace;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:rgba(238,240,243,0.52)">ESC</span>
+  </div>
+
+  <div class="ds-section">Amount Input</div>
+  <div>
+    <div class="ds-amount-wrap">
+      <span class="ds-amount-prefix">$</span>
+      <input class="ds-amount-input" type="text" value="500.00">
+    </div>
+    <div class="ds-presets">
+      <div class="ds-preset">$100</div>
+      <div class="ds-preset on">$500</div>
+      <div class="ds-preset">$1,000</div>
+      <div class="ds-preset">$1,500</div>
+    </div>
+  </div>
+</div>

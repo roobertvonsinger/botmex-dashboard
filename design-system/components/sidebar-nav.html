@@ -1,0 +1,57 @@
+<!-- @dsCard group="Components" subtitle="Sidebar navigation, nav items, groups" -->
+<!-- Botmexico Design System — Sidebar Navigation -->
+<style>
+  .ds-sidebar { display: flex; flex-direction: column; gap: 16px; padding: 16px; background: #08090c; border-radius: 12px; font-family: 'Inter', system-ui, sans-serif; }
+  .ds-section { font-size: 9px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(238,240,243,0.34); font-family: 'JetBrains Mono', monospace; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .ds-nav { appearance: none; border: none; background: transparent; color: rgba(238,240,243,0.72); font: inherit; font-size: 13px; padding: 5px 16px; margin: 0 8px; border-radius: 8px; display: flex; align-items: center; gap: 11px; text-align: left; cursor: pointer; position: relative; transition: background 0.18s, color 0.18s, transform 0.18s; }
+  .ds-nav:hover { background: rgba(255,255,255,0.03); color: #eef0f3; transform: translateX(2px); }
+  .ds-nav.on { background: linear-gradient(90deg, oklch(0.50 0.11 160 / 0.14), transparent 75%); color: #eef0f3; font-weight: 500; }
+  .ds-nav.on::before { content: ''; position: absolute; left: -8px; top: 7px; bottom: 7px; width: 2px; border-radius: 2px; background: oklch(0.50 0.11 160); box-shadow: 0 0 8px oklch(0.60 0.13 160 / 0.40); }
+  .ds-nav .i { font-size: 14px; width: 15px; text-align: center; color: rgba(238,240,243,0.72); }
+  .ds-nav.on .i { color: oklch(0.50 0.11 160); }
+  .ds-nav .b { margin-left: auto; font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 99px; background: rgba(255,255,255,0.04); color: rgba(238,240,243,0.72); border: 1px solid rgba(255,255,255,0.12); font-family: 'JetBrains Mono', monospace; }
+  .ds-nav .b.warn { background: oklch(0.66 0.21 24 / 0.12); color: oklch(0.66 0.21 24); border-color: oklch(0.66 0.21 24 / 0.22); }
+  .ds-nav .b.ok { background: oklch(0.50 0.11 160 / 0.14); color: oklch(0.50 0.11 160); }
+  .ds-group-header { display: flex; align-items: center; justify-content: space-between; padding: 7px 24px 3px; font-size: 9px; font-weight: 700; color: rgba(238,240,243,0.52); letter-spacing: 1.6px; text-transform: uppercase; font-family: 'JetBrains Mono', monospace; }
+  .ds-tristrip { display: flex; height: 1.5px; opacity: 0.55; margin: 0 22px 7px; }
+  .ds-tristrip i:nth-child(1) { flex: 1; background: linear-gradient(90deg, transparent, oklch(0.50 0.11 160)); }
+  .ds-tristrip i:nth-child(2) { flex: 1; background: rgba(238,240,243,0.65); }
+  .ds-tristrip i:nth-child(3) { flex: 1; background: linear-gradient(90deg, oklch(0.66 0.21 24), transparent); }
+  .ds-online { padding: 6px 10px; background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; }
+  .ds-online-head { display: flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: rgba(238,240,243,0.52); font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; }
+  .ds-online-dot { width: 6px; height: 6px; border-radius: 50%; background: oklch(0.50 0.11 160); box-shadow: 0 0 6px oklch(0.60 0.13 160 / 0.40); animation: dsPulse 1.6s ease-in-out infinite; }
+  @keyframes dsPulse { 0%,100%{opacity:1}50%{opacity:0.45} }
+  .ds-op { display: flex; align-items: center; gap: 7px; padding: 3px 4px; border-radius: 5px; cursor: pointer; font-size: 11.5px; }
+  .ds-op:hover { background: rgba(255,255,255,0.04); }
+  .ds-av { width: 18px; height: 18px; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 9.5px; color: #000; flex-shrink: 0; }
+  .ds-av.av-warn { background: linear-gradient(135deg, oklch(0.86 0.16 75), oklch(0.80 0.16 75)); }
+  .ds-av.av-accent { background: linear-gradient(135deg, oklch(0.68 0.13 160), oklch(0.58 0.13 160)); }
+  .ds-av.av-purple { background: linear-gradient(135deg, oklch(0.82 0.17 295), oklch(0.74 0.17 295)); }
+  .ds-op::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.28); margin-left: auto; flex-shrink: 0; }
+  .ds-op-online::after { background: oklch(0.50 0.11 160); box-shadow: 0 0 4px oklch(0.60 0.13 160 / 0.40); }
+</style>
+<div class="ds-sidebar">
+  <div class="ds-section">Navigation Items</div>
+  <div style="background:rgba(18,20,24,0.60);border-radius:8px;padding:4px 0;border:1px solid rgba(255,255,255,0.08)">
+    <button class="ds-nav on"><span class="i">▦</span>Cuentas<span class="b ok">24</span></button>
+    <button class="ds-nav"><span class="i">◈</span>Pool<span class="b">8</span></button>
+    <button class="ds-nav"><span class="i">⚡</span>Actividad<span class="b">12</span></button>
+    <button class="ds-nav"><span class="i">◔</span>Notificaciones<span class="b warn">·</span></button>
+    <button class="ds-nav"><span class="i">⚙</span>Controles</button>
+  </div>
+
+  <div class="ds-section">Tristrip (Brand)</div>
+  <div class="ds-tristrip"><i></i><i></i><i></i></div>
+
+  <div class="ds-section">Online Block</div>
+  <div class="ds-online">
+    <div class="ds-online-head">
+      <div class="ds-online-dot"></div>
+      <span style="flex:1">Online</span>
+      <span style="font-size:9.5px;padding:1px 5px;border-radius:99px;background:oklch(0.50 0.11 160 / 0.14);color:oklch(0.50 0.11 160);font-weight:700"><b>3</b>/4</span>
+    </div>
+    <div class="ds-op ds-op-online"><div class="ds-av av-warn">C</div><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">carlos</span><span style="font-size:9.5px;padding:1px 5px;border-radius:99px;background:oklch(0.50 0.11 160 / 0.14);color:oklch(0.50 0.11 160);font-weight:700">12</span></div>
+    <div class="ds-op ds-op-online"><div class="ds-av av-accent">R</div><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">robert</span><span style="font-size:9.5px;padding:1px 5px;border-radius:99px;background:oklch(0.50 0.11 160 / 0.14);color:oklch(0.50 0.11 160);font-weight:700">8</span></div>
+    <div class="ds-op" style="opacity:0.42"><div class="ds-av av-purple">A</div><span style="flex:1;color:rgba(238,240,243,0.52)">ana</span><span style="font-size:9.5px;padding:1px 5px;border-radius:99px;background:rgba(255,255,255,0.04);color:rgba(238,240,243,0.52);font-weight:700">4</span></div>
+  </div>
+</div>

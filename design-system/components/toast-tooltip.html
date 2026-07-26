@@ -1,0 +1,39 @@
+<!-- @dsCard group="Components" subtitle="Toast notifications, tooltips" -->
+<!-- Botmexico Design System — Toast & Tooltip -->
+<style>
+  .ds-toast-tip { display: flex; flex-direction: column; gap: 16px; padding: 16px; background: #08090c; border-radius: 12px; font-family: 'Inter', system-ui, sans-serif; color: #eef0f3; }
+  .ds-section { font-size: 9px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(238,240,243,0.34); font-family: 'JetBrains Mono', monospace; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .ds-toast { background: rgba(24,27,32,0.78); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.20); color: #eef0f3; padding: 10px 18px; border-radius: 8px; font-size: 12.5px; box-shadow: 0 8px 24px rgba(0,0,0,0.55); display: inline-flex; align-items: center; gap: 8px; }
+  .ds-toast.t-ok { border-color: oklch(0.50 0.11 160); box-shadow: 0 8px 24px rgba(0,0,0,0.55), 0 0 16px oklch(0.60 0.13 160 / 0.40); }
+  .ds-toast.t-err { border-color: oklch(0.66 0.21 24); }
+  .ds-tip { position: relative; display: inline-block; }
+  .ds-tip-box { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: rgba(24,27,32,0.78); backdrop-filter: blur(7px); border: 1px solid rgba(255,255,255,0.20); border-radius: 8px; padding: 8px 10px; font-size: 11px; font-family: 'JetBrains Mono', monospace; color: #eef0f3; box-shadow: 0 8px 24px rgba(0,0,0,0.4); max-width: 360px; white-space: nowrap; }
+  .ds-tip-box::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 6px solid transparent; border-top-color: rgba(255,255,255,0.20); }
+  .ds-dep-result { margin: 12px 0; padding: 12px 14px; border-radius: 8px; font-size: 12.5px; display: flex; align-items: center; gap: 10px; }
+  .ds-dep-result.dr-ok { background: oklch(0.50 0.11 160 / 0.14); border: 1px solid oklch(0.50 0.11 160); color: oklch(0.50 0.11 160); }
+  .ds-dep-result.dr-err { background: oklch(0.66 0.21 24 / 0.12); border: 1px solid oklch(0.66 0.21 24); color: oklch(0.66 0.21 24); }
+  .ds-dep-result.dr-load { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.20); color: rgba(238,240,243,0.72); }
+  .ds-spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.20); border-top-color: oklch(0.50 0.11 160); border-radius: 50%; animation: spin 800ms linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+<div class="ds-toast-tip">
+  <div class="ds-section">Toast Notifications</div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap">
+    <div class="ds-toast">✅ Combo copiado al portapapeles</div>
+    <div class="ds-toast t-ok">⚡ Depósito enviado — $500.00</div>
+    <div class="ds-toast t-err">✗ Error de conexión</div>
+  </div>
+
+  <div class="ds-section">Tooltip</div>
+  <div style="display:flex;gap:20px;align-items:center;padding-top:40px">
+    <div class="ds-tip">
+      <div class="ds-tip-box">robert@gmail.com:pass123<br><span style="color:rgba(238,240,243,0.52)">Grade A · $1,245.00 · 12 depósitos</span></div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(238,240,243,0.72)">hover me ↓</span>
+    </div>
+  </div>
+
+  <div class="ds-section">Deposit Result States</div>
+  <div class="ds-dep-result dr-ok">✅ Depósito exitoso — $500.00 acreditado</div>
+  <div class="ds-dep-result dr-err">❌ Tarjeta rechazada — BANK_REJECTED</div>
+  <div class="ds-dep-result dr-load"><div class="ds-spinner"></div> Procesando depósito...</div>
+</div>

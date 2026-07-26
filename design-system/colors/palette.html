@@ -1,0 +1,67 @@
+<!-- @dsCard group="Colors" -->
+<!-- Botmexico Design System — Color Palette -->
+<style>
+  .ds-palette { display: flex; flex-direction: column; gap: 16px; padding: 16px; background: #08090c; border-radius: 12px; font-family: 'Inter', system-ui, sans-serif; }
+  .ds-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ds-chip { display: flex; flex-direction: column; gap: 4px; min-width: 100px; }
+  .ds-swatch { width: 100%; height: 48px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); }
+  .ds-label { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: rgba(238,240,243,0.52); letter-spacing: 0.5px; }
+  .ds-value { font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(238,240,243,0.34); }
+  .ds-section { font-size: 9px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(238,240,243,0.34); font-family: 'JetBrains Mono', monospace; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+</style>
+<div class="ds-palette">
+  <div class="ds-section">Backgrounds</div>
+  <div class="ds-row">
+    <div class="ds-chip"><div class="ds-swatch" style="background:#08090c"></div><div class="ds-label">--bg</div><div class="ds-value">#08090c</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:#101216"></div><div class="ds-label">--surface-solid</div><div class="ds-value">#101216</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:rgba(18,20,24,0.60)"></div><div class="ds-label">--surface</div><div class="ds-value">rgba(18,20,24,.60)</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:rgba(24,27,32,0.78)"></div><div class="ds-label">--surface-elev</div><div class="ds-value">rgba(24,27,32,.78)</div></div>
+  </div>
+
+  <div class="ds-section">Accent (Hue 160)</div>
+  <div class="ds-row">
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.30 0.09 160)"></div><div class="ds-label">--accent-deep</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.40 0.10 160)"></div><div class="ds-label">--accent-mid</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.50 0.11 160)"></div><div class="ds-label">--accent</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.60 0.13 160 / 0.40)"></div><div class="ds-label">--accent-glow</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.50 0.11 160 / 0.14)"></div><div class="ds-label">--accent-soft</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.50 0.11 160 / 0.26)"></div><div class="ds-label">--accent-soft-2</div></div>
+  </div>
+
+  <div class="ds-section">Semantic</div>
+  <div class="ds-row">
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.66 0.21 24)"></div><div class="ds-label">--danger</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.66 0.21 24 / 0.12)"></div><div class="ds-label">--danger-soft</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.80 0.16 75)"></div><div class="ds-label">--warn</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.80 0.16 75 / 0.12)"></div><div class="ds-label">--warn-soft</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.82 0.14 85)"></div><div class="ds-label">--gold</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.82 0.14 85 / 0.14)"></div><div class="ds-label">--gold-soft</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.74 0.17 295)"></div><div class="ds-label">--purple</div></div>
+  </div>
+
+  <div class="ds-section">Grades</div>
+  <div class="ds-row">
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.75 0.20 152); box-shadow:0 0 11px oklch(0.75 0.20 152 / 0.8)"></div><div class="ds-label">A+ Premium</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.58 0.13 160)"></div><div class="ds-label">A Standard</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.70 0.16 235)"></div><div class="ds-label">B Blue-gray</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.80 0.16 75)"></div><div class="ds-label">C Amber</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.66 0.21 24)"></div><div class="ds-label">D Red</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:rgba(255,255,255,0.14)"></div><div class="ds-label">U Neutral</div></div>
+  </div>
+
+  <div class="ds-section">Operators</div>
+  <div class="ds-row">
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.80 0.16 75)"></div><div class="ds-label">op-warn</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.74 0.17 295)"></div><div class="ds-label">op-purple</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.58 0.13 160)"></div><div class="ds-label">op-accent</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:oklch(0.62 0.16 250)"></div><div class="ds-label">op-azure</div></div>
+  </div>
+
+  <div class="ds-section">Text (WCAG AA on #08090c)</div>
+  <div class="ds-row">
+    <div class="ds-chip"><div class="ds-swatch" style="background:#eef0f3"></div><div class="ds-label">--text (15.3:1)</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:rgba(238,240,243,0.72)"></div><div class="ds-label">--text-dim (7.8:1)</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:rgba(238,240,243,0.52)"></div><div class="ds-label">--text-muted (4.5:1)</div></div>
+    <div class="ds-chip"><div class="ds-swatch" style="background:rgba(238,240,243,0.28)"></div><div class="ds-label">--text-faint (2.4:1)</div></div>
+  </div>
+</div>

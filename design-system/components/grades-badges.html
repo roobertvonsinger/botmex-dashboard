@@ -1,0 +1,98 @@
+<!-- @dsCard group="Components" subtitle="Grade badges, status chips, lock indicators" -->
+<!-- Botmexico Design System — Grades & Badges -->
+<style>
+  .ds-grades { display: flex; flex-direction: column; gap: 16px; padding: 16px; background: #08090c; border-radius: 12px; font-family: 'Inter', system-ui, sans-serif; color: #eef0f3; }
+  .ds-section { font-size: 9px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(238,240,243,0.34); font-family: 'JetBrains Mono', monospace; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .ds-grade-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  /* Grade pill badges */
+  .ds-grade { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; font-weight: 700; font-size: 11px; font-family: 'Space Grotesk', sans-serif; }
+  .ds-grade.g-aplus { background: oklch(0.72 0.19 152 / 0.20); color: oklch(0.80 0.18 152); border: 1px solid oklch(0.72 0.19 152 / 0.45); box-shadow: 0 0 8px oklch(0.72 0.19 152 / 0.35); }
+  .ds-grade.g-a { background: oklch(0.58 0.13 160 / 0.16); color: oklch(0.58 0.13 160); border: 1px solid oklch(0.58 0.13 160 / 0.30); }
+  .ds-grade.g-b { background: rgba(238,240,243,0.06); color: oklch(0.86 0.02 95); border: 1px solid rgba(238,240,243,0.14); }
+  .ds-grade.g-c { background: oklch(0.66 0.21 24 / 0.12); color: oklch(0.80 0.16 75); border: 1px solid oklch(0.66 0.21 24 / 0.28); }
+  .ds-grade.g-d { background: oklch(0.66 0.21 24 / 0.12); color: oklch(0.66 0.21 24); border: 1px solid oklch(0.66 0.21 24 / 0.28); }
+  .ds-grade.g-u { background: rgba(255,255,255,0.04); color: rgba(238,240,243,0.52); border: 1px solid rgba(255,255,255,0.12); }
+  /* Grade dots */
+  .ds-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+  .ds-dot.d-aplus { background: oklch(0.75 0.20 152); box-shadow: 0 0 8px oklch(0.75 0.20 152 / 0.8); }
+  .ds-dot.d-a { background: oklch(0.58 0.13 160); box-shadow: 0 0 6px oklch(0.58 0.13 160); }
+  .ds-dot.d-b { background: oklch(0.70 0.16 235); box-shadow: 0 0 6px oklch(0.70 0.16 235 / 0.5); }
+  .ds-dot.d-c { background: oklch(0.80 0.16 75); box-shadow: 0 0 6px oklch(0.80 0.16 75); }
+  .ds-dot.d-d { background: oklch(0.66 0.21 24); box-shadow: 0 0 6px oklch(0.66 0.21 24); }
+  .ds-dot.d-u { background: rgba(255,255,255,0.20); }
+  /* Grade bar (table row left edge) */
+  .ds-bar { width: 3px; height: 22px; border-radius: 2px; }
+  .ds-bar.b-aplus { background: oklch(0.75 0.20 152); box-shadow: 0 0 11px oklch(0.75 0.20 152 / 0.8); }
+  .ds-bar.b-a { background: oklch(0.58 0.13 160); box-shadow: 0 0 8px oklch(0.58 0.13 160); }
+  .ds-bar.b-b { background: oklch(0.70 0.16 235); box-shadow: 0 0 8px oklch(0.70 0.16 235 / 0.5); }
+  .ds-bar.b-c { background: oklch(0.80 0.16 75); box-shadow: 0 0 8px oklch(0.80 0.16 75); }
+  .ds-bar.b-d { background: oklch(0.66 0.21 24); box-shadow: 0 0 8px oklch(0.66 0.21 24); }
+  .ds-bar.b-u { background: rgba(255,255,255,0.10); }
+  /* Lock chips */
+  .ds-lock { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 99px; font-size: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 600; white-space: nowrap; vertical-align: middle; border: 1px solid currentColor; }
+  .ds-lock.lk-warn { color: oklch(0.80 0.16 75); background: oklch(0.80 0.16 75 / 0.14); border-color: oklch(0.80 0.16 75 / 0.34); }
+  .ds-lock.lk-purple { color: oklch(0.74 0.17 295); background: oklch(0.74 0.17 295 / 0.14); border-color: oklch(0.74 0.17 295 / 0.34); }
+  .ds-lock.lk-accent { color: oklch(0.58 0.13 160); background: oklch(0.58 0.13 160 / 0.14); border-color: oklch(0.58 0.13 160 / 0.34); }
+  .ds-lock.lk-expired { color: oklch(0.66 0.21 24); background: oklch(0.66 0.21 24 / 0.12); border-color: oklch(0.66 0.21 24 / 0.40); }
+  /* Status pills */
+  .ds-status { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; padding: 1px 7px; border-radius: 99px; font-weight: 600; }
+  .ds-status.st-ok { background: oklch(0.50 0.11 160 / 0.14); color: oklch(0.50 0.11 160); }
+  .ds-status.st-pending { background: oklch(0.80 0.16 75 / 0.14); color: oklch(0.80 0.16 75); }
+  .ds-status.st-fail { background: oklch(0.66 0.21 24 / 0.12); color: oklch(0.66 0.21 24); }
+  /* Badge count */
+  .ds-badge { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: oklch(0.66 0.21 24); color: #fff; font-size: 9.5px; font-weight: 700; font-family: 'JetBrains Mono', monospace; display: inline-flex; align-items: center; justify-content: center; border: 2px solid #101216; }
+</style>
+<div class="ds-grades">
+  <div class="ds-section">Grade Badges (pill)</div>
+  <div class="ds-grade-row">
+    <div class="ds-grade g-aplus">A+</div>
+    <div class="ds-grade g-a">A</div>
+    <div class="ds-grade g-b">B</div>
+    <div class="ds-grade g-c">C</div>
+    <div class="ds-grade g-d">D</div>
+    <div class="ds-grade g-u">U</div>
+  </div>
+
+  <div class="ds-section">Grade Dots</div>
+  <div class="ds-grade-row">
+    <div class="ds-dot d-aplus"></div>
+    <div class="ds-dot d-a"></div>
+    <div class="ds-dot d-b"></div>
+    <div class="ds-dot d-c"></div>
+    <div class="ds-dot d-d"></div>
+    <div class="ds-dot d-u"></div>
+  </div>
+
+  <div class="ds-section">Grade Bars (table row edge)</div>
+  <div class="ds-grade-row">
+    <div class="ds-bar b-aplus"></div>
+    <div class="ds-bar b-a"></div>
+    <div class="ds-bar b-b"></div>
+    <div class="ds-bar b-c"></div>
+    <div class="ds-bar b-d"></div>
+    <div class="ds-bar b-u"></div>
+    <span style="font-size:10px;color:rgba(238,240,243,0.34);font-family:'JetBrains Mono',monospace;margin-left:4px">← 3px wide, left edge of row</span>
+  </div>
+
+  <div class="ds-section">Lock Chips</div>
+  <div class="ds-grade-row">
+    <span class="ds-lock lk-warn">🔒 carlos · 2h</span>
+    <span class="ds-lock lk-purple">🔒 robert · 24h</span>
+    <span class="ds-lock lk-accent">🔒 ana · 1h</span>
+    <span class="ds-lock lk-expired">⛔ expirado</span>
+  </div>
+
+  <div class="ds-section">Status Pills</div>
+  <div class="ds-grade-row">
+    <span class="ds-status st-ok">✓ Aprobado</span>
+    <span class="ds-status st-pending">⏳ Pendiente</span>
+    <span class="ds-status st-fail">✗ Rechazado</span>
+  </div>
+
+  <div class="ds-section">Badge Count</div>
+  <div class="ds-grade-row">
+    <span class="ds-badge">3</span>
+    <span class="ds-badge" style="min-width:20px">12</span>
+    <span class="ds-badge" style="background:oklch(0.80 0.16 75);animation:bellPulse 1.6s ease-in-out infinite">5</span>
+  </div>
+</div>

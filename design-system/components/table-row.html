@@ -1,0 +1,85 @@
+<!-- @dsCard group="Components" subtitle="Account table row with grade bar, combo, balance, actions" -->
+<!-- Botmexico Design System — Table Row -->
+<style>
+  .ds-table { padding: 16px; background: #08090c; border-radius: 12px; font-family: 'Inter', system-ui, sans-serif; }
+  .ds-section { font-size: 9px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(238,240,243,0.34); font-family: 'JetBrains Mono', monospace; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 10px; }
+  table.ds-tbl { width: 100%; border-collapse: collapse; font-size: 12px; color: #eef0f3; }
+  table.ds-tbl th { position: sticky; top: 0; background: #101216; border-bottom: 1px solid rgba(255,255,255,0.12); text-align: left; padding: 5px 10px; color: rgba(238,240,243,0.52); font-weight: 600; text-transform: uppercase; font-size: 9.5px; letter-spacing: 0.6px; font-family: 'JetBrains Mono', monospace; }
+  table.ds-tbl td { height: 30px; padding: 0 10px; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-bottom: 1px solid rgba(255,255,255,0.12); }
+  table.ds-tbl tr:hover td { background: rgba(255,255,255,0.025); }
+  .ds-gbar { width: 5px; min-width: 5px; max-width: 5px; padding: 0 !important; }
+  .ds-gbar div { width: 100%; height: 22px; border-radius: 2px; }
+  .ds-gbar div.g-a { background: oklch(0.58 0.13 160); box-shadow: 0 0 8px oklch(0.58 0.13 160); }
+  .ds-gbar div.g-b { background: oklch(0.70 0.16 235); box-shadow: 0 0 8px oklch(0.70 0.16 235 / 0.5); }
+  .ds-gbar div.g-c { background: oklch(0.80 0.16 75); box-shadow: 0 0 8px oklch(0.80 0.16 75); }
+  .ds-combo { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: rgba(238,240,243,0.72); cursor: pointer; }
+  .ds-combo b { color: #eef0f3; font-weight: 500; }
+  .ds-combo b:hover { color: oklch(0.50 0.11 160); }
+  .ds-bal { color: oklch(0.50 0.11 160); font-weight: 600; font-variant-numeric: tabular-nums; font-family: 'JetBrains Mono', monospace; }
+  .ds-bal.hot { color: oklch(0.86 0.26 142); font-weight: 700; text-shadow: 0 0 4px oklch(0.86 0.26 142 / 0.85), 0 0 10px oklch(0.78 0.28 145 / 0.55); }
+  .ds-row-ic { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 22px; border-radius: 5px; color: rgba(238,240,243,0.72); font-size: 12px; cursor: pointer; transition: all 120ms; border: 1px solid transparent; background: transparent; }
+  .ds-row-ic:hover { background: rgba(255,255,255,0.20); color: #eef0f3; }
+  .ds-row-sel td { background: oklch(0.50 0.11 160 / 0.14) !important; }
+  .ds-row-src td { position: relative; }
+  .ds-row-src td:first-child::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: oklch(0.50 0.11 160); box-shadow: 0 0 4px oklch(0.68 0.14 160 / 0.65), 0 0 10px oklch(0.58 0.13 160 / 0.32); border-radius: 0 2px 2px 0; }
+  .ds-row-src td { background: oklch(0.50 0.11 160 / 0.14); }
+</style>
+<div class="ds-table">
+  <div class="ds-section">Account Table Row</div>
+  <table class="ds-tbl">
+    <thead>
+      <tr>
+        <th style="width:5px;padding:0"></th>
+        <th style="width:100px">Saldo</th>
+        <th>Cuenta</th>
+        <th style="width:150px">Últ. Depósito</th>
+        <th style="width:170px">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Normal row -->
+      <tr>
+        <td class="ds-gbar"><div class="g-a"></div></td>
+        <td class="ds-bal">$1,245.00</td>
+        <td class="ds-combo"><b>robert@gmail.com</b>:pass123</td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:11px"><b>hace 2h</b></td>
+        <td style="text-align:right"><span class="ds-row-ic">📝</span><span class="ds-row-ic">💳</span><span class="ds-row-ic">📌</span></td>
+      </tr>
+      <!-- Hot balance row -->
+      <tr>
+        <td class="ds-gbar"><div class="g-a"></div></td>
+        <td class="ds-bal hot">$3,892.50</td>
+        <td class="ds-combo"><b>carlos@outlook.com</b>:mypass456</td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:11px"><b>hace 30m</b></td>
+        <td style="text-align:right"><span class="ds-row-ic">📝</span><span class="ds-row-ic">💳</span><span class="ds-row-ic">📌</span></td>
+      </tr>
+      <!-- Selected row -->
+      <tr class="ds-row-sel">
+        <td class="ds-gbar"><div class="g-b"></div></td>
+        <td class="ds-bal">$89.20</td>
+        <td class="ds-combo"><b>ana@yahoo.com</b>:secure789</td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:11px"><b>hace 1d</b></td>
+        <td style="text-align:right"><span class="ds-row-ic">📝</span><span class="ds-row-ic">💳</span><span class="ds-row-ic">📌</span></td>
+      </tr>
+      <!-- La Pantalla source row -->
+      <tr class="ds-row-src">
+        <td class="ds-gbar"><div class="g-c"></div></td>
+        <td class="ds-bal" style="color:oklch(0.80 0.16 75)">$42.00</td>
+        <td class="ds-combo"><b>maria@hotmail.com</b>:qwerty123</td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:11px"><b>hace 3d</b></td>
+        <td style="text-align:right"><span class="ds-row-ic">📝</span><span class="ds-row-ic">💳</span><span class="ds-row-ic">📌</span></td>
+      </tr>
+      <!-- Row with lock -->
+      <tr style="opacity:0.45">
+        <td class="ds-gbar"><div class="g-b"></div></td>
+        <td class="ds-bal" style="color:rgba(238,240,243,0.52)">$0.00</td>
+        <td class="ds-combo" style="opacity:0.5"><b>pedro@gmail.com</b>:oldpass</td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(238,240,243,0.52)">sin depósito</td>
+        <td style="text-align:right"><span class="ds-row-ic" style="opacity:0.3">📝</span><span class="ds-row-ic" style="opacity:0.3">💳</span><span class="ds-row-ic" style="opacity:0.3">📌</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <div style="margin-top:8px;font-size:9px;color:rgba(238,240,243,0.34);font-family:'JetBrains Mono',monospace">
+    Row 3 = selected (accent bg) · Row 4 = La Pantalla source (accent border glow) · Row 5 = cooling/disabled
+  </div>
+</div>
