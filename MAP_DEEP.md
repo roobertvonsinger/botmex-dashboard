@@ -113,24 +113,25 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `events` | def | L2592–L2602 |
 | `account_cards_pipe` | def | L2606–L2632 |
 | `account_notes_summary` | def | L2636–L2661 |
-| `account_details` | def | L2665–L2995 |
-| `NoteCreate` | class | L2998–L2999 |
-| `create_note` | def | L3003–L3032 |
-| `CurpUpdate` | class | L3035–L3036 |
-| `update_curp` | def | L3040–L3051 |
-| `get_clabes` | def | L3061–L3070 |
-| `refresh_clabes` | def | L3074–L3084 |
-| `_persist_withdrawal` | def | L3093–L3139 |
-| `withdraw` | def | L3143–L3188 |
-| `withdraw_status` | def | L3192–L3283 |
-| `delete_note` | def | L3287–L3299 |
-| `CombosRequest` | class | L3302–L3303 |
-| `accounts_combos` | def | L3307–L3320 |
-| `accounts_pass_map` | def | L3324–L3329 |
-| `list_all_cards` | def | L3333–L3408 |
-| `activity_feed` | def | L3412–L3533 |
-| `list_deposits` | def | L3537–L3566 |
-| `deposits_stats` | def | L3570–L3595 |
+| `_record_account_touch` | def | L2664–L2697 |
+| `account_details` | def | L2701–L3025 |
+| `NoteCreate` | class | L3028–L3029 |
+| `create_note` | def | L3033–L3062 |
+| `CurpUpdate` | class | L3065–L3066 |
+| `update_curp` | def | L3070–L3081 |
+| `get_clabes` | def | L3091–L3100 |
+| `refresh_clabes` | def | L3104–L3114 |
+| `_persist_withdrawal` | def | L3123–L3169 |
+| `withdraw` | def | L3173–L3218 |
+| `withdraw_status` | def | L3222–L3313 |
+| `delete_note` | def | L3317–L3329 |
+| `CombosRequest` | class | L3332–L3333 |
+| `accounts_combos` | def | L3337–L3350 |
+| `accounts_pass_map` | def | L3354–L3359 |
+| `list_all_cards` | def | L3363–L3438 |
+| `activity_feed` | def | L3442–L3563 |
+| `list_deposits` | def | L3567–L3596 |
+| `deposits_stats` | def | L3600–L3625 |
 
 ### `auth.py`
 
@@ -418,6 +419,17 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_sa_sees_others_touch` | def | L21–L23 |
 | `test_operator_does_not_see_others_touch` | def | L26–L28 |
 | `test_touch_dedup_one_per_day` | def | L31–L51 |
+
+### `test_account_touch_isolated.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `_reload_with_seed_db` | def | L13–L17 |
+| `test_record_touch_persists_new_touch` | def | L20–L29 |
+| `test_record_touch_dedup_same_day_returns_false` | def | L32–L41 |
+| `test_record_touch_different_actors_both_persist` | def | L44–L53 |
+| `test_record_touch_traps_locked_silently` | def | L56–L78 |
+| `test_account_details_dispatches_touch_off_request_path` | def | L81–L119 |
 
 ### `test_activity_scoped.py`
 

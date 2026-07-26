@@ -9,6 +9,9 @@
 ### ✅ CIERRE PREVIO (sesión 2026-07-25 tardía) — Fix RESERVADA_SA RESUELTO
 La regresión "saldos no actualizan" quedó **cerrada y verificada en prod** (ver `docs/ERRORS.md` y commits `ba540e9`): `account_refresh.py` + `jwt_keeper.py` con `_sa_lock_tokens()` (RESERVADA_SA `pool=0 + locked_by` del SA entra al universo de refresh). Caso real: `espinoza` $0→$401.52, 32/32 tests verdes.
 
+### ✅ CIERRE PREVIO (sesión 2026-07-25 noche) — Lock en `account_details:2952` RESUELTO
+La instrumentación `3b59fe7` cazó el lock sostenido: los 3 writes `#335/#336/#337` del 18:10 tenían origen `account_details:2952` — el `INSERT OR IGNORE INTO account_touches` (auditoría de quién abrió La Pantalla) vivía **síncrono en el path de read** bajo `with db(write=True)`. Bajo contención bot↔web (BD compartida), el touch esperaba hasta el `timeout=10s` → `database is locked` sostenido. **Fix:** `_record_account_touch()` extraída + despachada fire-and-forget en `threading.Thread(daemon=True)`. El request de `account_details` ya NO abre `db(write=True)`; el touch corre fuera del path síncrono (traga `OperationalError` en silencio — perder un toque de bitácora es aceptable, bloquear La Pantalla no). 5/5 tests nuevos + 55/55 pre-existentes verdes. Deployado: md5 `55f3b9c8...` servido en `botmexico.net`, health 200. **Instrumentación `3b59fe7` sigue corriendo** — vigilancia pasiva para confirmar que el lock no reaparece en otro sitio.
+
 ## ▶ Con qué arrancas (PRIMERA acción del próximo turno)
 **Validación visual del panel de retiro en col 3 + smoke funcional $1.** Pasos:
 1. Robert abre La Pantalla de una cuenta con saldo ≥ $100 (SA) en `botmexico.net` — checa botón "Retirar" (dorado, `ph-bank`) en `.pat-actions` + panel en col 3 con saldo Real + input monto.

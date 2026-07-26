@@ -2661,6 +2661,42 @@ def account_notes_summary(account_id: int, user: dict = Depends(require_session)
     return {"notes": [dict(r) for r in rows]}
 
 
+def _record_account_touch(account_id: int, account_email: str, actor_id) -> bool:
+    """Persiste el toque de auditoría (quién abrió La Pantalla de qué cuenta).
+
+    Dedup 1/día por (account_id, actor_id, touched_date) — la constraint UNIQUE
+    de `account_touches` lo garantiza a nivel BD; el INSERT OR IGNORE es idempotente.
+
+    Es una operación de escritura trivial pero, al correr en el path síncrono de
+    `account_details` (read de alta concurrencia), choca con writes sostenidos por
+    el bot TG sobre la BD compartida → `database is locked` sostenido (caza 2026-07-25,
+    instrumentación commit 3b59fe7). Por eso el caller la despacha fire-and-forget en
+    un thread daemon: el request de account_details NO espera al touch.
+
+    Devuelve True si el toque fue NUEVO (para que el caller decida broadcast SSE).
+    Traga OperationalError (lock) en silencio: perder un toque de bitácora es
+    aceptable; bloquear la lectura de La Pantalla no.
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        now_mx = datetime.now(ZoneInfo("UTC")).astimezone(ZoneInfo("America/Mexico_City"))
+    except Exception:
+        now_mx = datetime.utcnow() - timedelta(hours=6)  # MX = UTC-6 fijo (sin DST desde 2022)
+    touched_at = now_mx.strftime("%Y-%m-%d %H:%M:%S")
+    touched_date = touched_at[:10]
+    try:
+        with db(write=True) as c2:
+            cur = c2.execute(
+                "INSERT OR IGNORE INTO account_touches "
+                "(account_id, account_email, actor_id, touched_at, touched_date) "
+                "VALUES (?,?,?,?,?)",
+                (account_id, account_email, int(actor_id), touched_at, touched_date),
+            )
+        return bool(cur.rowcount)
+    except sqlite3.OperationalError:
+        return False
+
+
 @app.get("/api/accounts/{account_id}/details")
 def account_details(account_id: int, _user: dict = Depends(require_session)):
     with db() as c:
@@ -2939,29 +2975,23 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
             result["movimientos"] = []
 
         # Toque de cuenta (vigilancia: quién metió mano) — dedup 1/día por usuario+cuenta.
-        try:
-            actor_id = _user.get("telegram_id")
-            if actor_id is not None:
-                try:
-                    from zoneinfo import ZoneInfo
-                    now_mx = datetime.now(ZoneInfo("UTC")).astimezone(ZoneInfo("America/Mexico_City"))
-                except Exception:
-                    now_mx = datetime.utcnow() - timedelta(hours=6)  # MX = UTC-6 fijo (sin DST desde 2022)
-                touched_at = now_mx.strftime("%Y-%m-%d %H:%M:%S")
-                touched_date = touched_at[:10]
-                with db(write=True) as c2:
-                    cur = c2.execute(
-                        "INSERT OR IGNORE INTO account_touches "
-                        "(account_id, account_email, actor_id, touched_at, touched_date) "
-                        "VALUES (?,?,?,?,?)",
-                        (account_id, acc["email"], int(actor_id), touched_at, touched_date),
-                    )
-                if cur.rowcount:  # solo si fue un toque nuevo (no dedup)
+        # Fire-and-forget: el touch es un write de auditoría que NO debe bloquear la
+        # lectura de La Pantalla. Antes vivía síncrono en `db(write=True)` y, bajo
+        # contención con el bot TG sobre la BD compartida, lanzaba `database is locked`
+        # sostenido (caza 2026-07-25, commit 3b59fe7). Ahora corre en un thread daemon:
+        # el request sigue de inmediato; el touch persiste (o se pierde si hay lock —
+        # aceptable, es bitácora, no transacción). El broadcast SSE va dentro del thread
+        # para que solo dispare si el toque realmente entró.
+        actor_id = _user.get("telegram_id")
+        if actor_id is not None:
+            _acc_email = acc["email"]
+            def _touch_task():
+                ts = _record_account_touch(account_id, _acc_email, actor_id)
+                if ts:
                     _broadcast({"type": "activity", "kind": "account_touch",
-                                "ts": touched_at, "target": acc["email"], "id": account_id,
+                                "target": _acc_email, "id": account_id,
                                 **_resolve_who(actor_id)})
-        except sqlite3.OperationalError:
-            pass
+            threading.Thread(target=_touch_task, daemon=True).start()
 
         # Clabes de depósito SPEI (NVIO + STP) persistidas en BD. Se muestran en
         # La Pantalla sin enmascarar (feedback_no_masking). NO se taladra la cuenta
