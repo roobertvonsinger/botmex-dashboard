@@ -662,6 +662,46 @@ Cuentas/Pool/Actividad/Notificaciones/Logs/Salud/Controles/BINes):
   en su propio navegador con la ventana en un ancho medio (ej. 1366×768 o 1440×900) — el `overflow ≤0` del checklist
   original ya no es suficiente, agregar chequeo horizontal a futuras validaciones de este panel.
 
+## Panel de depósito compacto en La Pantalla col 3 (2026-07-26)
+
+Motor SINGLETON de `depos.js` (`_dx`) con DOS destinos de render posibles, decididos por
+`_dx.target` (`'float' | 'compact'`):
+- `el` — ventana flotante original (`#depos`, `#deposTpl`), SOLO para el multi-select bulk
+  de la tabla (`openDepositModal(null, {ids:[...]})`).
+- `elC` — panel compacto (`#depCompact`, `#deposCompactTpl`), montado en `#patDepSlot`
+  dentro de `.pat-col-stage` de La Pantalla vía `window.Depos.mountCompact(d)`, llamado
+  desde `pantalla.js`'s `_mountStage(d)` en cada render de detalle.
+
+Mutua exclusión con una misión bulk corriendo en paralelo: la regla CSS
+`.pat-col-stage:has(#depStage:not([hidden])) .pat-dep-stage { display:none; }` oculta el
+panel compacto mientras CUALQUIER misión (float o compacta) está corriendo — así un
+`_dx.accounts` que pertenece a la misión bulk nunca se pinta en el panel de la cuenta que
+La Pantalla tiene abierta. Cuando no hay misión corriendo, `mountCompact()` reseedea `_dx`
+a la cuenta visible (condición: `!_dx.running && (_dx.target!=='compact' || accounts[0].id !== d.id)`).
+
+El botón "Depositar" de `.pat-actions` (`.d-deposit-btn`) ya NO abre el popup — llama
+`window.Depos.fireCompact()` directo (mismo patrón que `.d-withdraw-fire`), guardado con
+`!dep.disabled` (Task 4 lo deshabilita mientras una misión compacta corre). `openDepositModal`
+(app.js) gana un guard: si la cuenta objetivo es la misma que `window.Pantalla.currentId`
+Y es una sola cuenta (nunca el multi-select bulk, que siempre tiene 2+ ids), no abre el
+popup — hace scroll a `.pat-dep-stage` y avisa por toast.
+
+Gotcha resuelto: `openDepos()` es lo único que reseteaba `#depStage.hidden=true`; una
+misión compacta nunca pasa por ahí, así que `journeyEnd()` lo re-oculta manualmente
+cuando `_dx.target==='compact'` (si no, el panel compacto queda oculto para siempre tras
+el primer depósito, por la regla `:has()` de arriba). `showToast()` también se adaptó para
+aparecer en el panel activo (`activeEl()`) en vez de siempre en el flotante.
+
+Backend intocable (`deposits.py`, `depos_logic.js`, endpoints) — todo el trabajo vivió en
+`static/index.html` (template + slot), `static/depos.js` (doble destino de render) y
+`static/pantalla.js` (rescate/montaje + disparo directo). Implementado vía
+`superpowers:subagent-driven-development` sobre `docs/superpowers/plans/2026-07-26-deposito-compacto-col3.md`
+(spec en `docs/superpowers/specs/2026-07-26-deposito-compacto-col3-design.md`).
+
+Pendiente de que Robert confirme en su propio navegador (ver `NEXT-SESSION.md`): ambos
+paneles visibles y apilados en reposo, disparo sin popup, y un smoke funcional de $10
+real desde el panel compacto.
+
 ## Convenciones
 
 - **`data-copy`** en cualquier elemento → click izquierdo copia el valor. Handler global en app.js:2715.

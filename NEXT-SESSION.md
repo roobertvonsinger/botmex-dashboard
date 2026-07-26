@@ -107,3 +107,35 @@ console.log({bottom:r.bottom,sheetBottom:sh.bottom,overflow:r.bottom-sh.bottom})
 - **Repo:** rama `feat/boton-retiro-automatico` mergeada a `main` (fast-forward `ba540e9`..`60c5361`). Deploy servido desde la rama antes del merge — md5 verificado.
 - **Deploy:** 3 archivos (`pantalla.js`, `pantalla.css`, `pantalla_logic.js`) en KVM4 `/docker/betmexico/code/web/static/`, md5 verificado vía `botmexico.net`.
 - **SDD workspace:** `.superpowers/sdd/2026-07-25-boton-retiro-dedicado/` (ledger + briefs + reports + review packages). Se borra cuando el feature cierre limpio.
+
+## 🎯 Objetivo en curso — depósito compacto en col 3 (sesión 2026-07-26 continuación)
+
+**Spec + plan aprobados, 6/7 tareas implementadas y revisadas limpio via `superpowers:subagent-driven-development`.**
+Rama `feature/depos-compacto-col3`. Spec: `docs/superpowers/specs/2026-07-26-deposito-compacto-col3-design.md`.
+Plan: `docs/superpowers/plans/2026-07-26-deposito-compacto-col3.md`. Ledger: `.superpowers/sdd/2026-07-26-deposito-compacto-col3/progress.md`.
+
+### ✅ Hecho (Tasks 1-6, todas review clean)
+- Task 1: template `#deposCompactTpl` + slot `#patDepSlot` + CSS `.pat-dep-*` (index.html/pantalla.js/pantalla.css).
+- Task 2: `depos.js` — `_dx.target` (`'float'|'compact'`), `activeEl()`, `qs()` reapuntado — CERO cambio de comportamiento (verificado por trace: nada seteaba `'compact'` aún).
+- Task 3: `mountCompact/rescueCompact/wireCompactStatic` + `window.Depos.{mountCompact,rescueCompact,fireCompact}`.
+- Task 4: cierra el hueco de staleness de `#depStage` (se re-oculta al terminar misión compacta) + disable del botón de disparo durante la corrida + `showToast` usa `activeEl()`.
+- Task 5: `pantalla.js` rescata/monta el slot compacto en cada render; `.d-deposit-btn` dispara `window.Depos.fireCompact()` directo (sin popup), guardado por `!dep.disabled`.
+- Task 6: `openDepositModal` (app.js) no abre el popup flotante si la cuenta ya está abierta en La Pantalla — el multi-select bulk de tabla queda intacto (nunca `_ids.length===1`).
+
+**Ver `docs/FRONTEND.md` §"Panel de depósito compacto en La Pantalla col 3"** para la arquitectura completa (motor singleton, doble destino de render, mutua exclusión vía `:has()`).
+
+### ⚠️ Hallazgo durante la ejecución — commits ajenos concurrentes en la misma rama
+Mientras esta sesión estaba pausada por límite, aparecieron commits de Robert en `feature/depos-compacto-col3`
+sobre mapeo de status "Declined" (`0dc2609`, luego revertidos: `7578933..b357bbd`) — verificado que NO tocan
+`depos.js`/`pantalla.js`/`pantalla.css`/`index.html`, cero conflicto. También hay WIP sin commitear (desde antes de
+esta sesión, en `app.py`/`static/activity_logic.js`/`static/app.js`/`static/index.html`/`static/style.css` — log
+rendering + iconos SSE) que persiste intacto (Task 6 lo protegió con `git stash`/`pop` para no mezclarlo en su commit).
+**No tocar ni commitear ese WIP** — es de Robert, ajeno a este feature.
+
+### 🔴 Pendiente — Task 7 (deploy + verificación, requiere autorización de Robert)
+1. Deploy a KVM4 de `index.html`, `pantalla.js`, `pantalla.css`, `depos.js`, `app.js` — **pendiente de "sí, autorizado"**.
+2. Verificación visual REAL (navegador de Robert, no el pane headless — rAF no corre ahí): ambos paneles (retiro +
+   depósito) visibles y apilados en reposo; disparo del botón "Depositar" sin popup; multi-select bulk de tabla
+   sigue abriendo el popup viejo sin cambios.
+3. Smoke funcional — **depósito real de $10** desde el panel compacto (acción con dinero real, la ejecuta Robert).
+4. Tras Task 7: revisión final de rama completa (`superpowers:subagent-driven-development`'s final review) + merge a main.
