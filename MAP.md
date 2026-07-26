@@ -219,6 +219,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `bd431c4` | fix(depos): re-oculta #depStage al terminar mision compacta (evita panel muerto tras el 1er deposito) |
 | `0dc2609` | @ fix(deposits): "Declined" genérico NO es rechazo real de banco |
 | `c6e9f68` | feat(depos): mountCompact/wireCompactStatic — panel de depósito montable en La Pantalla |
 | `83f8abb` | refactor(depos): _dx.target decide el destino de render (float/compact) sin cambiar comportamiento |
@@ -230,7 +231,6 @@ prewarm.py (router)
 | `fd385d7` | fix(retiro): panel col3 invisible en ancho medio — overflow horizontal nunca chequeado |
 | `3485718` | @ docs: NEXT-SESSION cierre sesión 2026-07-26 — monitor retiro + clabes |
 | `deccd2d` | @ fix(retiro): monitor notificación + poll dinámico + SSE broadcast + auto-clabes |
-| `3e369ce` | fix(db): reescribir callers web para no usar singleton betmexico_db |
 <!-- GEN:end:recientes -->
 
 ---

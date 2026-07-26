@@ -781,11 +781,13 @@
   function _rescueStage(detail) {
     const stage = document.getElementById('depStage');
     if (stage && detail.contains(stage)) document.body.appendChild(stage);
+    if (window.Depos && typeof window.Depos.rescueCompact === 'function') window.Depos.rescueCompact(detail);
   }
-  function _mountStage() {
+  function _mountStage(d) {
     const slot = document.getElementById('patStageSlot');
     const stage = document.getElementById('depStage');
     if (slot && stage && stage.parentNode !== slot) slot.appendChild(stage);
+    if (window.Depos && typeof window.Depos.mountCompact === 'function') window.Depos.mountCompact(d);
   }
 
   // Ancla --pat-ident-w a la medida REAL (getBoundingClientRect) de .pat-col-ident,
@@ -840,7 +842,7 @@
       const liquid = animate ? ' pat-liquid' : '';
       const gVar = (d.grade || 'U').replace('+', 'Plus');
       detail.innerHTML = `<div class="pat-wrap${liquid}" data-grade="${gVar}">${renderPantallaHead(d)}</div>`;
-      _mountStage();               // re-parenta el escenario de depósito a la zona derecha
+      _mountStage(d);              // re-parenta el escenario + monta/reseedea el panel de depósito compacto
       _syncIdentWidth();           // ancla --pat-ident-w a la medida REAL de la columna (form CURP la usa)
       _syncColumnsFit();           // marca .pat-cramped si las 3 columnas no caben lado a lado
       _wireColumnsFitResize();     // re-mide al redimensionar la ventana
@@ -915,9 +917,9 @@
       return;
     }
     const dep = e.target.closest('.d-deposit-btn');
-    if (dep && dep.dataset.accId) {
+    if (dep && dep.dataset.accId && !dep.disabled) {
       e.preventDefault();
-      if (typeof window.openDepositModal === 'function') window.openDepositModal(parseInt(dep.dataset.accId));
+      if (window.Depos && typeof window.Depos.fireCompact === 'function') window.Depos.fireCompact();
       return;
     }
     const mark = e.target.closest('.det-mark');
