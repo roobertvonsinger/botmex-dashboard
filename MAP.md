@@ -98,10 +98,10 @@ prewarm.py (router)
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 131 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2686 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2722 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 325 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 410 | `betmexico.dashboard.login_orch` | _[completar]_ |
-| `prewarm.py` | 870 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
+| `prewarm.py` | 901 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 364 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
@@ -219,6 +219,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `67c2488` | fix(db): cerrar conexiones sqlite3 crudas en web_grading (causa raíz del lock SOSTENIDO) |
 | `862e3e6` | fix(db): retry+backoff a writes del keeper/cooldown/auto_lock — depósito no se detiene |
 | `1577e91` | fix(db): touch de auditoría fuera del path síncrono de account_details |
 | `3b59fe7` | diag(db): instrumentar db(write=True) para cazar el lock sostenido en vivo |
@@ -230,7 +231,6 @@ prewarm.py (router)
 | `8283867` | feat(retiro): botón en .pat-actions + panel #wdStage en col 3 |
 | `72d1863` | feat(retiro): _withdrawBtnState — estado del botón dedicado (TDD) |
 | `eb9a9bb` | docs(retiro): spec v2 + plan — panel en col 3 (no popup flotante) |
-| `d5107f8` | docs(plan): botón de retiro dedicado + popup de monto — 6 tasks |
 <!-- GEN:end:recientes -->
 
 ---

@@ -267,18 +267,49 @@ def _db_save_txns_and_recalc(email: str, details: dict, operator_id: int) -> Non
     Cambio 2026-05-23: el recalc ahora usa `web_grading.recalc_grade_from_db`
     que lee TODAS las txns persistidas en BD, no solo las 10 del fetch actual.
     Eso da grade correcto incluso cuando fetch_mode='balance_only' trae solo
-    una página."""
+    una página.
+
+    Fix 2026-07-25: reescrito para usar `app.db(write=True)` en vez del singleton
+    `betmexico_db.db.conn` que no pasa por el registry del web y causaba locks
+    sostenidos (conexión huérfana sin rollback en error)."""
+    from datetime import datetime, timezone
     txn_data = (details or {}).get("transactions") or {}
     items = txn_data.get("items") or []
-    # Persiste txns nuevas (reusa el helper del bot)
-    if items:
+    if not items:
+        # Sin txns pero sí recalc — el grade puede cambiar por txns previas en BD
         try:
-            from betmexico_db import db as _bot_db
-            saver = getattr(_bot_db, "save_account_transactions", None)
-            if saver:
-                _bot_db.save_account_transactions(email, items, checked_by=operator_id)
+            from web_grading import recalc_grade_from_db
+            recalc_grade_from_db(email)
         except Exception as e:
-            logger.debug(f"[Prewarm] save_account_transactions: {e}")
+            logger.debug(f"[Prewarm] recalc_grade_from_db (sin txns): {e}")
+        return
+    # Persiste txns + recalc en UNA transacción vía app.db
+    try:
+        from app import db
+        now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        with db(write=True) as c:
+            c.execute(
+                "DELETE FROM account_transactions WHERE account_email=? AND checked_by=?",
+                (email, operator_id),
+            )
+            for txn in items:
+                c.execute(
+                    "INSERT INTO account_transactions "
+                    "(account_email, txn_date, amount, status, txn_type, gateway, "
+                    " checked_by, fetched_at) VALUES (?,?,?,?,?,?,?,?)",
+                    (
+                        email,
+                        txn.get("date", ""),
+                        float(txn.get("amount", 0)),
+                        int(txn.get("status", 0)),
+                        int(txn.get("type", 0)),
+                        int(txn.get("gateway", 0)),
+                        operator_id,
+                        now_utc,
+                    ),
+                )
+    except Exception as e:
+        logger.debug(f"[Prewarm] save_account_transactions: {e}")
     # Recalc grade usando TODAS las txns en BD (no solo las del fetch).
     try:
         from web_grading import recalc_grade_from_db

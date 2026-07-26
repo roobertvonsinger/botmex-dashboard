@@ -62,6 +62,41 @@ def _cooldown_active(cooldown_until, now=None) -> bool:
         return False
 
 
+def _save_txns_via_app_db(email: str, items: list, operator_id: int) -> None:
+    """Persiste transacciones vía app.db (no el singleton betmexico_db).
+
+    Fix 2026-07-25: el singleton betmexico_db.db.conn bypass-ea el write registry
+    del web y causaba locks sostenidos (conexión huérfana sin rollback en error).
+    Reescrito para pasar por db(write=True) del context manager registrado."""
+    from datetime import datetime, timezone
+    from app import db
+    now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        with db(write=True) as c:
+            c.execute(
+                "DELETE FROM account_transactions WHERE account_email=? AND checked_by=?",
+                (email, operator_id),
+            )
+            for txn in items:
+                c.execute(
+                    "INSERT INTO account_transactions "
+                    "(account_email, txn_date, amount, status, txn_type, gateway, "
+                    " checked_by, fetched_at) VALUES (?,?,?,?,?,?,?,?)",
+                    (
+                        email,
+                        txn.get("date", ""),
+                        float(txn.get("amount", 0)),
+                        int(txn.get("status", 0)),
+                        int(txn.get("type", 0)),
+                        int(txn.get("gateway", 0)),
+                        operator_id,
+                        now_utc,
+                    ),
+                )
+    except Exception as e:
+        logger.warning(f"[deposits] _save_txns_via_app_db failed para {email}: {e}")
+
+
 def _set_account_cooldown(email: str, minutes: int = RATE_LIMIT_COOLDOWN_MIN) -> int:
     """Marca la cuenta enfriando hasta now+minutes (persistente en BD). Devuelve
     el epoch de fin. No-throws (best-effort)."""
@@ -949,9 +984,10 @@ async def _acquire_session_and_begin(
                     txns_data = (login_result.get("account_details") or {}).get("transactions", {}) or {}
                     txn_items = txns_data.get("items") or []
                     if txn_items:
+                        # Fix 2026-07-25: usar app.db en vez del singleton betmexico_db
+                        # para no fugarte del write registry (causa del lock sostenido).
                         await asyncio.to_thread(
-                            _bot_db.save_account_transactions,
-                            email, txn_items, user.get("telegram_id", 0),
+                            _save_txns_via_app_db, email, txn_items, user.get("telegram_id", 0),
                         )
                     await asyncio.to_thread(recalc_grade_from_db, email)
             except Exception as e:
