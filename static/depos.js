@@ -9,17 +9,24 @@
   const tpl = document.getElementById('deposTpl');
   if (!root || !tpl || !D) return; // defensa: si falta algo, no rompe el dashboard
 
-  let el = null;          // #depos montado
+  let el = null;          // #depos montado (ventana FLOTANTE — bulk multi-select)
+  let elC = null;         // #depCompact montado (panel COMPACTO — dentro de La Pantalla, Task 3)
   let _mounted = false;
+  let _mountedC = false;
   let _greetTimer = null;
   let _win = null;        // controlador de ventana (depos_window.js): float / dock-izq / dock-der
-  const qs = (s) => (el ? el.querySelector(s) : null);
+  // UN SOLO motor (_dx) con DOS destinos de render posibles. _dx.target decide a cuál
+  // apunta qs() en cada momento — nunca corren los dos simultáneamente (mutua exclusión
+  // resuelta por :has(#depStage:not([hidden])) en pantalla.css + reseed condicional en
+  // mountCompact(), ver docs/superpowers/specs/2026-07-26-deposito-compacto-col3-design.md).
+  const activeEl = () => (_dx.target === 'compact' ? elC : el);
+  const qs = (s) => { const r = activeEl(); return r ? r.querySelector(s) : null; };
   // El ESCENARIO (escenas + %/sub + balance) ya NO vive en el panel: se movió a
   // #depStage, que La Pantalla monta en su zona derecha (#patStageSlot). sqs() lo
   // resuelve esté donde esté (re-parenteado por pantalla.js). #mov sigue en el panel → qs().
   const sqs = (s) => { const st = document.getElementById('depStage'); return st ? st.querySelector(s) : null; };
 
-  let _dx = { open: false, accounts: [], cards: [], reps: 1, amount: 50, mode: 'single', running: false };
+  let _dx = { open: false, target: 'float', accounts: [], cards: [], reps: 1, amount: 50, mode: 'single', running: false };
 
   // ── display 7 segmentos (reps) ──
   const SEGMAP = { 0:'abcdef',1:'bc',2:'abdeg',3:'abcdg',4:'bcfg',5:'acdfg',6:'acdefg',7:'abc',8:'abcdefg',9:'abcdfg' };
@@ -851,6 +858,7 @@
 
   window.openDepos = async function (opts) {
     opts = opts || {};
+    _dx.target = 'float';   // el operador abrió el popup flotante EXPLÍCITAMENTE: reclama el render
     mount();
     // reset COMPLETO de estado entre aperturas (evita movimientos/misiones stale)
     _dx.accounts = opts.accounts || (opts.ids || []).map((id) => ({ id, email: 'cuenta#' + id, password: '', grade: '' }));
