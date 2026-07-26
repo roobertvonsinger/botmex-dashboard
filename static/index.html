@@ -1049,6 +1049,39 @@
   </aside>
 </div>
 </template>
+
+<!-- Panel de depósito COMPACTO — mismo motor de depos.js, montado dentro de La
+     Pantalla (.pat-col-stage) en vez de la ventana flotante. Sin banner/saludo/
+     duo-columnas (ver docs/superpowers/specs/2026-07-26-deposito-compacto-col3-design.md).
+     Mismos ids internos que #deposTpl para que depos.js los reutilice sin cambios. -->
+<template id="deposCompactTpl">
+<div id="depCompact" class="pat-dep-stage">
+  <span class="pat-dep-head"><span class="pat-sv-emo">💳</span> Depositar <span class="pat-dep-mode" id="modeText"></span></span>
+  <div class="pat-dep-row">
+    <span class="pat-dep-label">Cuentas <span class="pat-dep-cnt" id="accCount">1</span></span>
+    <div class="pat-dep-chips" id="accChips"></div>
+  </div>
+  <div class="pat-dep-row">
+    <span class="pat-dep-label">Tarjetas <span class="pat-dep-cnt" id="cardCount">0</span></span>
+    <div class="pat-dep-chips" id="cardChips"></div>
+  </div>
+  <div class="pat-dep-row pat-dep-amt-row">
+    <div class="pat-dep-amt dis" id="amtManual"><span>$</span><input id="amtInput" value="50" inputmode="numeric" aria-label="Monto manual" class="pat-input pat-input-mono"></div>
+    <div class="pat-dep-presets" id="amtPresets"></div>
+  </div>
+  <div class="pat-dep-note" id="amtNote"></div>
+  <div class="pat-dep-reps hide" id="repsBox">
+    <span class="pat-dep-label">Reps</span>
+    <div class="pat-dep-seg" id="segDisp"></div>
+    <button type="button" class="pat-btn pat-btn-ghost" id="repUp" aria-label="Subir">&#9650;</button>
+    <button type="button" class="pat-btn pat-btn-ghost" id="repDn" aria-label="Bajar">&#9660;</button>
+  </div>
+  <div class="pat-dep-runrow" id="runrow">
+    <button type="button" class="pat-btn pat-btn-ghost" id="abort">Abortar</button>
+  </div>
+  <button type="button" class="newproc pat-dep-newproc"><span class="plus">+</span> Otro depósito</button>
+</div>
+</template>
 <div id="deposRoot" class="depos-root hidden" aria-hidden="true"></div>
 
 <!-- Toast -->

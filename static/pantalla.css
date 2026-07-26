@@ -434,10 +434,8 @@
 .pat-act-wd:hover:not(:disabled) { filter: brightness(1.08); }
 .pat-act-wd:disabled { opacity: .4; cursor: not-allowed; background: var(--pat-edge); color: var(--text-dim); box-shadow: none; }
 .pat-act-wd:disabled:hover { transform: none; filter: none; }
-/* Con el panel de depósitos abierto, La Pantalla oculta SU botón "Depositar" — no debe
-   haber dos botones de depósito a la vez (Robert 2026-07-17). Reaparece al cerrar el
-   panel (efecto "se movió del detalle al panel"). */
-body.depos-open .pat-act-dep { display: none; }
+.pat-act-dep:disabled { opacity: .4; cursor: not-allowed; background: var(--pat-edge); color: var(--text-dim); box-shadow: none; }
+.pat-act-dep:disabled:hover { background: var(--pat-edge); box-shadow: none; }
 
 /* COMBO copiable — ahora vive DENTRO de la columna de datos (.pat-col-ident), como
    primera fila de esa columna (2026-07-09: ya no reserva hueco de la X, los
@@ -566,7 +564,8 @@ body.depos-open .pat-act-dep { display: none; }
 }
 /* Coexistencia: si hay misión de depósito activa (#depStage visible en #patStageSlot),
    oculta el panel de retiro. depos.js intacto — la prioridad visual la resuelve el CSS. */
-.pat-col-stage:has(#depStage:not([hidden])) .pat-wd-stage { display: none; }
+.pat-col-stage:has(#depStage:not([hidden])) .pat-wd-stage,
+.pat-col-stage:has(#depStage:not([hidden])) .pat-dep-stage { display: none; }
 .pat-wd-head { font-size: 12px; font-weight: 600; display: flex; gap: 5px; align-items: center; }
 .pat-wd-email { color: var(--text-dim); font-weight: 400; }
 .pat-wd-balance { font-size: 10.5px; color: var(--text-dim); }
@@ -574,6 +573,47 @@ body.depos-open .pat-act-dep { display: none; }
 .pat-wd-stage .pat-input { width: 100%; }
 .pat-wd-status { margin-top: 4px; }
 .pat-wd-status:empty { display: none; }
+/* Panel de depósito compacto — mismo motor de depos.js (window.Depos.mountCompact),
+   montado en #patDepSlot. Estructura reusa las clases que renderAccounts/renderCards/
+   setPresets ya generan (chip, chip-x, amt-preset, hdot) — se re-skinnean AQUÍ, scoped
+   a .pat-dep-stage, para NO tocar depos.css (spec: no reutilizar el look del panel viejo). */
+.pat-dep-stage {
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 12px 4px 4px 0; margin-top: 4px;
+  border-top: 1px solid var(--pat-edge);
+  color: var(--text);
+}
+.pat-dep-head { font-size: 12px; font-weight: 600; display: flex; gap: 5px; align-items: center; }
+.pat-dep-mode { font-weight: 400; color: var(--text-dim); font-size: 10px; margin-left: auto; }
+.pat-dep-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pat-dep-label { font-size: 10px; color: var(--text-dim); flex: 0 0 auto; }
+.pat-dep-cnt { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-muted); }
+.pat-dep-chips { display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto; }
+.pat-dep-stage .chip {
+  background: oklch(0.80 0.085 160 / 0.08); border: 1px solid var(--pat-edge);
+  border-radius: 20px; padding: 2px 8px; font-size: 10px;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.pat-dep-stage .chip-x { cursor: pointer; opacity: .6; }
+.pat-dep-stage .chip-x:hover { opacity: 1; color: var(--danger); }
+.pat-dep-amt-row { gap: 8px; }
+.pat-dep-stage .amt-preset {
+  border: 1px solid var(--pat-edge); border-radius: 6px; padding: 2px 8px;
+  font-family: var(--font-mono); font-size: 10.5px; cursor: pointer;
+}
+.pat-dep-stage .amt-preset.on { background: var(--pat-gold-soft); color: var(--pat-gold); border-color: var(--pat-edge-h); }
+.pat-dep-amt.dis input { opacity: .45; pointer-events: none; }
+.pat-dep-presets { display: flex; gap: 4px; flex-wrap: wrap; }
+.pat-dep-note { font-size: 9.5px; color: var(--text-faint); }
+.pat-dep-reps { display: flex; align-items: center; gap: 6px; }
+.pat-dep-reps.hide { display: none; }
+.pat-dep-runrow { display: none; }
+.pat-dep-runrow.on { display: flex; gap: 6px; }
+.pat-dep-newproc {
+  align-self: flex-start; background: transparent; border: 1px dashed var(--pat-edge);
+  color: var(--text-dim); font-size: 9.5px; padding: 2px 8px; border-radius: 6px; cursor: pointer;
+}
+.pat-dep-newproc:hover { color: var(--pat-gold); border-color: var(--pat-gold); }
 .pat-curp-pop .pat-input {
   width: 19ch; text-align: center; letter-spacing: 1px;
   background: oklch(0.20 0.02 160 / 0.22); border-color: var(--hairline);
@@ -617,6 +657,7 @@ body.depos-open .pat-act-dep { display: none; }
   padding-left: 22px;
   border-left: 1px solid var(--pat-edge);
   box-shadow: -1px 0 16px -12px var(--pat-gold-soft);
+  overflow-y: auto;
 }
 .pat-col-stage[hidden] { display: none; }
 

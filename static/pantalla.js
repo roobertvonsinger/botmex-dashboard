@@ -345,6 +345,7 @@
         <div class="pat-col-stage">
           ${renderPantallaWithdrawStage(d)}
           <div id="patStageSlot"></div>
+          <div id="patDepSlot"></div>
         </div>
       </div>
       <div class="pat-actions">
