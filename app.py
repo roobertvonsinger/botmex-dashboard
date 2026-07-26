@@ -1514,12 +1514,27 @@ def accounts_refresh(req: RefreshRequest, _user: dict = Depends(require_session)
 
 # ─── Logs en tiempo real ───────────────────────────────────────────────────────
 
+_LOG_NOISE_PATTERNS: list[re.Pattern] = [
+    # uvicorn request lines: "GET /api/x 200" / "POST /api/x 304"
+    re.compile(r'^\S+ \d+:\d+:\d+,\d+ - (GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD) /'),
+    # SSE /api/events connections
+    re.compile(r'^\S+ \d+:\d+:\d+,\d+ - connection open$', re.IGNORECASE),
+    re.compile(r'^\S+ \d+:\d+:\d+,\d+ - connection closed$', re.IGNORECASE),
+    # Health check internal pings (GET /api/health/*)
+    re.compile(r'^\S+ \d+:\d+:\d+,\d+ - (GET|POST) /api/health'),
+    # Import checks / module loads
+    re.compile(r'^\S+ \d+:\d+:\d+,\d+ - import\b', re.IGNORECASE),
+]
+
+
 @app.get("/api/logs")
 def get_logs(limit: int = 200, since: Optional[str] = None,
+             level: Optional[str] = None,
              user: dict = Depends(require_session)):
-    """Lee las últimas N líneas del log del dashboard.
-    Fix 2026-05-23: antes usaba journalctl, pero en Docker no hay systemd. Ahora
-    lee `/data/logs/dashboard.log` que escribe el RotatingFileHandler de app.py."""
+    """Lee las últimas N líneas filtradas del log del dashboard.
+    Filtra ruido (uvicorn requests, health checks, SSE heartbeats, imports).
+    Param `level`: ERROR | WARNING | WARN | CRITICAL | INFO | ALL (default ALL).
+    Fix 2026-05-23: lee `/data/logs/dashboard.log` (RotatingFileHandler de app.py)."""
     if user.get("role") != "superadmin":
         raise HTTPException(403, "Solo superadmin")
     log_file = Path("/data/logs/dashboard.log")
@@ -1536,8 +1551,16 @@ def get_logs(limit: int = 200, since: Optional[str] = None,
             data = f.read().decode("utf-8", errors="replace")
         lines = data.splitlines()[-n:]
         if since:
-            # Filtro simple por prefijo timestamp (las líneas empiezan con "YYYY-MM-DD HH:MM:SS,ms")
             lines = [ln for ln in lines if ln[:19] >= since[:19]]
+        # Filtrar ruido de uvicorn/health/SSE/imports
+        lines = [ln for ln in lines
+                 if not any(p.search(ln) for p in _LOG_NOISE_PATTERNS)]
+        # Filtrar por nivel si se pide
+        lvl = (level or '').upper().strip()
+        if lvl and lvl != 'ALL':
+            if lvl in ('WARN',):
+                lvl = 'WARNING'
+            lines = [ln for ln in lines if lvl in ln.upper()]
         return {"lines": lines}
     except Exception as e:
         return {"lines": [f"Error leyendo log: {e}"]}
@@ -3633,32 +3656,8 @@ def activity_feed(
         except sqlite3.OperationalError:
             pass
 
-        # Prewarms (process_log)
-        try:
-            sql = (
-                "SELECT phase, payload_json, created_at FROM process_log "
-                "WHERE process_type='prewarm' "
-            )
-            params = []
-            if op_filter is not None:
-                sql += "AND payload_json LIKE ? "
-                params.append(f'%"operator_id": {op_filter}%')
-            sql += "ORDER BY timestamp_ms DESC LIMIT ?"
-            params.append(limit)
-            for r in c.execute(sql, params).fetchall():
-                p = {}
-                try:
-                    p = _json.loads(r["payload_json"])
-                except Exception:
-                    pass
-                events.append({
-                    "kind": f"prewarm_{r['phase']}", "ts": r["created_at"],
-                    "who": _resolve_operator(p.get("operator_id")),
-                    "who_color": _operator_color(p.get("operator_id")), "who_id": p.get("operator_id"),
-                    "target": _combo(p.get("email", "")),
-                })
-        except sqlite3.OperationalError:
-            pass
+        # Prewarms eliminados del feed (2026-07-26): ruido operacional interno.
+        # Quedan en process_log para auditoría; no se sirven en el feed.
 
     events.sort(key=lambda e: str(e.get("ts", "")), reverse=True)
     return {"feed": events[:limit]}

@@ -1210,7 +1210,16 @@ async function reloadActivity() {
       `<tr><td colspan="1" class="loading" style="color:var(--danger)">Error: ${esc(e.message)}</td></tr>`;
   }
 }
+// 2026-07-26: eventos filtrados del feed — ruido operacional que solo ensucia.
+// Quedan en BD/audit trail pero no se muestran al operador.
+const _FEED_NOISE_KINDS = new Set([
+  'deposit_step',   // traza interna paso-a-paso (ya vive en detalle de La Pantalla)
+  'account_touch',  // "abrió cuenta" — auditoría, no acción
+]);
 function pushActivityEvent(ev) {
+  // Filtrar ruido del feed antes de insertar
+  if (_FEED_NOISE_KINDS.has(ev.kind)) return;
+  if (ev.kind?.startsWith('prewarm_')) return;
   // Insert at top, dedupe-ish, cap 500
   const row = {
     kind: ev.kind, ts: ev.ts, who: ev.who, who_color: ev.who_color, who_id: ev.who_id,
@@ -1220,8 +1229,6 @@ function pushActivityEvent(ev) {
     sched_id: ev.sched_id, iter: ev.iter, total: ev.total,
     code: ev.code, success: ev.success,
     name: ev.name, data: ev.data, email: ev.email,
-    // Campos de deposit_step (Fase 2 KPI Logs): traza paso a paso.
-    step: ev.step, ok: ev.ok, attempt_id: ev.attempt_id, run_id: ev.run_id,
   };
   // Si el evento trae 'email' (scheduled*) pero no 'target', usar email como target
   // para que la columna "Cuenta" del feed muestre el combo y filtros por target funcionen.
@@ -1234,18 +1241,10 @@ function pushActivityEvent(ev) {
   renderActivityMarquee();
 }
 
-// ─── 📋 Logs — feed vertical (ex-marquesina de Actividad LIVE) ───
-// Fase 4 (spec 2026-07-05): éxito rutinario calla, fallo siempre habla.
-// Familias: deposit_step (traza paso a paso, agrupada), account_touch (vigilancia
-// de quién metió mano), y el resto de acciones (solo si fue fallo).
-// Nota: lock/unlock/mark/pool_move son eventos de ACCIÓN (no tienen resultado
-// éxito/fallo propio en su payload — "alguien bloqueó X" ya es el hecho
-// completo), por eso siempre se muestran. deposit_step/account_touch/deposit
-// sí tienen lógica de éxito/fallo y la aplican en su propio render.
-const _LOGS_KINDS = new Set([
-  'deposit','lock','unlock','unlock_auto','account_cooling','mark','pool_move',
-  'deposit_step','account_touch',
-]);
+// ─── 📋 Feed de actividad (marquee KPI + tabla) ───
+// 2026-07-26: simplificado — deposit_step y account_touch se filtran en
+// pushActivityEvent(). Solo quedan acciones con resultado: depósitos, locks,
+// notas, retiros, scheduled. Éxito rutinario calla, fallo siempre habla.
 
 async function loadActivityMarquee() {
   try {
@@ -1277,80 +1276,18 @@ function _humanizeDepositCode(code) {
   return key ? _DEPOSIT_CODE_HUMANO[key] : String(code);
 }
 
-// Agrupa los steps sueltos de un mismo depósito (deposit_step) en UNA traza
-// acumulada por corrida: attempt_id (single) / run_id (matchmaker) / sched_id
-// (scheduled) + email como fallback si ninguno viene.
-const _STEP_ORDER = ['login', 'begin', 'submit', 'check'];
-function _depositStepRunKey(ev) {
-  return `run:${ev.attempt_id || ev.run_id || ev.sched_id || ''}:${ev.email || ev.target || ''}`;
-}
-function _groupDepositSteps(rows) {
-  const runs = new Map(); // runKey -> { ts, email, who, who_id, who_color, steps:{login:{ok,code}, ...} }
-  const order = []; // orden de aparición (más reciente primero, ya viene así en activityRows)
-  for (const ev of rows) {
-    if (ev.kind !== 'deposit_step') continue;
-    const key = _depositStepRunKey(ev);
-    let run = runs.get(key);
-    if (!run) {
-      run = { key, ts: ev.ts, email: ev.email || ev.target, who: ev.who, who_id: ev.who_id, who_color: ev.who_color, steps: {} };
-      runs.set(key, run);
-      order.push(key);
-    }
-    // El primer step visto (más reciente, activityRows viene newest-first) manda el ts.
-    if (ev.ts > run.ts) run.ts = ev.ts;
-    if (!run.steps[ev.step]) run.steps[ev.step] = { ok: ev.ok, code: ev.code };
-  }
-  return order.map(k => runs.get(k));
-}
-// Traza técnica: "✓login ✓begin ✗submit → BANK_REJECTED"
-function _depositRunTraceSA(run) {
-  const parts = _STEP_ORDER.filter(s => run.steps[s]).map(s => {
-    const st = run.steps[s];
-    const mark = st.ok === false ? '✗' : '✓';
-    return `${mark}${s}`;
-  });
-  const lastFail = _STEP_ORDER.map(s => run.steps[s]).reverse().find(st => st && (st.ok === false || st.code));
-  const codeTxt = lastFail && (lastFail.ok === false || lastFail.code) ? ` → ${esc(lastFail.code || 'FALLO')}` : '';
-  return `${parts.join(' ')}${codeTxt}`;
-}
-// Síntesis operador: 1 línea simple, sin jerga técnica.
-function _depositRunTraceOperador(run) {
-  const failStep = _STEP_ORDER.map(s => run.steps[s]).find(st => st && st.ok === false);
-  const okAll = _STEP_ORDER.every(s => !run.steps[s] || run.steps[s].ok !== false);
-  if (failStep && failStep.code) return `❌ ${_humanizeDepositCode(failStep.code)}`;
-  if (!okAll) return '❌ el depósito no completó';
-  const checkCode = run.steps.check?.code;
-  if (checkCode && String(checkCode).startsWith('txn:') && !String(checkCode).endsWith(':1')) {
-    return `❌ ${_humanizeDepositCode(checkCode)}`;
-  }
-  return '✓ en curso';
-}
-
 function renderActivityMarquee() {
   const host = document.getElementById('lpActivity');
   if (!host) return;
   const isSA = state.user?.role === 'superadmin';
 
-  // 1) deposit_step agrupados en trazas (máx 15 corridas más recientes)
-  const depositRuns = _groupDepositSteps(activityRows).slice(0, 15);
-  const runKeys = new Set(depositRuns.map(r => r.key));
+  // 2026-07-26: simplificado — deposit_step y account_touch ya se filtran en
+  // pushActivityEvent(). Solo queda dedup + agrupación de depósitos repetidos.
+  const rest = ActivityLogic.dedupeActivity(activityRows);
 
-  // 2) resto de eventos del feed (sin deposit_step suelto — ya va agrupado).
-  //    Dedup de account_touch: 1 por (operador, cuenta, día) — no spamear con
-  //    "X entró a la misma cuenta" repetido (el dato completo persiste en BD).
-  const _touchSeen = new Set();
-  const rest = ActivityLogic.dedupeActivity(activityRows)
-    .filter(ev => ev.kind !== 'deposit_step' && _LOGS_KINDS.has(ev.kind))
-    .filter(ev => {
-      if (ev.kind !== 'account_touch') return true;
-      const k = `${ev.who_id ?? ev.who}|${ev.target}|${_mxYmd(_feedEpoch(ev.ts, ev.kind))}`;
-      if (_touchSeen.has(k)) return false;
-      _touchSeen.add(k); return true;
-    });
-
-  // 3) Agrupar depósitos repetidos (mismo operador+cuenta+resultado+monto+día) en
-  //    una fila representante (la más nueva) desplegable; los demás se sublistan
-  //    al click. activityRows viene newest-first → el 1º de cada grupo es el rep.
+  // Agrupar depósitos repetidos (mismo operador+cuenta+resultado+monto+día) en
+  // una fila representante (la más nueva) desplegable; los demás se sublistan
+  // al click. activityRows viene newest-first → el 1º de cada grupo es el rep.
   const depGroups = new Map();
   const restItems = []; // {__ev,ep} | {__group,ep}
   for (const ev of rest) {
@@ -1363,13 +1300,8 @@ function renderActivityMarquee() {
     else g.kids.push({ ev, ep });
   }
 
-  // Combinar y ordenar por EPOCH ABSOLUTO desc (no por string: ts vienen en
-  // formatos/zonas mezclados — ver _feedEpoch). Sin esto los locks (ts con 'T')
-  // se pineaban arriba de los depósitos (ts con ' ') sin importar la hora real.
-  const combined = [
-    ...depositRuns.map(r => ({ __run: r, ep: _feedEpoch(r.ts, 'deposit_step') })),
-    ...restItems,
-  ].sort((a, b) => b.ep - a.ep).slice(0, 30);
+  // Ordenar por EPOCH ABSOLUTO desc (ts vienen en formatos/zonas mezclados).
+  const combined = restItems.sort((a, b) => b.ep - a.ep).slice(0, 30);
 
   const counter = document.getElementById('lpFeedCount');
   if (counter) counter.textContent = combined.length ? `${combined.length} eventos` : '—';
@@ -1379,38 +1311,13 @@ function renderActivityMarquee() {
     return;
   }
 
-  const makeRunRow = (run, ep) => {
-    const email = String(run.email || '').split(':')[0];
-    const who = isSA ? esc(run.who || '—') : 'Tú';
-    const amt = ''; // deposit_step no trae amount — la traza no lo necesita
-    const trace = isSA ? _depositRunTraceSA(run) : _depositRunTraceOperador(run);
-    const hasFail = _STEP_ORDER.some(s => run.steps[s]?.ok === false);
-    const cls = hasFail ? 'fail' : 'neutral';
-    const icon = hasFail ? '✗' : '⏳';
-    const headline = isSA
-      ? `${who} · depósito${amt} · ${esc(email)}`
-      : `Depositando en ${esc(email)}`;
-    return `<div class="lp-feed-row lp-feed-${cls} lp-feed-clickable lp-feed-run" data-open-email="${esc(email)}" title="Abrir cuenta">` +
-      `${isSA ? _whoDot(run.who_color) : ''}<span class="lp-feed-ic">${icon}</span>` +
-      `<div class="lp-feed-body"><span class="lp-feed-txt">${headline}</span><span class="lp-feed-trace mono dim">${trace}</span></div>` +
-      `<span class="lp-feed-time mono dim">${_exactHoraEp(ep)}</span></div>`;
-  };
-
   const makeEvRow = (ev, ep) => {
-    if (ev.kind === 'account_touch') {
-      const email = String(ev.target || '').split(':')[0];
-      const who = isSA ? esc(ev.who || '—') : 'Tú';
-      const txt = isSA ? `${who} · 👁 abrió ${esc(email)} <span class="dim">(1/día)</span>` : `👁 abriste ${esc(email)}`;
-      return `<div class="lp-feed-row lp-feed-neutral lp-feed-clickable" data-open-email="${esc(email)}" data-open-id="${esc(ev.id ?? '')}" title="Abrir cuenta">${isSA ? _whoDot(ev.who_color) : ''}<span class="lp-feed-ic">👁</span><span class="lp-feed-txt">${txt}</span><span class="lp-feed-time mono dim">${_exactHoraEp(ep)}</span></div>`;
-    }
     const c = ActivityLogic.formatActivityCopy(ev, isSA);
     const email = String(ev.target || ev.email || '').split(':')[0];
     return `<div class="lp-feed-row lp-feed-${esc(c.cls)} lp-feed-clickable" data-open-email="${esc(email)}" title="Abrir cuenta">${isSA ? _whoDot(ev.who_color) : ''}<span class="lp-feed-ic">${c.icon}</span><span class="lp-feed-txt">${esc(c.text)}</span><span class="lp-feed-time mono dim">${_exactHoraEp(ep)}</span></div>`;
   };
 
-  // Fila de grupo de depósitos: representante (más nuevo) + badge "×N" desplegable.
-  // Click en el badge → despliega los demás sublistados con su hora. N=1 → normal.
-  // Click en el cuerpo → abre la cuenta (como cualquier fila).
+  // Grupo de depósitos: representante + badge "×N" desplegable.
   const makeGroupRows = (g, ep) => {
     if (g.kids.length === 0) return makeEvRow(g.rep, ep);
     const c = ActivityLogic.formatActivityCopy(g.rep, isSA);
@@ -1430,8 +1337,7 @@ function renderActivityMarquee() {
     return head + kids;
   };
 
-  // Render con cabeceras de día (Hoy / Ayer / fecha MX): el feed es un stream
-  // cronológico único — nada pineado por tipo, y la hora sin día no reconstruye.
+  // Render con cabeceras de día (Hoy / Ayer / fecha MX).
   let lastDay = null;
   const rowsHtml = combined.map(item => {
     const dayKey = _mxYmd(item.ep);
@@ -1441,12 +1347,10 @@ function renderActivityMarquee() {
       head = `<div class="lp-feed-day mono">${esc(_dayLabelEp(item.ep))}</div>`;
     }
     let body;
-    if (item.__run) body = makeRunRow(item.__run, item.ep);
-    else if (item.__group) body = makeGroupRows(item.__group, item.ep);
+    if (item.__group) body = makeGroupRows(item.__group, item.ep);
     else body = makeEvRow(item.__ev, item.ep);
     return head + body;
   }).join('');
-  // Feed vertical scrolleable — SIN duplicado de ticker, SIN animación de loop.
   host.innerHTML = rowsHtml;
 }
 
@@ -2303,11 +2207,12 @@ async function refreshVisible(opts = {}) {
 let _logsTimer = null;
 let _logsPaused = false;
 let _logsAutoScroll = true;
+let _logsLevel = 'ALL';
 async function reloadLogs() {
   const v = $('#logsView');
   if (!v) return;
   try {
-    const r = await fetch('/api/logs?limit=300');
+    const r = await fetch(`/api/logs?limit=300&level=${encodeURIComponent(_logsLevel)}`);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
     $('#logsCount').textContent = `${data.lines.length} líneas${_logsAutoScroll ? '' : ' · 🔒 scroll bloqueado'}`;
@@ -2785,6 +2690,10 @@ $$('.seg').forEach(seg => {
         activityFilter.time = btn.dataset.v;
         activityPage = 1;
         return renderActivity();
+      }
+      if (key === 'loglevel') {
+        _logsLevel = btn.dataset.v || 'ALL';
+        return reloadLogs();
       }
       state[key] = btn.dataset.v;
       state.page = 1;

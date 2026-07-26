@@ -632,6 +632,11 @@
       <section class="filterbar">
         <h2>Logs <span class="dim mono" id="logsCount">—</span></h2>
         <div class="grow"></div>
+        <div class="seg" data-seg="loglevel" title="Filtra por nivel de severidad">
+          <button data-v="ALL" class="on" title="Todas las líneas">Todo</button>
+          <button data-v="ERROR" title="Solo errores">✗ Error</button>
+          <button data-v="WARNING" title="Solo advertencias">⚠ Warn</button>
+        </div>
         <button class="seg-btn" id="btnLogsCopy" title="Copiar todo al portapapeles">📋 Copiar</button>
         <button class="seg-btn" id="btnLogsScrollEnd" title="Ir al final + reanudar auto-scroll">⤓ Final</button>
         <button class="seg-btn" id="btnLogsClear" title="Borra el contenido visible (no afecta servidor)">Limpiar</button>

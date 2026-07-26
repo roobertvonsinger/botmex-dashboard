@@ -219,6 +219,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `6c68b27` | docs(plan): implementación depósito compacto col 3 — 7 tareas, doble destino de render en depos.js |
 | `4ef172d` | docs(spec): diseño depósito compacto conviviendo con retiro en col 3 |
 | `86c589d` | fix(retiro): withdraw_status nunca resolvía a terminal cuando BetMexico ya sacó el retiro de pendientes |
 | `fd385d7` | fix(retiro): panel col3 invisible en ancho medio — overflow horizontal nunca chequeado |
@@ -230,7 +231,6 @@ prewarm.py (router)
 | `1577e91` | fix(db): touch de auditoría fuera del path síncrono de account_details |
 | `3b59fe7` | diag(db): instrumentar db(write=True) para cazar el lock sostenido en vivo |
 | `db45738` | fix(retiro): persist con retry+backoff — no perder el registro si BD está lockeada |
-| `c2af215` | fix(retiro): pantalla.js leía window.state (siempre undefined) en vez de state |
 <!-- GEN:end:recientes -->
 
 ---
