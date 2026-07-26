@@ -1982,7 +1982,28 @@ td.sel-cell:hover { background: rgba(255,255,255,0.04); }
   color: var(--text-dim);
   height: 100%; overflow-y: auto;
   margin: 0;
+  line-height: 1.65;
 }
+/* Log line parsed components */
+.log-line { display: block; padding: 1px 0; }
+.log-ts { font-size: 10px; opacity: .55; margin-right: 4px; }
+.log-level { font-weight: 700; font-size: 9.5px; padding: 0 5px; border-radius: 3px; margin: 0 3px; vertical-align: middle; }
+.log-err  { color: var(--danger); background: var(--danger-soft); }
+.log-warn { color: var(--warn); background: oklch(0.80 0.16 75 / 0.12); }
+.log-info { color: var(--accent); }
+.log-crit { color: #fff; background: var(--danger); }
+.log-debug { color: var(--text-dim); opacity: .45; }
+.log-logger { font-size: 10px; opacity: .5; margin-right: 6px; }
+.log-msg { color: var(--text); }
+.log-raw { color: var(--text-dim); }
+/* Highlight: [DETAILS] lines */
+.log-line.log-details { background: oklch(0.25 0.05 75); padding: 2px 4px; border-radius: 4px; margin-bottom: 2px; }
+.log-line.log-details .log-msg { color: #fff; }
+.log-line.log-details .log-balance { font-weight: 700; text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 2px; }
+/* Level counts in header */
+.log-level-counts { font-size: 11px; margin-left: 8px; }
+.log-level-counts .lc-e { color: var(--danger); font-weight: 600; }
+.log-level-counts .lc-w { color: var(--warn); font-weight: 600; }
 
 /* ─── Health view ─── */
 .health-view { padding: 18px 22px 80px; }

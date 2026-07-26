@@ -1790,7 +1790,7 @@ function connectSSE() {
           _liveReload();
           loadRecientes();
         } else if (ev.kind === 'unlock') {
-          pushNotif({ icon: '🔓', msg: `${ev.who} liberó ${ev.target}` });
+          pushNotif({ icon: '✔️', msg: `${ev.who} liberó ${ev.target}` });
           _liveReload();
           loadRecientes();
         } else if (ev.kind === 'deposit') {
@@ -1861,7 +1861,7 @@ function connectSSE() {
       } else if (ev.type === 'window_released') {
         const myTg = state.user?.telegram_id;
         if (!myTg || ev.operator_id === myTg || state.user?.role === 'superadmin') {
-          pushNotif({ icon: '↩️', msg: ev.msg || `${ev.email} liberada al pool` });
+          pushNotif({ icon: '✔️', msg: ev.msg || `${ev.email} liberada al pool` });
           _liveReload();
         }
       }
@@ -2208,6 +2208,54 @@ let _logsTimer = null;
 let _logsPaused = false;
 let _logsAutoScroll = true;
 let _logsLevel = 'ALL';
+// Parsea una línea de log en componentes estructurados.
+// Formato: "2026-07-26 12:34:56,789 [INFO] [betmexico.dashboard.db] message"
+const _LOG_LINE_RE = /^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d{3})\s+\[(\w+)\]\s+\[([^\]]+)\]\s+(.*)$/;
+function _parseLogLine(line) {
+  const m = line.match(_LOG_LINE_RE);
+  if (!m) return { raw: line };
+  return { ts: m[1], level: m[2], logger: m[3], msg: m[4] };
+}
+function _renderLogLine(p) {
+  if (p.raw != null) return `<span class="log-raw">${esc(p.raw)}</span>`;
+  const lvl = p.level.toUpperCase();
+  const cls = lvl === 'ERROR' || lvl === 'CRITICAL' ? 'log-err'
+    : lvl === 'WARNING' ? 'log-warn'
+    : lvl === 'DEBUG' ? 'log-debug'
+    : lvl === 'INFO' ? 'log-info'
+    : 'log-info';
+  // Hora corta: HH:MM:SS (sin fecha)
+  const shortTs = p.ts.length >= 19 ? p.ts.slice(11, 19) : p.ts;
+  // Último segmento del logger: "betmexico.dashboard.db" → "db"
+  const shortLog = p.logger.includes('.') ? p.logger.split('.').pop() : p.logger;
+
+  let msg = p.msg;
+  let lineCls = 'log-line';
+
+  // Aplastar check verdes en texto plano para evitar confusión con status real de depósito
+  msg = msg.replace(/✅/g, '✔️');
+
+  // Resaltar [DETAILS] de BetMexico (línea amarilla tenue, texto blanco, balance subrayado)
+  if (msg.includes('[DETAILS]')) {
+    lineCls += ' log-details';
+    msg = msg.replace(/\[DETAILS\]\s*/i, '');
+    msg = msg.replace(/(Balance:\s*[\d\.,]+)/i, '<span class="log-balance">$1</span>');
+  }
+
+  // Se usa innerHTML directo en _renderLogLine así que hay que escapar msg CUIDADOSAMENTE,
+  // pero ya le inyectamos HTML (<span class="log-balance">).
+  // Estrategia: escapar primero TODO, y luego reinyectar el HTML seguro.
+  // Pero lo más fácil: escapar antes de aplicar los replaces de HTML.
+
+  let safeMsg = esc(p.msg).replace(/✅/g, '✔️');
+  if (safeMsg.includes('[DETAILS]')) {
+    lineCls += ' log-details';
+    safeMsg = safeMsg.replace(/\[DETAILS\]\s*/i, '');
+    safeMsg = safeMsg.replace(/(Balance:\s*[\d\.,]+)/i, '<span class="log-balance">$1</span>');
+  }
+
+  return `<span class="${lineCls}"><span class="log-ts">${esc(shortTs)}</span><span class="log-level ${cls}">${esc(lvl)}</span><span class="log-logger">${esc(shortLog)}</span><span class="log-msg">${safeMsg}</span></span>`;
+}
 async function reloadLogs() {
   const v = $('#logsView');
   if (!v) return;
@@ -2215,13 +2263,27 @@ async function reloadLogs() {
     const r = await fetch(`/api/logs?limit=300&level=${encodeURIComponent(_logsLevel)}`);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
-    $('#logsCount').textContent = `${data.lines.length} líneas${_logsAutoScroll ? '' : ' · 🔒 scroll bloqueado'}`;
+    // Contar por nivel
+    let eC = 0, wC = 0;
+    for (const ln of data.lines) {
+      if (ln.includes('[ERROR]') || ln.includes('[CRITICAL]')) eC++;
+      else if (ln.includes('[WARNING]')) wC++;
+    }
+    const total = data.lines.length;
+    $('#logsCount').textContent = `${total} líneas${_logsAutoScroll ? '' : ' · 🔒 scroll bloqueado'}`;
+    const lcEl = $('#logsLevelCounts');
+    if (lcEl) {
+      const parts = [];
+      if (eC) parts.push(`<span class="lc-e">✗${eC}</span>`);
+      if (wC) parts.push(`<span class="lc-w">⚠${wC}</span>`);
+      lcEl.innerHTML = parts.join(' ');
+    }
     // Preserve selection — solo actualiza si nada está seleccionado
     const sel = window.getSelection();
     const hasSelection = sel && sel.toString().length > 0 && v.contains(sel.anchorNode);
     if (hasSelection) return;
     const wasAtBottom = (v.scrollHeight - v.scrollTop - v.clientHeight) < 50;
-    v.textContent = data.lines.join('\n');
+    v.innerHTML = data.lines.map(ln => _renderLogLine(_parseLogLine(ln))).join('\n');
     // Solo auto-scroll si el usuario no se ha movido manualmente
     if (_logsAutoScroll && wasAtBottom) {
       v.scrollTop = v.scrollHeight;
@@ -5104,7 +5166,7 @@ function _handleExecStreamEvent(ev, amount) {
     if (ev.success) {
       res.className = 'dep-result success';
       res.innerHTML = `<b>✓ Depósito aprobado</b> — $${(amount || 0).toFixed(2)} <span class="dim mono"> · ${ev.duration_ms || 0}ms</span>`;
-      pushNotif({ icon: '💳', msg: `Depósito $${(amount || 0).toFixed(2)} aprobado` });
+      pushNotif({ icon: '✅', msg: `Depósito $${(amount || 0).toFixed(2)} aprobado` });
       // Reconcile: backend confirmó aprobado. Si el step 'check' quedó marcado fail por
       // un edge case (txn_status=0 mientras el banco ya aprobó), corregirlo a ok aquí.
       const checkEl = document.querySelector('.dep-phase[data-step="check"]');
@@ -5798,7 +5860,7 @@ function handleMmEvent(ev) {
       _mmRender();
       _mmFeedAdd('mm-match',
         `✓ <b class="mono">${esc(ev.tail)}</b> ↔ <b>${esc(ev.email)}</b> · $${ev.amount.toFixed(2)} <span class="dim mono">${ev.duration_ms}ms</span>`);
-      pushNotif({ icon: '💳', msg: `Match: ${ev.tail} ↔ ${ev.email}` });
+      pushNotif({ icon: '✔️', msg: `Match: ${ev.tail} ↔ ${ev.email}` });
       break;
     }
     case 'done': {

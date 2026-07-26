@@ -1524,6 +1524,8 @@ _LOG_NOISE_PATTERNS: list[re.Pattern] = [
     re.compile(r'^\S+ \d+:\d+:\d+,\d+ - (GET|POST) /api/health'),
     # Import checks / module loads
     re.compile(r'^\S+ \d+:\d+:\d+,\d+ - import\b', re.IGNORECASE),
+    # Spam de KYC de BetMexico
+    re.compile(r'\[KYC.*?\]', re.IGNORECASE),
 ]
 
 

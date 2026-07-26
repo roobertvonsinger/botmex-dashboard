@@ -219,6 +219,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `7549baa` | docs(bitacora): panel de deposito compacto col 3 — arquitectura + cierre parcial de sesion |
 | `fbd5c2d` | fix(app): openDepositModal no abre el popup flotante si la cuenta ya está en La Pantalla |
 | `b357bbd` | @ revert: deshacer fix "Declined" false positive (no solicitado) |
 | `2dde979` | Revert "@" |
@@ -230,7 +231,6 @@ prewarm.py (router)
 | `0dc2609` | @ fix(deposits): "Declined" genérico NO es rechazo real de banco |
 | `c6e9f68` | feat(depos): mountCompact/wireCompactStatic — panel de depósito montable en La Pantalla |
 | `83f8abb` | refactor(depos): _dx.target decide el destino de render (float/compact) sin cambiar comportamiento |
-| `d68cb5d` | feat(depos): template+CSS del panel de depósito compacto en col 3 (inerte, sin JS aún) |
 <!-- GEN:end:recientes -->
 
 ---
