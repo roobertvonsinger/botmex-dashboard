@@ -67,7 +67,7 @@
     if (!_toastEl) {
       _toastEl = document.createElement('div');
       _toastEl.className = 'toast';
-      el.appendChild(_toastEl);
+      (activeEl() || el).appendChild(_toastEl);
     }
     _toastEl.textContent = t;
     _toastEl.classList.add('on');
@@ -360,10 +360,20 @@
     const js = sqs('#jstatus'); if (js) js.style.visibility = 'visible';
     const dep = qs('#dep'); if (dep) dep.style.display = 'none';
     const rr = qs('#runrow'); if (rr) rr.classList.add('on');
+    if (_dx.target === 'compact') {
+      const fireBtn = document.querySelector('.d-deposit-btn'); if (fireBtn) fireBtn.disabled = true;
+    }
   }
   function journeyEnd() {
     const dep = qs('#dep'); if (dep) dep.style.display = '';
     const rr = qs('#runrow'); if (rr) rr.classList.remove('on');
+    // Misión COMPACTA: openDepos() nunca corre para re-ocultar #depStage (eso solo pasa
+    // al abrir el popup flotante) — sin esto, #depStage se queda visible para siempre
+    // tras el primer depósito compacto y :has() oculta el panel compacto de por vida.
+    if (_dx.target === 'compact') {
+      const stg = document.getElementById('depStage'); if (stg) stg.hidden = true;
+      const fireBtn = document.querySelector('.d-deposit-btn'); if (fireBtn) fireBtn.disabled = false;
+    }
   }
 
   // lee un stream SSE-NL (data: {json}\n\n) y llama onEvent por cada evento
