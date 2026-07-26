@@ -762,16 +762,16 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `_sha256` | def | L34–L36 |
-| `compute_card_fingerprint` | def | L39–L42 |
-| `parse_pipe_card` | def | L45–L121 |
-| `_friendly_error` | def | L124–L139 |
-| `_normalize_ccexp` | def | L142–L148 |
-| `canonical_card_pipe` | def | L151–L170 |
-| `_build_proxy_url` | def | L173–L177 |
-| `_extract_user_from_message` | def | L180–L199 |
-| `_categorize_event` | def | L202–L222 |
-| `_parse_log_entry` | def | L225–L266 |
+| `_sha256` | def | L33–L35 |
+| `compute_card_fingerprint` | def | L38–L41 |
+| `parse_pipe_card` | def | L44–L120 |
+| `_friendly_error` | def | L123–L138 |
+| `_normalize_ccexp` | def | L141–L147 |
+| `canonical_card_pipe` | def | L150–L169 |
+| `_build_proxy_url` | def | L172–L176 |
+| `_extract_user_from_message` | def | L179–L198 |
+| `_categorize_event` | def | L201–L221 |
+| `_parse_log_entry` | def | L224–L265 |
 
 ### `withdrawals.py`
 

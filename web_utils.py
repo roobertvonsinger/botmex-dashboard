@@ -21,7 +21,6 @@ _ERROR_MESSAGES = {
     "KYC_PENDING": "Cuenta en verificación KYC — no puede depositar",
     "AUTOEXCLUSION": "Cuenta autoexcluida",
     "PAYMENT_ERROR": "Error de pasarela — reintenta",
-    "Declined": "Error de pasarela — reintenta",
     "3DS_REQUIRED": "Tarjeta requiere verificación 3D Secure",
     "CARD_CONFLICT": "Tarjeta ya registrada en otra cuenta",
     "ALL_REJECTED": "Todas las tarjetas fueron rechazadas",
