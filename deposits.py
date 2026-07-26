@@ -67,9 +67,12 @@ def _set_account_cooldown(email: str, minutes: int = RATE_LIMIT_COOLDOWN_MIN) ->
     el epoch de fin. No-throws (best-effort)."""
     until = int(time.time()) + int(minutes) * 60
     try:
-        from app import db as _appdb
-        with _appdb(write=True) as c:
-            c.execute("UPDATE accounts SET cooldown_until=? WHERE email=?", (until, email))
+        from app import _db_write_with_retry
+        _db_write_with_retry(
+            lambda c: c.execute(
+                "UPDATE accounts SET cooldown_until=? WHERE email=?", (until, email)
+            )
+        )
     except Exception as e:
         logger.warning(f"[cooldown] no pude setear cooldown {email}: {e}")
     return until
@@ -334,7 +337,7 @@ def _auto_lock_for_deposit(
     - Si no está lockeada → toma el lock
     Broadcasta evento `kind:lock` con flag `auto:True` para distinguir del manual.
     """
-    from app import db, _broadcast
+    from app import db, _broadcast, _db_write_with_retry
     now = datetime.now(timezone.utc)
     locked_at = now.isoformat()
     is_sa = user.get("role") == "superadmin"
@@ -342,14 +345,16 @@ def _auto_lock_for_deposit(
     # libera, invisible a operadores). Operador → lock temporal (Nh) como hoy.
     locked_until = None if is_sa else (now + timedelta(hours=hours)).isoformat()
 
-    with db(write=True) as c:
+    # El SELECT de conflicto + el UPDATE deben ir en la MISMA transacción (atomicidad:
+    # si el retry reabre la conn, revalúa el lock para no pisar a otro operador que
+    # tomó la cuenta entre intentos). El helper envuelve todo el bloque.
+    def _do(c):
         row = c.execute(
             "SELECT locked_by, email FROM accounts WHERE id=?", (account_id,)
         ).fetchone()
         if not row:
             raise HTTPException(404, "Cuenta no encontrada")
         cur_lock = row["locked_by"]
-        # Normalizar cur_lock para comparar contra operator_id (int)
         try:
             cur_lock_int = int(cur_lock) if cur_lock else None
         except (TypeError, ValueError):
@@ -360,7 +365,9 @@ def _auto_lock_for_deposit(
             "UPDATE accounts SET locked_by=?, locked_at=?, locked_until=? WHERE id=?",
             (str(operator_id), locked_at, locked_until, account_id),
         )
-        email = row["email"]
+        return row["email"]
+
+    email = _db_write_with_retry(_do)
     try:
         from app import _resolve_who
         _broadcast({

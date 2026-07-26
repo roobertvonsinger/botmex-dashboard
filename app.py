@@ -191,6 +191,41 @@ def db(write: bool = False):
         conn.close()
 
 
+def _db_write_with_retry(fn, *, attempts: int = 3, base_delay: float = 0.2):
+    """Ejecuta `fn(conn)` dentro de `db(write=True)` con retry ante `database is locked`.
+
+    Robert, campo 2026-07-25: los writes triviales (UPDATE de cooldown / rl_streak /
+    locked_by) mueren al primer lock sostenido y, por contención bot↔web + jwt_keeper
+    corriendo su ciclo horario, tumbaban el depósito del operador. En vez de N copias
+    del loop (revolvedero), UN helper.
+
+    Backoff corto (no el de 5×10s del retiro — ese es para dinero real). Aquí 3 intentos
+    con delays 0.2/0.5/1.0s: cada `db(write=True)` ya tiene su `timeout=10` interno, así
+    que el primer intento espera hasta 10s; si aún así choca, un segundo intento rápido
+    suele entrar en el gap que dejó el writer anterior. Si los 3 fallan, relanza — el
+    caller decide (best-effort lo traga, crítico lo propaga).
+
+    `fn` recibe la conexión y devuelve lo que quiera (rowcount, fila, None).
+    """
+    _lg = _logging.getLogger("betmexico.dashboard.db")
+    last = None
+    for attempt in range(1, attempts + 1):
+        try:
+            with db(write=True) as c:
+                return fn(c)
+        except sqlite3.OperationalError as e:
+            last = e
+            if "locked" not in str(e) or attempt == attempts:
+                raise
+            delay = base_delay * attempt  # 0.2, 0.4, 0.6…
+            _lg.warning(
+                f"[db] write retry {attempt}/{attempts} chocó con lock, "
+                f"reintentando en {delay:.1f}s"
+            )
+            time.sleep(delay)
+    raise last  # inalcanzable (attempt==attempts ya relanzó arriba)
+
+
 def _migrate():
     """Aditivo: locked_until + published_to_pool (default 1 = pool)."""
     for col, ddl in [

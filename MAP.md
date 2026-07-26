@@ -93,13 +93,13 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 3632 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3667 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 131 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2679 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
-| `jwt_keeper.py` | 323 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
+| `deposits.py` | 2686 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `jwt_keeper.py` | 325 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 410 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 870 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 364 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
@@ -219,6 +219,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `1577e91` | fix(db): touch de auditoría fuera del path síncrono de account_details |
 | `3b59fe7` | diag(db): instrumentar db(write=True) para cazar el lock sostenido en vivo |
 | `db45738` | fix(retiro): persist con retry+backoff — no perder el registro si BD está lockeada |
 | `c2af215` | fix(retiro): pantalla.js leía window.state (siempre undefined) en vez de state |
@@ -230,7 +231,6 @@ prewarm.py (router)
 | `eb9a9bb` | docs(retiro): spec v2 + plan — panel en col 3 (no popup flotante) |
 | `d5107f8` | docs(plan): botón de retiro dedicado + popup de monto — 6 tasks |
 | `207b29d` | docs(spec): botón de retiro dedicado + popup de monto |
-| `ba540e9` | fix(saldos): RESERVADA_SA + invalidación JWT muerto server-side |
 <!-- GEN:end:recientes -->
 
 ---

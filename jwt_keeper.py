@@ -187,13 +187,14 @@ def _bump_rl_streak(email: str) -> int:
     """Incrementa rl_streak y devuelve el nuevo valor (best-effort, 0 si falla)."""
     try:
         import app
-        with app.db(write=True) as c:
+        def _do(c):
             c.execute(
                 "UPDATE accounts SET rl_streak = COALESCE(rl_streak,0) + 1 WHERE email=?",
                 (email,))
             row = c.execute(
                 "SELECT rl_streak FROM accounts WHERE email=?", (email,)).fetchone()
             return int(row["rl_streak"]) if row and row["rl_streak"] is not None else 0
+        return app._db_write_with_retry(_do)
     except Exception as e:  # pragma: no cover
         logger.warning(f"[jwt_keeper] no pude incrementar rl_streak {email}: {e}")
         return 0
@@ -202,8 +203,9 @@ def _bump_rl_streak(email: str) -> int:
 def _reset_rl_streak(email: str) -> None:
     try:
         import app
-        with app.db(write=True) as c:
-            c.execute("UPDATE accounts SET rl_streak=0 WHERE email=?", (email,))
+        app._db_write_with_retry(
+            lambda c: c.execute("UPDATE accounts SET rl_streak=0 WHERE email=?", (email,))
+        )
     except Exception as e:  # pragma: no cover
         logger.warning(f"[jwt_keeper] no pude resetear rl_streak {email}: {e}")
 
