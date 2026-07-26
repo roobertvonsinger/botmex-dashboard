@@ -93,7 +93,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 3733 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3732 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
@@ -219,6 +219,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `4ef172d` | docs(spec): diseño depósito compacto conviviendo con retiro en col 3 |
 | `86c589d` | fix(retiro): withdraw_status nunca resolvía a terminal cuando BetMexico ya sacó el retiro de pendientes |
 | `fd385d7` | fix(retiro): panel col3 invisible en ancho medio — overflow horizontal nunca chequeado |
 | `3485718` | @ docs: NEXT-SESSION cierre sesión 2026-07-26 — monitor retiro + clabes |
@@ -230,7 +231,6 @@ prewarm.py (router)
 | `3b59fe7` | diag(db): instrumentar db(write=True) para cazar el lock sostenido en vivo |
 | `db45738` | fix(retiro): persist con retry+backoff — no perder el registro si BD está lockeada |
 | `c2af215` | fix(retiro): pantalla.js leía window.state (siempre undefined) en vez de state |
-| `339f383` | docs: NEXT-SESSION cierre — botón retiro col 3 deployado, Task 5 validación visual pendiente |
 <!-- GEN:end:recientes -->
 
 ---
