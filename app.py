@@ -3276,6 +3276,7 @@ async def withdraw_status(account_id: int, tx_id: str, user: dict = Depends(requ
         pass
 
     expected_digits = row["account_digits"]
+    prev_status = row["status_api"]
     pending = None
     if jwt:
         try:
@@ -3333,7 +3334,6 @@ async def withdraw_status(account_id: int, tx_id: str, user: dict = Depends(requ
                     (status_api, tx_id),
                 )
     else:
-        prev_status = row["status_api"]
         if prev_status == 6:
             out["status"] = "completed"
         elif prev_status is not None and prev_status < 0:
@@ -3344,6 +3344,21 @@ async def withdraw_status(account_id: int, tx_id: str, user: dict = Depends(requ
         out["transactionStatus"] = prev_status
         out["lastModifiedUtc"] = row["last_modified_utc"]
         out["gateway"] = row["gateway"]
+
+    # SSE broadcast cuando el status cambia a terminal (Task #12): permite que
+    # otros clientes/tabs/feed vean el cambio sin tener que hacer poll.
+    _WD_TERMINAL = {6}  # status_api 6 = ejecutado
+    new_status_api = out.get("transactionStatus")
+    new_terminal = new_status_api in _WD_TERMINAL or out.get("status") in ("successful", "completed", "failed")
+    was_terminal = prev_status in _WD_TERMINAL
+    if new_terminal and not was_terminal:
+        _broadcast({
+            "type": "activity", "kind": "withdrawal_status",
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "target": row["account_email"], "id": account_id,
+            "transactionId": tx_id, "status": out["status"],
+            "amount": row["amount"],
+        })
 
     return out
 

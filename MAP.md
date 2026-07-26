@@ -93,7 +93,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 3667 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3682 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
@@ -219,6 +219,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `3e369ce` | fix(db): reescribir callers web para no usar singleton betmexico_db |
 | `67c2488` | fix(db): cerrar conexiones sqlite3 crudas en web_grading (causa raíz del lock SOSTENIDO) |
 | `862e3e6` | fix(db): retry+backoff a writes del keeper/cooldown/auto_lock — depósito no se detiene |
 | `1577e91` | fix(db): touch de auditoría fuera del path síncrono de account_details |
@@ -230,7 +231,6 @@ prewarm.py (router)
 | `50412f7` | fix(retiro): handler fire + polling operan sobre el panel [data-wd-stage] |
 | `8283867` | feat(retiro): botón en .pat-actions + panel #wdStage en col 3 |
 | `72d1863` | feat(retiro): _withdrawBtnState — estado del botón dedicado (TDD) |
-| `eb9a9bb` | docs(retiro): spec v2 + plan — panel en col 3 (no popup flotante) |
 <!-- GEN:end:recientes -->
 
 ---

@@ -81,8 +81,10 @@
   let _currentId = null;
   let _deposAutoHidden = false; // true si La Pantalla retrajo el panel de depósitos flotante (F4) — se restaura al cerrar
   // Polling de estado de retiro: 1 interval activo por cuenta (accId -> {timer, txId}).
-  // 60s fijo (guardarrail: nunca menos, no alimentar rate-limit de BetMexico).
   const _wdPolls = {};
+  // Auto-fetch de clabes SPEI: una sola vez por cuenta (las clabes son FIJAS por
+  // usuario — una vez obtenidas, no se re-piden). Evita spam a BeginDeposit.
+  const _clabesFetched = new Set();
   // true mientras el último gesto sobre .pat-txn-col fue un drag-scroll (>6px de
   // movimiento) — el click handler de .pat-mv lo consulta para NO togglear el
   // detalle expandible al soltar tras arrastrar (initTxnScroll, más abajo).
@@ -580,31 +582,59 @@
         const done = WD_TERMINAL.has(st.status);
         wrap.classList.toggle('pending', !done);
         const input = wrap.querySelector('[data-wd-amount]');
-        // El botón d-withdraw-fire vive en .pat-actions (hermano de .pat-col-stage),
-        // no dentro de [data-wd-stage]. Se resuelve por data-acc-id en todo el documento.
         const btn = document.querySelector(`.d-withdraw-fire[data-acc-id="${accId}"]`);
         if (input) input.disabled = !done;
         if (btn) btn.disabled = !done;
-        if (done) _stopWithdrawPoll(accId);
+        if (done) {
+          _stopWithdrawPoll(accId);
+          // Notificación al operador: retiro completado o fallido (Task #11)
+          const ref = st.reference ? ` (ref ${st.reference})` : '';
+          if (st.status === 'successful' || st.status === 'completed') {
+            if (window.toast) toast(`✅ Retiro completado${ref}. Confirma en tu banco.`, 'success');
+          } else if (st.status === 'failed') {
+            if (window.toast) toast(`❌ Retiro fallido${ref}`, 'error');
+          }
+          // Refresh de la cuenta para que el saldo se actualice (Task #13)
+          try {
+            const cr = await fetch(`/api/accounts/${accId}/details`);
+            if (cr.ok) {
+              const cd = await cr.json();
+              const cache = _cacheGet(accId);
+              if (cache) {
+                Object.assign(cache, cd);
+                if (_currentId === accId) _renderDetailView(cache, false);
+              }
+            }
+          } catch (_) { /* best-effort */ }
+        } else {
+          // Degradar a poll lento después de 5 min (Task #13)
+          const poll = _wdPolls[accId];
+          if (poll && Date.now() > poll.fastUntil) {
+            clearInterval(poll.timer);
+            poll.timer = setInterval(() => _fetchWithdrawStatus(accId, txId), WD_POLL_SLOW_MS);
+          }
+        }
       }
       const cache = _cacheGet(accId);
       if (cache) {
         cache.last_withdrawal = { ...(cache.last_withdrawal || {}), status_api: st.transactionStatus, gateway: st.gateway, last_modified_utc: st.lastModifiedUtc };
       }
     } catch (err) {
-      // Silencioso: el próximo tick reintenta. No spamear toasts cada 60s.
       console.warn('[Pantalla] withdraw poll falló:', err.message);
     }
   }
 
-  // 60s fijo — guardarrail explícito del plan (nunca menos, no alimentar rate-limit).
-  const WD_POLL_MS = 60000;
+  // Poll dinámico: 15s durante retiro activo (el operador quiere ver progreso),
+  // 60s como mínimo absoluto (guardarrail rate-limit BetMexico). Al detectar
+  // estado terminal, el poll se detiene solo (ver _fetchWithdrawStatus).
+  const WD_POLL_FAST_MS = 15000;
+  const WD_POLL_SLOW_MS = 60000;
 
   function _startWithdrawPoll(accId, txId) {
     _stopWithdrawPoll(accId); // 1 solo interval activo por cuenta
-    _fetchWithdrawStatus(accId, txId); // primer chequeo inmediato, no esperar 60s
-    const timer = setInterval(() => _fetchWithdrawStatus(accId, txId), WD_POLL_MS);
-    _wdPolls[accId] = { timer, txId };
+    _fetchWithdrawStatus(accId, txId); // primer chequeo inmediato
+    const timer = setInterval(() => _fetchWithdrawStatus(accId, txId), WD_POLL_FAST_MS);
+    _wdPolls[accId] = { timer, txId, fastUntil: Date.now() + 5 * 60 * 1000 };
   }
 
   // Reanuda el polling si La Pantalla se reabre con un retiro no-terminal (p.ej.
@@ -785,6 +815,24 @@
       _mountStage();               // re-parenta el escenario de depósito a la zona derecha
       _syncIdentWidth();           // ancla --pat-ident-w a la medida REAL de la columna (form CURP la usa)
       _resumeWithdrawPollIfPending(d);
+      // Auto-fetch clabes SPEI si no existen (Task #14): una sola vez por cuenta.
+      // Las clabes son FIJAS por usuario — BeginDeposit no duplica, solo devuelve
+      // las mismas. Se dispara en background, sin bloquear el render.
+      const clabesArr = Array.isArray(d.clabes) ? d.clabes : [];
+      if (clabesArr.length === 0 && d.id && !_clabesFetched.has(d.id)) {
+        _clabesFetched.add(d.id);
+        const autoAccId = d.id;
+        fetch(`/api/accounts/${autoAccId}/clabes/refresh`, { method: 'POST' })
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (data && data.clabes && data.clabes.length > 0) {
+              const cache = _cacheGet(autoAccId);
+              if (cache) { cache.clabes = data.clabes; _renderDetailView(cache, false); }
+              if (window.toast) toast(`🏦 ${(data.clabes || []).length} clabes SPEI obtenidas`, 'success');
+            }
+          })
+          .catch(() => {}); // silencioso: si falla, el botón manual queda disponible
+      }
       return true;
     } catch (e) {
       console.error('[Pantalla] render failed:', e);
