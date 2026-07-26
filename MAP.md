@@ -98,7 +98,7 @@ prewarm.py (router)
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 131 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2728 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2722 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 325 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 410 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 901 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -219,6 +219,11 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `2dde979` | Revert "@" |
+| `1192193` | Revert "@" |
+| `7a66eb6` | @ fix(ui): mapear "Declined" a "error de pasarela, reintenta" |
+| `7578933` | @ fix(ui): notif depósito transitorio = "no procesado, reintentar" ≠ "rechazado" |
+| `c190fa2` | feat(pantalla): boton Depositar dispara directo al panel compacto (sin popup), rescata/monta el slot |
 | `bd431c4` | fix(depos): re-oculta #depStage al terminar mision compacta (evita panel muerto tras el 1er deposito) |
 | `0dc2609` | @ fix(deposits): "Declined" genérico NO es rechazo real de banco |
 | `c6e9f68` | feat(depos): mountCompact/wireCompactStatic — panel de depósito montable en La Pantalla |
@@ -226,11 +231,6 @@ prewarm.py (router)
 | `d68cb5d` | feat(depos): template+CSS del panel de depósito compacto en col 3 (inerte, sin JS aún) |
 | `c423902` | refactor(logs): síntesis de feeds — filtrar ruido, unificar renderers, chips de nivel |
 | `6c68b27` | docs(plan): implementación depósito compacto col 3 — 7 tareas, doble destino de render en depos.js |
-| `4ef172d` | docs(spec): diseño depósito compacto conviviendo con retiro en col 3 |
-| `86c589d` | fix(retiro): withdraw_status nunca resolvía a terminal cuando BetMexico ya sacó el retiro de pendientes |
-| `fd385d7` | fix(retiro): panel col3 invisible en ancho medio — overflow horizontal nunca chequeado |
-| `3485718` | @ docs: NEXT-SESSION cierre sesión 2026-07-26 — monitor retiro + clabes |
-| `deccd2d` | @ fix(retiro): monitor notificación + poll dinámico + SSE broadcast + auto-clabes |
 <!-- GEN:end:recientes -->
 
 ---

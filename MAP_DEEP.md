@@ -214,16 +214,16 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_run_deposit_with_phases` | def | L1108–L1422 |
 | `deposit_execute_stream` | def | L1426–L1626 |
 | `cap_status` | def | L1630–L1642 |
-| `_mm_is_real_decline` | def | L1679–L1691 |
-| `_mm_is_ambiguous_charge` | def | L1694–L1704 |
-| `classify_deposit_status` | def | L1707–L1738 |
-| `_mm_session_get` | def | L1788–L1792 |
-| `_mm_session_update` | def | L1795–L1804 |
-| `multi_stream` | def | L1808–L2305 |
-| `multi_cancel` | def | L2309–L2314 |
-| `scheduled_create` | def | L2327–L2690 |
-| `scheduled_list` | def | L2694–L2716 |
-| `scheduled_cancel` | def | L2720–L2728 |
+| `_mm_is_real_decline` | def | L1679–L1685 |
+| `_mm_is_ambiguous_charge` | def | L1688–L1698 |
+| `classify_deposit_status` | def | L1701–L1732 |
+| `_mm_session_get` | def | L1782–L1786 |
+| `_mm_session_update` | def | L1789–L1798 |
+| `multi_stream` | def | L1802–L2299 |
+| `multi_cancel` | def | L2303–L2308 |
+| `scheduled_create` | def | L2321–L2684 |
+| `scheduled_list` | def | L2688–L2710 |
+| `scheduled_cancel` | def | L2714–L2722 |
 
 ### `jwt_keeper.py`
 
