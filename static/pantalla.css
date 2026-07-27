@@ -479,8 +479,34 @@
    queda TAPADO por el botón — medido en vivo (getBoundingClientRect, campo
    2026-07-26): .pat-columns terminaba en y=265, .pat-actions empezaba en y=238,
    27px de overlap real. El valor es fijo en px (no %) porque .pat-actions también
-   usa insets fijos — se sostiene a cualquier alto de ficha. */
-.pat-columns { display: flex; gap: 0; flex: 1 1 auto; min-height: 0; margin-bottom: 44px; }
+   usa insets fijos — se sostiene a cualquier alto de ficha.
+
+   GRID (reemplaza el flex 3-en-fila + .pat-cramped stack de abajo, 2026-07-27):
+   identidad + escenario (retiro/depósito) SIEMPRE lado a lado en la fila de
+   arriba — son los controles ACCIONABLES, tienen que verse sin scroll (campo,
+   Robert: "no se donde se pone el monto de retiro... todo en un solo sitio sin
+   scrolls"). Movimientos (sin cap, puede ser larguísimo — MV_CAP=400) baja a su
+   propia fila ABAJO, con su scroll propio (ya lo tenía, .pat-txn-col) — es la
+   ÚNICA zona con scroll interno (regla original 2026-07-09). `auto` en la 1ª fila
+   = alto real del contenido (identidad/escenario nunca se aplastan); `1fr` en la
+   2ª = lo que sobre del alto real de la ficha (ver initLpVResize→apply() en
+   app.js, que ahora crece la ficha para que la fila de arriba quepa completa). */
+.pat-columns {
+  display: grid;
+  grid-template-columns: max-content minmax(380px, 1fr);
+  grid-template-rows: auto minmax(64px, 1fr);
+  grid-template-areas: "ident stage" "txns txns";
+  column-gap: 0; row-gap: 14px;
+  flex: 1 1 auto; min-height: 0; margin-bottom: 44px;
+}
+/* Fallback SOLO si ni siquiera identidad+escenario caben lado a lado (combo/email
+   muy largo en un viewport angosto) — apila las 3, último recurso. `.pat-cramped`
+   lo sigue marcando pantalla.js (_syncColumnsFit, scrollWidth vs clientWidth). */
+.pat-wrap.pat-cramped .pat-columns {
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto minmax(64px, 1fr);
+  grid-template-areas: "ident" "stage" "txns";
+}
 
 /* Ancho = el del combo en una línea (max-content). El divisor de .pat-col-txns cae
    justo al terminar el combo + el padding-right (aire antes de la línea). No fijo a
@@ -496,6 +522,7 @@
    (regla de campo 2026-07-09/feedback_no_masking) — el ancho sigue siendo
    max-content puro, solo el alto gana scroll. */
 .pat-col-ident {
+  grid-area: ident;
   flex: 0 0 auto; width: max-content;
   display: flex; flex-direction: column; gap: 7px; padding-right: 34px;
   overflow-y: auto; min-height: 0;
@@ -647,10 +674,11 @@
    objetivo marcado por Robert es más parejo (~55:45 movimientos:escenario), no 2:1.
    min-width 340 = piso para que las descripciones no queden en elipsis constante. */
 .pat-col-txns {
-  flex: 1.35 1 0; display: flex; flex-direction: column;
-  min-width: 340px; min-height: 0; padding-left: 22px;
-  border-left: 1px solid var(--pat-edge);
-  box-shadow: -1px 0 16px -12px var(--pat-gold-soft);
+  grid-area: txns;
+  display: flex; flex-direction: column;
+  min-height: 0; padding-top: 14px;
+  border-top: 1px solid var(--pat-edge);
+  box-shadow: 0 -1px 16px -12px var(--pat-gold-soft);
 }
 
 /* Columna 3 (derecha) — ESCENARIO del progreso de depósito. En reposo va vacía; el
@@ -662,8 +690,9 @@
    #depStage .scene svg viewBox="0 0 380 200") — no un número inventado, es el ancho
    nativo del arte; por debajo de eso las escenas se ven proporcionalmente apretadas. */
 .pat-col-stage {
-  flex: 1 1 0; min-width: 380px; min-height: 0;
-  display: flex; flex-direction: column; justify-content: center;
+  grid-area: stage;
+  min-height: 0;
+  display: flex; flex-direction: column; justify-content: flex-start;
   padding-left: 22px;
   border-left: 1px solid var(--pat-edge);
   box-shadow: -1px 0 16px -12px var(--pat-gold-soft);
@@ -671,52 +700,11 @@
 }
 .pat-col-stage[hidden] { display: none; }
 
-/* Ancho medio (variable según el combo, típicamente ~768–1530px): las 3 columnas
-   (.pat-col-ident max-content + .pat-col-txns min 340 + .pat-col-stage min 380 +
-   paddings/bordes) pueden sumar más ancho del que da .pat-columns, y no había
-   breakpoint entre el mobile (≤767px, aparte oculta el escenario) y el desktop
-   ancho — el stage se desbordaba HORIZONTAL y quedaba invisible, clippeado por
-   `overflow:hidden` de .pantalla-sheet (medido en campo 2026-07-26: la validación
-   de overflow VERTICAL del panel de retiro pasaba igual, porque nunca chequeaba
-   el eje horizontal). `.pat-cramped` lo marca `pantalla.js` (_syncColumnsFit)
-   midiendo scrollWidth real de .pat-columns vs su clientWidth — no un breakpoint
-   px inventado (feedback_ui_ancla_medida_no_pixel_inventado). A diferencia de
-   mobile, acá el escenario NO se oculta (apila abajo con su ancho completo,
-   sigue habiendo aire vertical de sobra). */
-.pat-wrap.pat-cramped .pat-columns {
-  flex-direction: column;
-  overflow-y: auto;
-  gap: 14px;
-}
-/* flex:0 0 auto — SIN esto, cada columna hereda su flex:1(.35) 1 0 del layout
-   lado-a-lado y el modo apilado las reparte a la fuerza en fracciones iguales
-   del alto FIJO de la ficha (min-height:0 les permite encogerse por debajo de
-   su contenido real). Con 1 solo panel compacto (retiro) esa fracción alcanzaba
-   por poco; con retiro+depósito apilados en .pat-col-stage (2026-07-26) el
-   contenido real casi triplicó y la columna quedaba aplastada a ~15px con sus
-   hijos desbordándose encima de todo — "amontonado" (campo, Robert 2026-07-26).
-   flex:0 0 auto = cada columna toma su alto de contenido real; .pat-columns ya
-   scrollea (arriba) si la suma no cabe en la ficha. Medido con
-   getBoundingClientRect en vivo, no un breakpoint inventado. */
-.pat-wrap.pat-cramped .pat-col-ident,
-.pat-wrap.pat-cramped .pat-col-txns,
-.pat-wrap.pat-cramped .pat-col-stage {
-  flex: 0 0 auto;
-  width: 100%;
-  min-height: 0;
-}
-/* Orden apilado: identidad → controles accionables (retiro+depósito) → historial.
-   El historial de movimientos puede ser larguísimo (cientos de filas, sin cap —
-   ver MV_CAP=400) y con flex:0 0 auto arriba se renderiza a su alto COMPLETO
-   (ya no vive acotado dentro del alto fijo de la ficha como en modo lado-a-lado).
-   Si el historial fuera primero, el operador tendría que scrollear cientos de px
-   de movimientos viejos antes de llegar al monto de retiro/depósito — friccción
-   directa contra el objetivo del panel (feedback_frictionless_norte). Reordenado
-   solo visual (order), el DOM/lógica no cambian. */
-.pat-wrap.pat-cramped .pat-col-ident { order: 1; padding-right: 0; }
-.pat-wrap.pat-cramped .pat-col-stage { order: 2; }
-.pat-wrap.pat-cramped .pat-col-txns { order: 3; }
-.pat-wrap.pat-cramped .pat-col-txns,
+/* Fallback de .pat-cramped (identidad+escenario no caben lado a lado) definido
+   junto a la regla base de .pat-columns, arriba — apila las 3 en 1 columna.
+   .pat-col-ident pierde el padding-right (era aire hacia .pat-col-txns, que ya
+   no es su vecino directo en modo apilado). */
+.pat-wrap.pat-cramped .pat-col-ident { padding-right: 0; }
 .pat-wrap.pat-cramped .pat-col-stage {
   border-left: none; padding-left: 0;
   border-top: 1px solid var(--pat-edge); padding-top: 14px;

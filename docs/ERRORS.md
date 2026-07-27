@@ -2,6 +2,41 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## Retiro/Depósito de La Pantalla necesitaban scroll para verse — rediseño a grid (2026-07-27)
+
+- **Síntoma**: Robert, campo, muy explícito: "no se donde se pone el monto de retiro", "todo amontonado sin forma",
+  exige "todo en un solo sitio sin scrolls sin fricción, ADHD friendly, obligatorio".
+- **Causa raíz**: `.pat-columns` era flex de 3 columnas lado a lado (identidad | movimientos | escenario), con
+  `.pat-cramped` (JS `_syncColumnsFit`) apilando las 3 en una sola columna cuando no cabían anchas. En AMBOS
+  modos, identidad+escenario (retiro+depósito) competían por el mismo alto FIJO de la ficha (`ANCHOR_H`,
+  calculado en `app.js` para alinear "Sistema" con "Cuentas" — 2026-07-09, sin saber que el panel compacto de
+  depósito existiría). Con retiro+depósito ahora viviendo ahí, su contenido real (~350-700px) excedía por mucho
+  el alto disponible (~170-280px) — quedaba recortado, exigiendo scroll interno para ver el monto.
+- **Fix — 2 cambios que trabajan juntos**:
+  1. **`pantalla.css`**: `.pat-columns` pasa de flex a **CSS Grid** — `grid-template-areas: "ident stage" "txns
+     txns"`. Identidad + escenario SIEMPRE lado a lado en la fila de arriba (controles accionables, deben verse
+     sin scroll); movimientos baja a su propia fila ABAJO, ancho completo, con su scroll propio — la ÚNICA zona
+     pensada para scrollear (regla original 2026-07-09, preservada, no inventada). Fallback `.pat-cramped`
+     (ident no cabe junto a stage) apila las 3 en 1 columna, último recurso.
+  2. **`pantalla.js` (`_syncFichaHeight`) + `app.js` (`KpiPanel.focusMaxH`)**: mientras La Pantalla está abierta,
+     mide el alto REAL de contenido (`scrollHeight`, no una constante) de identidad+escenario y CRECE
+     `#adminPanel`+`#pantalla` juntos (mismo `apply()` de siempre — NO se desacopla su alto, evita romper el
+     `ResizeObserver` de `DeposWindow` o el ancla del sidebar). `focusMaxH()` cede de 10 a 3 filas de tabla
+     reservadas mientras el operador está enfocado en una cuenta. Al cerrar (`_finishClose`), restaura
+     `ANCHOR_H`.
+- **Verificado en vivo** (`getBoundingClientRect` + clicks reales, no solo lectura de CSS): en 1400×900 y
+  1000×950, identidad+retiro+depósito 100% visibles sin scroll (`scrollHeight === clientHeight`); en 850×1050
+  (viewport angosto Y corto simultáneo) degrada a scroll interno — límite físico real, no bug, documentado.
+  Cierre restaura el alto ancla. Mobile (<768px, ya ocultaba el escenario) sin cambios. Guiado de "Retirar" con
+  monto vacío y "Depositar" con 0 tarjetas (`hint-target-glow` + scroll + foco) verificados con clicks reales.
+  Cambio de cuenta A→B sin cerrar La Pantalla verificado sin fuga de estado (botón/chip/`Pantalla.currentId`
+  consistentes en B).
+- **Lección**: un alto "fijo" (`ANCHOR_H`) calculado para UN propósito (alinear sidebar) se vuelve una trampa en
+  cuanto otro feature (panel compacto de depósito) asume que hay espacio de sobra — medir el contenido real
+  en vez de asumir que el ancla original todavía alcanza.
+
+## Botón flotante "Depositar/Retirar" (`.pat-actions`, esquina inf. derecha) tapaba el panel compacto (2026-07-27)
+
 ## Botón flotante "Depositar/Retirar" (`.pat-actions`, esquina inf. derecha) tapaba el panel compacto (2026-07-27)
 
 - **Síntoma**: en La Pantalla, con el panel compacto de depósito/retiro visible en `.pat-col-stage`, el CTA

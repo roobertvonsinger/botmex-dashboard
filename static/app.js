@@ -2907,6 +2907,24 @@ $$('.seg').forEach(seg => {
   function maxH() {
     return PL.panelMaxH({ mainH: main.clientHeight, reserve: measuredReserve(), minPanelH: MIN, fallback: 460 });
   }
+  // focusMaxH: tope MÁS GENEROSO, solo mientras La Pantalla está abierta enfocando
+  // una cuenta (2026-07-27). maxH() reserva 10 filas de tabla SIEMPRE visibles —
+  // correcto en reposo, pero cuando el operador está viendo el detalle de una
+  // cuenta, esas 10 filas de fondo importan menos que ver retiro/depósito SIN
+  // scroll (campo, Robert: "todo en un solo sitio sin scrolls, obligatorio").
+  // Reserva solo 3 filas (contexto mínimo de la tabla, no cero) en vez de 10.
+  const FOCUS_MIN_ROWS = 3;
+  function focusMaxH() {
+    const fb = document.querySelector('.filterbar-accounts');
+    const pb = document.getElementById('pagebar');
+    const reserve = PL.panelReserve({
+      filterbarH: fb ? fb.getBoundingClientRect().height : 0,
+      pagebarH: pb ? pb.getBoundingClientRect().height : 0,
+      rowH: rowH(),
+      minRows: FOCUS_MIN_ROWS,
+    });
+    return PL.panelMaxH({ mainH: main.clientHeight, reserve, minPanelH: MIN, fallback: 620 });
+  }
   function currentH() { return panel.getBoundingClientRect().height; }
 
   // ANCHOR_H: alto FIJO tal que "Sistema" (menú lateral, #sbSectionSistema) quede
@@ -2927,9 +2945,12 @@ $$('.seg').forEach(seg => {
   apply(Math.min(ANCHOR_H, maxH()));
 
   // Se expone SOLO por si algún módulo necesita leer el alto vigente (currentH) o
-  // el tope teórico del viewport (maxH) — sin toggle/expand/collapse/applyH, ya
-  // no existen controles de tamaño en ningún lado.
-  window.KpiPanel = { maxH, currentH, DEFAULT_H: ANCHOR_H };
+  // el tope teórico del viewport (maxH) — sin toggle/expand/collapse manuales, ya
+  // no existen controles de tamaño para el OPERADOR en ningún lado.
+  // `apply` SÍ se expone (2026-07-27): pantalla.js la usa para crecer la ficha
+  // en caliente cuando identidad+escenario no caben en ANCHOR_H sin scroll (campo,
+  // Robert: "todo en un solo sitio sin scrolls") — mismo mecanismo, no uno nuevo.
+  window.KpiPanel = { maxH, focusMaxH, currentH, apply, DEFAULT_H: ANCHOR_H };
 })();
 
 // ── El panel de depósitos (DeposWindow) se ancla leyendo el rect de #accDockZone,
@@ -6436,12 +6457,14 @@ _acctWrap()?.addEventListener('scroll', _saveAcctStateSoon, { passive: true });
   // Reanclar misiones programadas activas DESPUÉS de reload() (necesitamos
   // state.rows para resolver el target block) y de connectSSE (para que los
   // próximos phase events lleguen al handler ya cargado).
-  // C1 ROOT CAUSE (2026-07-26): esto SIEMPRE reabría el drawer viejo (#depDrawer)
-  // sin importar el flag deposV8 — depos.js ya traía su propio rehydrateScheduled
-  // (Task 11) pero quedó huérfano, nunca cableado. Por eso "veo el panel antiguísimo":
-  // cualquier misión Programada activa forzaba el drawer legacy en CADA reload.
-  if (window.rehydrateDepos) window.rehydrateDepos();
-  else rehydrateActiveScheduled();
+  // REVERTIDO 2026-07-26 (mismo día): el intento de cablear window.rehydrateDepos()
+  // aquí abría el popup flotante v8 automáticamente en CADA reload cuando había una
+  // misión Programada activa de OTRO account — pisando `_dx.accounts` (estado
+  // compartido) si el operador tenía el popup abierto armando su propia selección
+  // multi-cuenta al mismo tiempo. Causó depósito real a cuenta no seleccionada
+  // (Robert, en vivo). Ver docs/ERRORS.md. Vuelve al drawer legacy (aislado, no
+  // comparte `_dx`) hasta tener un fix que no toque estado compartido en autoload.
+  rehydrateActiveScheduled();
 })();
 
 window.addEventListener('beforeunload', () => {

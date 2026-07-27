@@ -221,6 +221,11 @@
     _clearSourceRow();
     // Cerrada La Pantalla, ningún polling de retiro debe seguir vivo en background.
     Object.keys(_wdPolls).forEach(_stopWithdrawPoll);
+    // Restaura el alto ancla (ANCHOR_H) — _syncFichaHeight() lo crece mientras
+    // La Pantalla está abierta, no debe quedarse crecido con la ficha cerrada.
+    if (window.KpiPanel && typeof window.KpiPanel.apply === 'function') {
+      window.KpiPanel.apply(window.KpiPanel.DEFAULT_H);
+    }
     // Cerrada La Pantalla, el panel de depósitos puede volver a flotar si esa era
     // la preferencia del operador (el forzado a dockeado era solo mientras estaba abierta).
     try {
@@ -834,6 +839,57 @@
     });
   }
 
+  // Alto dinámico de la ficha (2026-07-27, campo — Robert: "todo en un solo sitio
+  // sin scrolls sin fricción, ADHD friendly, obligatorio"). Identidad + escenario
+  // (retiro/depósito) viven ahora lado a lado en la fila de arriba de .pat-columns
+  // (grid, ver pantalla.css) y NUNCA deben necesitar scroll propio — pero
+  // ANCHOR_H (app.js) se calculó SOLO para alinear "Sistema" con "Cuentas", sin
+  // saber que el panel de depósito compacto existiría. Medimos el alto REAL de
+  // contenido (scrollHeight, no una constante inventada) y crecemos #adminPanel+
+  // #pantalla JUNTOS via el mismo apply() de siempre (NO desacoplamos su alto —
+  // eso rompería el ResizeObserver de DeposWindow y el ancla del sidebar, ver
+  // docs/ERRORS.md). Movimientos (.pat-col-txns) se queda como la ÚNICA zona con
+  // scroll propio — regla original 2026-07-09, TXNS_MIN solo le da un piso visible.
+  function _syncFichaHeight() {
+    requestAnimationFrame(() => {
+      if (!window.KpiPanel || typeof window.KpiPanel.apply !== 'function') return;
+      const wrap = document.querySelector('.pat-wrap');
+      const ident = wrap && wrap.querySelector('.pat-col-ident');
+      const stage = wrap && wrap.querySelector('.pat-col-stage');
+      const topbar = wrap && wrap.querySelector('.pat-topbar');
+      if (!wrap || !ident || !stage) return;
+      const SHEET_INSETS = 18 + 14;    // .pantalla-sheet top+bottom (pantalla.css)
+      const WRAP_GAP = 9;              // .pat-wrap gap (pantalla.css)
+      const ROW_GAP = 14;              // .pat-columns row-gap (grid)
+      // Modo apilado (.pat-cramped, ident no cabe junto a stage): la fila de
+      // arriba es la SUMA (uno debajo del otro), no el máximo — a diferencia del
+      // modo lado a lado. Sin esto, la ficha crecía poco y stage (con overflow-y:
+      // auto + min-height:0) se comprimía otra vez por debajo de su contenido real.
+      const topRowH = wrap.classList.contains('pat-cramped')
+        ? ident.scrollHeight + ROW_GAP + stage.scrollHeight
+        : Math.max(ident.scrollHeight, stage.scrollHeight);
+      const topbarH = topbar ? Math.ceil(topbar.getBoundingClientRect().height) : 0;
+      const ACTIONS_CLEARANCE = 44;    // .pat-columns margin-bottom (despeje del CTA)
+      const TXNS_MIN = 140;            // piso visible de movimientos (su scroll propio hace el resto)
+      const needed = topbarH + WRAP_GAP + topRowH + ROW_GAP + ACTIONS_CLEARANCE + TXNS_MIN + SHEET_INSETS;
+      // focusMaxH() (no maxH()): con La Pantalla abierta y enfocada, ceder el
+      // "10 filas de tabla siempre visibles" a solo 3 — el objetivo aquí es que
+      // retiro/depósito NUNCA necesiten scroll propio.
+      const cap = typeof window.KpiPanel.focusMaxH === 'function' ? window.KpiPanel.focusMaxH() : window.KpiPanel.maxH();
+      const h = Math.min(Math.max(Math.ceil(needed), window.KpiPanel.DEFAULT_H), cap);
+      window.KpiPanel.apply(h);
+    });
+  }
+  let _fichaHeightResizeWired = false;
+  function _wireFichaHeightResize() {
+    if (_fichaHeightResizeWired) return;
+    _fichaHeightResizeWired = true;
+    window.addEventListener('resize', () => {
+      const root = document.getElementById('pantalla');
+      if (document.querySelector('.pat-wrap') && root && !root.hidden) _syncFichaHeight();
+    });
+  }
+
   function _renderDetailView(d, animate) {
     const { detail } = els();
     if (!detail) return false;
@@ -846,6 +902,8 @@
       _syncIdentWidth();           // ancla --pat-ident-w a la medida REAL de la columna (form CURP la usa)
       _syncColumnsFit();           // marca .pat-cramped si las 3 columnas no caben lado a lado
       _wireColumnsFitResize();     // re-mide al redimensionar la ventana
+      _syncFichaHeight();          // crece la ficha si identidad+escenario no caben sin scroll
+      _wireFichaHeightResize();
       _resumeWithdrawPollIfPending(d);
       // Auto-fetch clabes SPEI si no existen (Task #14): una sola vez por cuenta.
       // Las clabes son FIJAS por usuario — BeginDeposit no duplica, solo devuelve
@@ -1036,7 +1094,17 @@
       const amount = input ? parseFloat(input.value) : NaN;
       if (!accId || wdFire.disabled) return;
       if (!amount || isNaN(amount) || amount < 100) {
-        if (window.toast) toast('Monto mínimo $100', 'error');
+        // El CTA vive fijo en la esquina, pero el campo de monto puede estar fuera
+        // de vista (columna scrolleable) — un toast solo no dice DÓNDE escribir.
+        // Llevamos la vista al campo y lo enfocamos (campo, Robert 2026-07-27:
+        // "no se donde se pone el monto de retiro").
+        if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (input) {
+          input.focus(); input.select();
+          input.classList.add('hint-target-glow');
+          setTimeout(() => input.classList.remove('hint-target-glow'), 2400);
+        }
+        if (window.toast) toast('Escribe el monto a retirar (mín. $100) ↑', 'error');
         return;
       }
       wdFire.disabled = true;

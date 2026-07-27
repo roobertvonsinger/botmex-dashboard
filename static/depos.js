@@ -451,7 +451,15 @@
     const acc = _dx.accounts[0];
     const pipe = _dx.cards[0];
     if (!acc) { showToast('Selecciona 1 cuenta'); return; }
-    if (!pipe) { showToast('Agrega una tarjeta'); return; }
+    if (!pipe) {
+      // El CTA "Depositar" vive fijo en la esquina; el panel (con su fila de
+      // tarjetas) puede estar fuera de vista en la columna scrolleable — guiar
+      // a DÓNDE agregarla, no solo avisar que falta (campo, Robert 2026-07-27).
+      const addEl = qs('.chip-add');
+      if (addEl) { addEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); startAddCard(addEl); }
+      showToast('Agrega una tarjeta ↑');
+      return;
+    }
     const err = D.validatePipe(pipe); if (err) { showToast(err); return; }
     const amount = _dx.amount;
 
@@ -522,7 +530,15 @@
     const acc = _dx.accounts[0];
     const pipe = _dx.cards[0];
     if (!acc) { showToast('Selecciona 1 cuenta'); return; }
-    if (!pipe) { showToast('Agrega una tarjeta'); return; }
+    if (!pipe) {
+      // El CTA "Depositar" vive fijo en la esquina; el panel (con su fila de
+      // tarjetas) puede estar fuera de vista en la columna scrolleable — guiar
+      // a DÓNDE agregarla, no solo avisar que falta (campo, Robert 2026-07-27).
+      const addEl = qs('.chip-add');
+      if (addEl) { addEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); startAddCard(addEl); }
+      showToast('Agrega una tarjeta ↑');
+      return;
+    }
     const err = D.validatePipe(pipe); if (err) { showToast(err); return; }
     const amount = _dx.amount, reps = _dx.reps;
 
