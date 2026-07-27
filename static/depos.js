@@ -610,7 +610,10 @@
       const data = await r.json();
       const active = (data.schedules || data.active || data || []).filter ? (data.schedules || data.active || []) : [];
       if (active && active.length) {
-        const m = active[0];
+        // SA ve las misiones de TODOS los operadores — priorizar la propia si existe
+        // (paridad con el drawer viejo que este rehydrate reemplaza).
+        const meId = state.user?.telegram_id;
+        const m = active.find((s) => s.operator_id === meId) || active[0];
         await window.openDepos({ accounts: [{ id: m.account_id, email: m.email || '', grade: '' }] });
         _dx.reps = m.total || m.repetitions || 1; drawReps(); refreshMode();
         if (m.card_pipe && _dx.cards.indexOf(m.card_pipe) < 0) { _dx.cards.push(m.card_pipe); renderCards(); }

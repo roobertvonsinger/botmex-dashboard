@@ -6436,7 +6436,12 @@ _acctWrap()?.addEventListener('scroll', _saveAcctStateSoon, { passive: true });
   // Reanclar misiones programadas activas DESPUÉS de reload() (necesitamos
   // state.rows para resolver el target block) y de connectSSE (para que los
   // próximos phase events lleguen al handler ya cargado).
-  rehydrateActiveScheduled();
+  // C1 ROOT CAUSE (2026-07-26): esto SIEMPRE reabría el drawer viejo (#depDrawer)
+  // sin importar el flag deposV8 — depos.js ya traía su propio rehydrateScheduled
+  // (Task 11) pero quedó huérfano, nunca cableado. Por eso "veo el panel antiguísimo":
+  // cualquier misión Programada activa forzaba el drawer legacy en CADA reload.
+  if (window.rehydrateDepos) window.rehydrateDepos();
+  else rehydrateActiveScheduled();
 })();
 
 window.addEventListener('beforeunload', () => {

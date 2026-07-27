@@ -101,10 +101,15 @@
 - Click → `confirm()` → `POST /api/deposits/scheduled/{sched_id}/cancel` → backend hace `task.cancel()`, el loop sale por `CancelledError` y emite `scheduled_cancelled`.
 - El handler SSE `_schedOnCancelled` muestra "⏹ Misión cancelada", limpia timers y restaura el botón Ejecutar.
 
-**Rehidratación de misión scheduled al recargar** — 2026-05-26 (`rehydrateActiveScheduled()`):
-- Tras `loadMe()` + `reload()` + `connectSSE()`, el init llama `rehydrateActiveScheduled()`.
-- Fetch `GET /api/deposits/scheduled/list`. Si hay misión activa del user (backend ya filtra para non-SA), reabre el drawer en modo schedule, llena `_depAccountIds`/`#depTargetEmail`/`#depTargetBalance` desde `state.rows`, repinta `#depCardPipe`, y llama `_schedShow(sched_id, repetitions, {currentIter, resumed: true})` para anclar la barra al iter actual sin esperar al próximo evento SSE.
-- Toast informa: `↺ Misión activa reanclada · iter X/N · email`.
+**Rehidratación de misión scheduled al recargar** — 2026-05-26, **motor cambiado a v8 el 2026-07-26**:
+- Tras `loadMe()` + `reload()` + `connectSSE()`, el init llama `window.rehydrateDepos()` (motor v8, `depos.js`) con
+  fallback a `rehydrateActiveScheduled()` (drawer legacy) SOLO si `window.rehydrateDepos` no cargó.
+  **`rehydrateActiveScheduled()` ya NO es el call site real** — quedó como fallback de carga, no se debe volver a
+  cablear como default (ver `docs/ERRORS.md` §"Rehydrate de misión Programada SIEMPRE reabría el drawer viejo").
+- `window.rehydrateDepos` (`depos.js`, alias de `rehydrateScheduled()`) hace fetch a
+  `GET /api/deposits/scheduled/list`, prioriza la misión del operador actual (`state.user.telegram_id`) sobre
+  `active[0]` si hay varias activas (SA ve todas), y llama `window.openDepos({accounts:[...]})` — reabre el popup
+  flotante v8 (o el panel compacto si `_dx.target==='compact'` ya estaba montado), no el drawer legacy.
 - Backend trackea `current_iter` en `_active_schedules[sid]["current_iter"]` (actualizado por el loop antes de cada iter). Sin esto, el frontend mostraba "0/N" hasta que llegara el primer `scheduled_phase` post-refresh.
 - Justificación TDAH: el operador puede recargar (intencional o accidentalmente) y NO perder de vista la misión. El flujo conductual se mantiene — sigue siendo obvio qué está corriendo.
 

@@ -2,6 +2,34 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## Rehydrate de misión Programada SIEMPRE reabría el drawer viejo — `deposV8` era irrelevante (2026-07-26)
+
+- **Síntoma**: Robert reportó, tras el deploy del panel compacto de col 3, "pues yo veo el panel de depositos
+  antiguisimo el que teniamos antes del anterior" — el drawer legacy `#depDrawer` (flotante, empuja el dashboard)
+  seguía apareciendo, incluida su vista "Programado" confusa ("no se sabe donde iniciar un programado").
+- **Hipótesis descartada**: el flag `localStorage.deposV8='0'` (escape hatch por navegador, ver comentario en
+  `app.js:4792`). Se descartó porque no explicaba por qué el drawer viejo aparecía SIN que el operador tocara
+  ningún botón de depósito.
+- **Causa raíz real**: `app.js` tiene `rehydrateActiveScheduled()`, invocada incondicionalmente en cada carga de
+  página (`app.js` IIFE final) para reanclar una misión Programada activa (`_active_schedules` en `deposits.py`)
+  tras un reload — TDAH-friendly, para no perder de vista una misión corriendo. Esta función abre `#depDrawer`
+  DIRECTAMENTE (`$('#depDrawer').classList.add('dep-drawer-open')`), sin pasar por `openDepositModal()` y por
+  tanto sin pasar por el gate `deposV8` — es decir, **cualquier misión Programada activa forzaba el drawer legacy
+  en cada reload, sin importar el flag ni ningún trabajo hecho en el motor v8/compacto**. `depos.js` YA traía su
+  propio equivalente (`rehydrateScheduled()`, expuesto como `window.rehydrateDepos`, comentario "Task 11") que usa
+  `window.openDepos()` (el motor v8), pero quedó huérfano — nunca se cableó la llamada en `app.js`.
+- **Fix**: `app.js` — el call site ahora prefiere `window.rehydrateDepos()` (v8) y solo cae a
+  `rehydrateActiveScheduled()` (drawer viejo) si `window.rehydrateDepos` no cargó (fallback de carga, no de
+  flag). `depos.js` — `rehydrateScheduled()` ahora prioriza la misión del operador actual (`state.user.telegram_id`)
+  sobre `active[0]` cuando hay varias activas simultáneas (SA ve las de TODOS los operadores vía
+  `GET /scheduled/list`), paridad con la lógica que tenía el drawer viejo.
+- **Verificación pendiente**: este bug SOLO reproduce con una misión Programada activa en el momento del reload
+  (`_active_schedules` no vacío server-side) — no se puede confirmar recargando en frío. Pendiente que Robert lo
+  confirme la próxima vez que corra/reload durante una misión Programada real.
+- **Lección**: una función "de reemplazo" (`window.rehydrateDepos`) escrita y expuesta pero nunca invocada desde
+  el call site real es tan peligrosa como no haberla escrito — verificar el call site, no solo que la función
+  exista.
+
 ## [CRÍTICO] Retiro se queda "en proceso" para siempre — `withdraw_status` nunca resolvía a terminal (2026-07-26)
 
 - **Síntoma**: Robert reportó que el panel de retiro col 3 muestra "🔄 Retiro en proceso…" indefinidamente — nunca

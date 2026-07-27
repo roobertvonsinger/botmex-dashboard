@@ -219,6 +219,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `82ab4ca` | docs(bitacora): documenta race de deposito a cuenta equivocada — atrapado en revision final, nunca en prod |
 | `fb483bd` | docs: cierre Task 7 — revision final + fix wave + redeploy critico verificado |
 | `d01894e` | fix: cierre de findings de revisión final (rama depos-compacto-col3) |
 | `08917c5` | docs(design-system): documentar paneles compactos col3, iconos actividad, log viewer |
@@ -230,7 +231,6 @@ prewarm.py (router)
 | `2dde979` | Revert "@" |
 | `1192193` | Revert "@" |
 | `7a66eb6` | @ fix(ui): mapear "Declined" a "error de pasarela, reintenta" |
-| `7578933` | @ fix(ui): notif depósito transitorio = "no procesado, reintentar" ≠ "rechazado" |
 <!-- GEN:end:recientes -->
 
 ---

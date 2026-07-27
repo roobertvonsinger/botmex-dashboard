@@ -678,7 +678,34 @@
   overflow-y: auto;
   gap: 14px;
 }
-.pat-wrap.pat-cramped .pat-col-ident { width: 100%; padding-right: 0; }
+/* flex:0 0 auto — SIN esto, cada columna hereda su flex:1(.35) 1 0 del layout
+   lado-a-lado y el modo apilado las reparte a la fuerza en fracciones iguales
+   del alto FIJO de la ficha (min-height:0 les permite encogerse por debajo de
+   su contenido real). Con 1 solo panel compacto (retiro) esa fracción alcanzaba
+   por poco; con retiro+depósito apilados en .pat-col-stage (2026-07-26) el
+   contenido real casi triplicó y la columna quedaba aplastada a ~15px con sus
+   hijos desbordándose encima de todo — "amontonado" (campo, Robert 2026-07-26).
+   flex:0 0 auto = cada columna toma su alto de contenido real; .pat-columns ya
+   scrollea (arriba) si la suma no cabe en la ficha. Medido con
+   getBoundingClientRect en vivo, no un breakpoint inventado. */
+.pat-wrap.pat-cramped .pat-col-ident,
+.pat-wrap.pat-cramped .pat-col-txns,
+.pat-wrap.pat-cramped .pat-col-stage {
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: 0;
+}
+/* Orden apilado: identidad → controles accionables (retiro+depósito) → historial.
+   El historial de movimientos puede ser larguísimo (cientos de filas, sin cap —
+   ver MV_CAP=400) y con flex:0 0 auto arriba se renderiza a su alto COMPLETO
+   (ya no vive acotado dentro del alto fijo de la ficha como en modo lado-a-lado).
+   Si el historial fuera primero, el operador tendría que scrollear cientos de px
+   de movimientos viejos antes de llegar al monto de retiro/depósito — friccción
+   directa contra el objetivo del panel (feedback_frictionless_norte). Reordenado
+   solo visual (order), el DOM/lógica no cambian. */
+.pat-wrap.pat-cramped .pat-col-ident { order: 1; padding-right: 0; }
+.pat-wrap.pat-cramped .pat-col-stage { order: 2; }
+.pat-wrap.pat-cramped .pat-col-txns { order: 3; }
 .pat-wrap.pat-cramped .pat-col-txns,
 .pat-wrap.pat-cramped .pat-col-stage {
   border-left: none; padding-left: 0;
