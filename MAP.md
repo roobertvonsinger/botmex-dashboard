@@ -219,6 +219,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `cc53fdc` | fix: rehydrate de misión Programada usaba drawer legacy sin importar deposV8 |
 | `82ab4ca` | docs(bitacora): documenta race de deposito a cuenta equivocada — atrapado en revision final, nunca en prod |
 | `fb483bd` | docs: cierre Task 7 — revision final + fix wave + redeploy critico verificado |
 | `d01894e` | fix: cierre de findings de revisión final (rama depos-compacto-col3) |
@@ -230,7 +231,6 @@ prewarm.py (router)
 | `b357bbd` | @ revert: deshacer fix "Declined" false positive (no solicitado) |
 | `2dde979` | Revert "@" |
 | `1192193` | Revert "@" |
-| `7a66eb6` | @ fix(ui): mapear "Declined" a "error de pasarela, reintenta" |
 <!-- GEN:end:recientes -->
 
 ---

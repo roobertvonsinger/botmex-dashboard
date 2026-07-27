@@ -2,6 +2,24 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## Botón flotante "Depositar/Retirar" (`.pat-actions`, esquina inf. derecha) tapaba el panel compacto (2026-07-27)
+
+- **Síntoma**: en La Pantalla, con el panel compacto de depósito/retiro visible en `.pat-col-stage`, el CTA
+  "Depositar"/"Retirar" (anclado a la esquina inferior derecha desde 2026-07-09, `position:absolute` sobre
+  `.pantalla-view`) se renderizaba ENCIMA del propio panel al que dispara — texto/controles tapados, "amontonado".
+- **Causa raíz**: `.pat-actions` está anclado con `bottom:14px` sobre `.pantalla-view` (fijo, independiente del
+  scroll interno de `.pat-columns`). Esa esquina estaba VACÍA en reposo cuando se diseñó (2026-07-09) — el
+  panel compacto de depósito (2026-07-26) ahora ocupa esa zona, y `.pat-columns` llenaba el 100% del alto de
+  `.pantalla-view`, así que su borde inferior coincidía casi exactamente con donde arranca el botón fijo.
+  Medido en vivo: `.pat-columns` terminaba en y=265, `.pat-actions` empezaba en y=238 → 27px de overlap real.
+- **Fix**: `margin-bottom: 44px` en `.pat-columns` (altura del botón 26px + offset 14px + 4px de aire) — reserva
+  el hueco permanentemente, en CUALQUIER viewport (valor fijo en px, coherente con los insets fijos del botón).
+  Verificado con `getBoundingClientRect` en modo ancho (liquid), apilado (cramped) y mobile — 17px de despeje
+  limpio en los tres, sin overlap en ningún punto del scroll.
+- **Lección**: un elemento `position:absolute` anclado a una esquina "vacía en reposo" deja de ser inocuo en
+  cuanto algo nuevo empieza a vivir en esa zona — revisar overlays fijos cada vez que se agrega contenido
+  permanente a un contenedor que antes estaba vacío.
+
 ## Rehydrate de misión Programada SIEMPRE reabría el drawer viejo — `deposV8` era irrelevante (2026-07-26)
 
 - **Síntoma**: Robert reportó, tras el deploy del panel compacto de col 3, "pues yo veo el panel de depositos

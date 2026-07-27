@@ -470,7 +470,17 @@
    no scrollea) + su contenido, con un hairline dorado CONTINUO (header→contenido)
    marcando cada frontera — visible pero sutil, mismo lenguaje visual que ya
    existía (border-left + glow), no un elemento nuevo. */
-.pat-columns { display: flex; gap: 0; flex: 1 1 auto; min-height: 0; }
+/* margin-bottom 44px = despeje del CTA flotante (.pat-actions, ver más abajo:
+   position:absolute, bottom:14px, height:26px = 40px de huella + 4px de aire) —
+   SIN esto, .pat-columns llena TODO el alto de .pantalla-view y su borde inferior
+   cae exactamente donde vive el botón "Depositar"/"Retirar" anclado a la esquina.
+   Con el panel compacto de depósito ahora viviendo dentro de .pat-col-stage (antes
+   esa esquina inferior estaba vacía en reposo), cualquier contenido que caiga ahí
+   queda TAPADO por el botón — medido en vivo (getBoundingClientRect, campo
+   2026-07-26): .pat-columns terminaba en y=265, .pat-actions empezaba en y=238,
+   27px de overlap real. El valor es fijo en px (no %) porque .pat-actions también
+   usa insets fijos — se sostiene a cualquier alto de ficha. */
+.pat-columns { display: flex; gap: 0; flex: 1 1 auto; min-height: 0; margin-bottom: 44px; }
 
 /* Ancho = el del combo en una línea (max-content). El divisor de .pat-col-txns cae
    justo al terminar el combo + el padding-right (aire antes de la línea). No fijo a
