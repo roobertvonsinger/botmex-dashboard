@@ -3777,6 +3777,129 @@ def deposits_stats(_user: dict = Depends(require_session)):
         }
 
 
+# ─── Modo auto-depósito V2 (Task C) ─────────────────────────────────────────
+# Plan: docs/superpowers/plans/2026-07-28-modo-auto-deposito-v2.md.
+# Imports de auto_deposit/deposits SIEMPRE lazy dentro del body (regla 10 del
+# plan — evita el ciclo app → auto_deposit → deposits → app).
+
+def _persist_auto_mission(mission_id, operator_id, card_pipes, amount,
+                          target_count, plan):
+    """INSERT de la misión auto en `auto_missions` (tabla creada en `_migrate()`,
+    Task A). status='pending' — el orquestador la mueve a matching/scheduling/
+    completed. Las listas van serializadas a JSON (card_pipes pegados,
+    accounts_selected = ids, matches = {account_id, card_pipe, email})."""
+    now = datetime.now(timezone.utc).isoformat()
+    accounts = plan.get("accounts", [])
+    with db(write=True) as c:
+        c.execute(
+            "INSERT INTO auto_missions ("
+            "mission_id, operator_id, card_pipes, amount, target_count, "
+            "accounts_selected, matches, status, created_at, updated_at"
+            ") VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (
+                mission_id,
+                operator_id,
+                _json.dumps(card_pipes),
+                amount,
+                target_count,
+                _json.dumps([a.get("id") for a in accounts]),
+                _json.dumps([
+                    {"account_id": a.get("id"), "card_pipe": a.get("card_pipe"),
+                     "email": a.get("email")}
+                    for a in accounts
+                ]),
+                "pending",
+                now,
+                now,
+            ),
+        )
+
+
+@app.post("/api/deposits/auto")
+async def auto_deposit_create(request: Request,
+                              user: dict = Depends(require_session)):
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Solo superadmin")
+    # Lazy: caps + semáforo de misiones (necesarios para validación)
+    from deposits import DEP_MAX_PER_TXN, DEP_MAX_24H, _mission_sem, _parse_pipe  # noqa: F401
+    body = await request.json()
+    card_pipes = body.get("card_pipes", [])
+    amount = float(body.get("amount", 150))
+    target_count = int(body.get("target_count", 9))
+    if not card_pipes:
+        raise HTTPException(400, "Se requieren tarjetas (card_pipes)")
+    if amount < 1 or amount > DEP_MAX_PER_TXN:              # V2: cap por txn
+        raise HTTPException(400, f"Monto debe ser $1-${DEP_MAX_PER_TXN:.0f}")
+    if target_count < 1 or target_count > 20:               # V2: cota razonable
+        raise HTTPException(400, "target_count debe ser 1-20")
+    if amount * target_count > DEP_MAX_24H:
+        raise HTTPException(400, f"Total ${amount * target_count} excede cap 24h ${DEP_MAX_24H}")
+    if _mission_sem.locked():                               # fail-fast, no encolar
+        raise HTTPException(429, "Misiones activas — intenta cuando terminen")
+    # Lazy: planner + orquestador (run_auto_mission la implementa Task D)
+    from auto_deposit import plan_auto_mission, run_auto_mission
+    plan = plan_auto_mission(DB_PATH, card_pipes, amount, target_count)
+    if not plan["feasible"]:
+        raise HTTPException(409, plan["reason"])
+    from uuid import uuid4
+    mission_id = str(uuid4())[:8]
+    operator_id = user.get("telegram_id")                   # V2: modo open no tiene (S8)
+    _persist_auto_mission(mission_id, operator_id, card_pipes, amount,
+                          target_count, plan)
+    asyncio.create_task(run_auto_mission(mission_id, plan, user))
+    _broadcast({"type": "activity", "kind": "auto_mission",
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "mission_id": mission_id, "status": "started",
+                "accounts": len(plan["accounts"]), **_resolve_who(operator_id)})
+    return {"mission_id": mission_id, "accounts_selected": len(plan["accounts"]),
+            "total_estimated": plan["total_estimated"], "status": "matching"}
+
+
+@app.post("/api/deposits/auto/{mission_id}/cancel")
+def auto_deposit_cancel(mission_id: str,
+                        user: dict = Depends(require_session)):
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Solo superadmin")
+    with db(write=True) as c:
+        row = c.execute(
+            "SELECT status FROM auto_missions WHERE mission_id=?", (mission_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Misión no encontrada")
+        if row["status"] in ("completed", "cancelled", "failed"):
+            # Ya terminal — no-op idempotente (el orquestador ya cerró)
+            return {"mission_id": mission_id, "status": row["status"],
+                    "changed": False}
+        # Cancel cooperativo: el orquestador lee este status entre iteraciones
+        # y sale limpio (release sem + unlock de cuenta), regla 4 del plan.
+        now = datetime.now(timezone.utc).isoformat()
+        c.execute(
+            "UPDATE auto_missions SET status='cancelled', updated_at=?, "
+            "completed_at=? WHERE mission_id=?",
+            (now, now, mission_id),
+        )
+    _broadcast({"type": "activity", "kind": "auto_mission",
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "mission_id": mission_id, "status": "cancelled",
+                **_resolve_who(user.get("telegram_id"))})
+    return {"mission_id": mission_id, "status": "cancelled", "changed": True}
+
+
+@app.get("/api/deposits/auto/{mission_id}/status")
+def auto_deposit_status(mission_id: str,
+                        _user: dict = Depends(require_session)):
+    with db() as c:
+        row = c.execute(
+            "SELECT * FROM auto_missions WHERE mission_id=?", (mission_id,)
+        ).fetchone()
+    if not row:
+        raise HTTPException(404, "Misión no encontrada")
+    d = dict(row)
+    for k in ("card_pipes", "accounts_selected", "matches"):
+        d[k] = _json.loads(d.get(k) or "[]")
+    return d
+
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("BMX_WEB_PORT", "5001"))

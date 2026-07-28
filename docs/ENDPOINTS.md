@@ -157,6 +157,14 @@
 | GET | `/api/deposits` | Listar `deposit_attempts` | require_session | query: filtros | `{rows, total}` | `app.py:1863` |
 | GET | `/api/deposits/stats` | Stats agregados | require_session | query: `range` | `{stats}` | `app.py:1892` |
 
+## Modo auto-depósito V2 (inline en `app.py`)
+
+| Método | Path | Función | Auth | Body / Query | Respuesta | File:line |
+|---|---|---|---|---|---|---|
+| POST | `/api/deposits/auto` | Crea misión auto: valida caps (`amount` ≤ `DEP_MAX_PER_TXN`, `target_count` 1-20, total ≤ `DEP_MAX_24H`), fail-fast 429 si `_mission_sem.locked()`, planifica con `auto_deposit.plan_auto_mission` (409 si no feasible), persiste en `auto_missions` (status `pending`) y lanza `run_auto_mission` en background. Broadcast SSE `kind=auto_mission status=started`. | superadmin (403 otro rol) | `{card_pipes: ["num\|exp\|cvv",...], amount?, target_count?}` | `{mission_id, accounts_selected, total_estimated, status:"matching"}` | `app.py:3818` |
+| POST | `/api/deposits/auto/{mission_id}/cancel` | Cancel cooperativo: UPDATE `status='cancelled'` solo si existe (404 si no) y no está terminal (completed/cancelled/failed → no-op idempotente). El orquestador lee el status entre iteraciones y sale limpio. | superadmin (403 otro rol) | — | `{mission_id, status, changed}` | `app.py:3858` |
+| GET | `/api/deposits/auto/{mission_id}/status` | Estado de la misión (fila completa de `auto_missions`; `card_pipes`/`accounts_selected`/`matches` parseados de JSON). 404 si no existe. | require_session | — | fila `auto_missions` | `app.py:3888` |
+
 ## Prewarm (router `/api/prewarm/*`)
 
 | Método | Path | Función | Auth | Body / Query | Respuesta | File:line |

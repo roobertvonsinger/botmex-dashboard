@@ -224,6 +224,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c0bc47d` | feat(auto): orquestador de misión auto (matchmaking + scheduled) |
 | `9074c5c` | feat(ui): botón Modo Auto brillante en paginador + docs FRONTEND |
 | `9be77d3` | feat(auto): motor de selección de cuentas + tarjetas para modo auto (17 tests) |
 | `9cd1c23` | feat(db): tabla auto_missions + reaper zombie (bitácora de corridas auto) + docs ARCHITECTURE/AUDIT |
@@ -235,7 +236,6 @@ prewarm.py (router)
 | `cc53fdc` | fix: rehydrate de misión Programada usaba drawer legacy sin importar deposV8 |
 | `82ab4ca` | docs(bitacora): documenta race de deposito a cuenta equivocada — atrapado en revision final, nunca en prod |
 | `fb483bd` | docs: cierre Task 7 — revision final + fix wave + redeploy critico verificado |
-| `d01894e` | fix: cierre de findings de revisión final (rama depos-compacto-col3) |
 <!-- GEN:end:recientes -->
 
 ---
