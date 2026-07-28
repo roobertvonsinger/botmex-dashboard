@@ -4,33 +4,36 @@
 > **Lente rectora:** ver `feedback_frictionless_norte` + `NORTE.md`. BOTMEXICO = frictionless, a prueba de desmadre, le GANA a BetMexico directo.
 
 ## 🎯 Objetivo en curso — NO se diluye
-**MODO AUTO — depósito automatizado con autoselección de cuentas.** Plan aprobado por Robert (2026-07-27), commiteado `c173940`, listo para ejecutar. Botón "🤖 Modo Auto" brillante en el paginador → drawer pide SOLO tarjetas → auto-selecciona mejores cuentas → matchmaking animado → al hacer match, scheduled automático 9×$150 cada 60s → stop manual siempre visible. Spec verbatim de Robert + todos los anclajes file:line verificados en `docs/superpowers/plans/2026-07-27-modo-auto-deposito.md`.
+**Vista distinta y animada para depósito multi-cuenta en La Pantalla.** Robert rechazó explícito el patrón inline (chips de varias cuentas dentro del detalle de UNA cuenta) que quedó armado en `depos.js mountCompact`/`app.js updateCmdBar` — pidió que seleccionar varias cuentas SAQUE de los detalles de una cuenta hacia una vista/animación propia: "atractiva, lógica, intuitiva, sencilla... sin información de más, ni ruido, ni data irrelevante — solo lo que ocupa un operador para dar seguimiento". No se diseñó el contenido aún (qué mínimo por cuenta, qué feedback de progreso en la animación) — necesita su propia ronda antes de tocar código. Detalle completo en `DESIGN.md` §Pendiente.
+
+*(Nota — hilo paralelo, no bloquea lo de arriba: **MODO AUTO** — el plan `c173940` de depósito automatizado con autoselección **ya se ejecutó por completo** en una sesión anterior a ésta, commits `9cd1c23`…`63f5287`, deployado en KVM4 (`auto_deposit.py` presente y montado en el container, verificado). Lo único que falta es el **Task H: smoke real de Robert en navegador** — sigue marcado `🔵 pendiente smoke en prod` en `docs/AUDIT.md:418`. La vieja instrucción de este archivo ("arranca con /Smartexe sobre el plan") estaba OBSOLETA — el plan ya no está pendiente de ejecutar, solo de que Robert lo pruebe en vivo.)*
 
 ## ▶ Con qué arrancas (PRIMERA acción del próximo turno)
-**`/Smartexe` sobre `docs/superpowers/plans/2026-07-27-modo-auto-deposito.md`.** El plan es autocontenido: Task 0 crea la rama `feat/modo-auto-deposito`, Tasks A-H van en orden (BD → motor → endpoints → orquestador → UI → integración → smoke Robert). Subagentes Haiku/Sonnet ÚNICAMENTE (Opus prohibido), briefs con contexto mínimo, kill si un subagente se cuelga ~5 min, cero intervención de Robert entre tasks.
+Pregúntale a Robert si ya probó Modo Auto en producción (botón 🤖 en el paginador). Si SÍ y sin problemas → cierra ese hilo (marca `docs/AUDIT.md:418` como ✅) y arranca el brainstorm de la vista multi-cuenta animada (`superpowers:brainstorming`, no código directo — el contenido/interacción no está decidido). Si Robert NO lo ha probado, ofrécele hacerlo juntos antes de abrir un tema nuevo.
 
 ## 🧭 Recomendación de approach
-Ejecutar el plan de corrido en una sesión (está optimizado para eso: tasks autocontenidas, loops con salida explícita, vigilancia anti-cuelgue). No re-explorar el repo — todo anclaje ya está verificado en el plan. Task H (smoke real con tarjetas de prueba) es lo único que hace Robert.
+Para la vista multi-cuenta: NO adivinar un tercer diseño sin confirmar con Robert (ya pasó 2 veces esta sesión que un supuesto mío sobre "dónde va esto" salió mal). Antes de codear, aterrizar con Robert: ¿qué campos mínimos por cuenta en la vista? ¿la animación es por-cuenta o agregada? ¿reemplaza La Pantalla temporalmente o es una capa nueva? El `DESIGN.md` ya tiene el brief textual de Robert — úsalo como punto de partida de la pregunta, no como spec cerrada.
 
-## ⏳ Pendientes próximos (modo auto — del plan)
-- [ ] **Task 0-H:** ejecutar `/Smartexe` (rama, tabla `auto_missions`, `auto_deposit.py` 17 tests, endpoints 16 tests, orquestador 11 tests, botón paginador, drawer auto animado, integración, deploy).
-- [ ] **Task H — Robert:** smoke real en navegador (botón visible, pega tarjetas, matchmaking animado, scheduled arranca, stop funciona).
-- [ ] **Pendientes heredados (no bloquean modo auto):** validación visual panel retiro col 3 + smoke retiro $1 (de sesión 2026-07-26); drawer legacy roto de fondo; deuda `locked_by` formatos mixtos; copia duplicada `account_refresh.py` en server.
+## ⏳ Pendientes próximos
+- [ ] **Vista multi-cuenta animada** — diseño + implementación (ver arriba). Prioridad #1.
+- [ ] **Modo Auto — Task H (Robert):** smoke real en navegador (botón visible, pega tarjetas, matchmaking animado, scheduled arranca, stop funciona). Código y deploy ya están hechos.
+- [ ] Countdown/temporizador visual de depósito programado (`#etaSeg`) — ya existe, confirmar con Robert si es visualmente suficiente (disparando un depósito programado real).
+- [ ] Modo auto/matchmaking sigue siendo flujo aparte de La Pantalla — integrarlo no se evaluó esta sesión.
+- **Pendientes heredados (sin tocar, no bloquean nada activo):** validación visual panel retiro col 3 + smoke retiro $1 (de sesión 2026-07-26); drawer legacy roto de fondo; deuda `locked_by` formatos mixtos; copia duplicada `account_refresh.py` en server.
 
-## ✅ Hecho esta sesión (2026-07-27)
-- **`c173940`** plan Modo Auto escrito, revisado (2 rondas de feedback de Robert: modelos Opus→Sonnet, anti-cuelgue, loops exactos, ejecución continua) y commiteado. Nada de código de producto aún — solo el plan.
+## ✅ Hecho esta sesión (2026-07-28)
+- **`8caf392`** — rediseño completo de La Pantalla (3 columnas iguales datos|depósito-retiro|historial, panel único Depositar+Retirar sin tabs, look graphite + acento `--gold` único) + candado anti-reuso de tarjeta entre cuentas en `deposits.py` (`CARD_LOCKED_OTHER_ACCOUNT`) + fix de bug latente (`.pat-form` no respetaba `[hidden]`). Deployado a KVM4, smoke con `curl`/DOM real verificado (ver abajo).
+- **`d991642`** — `docs/AUDIT.md`/`docs/FRONTEND.md`/`docs/ERRORS.md` actualizados con la bitácora de este rediseño (regla `botmex-bitacora`, se hizo después del commit de código por el orden real de la sesión — anotado aquí para que no se repita ese orden).
 
-## 🔧 Decisiones tomadas (sesión 2026-07-27)
-- **Botón en `.pb-center` del paginador** (index.html:527) — agnóstico a selección de cuentas, pedido de Robert con screenshot.
-- **Arquitectura:** módulo nuevo `auto_deposit.py` (motor puro TDD) + endpoints inline en `app.py`; reuso de selectores existentes (`jwt_keeper.select_refresh_candidates`), `_run_deposit_with_phases` con reuso de sesión (patrón SP-2: 0 captcha tras el match), `_mission_sem` respetado.
-- **Math de caps verificado:** 9×$150=$1,350 ≤ DEP_MAX_24H $1,499 ✓.
-- **Modo auto es SA-only** (ve todas las cuentas del pool).
-- **Subagentes: Haiku 4.5 + Sonnet 5 únicamente** — Opus prohibido en la ejecución (regla verbatim de Robert); briefs con contexto mínimo; kill + brief más chico si se cuelgan.
+## 🔧 Decisiones tomadas (sesión 2026-07-28)
+- **3 columnas con `minmax(0,1fr)`, no `1fr` a secas** — un `1fr` simple deja que la columna con contenido menos encogible se robe espacio (medido: 341/341/416px vs 366/366/366px). Aplica a cualquier grid futuro de columnas iguales en este repo.
+- **Cap de ancho en el CONTENIDO, no en la columna** (`.pat-dep-stage max-width:300px` dentro de una columna de grid que sí debe ser 1/3 completo) — evita que controles ligeros (botones/inputs) se estiren gigantes en pantallas anchas sin sacrificar la igualdad de columnas que pidió Robert. Patrón reusable si vuelve a aparecer el bug de "botón gigante".
+- **Vista multi-cuenta animada NO se construyó a la 3ª adivinada** — Robert corrigió 2 veces en la misma sesión un supuesto mío sobre dónde/cómo debía vivir el multi-cuenta; se documentó como pendiente explícito en vez de forzar un 3er intento sin confirmar.
 
 ## 🖥️ Estado del sistema al cerrar
-- **KVM4:** web ✓ Up 23h · health 200 · 941 cuentas · pool 1001 proxies (dataimpulse 1000 + nodemaven 1) · bot Up (esperado) · cero errores 12h.
-- **Repo:** `main`, limpio, `c173940`. Push a Forgejo hecho.
-- **Deploy:** ninguno esta sesión (solo plan).
+- **KVM4:** web ✓ Up (reiniciado hoy, deploy de esta sesión) · health 200 · 941 cuentas · bot ✓ Up · pool de proxies NO verificado esta sesión (no re-chequear sin medir — dejarlo así en vez de asumir el número de sesiones previas).
+- **Repo:** `main`, push a Forgejo hecho hasta `8caf392` + el commit de docs de este cierre.
+- **Deploy:** `deposits.py`, `static/{app,depos,depos_logic,index.html,pantalla.css,pantalla.js}` → KVM4, verificado con `docker inspect StartedAt` > mtime del archivo + `curl` a `botmexico.net` sirviendo el CSS nuevo + `/api/health` ok.
 
 ---
 
