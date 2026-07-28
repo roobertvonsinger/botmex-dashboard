@@ -179,6 +179,10 @@ Visible cuando `selectedIds.size > 0`. Actualizado por `updateCmdBar()` (app.js:
 | (count) | `#cmdSelCount` | número de cuentas seleccionadas |
 | (stats) | `#cmdStats` | suma total potencial / status mixto |
 
+## Botón Modo Auto (`#cmdAutoDeposit`)
+
+Vive en `.pb-center` de la `.pagebar` (NO en `.pb-actions` — siempre visible, con o sin selección), como sibling de `<span id="pbPages">` para sobrevivir los re-renders del paginador (`innerHTML`). Solo SA: gate `state.user?.role !== 'superadmin'` → toast; si no `openDepos({ mode: 'auto' })`. Estilo `.act-auto` (gradiente verde + keyframes `autoGlow`); override `.pagebar.has-sel .pb-center .act-auto { opacity: 1 }` para que el dimming de `.pb-center` (`.has-sel` → `opacity .45`) no lo apague con selección activa.
+
 ## Tabla principal (`#accTable`)
 
 **Render**: `renderTable()` (app.js:450).

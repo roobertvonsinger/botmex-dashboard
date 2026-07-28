@@ -6196,6 +6196,12 @@ $('#cmdDeposit').addEventListener('click', () => {
   openDepositModal(null, { ids: [...selectedIds] });
 });
 
+// Botón Modo Auto — abre el drawer de depósitos en modo automático (solo SA)
+$('#cmdAutoDeposit').addEventListener('click', () => {
+  if (state.user?.role !== 'superadmin') { toast('Solo superadmin', 'error'); return; }
+  openDepos({ mode: 'auto' });
+});
+
 $('#cmdCopy')?.addEventListener('click', copySelectedCombos);
 $('#cmdTrastienda')?.addEventListener('click', bulkTrastienda);
 $('#cmdLock').addEventListener('click', bulkLock);

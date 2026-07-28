@@ -222,6 +222,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `9be77d3` | feat(auto): motor de selección de cuentas + tarjetas para modo auto (17 tests) |
 | `9cd1c23` | feat(db): tabla auto_missions + reaper zombie (bitácora de corridas auto) + docs ARCHITECTURE/AUDIT |
 | `e9ccb20` | docs(plan): modo auto v2 — anclajes corregidos post-auditoría + gate Claude APROBADO |
 | `0a4611d` | docs(next-session): cierre sesión Modo Auto — plan aprobado, arranque = /Smartexe |
@@ -233,7 +234,6 @@ prewarm.py (router)
 | `fb483bd` | docs: cierre Task 7 — revision final + fix wave + redeploy critico verificado |
 | `d01894e` | fix: cierre de findings de revisión final (rama depos-compacto-col3) |
 | `08917c5` | docs(design-system): documentar paneles compactos col3, iconos actividad, log viewer |
-| `b4793ac` | chore(agents): AGENTS.md + design-system/ + .agents scaffolding (sesión previa, preservado) |
 <!-- GEN:end:recientes -->
 
 ---
