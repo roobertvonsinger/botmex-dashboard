@@ -1538,8 +1538,6 @@ async def deposit_execute_stream(request: Request, user: dict = Depends(require_
             yield f"data: {json.dumps({'type':'start','attempt_id':attempt_id,'email':email,'amount':amount})}\n\n"
 
             pool = make_pool(cap_key, size=2, workers=1)
-            await pool.start_factory()  # spare caliente; con reuso un token cubre varios reintentos
-            prefetch_task = asyncio.create_task(pool.prefetch(2))
 
             # Lanza deposit en background — emite fases vía phase_cb → queue
             deposit_task = asyncio.create_task(
@@ -2015,8 +2013,7 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
             # size=len(cards) mantenía decenas de tokens calientes toda la misión (el
             # factory regenera al expirar) para ~3-5 logins reales = captcha drenado.
             pool = make_pool(cap_key, size=max(2, min(len(accounts), len(cards))), workers=1)
-            await pool.start_factory()
-            prefetch = asyncio.create_task(pool.prefetch(min(len(accounts), len(cards))))
+            prefetch = None
 
             while True:
                 if cancel_event.is_set():
@@ -2432,10 +2429,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
             # ya listo en vez de esperar el solve (~4-7s). Las iters 1..N reusan JWT
             # (0 captcha) y la factory se detiene tras capturar sesión.
             pool = make_pool(cap_key, size=2, workers=1)
-            logger.info(f"[Scheduled {sched_id}] make_pool OK, start_factory…")
-            await pool.start_factory()
-            logger.info(f"[Scheduled {sched_id}] start_factory OK, prefetch + entrando al for")
-            asyncio.create_task(pool.prefetch(2))
+            logger.info(f"[Scheduled {sched_id}] make_pool OK — factory se iniciará bajo demanda si hay cache miss")
             # Sesión reutilizada entre iteraciones: la iter 0 hace login real
             # (1 captcha) y captura el JWT + proxy; las iters 1..N lo reusan sin
             # volver a loguear. El JWT vive ~7 días, el run dura <20 min → seguro.
@@ -2628,9 +2622,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                     if pool is None:
                         try:
                             pool = make_pool(cap_key, size=1, workers=1)
-                            await pool.start_factory()
-                            asyncio.create_task(pool.prefetch(1))
-                            logger.info(f"[Scheduled {sched_id}] sesión murió — pool reactivado para re-login")
+                            logger.info(f"[Scheduled {sched_id}] sesión murió — pool recreado para re-login bajo demanda")
                         except Exception as _re:
                             logger.warning(f"[Scheduled {sched_id}] no pude reactivar pool: {_re}")
 

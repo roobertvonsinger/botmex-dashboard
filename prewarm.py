@@ -426,19 +426,9 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
         # JWT cacheado vigente (sin captcha) en el intento 0 — updates baratos.
         # max_login_retries=5: el update solo trae balance, vale reintentar.
         #
-        # C2 (fix 2026-07-02): NO gastar captcha si el login será cache-hit.
-        # Pre-chequeamos el JWT cache ANTES de precalentar el pool. Con JWT vigente,
-        # gentle_login reusa (0 captcha) → el prefetch(1)+factory resolvía 1 token
-        # que se tiraba a la basura en CADA cuenta cacheada (regresión de ERRORS.md
-        # "Capsolver gastado en vano"). Creamos el pool igual (defensivo: si por una
-        # carrera el cache expira justo aquí, gentle_login tiene de dónde pedir un
-        # token on-demand), pero solo lo precalentamos en cache-miss real.
+        # Inicialización del pool lazy. gentle_login se encargará de iniciarlo si hay cache miss.
         jwt_from_cache = False
-        cached_jwt = await asyncio.to_thread(_db_get_jwt_cache, email)
         pool = make_pool(cap_key, size=2, workers=1)
-        if not cached_jwt:
-            await pool.prefetch(1)
-            await pool.start_factory()
 
         from login_orchestrator import gentle_login
         login_res = await gentle_login(

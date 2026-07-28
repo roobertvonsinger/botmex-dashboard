@@ -244,18 +244,18 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_should_relogin_after_401` | def | L849–L853 |
 | `_acquire_session_and_begin` | def | L856–L1105 |
 | `_run_deposit_with_phases` | def | L1108–L1452 |
-| `deposit_execute_stream` | def | L1456–L1656 |
-| `cap_status` | def | L1660–L1672 |
-| `_mm_is_real_decline` | def | L1709–L1715 |
-| `_mm_is_ambiguous_charge` | def | L1718–L1728 |
-| `classify_deposit_status` | def | L1731–L1762 |
-| `_mm_session_get` | def | L1812–L1816 |
-| `_mm_session_update` | def | L1819–L1828 |
-| `multi_stream` | def | L1832–L2329 |
-| `multi_cancel` | def | L2333–L2338 |
-| `scheduled_create` | def | L2351–L2714 |
-| `scheduled_list` | def | L2718–L2740 |
-| `scheduled_cancel` | def | L2744–L2752 |
+| `deposit_execute_stream` | def | L1456–L1654 |
+| `cap_status` | def | L1658–L1670 |
+| `_mm_is_real_decline` | def | L1707–L1713 |
+| `_mm_is_ambiguous_charge` | def | L1716–L1726 |
+| `classify_deposit_status` | def | L1729–L1760 |
+| `_mm_session_get` | def | L1810–L1814 |
+| `_mm_session_update` | def | L1817–L1826 |
+| `multi_stream` | def | L1830–L2326 |
+| `multi_cancel` | def | L2330–L2335 |
+| `scheduled_create` | def | L2348–L2706 |
+| `scheduled_list` | def | L2710–L2732 |
+| `scheduled_cancel` | def | L2736–L2744 |
 
 ### `jwt_keeper.py`
 
@@ -269,8 +269,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_set_cooldown` | def | L176–L183 |
 | `_bump_rl_streak` | def | L186–L200 |
 | `_reset_rl_streak` | def | L203–L210 |
-| `run_keepalive_cycle` | def | L214–L315 |
-| `run_keepalive_cycle_from_env` | def | L318–L325 |
+| `run_keepalive_cycle` | def | L214–L313 |
+| `run_keepalive_cycle_from_env` | def | L316–L323 |
 
 ### `login_orchestrator.py`
 
@@ -285,7 +285,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_classify_dead` | def | L180–L192 |
 | `_pool_session` | def | L195–L206 |
 | `_jitter_base` | def | L209–L216 |
-| `gentle_login` | def | L220–L410 |
+| `gentle_login` | def | L220–L416 |
 
 ### `prewarm.py`
 
@@ -306,11 +306,11 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_db_mark_dead` | def | L350–L373 |
 | `_is_balance_fresh` | def | L376–L384 |
 | `_capmonster_balance` | def | L389–L405 |
-| `_run_prewarm` | def | L410–L595 |
-| `prewarm_select` | def | L601–L682 |
-| `prewarm_cancel` | def | L686–L696 |
-| `prewarm_status` | def | L700–L715 |
-| `prewarm_refresh_stream` | def | L721–L901 |
+| `_run_prewarm` | def | L410–L585 |
+| `prewarm_select` | def | L591–L672 |
+| `prewarm_cancel` | def | L676–L686 |
+| `prewarm_status` | def | L690–L705 |
+| `prewarm_refresh_stream` | def | L711–L891 |
 
 ### `proxy_pool.py`
 

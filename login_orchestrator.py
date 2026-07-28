@@ -288,7 +288,13 @@ async def gentle_login(
             if pool is None:
                 logger.error(f"[gentle_login] {email} sin pool de captcha")
                 return LoginResult(ok=False, code="DEPS_MISSING", error="no captcha pool")
-            res = await pool.get_token(timeout=30)
+
+            # Inicializar la factory del pool bajo demanda (lazy) si no se ha iniciado aún.
+            if hasattr(pool, "start_factory") and getattr(pool, "_factory_task", None) is None and not getattr(pool, "stopped", False):
+                logger.info(f"[gentle_login] {email} iniciando pool de captcha bajo demanda")
+                await pool.start_factory()
+
+            res = await pool.get_token(timeout=90)
             if not res:
                 # Pool de captcha seco → esperar y NO gastar intento (cota 5).
                 if pool_dry_waits < 5:

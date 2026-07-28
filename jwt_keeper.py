@@ -255,8 +255,6 @@ async def run_keepalive_cycle(
         return stats
 
     pool = make_pool(cap_key, size=2, workers=1)
-    await pool.prefetch(1)
-    await pool.start_factory()
     try:
         for i, r in enumerate(cands):
             if i > 0:
