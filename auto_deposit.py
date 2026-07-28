@@ -296,3 +296,362 @@ def plan_auto_mission(
         "feasible": feasible,
         "reason": reason,
     }
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Task D — Orquestador de misión auto (matchmaking probe $10 + scheduled 9×$150)
+#
+# Reglas duras (plan v2, auditado por Claude):
+#  1. Siempre r.get("jwt")/r.get("used_proxy") — returns tempranos no las traen.
+#  2. Match sin JWT → Fase 2 arranca con session_jwt=None y captura en su 1er éxito.
+#  3. Totales incrementales en auto_missions tras CADA intento (anti-zombie).
+#  4. Cancel cooperativo: chequeo de status en BD entre iteraciones → unlock + salir.
+#  5. 1 slot de _mission_sem para TODA la misión (cuentas secuenciales). Fail-fast.
+#  6. NUNCA proxyless (lo garantiza _run_deposit_with_phases internamente).
+#  7. Lock SOLO antes del 1er intento con tarjeta candidata; unlock si ninguna jala
+#     y al cerrar la misión (el lock SA es perpetuo — no dejar cuentas reservadas).
+#  8. _record_attempt tras CADA intento (patrón scheduled deposits.py:2486-2492).
+#  9. Captcha pool vía _load_deps; stop cuando nadie más necesita login.
+# 10. Imports cross-módulo SIEMPRE lazy dentro de función.
+# 11. Reuso de sesión entre tarjetas de la MISMA cuenta (_mm_session_* :1782-1798).
+# ════════════════════════════════════════════════════════════════════════════
+import asyncio
+import json
+import logging
+import os
+import uuid
+
+logger = logging.getLogger("betmexico.dashboard.auto_deposit")
+
+PROBE_AMOUNT = 10.0          # D1: probe de matchmaking (dinero real, queda en la cuenta)
+MATCH_TRANSIENT_RETRIES = 4  # = MM_MAX_PAIR_TRANSIENT (nuestro lado, no quema tarjeta)
+
+
+# ── seams de BD/app (los tests los monkeypatchean; producción usa app.db) ─────
+def _iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _m_load(mission_id: str) -> Optional[Dict[str, Any]]:
+    """Fila de la misión (amount, target_count, card_pipes, status)."""
+    from app import db
+    with db() as c:
+        row = c.execute(
+            "SELECT * FROM auto_missions WHERE mission_id=?", (mission_id,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def _m_status(mission_id: str) -> Optional[str]:
+    m = _m_load(mission_id)
+    return m.get("status") if m else None
+
+
+def _m_update(mission_id: str, **fields) -> None:
+    """UPDATE incremental — SIEMPRE toca updated_at (regla 3, anti-zombie)."""
+    from app import db
+    fields["updated_at"] = _iso()
+    cols = ", ".join(f"{k}=?" for k in fields)
+    with db(write=True) as c:
+        c.execute(
+            f"UPDATE auto_missions SET {cols} WHERE mission_id=?",
+            (*fields.values(), mission_id),
+        )
+
+
+def _fetch_account(account_id: int) -> Optional[Dict[str, Any]]:
+    from app import db
+    with db() as c:
+        row = c.execute(
+            "SELECT id, email, password FROM accounts WHERE id=?", (account_id,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def _unlock(account_id: int) -> None:
+    """Unlock explícito (reglas 4 y 7). El lock SA es perpetuo (locked_until NULL)
+    — sin esto la cuenta queda RESERVADA_SA para siempre tras la misión."""
+    from app import db
+    with db(write=True) as c:
+        c.execute(
+            "UPDATE accounts SET locked_by=NULL, locked_until=NULL WHERE id=?",
+            (account_id,),
+        )
+
+
+def _broadcast_mission(mission_id: str, status: str, user: dict, **extra) -> None:
+    from app import _broadcast, _resolve_who
+    try:
+        _broadcast({
+            "type": "activity", "kind": "auto_mission",
+            "mission_id": mission_id, "status": status, "ts": _iso(),
+            **_resolve_who(user.get("telegram_id")), **extra,
+        })
+    except Exception as e:
+        logger.warning(f"[Auto {mission_id}] broadcast falló ({status}): {e}")
+
+
+async def _stop_pool(pool, mission_id: str) -> None:
+    if pool is None:
+        return
+    try:
+        await pool.stop()
+        logger.info(f"[Auto {mission_id}] captcha pool detenido")
+    except Exception as e:
+        logger.warning(f"[Auto {mission_id}] no pude detener pool: {e}")
+
+
+# ── orquestador ──────────────────────────────────────────────────────────────
+async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) -> None:
+    """Orquesta Fase 1 (matchmaking probe $10) + Fase 2 (scheduled N×amount/60s)
+    + Fase 3 (cierre). Lee amount/target_count/card_pipes de la fila de la misión
+    (self-sufficient: no depende del shape exacto de `plan`)."""
+    import deposits as dep
+
+    operator_id = user.get("telegram_id")
+
+    # Regla 5: fail-fast si el semáforo está lleno (el endpoint ya devolvió 429,
+    # pero la misión pudo encolarse antes de que se llenara).
+    if dep._mission_sem.locked():
+        _m_update(mission_id, status="failed",
+                  phase_detail="misiones activas — semáforo lleno", completed_at=_iso())
+        return
+
+    async with dep._mission_sem:
+        make_pool = dep._load_deps()
+        if make_pool is None:
+            _m_update(mission_id, status="failed",
+                      phase_detail="módulo de depósitos no disponible",
+                      completed_at=_iso())
+            return
+        mission = _m_load(mission_id) or {}
+        amount = float(mission.get("amount") or 150)
+        target_count = int(mission.get("target_count") or 9)
+        try:
+            card_pipes = json.loads(mission.get("card_pipes") or "[]")
+        except (TypeError, ValueError):
+            card_pipes = []
+
+        cap_key = os.environ.get("CAPMONSTER_KEY", "") or os.environ.get("BMX_CAPMONSTER_KEY", "")
+        pool = make_pool(cap_key, size=2, workers=1)
+        await pool.start_factory()
+        asyncio.create_task(pool.prefetch(2))
+
+        sessions: Dict[str, Any] = {}     # email -> (jwt, proxy) — regla 11
+        matches: List[Dict[str, Any]] = []
+        locked_ids: set = set()
+        deposited = 0.0
+        approved = 0
+        failed = 0
+        cancelled = False
+
+        def _cancelled() -> bool:
+            return _m_status(mission_id) == "cancelled"
+
+        async def _attempt(email, password, pipe, amt, sj, sp):
+            """Un intento de depósito + persistencia (regla 8). Retorna (r, ok, code)."""
+            import deposits as _d
+            num, exp, cvv = _d._parse_pipe(pipe)
+            t0 = asyncio.get_event_loop().time()
+            r = await _d._run_deposit_with_phases(
+                email, password, num, exp, cvv, amt, user, pool, None,
+                session_jwt=sj, session_proxy=sp,
+                persist_login_data=(sj is None),
+            )
+            ok = bool(r.get("success"))
+            code = r.get("result_code", "UNKNOWN")
+            reason = r.get("error") or code
+            duration = r.get("duration_ms") or int((asyncio.get_event_loop().time() - t0) * 1000)
+            _d._record_attempt(
+                uuid.uuid4().hex, email, amt,
+                _d.classify_deposit_status(code, ok),
+                reason, duration, operator_id, card_pipe=pipe,
+            )
+            return r, ok, code
+
+        try:
+            # ── FASE 1 — MATCHMAKING (probe $10 real, D1) ────────────────────
+            _m_update(mission_id, status="matching",
+                      phase_detail="buscando pares cuenta×tarjeta")
+            _broadcast_mission(mission_id, "matching", user,
+                               accounts=len(plan.get("accounts", [])))
+            for acc in plan.get("accounts", []):
+                if _cancelled():
+                    cancelled = True
+                    break
+                account_id, email = acc.get("id"), acc.get("email")
+                acct = _fetch_account(account_id)
+                if not acct:
+                    continue
+                # Tarjetas candidatas: la asignada (married si había) + pool (regla 7:
+                # si no hay ninguna, siguiente cuenta SIN lockear)
+                candidates = [p for p in [acc.get("card_pipe"), *card_pipes] if p]
+                candidates = list(dict.fromkeys(candidates))  # dedup, orden estable
+                if not candidates:
+                    continue
+                matched = False
+                locked = False
+                code = None
+                for pipe in candidates:
+                    if matched or _cancelled():
+                        break
+                    if not locked:  # regla 7: lock justo antes del 1er intento real
+                        dep._auto_lock_for_deposit(account_id, operator_id, user, hours=4)
+                        locked = True
+                        locked_ids.add(account_id)
+                    transient = 0
+                    while True:  # reintentos transitorios del PAR (nuestro lado)
+                        sj, sp = dep._mm_session_get(sessions, email)
+                        r, ok, code = await _attempt(email, acct["password"], pipe,
+                                                     PROBE_AMOUNT, sj, sp)
+                        dep._mm_session_update(sessions, email, r)  # regla 11
+                        if ok:
+                            matched = True
+                            deposited += PROBE_AMOUNT
+                            approved += 1
+                            matches.append({
+                                "account_id": account_id, "email": email,
+                                "card_pipe": pipe,
+                                "jwt": r.get("jwt"), "proxy": r.get("used_proxy"),
+                            })
+                            _m_update(mission_id, matches=json.dumps(matches),
+                                      total_deposited=deposited, total_approved=approved,
+                                      phase_detail=f"match {email}")
+                            _broadcast_mission(mission_id, "match", user,
+                                               email=email, card_tail=f"···{pipe[:6]}")
+                            break
+                        if code in dep.MM_THREEDS_RC:
+                            # 3DS → cuenta premium A+ (no es decline) — patrón :2541-2549
+                            try:
+                                from app import db as _adb
+                                with _adb(write=True) as cdb:
+                                    cdb.execute("UPDATE accounts SET grade='A+' WHERE email=?",
+                                                (email,))
+                            except Exception as ex:
+                                logger.error(f"[Auto {mission_id}] no pude marcar A+ {email}: {ex}")
+                            break  # siguiente tarjeta
+                        if code == "RATE_LIMITED":
+                            dep._set_account_cooldown(email)
+                            break  # siguiente cuenta (sale del for de tarjetas vía flag)
+                        if dep._mm_is_real_decline(code) or dep._mm_is_ambiguous_charge(code):
+                            failed += 1
+                            break  # siguiente tarjeta (decline real o cargo ambiguo: terminal)
+                        if code in dep.MM_DEAD_RC:
+                            failed += 1
+                            break  # cuenta muerta — siguiente cuenta
+                        # TRANSITORIO (nuestro lado) → reintentar el par
+                        transient += 1
+                        if transient > MATCH_TRANSIENT_RETRIES:
+                            failed += 1
+                            break
+                        await asyncio.sleep(25)
+                    if code and (code == "RATE_LIMITED" or code in dep.MM_DEAD_RC):
+                        break  # siguiente cuenta
+                    if not matched and code is not None:
+                        await asyncio.sleep(dep.MM_COOLDOWN)  # piso 60s entre intentos
+                if locked and not matched:
+                    _unlock(account_id)  # regla 7: no dejar 4h/perpetuo sin match
+                    locked_ids.discard(account_id)
+
+            if not matches:
+                _m_update(mission_id, status="failed" if not cancelled else "cancelled",
+                          phase_detail="sin matches" if not cancelled else "cancelada por el operador",
+                          total_deposited=deposited, total_approved=approved,
+                          total_failed=failed, completed_at=_iso())
+                _broadcast_mission(mission_id, "failed" if not cancelled else "cancelled",
+                                   user, reason="sin matches")
+                return
+
+            # Si TODOS los matches capturaron sesión, el pool ya no se necesita (regla 9)
+            if all(m.get("jwt") for m in matches):
+                await _stop_pool(pool, mission_id)
+                pool = None
+
+            # ── FASE 2 — SCHEDULED por match (N×amount cada 60s, SP-2) ───────
+            _m_update(mission_id, status="scheduling",
+                      phase_detail=f"{len(matches)} matches — {target_count}×${amount:.0f}/60s")
+            _broadcast_mission(mission_id, "scheduling", user, matches=len(matches))
+            for m in matches:
+                if _cancelled():
+                    cancelled = True
+                    break
+                email = m["email"]
+                acct = _fetch_account(m["account_id"])
+                if not acct:
+                    continue
+                session_jwt, session_proxy = m.get("jwt"), m.get("proxy")  # regla 2
+                completed = 0
+                retries = 0
+                while completed < target_count:
+                    if _cancelled():
+                        cancelled = True
+                        break
+                    r, ok, code = await _attempt(email, acct["password"], m["card_pipe"],
+                                                 amount, session_jwt, session_proxy)
+                    if ok:
+                        completed += 1
+                        retries = 0
+                        deposited += amount
+                        approved += 1
+                        if session_jwt is None and r.get("jwt"):  # SP-2 verbatim (:2475)
+                            session_jwt = r.get("jwt")
+                            session_proxy = r.get("used_proxy")
+                            m["jwt"], m["proxy"] = session_jwt, session_proxy
+                            if all(mm.get("jwt") for mm in matches) and pool is not None:
+                                await _stop_pool(pool, mission_id)
+                                pool = None
+                        _m_update(mission_id, total_deposited=deposited,
+                                  total_approved=approved,
+                                  phase_detail=f"{email} {completed}/{target_count}")
+                        _broadcast_mission(mission_id, "scheduling", user,
+                                           email=email, completed=completed,
+                                           total=target_count)
+                        if completed < target_count:
+                            await asyncio.sleep(60)
+                        continue
+                    # Terminal para ESTA cuenta (no las demás) — misma ley que scheduled
+                    if (code == "RATE_LIMITED" or code in dep.MM_THREEDS_RC
+                            or dep._mm_is_real_decline(code) or code in dep.MM_DEAD_RC
+                            or code == "PENDING_NOT_APPLIED" or dep._mm_is_ambiguous_charge(code)):
+                        if code == "RATE_LIMITED":
+                            dep._set_account_cooldown(email)
+                        failed += 1
+                        _m_update(mission_id, total_failed=failed,
+                                  phase_detail=f"{email} abortada ({code})")
+                        _broadcast_mission(mission_id, "scheduling", user,
+                                           email=email, aborted=code)
+                        break
+                    # Transitorio → retry (SCHED_MAX_TRANSIENT_RETRIES=4, backoff 25s)
+                    low = str(r.get("error") or "").lower()
+                    if session_jwt and ("sesión rechazada" in low or "401" in low
+                                        or "redirectlogin" in low):
+                        session_jwt = session_proxy = None  # patrón :2594-2605
+                        if pool is None:
+                            pool = make_pool(cap_key, size=2, workers=1)
+                            await pool.start_factory()
+                            asyncio.create_task(pool.prefetch(1))
+                    retries += 1
+                    if retries > dep.SCHED_MAX_TRANSIENT_RETRIES:
+                        failed += 1
+                        _m_update(mission_id, total_failed=failed,
+                                  phase_detail=f"{email} sin éxito tras {retries - 1} reintentos")
+                        break
+                    await asyncio.sleep(dep.SCHED_RETRY_BACKOFF_SEC)
+
+            # ── FASE 3 — CIERRE ──────────────────────────────────────────────
+            final = "cancelled" if cancelled else "completed"
+            _m_update(mission_id, status=final,
+                      phase_detail=("cancelada por el operador" if cancelled
+                                    else f"${deposited:.0f} en {len(matches)} cuentas"),
+                      total_deposited=deposited, total_approved=approved,
+                      total_failed=failed, completed_at=_iso())
+            _broadcast_mission(mission_id, final, user,
+                               deposited=deposited, approved=approved, failed=failed,
+                               accounts=len(matches))
+        finally:
+            await _stop_pool(pool, mission_id)
+            for aid in locked_ids:  # regla 7: la misión no deja cuentas reservadas
+                try:
+                    _unlock(aid)
+                except Exception as e:
+                    logger.warning(f"[Auto {mission_id}] unlock {aid} falló: {e}")

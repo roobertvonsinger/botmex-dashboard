@@ -93,9 +93,9 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 3784 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3907 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 298 | `—` | _[completar]_ |
+| `auto_deposit.py` | 657 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 145 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -151,6 +151,8 @@ prewarm.py (router)
 | `PERSISTENT_USERS` | `{"robertvs"}` | `auth.py` |
 | `PERSISTENT_TTL` | `60 * 60 * 24 * 365 * 10` | `auth.py` |
 | `THREEDS_RECENT_H` | `24` | `auto_deposit.py` |
+| `PROBE_AMOUNT` | `10.0` | `auto_deposit.py` |
+| `MATCH_TRANSIENT_RETRIES` | `4` | `auto_deposit.py` |
 | `BETMEXICO_PAYMENTS_API` | `"https://paymentsapi.betmexico.mx"` | `clabe_fetch.py` |
 | `BEGIN_DEPOSIT_PATH` | `"/api/stp/BeginDeposit"` | `clabe_fetch.py` |
 | `DEP_MAX_PER_TXN` | `499.0` | `deposits.py` |
@@ -222,6 +224,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `9074c5c` | feat(ui): botón Modo Auto brillante en paginador + docs FRONTEND |
 | `9be77d3` | feat(auto): motor de selección de cuentas + tarjetas para modo auto (17 tests) |
 | `9cd1c23` | feat(db): tabla auto_missions + reaper zombie (bitácora de corridas auto) + docs ARCHITECTURE/AUDIT |
 | `e9ccb20` | docs(plan): modo auto v2 — anclajes corregidos post-auditoría + gate Claude APROBADO |
@@ -233,7 +236,6 @@ prewarm.py (router)
 | `82ab4ca` | docs(bitacora): documenta race de deposito a cuenta equivocada — atrapado en revision final, nunca en prod |
 | `fb483bd` | docs: cierre Task 7 — revision final + fix wave + redeploy critico verificado |
 | `d01894e` | fix: cierre de findings de revisión final (rama depos-compacto-col3) |
-| `08917c5` | docs(design-system): documentar paneles compactos col3, iconos actividad, log viewer |
 <!-- GEN:end:recientes -->
 
 ---

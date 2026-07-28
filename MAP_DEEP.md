@@ -133,6 +133,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `activity_feed` | def | L3618–L3715 |
 | `list_deposits` | def | L3719–L3748 |
 | `deposits_stats` | def | L3752–L3777 |
+| `_persist_auto_mission` | def | L3785–L3815 |
+| `auto_deposit_create` | def | L3819–L3855 |
+| `auto_deposit_cancel` | def | L3859–L3885 |
+| `auto_deposit_status` | def | L3889–L3900 |
 
 ### `auth.py`
 
@@ -168,6 +172,15 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `select_accounts_for_auto` | def | L117–L173 |
 | `select_card_for_account` | def | L177–L199 |
 | `plan_auto_mission` | def | L203–L298 |
+| `_iso` | def | L331–L332 |
+| `_m_load` | def | L335–L342 |
+| `_m_status` | def | L345–L347 |
+| `_m_update` | def | L350–L359 |
+| `_fetch_account` | def | L362–L368 |
+| `_unlock` | def | L371–L379 |
+| `_broadcast_mission` | def | L382–L391 |
+| `_stop_pool` | def | L394–L401 |
+| `run_auto_mission` | def | L405–L657 |
 
 ### `autoexclusion.py`
 
@@ -886,6 +899,9 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `GET` | `/api/activity` | `app.py` |
 | `GET` | `/api/deposits` | `app.py` |
 | `GET` | `/api/deposits/stats` | `app.py` |
+| `POST` | `/api/deposits/auto` | `app.py` |
+| `POST` | `/api/deposits/auto/{mission_id}/cancel` | `app.py` |
+| `GET` | `/api/deposits/auto/{mission_id}/status` | `app.py` |
 | `GET` | `/bin-check/{bin6}` | `deposits.py` |
 | `GET` | `/bin-stats` | `deposits.py` |
 | `POST` | `/execute-stream` | `deposits.py` |
@@ -910,6 +926,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 |--------|--------|
 | `betmexico.dashboard` | `app.py` |
 | `betmexico.dashboard.account_refresh` | `account_refresh.py` |
+| `betmexico.dashboard.auto_deposit` | `auto_deposit.py` |
 | `betmexico.dashboard.autoexclusion` | `autoexclusion.py` |
 | `betmexico.dashboard.clabe_fetch` | `clabe_fetch.py` |
 | `betmexico.dashboard.db` | `app.py` |
