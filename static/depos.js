@@ -139,21 +139,26 @@
     _dx.accounts.forEach((a) => {
       const combo = a.email + (a.password ? (':' + a.password) : '');
       const grade = (a.grade || '').toLowerCase();
+      const isMatched = !!a.matched;
       // SOLO el texto copia (no toda la cápsula): así la tachita queda libre y usable.
       // createElement/textContent → seguro aunque el password traiga comillas o <>.
       const chip = document.createElement('span');
-      chip.className = 'chip';
+      chip.className = 'chip' + (isMatched ? ' chip-success' : '');
       const hdot = document.createElement('span');
-      hdot.className = 'hdot ' + (['a', 'b', 'c', 'd'].indexOf(grade) >= 0 ? grade : '');
+      hdot.className = 'hdot ' + (isMatched ? 'ok' : (['a', 'b', 'c', 'd'].indexOf(grade) >= 0 ? grade : ''));
       const txt = document.createElement('span');
       txt.className = 'txt copyable';
       txt.setAttribute('data-copy', combo);
-      txt.textContent = combo;
-      const x = document.createElement('span');
-      x.className = 'chip-x';
-      x.title = 'Quitar de esta misión (no se borra de la cuenta)';
-      x.textContent = '×';
-      chip.append(hdot, txt, x);
+      txt.textContent = combo + (isMatched ? ' ✓' : '');
+      chip.append(hdot, txt);
+
+      if (!isMatched) {
+        const x = document.createElement('span');
+        x.className = 'chip-x';
+        x.title = 'Quitar de esta misión (no se borra de la cuenta)';
+        x.textContent = '×';
+        chip.append(x);
+      }
       box.appendChild(chip);
     });
   }
@@ -678,10 +683,19 @@
     }
     delete _mmRows[email];
   }
+  function mmMarkAccountDone(email) {
+    const acc = _dx.accounts.find((a) => a.email === email);
+    if (acc) {
+      acc.matched = true;
+      renderAccounts();
+    }
+  }
+
   async function runMulti() {
-    const ids = _dx.accounts.map((a) => a.id).filter(Boolean);
+    const activeAccounts = _dx.accounts.filter((a) => !a.matched);
+    const ids = activeAccounts.map((a) => a.id).filter(Boolean);
     const cards = _dx.cards.slice();
-    if (ids.length < 2) { showToast('Selecciona 2+ cuentas'); return; }
+    if (ids.length < 2) { showToast('Selecciona 2+ cuentas activas (no completadas)'); return; }
     if (!cards.length) { showToast('Agrega tarjetas al pool'); return; }
     for (const p of cards) { const e = D.validatePipe(p); if (e) { showToast(e); return; } }
     const amount = _dx.amount;
@@ -714,8 +728,8 @@
             const pct = D.phaseToPct(ev.name); if (pct != null) setPct(pct);
             setSub(phaseLabel(ev.name) + ' · ' + shortEmail(ev.email)); break;
           }
-          case 'match': setScene('done'); setPct(100); _dx.mm.matches += 1; mmUpdate(ev.email, 'ok'); setSub('Acreditado ✓ · ' + shortEmail(ev.email), true); break;
-          case 'account_aplus': setScene('done'); mmUpdate(ev.email, 'ok', 'A+ · 3DS'); setSub('Cuenta premium A+ · ' + shortEmail(ev.email), true); break;
+          case 'match': setScene('done'); setPct(100); _dx.mm.matches += 1; mmUpdate(ev.email, 'ok'); mmMarkAccountDone(ev.email); setSub('Acreditado ✓ · ' + shortEmail(ev.email), true); break;
+          case 'account_aplus': setScene('done'); mmUpdate(ev.email, 'ok', 'A+ · 3DS'); mmMarkAccountDone(ev.email); setSub('Cuenta premium A+ · ' + shortEmail(ev.email), true); break;
           case 'rejected': if (D.isRealRejection(ev.code)) mmUpdate(ev.email, 'wait', 'no aplicado'); else mmUpdate(ev.email, null); break;
           case 'account_cooling': {
             // anti-rate-limit (Capa 3): la cuenta entró en enfriamiento (429). Estado
@@ -744,6 +758,8 @@
     } catch (e) {
       if (e.name !== 'AbortError') setSub('Algo falló, reintenta');
     } finally {
+      _dx.accounts = _dx.accounts.filter((a) => !a.matched);
+      renderAccounts(); refreshMode();
       _dx.running = false; journeyEnd();
       if (!_dx.open) pillHide();
       busCloseDeferred();

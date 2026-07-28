@@ -581,6 +581,25 @@ def _check_card_velocity(card_pipe: str, account_email: str) -> Optional[dict]:
     }
 
 
+def _has_recent_approved_deposit(email: str, minutes: int = 30) -> bool:
+    """True si la cuenta tuvo un depósito APPROVED en los últimos `minutes` min."""
+    if not email:
+        return False
+    try:
+        from app import db
+        with db() as c:
+            row = c.execute(
+                "SELECT COUNT(*) AS c FROM deposit_attempts "
+                "WHERE account_email=? AND UPPER(status)='APPROVED' "
+                "AND created_at >= datetime('now', ?)",
+                (email, f"-{int(minutes)} minutes"),
+            ).fetchone()
+            return bool(row and row["c"] > 0)
+    except Exception as e:
+        logger.warning(f"Error verificando depósito reciente para {email}: {e}")
+        return False
+
+
 def _record_attempt(
     attempt_id: str,
     email: str,
@@ -1883,6 +1902,24 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
 
     if not accounts:
         raise HTTPException(404, "Ninguna cuenta encontrada")
+
+    # Filtrar cuentas con depósito exitoso en los últimos 30 min (protección anti-redepósito)
+    valid_accounts = []
+    recent_deposit_emails = []
+    for a in accounts:
+        if _has_recent_approved_deposit(a["email"], minutes=30):
+            recent_deposit_emails.append(a["email"])
+        else:
+            valid_accounts.append(a)
+
+    if not valid_accounts:
+        raise HTTPException(
+            400,
+            f"Todas las cuentas seleccionadas registraron un depósito exitoso en los últimos 30 min: "
+            f"{', '.join(recent_deposit_emails)}"
+        )
+
+    accounts = valid_accounts
 
     # Cap check por cuenta — si alguna está full, abortar antes de empezar
     cap_errors = []

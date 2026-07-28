@@ -100,10 +100,14 @@
 #depos .col{min-width:0}
 #depos .col:first-child{padding-right:16px; border-right:1px solid var(--line-2)}
 #depos .col:last-child{padding-left:16px}
-#depos .chips{display:flex; flex-direction:column; gap:6px}
+#depos .chips{display:flex; flex-direction:column; gap:6px; max-height:120px; overflow-y:auto; padding-right:2px}
+#depos .chips::-webkit-scrollbar{width:4px}
+#depos .chips::-webkit-scrollbar-thumb{background:var(--line-2); border-radius:4px}
 #depos .chip{display:flex; align-items:center; gap:8px; padding:7px 9px 7px 8px; border-radius:11px;
   background:var(--panel); border:1px solid var(--line-2); font-family:'JetBrains Mono',monospace; font-size:11px;
   color:var(--ink); transition:var(--t-fast); min-width:0}
+#depos .chip.chip-success{background:var(--aqua-soft); border-color:var(--aqua-line); color:var(--aqua)}
+#depos .chip .hdot.ok{color:var(--aqua); background:var(--aqua)}
 #depos .chip .txt{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1}
 /* copyable = SOLO el texto del combo/tarjeta (no la cápsula). Hover verde = "click para copiar". */
 #depos .copyable{cursor:pointer; border-radius:6px; transition:color var(--t-fast)}

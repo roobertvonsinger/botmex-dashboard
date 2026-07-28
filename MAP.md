@@ -99,7 +99,7 @@ prewarm.py (router)
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 145 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2744 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2781 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 323 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 416 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 892 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -227,6 +227,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `fb9ae44` | logging(auto): inyectar logs estructurados con emojis en run_auto_mission |
 | `e824898` | fix(auto): integrar a main el fix de ValueError en parseo de pipes de 4 partes |
 | `d30e826` | docs(errors): document definitive fix for _fetch_looks_empty regression |
 | `72f92b0` | feat(refresh): fast 5-minute background refresh with balance_only mode |
@@ -238,7 +239,6 @@ prewarm.py (router)
 | `e74a470` | fix(ux): humanizar errores, distinguir vacío de roto, guardarriles y accesibilidad |
 | `63f5287` | refactor(auto): robust stratified round-robin selection and test coverage |
 | `321d208` | feat(auto): stratified round-robin + instant rate-limit quarantine + live login SSE feedback |
-| `83822b1` | feat(auto): reglas anti-rafagueo de Robert — cooldown 60s/5s + tope declines + cap cuentas por tarjetas |
 <!-- GEN:end:recientes -->
 
 ---
