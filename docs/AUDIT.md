@@ -3,6 +3,19 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-07-28 (rediseño completo La Pantalla + candado anti-reuso de tarjeta entre cuentas)
+
+**Motivo**: 4 rondas de campo en vivo (Robert, screenshots reales) sobre el look "esqueleto verde" rotando por grade, espacio horizontal desperdiciado, tabs Depositar/Retirar percibidos como 2 mundos separados, y un pedido de seguridad explícito ("si ya se aprobó en una cuenta una tarjeta debe de haber un freno ahí"). Detalle de criterio de diseño en `DESIGN.md` §"Surface: La Pantalla".
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Candado anti-reuso de tarjeta** (`deposits.py` `_run_deposit_with_phases`) | Antes de tocar a BetMexico (login/begin_deposit/submit_card), `SELECT account_email FROM account_cards WHERE card_number=? AND account_email!=?` — si hay match, corta con `result_code=CARD_LOCKED_OTHER_ACCOUNT`, sin cobrar. Causa raíz cerrada: el único freno previo (`account_cards.card_number UNIQUE`) actuaba vía `INSERT OR IGNORE` DESPUÉS de un depósito ya aprobado — la tarjeta se cobraba en la cuenta equivocada y el conflicto se tragaba en silencio. Cubre single/multi/scheduled (comparten esta función). Fallo de infra en el candado degrada sin bloquear el depósito (logueado). | ✅ implementado | ⚠️ no probado disparando un depósito real (evitado a propósito — riesgo financiero); sí verificado: schema `account_cards` coincide, `cc_num` en ambos lados viene de `_parse_pipe` (mismo formato), `ast.parse`/`py_compile` OK, 48 tests de `test_deposit_step.py`/`test_deposit_status_classify.py`/`test_withdrawals.py` verdes |
+| **`.pat-columns` → 3 columnas iguales (CSS Grid)** (`pantalla.css`/`pantalla.js`) | Ver `docs/FRONTEND.md` §"La Pantalla" para el detalle técnico. Historial pasó de fila-propia-a-todo-ancho a 3ª columna; `_syncFichaHeight` toma el máximo de las 3 en vez de sumarlas. | ✅ implementado | ✅ medido en vivo vía DOM (`getBoundingClientRect`/`scrollWidth`) a 3 anchos de viewport (650/800/1400px): columnas 366/366/366px exactas, sin overflow horizontal, `.pat-cramped` no se dispara de más |
+| **Panel único Depositar+Retirar sin tabs** | Campo de monto compartido, botones lado a lado, Reps/multi progresivos. Reemplaza el sistema de tabs de la ronda anterior (también de esta sesión). | ✅ implementado | ✅ verificado en vivo: Retirar deshabilitado con tooltip correcto ("Saldo < $100") para cuenta de prueba con $17.21 |
+| **Look graphite + acento único `--gold`** | Reemplaza rotación de hue por grade (`[data-grade]` eliminado). El grade vive solo en el badge. | ✅ implementado | ✅ verificado: sin overrides `[data-grade]` en el CSS servido |
+
+**Pendiente explícito (no construido esta sesión):** vista animada distinta para depósito multi-cuenta — Robert rechazó el patrón inline actual (chips dentro del detalle de una cuenta) y pidió que seleccionar varias cuentas saque de los detalles hacia una vista/animación propia, "atractiva, lógica, intuitiva, sin ruido ni data irrelevante". El plumbing inline (`depos.js mountCompact` + `app.js updateCmdBar`) sigue vivo pero es la implementación que Robert ya marcó como incorrecta — no construir más encima sin diseñar la vista nueva primero. Ver `DESIGN.md` §Pendiente.
+
 ## Captura: 2026-07-11 (JWT keeper — mantener sesiones vivas para bajar el 429)
 
 **Motivo**: rate-limit masivo (49% de intentos en 48h) por 88% de JWT expirados sin refrescar → cada toque forzaba login → 429. Ver `docs/ERRORS.md` §"Rate-limit (429) masivo por JWT expirados".

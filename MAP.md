@@ -227,6 +227,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `8caf392` | redesign(pantalla): rediseño completo — 3 columnas iguales, panel único depósito/retiro, candado anti-reuso de tarjeta |
 | `e74a470` | fix(ux): humanizar errores, distinguir vacío de roto, guardarriles y accesibilidad |
 | `63f5287` | refactor(auto): robust stratified round-robin selection and test coverage |
 | `321d208` | feat(auto): stratified round-robin + instant rate-limit quarantine + live login SSE feedback |
@@ -238,7 +239,6 @@ prewarm.py (router)
 | `9be77d3` | feat(auto): motor de selección de cuentas + tarjetas para modo auto (17 tests) |
 | `9cd1c23` | feat(db): tabla auto_missions + reaper zombie (bitácora de corridas auto) + docs ARCHITECTURE/AUDIT |
 | `e9ccb20` | docs(plan): modo auto v2 — anclajes corregidos post-auditoría + gate Claude APROBADO |
-| `0a4611d` | docs(next-session): cierre sesión Modo Auto — plan aprobado, arranque = /Smartexe |
 <!-- GEN:end:recientes -->
 
 ---

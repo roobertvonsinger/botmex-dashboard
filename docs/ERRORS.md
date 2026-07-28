@@ -2,6 +2,29 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## `.pat-form` no respetaba `[hidden]` — 300px de layout invisible desbordando columnas angostas (2026-07-28)
+
+- **Síntoma**: al medir `scrollWidth` vs `clientWidth` de `.pat-col-ident` en viewports angostos (800px) tras
+  pasar `.pat-columns` a 3 columnas iguales, aparecía overflow horizontal (461px vs 454px) sin ningún elemento
+  visible causándolo — el combo ya envolvía, no había texto largo a la vista.
+- **Causa raíz**: `pantalla.css` tenía `.pat-form { display: flex; ...; width: var(--pat-ident-w, 300px); }` sin
+  un `.pat-form[hidden] { display:none }` que lo acompañara. El form de "agregar nota" se renderiza con el
+  atributo `hidden` cuando está cerrado, pero la regla `[hidden]{display:none}` vive en el **user-agent
+  stylesheet** (prioridad más baja que cualquier regla de autor) — la regla de autor `.pat-form{display:flex}`
+  la pisaba pese a especificidad empatada (0,1,0 vs 0,1,0: gana la de origen `author` sobre `user-agent`). El
+  form cerrado seguía ocupando 300px de layout real, invisible (sin fondo/borde definidos a ese nivel), pero
+  contando para `scrollWidth` del padre.
+- **Por qué no se veía antes**: `.pat-col-ident` era `width: max-content` (ronda 2026-07-09/27) — el ancho de la
+  columna se ajustaba a su contenido más ancho (incluido el form fantasma), así que nunca desbordaba, solo
+  hacía la columna un poco más ancha de lo necesario, indetectable a simple vista.
+- **Por qué se detectó ahora**: la columna pasó a un tercio FIJO del grid (`minmax(0,1fr)`, rediseño 2026-07-28)
+  — un contenido más ancho que la columna ya no puede "pedir más espacio", desborda de verdad.
+- **Fix**: agregar `.pat-form[hidden] { display: none; }` en `pantalla.css`, junto a los demás overrides
+  `[hidden]` del archivo (`.pat-curp-pop[hidden]`, `.pat-col-stage[hidden]`, etc. — patrón ya establecido, solo
+  faltaba en este selector).
+- **Verificado**: `identScrollW`/`identClientW` iguales (161==161) en el mismo viewport tras el fix, medido con
+  `getBoundingClientRect`/`scrollWidth` real, no a ojo.
+
 ## Retiro/Depósito de La Pantalla necesitaban scroll para verse — rediseño a grid (2026-07-27)
 
 - **Síntoma**: Robert, campo, muy explícito: "no se donde se pone el monto de retiro", "todo amontonado sin forma",
