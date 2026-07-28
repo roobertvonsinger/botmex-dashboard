@@ -219,6 +219,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a3acf5c` | fix: retiro/depósito en La Pantalla — grid sin scroll + guiado a campos ocultos |
 | `4b483bc` | fix: botón flotante Depositar/Retirar tapaba el panel compacto de La Pantalla |
 | `cc53fdc` | fix: rehydrate de misión Programada usaba drawer legacy sin importar deposV8 |
 | `82ab4ca` | docs(bitacora): documenta race de deposito a cuenta equivocada — atrapado en revision final, nunca en prod |
@@ -230,7 +231,6 @@ prewarm.py (router)
 | `7549baa` | docs(bitacora): panel de deposito compacto col 3 — arquitectura + cierre parcial de sesion |
 | `fbd5c2d` | fix(app): openDepositModal no abre el popup flotante si la cuenta ya está en La Pantalla |
 | `b357bbd` | @ revert: deshacer fix "Declined" false positive (no solicitado) |
-| `2dde979` | Revert "@" |
 <!-- GEN:end:recientes -->
 
 ---
