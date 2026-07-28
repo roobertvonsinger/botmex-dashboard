@@ -955,9 +955,13 @@ def list_accounts(
                 except (TypeError, ValueError):
                     r["cooldown_min"] = 0
             return rows
-    except sqlite3.OperationalError:
-        # Si no hay tabla account_assignments todavía
-        return []
+    except sqlite3.OperationalError as e:
+        if "account_assignments" in str(e):
+            # Si no hay tabla account_assignments todavía (setup nuevo, sin asignaciones)
+            return []
+        # Cualquier otro OperationalError (p.ej. "no such table: accounts") es una
+        # BD rota, no "cero cuentas" — no tragar en silencio (vacío != roto).
+        raise HTTPException(500, f"DB: {e}")
 
 
 # ─── Asignaciones / Liberador ──────────────────────────────────────────────────

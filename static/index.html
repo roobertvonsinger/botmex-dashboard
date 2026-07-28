@@ -466,7 +466,7 @@
           <button data-v="DEAD" title="Las que ya descansan en paz">DEAD</button>
         </div>
         <div class="seg" data-seg="grade" title="Filtra por salud de la pasarela">
-          <button data-v="" class="on" title="Sin filtrar grado">Todos</button>
+          <button data-v="" class="on seg-all" title="Sin filtrar grado">↺</button>
           <button data-v="A" title="🟢 Pasarela sana — dale con confianza">A</button>
           <button data-v="B" title="🔵 Buena — alta prob. de éxito">B</button>
           <button data-v="C" title="🟡 Cuidado — señales raras">C</button>
@@ -550,7 +550,7 @@
         <h2>Pool <span class="dim mono">— gestión de visibilidad del pool</span></h2>
         <div class="grow"></div>
         <button class="seg-btn" id="btnPoolRefresh" title="Recargar la lista de pool">↻</button>
-        <button class="seg-btn danger" id="btnPoolHideAll" title="Esconde TODAS de los operadores — el botón rojo del pánico">📤 Ocultar todas</button>
+        <button class="seg-btn danger" id="btnPoolHideAll" disabled title="Esperando carga del pool…">📤 Ocultar todas</button>
       </section>
       <section class="pool-split">
         <div class="pool-col" id="poolColOutside">
@@ -582,7 +582,7 @@
         </h2>
         <div class="grow"></div>
         <div class="seg" data-seg="actkind" title="Filtra qué tipo de eventos ves">
-          <button data-v="" class="on" title="Todo, sin filtrar">Todos</button>
+          <button data-v="" class="on seg-all" title="Todo, sin filtrar">↺</button>
           <button data-v="deposit" title="Solo depósitos (éxitos y fracasos)">💳 Depósitos</button>
           <button data-v="lock" title="Cuándo alguien apartó cuentas">🔒 Locks</button>
           <button data-v="unlock" title="Cuándo se liberaron">🔓 Unlocks</button>

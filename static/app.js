@@ -583,7 +583,8 @@ function renderTable() {
   const _th = (col, label, cls = '') => {
     const on = _sortCol === col;
     const ic = on ? (_sortDir === 1 ? ' ↑' : ' ↓') : '';
-    return `<th class="th-sort${on ? ' sort-on' : ''} ${cls}" data-sort="${col}">${label}${ic}</th>`;
+    const ariaSort = on ? (_sortDir === 1 ? 'ascending' : 'descending') : 'none';
+    return `<th class="th-sort${on ? ' sort-on' : ''} ${cls}" data-sort="${col}" tabindex="0" role="columnheader button" aria-sort="${ariaSort}" title="Ordenar por ${label}">${label}${ic}</th>`;
   };
   const cols = state.view === 'simple'
     ? `<tr>
@@ -608,6 +609,15 @@ function renderTable() {
     th.addEventListener('click', ev => {
       ev.stopPropagation();
       sortRows(th.dataset.sort);
+    });
+    // Ordenar solo con mouse era un bloqueo real para teclado/lector de pantalla
+    // (P2 auditoría UX 2026-07-28) — mismo control, ruta de teclado equivalente.
+    th.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        ev.stopPropagation();
+        sortRows(th.dataset.sort);
+      }
     });
   });
 
@@ -644,13 +654,13 @@ function renderTable() {
     //   🟢/🔑 jwt_alive: sesión viva reutilizable / expirada (solo en LIVE que no enfría).
     let jwtBadge = '';
     if (r.needs_reset) {
-      jwtBadge = `<span class="jwt-chip jwt-reset" title="Bloqueada por BetMexico (límite de intentos) — revive solo con reset de contraseña">⛔</span>`;
+      jwtBadge = `<span class="jwt-chip jwt-reset" role="img" aria-label="Bloqueada por BetMexico, límite de intentos — revive solo con reset de contraseña" title="Bloqueada por BetMexico (límite de intentos) — revive solo con reset de contraseña">⛔</span>`;
     } else if (r.cooldown_min > 0) {
-      jwtBadge = `<span class="jwt-chip jwt-cooldown" title="Enfriando tras rate-limit — no tocar ${r.cooldown_min} min">⏳</span>`;
+      jwtBadge = `<span class="jwt-chip jwt-cooldown" role="img" aria-label="Enfriando tras rate-limit, no tocar ${r.cooldown_min} minutos" title="Enfriando tras rate-limit — no tocar ${r.cooldown_min} min">⏳</span>`;
     } else if (r.status === 'LIVE' && r.jwt_alive !== undefined) {
       jwtBadge = r.jwt_alive
-        ? `<span class="jwt-chip jwt-alive" title="Sesión viva — reutilizable sin captcha">🟢</span>`
-        : `<span class="jwt-chip jwt-expired" title="Sesión expirada — el próximo uso requiere resolver captcha">🔑</span>`;
+        ? `<span class="jwt-chip jwt-alive" role="img" aria-label="Sesión viva, reutilizable sin captcha" title="Sesión viva — reutilizable sin captcha">🟢</span>`
+        : `<span class="jwt-chip jwt-expired" role="img" aria-label="Sesión expirada, el próximo uso requiere resolver captcha" title="Sesión expirada — el próximo uso requiere resolver captcha">🔑</span>`;
     }
     const isSA = state.user?.role === 'superadmin';
     const trTitle = isSA ? `Grade ${esc(r.grade) || '?'}` : '';
@@ -817,7 +827,7 @@ async function copySelectedCombos() {
     await navigator.clipboard.writeText(txt);
     toast(`✓ ${data.combos.length} combo${data.combos.length > 1 ? 's' : ''} copiado${data.combos.length > 1 ? 's' : ''}`, 'success');
   } catch (e) {
-    toast(`Error: ${e.message}`, 'error');
+    toast(humanizeApiError(e), 'error');
   }
 }
 
@@ -867,7 +877,7 @@ async function bulkTrastienda() {
       'success');
     await reload();
   } catch (e) {
-    toast(`Error: ${e.message}`, 'error');
+    toast(humanizeApiError(e), 'error');
   }
 }
 
@@ -1211,7 +1221,7 @@ async function reloadActivity() {
     renderActivity();
   } catch (e) {
     $('#actTable').querySelector('tbody').innerHTML =
-      `<tr><td colspan="1" class="loading" style="color:var(--danger)">Error: ${esc(e.message)}</td></tr>`;
+      `<tr><td colspan="1" class="loading" style="color:var(--danger)">${esc(humanizeApiError(e))}</td></tr>`;
   }
 }
 // 2026-07-26: eventos filtrados del feed — ruido operacional que solo ensucia.
@@ -1377,6 +1387,21 @@ async function openAccountByEmail(email) {
   toast('No encontré esa cuenta', 'error');
 }
 
+// Traduce errores técnicos de fetch/backend (HTTP 5xx, "Failed to fetch",
+// tracebacks de DB, timeouts) al idioma llano del operador. Misma familia que
+// _humanizeCritical/_humanizeDepositCode: nunca stack/SQL/código crudo en
+// pantalla — degrada a un mensaje accionable, nunca vacío.
+function humanizeApiError(e) {
+  const raw = String((e && e.message) || e || '').trim();
+  if (!raw) return 'Ocurrió un error inesperado';
+  if (/failed to fetch|networkerror|load failed/i.test(raw)) return 'Sin conexión con el servidor, revisa tu red';
+  if (/HTTP 5\d\d/.test(raw)) return 'El servidor tuvo un problema interno, reintenta en un momento';
+  if (/HTTP 4\d\d/.test(raw)) return 'La solicitud no fue válida, revisa los datos e intenta de nuevo';
+  if (/no such table|no such column|operationalerror|sqlite/i.test(raw)) return 'Problema con la base de datos, avisa al equipo técnico';
+  if (/timeout/i.test(raw)) return 'El servidor tardó demasiado en responder, reintenta';
+  return raw;
+}
+
 function _humanizeCritical(ev) {
   if (ev.kind === 'capmonster_low' || (ev.type === 'alert' && (ev.msg || '').toLowerCase().includes('capmonster')))
     return 'Servicio de verificación sin saldo';
@@ -1517,7 +1542,7 @@ document.body.addEventListener('click', async e => {
       if (state.section === 'notifications') renderNotifs();
       renderNotifBadge();
     } catch (err) {
-      toast(`Error: ${err.message}`, 'error');
+      toast(humanizeApiError(err), 'error');
     }
     return;
   }
@@ -1563,7 +1588,7 @@ async function reloadBinStats() {
     const data = await r.json();
     renderBinStats(data);
   } catch (e) {
-    if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="loading" style="color:var(--danger)">Error: ${esc(e.message)}</td></tr>`;
+    if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="loading" style="color:var(--danger)">${esc(humanizeApiError(e))}</td></tr>`;
     if (chart) chart.innerHTML = `<div class="dim" style="padding:20px">Error cargando</div>`;
   }
 }
@@ -1693,8 +1718,15 @@ async function reloadPool() {
     const insideCount = (d.inside || []).length;
     const navBadge = $('#navPoolCount');
     if (navBadge) navBadge.textContent = insideCount;
+    // El botón del pánico opera sobre window._poolData — si la carga falló,
+    // esos datos son viejos/inexistentes y NO debe poder dispararse sobre ellos.
+    const hideAllBtn = $('#btnPoolHideAll');
+    if (hideAllBtn) { hideAllBtn.disabled = false; hideAllBtn.title = 'Esconde TODAS de los operadores — el botón rojo del pánico'; }
   } catch (e) {
-    if (outside) outside.innerHTML = `<div class="pool-empty" style="color:var(--danger)">Error: ${esc(e.message)}</div>`;
+    window._poolData = null;
+    if (outside) outside.innerHTML = `<div class="pool-empty" style="color:var(--danger)">${esc(humanizeApiError(e))}</div>`;
+    const hideAllBtn = $('#btnPoolHideAll');
+    if (hideAllBtn) { hideAllBtn.disabled = true; hideAllBtn.title = 'No se pudo cargar el pool — no hay datos confiables que ocultar'; }
   }
 }
 
@@ -1708,6 +1740,7 @@ async function _poolPublish(emails, publish) {
 }
 
 async function hideAllPool() {
+  if (!window._poolData) { toast('El pool no cargó — no hay datos confiables que ocultar', 'error'); return; }
   const allInside = (window._poolData?.inside || []).map(it => it.email);
   const n = allInside.length;
   if (!n) { toast('Pool ya vacía', 'info'); return; }
@@ -1717,7 +1750,7 @@ async function hideAllPool() {
     toast(`✓ ${data.moved} ocultas`, 'success');
     reloadPool();
   } catch (e) {
-    toast(`Error: ${e.message}`, 'error');
+    toast(humanizeApiError(e), 'error');
   }
 }
 
@@ -1735,7 +1768,7 @@ async function reload() {
     renderStats(stats);
   } catch (e) {
     $('#accTable').querySelector('tbody').innerHTML =
-      `<tr><td colspan="9" class="loading" style="color:var(--danger)">Error: ${esc(e.message)}</td></tr>`;
+      `<tr><td colspan="9" class="loading" style="color:var(--danger)">${esc(humanizeApiError(e))}</td></tr>`;
   }
 }
 
@@ -2054,7 +2087,7 @@ async function refreshSingleRow(accId, btnEl) {
       toast(`⚠ Sin respuesta del servidor`, 'error');
     }
   } catch (e) {
-    toast(`Error: ${e.message}`, 'error');
+    toast(humanizeApiError(e), 'error');
   } finally {
     // Re-localizar el botón (renderTable lo reemplazó)
     const newBtn = document.querySelector(`#accTable tbody tr[data-id="${accId}"] .row-refresh-one`);
@@ -2203,7 +2236,7 @@ async function refreshVisible(opts = {}) {
     if (e.name === 'AbortError') {
       toast(`⏹ Cancelado`, 'success');
     } else {
-      toast(`Error: ${e.message}`, 'error');
+      toast(humanizeApiError(e), 'error');
     }
   } finally {
     clearInterval(watchdog);
@@ -2306,7 +2339,7 @@ async function reloadLogs() {
       v.scrollTop = v.scrollHeight;
     }
   } catch (e) {
-    v.textContent = `Error: ${e.message}`;
+    v.textContent = humanizeApiError(e);
   }
 }
 // Detecta si el user scrolleó manualmente → desactiva auto-scroll temporal
@@ -2354,7 +2387,7 @@ async function loadHealth(forceRun = false) {
       badge.textContent = (h.issues || []).length;
     }
   } catch (e) {
-    v.innerHTML = `<div class="health-bad">Error: ${esc(e.message)}</div>`;
+    v.innerHTML = `<div class="health-bad">${esc(humanizeApiError(e))}</div>`;
   }
 }
 
@@ -2364,7 +2397,7 @@ async function openReleasePopup() {
   if (selectedIds.size === 0) { toast('Selecciona cuentas primero', 'error'); return; }
   if (_users.length === 0) {
     try { _users = await fetch('/api/users').then(r => r.json()); }
-    catch (e) { toast(`Error: ${e.message}`, 'error'); return; }
+    catch (e) { toast(humanizeApiError(e), 'error'); return; }
   }
   // Solo usuarios role 'user' (a quienes liberar)
   const targets = _users.filter(u => u.role === 'user');
@@ -2395,7 +2428,7 @@ async function assignSelected(userId) {
     const data = await r.json();
     toast(`🎁 ${data.assigned} liberadas`, 'success');
   } catch (e) {
-    toast(`Error: ${e.message}`, 'error');
+    toast(humanizeApiError(e), 'error');
   }
 }
 
@@ -2518,7 +2551,7 @@ $('#btnLogsCopy')?.addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(txt);
     toast(`✓ ${txt.split('\n').length} líneas copiadas`, 'success');
-  } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+  } catch (e) { toast(humanizeApiError(e), 'error'); }
 });
 $('#btnLogsScrollEnd')?.addEventListener('click', () => {
   const v = $('#logsView');
@@ -2565,7 +2598,7 @@ $('#poolBtnExpose')?.addEventListener('click', async () => {
     const data = await _poolPublish(emails, true);
     toast(`✓ ${data.moved} expuesta(s) al pool`, 'success');
     reloadPool();
-  } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+  } catch (e) { toast(humanizeApiError(e), 'error'); }
 });
 
 // Bulk — hide (inside → outside, safe: no confirm)
@@ -2577,7 +2610,7 @@ $('#poolBtnHide')?.addEventListener('click', async () => {
     const data = await _poolPublish(emails, false);
     toast(`✓ ${data.moved} sacada(s) del pool`, 'success');
     reloadPool();
-  } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+  } catch (e) { toast(humanizeApiError(e), 'error'); }
 });
 
 // Drag-drop — drop zones
@@ -2599,7 +2632,7 @@ function _setupPoolDropZone(hostId, targetSide) {
       const data = await _poolPublish([email], publish);
       toast(`✓ ${data.moved} ${publish ? 'expuesta' : 'sacada'} del pool`, 'success');
       reloadPool();
-    } catch (e2) { toast(`Error: ${e2.message}`, 'error'); }
+    } catch (e2) { toast(humanizeApiError(e2), 'error'); }
   });
 }
 _setupPoolDropZone('#poolOutside', 'outside');
@@ -2640,7 +2673,7 @@ $('#btnAdminDiag')?.addEventListener('click', async () => {
       <span>${c.ok?'✓':'✗'} ${esc(c.name)}</span>
       <span class="dim mono">${esc(c.info || c.error || '')}</span>
     </div>`).join('');
-  } catch (e) { out.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; }
+  } catch (e) { out.innerHTML = `<span style="color:var(--danger)">${esc(humanizeApiError(e))}</span>`; }
 });
 $('#btnAdminPing')?.addEventListener('click', async () => {
   const out = $('#adminPingOut');
@@ -2651,7 +2684,7 @@ $('#btnAdminPing')?.addEventListener('click', async () => {
       <span>${r.ok?'✓':'✗'} ${esc(r.host)}</span>
       <span class="dim mono">${r.latency_ms != null ? r.latency_ms+'ms' : esc(r.error||'no responde')}</span>
     </div>`).join('');
-  } catch (e) { out.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; }
+  } catch (e) { out.innerHTML = `<span style="color:var(--danger)">${esc(humanizeApiError(e))}</span>`; }
 });
 $('#btnAdminProxyRefresh')?.addEventListener('click', async () => {
   const out = $('#adminProxyOut');
@@ -2662,7 +2695,7 @@ $('#btnAdminProxyRefresh')?.addEventListener('click', async () => {
       ? `<div class="adm-check ok"><span>✓ ${esc(data.country||'?')}</span><span class="dim mono">${data.latency_ms||'?'}ms</span></div>`
       : `<div class="adm-check fail"><span>✗ caído</span><span class="dim mono">${esc(data.error||'')}</span></div>`;
     refreshKpis();
-  } catch (e) { out.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; }
+  } catch (e) { out.innerHTML = `<span style="color:var(--danger)">${esc(humanizeApiError(e))}</span>`; }
 });
 async function _restartService(target) {
   if (!confirm(`¿Reiniciar ${target}? Habrá downtime de unos segundos.`)) return;
@@ -2672,7 +2705,7 @@ async function _restartService(target) {
     if (target === 'web' || target === 'all') {
       setTimeout(() => location.reload(), 5000);
     }
-  } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+  } catch (e) { toast(humanizeApiError(e), 'error'); }
 }
 $('#btnAdminRestartWeb')?.addEventListener('click', () => _restartService('web'));
 $('#btnAdminRestartBot')?.addEventListener('click', () => _restartService('bot'));
@@ -2683,14 +2716,14 @@ $('#btnAdminPause')?.addEventListener('click', async () => {
     await _adminPost('/api/admin/pause', { reason });
     toast('⏸ Sistema pausado', 'success');
     loadAdminState();
-  } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+  } catch (e) { toast(humanizeApiError(e), 'error'); }
 });
 $('#btnAdminResume')?.addEventListener('click', async () => {
   try {
     await _adminPost('/api/admin/resume');
     toast('▶ Sistema reanudado', 'success');
     loadAdminState();
-  } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+  } catch (e) { toast(humanizeApiError(e), 'error'); }
 });
 $('#btnAdminEmergency')?.addEventListener('click', async () => {
   if (!confirm('🛑 PARO DE EMERGENCIA\n\nEsto va a:\n• Pausar todos los nuevos prewarms y depósitos\n• Cancelar prewarms en curso\n• Cancelar misiones programadas\n• Cancelar matchmakers en vivo\n\n¿Continuar?')) return;
@@ -2698,7 +2731,7 @@ $('#btnAdminEmergency')?.addEventListener('click', async () => {
     const data = await _adminPost('/api/admin/emergency-stop');
     toast(`🛑 Stop: ${data.cancelled_prewarms} prewarms, ${data.cancelled_schedules} misiones canceladas`, 'success');
     loadAdminState();
-  } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+  } catch (e) { toast(humanizeApiError(e), 'error'); }
 });
 $('#btnAdminExportLogs')?.addEventListener('click', () => {
   window.open('/api/admin/export-logs?lines=2000', '_blank');
@@ -2712,7 +2745,7 @@ $('#btnAdminRebootVps')?.addEventListener('click', async () => {
   try {
     const data = await _adminPost('/api/admin/vps-reboot?confirm=REBOOT');
     toast(`🔄 VPS reboot programado en ${data.in}`, 'success');
-  } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+  } catch (e) { toast(humanizeApiError(e), 'error'); }
 });
 
 // Health
@@ -2726,7 +2759,7 @@ $('#btnHealthDismiss')?.addEventListener('click', async () => {
     else toast(`Issues persisten: ${h.issues.length}`, 'error');
     await loadHealth(false);
   } catch (e) {
-    toast(`Error: ${e.message}`, 'error');
+    toast(humanizeApiError(e), 'error');
   }
 });
 
@@ -3327,7 +3360,7 @@ async function _showRowTip(target, kind, accId) {
       tip.style.left = (r2.left - tipRect.width - 8) + 'px';
     }
   } catch (e) {
-    tip.innerHTML = `<div class="dim">Error: ${esc(e.message)}</div>`;
+    tip.innerHTML = `<div class="dim">${esc(humanizeApiError(e))}</div>`;
   }
 }
 function _attachRowIconTooltip() {
@@ -3361,7 +3394,7 @@ async function _quickAddNote(accId, email) {
     toast('✓ Nota guardada', 'success');
     reload();
   } catch (e) {
-    toast(`Error: ${e.message}`, 'error');
+    toast(humanizeApiError(e), 'error');
   }
 }
 
@@ -3485,7 +3518,7 @@ async function openCurpValidator(accId) {
   let d;
   try {
     d = await fetch(`/api/accounts/${accId}/details`).then(r => r.json());
-  } catch (e) { toast(`Error: ${e.message}`, 'error'); return; }
+  } catch (e) { toast(humanizeApiError(e), 'error'); return; }
   const bdate = d.birthdate ? String(d.birthdate).split('T')[0].split(' ')[0] : null;
   if (!d.fullname || !bdate) { toast('Faltan nombre o fecha de nacimiento', 'error'); return; }
   const split = _splitFullname(d.fullname);
@@ -3552,7 +3585,7 @@ async function openCurpValidator(accId) {
       try {
         await navigator.clipboard.writeText(blob);
         toast('✓ Datos copiados', 'success');
-      } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+      } catch (e) { toast(humanizeApiError(e), 'error'); }
       return;
     }
     if (act === 'open') {
@@ -3572,7 +3605,7 @@ async function openCurpValidator(accId) {
         toast(`✓ CURP guardado: ${v}`, 'success');
         overlay.remove();
         openDetailModal(accId);  // re-render
-      } catch (e) { toast(`Error: ${e.message}`, 'error'); }
+      } catch (e) { toast(humanizeApiError(e), 'error'); }
     }
   });
 }
@@ -3641,7 +3674,7 @@ $('#accTable').addEventListener('click', async e => {
       _liveReload();
     } catch (err) {
       inuse.classList.toggle('on', !turningOn);  // revert
-      toast(`Error: ${err.message}`, 'error');
+      toast(humanizeApiError(err), 'error');
     }
     return;
   }
@@ -3686,7 +3719,7 @@ $('#accTable').addEventListener('click', async e => {
       if (detailDataCache[accId]) detailDataCache[accId].notes = (detailDataCache[accId].notes || []).filter(n => n.id !== noteId);
       toast('✓ Nota borrada', 'success');
       _injectExpandedDetail(true);
-    } catch (err) { toast(`Error: ${err.message}`, 'error'); }
+    } catch (err) { toast(humanizeApiError(err), 'error'); }
     return;
   }
 
@@ -3783,7 +3816,7 @@ async function _submitInlineAddForm(form) {
     }
     _injectExpandedDetail(true);
   } catch (err) {
-    toast(`Error: ${err.message}`, 'error');
+    toast(humanizeApiError(err), 'error');
     if (saveBtn) saveBtn.disabled = false;
   }
 }
@@ -3854,7 +3887,7 @@ $('#detModalBody').addEventListener('submit', async e => {
     const cnt = $('#dNotesCount');
     if (cnt) cnt.textContent = list.children.length;
   } catch (err) {
-    toast(`Error: ${err.message}`, 'error');
+    toast(humanizeApiError(err), 'error');
   } finally {
     btn.disabled = false;
   }
@@ -3875,7 +3908,7 @@ $('#detModalBody').addEventListener('click', async e => {
     if (li) li.remove();
     toast('✓ Nota borrada', 'success');
   } catch (err) {
-    toast(`Error: ${err.message}`, 'error');
+    toast(humanizeApiError(err), 'error');
   }
 });
 
@@ -4174,7 +4207,7 @@ async function openDetailModal(id) {
   } catch (e) {
     if (expandedAccountId === id) {
       const cell = _expandedDetailCell();
-      if (cell) cell.innerHTML = `<div class="acc-detail"><div class="acc-error">Error: ${esc(e.message)}</div></div>`;
+      if (cell) cell.innerHTML = `<div class="acc-detail"><div class="acc-error">${esc(humanizeApiError(e))}</div></div>`;
     }
   }
 }
@@ -4594,7 +4627,7 @@ function _copyText(txt) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(txt)
       .then(() => toast(`✓ copiado: ${short}`, 'success'))
-      .catch(err => toast(`Error al copiar: ${err.message || err}`, 'error'));
+      .catch(err => toast(`No se pudo copiar: ${humanizeApiError(err)}`, 'error'));
     return true;
   }
   toast('Error al copiar (no hay API disponible)', 'error');
@@ -5116,7 +5149,7 @@ async function executeDeposit() {
     }
     $('#depExec').textContent = '🔁 Otro intento';
   } catch (e) {
-    _showStepperFatal(e.message);
+    _showStepperFatal(humanizeApiError(e));
     $('#depExec').textContent = '🔁 Reintentar';
   } finally {
     // Cancel SSE reader if still open (network drop, modal closed, etc.)
@@ -5608,7 +5641,7 @@ async function executeScheduled(pipe, amount) {
     pushNotif({ icon: '⏰', msg: `Misión ${data.sched_id}: ${_depReps} reps en ${data.email}` });
     $('#depExec').textContent = '⏳ Misión activa';
   } catch (e) {
-    toast(`Error: ${e.message}`, 'error');
+    toast(humanizeApiError(e), 'error');
     $('#depExec').textContent = '⏰ Programar misión';
   } finally {
     _depBusy = false;
@@ -5833,7 +5866,7 @@ async function executeMatchmaker() {
     }
   } catch (e) {
     if (e.name !== 'AbortError') {
-      _mmFeedAdd('mm-err', `✗ ${esc(e.message)}`);
+      _mmFeedAdd('mm-err', `✗ ${esc(humanizeApiError(e))}`);
     }
   } finally {
     _depBusy = false;
@@ -6086,7 +6119,7 @@ async function cancelMatchmaker() {
     await fetch(`/api/deposits/multi/${_depMmRunId}/cancel`, { method: 'POST' });
     toast('⏹ Cancelando…', 'success');
   } catch (e) {
-    toast(`Error: ${e.message}`, 'error');
+    toast(humanizeApiError(e), 'error');
   }
 }
 
@@ -6107,7 +6140,7 @@ async function cancelScheduled() {
     }
     toast('⏹ Misión cancelada', 'success');
   } catch (e) {
-    toast(`Error cancelando: ${e.message}`, 'error');
+    toast(`No se pudo cancelar: ${humanizeApiError(e)}`, 'error');
     if (btn) { btn.disabled = false; btn.textContent = '⏹ Cancelar misión'; }
   }
 }
@@ -6365,9 +6398,22 @@ async function rehydrateActiveScheduled() {
 // resueltas (pinned/recent) con id, status, balance, grade, lock.
 async function loadRecientes() {
   try {
-    const athand = await fetch('/api/accounts/at-hand').then(r => r.json());
-    renderRecientes(athand || {});
-  } catch {}
+    const r = await fetch('/api/accounts/at-hand');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    renderRecientes(await r.json());
+  } catch (e) {
+    renderRecientesError(e);
+  }
+}
+// Vacío real ("sin cuentas a la mano") y falla de carga se ven distinto —
+// si no, el operador no puede saber si debe escalar o simplemente no hay chamba.
+function renderRecientesError(e) {
+  const host = $('#lpRecientes');
+  if (!host) return;
+  host.innerHTML = `<div class="lp-empty lp-empty-error mono" style="color:var(--danger)">⚠ ${esc(humanizeApiError(e))} · <a href="#" data-retry-athand>reintentar</a></div>`;
+  const cnt = $('#lpRecientesCount');
+  if (cnt) cnt.textContent = '?';
+  host.querySelector('[data-retry-athand]')?.addEventListener('click', (ev) => { ev.preventDefault(); loadRecientes(); });
 }
 // Estado visual de una cuenta at-hand. El badge SOLO habla cuando es una
 // excepción que orienta (bloqueada = guardarraíl, DEAD = no la toques). LIVE es
