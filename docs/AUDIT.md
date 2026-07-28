@@ -402,6 +402,7 @@ Los 3 puntos del gate anterior fallaron en la primera vuelta (capturas de Robert
 | Persistir `gateway_response_raw` con info útil | ✅ JSON serializable con resultCode, orderId, etc. | ✅ `_persist_final` lo guarda | ✅ |
 | 1 sola row en `deposit_attempts` por intento (sin duplicación) | ✅ | ✅ desde 2026-05-11 (consolidado en `_persist_final`) | ✅ |
 | Histórico de tarjetas por cuenta (último uso, fails, status) | ✅ tabla `account_cards` con total_deposits/approved/rejected | ✅ | ✅ |
+| Tabla `auto_missions` (modo auto-depósito V2) | ✅ `mission_id` UNIQUE + defaults + reaper zombie (marca `failed` y libera locks de cuentas) en `_migrate()` | ✅ tests `test_auto_missions_migrate.py` (5/5) | 🔵 — pendiente smoke en prod |
 
 ## Admin / Controles SA
 

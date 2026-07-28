@@ -93,11 +93,12 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 3734 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3784 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
+| `auto_deposit.py` | 298 | `—` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
-| `conftest.py` | 131 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
+| `conftest.py` | 145 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `deposits.py` | 2722 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 325 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 410 | `betmexico.dashboard.login_orch` | _[completar]_ |
@@ -116,6 +117,7 @@ prewarm.py (router)
 | `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
 | `test_anti_rate_limit.py` | 271 | `—` | _[completar]_ |
 | `test_at_hand.py` | 73 | `—` | _[completar]_ |
+| `test_auto_missions_migrate.py` | 120 | `—` | _[completar]_ |
 | `test_deposit_status_classify.py` | 95 | `—` | _[completar]_ |
 | `test_deposit_step.py` | 132 | `—` | _[completar]_ |
 | `test_grading_a_plus_m7.py` | 184 | `—` | _[completar]_ |
@@ -148,6 +150,7 @@ prewarm.py (router)
 | `SESSION_TTL` | `86_400` | `auth.py` |
 | `PERSISTENT_USERS` | `{"robertvs"}` | `auth.py` |
 | `PERSISTENT_TTL` | `60 * 60 * 24 * 365 * 10` | `auth.py` |
+| `THREEDS_RECENT_H` | `24` | `auto_deposit.py` |
 | `BETMEXICO_PAYMENTS_API` | `"https://paymentsapi.betmexico.mx"` | `clabe_fetch.py` |
 | `BEGIN_DEPOSIT_PATH` | `"/api/stp/BeginDeposit"` | `clabe_fetch.py` |
 | `DEP_MAX_PER_TXN` | `499.0` | `deposits.py` |
@@ -219,6 +222,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `e9ccb20` | docs(plan): modo auto v2 — anclajes corregidos post-auditoría + gate Claude APROBADO |
 | `0a4611d` | docs(next-session): cierre sesión Modo Auto — plan aprobado, arranque = /Smartexe |
 | `c173940` | docs(plan): Modo Auto — depósito automatizado con autoselección (aprobado por Robert, listo para /Smartexe) |
 | `a3acf5c` | fix: retiro/depósito en La Pantalla — grid sin scroll + guiado a campos ocultos |
@@ -230,7 +234,6 @@ prewarm.py (router)
 | `08917c5` | docs(design-system): documentar paneles compactos col3, iconos actividad, log viewer |
 | `b4793ac` | chore(agents): AGENTS.md + design-system/ + .agents scaffolding (sesión previa, preservado) |
 | `06f387c` | feat(ui): iconos de actividad consistentes + render estructurado de logs + filtro ruido KYC |
-| `7549baa` | docs(bitacora): panel de deposito compacto col 3 — arquitectura + cierre parcial de sesion |
 <!-- GEN:end:recientes -->
 
 ---

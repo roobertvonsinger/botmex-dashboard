@@ -368,6 +368,56 @@ def _migrate():
     except sqlite3.OperationalError:
         pass
 
+    # Modo auto-depósito V2: bitácora de corridas auto (misiones). UNIQUE(mission_id)
+    # garantiza idempotencia. updated_at permite detectar misiones congeladas
+    # (anti-zombie). Aditiva. Ver docs/superpowers/plans/2026-07-28-modo-auto-deposito-v2.md.
+    try:
+        with db(write=True) as c:
+            c.execute(
+                "CREATE TABLE IF NOT EXISTS auto_missions ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "mission_id TEXT UNIQUE NOT NULL, "
+                "operator_id INTEGER, "
+                "card_pipes TEXT NOT NULL, "
+                "amount REAL NOT NULL DEFAULT 150, "
+                "target_count INTEGER NOT NULL DEFAULT 9, "
+                "accounts_selected TEXT, "
+                "matches TEXT, "
+                "status TEXT NOT NULL DEFAULT 'pending', "
+                "phase_detail TEXT, "
+                "total_deposited REAL DEFAULT 0, "
+                "total_approved INTEGER DEFAULT 0, "
+                "total_failed INTEGER DEFAULT 0, "
+                "created_at TEXT NOT NULL, "
+                "updated_at TEXT NOT NULL, "
+                "completed_at TEXT)"
+            )
+            # Reaper de misiones zombie: las que quedaron vivas cuando murió el
+            # proceso pasan a 'failed' (dinero real no espera). Fix auditor B2:
+            # también libera los locks de cuentas de esas misiones (si no, quedan
+            # lockeadas hasta que expire locked_until aunque nadie las use).
+            zombies = c.execute(
+                "SELECT mission_id, matches, accounts_selected FROM auto_missions "
+                "WHERE status IN ('pending','matching','scheduling')"
+            ).fetchall()
+            c.execute(
+                "UPDATE auto_missions SET status='failed', "
+                "phase_detail='proceso reiniciado a mitad de misión', "
+                "completed_at=? "
+                "WHERE status IN ('pending','matching','scheduling')",
+                (datetime.now(timezone.utc).isoformat(),),
+            )
+            for z in zombies:
+                ids = {m.get("account_id") for m in _json.loads(z["matches"] or "[]")}
+                ids |= set(_json.loads(z["accounts_selected"] or "[]"))
+                for aid in filter(None, ids):
+                    c.execute(
+                        "UPDATE accounts SET locked_by=NULL, locked_until=NULL WHERE id=?",
+                        (aid,),
+                    )
+    except sqlite3.OperationalError:
+        pass
+
     _backfill_grades_v10_m7()
 
 
