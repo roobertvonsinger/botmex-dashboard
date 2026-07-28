@@ -4,7 +4,40 @@
 > **Lente rectora:** ver `feedback_frictionless_norte` + `NORTE.md`. BOTMEXICO = frictionless, a prueba de desmadre, le GANA a BetMexico directo.
 
 ## 🎯 Objetivo en curso — NO se diluye
-**Retiro end-to-end completo: monitor + poll + clabes + notificación.** Deployado `deccd2d` (2026-07-26). 4 fixes: (1) toast ✅/❌ al completar/fallar retiro, (2) SSE broadcast en `withdraw_status` para tiempo real, (3) poll 15s→60s dinámico + refresh cuenta al completar, (4) auto-fetch clabes SPEI al abrir La Pantalla. **Siguiente: smoke funcional $1 fresco (end-to-end) + diseño de convivencia depósito/retiro en col 3 (ver abajo).**
+**MODO AUTO — depósito automatizado con autoselección de cuentas.** Plan aprobado por Robert (2026-07-27), commiteado `c173940`, listo para ejecutar. Botón "🤖 Modo Auto" brillante en el paginador → drawer pide SOLO tarjetas → auto-selecciona mejores cuentas → matchmaking animado → al hacer match, scheduled automático 9×$150 cada 60s → stop manual siempre visible. Spec verbatim de Robert + todos los anclajes file:line verificados en `docs/superpowers/plans/2026-07-27-modo-auto-deposito.md`.
+
+## ▶ Con qué arrancas (PRIMERA acción del próximo turno)
+**`/Smartexe` sobre `docs/superpowers/plans/2026-07-27-modo-auto-deposito.md`.** El plan es autocontenido: Task 0 crea la rama `feat/modo-auto-deposito`, Tasks A-H van en orden (BD → motor → endpoints → orquestador → UI → integración → smoke Robert). Subagentes Haiku/Sonnet ÚNICAMENTE (Opus prohibido), briefs con contexto mínimo, kill si un subagente se cuelga ~5 min, cero intervención de Robert entre tasks.
+
+## 🧭 Recomendación de approach
+Ejecutar el plan de corrido en una sesión (está optimizado para eso: tasks autocontenidas, loops con salida explícita, vigilancia anti-cuelgue). No re-explorar el repo — todo anclaje ya está verificado en el plan. Task H (smoke real con tarjetas de prueba) es lo único que hace Robert.
+
+## ⏳ Pendientes próximos (modo auto — del plan)
+- [ ] **Task 0-H:** ejecutar `/Smartexe` (rama, tabla `auto_missions`, `auto_deposit.py` 17 tests, endpoints 16 tests, orquestador 11 tests, botón paginador, drawer auto animado, integración, deploy).
+- [ ] **Task H — Robert:** smoke real en navegador (botón visible, pega tarjetas, matchmaking animado, scheduled arranca, stop funciona).
+- [ ] **Pendientes heredados (no bloquean modo auto):** validación visual panel retiro col 3 + smoke retiro $1 (de sesión 2026-07-26); drawer legacy roto de fondo; deuda `locked_by` formatos mixtos; copia duplicada `account_refresh.py` en server.
+
+## ✅ Hecho esta sesión (2026-07-27)
+- **`c173940`** plan Modo Auto escrito, revisado (2 rondas de feedback de Robert: modelos Opus→Sonnet, anti-cuelgue, loops exactos, ejecución continua) y commiteado. Nada de código de producto aún — solo el plan.
+
+## 🔧 Decisiones tomadas (sesión 2026-07-27)
+- **Botón en `.pb-center` del paginador** (index.html:527) — agnóstico a selección de cuentas, pedido de Robert con screenshot.
+- **Arquitectura:** módulo nuevo `auto_deposit.py` (motor puro TDD) + endpoints inline en `app.py`; reuso de selectores existentes (`jwt_keeper.select_refresh_candidates`), `_run_deposit_with_phases` con reuso de sesión (patrón SP-2: 0 captcha tras el match), `_mission_sem` respetado.
+- **Math de caps verificado:** 9×$150=$1,350 ≤ DEP_MAX_24H $1,499 ✓.
+- **Modo auto es SA-only** (ve todas las cuentas del pool).
+- **Subagentes: Haiku 4.5 + Sonnet 5 únicamente** — Opus prohibido en la ejecución (regla verbatim de Robert); briefs con contexto mínimo; kill + brief más chico si se cuelgan.
+
+## 🖥️ Estado del sistema al cerrar
+- **KVM4:** web ✓ Up 23h · health 200 · 941 cuentas · pool 1001 proxies (dataimpulse 1000 + nodemaven 1) · bot Up (esperado) · cero errores 12h.
+- **Repo:** `main`, limpio, `c173940`. Push a Forgejo hecho.
+- **Deploy:** ninguno esta sesión (solo plan).
+
+---
+
+## Historial de sesiones previas (contexto, no bloquea)
+
+### Objetivo previo — Retiro end-to-end (deployado `deccd2d` 2026-07-26)
+**Retiro end-to-end completo: monitor + poll + clabes + notificación.** 4 fixes: (1) toast ✅/❌ al completar/fallar retiro, (2) SSE broadcast en `withdraw_status` para tiempo real, (3) poll 15s→60s dinámico + refresh cuenta al completar, (4) auto-fetch clabes SPEI al abrir La Pantalla. **Pendiente: smoke funcional $1 fresco (end-to-end).**
 
 ### ✅ CIERRE (sesión 2026-07-26 noche) — Retiro atorado en "en proceso" para siempre RESUELTO
 Robert probó el panel real y el status nunca resolvía a completado (+ balance de tabla/detalle sin refrescar en vivo).
