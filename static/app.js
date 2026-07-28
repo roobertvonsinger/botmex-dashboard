@@ -514,6 +514,10 @@ async function loadMe() {
     const inUseRow = $('#stInUse')?.closest('div');
     if (inUseRow) inUseRow.style.display = 'none';
   }
+  // Modo Auto: SOLO superadmin (Robert) — oculto para otros operadores mientras está en pruebas
+  if (!isSuper) {
+    const btnAuto = $('#cmdAutoDeposit'); if (btnAuto) btnAuto.style.display = 'none';
+  }
   // Page sizes según rol
   const sizes = isSuper ? [20, 50, 100, 200, 500] : [20, 30, 50];
   const sel = $('#pageSize');

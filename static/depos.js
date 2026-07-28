@@ -871,6 +871,15 @@
         setScene('matching');
         setSub('Buscando las mejores cuentas' + (ev.accounts ? ' · ' + ev.accounts + ' candidatas' : '…'));
         setPct(20); break;
+      case 'logging_in':
+        setScene('matching');
+        setSub('🔑 Obteniendo sesión de ' + shortEmail(ev.email) + ' (' + (ev.current || 1) + '/' + (ev.total || '…') + ')…', true);
+        setPct(Math.min(85, 20 + ((ev.current || 1) / Math.max(ev.total || 1, 1)) * 30));
+        break;
+      case 'cooldown':
+        setScene('matching');
+        setSub('⏳ ' + shortEmail(ev.email) + ' en cuarentena por rate-limit → probando siguiente…', true);
+        break;
       case 'match':
         setScene('matching');
         a.matches++; mmAddMatch(ev.email);

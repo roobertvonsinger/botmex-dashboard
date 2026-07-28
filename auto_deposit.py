@@ -123,6 +123,7 @@ def select_accounts_for_auto(
     count: int,
     window_map: Dict[str, Dict[str, Any]],
     decline_map: Optional[Dict[str, int]] = None,
+    meta_map: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     """Filtra + ordena + limita cuentas candidatas al depósito auto.
 
@@ -140,13 +141,22 @@ def select_accounts_for_auto(
          cuenta con >=2 declines en las últimas 12h no se taladra de nuevo;
          decline_map=None → sin restricción, backward-compat)
 
-    Orden: (grade_rank ASC, grade_score DESC, balance_total DESC).
+    Orden (Reglas de priorización Robert 2026-07-28):
+      1. 3DS reciente / Grade 'A+' (bonificación top)
+      2. Ponderación de declines por antigüedad (recientes pesan más que viejos)
+      3. Recuencia de intentos/movimientos recientes (penaliza cuentas intentadas recientemente)
+      4. Cantidad de tarjetas asociadas en dashboard (>=3 tarjetas bajan de prioridad)
+      5. Grade rank y score base.
+
     Corta en `count`.
     """
     now = _now_epoch()
     sa = _sa_tokens()
     out: List[Dict[str, Any]] = []
+    meta_map = meta_map or {}
+
     for r in rows:
+        email = r.get("email")
         if (r.get("status") or "") != "LIVE":
             continue
         if (r.get("grade") or "") not in ("A+", "A", "B"):
@@ -166,21 +176,75 @@ def select_accounts_for_auto(
             continue
         if _exp_int(r.get("jwt_expires_at")) <= now + 60:
             continue
-        win = (window_map or {}).get(r.get("email")) or {}
+        win = (window_map or {}).get(email) or {}
         avail = win.get("available")
         if avail is not None and float(avail) < amount * count:
             continue
         if decline_map is not None:
-            if (decline_map.get(r.get("email")) or 0) >= MM_ACCOUNT_RECENT_DECLINE_LIMIT:
+            if (decline_map.get(email) or 0) >= MM_ACCOUNT_RECENT_DECLINE_LIMIT:
                 continue
         out.append(r)
 
-    out.sort(key=lambda r: (
-        _grade_rank(r.get("grade")),
-        -(r.get("grade_score") or 0),
-        -(r.get("balance_total") or 0),
-    ))
-    return out[:count]
+    def _calc_rank_score(r: Dict[str, Any]) -> float:
+        email = r.get("email")
+        meta = meta_map.get(email) or {}
+
+        # 1. 3DS / Grade A+ (Prioridad superior -> menor score en la tupla de sort)
+        grade = r.get("grade") or ""
+        is_3ds = 1 if grade == "A+" else 0
+
+        # 2. Declines acumulados con peso por antigüedad
+        # weighted_declines: recs <2h (1.0), 2-12h (0.4), >12h (0.1)
+        w_declines = meta.get("weighted_declines", 0.0)
+
+        # 3. Recuencia de intento / movimiento reciente (minutos desde el último intento)
+        # Menos minutos (muy reciente) -> mayor penalización
+        last_min = meta.get("mins_since_last_attempt", 99999)
+        recency_penalty = 50.0 / (last_min + 1)  # recientísimo = penalty ~50
+
+        # 4. Tarjetas asociadas en dashboard (>=3 bajan prioridad)
+        card_count = meta.get("card_count", 0)
+        card_penalty = 20.0 if card_count >= 3 else 0.0
+
+        # Tupla de ordenamiento: menor score global va primero
+        # -is_3ds (-1 primero), luego peso acumulado de penalización, luego grade base
+        total_penalty = (w_declines * 15.0) + recency_penalty + card_penalty + (_grade_rank(grade) * 5.0) - (r.get("grade_score") or 0) * 0.1
+        return (-is_3ds, total_penalty)
+
+    # Estratificación en 3 Tiers (Top, Mid, Low) + Selección Intercalada (Round-Robin)
+    # Robert 2026-07-28: No agotar solo las A+, intercalar 1 Top, 1 Mid, 1 Low...
+    out.sort(key=_calc_rank_score)
+
+    if len(out) <= 3:
+        return out[:count]
+
+    # Dividir en 3 estratos
+    n = len(out)
+    t1_end = max(1, n // 3)
+    t2_end = max(t1_end + 1, (2 * n) // 3)
+
+    tier_top = out[:t1_end]
+    tier_mid = out[t1_end:t2_end]
+    tier_low = out[t2_end:]
+
+    stratified = []
+    i_top, i_mid, i_low = 0, 0, 0
+
+    while len(stratified) < count and (i_top < len(tier_top) or i_mid < len(tier_mid) or i_low < len(tier_low)):
+        if i_top < len(tier_top):
+            stratified.append(tier_top[i_top])
+            i_top += 1
+            if len(stratified) == count: break
+        if i_mid < len(tier_mid):
+            stratified.append(tier_mid[i_mid])
+            i_mid += 1
+            if len(stratified) == count: break
+        if i_low < len(tier_low):
+            stratified.append(tier_low[i_low])
+            i_low += 1
+            if len(stratified) == count: break
+
+    return stratified
 
 
 # ── B2 — selección de tarjeta (pura) ─────────────────────────────────────────
@@ -252,6 +316,7 @@ def plan_auto_mission(
         rows = [dict(r) for r in con.execute("SELECT * FROM accounts").fetchall()]
         window_map: Dict[str, Dict[str, Any]] = {}
         decline_map: Dict[str, int] = {}
+        meta_map: Dict[str, Dict[str, Any]] = {}
         for r in rows:
             email = r.get("email")
             used = con.execute(
@@ -270,6 +335,55 @@ def plan_auto_mission(
                 (email,),
             ).fetchone()["n"]
             decline_map[email] = int(declines or 0)
+
+            # Métricas avanzadas para la fórmula de priorización
+            # 1. Ponderación de declines por antigüedad
+            d_recent = con.execute(
+                "SELECT created_at FROM deposit_attempts "
+                "WHERE account_email=? AND UPPER(status)='REJECTED' "
+                "ORDER BY created_at DESC LIMIT 20",
+                (email,),
+            ).fetchall()
+            now_dt = datetime.now(timezone.utc)
+            w_declines = 0.0
+            for d_row in d_recent:
+                try:
+                    dt = datetime.fromisoformat(str(d_row["created_at"]).replace(" ", "T").replace("Z", "+00:00"))
+                    if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
+                    hrs = (now_dt - dt).total_seconds() / 3600.0
+                    if hrs < 2: w_declines += 1.0
+                    elif hrs < 12: w_declines += 0.4
+                    else: w_declines += 0.1
+                except Exception:
+                    w_declines += 0.2
+
+            # 2. Minutos desde el último intento/movimiento (evita taladrar recientemente intentadas)
+            last_att = con.execute(
+                "SELECT created_at FROM deposit_attempts "
+                "WHERE account_email=? ORDER BY created_at DESC LIMIT 1",
+                (email,),
+            ).fetchone()
+            mins_since = 99999
+            if last_att and last_att["created_at"]:
+                try:
+                    dt = datetime.fromisoformat(str(last_att["created_at"]).replace(" ", "T").replace("Z", "+00:00"))
+                    if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
+                    mins_since = int((now_dt - dt).total_seconds() / 60.0)
+                except Exception:
+                    pass
+
+            # 3. Tarjetas asociadas en dashboard (>=3 bajan prioridad)
+            card_cnt = con.execute(
+                "SELECT COUNT(*) AS c FROM account_cards WHERE account_email=? AND status='ACTIVE'",
+                (email,),
+            ).fetchone()["c"]
+
+            meta_map[email] = {
+                "weighted_declines": w_declines,
+                "mins_since_last_attempt": mins_since,
+                "card_count": int(card_cnt or 0),
+            }
+
         try:
             bin_stats_map = {
                 str(s["bin"]): dict(s)
@@ -279,7 +393,7 @@ def plan_auto_mission(
             bin_stats_map = {}
 
         selected = select_accounts_for_auto(
-            rows, amount, target_count, window_map, decline_map=decline_map
+            rows, amount, target_count, window_map, decline_map=decline_map, meta_map=meta_map
         )[:max_accounts]
 
         pool: List[Dict[str, Any]] = []
@@ -524,6 +638,17 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                 acct = _fetch_account(account_id)
                 if not acct:
                     continue
+
+                # Emitir evento SSE de feedback: obteniendo datos/sesión de la cuenta
+                _broadcast_mission(
+                    mission_id,
+                    "logging_in",
+                    user,
+                    email=email,
+                    current=acc_idx + 1,
+                    total=len(accounts_list),
+                )
+
                 # Tarjetas candidatas: la asignada (married si había) + pool (regla 7:
                 # si no hay ninguna, siguiente cuenta SIN lockear)
                 candidates = [p for p in [acc.get("card_pipe"), *card_pipes] if p]
@@ -575,8 +700,16 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                                 logger.error(f"[Auto {mission_id}] no pude marcar A+ {email}: {ex}")
                             break  # siguiente tarjeta
                         if code == "RATE_LIMITED":
+                            # Cuarentena instantánea + aviso SSE
                             dep._set_account_cooldown(email)
-                            break  # siguiente cuenta (sale del for de tarjetas vía flag)
+                            _broadcast_mission(
+                                mission_id,
+                                "cooldown",
+                                user,
+                                email=email,
+                                reason="rate_limited",
+                            )
+                            break  # siguiente cuenta inmediatamente (0 espera)
                         if dep._mm_is_real_decline(code) or dep._mm_is_ambiguous_charge(code):
                             failed += 1
                             account_declines += 1
@@ -592,7 +725,7 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                             break
                         await asyncio.sleep(25)
                     if code and (code == "RATE_LIMITED" or code in dep.MM_DEAD_RC):
-                        break  # siguiente cuenta
+                        break  # siguiente cuenta inmediatamente
                     # Regla Robert 2026-07-28: 60s SOLO si vamos a reintentar OTRA
                     # tarjeta en la MISMA cuenta (no al salir hacia la siguiente cuenta).
                     has_more_candidates = pipe_idx < len(candidates) - 1
