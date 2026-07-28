@@ -227,6 +227,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `06e40d5` | optimization(captcha): lazy initialization of captcha pool in gentle_login |
 | `ead496e` | docs(next-session): cierre — vista multi-cuenta animada como objetivo, Modo Auto ya ejecutado (falta smoke Robert) |
 | `d991642` | docs(bitacora): registrar rediseño de La Pantalla + candado anti-reuso en AUDIT/FRONTEND/ERRORS |
 | `8caf392` | redesign(pantalla): rediseño completo — 3 columnas iguales, panel único depósito/retiro, candado anti-reuso de tarjeta |
@@ -238,7 +239,6 @@ prewarm.py (router)
 | `9c5e731` | feat(api): endpoints modo auto — POST /api/deposits/auto + cancel + status |
 | `c0bc47d` | feat(auto): orquestador de misión auto (matchmaking + scheduled) |
 | `9074c5c` | feat(ui): botón Modo Auto brillante en paginador + docs FRONTEND |
-| `9be77d3` | feat(auto): motor de selección de cuentas + tarjetas para modo auto (17 tests) |
 <!-- GEN:end:recientes -->
 
 ---

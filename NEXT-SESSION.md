@@ -14,8 +14,12 @@ Pregúntale a Robert si ya probó Modo Auto en producción (botón 🤖 en el pa
 ## 🧭 Recomendación de approach
 Para la vista multi-cuenta: NO adivinar un tercer diseño sin confirmar con Robert (ya pasó 2 veces esta sesión que un supuesto mío sobre "dónde va esto" salió mal). Antes de codear, aterrizar con Robert: ¿qué campos mínimos por cuenta en la vista? ¿la animación es por-cuenta o agregada? ¿reemplaza La Pantalla temporalmente o es una capa nueva? El `DESIGN.md` ya tiene el brief textual de Robert — úsalo como punto de partida de la pregunta, no como spec cerrada.
 
+## ⚠️ Cambios AJENOS sin commitear encontrados al cerrar — NO tocados
+`deposits.py` (pool prefetch/factory en `deposit_execute_stream`/`multi_stream`/`scheduled_create`) y `login_orchestrator.py` (`gentle_login`: init lazy del pool de captcha bajo demanda + timeout `get_token` 30s→90s) tienen cambios en el working tree que **NO son de esta sesión** — no aparecen en ningún registro de lo que se hizo hoy, mtime `11:45-11:46` (antes de que este hilo tocara `deposits.py` para el candado). Se ven coherentes (init lazy de la factory de captcha, no arranca prefetch por adelantado) pero no fueron probados ni commiteados por mí — **no los descarté, siguen en el working tree tal cual los encontré**. Preguntarle a Robert de dónde salieron antes de commitear o revertir.
+
 ## ⏳ Pendientes próximos
 - [ ] **Vista multi-cuenta animada** — diseño + implementación (ver arriba). Prioridad #1.
+- [ ] **Confirmar con Robert el origen de los cambios sin commitear en `deposits.py`/`login_orchestrator.py`** (ver arriba) — decidir si se prueban/commitean o se descartan.
 - [ ] **Modo Auto — Task H (Robert):** smoke real en navegador (botón visible, pega tarjetas, matchmaking animado, scheduled arranca, stop funciona). Código y deploy ya están hechos.
 - [ ] Countdown/temporizador visual de depósito programado (`#etaSeg`) — ya existe, confirmar con Robert si es visualmente suficiente (disparando un depósito programado real).
 - [ ] Modo auto/matchmaking sigue siendo flujo aparte de La Pantalla — integrarlo no se evaluó esta sesión.
