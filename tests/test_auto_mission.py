@@ -171,6 +171,50 @@ def test_mission_unlocks_account_when_no_card_works(H):
     assert H.updates[-1]["phase_detail"] == "sin matches"
 
 
+def test_mission_same_account_waits_mm_cooldown_between_cards(H):
+    """Regla Robert 2026-07-28: no reintentar en la MISMA cuenta antes de 60s
+    (MM_COOLDOWN) aunque sea con otra tarjeta."""
+    H.card_pipes = [P1, P2]
+    calls = {"n": 0}
+
+    def script(email, amount, kw):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return {"success": False, "result_code": "BANK_REJECTED", "error": "x"}
+        return {"success": True, "result_code": "BANK_APPROVED", "jwt": "J", "used_proxy": "P"}
+    H.script = script
+    run(H, plan(1))
+    assert dep.MM_COOLDOWN in H.sleeps
+
+
+def test_mission_cross_account_gap_is_5s_not_60s(H):
+    """Regla Robert 2026-07-28: entre cuentas DISTINTAS basta un respiro de 5s,
+    no el cooldown de 60s de reintento en la misma cuenta."""
+    def script(email, amount, kw):
+        if email == "acc1@x.com":
+            return {"success": False, "result_code": "BANK_REJECTED", "error": "x"}
+        return {"success": True, "result_code": "BANK_APPROVED", "jwt": "J", "used_proxy": "P"}
+    H.script = script
+    run(H, plan(1, 2))
+    assert ad.MM_CROSS_ACCOUNT_GAP in H.sleeps
+    assert dep.MM_COOLDOWN not in H.sleeps  # única tarjeta por cuenta: sin reintento misma cuenta
+
+
+def test_mission_caps_declines_per_account_per_run(H):
+    """Regla Robert 2026-07-28: tope de 2 declines por cuenta en la MISMA
+    corrida — con 3+ tarjetas candidatas, no se taladra una 3a vez."""
+    H.card_pipes = [P1, P2, "4333333333333333|10|29|789"]
+    calls = {"n": 0}
+
+    def script(email, amount, kw):
+        calls["n"] += 1
+        return {"success": False, "result_code": "BANK_REJECTED", "error": "x"}
+    H.script = script
+    run(H, plan(1))
+    probes = [c for c in H.run_calls if c["amount"] == ad.PROBE_AMOUNT]
+    assert len(probes) == ad.MM_MAX_ACCOUNT_DECLINES_PER_RUN
+
+
 def test_mission_no_lock_before_card_candidates(H):
     """Regla 7: sin tarjetas candidatas la cuenta ni se lockea ni se intenta."""
     H.card_pipes = []

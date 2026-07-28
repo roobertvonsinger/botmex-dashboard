@@ -95,7 +95,7 @@ prewarm.py (router)
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
 | `app.py` | 3907 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 657 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 711 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 145 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -151,8 +151,11 @@ prewarm.py (router)
 | `PERSISTENT_USERS` | `{"robertvs"}` | `auth.py` |
 | `PERSISTENT_TTL` | `60 * 60 * 24 * 365 * 10` | `auth.py` |
 | `THREEDS_RECENT_H` | `24` | `auto_deposit.py` |
+| `MM_ACCOUNT_RECENT_DECLINE_LIMIT` | `2` | `auto_deposit.py` |
 | `PROBE_AMOUNT` | `10.0` | `auto_deposit.py` |
 | `MATCH_TRANSIENT_RETRIES` | `4` | `auto_deposit.py` |
+| `MM_CROSS_ACCOUNT_GAP` | `5` | `auto_deposit.py` |
+| `MM_MAX_ACCOUNT_DECLINES_PER_RUN` | `2` | `auto_deposit.py` |
 | `BETMEXICO_PAYMENTS_API` | `"https://paymentsapi.betmexico.mx"` | `clabe_fetch.py` |
 | `BEGIN_DEPOSIT_PATH` | `"/api/stp/BeginDeposit"` | `clabe_fetch.py` |
 | `DEP_MAX_PER_TXN` | `499.0` | `deposits.py` |
@@ -224,6 +227,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `103e1a0` | feat(ui): drawer Modo Auto — escenas matching/scheduling + bus auto_mission |
 | `9c5e731` | feat(api): endpoints modo auto — POST /api/deposits/auto + cancel + status |
 | `c0bc47d` | feat(auto): orquestador de misión auto (matchmaking + scheduled) |
 | `9074c5c` | feat(ui): botón Modo Auto brillante en paginador + docs FRONTEND |
@@ -235,7 +239,6 @@ prewarm.py (router)
 | `a3acf5c` | fix: retiro/depósito en La Pantalla — grid sin scroll + guiado a campos ocultos |
 | `4b483bc` | fix: botón flotante Depositar/Retirar tapaba el panel compacto de La Pantalla |
 | `cc53fdc` | fix: rehydrate de misión Programada usaba drawer legacy sin importar deposV8 |
-| `82ab4ca` | docs(bitacora): documenta race de deposito a cuenta equivocada — atrapado en revision final, nunca en prod |
 <!-- GEN:end:recientes -->
 
 ---

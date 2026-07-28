@@ -114,11 +114,15 @@ def _pipe_str(card: Dict[str, Any]) -> str:
 
 
 # ── B1 — selección de cuentas (pura) ─────────────────────────────────────────
+MM_ACCOUNT_RECENT_DECLINE_LIMIT = 2  # >= N declines en 12h → cuenta fuera de selección (Robert 2026-07-28)
+
+
 def select_accounts_for_auto(
     rows: List[Dict[str, Any]],
     amount: float,
     count: int,
     window_map: Dict[str, Dict[str, Any]],
+    decline_map: Optional[Dict[str, int]] = None,
 ) -> List[Dict[str, Any]]:
     """Filtra + ordena + limita cuentas candidatas al depósito auto.
 
@@ -132,6 +136,9 @@ def select_accounts_for_auto(
       6. jwt_expires_at > now + 60 (aquí se exige JWT VIVO, no por expirar)
       7. window_map[email]["available"] >= amount * count (cap 24h alcanza;
          email ausente del map → sin restricción, el caller decide)
+      8. decline_map[email] < MM_ACCOUNT_RECENT_DECLINE_LIMIT (Robert 2026-07-28:
+         cuenta con >=2 declines en las últimas 12h no se taladra de nuevo;
+         decline_map=None → sin restricción, backward-compat)
 
     Orden: (grade_rank ASC, grade_score DESC, balance_total DESC).
     Corta en `count`.
@@ -163,6 +170,9 @@ def select_accounts_for_auto(
         avail = win.get("available")
         if avail is not None and float(avail) < amount * count:
             continue
+        if decline_map is not None:
+            if (decline_map.get(r.get("email")) or 0) >= MM_ACCOUNT_RECENT_DECLINE_LIMIT:
+                continue
         out.append(r)
 
     out.sort(key=lambda r: (
@@ -200,12 +210,19 @@ def select_card_for_account(
 
 
 # ── B3 — planner (toca la BD) ────────────────────────────────────────────────
+def _max_accounts_for_cards(num_cards: int) -> int:
+    """Robert 2026-07-28: 3 cuentas para la 1a tarjeta + 1 extra por tarjeta
+    adicional — evita taladrar todo el pool para lograr el match, con rango
+    suficiente cuando hay más tarjetas para probar."""
+    return 3 + max(0, num_cards - 1)
+
+
 def plan_auto_mission(
     db_path,
     card_pipes: List[str],
     amount: float = 150,
     target_count: int = 9,
-    max_accounts: int = 5,
+    max_accounts: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Plan de misión auto: cuentas elegibles + tarjeta asignada a cada una.
 
@@ -215,18 +232,26 @@ def plan_auto_mission(
     - Cuentas: select_accounts_for_auto sobre `accounts` de la BD; el
       window_map se computa desde deposit_attempts con la misma semántica de
       deposits._window_status (available = max(0, DEP_MAX_24H - used 24h)).
+      decline_map (Robert 2026-07-28) cuenta declines en las últimas 12h por
+      cuenta — >=2 la saca de la selección (cuenta ya "quemada" reciente).
     - Tarjeta: married ACTIVE de la cuenta si existe; si no, pool de
       card_pipes rankeado por approval_rate computado / 3DS reciente.
+    - max_accounts: si no se pasa explícito, se escala con el número de
+      tarjetas pegadas (`_max_accounts_for_cards`).
     - feasible = hay cuentas Y todas tienen tarjeta viable.
     """
     import sqlite3
     import deposits as dep
+
+    if max_accounts is None:
+        max_accounts = _max_accounts_for_cards(len(card_pipes or []))
 
     con = sqlite3.connect(str(db_path))
     con.row_factory = sqlite3.Row
     try:
         rows = [dict(r) for r in con.execute("SELECT * FROM accounts").fetchall()]
         window_map: Dict[str, Dict[str, Any]] = {}
+        decline_map: Dict[str, int] = {}
         for r in rows:
             email = r.get("email")
             used = con.execute(
@@ -238,6 +263,13 @@ def plan_auto_mission(
             window_map[email] = {
                 "available": max(0.0, float(dep.DEP_MAX_24H) - float(used or 0))
             }
+            declines = con.execute(
+                "SELECT COUNT(*) AS n FROM deposit_attempts "
+                "WHERE account_email=? AND UPPER(status)='REJECTED' "
+                "AND created_at >= datetime('now','-12 hours')",
+                (email,),
+            ).fetchone()["n"]
+            decline_map[email] = int(declines or 0)
         try:
             bin_stats_map = {
                 str(s["bin"]): dict(s)
@@ -247,7 +279,7 @@ def plan_auto_mission(
             bin_stats_map = {}
 
         selected = select_accounts_for_auto(
-            rows, amount, target_count, window_map
+            rows, amount, target_count, window_map, decline_map=decline_map
         )[:max_accounts]
 
         pool: List[Dict[str, Any]] = []
@@ -325,6 +357,14 @@ logger = logging.getLogger("betmexico.dashboard.auto_deposit")
 
 PROBE_AMOUNT = 10.0          # D1: probe de matchmaking (dinero real, queda en la cuenta)
 MATCH_TRANSIENT_RETRIES = 4  # = MM_MAX_PAIR_TRANSIENT (nuestro lado, no quema tarjeta)
+
+# Regla Robert 2026-07-28 (anti-rafagueo):
+#  - MISMA cuenta, otra tarjeta: esperar dep.MM_COOLDOWN (60s) antes de reintentar.
+#  - Cuenta DISTINTA: basta un respiro de MM_CROSS_ACCOUNT_GAP (5s).
+#  - Tope de declines reales por cuenta EN ESTA CORRIDA antes de abandonarla
+#    (independiente del límite histórico de 12h aplicado en la selección).
+MM_CROSS_ACCOUNT_GAP = 5
+MM_MAX_ACCOUNT_DECLINES_PER_RUN = 2
 
 
 # ── seams de BD/app (los tests los monkeypatchean; producción usa app.db) ─────
@@ -475,7 +515,8 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                       phase_detail="buscando pares cuenta×tarjeta")
             _broadcast_mission(mission_id, "matching", user,
                                accounts=len(plan.get("accounts", [])))
-            for acc in plan.get("accounts", []):
+            accounts_list = plan.get("accounts", [])
+            for acc_idx, acc in enumerate(accounts_list):
                 if _cancelled():
                     cancelled = True
                     break
@@ -492,9 +533,12 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                 matched = False
                 locked = False
                 code = None
-                for pipe in candidates:
+                account_declines = 0  # regla Robert 2026-07-28: tope por cuenta EN ESTA CORRIDA
+                for pipe_idx, pipe in enumerate(candidates):
                     if matched or _cancelled():
                         break
+                    if account_declines >= MM_MAX_ACCOUNT_DECLINES_PER_RUN:
+                        break  # ya declinó 2 veces esta corrida — no taladrar más, siguiente cuenta
                     if not locked:  # regla 7: lock justo antes del 1er intento real
                         dep._auto_lock_for_deposit(account_id, operator_id, user, hours=4)
                         locked = True
@@ -535,9 +579,11 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                             break  # siguiente cuenta (sale del for de tarjetas vía flag)
                         if dep._mm_is_real_decline(code) or dep._mm_is_ambiguous_charge(code):
                             failed += 1
+                            account_declines += 1
                             break  # siguiente tarjeta (decline real o cargo ambiguo: terminal)
                         if code in dep.MM_DEAD_RC:
                             failed += 1
+                            account_declines += 1
                             break  # cuenta muerta — siguiente cuenta
                         # TRANSITORIO (nuestro lado) → reintentar el par
                         transient += 1
@@ -547,11 +593,19 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                         await asyncio.sleep(25)
                     if code and (code == "RATE_LIMITED" or code in dep.MM_DEAD_RC):
                         break  # siguiente cuenta
-                    if not matched and code is not None:
-                        await asyncio.sleep(dep.MM_COOLDOWN)  # piso 60s entre intentos
+                    # Regla Robert 2026-07-28: 60s SOLO si vamos a reintentar OTRA
+                    # tarjeta en la MISMA cuenta (no al salir hacia la siguiente cuenta).
+                    has_more_candidates = pipe_idx < len(candidates) - 1
+                    if (not matched and code is not None and has_more_candidates
+                            and account_declines < MM_MAX_ACCOUNT_DECLINES_PER_RUN):
+                        await asyncio.sleep(dep.MM_COOLDOWN)
                 if locked and not matched:
                     _unlock(account_id)  # regla 7: no dejar 4h/perpetuo sin match
                     locked_ids.discard(account_id)
+                # Regla Robert 2026-07-28: 5s de respiro entre CUENTAS distintas
+                # (no 60s — ese piso es solo para reintentar en la misma cuenta).
+                if not _cancelled() and acc_idx < len(accounts_list) - 1:
+                    await asyncio.sleep(MM_CROSS_ACCOUNT_GAP)
 
             if not matches:
                 _m_update(mission_id, status="failed" if not cancelled else "cancelled",

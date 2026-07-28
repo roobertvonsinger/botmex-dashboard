@@ -2,7 +2,7 @@
 """Tests del motor de selección del modo auto (auto_deposit.py — Task B)."""
 import sqlite3
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from auto_deposit import (
     plan_auto_mission,
@@ -85,6 +85,23 @@ def test_select_respects_count():
 def test_select_empty_when_none_eligible():
     rows = [_row("d@t.com", status="DEAD"), _row("l@t.com", locked_by=1)]
     assert select_accounts_for_auto(rows, 150, 9, {}) == []
+
+
+def test_select_filters_recent_declines():
+    """Regla Robert 2026-07-28: cuenta con >=2 declines en las últimas 12h
+    queda fuera de la selección auto (aunque cumpla el resto de filtros)."""
+    rows = [_row("clean@t.com"), _row("burned@t.com")]
+    win = _win("clean@t.com", "burned@t.com")
+    declines = {"burned@t.com": 2, "clean@t.com": 1}
+    sel = select_accounts_for_auto(rows, 150, 9, win, decline_map=declines)
+    assert [r["email"] for r in sel] == ["clean@t.com"]
+
+
+def test_select_ignores_decline_map_when_absent():
+    """Sin decline_map (llamadas existentes/backward-compat), no filtra por declines."""
+    rows = [_row("a@t.com")]
+    sel = select_accounts_for_auto(rows, 150, 9, _win("a@t.com"))
+    assert [r["email"] for r in sel] == ["a@t.com"]
 
 
 # ── B2 — select_card_for_account ─────────────────────────────────────────────
@@ -191,3 +208,46 @@ def test_plan_estimates_total(seed_db):
     plan = plan_auto_mission(seed_db, [], amount=150, target_count=9)
     assert len(plan["accounts"]) == 2
     assert plan["total_estimated"] == 150 * 9 * 2
+
+
+def _add_rejected_attempt(db_path, email, hours_ago=1):
+    con = sqlite3.connect(str(db_path))
+    try:
+        ts = datetime.now(timezone.utc) - timedelta(hours=hours_ago)
+        con.execute(
+            "INSERT INTO deposit_attempts (attempt_id,account_email,amount,status,"
+            "rejection_reason,source,created_at) VALUES (?,?,?,?,?,?,?)",
+            ("x" + str(time.time_ns()), email, 10.0, "rejected", "BANK_REJECTED",
+             "auto", ts.strftime("%Y-%m-%d %H:%M:%S")))
+        con.commit()
+    finally:
+        con.close()
+
+
+def test_plan_excludes_accounts_with_recent_declines(seed_db):
+    """Regla Robert: cuenta con 2 declines en las últimas 12h NO entra al plan
+    aunque cumpla el resto de filtros (no taladrar cuentas ya quemadas)."""
+    _add_account(seed_db, "burned@t.com")
+    _add_card(seed_db, "4111111111111111", "burned@t.com")
+    _add_rejected_attempt(seed_db, "burned@t.com", hours_ago=1)
+    _add_rejected_attempt(seed_db, "burned@t.com", hours_ago=2)
+    plan = plan_auto_mission(seed_db, [], amount=150, target_count=9)
+    assert plan["feasible"] is False
+    assert plan["accounts"] == []
+
+
+def test_plan_max_accounts_scales_with_card_count(seed_db):
+    """Regla Robert: 3 cuentas para la 1a tarjeta + 1 extra por tarjeta
+    adicional (no taladrar todo el pool para lograr el match)."""
+    for i in range(6):
+        _add_account(seed_db, f"u{i}@t.com")
+        _add_card(seed_db, f"411111111111{i:04d}", f"u{i}@t.com")
+    plan_1card = plan_auto_mission(seed_db, ["4999999999999999|0130|999"],
+                                    amount=150, target_count=9)
+    plan_3cards = plan_auto_mission(
+        seed_db,
+        ["4999999999999999|0130|999", "4888888888888888|0130|999",
+         "4777777777777777|0130|999"],
+        amount=150, target_count=9)
+    assert len(plan_1card["accounts"]) == 3
+    assert len(plan_3cards["accounts"]) == 5
