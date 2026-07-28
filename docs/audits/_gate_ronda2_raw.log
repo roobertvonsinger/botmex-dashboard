@@ -1,0 +1,36 @@
+⚠ claude.ai connectors are disabled because ANTHROPIC_API_KEY or another auth source is set and takes precedence over your claude.ai login · Unset it to load your organization's connectors
+Warning: Advisor disabled — base model 'Moon/kimi-k2.7-code-highspeed' has no advisor rank in the model catalog. Switch to a public model alias (opus, sonnet, fable) or set CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL=1.
+He leído el gate, el plan V2 y el prompt de auditoría. Ahora verifico los 6 hallazgos bloqueantes EN EL PLAN V2 y hago spot-check del flujo.
+
+---
+
+## VEREDICTO: APROBADO
+
+- **B1 — RESUELTO.** Task D regla 10: "TODOS los accesos cross-módulo desde `auto_deposit.py` son lazy dentro de función: `import deposits as dep` / `from app import db`". Task C1 snippet: `from deposits import DEP_MAX_PER_TXN, DEP_MAX_24H, _mission_sem, _parse_pipe` dentro del body del endpoint, con comentario explícito "Fix auditor B1/B3: imports lazy dentro del body".
+
+- **B2 — RESUELTO.** Task A reaper: tras marcar zombies como `failed`, itera `matches` ∪ `accounts_selected` y ejecuta `UPDATE accounts SET locked_by=NULL, locked_until=NULL WHERE id=?` por cada account_id. Comentario explícito "Fix auditor B2: liberar locks de cuentas de misiones zombie".
+
+- **B3 — RESUELTO.** Task C1 snippet incluye `from deposits import DEP_MAX_PER_TXN, DEP_MAX_24H, _mission_sem, _parse_pipe` lazy en el body, y el endpoint valida `amount > DEP_MAX_PER_TXN` y `amount * target_count > DEP_MAX_24H`. No hay import a nivel módulo.
+
+- **B4 — RESUELTO.** Task D regla 7: "NO lockear al iterar la cuenta. `_auto_lock_for_deposit(...)` se llama justo antes del primer `_run_deposit_with_phases` de esa cuenta (ya sabiendo que hay ≥1 tarjeta candidata). Si TODAS las tarjetas fallan → unlock explícito inmediato". Fase 1 refuerza: `locked = False`; lock solo dentro del loop de tarjetas; al final "Si la cuenta quedó sin match and locked → UNLOCK explícito". Tests mencionados: `test_mission_unlocks_account_when_no_card_works`, `test_mission_no_lock_before_card_candidates`.
+
+- **B5 — RESUELTO.** Task D regla 11: dict `sessions[account_id]` replicando patrón `_mm_session_get`/`_mm_session_update`. Fase 1: `sessions = {}`; `sess = sessions.get(account_id, {})`; primer intento sin JWT; tras éxito guarda `jwt`+`proxy`; intentos siguientes de la misma cuenta lo reusan. Test dedicado: `test_mission_matchmaking_reuses_session_between_cards`.
+
+- **B6 — RESUELTO.** Task D regla 5: "la misión adquiere 1 slot de `_mission_sem` para TODA la misión"; justifica cuentas secuenciales; operador conserva 2º slot; fail-fast si `_mission_sem.locked()` al entrar; "NUNCA delegar a `scheduled_create` (él adquiere el sem internamente :2378 = doble semáforo)". Endpoint C1 también hace fail-fast con `if _mission_sem.locked(): raise 429`.
+
+---
+
+## HALLAZGOS NUEVOS
+
+Ninguno bloqueante. Solo observaciones de redacción menor que no afectan ejecución:
+
+1. **(observación)** Task D regla 8 menciona `classify_deposit_status(code, ok)` con referencia `deposits.py:1701`. No verifiqué este anclaje en esta ronda; ya estaba en ronda 1 como parte de los 19 anclajes verificados.
+2. **(observación)** El comentario de Fase 2 "si sesión muere (401/redirectlogin) → session_jwt=None, reactivar pool" es algo coloquial; el plan no especifica mecánica exacta de "reactivar pool", pero esto es implementación, no especificación.
+
+---
+
+## NOTA
+
+No re-audité los 19 anclajes de ronda 1. Enfoco la verificación exclusivamente en las correcciones de los 6 hallazgos bloqueantes y sus efectos en el flujo Task D. El flujo Fase 1 con `sessions[account_id]` es coherente con el patrón real `_mm_session_get`/`_mm_session_update` descrito en `deposits.py:1782-1798` (el plan cita el mismo rango y replica la semántica: dict por account_id, primera vez None, capturar tras éxito, reusar en intentos subsecuentes de la misma cuenta).
+
+Nada del dinero real quedó peor que en ronda 1. Las correcciones mantienen o mejoran las salvaguardas: lock diferido, unlock explícito, reaper con liberación de locks, semáforo de 1 slot, reuso de sesión.
