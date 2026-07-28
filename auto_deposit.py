@@ -633,6 +633,10 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
             import deposits as _d
             num, exp, cvv = _d._parse_pipe(pipe)
             t0 = asyncio.get_event_loop().time()
+            if sj:
+                logger.info(f"🔑 LOGIN OK (Sesión reusada) | {email}")
+            else:
+                logger.info(f"🔑 LOGIN START | {email}")
             r = await _d._run_deposit_with_phases(
                 email, password, num, exp, cvv, amt, user, pool, None,
                 session_jwt=sj, session_proxy=sp,
@@ -642,6 +646,17 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
             code = r.get("result_code", "UNKNOWN")
             reason = r.get("error") or code
             duration = r.get("duration_ms") or int((asyncio.get_event_loop().time() - t0) * 1000)
+
+            if ok:
+                logger.info(f"💳 SUBMIT SUCCESS | {email} | Pipe: {pipe[:6]}... | Code: {code} | Duration: {duration}ms")
+            else:
+                if code == "RATE_LIMITED":
+                    logger.warning(f"⏱️ RATE-LIMIT | {email} | Reason: {reason}")
+                elif code in _d.MM_DEAD_RC:
+                    logger.error(f"💀 DEAD ACCOUNT | {email} | Code: {code}")
+                else:
+                    logger.warning(f"💳 SUBMIT REJECTED | {email} | Code: {code} | Reason: {reason}")
+
             _d._record_attempt(
                 uuid.uuid4().hex, email, amt,
                 _d.classify_deposit_status(code, ok),
@@ -698,6 +713,7 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                     transient = 0
                     while True:  # reintentos transitorios del PAR (nuestro lado)
                         sj, sp = dep._mm_session_get(sessions, email)
+                        logger.info(f"🏦 BEGIN_DEPOSIT | {email} | Target Pipe: {pipe[:6]}... | Amt: ${PROBE_AMOUNT}")
                         r, ok, code = await _attempt(email, acct["password"], pipe,
                                                      PROBE_AMOUNT, sj, sp)
                         dep._mm_session_update(sessions, email, r)  # regla 11
@@ -705,6 +721,7 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                             matched = True
                             deposited += PROBE_AMOUNT
                             approved += 1
+                            logger.info(f"🎯 MATCH FOUND | {email} x {pipe[:6]}...")
                             matches.append({
                                 "account_id": account_id, "email": email,
                                 "card_pipe": pipe,

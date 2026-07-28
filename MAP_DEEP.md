@@ -183,7 +183,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_unlock` | def | L551–L559 |
 | `_broadcast_mission` | def | L562–L571 |
 | `_stop_pool` | def | L574–L581 |
-| `run_auto_mission` | def | L585–L871 |
+| `run_auto_mission` | def | L585–L888 |
 
 ### `autoexclusion.py`
 

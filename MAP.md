@@ -95,7 +95,7 @@ prewarm.py (router)
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
 | `app.py` | 3911 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 871 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 888 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 145 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -227,6 +227,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `e824898` | fix(auto): integrar a main el fix de ValueError en parseo de pipes de 4 partes |
 | `d30e826` | docs(errors): document definitive fix for _fetch_looks_empty regression |
 | `72f92b0` | feat(refresh): fast 5-minute background refresh with balance_only mode |
 | `016a1aa` | docs(next-session): flag cambios ajenos sin commitear en deposits.py/login_orchestrator.py |
@@ -238,7 +239,6 @@ prewarm.py (router)
 | `63f5287` | refactor(auto): robust stratified round-robin selection and test coverage |
 | `321d208` | feat(auto): stratified round-robin + instant rate-limit quarantine + live login SSE feedback |
 | `83822b1` | feat(auto): reglas anti-rafagueo de Robert — cooldown 60s/5s + tope declines + cap cuentas por tarjetas |
-| `103e1a0` | feat(ui): drawer Modo Auto — escenas matching/scheduling + bus auto_mission |
 <!-- GEN:end:recientes -->
 
 ---
