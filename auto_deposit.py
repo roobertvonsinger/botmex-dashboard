@@ -113,6 +113,35 @@ def _pipe_str(card: Dict[str, Any]) -> str:
     )
 
 
+def _parse_card_pipe(p: str) -> Optional[Dict[str, Any]]:
+    parts = [part.strip() for part in str(p).split("|") if part.strip()]
+    if not parts or not parts[0]:
+        return None
+    if len(parts) == 3:
+        return {
+            "card_number": parts[0],
+            "card_expiry": parts[1],
+            "card_cvv": parts[2],
+        }
+    if len(parts) == 4:
+        mm = parts[1]
+        yy = parts[2]
+        cvv = parts[3]
+        if len(yy) == 4:
+            yy = yy[-2:]
+        return {
+            "card_number": parts[0],
+            "card_expiry": f"{mm}{yy}",
+            "card_cvv": cvv,
+        }
+    return None
+
+
+def _normalize_pipe_to_3part(p: str) -> str:
+    c = _parse_card_pipe(p)
+    return _pipe_str(c) if c else p
+
+
 # ── B1 — selección de cuentas (pura) ─────────────────────────────────────────
 MM_ACCOUNT_RECENT_DECLINE_LIMIT = 2  # >= N declines en 12h → cuenta fuera de selección (Robert 2026-07-28)
 
@@ -399,13 +428,9 @@ def plan_auto_mission(
 
         pool: List[Dict[str, Any]] = []
         for p in (card_pipes or []):
-            parts = str(p).split("|")
-            if parts and parts[0]:
-                pool.append({
-                    "card_number": parts[0],
-                    "card_expiry": parts[1] if len(parts) > 1 else "",
-                    "card_cvv": parts[2] if len(parts) > 2 else "",
-                })
+            c = _parse_card_pipe(p)
+            if c:
+                pool.append(c)
         pool.sort(key=lambda c: _rank_key(c, bin_stats_map))
 
         accounts_out: List[Dict[str, Any]] = []
@@ -653,6 +678,7 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                 # Tarjetas candidatas: la asignada (married si había) + pool (regla 7:
                 # si no hay ninguna, siguiente cuenta SIN lockear)
                 candidates = [p for p in [acc.get("card_pipe"), *card_pipes] if p]
+                candidates = [_normalize_pipe_to_3part(p) for p in candidates]
                 candidates = list(dict.fromkeys(candidates))  # dedup, orden estable
                 if not candidates:
                     continue

@@ -2,6 +2,18 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## Modo Auto abortaba inmediatamente por ValueError al procesar tarjetas de 4 partes (2026-07-28)
+
+- **Síntoma**: Al iniciar el Modo Auto en el dashboard, pegar las tarjetas en el formato normal de la UI (`numero|MM|YYYY|CVV`) e iniciar la confirmación, el proceso se cancelaba de inmediato en la pantalla sin mostrar ningún error (la UI regresaba a su estado inicial en milisegundos).
+- **Causa raíz**: El frontend normaliza las tarjetas al formato canónico de 4 partes (`number|MM|YYYY|CVV`) y las envía al endpoint `POST /api/deposits/auto`. Sin embargo, `auto_deposit.py:plan_auto_mission` solo sabía procesar pipes de 3 partes (`number|MMYY|CVV`). Al partir el pipe de 4 partes por el divisor `|`, tomaba la segunda parte (`MM`, 2 caracteres) como `card_expiry` y la tercera (`YYYY`, 4 caracteres) como `card_cvv`, perdiendo el CVV real. Esto producía un pipe inválido de 3 partes (`number|MM|YYYY`) que al pasarse al orquestador e intentar ejecutarse a través de `_parse_pipe` en `deposits.py`, elevaba un error fatal `ValueError: Vencimiento inválido (usa MMYY)` al detectar que la fecha de vencimiento tenía longitud 2 en lugar de 4 o 6.
+- **Por qué no se veía antes**: Los tests mockeaban la respuesta de planificación o utilizaban mock constants de 3 partes, por lo que nunca evaluaron el flujo de orquestación real con las tarjetas normalizadas por la interfaz de usuario en producción.
+- **Fix**:
+  1. Se agregó en `auto_deposit.py` la función `_parse_card_pipe` para soportar de manera robusta la lectura y parseo tanto de formatos de 3 partes como de 4 partes, extrayendo el año a 2 dígitos (`YY`) y conformando el vencimiento como `MMYY` de 4 caracteres.
+  2. Se modificó el bucle de parseo del pool de tarjetas en `plan_auto_mission` para consumir `_parse_card_pipe`.
+  3. Se normalizaron todos los pipes de tarjetas candidatas en `run_auto_mission` a formato estándar de 3 partes mediante la nueva función `_normalize_pipe_to_3part` para evitar duplicados en la dedup y asegurar formato correcto.
+  4. En el frontend (`static/depos.js`), se agregó un toast de alerta `showToast(msg)` en el `catch` de `runAuto()` para que cualquier error de viabilidad o de inicio del backend sea visible al operador en lugar de fallar silenciosamente al ocultar la pantalla de progreso.
+- **Verificado**: Todos los 56 tests unitarios en local pasaron con éxito. En producción (KVM4), tras subir el backend y el frontend y reiniciar el servicio, se verificó mediante scripts interactivos que el planificador ahora lee pipes de 4 partes, genera planes con estado `Feasible: True`, y selecciona las cuentas de forma correcta.
+
 ## `.pat-form` no respetaba `[hidden]` — 300px de layout invisible desbordando columnas angostas (2026-07-28)
 
 - **Síntoma**: al medir `scrollWidth` vs `clientWidth` de `.pat-col-ident` en viewports angostos (800px) tras

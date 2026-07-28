@@ -210,6 +210,13 @@ def test_plan_assigns_pool_cards(seed_db):
     assert plan["accounts"][0]["card_pipe"] == "4333333333333333|0131|999"
 
 
+def test_plan_normalizes_4part_pool_cards(seed_db):
+    _add_account(seed_db, "p2@t.com")
+    plan = plan_auto_mission(seed_db, ["4333333333333333|01|2031|999"], amount=150, target_count=9)
+    assert plan["feasible"] is True
+    assert plan["accounts"][0]["card_pipe"] == "4333333333333333|0131|999"
+
+
 def test_plan_feasibility_check(seed_db):
     # seed base: a@ lockeada, b@ sin JWT vivo, c@ DEAD → ninguna elegible
     plan = plan_auto_mission(seed_db, ["4111111111111111|1230|123"], amount=150, target_count=9)

@@ -13,8 +13,8 @@ import pytest
 import auto_deposit as ad
 import deposits as dep
 
-P1 = "4111111111111111|12|30|123"
-P2 = "4222222222222222|11|29|456"
+P1 = "4111111111111111|1230|123"
+P2 = "4222222222222222|1129|456"
 
 
 class FakePool:
@@ -203,7 +203,7 @@ def test_mission_cross_account_gap_is_5s_not_60s(H):
 def test_mission_caps_declines_per_account_per_run(H):
     """Regla Robert 2026-07-28: tope de 2 declines por cuenta en la MISMA
     corrida — con 3+ tarjetas candidatas, no se taladra una 3a vez."""
-    H.card_pipes = [P1, P2, "4333333333333333|10|29|789"]
+    H.card_pipes = [P1, P2, "4333333333333333|1029|789"]
     calls = {"n": 0}
 
     def script(email, amount, kw):

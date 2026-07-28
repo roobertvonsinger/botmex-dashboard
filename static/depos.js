@@ -859,7 +859,8 @@
       const buf = _dx.auto.pending; _dx.auto.pending = [];
       buf.forEach(_autoOnBus);
     } catch (e) {
-      setSub(typeof humanizeApiError === 'function' ? humanizeApiError(e) : 'No se pudo iniciar, reintenta');
+      const msg = typeof humanizeApiError === 'function' ? humanizeApiError(e) : 'No se pudo iniciar, reintenta';
+      showToast(msg);
       _dx.running = false; _dx.auto = null; journeyEnd(); busClose();
     }
   }
