@@ -227,6 +227,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `72f92b0` | feat(refresh): fast 5-minute background refresh with balance_only mode |
 | `016a1aa` | docs(next-session): flag cambios ajenos sin commitear en deposits.py/login_orchestrator.py |
 | `06e40d5` | optimization(captcha): lazy initialization of captcha pool in gentle_login |
 | `ead496e` | docs(next-session): cierre — vista multi-cuenta animada como objetivo, Modo Auto ya ejecutado (falta smoke Robert) |
@@ -238,7 +239,6 @@ prewarm.py (router)
 | `83822b1` | feat(auto): reglas anti-rafagueo de Robert — cooldown 60s/5s + tope declines + cap cuentas por tarjetas |
 | `103e1a0` | feat(ui): drawer Modo Auto — escenas matching/scheduling + bus auto_mission |
 | `9c5e731` | feat(api): endpoints modo auto — POST /api/deposits/auto + cancel + status |
-| `c0bc47d` | feat(auto): orquestador de misión auto (matchmaking + scheduled) |
 <!-- GEN:end:recientes -->
 
 ---

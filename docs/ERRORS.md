@@ -156,8 +156,8 @@
 3. Adicionalmente, el chequeo `float(details.get("last_deposit_amount"))` provocaba `ValueError` no capturado cuando el valor por defecto era `"N/A"`.
 
 **Fix / Estado**:
-- Commits `a8df3f5` (guardias en `_db_upsert_balance` descartando `""` y `"N/A"`) y commit `a2d670a`/`cde1d32` aislan el frontend. 
-- Los cambios experimentales e inestables no commiteados en `prewarm.py`, `account_refresh.py` y `deposits.py` se limpian/revierten para conservar la estabilidad del backend mientras se analiza la solución definitiva con un modelo de mayor disciplina.
+- Commits `a8df3f5` (guardias en `_db_upsert_balance` descartando `""` y `"N/A"`) y commit `a2d670a`/`cde1d32` aislan el frontend.
+- **SOLUCIÓN DEFINITIVA (2026-07-28)**: Se modificó `_fetch_looks_empty()` en `prewarm.py` para verificar si `transactions.get("fetched")` es `True`. Como en `balance_only` la API de transacciones responde exitosamente (200 OK), este flag certifica que la sesión sigue viva aun con balance $0 y 0 transacciones. Esto permitió desplegar de forma segura el refresco rápido cada 5 minutos usando `balance_only` (muy ligero, ahorra 4 peticiones HTTP por cuenta) sin falsos positivos de invalidación de JWT. Corriendo verificado en KVM4.
 
 ## 3 bugs de layout (panel depósitos, escenario en La Pantalla, feed de logs) (2026-07-17)
 
