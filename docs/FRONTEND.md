@@ -144,6 +144,17 @@ El panel mapea por `ev.type` (streams single/multi) y `ev.kind` (bus `/api/event
 - **SCHEDULED** (`_schedOnBus`, bus): el backend manda `iter` **1-indexed** (`iter_num = completed+1`). El frontend NO vuelve a sumar 1 (causaba off-by-one: terminaba una rep antes y ocultaba la última). `s.iter`/`s.done = ev.iter`; `schedFinish` cuando `s.done >= total`. `3DS`→premium A+ (no "fallo"); `RATE_LIMITED`→"en pausa"; rechazo real→humanizado.
 - **Estados visuales** (`depos.css` `.mov-dot`/`.mov-tag`): `ok` (verde) · `wait` (dorado=en curso) · `skip` (gris neutro=terminal no-aprobado: enfriando/saltada). Añadir un `kind`/`type` nuevo en el backend ⇒ agregar su case aquí.
 
+### Modo Auto del drawer (Task F — 2026-07-28)
+
+Entrada: `openDepos({ mode: 'auto' })` (botón `#cmdAutoDeposit`, ver sección abajo). Contrato backend: `POST /api/deposits/auto` + SSE `kind:'auto_mission'` (ver `docs/SSE_EVENTS.md`).
+
+- **Modo forzado:** `deriveMode(n, reps, forced)` — `forced='auto'` gana a cuentas/reps (`depos_logic.js:11`). `presetsForMode('auto')` = `[150]`, sin manual, sin reps, `cardsOnly:true`. El drawer guarda `_dx.forcedMode` y `refreshMode()` lo pasa como 3er arg.
+- **UI cards-only:** `applyAutoUI(true)` pone la clase `.auto-mode` en `#depos` — CSS oculta la columna de cuentas (`.duo .col:first-child`) y toda la `.row2` (monto/reps), deja solo tarjetas + botón **🤖 GO** con glow (`@keyframes auto-glow`). Banner guía inyectado ("Pega las tarjetas y el sistema hace el resto") + título fijo "🤖 Modo Auto" (no rota greetings). Todo vía clase/DOM inyectado — `index.html` intacto.
+- **Flujo:** GO → valida pipes → **preview** inline (`.auto-preview`: "Voy a buscar las mejores cuentas para estas N tarjetas. ¿Dale?") → `POST /api/deposits/auto {card_pipes}` → `mission_id` → escenas vía bus propio (`onBusEvent` → `_autoOnBus`, con buffer anti-carrera hasta tener `mission_id`, patrón `_schedOnBus`).
+- **Escenas nuevas** (inyectadas en `#scene-stage` por `injectAutoScenes()` al montar, mismo patrón `.scene` + keyframes por prefijo): `#scene-matching` (`mm-*`: tarjetas a la izq, cuentas a la der, línea SVG animada `mm-draw` al match + mascota 🤖 `mm-bob`/`mm-win`) y `#scene-scheduling` (`sc-*`: progress bar + countdown 60s reutilizando `startSchedCountdown`/`#etaSeg`). Resumen final reusa `#scene-done` ("Se depositaron $X en Y cuentas · Z aprobados, W fallidos").
+- **Stop:** el `#abort` existente (siempre visible durante el run vía `runrow.on`) → `POST /api/deposits/auto/{mission_id}/cancel` (branch `_dx.auto` en `onAbort`). Cancel cooperativo del orquestador.
+- **app.js:** `connectSSE` tiene un `else if (ev.kind === 'auto_mission')` solo para notifs de hitos terminales (🤖 completada / ❌ falló / 🛑 detenida); la fila del feed entra por el `pushActivityEvent()` genérico.
+
 **Chips de cuentas/tarjetas — interacción (2026-06-27):**
 - Cada chip = `<span class="chip">` con `[.txt.copyable, .chip-x]` (cuentas además llevan `.hdot` de grado al inicio).
 - **Copiar:** SOLO el `.txt` es `.copyable` (lleva `data-copy`=combo/pipe). Click en el texto → copia al portapapeles (`showToast('copiado')`). El listener vive en `el` y resuelve `e.target.closest('.copyable')`. Hover del texto → verde (`--aqua`) = señal de copiable.

@@ -1818,6 +1818,19 @@ function connectSSE() {
           _schedOnAborted(ev);
         } else if (ev.kind === 'scheduled_cancelled') {
           _schedOnCancelled(ev);
+        } else if (ev.kind === 'auto_mission') {
+          // Misión auto (Task F): el drawer lleva el detalle por su PROPIO bus
+          // (depos.js onBusEvent); aquí solo hitos terminales al operador.
+          // La fila del feed ya entró vía pushActivityEvent() (más arriba).
+          if (ev.status === 'completed') {
+            // Payload terminal real de run_auto_mission: {deposited, approved, failed, accounts}
+            pushNotif({ icon: '🤖', msg: `Misión auto completada — ${fmtMoney(ev.deposited || 0)} · ${ev.approved || 0} aprobados, ${ev.failed || 0} fallidos` });
+            _liveReload();
+          } else if (ev.status === 'failed') {
+            pushNotif({ icon: '❌', msg: `Misión auto falló${ev.reason ? ': ' + ev.reason : ''}` });
+          } else if (ev.status === 'cancelled') {
+            pushNotif({ icon: '🛑', msg: 'Misión auto detenida' });
+          }
         } else if (ev.kind === 'note') {
           const myTg = state.user?.telegram_id;
           const isMine = ev.who_id && myTg && ev.who_id === myTg;

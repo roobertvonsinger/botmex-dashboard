@@ -33,6 +33,25 @@ test('presetsForMode scheduled: como single (reps visible)', () => {
   assert.equal(p.manual, true);
 });
 
+// ── Task F1: modo auto (forced gana; presets solo tarjetas) ──
+test('deriveMode: forced auto gana a cuentas/reps', () => {
+  assert.equal(D.deriveMode(0, 1, 'auto'), 'auto');
+  assert.equal(D.deriveMode(5, 9, 'auto'), 'auto'); // gana incluso sobre multi
+});
+test('deriveMode: sin forced sigue igual (regresión)', () => {
+  assert.equal(D.deriveMode(0, 1, undefined), 'single');
+  assert.equal(D.deriveMode(1, 5), 'scheduled');
+  assert.equal(D.deriveMode(3, 1, null), 'multi');
+});
+test('presetsForMode auto: [150], sin manual, sin reps, cardsOnly', () => {
+  const p = D.presetsForMode('auto');
+  assert.deepEqual(p.presets, [150]);
+  assert.equal(p.manual, false);
+  assert.equal(p.repsVisible, false);
+  assert.equal(p.cardsOnly, true);
+  assert.ok(typeof p.note === 'string' && p.note.length > 0);
+});
+
 // ── Task 2: mapPhaseToScene + phaseToPct ──
 test('mapPhaseToScene: login family', () => {
   ['login_start', 'login_done', 'login_reused'].forEach(n =>

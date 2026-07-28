@@ -224,6 +224,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `9c5e731` | feat(api): endpoints modo auto — POST /api/deposits/auto + cancel + status |
 | `c0bc47d` | feat(auto): orquestador de misión auto (matchmaking + scheduled) |
 | `9074c5c` | feat(ui): botón Modo Auto brillante en paginador + docs FRONTEND |
 | `9be77d3` | feat(auto): motor de selección de cuentas + tarjetas para modo auto (17 tests) |
@@ -235,7 +236,6 @@ prewarm.py (router)
 | `4b483bc` | fix: botón flotante Depositar/Retirar tapaba el panel compacto de La Pantalla |
 | `cc53fdc` | fix: rehydrate de misión Programada usaba drawer legacy sin importar deposV8 |
 | `82ab4ca` | docs(bitacora): documenta race de deposito a cuenta equivocada — atrapado en revision final, nunca en prod |
-| `fb483bd` | docs: cierre Task 7 — revision final + fix wave + redeploy critico verificado |
 <!-- GEN:end:recientes -->
 
 ---

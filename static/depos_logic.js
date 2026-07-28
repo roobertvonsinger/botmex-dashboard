@@ -8,12 +8,19 @@
   'use strict';
 
   // La UI impone las reglas: 1 cuenta + reps>1 = programado; 1 (o 0) cuenta + reps=1 = único; varias = multi.
-  function deriveMode(nAccounts, reps) {
+  // `forced` ('auto') gana a todo: modo auto = el sistema elige cuentas y montos (Task F).
+  function deriveMode(nAccounts, reps, forced) {
+    if (forced === 'auto') return 'auto';
     if (nAccounts > 1) return 'multi';
     return reps > 1 ? 'scheduled' : 'single';
   }
 
   function presetsForMode(mode) {
+    if (mode === 'auto') return {
+      presets: [150], manual: false, repsVisible: false,
+      note: 'El sistema selecciona cuentas y montos automáticamente',
+      cardsOnly: true,
+    };
     if (mode === 'multi') {
       // Tope real del backend = DEP_MAX_PER_TXN $499 (deposits.py:1641). $1000
       // daba HTTP 400 SIEMPRE (preset roto). 490 = monto alto dentro del cap.

@@ -77,6 +77,7 @@
 
   // ── modo (la UI impone las reglas, vía DeposLogic) ──
   function modeLabel(mode, reps) {
+    if (mode === 'auto') return '🤖 Modo Auto · el sistema elige cuentas y montos';
     if (mode === 'multi') return 'Varias cuentas · una tarjeta a cada una';
     if (mode === 'scheduled') return 'Programado · ' + reps + ' depósitos · cada 60s';
     return 'Un solo depósito';
@@ -101,7 +102,7 @@
   function refreshMode() {
     const n = _dx.accounts.length;
     const cc = qs('#accCount'); if (cc) cc.textContent = n;
-    _dx.mode = D.deriveMode(n, _dx.reps);
+    _dx.mode = D.deriveMode(n, _dx.reps, _dx.forcedMode);
     const cfg = D.presetsForMode(_dx.mode);
     const rb = qs('#repsBox'); if (rb) rb.classList.toggle('hide', !cfg.repsVisible);
     // ajustar monto al modo si el actual no aplica
@@ -431,7 +432,7 @@
   // al arrancar otra misión, para no borrar el estado de la nueva.
   function busCloseDeferred() {
     if (_busCloseTimer) clearTimeout(_busCloseTimer);
-    _busCloseTimer = setTimeout(() => { _dx.sched = null; _dx.mm = null; busClose(); _busCloseTimer = null; }, 4000);
+    _busCloseTimer = setTimeout(() => { _dx.sched = null; _dx.mm = null; _dx.auto = null; busClose(); _busCloseTimer = null; }, 4000);
   }
   function onBusEvent(ev) {
     if (!ev) return;
@@ -444,6 +445,7 @@
       }
     }
     if (_dx.sched && typeof _schedOnBus === 'function') _schedOnBus(ev); // Task 8
+    if (_dx.auto && ev.kind === 'auto_mission') _autoOnBus(ev); // Task F
   }
 
   // ── SINGLE: /execute-stream ──
@@ -642,7 +644,11 @@
   window.rehydrateDepos = rehydrateScheduled;
 
   async function onAbort() {
-    if (_dx.sched && _dx.sched.sched_id) {
+    if (_dx.auto && _dx.auto.mission_id) {
+      // Stop siempre visible (Task F): cancel cooperativo del orquestador auto
+      try { await fetch('/api/deposits/auto/' + _dx.auto.mission_id + '/cancel', { method: 'POST' }); } catch (_) {}
+      showToast('Deteniendo misión auto…');
+    } else if (_dx.sched && _dx.sched.sched_id) {
       try { await fetch('/api/deposits/scheduled/' + _dx.sched.sched_id + '/cancel', { method: 'POST' }); } catch (_) {}
       showToast('Cancelando misión…');
     } else if (_dx.mm && _dx.mm.run_id) {
@@ -737,11 +743,235 @@
     }
   }
 
+  // ── AUTO (Task F): POST /api/deposits/auto + eventos por el bus global ──
+  // Flujo: GO → preview "¿Dale?" → POST → escena matching → SSE auto_mission →
+  // scheduling (countdown + progress) → resumen en escena done. Stop = #abort.
+  function cardTail(pipe) { const d = String(pipe || '').replace(/\D/g, ''); return d.slice(-4) || '????'; }
+
+  // Preview de confirmación inline (overlay dentro del drawer; promise → bool).
+  function autoPreview(n) {
+    return new Promise((resolve) => {
+      const ov = document.createElement('div');
+      ov.className = 'auto-preview';
+      const box = document.createElement('div');
+      box.className = 'ap-box';
+      const txt = document.createElement('div');
+      txt.className = 'ap-txt';
+      txt.textContent = 'Voy a buscar las mejores cuentas para estas ' + n + ' tarjetas. ¿Dale?';
+      const btns = document.createElement('div');
+      btns.className = 'ap-btns';
+      const ok = document.createElement('button'); ok.className = 'ap-ok'; ok.textContent = 'Dale 🤖';
+      const no = document.createElement('button'); no.className = 'ap-no'; no.textContent = 'Nel';
+      btns.append(ok, no); box.append(txt, btns); ov.appendChild(box);
+      const done = (v) => { ov.remove(); resolve(v); };
+      ok.onclick = () => done(true); no.onclick = () => done(false);
+      (activeEl() || el).appendChild(ov);
+    });
+  }
+
+  // Escena matching: tarjetas a la izquierda, cuentas a la derecha, línea al match.
+  function mmReset(cards) {
+    const box = sqs('#mmCards'); if (box) {
+      box.innerHTML = '';
+      cards.forEach((p) => {
+        const c = document.createElement('div');
+        c.className = 'mm-chip mm-card';
+        c.textContent = '💳 ····' + cardTail(p);
+        box.appendChild(c);
+      });
+    }
+    const ac = sqs('#mmAccts'); if (ac) ac.innerHTML = '';
+    const ln = sqs('#mmLines'); if (ln) ln.innerHTML = '';
+    const ms = sqs('#mmMascot'); if (ms) ms.className = 'mm-mascot';
+  }
+  function mmDrawLine() {
+    const ln = sqs('#mmLines'); if (!ln) return;
+    const cards = sqs('#mmCards'), accts = sqs('#mmAccts');
+    const nc = cards ? cards.children.length : 1, na = accts ? accts.children.length : 1;
+    // posiciones por índice en el viewBox 380x172 (preserveAspectRatio=none)
+    const y1 = ((nc - 0.5) / Math.max(nc, 1)) * 140 + 16;
+    const y2 = ((na - 0.5) / Math.max(na, 1)) * 140 + 16;
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', '8'); line.setAttribute('y1', String(y1));
+    line.setAttribute('x2', '372'); line.setAttribute('y2', String(y2));
+    line.setAttribute('class', 'mm-line');
+    ln.appendChild(line);
+  }
+  function mmMascotHit(win) {
+    const ms = sqs('#mmMascot'); if (!ms) return;
+    ms.className = 'mm-mascot ' + (win ? 'win' : 'hit');
+    setTimeout(() => { ms.className = 'mm-mascot'; }, 900);
+  }
+  function mmAddMatch(email) {
+    const ac = sqs('#mmAccts');
+    if (ac) {
+      const c = document.createElement('div');
+      c.className = 'mm-chip mm-acct ok';
+      c.textContent = '✅ ' + shortEmail(email);
+      ac.appendChild(c);
+    }
+    mmDrawLine(); mmMascotHit(true);
+  }
+
+  // Escena scheduling: progress bar + countdown (reusa segMini/startSchedCountdown).
+  function scSetProgress(done, total, amount) {
+    const t = sqs('#scTitle');
+    if (t) t.textContent = '¡Match! ' + total + ' depósitos de $' + (amount || 150) + ' cada 60s · ' + done + '/' + total;
+    const f = sqs('#scFill'); if (f) f.style.width = Math.min(100, (done / Math.max(total, 1)) * 100) + '%';
+  }
+
+  async function runAuto() {
+    const cards = _dx.cards.slice();
+    if (!cards.length) {
+      const addEl = qs('.chip-add');
+      if (addEl) { addEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); startAddCard(addEl); }
+      showToast('Pega las tarjetas ↑');
+      return;
+    }
+    for (const p of cards) { const e = D.validatePipe(p); if (e) { showToast(e); return; } }
+    if (!(await autoPreview(cards.length))) return;
+
+    _dx.running = true; journeyStart(); busOpen();
+    _dx.auto = { mission_id: null, matches: 0, fails: 0, pending: [] };
+    mmReset(cards);
+    setScene('matching'); setSub('Buscando las mejores cuentas…'); setPct(10);
+    try {
+      const r = await fetch('/api/deposits/auto', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ card_pipes: cards }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d.detail || ('HTTP ' + r.status));
+      }
+      const data = await r.json();
+      _dx.auto.mission_id = data.mission_id;
+      setSub('Matchmaking en curso · ' + (data.accounts_selected || '?') + ' cuentas candidatas');
+      setPct(20);
+      // carrera con el bus: eventos que llegaron antes del mission_id → drenar buffer
+      const buf = _dx.auto.pending; _dx.auto.pending = [];
+      buf.forEach(_autoOnBus);
+    } catch (e) {
+      setSub((e.message && e.message.indexOf('HTTP ') !== 0) ? e.message : 'No se pudo iniciar, reintenta');
+      _dx.running = false; _dx.auto = null; journeyEnd(); busClose();
+    }
+  }
+
+  function _autoOnBus(ev) {
+    const a = _dx.auto; if (!a) return;
+    if (!a.mission_id) { a.pending.push(ev); return; } // carrera: bufferear hasta tener id
+    if (ev.mission_id && ev.mission_id !== a.mission_id) return;
+    // Contrato real (auto_deposit.py `_broadcast_mission`): started{accounts} ·
+    // matching{accounts} · match{email,card_tail} · scheduling{matches} |
+    // {email,completed,total} | {email,aborted} · completed/cancelled/failed
+    // {deposited,approved,failed,accounts} o {reason}.
+    switch (ev.status) {
+      case 'started':
+      case 'matching':
+        setScene('matching');
+        setSub('Buscando las mejores cuentas' + (ev.accounts ? ' · ' + ev.accounts + ' candidatas' : '…'));
+        setPct(20); break;
+      case 'match':
+        setScene('matching');
+        a.matches++; mmAddMatch(ev.email);
+        movRow(ev.email || 'cuenta', 10, 'ok'); movSetState('ok', 'match'); // probe $10 (D1)
+        setSub('✅ ' + shortEmail(ev.email) + ' ↔ tarjeta ' + (ev.card_tail || ''), true);
+        setPct(Math.min(90, 25 + a.matches * 15));
+        break;
+      case 'scheduling':
+        setScene('scheduling');
+        if (ev.completed != null) {
+          // progreso por rep: barra + countdown local de 60s entre depósitos
+          const total = ev.total || 9;
+          scSetProgress(ev.completed, total, 150);
+          setSub('Acreditado ✓ · ' + shortEmail(ev.email) + ' · ' + ev.completed + '/' + total, true);
+          setPct(Math.min(99, 30 + (ev.completed / Math.max(total, 1)) * 70));
+          if (ev.completed < total) startSchedCountdown(60);
+        } else if (ev.aborted) {
+          a.fails++;
+          movRow(ev.email || 'cuenta', 150, 'wait'); movSetState('wait', 'no jaló');
+          setSub('❌ ' + shortEmail(ev.email) + ' no jaló (' + humanError(ev.aborted) + ')');
+        } else {
+          scSetProgress(0, ev.total || 9, 150);
+          setSub('¡Match! Ahora depósitos de $150 cada 60s' + (ev.matches ? ' · ' + ev.matches + ' cuentas' : ''));
+          setPct(30);
+        }
+        break;
+      case 'completed':
+        clearSchedCountdown();
+        setScene('done'); setPct(100);
+        setSub('Se depositaron ' + D.fmtMoney(ev.deposited || 0) + ' en ' +
+          (ev.accounts != null ? ev.accounts : a.matches) + ' cuentas · ' +
+          (ev.approved || 0) + ' aprobados, ' + (ev.failed || 0) + ' fallidos', true);
+        autoFinish(); break;
+      case 'cancelled':
+        clearSchedCountdown(); setSub('Misión detenida'); autoFinish(); break;
+      case 'failed':
+        clearSchedCountdown();
+        setSub('La misión falló' + (ev.reason ? ' · ' + ev.reason : ''));
+        autoFinish(); break;
+    }
+  }
+  function autoFinish() {
+    clearSchedCountdown();
+    _dx.running = false; journeyEnd();
+    if (!_dx.open) pillHide();
+    busCloseDeferred();
+  }
+
   function onDeposit() {
     if (_dx.running) return;
+    if (_dx.mode === 'auto') return runAuto();
     if (_dx.mode === 'single') return runSingle();
     if (_dx.mode === 'scheduled') return runScheduled();
     if (_dx.mode === 'multi') return runMulti();
+  }
+
+  // ── MODO AUTO (Task F): solo tarjetas + GO. Sin tocar index.html: la UI se
+  //    ajusta con la clase .auto-mode sobre #depos (CSS en depos.css) y un banner
+  //    inyectado; las escenas nuevas se inyectan en #scene-stage al montar. ──
+  function applyAutoUI(on) {
+    if (el) el.classList.toggle('auto-mode', !!on);
+    let banner = el ? el.querySelector('.auto-guide') : null;
+    if (on) {
+      stopGreet(); // el título es fijo en auto ("🤖 Modo Auto"), no rota greetings
+      const g = qs('#greet'); if (g) g.textContent = '🤖 Modo Auto';
+      if (!banner && el) {
+        banner = document.createElement('div');
+        banner.className = 'auto-guide';
+        banner.textContent = 'Pega las tarjetas y el sistema hace el resto — elige cuentas, montos y ritmo solo';
+        const controls = el.querySelector('.controls');
+        if (controls) controls.insertBefore(banner, controls.firstChild);
+      }
+      const depBtn = qs('#dep'); if (depBtn) depBtn.textContent = '🤖 GO';
+    } else {
+      if (banner) banner.remove();
+      const depBtn = qs('#dep'); if (depBtn) depBtn.textContent = 'Depositar';
+    }
+  }
+
+  // Escenas del modo auto inyectadas en #scene-stage (vive en #depStage, index.html
+  // intocable — Task F). Mismo patrón .scene + keyframes por prefijo (mm-*/sc-*).
+  function injectAutoScenes() {
+    const stage = document.getElementById('scene-stage');
+    if (!stage || document.getElementById('scene-matching')) return;
+    const mk = (id, html) => {
+      const d = document.createElement('div');
+      d.className = 'scene'; d.id = id; d.innerHTML = html;
+      stage.appendChild(d);
+    };
+    mk('scene-matching',
+      '<div class="mm-stage">' +
+        '<div class="mm-side mm-cards" id="mmCards"></div>' +
+        '<svg class="mm-lines" id="mmLines" viewBox="0 0 380 172" preserveAspectRatio="none"></svg>' +
+        '<div class="mm-side mm-accts" id="mmAccts"></div>' +
+        '<div class="mm-mascot" id="mmMascot">🤖</div>' +
+      '</div>');
+    mk('scene-scheduling',
+      '<div class="sc-stage">' +
+        '<div class="sc-title" id="scTitle">Programando…</div>' +
+        '<div class="sc-bar"><div class="sc-fill" id="scFill"></div></div>' +
+      '</div>');
   }
 
   // ── montaje ──
@@ -756,6 +986,7 @@
       const cnt = cols[1].querySelector('.count'); if (cnt) cnt.id = 'cardCount';
     }
     injectWindow();
+    injectAutoScenes();
     wireStatic();
     _mounted = true;
   }
@@ -785,6 +1016,7 @@
       _dx.accounts = [{ id: d.id, email: d.email || '', password: d.password || '', grade: (d.grade || '').toLowerCase() }];
       _dx.cards = []; _dx.reps = 1; _dx.amount = 50; _dx.cap = null;
       _dx.sched = null; _dx.mm = null; _dx.cancelled = false; _dx.balRefreshed = false;
+      _dx.forcedMode = null; _dx.auto = null; // el modo auto es solo del drawer flotante
       renderAccounts(); renderCards(); refreshMode(); drawReps();
       resolveAccounts().then(() => { renderAccounts(); refreshMode(); });
       loadSavedCards();
@@ -1013,7 +1245,11 @@
     // reset COMPLETO de estado entre aperturas (evita movimientos/misiones stale)
     _dx.accounts = opts.accounts || (opts.ids || []).map((id) => ({ id, email: 'cuenta#' + id, password: '', grade: '' }));
     _dx.cards = []; _dx.reps = 1; _dx.amount = 50; _dx.running = false; _dx.cap = null;
-    _dx.sched = null; _dx.mm = null; _dx.cancelled = false; _dx.balRefreshed = false;
+    _dx.sched = null; _dx.mm = null; _dx.auto = null; _dx.cancelled = false; _dx.balRefreshed = false;
+    // Task F: modo auto (botón #cmdAutoDeposit) — deriveMode forzado, solo tarjetas
+    _dx.forcedMode = (opts.mode === 'auto') ? 'auto' : null;
+    if (_dx.forcedMode === 'auto') _dx.accounts = [];
+    applyAutoUI(_dx.forcedMode === 'auto');
     _lastMov = null; _mmRows = {};
     const movEl = qs('#mov'); if (movEl) movEl.innerHTML = '';
     setSub('Listo'); setPct(0);
@@ -1032,7 +1268,7 @@
     _dx.open = true;
     document.removeEventListener('keydown', onEsc); // evita listener duplicado si ya estaba abierto
     document.addEventListener('keydown', onEsc);
-    startGreet();
+    if (_dx.forcedMode !== 'auto') startGreet(); // en auto el título es fijo (applyAutoUI)
     // completar contra el backend sin bloquear la apertura (frictionless)
     await resolveAccounts(); renderAccounts(); refreshMode();
     await loadSavedCards();
@@ -1063,10 +1299,12 @@
       _pillEl.onclick = pillReopen;
       document.body.appendChild(_pillEl);
     }
-    _pillEl.querySelector('.dp-ic').textContent = _dx.sched ? '⏰' : '🎯';
-    _pillEl.querySelector('.dp-tx').textContent = _dx.sched
-      ? ('Programado ' + _dx.sched.done + '/' + _dx.sched.total)
-      : 'Matchmaker en curso';
+    _pillEl.querySelector('.dp-ic').textContent = _dx.auto ? '🤖' : (_dx.sched ? '⏰' : '🎯');
+    _pillEl.querySelector('.dp-tx').textContent = _dx.auto
+      ? 'Misión auto en curso'
+      : (_dx.sched
+        ? ('Programado ' + _dx.sched.done + '/' + _dx.sched.total)
+        : 'Matchmaker en curso');
     _pillEl.classList.remove('hide');
   }
   function pillHide() { if (_pillEl) _pillEl.classList.add('hide'); }
