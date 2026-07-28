@@ -8,6 +8,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- La Pantalla (2026-07-28): tipografía propia, distinta del resto de la app —
+     IBM Plex Sans/Mono, terminal de operación real, no el geométrico genérico
+     de Space Grotesk (Robert, campo: "las fuentes no me agradan"). -->
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- Modal Depósitos v8: Ranchers (greeting folklor) + Clash Display (títulos/botón) -->
 <link href="https://fonts.googleapis.com/css2?family=Ranchers&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&display=swap">
@@ -1061,8 +1065,8 @@
      Mismos ids internos que #deposTpl para que depos.js los reutilice sin cambios. -->
 <template id="deposCompactTpl">
 <div id="depCompact" class="pat-dep-stage">
-  <span class="pat-dep-head"><span class="pat-sv-emo">💳</span> Depositar <span class="pat-dep-mode" id="modeText"></span></span>
-  <div class="pat-dep-row">
+  <span class="pat-dep-head"><span class="pat-sv-emo">💳</span> Depositar / Retirar <span class="pat-dep-mode" id="modeText"></span></span>
+  <div class="pat-dep-row pat-dep-row-multi" id="accRow">
     <span class="pat-dep-label">Cuentas <span class="pat-dep-cnt" id="accCount">1</span></span>
     <div class="pat-dep-chips" id="accChips"></div>
   </div>
@@ -1070,8 +1074,9 @@
     <span class="pat-dep-label">Tarjetas <span class="pat-dep-cnt" id="cardCount">0</span></span>
     <div class="pat-dep-chips" id="cardChips"></div>
   </div>
+  <div class="pat-wd-balance" id="wdBalance"></div>
   <div class="pat-dep-row pat-dep-amt-row">
-    <div class="pat-dep-amt dis" id="amtManual"><span>$</span><input id="amtInput" value="50" inputmode="numeric" aria-label="Monto manual" class="pat-input pat-input-mono"></div>
+    <div class="pat-dep-amt dis" id="amtManual"><span>$</span><input id="amtInput" value="50" inputmode="numeric" aria-label="Monto — depósito o retiro, según el botón" class="pat-input pat-input-mono"></div>
     <div class="pat-dep-presets" id="amtPresets"></div>
   </div>
   <div class="pat-dep-note" id="amtNote"></div>
@@ -1084,6 +1089,12 @@
   <div class="pat-dep-runrow" id="runrow">
     <button type="button" class="pat-btn pat-btn-ghost" id="abort">Abortar</button>
   </div>
+  <div class="pat-dep-fire-row">
+    <button type="button" class="pat-act pat-act-dep d-deposit-btn" id="dep" title="Depositar"><i class="ph-duotone ph-credit-card"></i><span>Depositar</span></button>
+    <button type="button" class="pat-act pat-act-wd d-withdraw-fire" id="wd" title="Retirar" hidden><i class="ph-duotone ph-bank"></i><span>Retirar</span></button>
+  </div>
+  <div class="pat-form-err" id="wdErr" hidden></div>
+  <div class="pat-wd-status" id="wdStatus"></div>
   <button type="button" class="newproc pat-dep-newproc"><span class="plus">+</span> Otro depósito</button>
 </div>
 </template>

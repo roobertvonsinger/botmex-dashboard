@@ -243,19 +243,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_refresh_account_after_deposit` | def | L787–L846 |
 | `_should_relogin_after_401` | def | L849–L853 |
 | `_acquire_session_and_begin` | def | L856–L1105 |
-| `_run_deposit_with_phases` | def | L1108–L1422 |
-| `deposit_execute_stream` | def | L1426–L1626 |
-| `cap_status` | def | L1630–L1642 |
-| `_mm_is_real_decline` | def | L1679–L1685 |
-| `_mm_is_ambiguous_charge` | def | L1688–L1698 |
-| `classify_deposit_status` | def | L1701–L1732 |
-| `_mm_session_get` | def | L1782–L1786 |
-| `_mm_session_update` | def | L1789–L1798 |
-| `multi_stream` | def | L1802–L2299 |
-| `multi_cancel` | def | L2303–L2308 |
-| `scheduled_create` | def | L2321–L2684 |
-| `scheduled_list` | def | L2688–L2710 |
-| `scheduled_cancel` | def | L2714–L2722 |
+| `_run_deposit_with_phases` | def | L1108–L1452 |
+| `deposit_execute_stream` | def | L1456–L1656 |
+| `cap_status` | def | L1660–L1672 |
+| `_mm_is_real_decline` | def | L1709–L1715 |
+| `_mm_is_ambiguous_charge` | def | L1718–L1728 |
+| `classify_deposit_status` | def | L1731–L1762 |
+| `_mm_session_get` | def | L1812–L1816 |
+| `_mm_session_update` | def | L1819–L1828 |
+| `multi_stream` | def | L1832–L2329 |
+| `multi_cancel` | def | L2333–L2338 |
+| `scheduled_create` | def | L2351–L2714 |
+| `scheduled_list` | def | L2718–L2740 |
+| `scheduled_cancel` | def | L2744–L2752 |
 
 ### `jwt_keeper.py`
 

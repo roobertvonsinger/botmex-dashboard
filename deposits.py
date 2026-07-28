@@ -1130,6 +1130,36 @@ async def _run_deposit_with_phases(
       {"success": bool, "result_code": str, "error": str|None, "duration_ms": int,
        "jwt": str|None, "used_proxy": str|None}  # jwt/used_proxy: para reuso de sesión
     """
+    # Candado anti-reuso de tarjeta entre cuentas (Robert 2026-07-28, campo: "jamás
+    # reutilizar una tarjeta guardada previamente para depositar en otra cuenta...
+    # si ya se aprobó en una cuenta una tarjeta debe haber un freno ahí"). Causa
+    # raíz del hueco: account_cards.card_number es UNIQUE, pero _record_attempt
+    # (más abajo en este archivo) solo hace INSERT OR IGNORE DESPUÉS de un depósito
+    # ya aprobado — si la tarjeta ya estaba ligada a otra cuenta, el INSERT se
+    # ignora en silencio pero el depósito YA SE COBRÓ en la cuenta equivocada. Este
+    # freno corta ANTES de tocar a BetMexico (login/begin_deposit/submit_card),
+    # no después del hecho.
+    try:
+        from app import db as _dash_db
+        with _dash_db() as _c:
+            _locked = _c.execute(
+                "SELECT account_email FROM account_cards WHERE card_number=? AND account_email!=?",
+                (cc_num, email),
+            ).fetchone()
+        if _locked:
+            _msg = f"Tarjeta ya aprobada en {_locked['account_email']} — bloqueada para otras cuentas"
+            await _safe_phase(phase_cb, "done", {
+                "success": False, "result_code": "CARD_LOCKED_OTHER_ACCOUNT", "error": _msg,
+            })
+            return {
+                "success": False, "result_code": "CARD_LOCKED_OTHER_ACCOUNT",
+                "error": _msg, "duration_ms": 0,
+            }
+    except Exception as e:
+        # Degradar sin bloquear: un fallo de infra en el candado no debe tumbar
+        # el flujo de depósito completo — pero SÍ queda en logs para revisar.
+        logger.error(f"[Deposits/phases] candado tarjeta-cuenta falló, degradando: {e}")
+
     try:
         # Login lo maneja gentle_login (importa get_jwt internamente). Aquí solo
         # validamos que las deps de depósito del bot estén disponibles.

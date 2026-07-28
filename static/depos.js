@@ -128,6 +128,13 @@
   // ── cuentas (chips combo+grado). Stub Task5; resolución de password/grade en Task6 ──
   function renderAccounts() {
     const box = qs('#accChips'); if (!box) return;
+    // La fila "Cuentas" se esconde con 1 sola (2026-07-28, campo: "para no
+    // saturar" — es redundante con la identidad ya visible arriba de La
+    // Pantalla). Solo aplica al panel COMPACTO — el flotante siempre la muestra.
+    if (_dx.target === 'compact') {
+      const row = box.closest('.pat-dep-row-multi');
+      if (row) row.classList.toggle('pat-dep-row-hidden', _dx.accounts.length <= 1);
+    }
     box.innerHTML = '';
     _dx.accounts.forEach((a) => {
       const combo = a.email + (a.password ? (':' + a.password) : '');
@@ -1019,10 +1026,30 @@
     } else if (elC.parentNode !== slot) {
       slot.appendChild(elC);
     }
-    const needsReseed = !_dx.running && (_dx.target !== 'compact' || !_dx.accounts.length || _dx.accounts[0].id !== d.id);
+    // El botón "Depositar" ahora vive DENTRO del panel (Robert 2026-07-28: junto al
+    // monto, no en la esquina lejana) — data-acc-id se refresca en cada mount porque
+    // el botón es parte de la plantilla estática (un solo clone, nunca se re-genera).
+    const fireBtn = elC.querySelector('#dep');
+    if (fireBtn) fireBtn.setAttribute('data-acc-id', d.id);
+    // Multi-cuenta (Robert 2026-07-28, campo: "solo se habilitan los controles de
+    // depósito multi si hay más de una cuenta seleccionada"): si la selección tipo
+    // Excel de la tabla (selectedIds, app.js — mismo scope léxico compartido que
+    // `state`, ver pantalla.js) tiene >1 Y la cuenta abierta está entre ellas, el
+    // depósito compacto opera sobre TODA la selección — refreshMode() ya deriva
+    // modo "multi" solo con accounts.length > 1 (mismo motor que el drawer flotante,
+    // nada nuevo que construir). Con 1 sola cuenta abierta/seleccionada, igual que antes.
+    // d.id SIEMPRE primero: fireCompact() valida expectedAccId contra _dx.accounts[0]
+    // (guardarrail anti-disparo-en-cuenta-vieja) — el orden de Set no garantiza que la
+    // cuenta ABIERTA (la que el botón conoce) quede en la posición 0.
+    const wantIds = (typeof selectedIds !== 'undefined' && selectedIds.size > 1 && selectedIds.has(d.id))
+      ? [d.id, ...Array.from(selectedIds).filter(id => id !== d.id)] : [d.id];
+    const sameSelection = _dx.accounts.length === wantIds.length && wantIds.every(id => _dx.accounts.some(a => a.id === id));
+    const needsReseed = !_dx.running && (_dx.target !== 'compact' || !_dx.accounts.length || !sameSelection);
     if (needsReseed) {
       _dx.target = 'compact';
-      _dx.accounts = [{ id: d.id, email: d.email || '', password: d.password || '', grade: (d.grade || '').toLowerCase() }];
+      _dx.accounts = wantIds.map(id => id === d.id
+        ? { id: d.id, email: d.email || '', password: d.password || '', grade: (d.grade || '').toLowerCase() }
+        : { id, email: '', password: '', grade: '' });
       _dx.cards = []; _dx.reps = 1; _dx.amount = 50; _dx.cap = null;
       _dx.sched = null; _dx.mm = null; _dx.cancelled = false; _dx.balRefreshed = false;
       _dx.forcedMode = null; _dx.auto = null; // el modo auto es solo del drawer flotante
@@ -1042,10 +1069,12 @@
     if (elC && detail && detail.contains(elC)) document.body.appendChild(elC);
   }
 
-  // Listeners del panel COMPACTO — subconjunto de wireStatic() (sin #dep: el disparo
-  // vive en .pat-actions vía window.Depos.fireCompact; sin greet/drag-window/pause:
-  // no aplican a un panel inline). Reusa las MISMAS funciones (renderAccounts,
-  // renderCards, startAddCard, addAccounts) — cero lógica duplicada.
+  // Listeners del panel COMPACTO — subconjunto de wireStatic() (#dep se dispara vía
+  // el listener delegado de pantalla.js sobre `.d-deposit-btn`, que llama
+  // window.Depos.fireCompact — no se wirea aquí para no duplicar el handler; sin
+  // greet/drag-window/pause: no aplican a un panel inline). Reusa las MISMAS
+  // funciones (renderAccounts, renderCards, startAddCard, addAccounts) — cero
+  // lógica duplicada.
   function wireCompactStatic() {
     if (!elC) return;
     const up = elC.querySelector('#repUp'), dn = elC.querySelector('#repDn');

@@ -765,6 +765,14 @@ function renderStats(s) {
 // ─── command bar ───
 function updateCmdBar() {
   const n = selectedIds.size;
+  // Con La Pantalla abierta, ampliar/reducir la selección tipo Excel debe reflejarse
+  // EN VIVO en el depósito compacto (Robert 2026-07-28: multi se habilita solo con
+  // >1 seleccionada) — sin esto, seleccionar más filas mientras la ficha sigue
+  // abierta no se enteraba hasta cerrar/reabrir.
+  if (window.Pantalla && window.Pantalla.currentId && window.Depos && typeof window.Depos.mountCompact === 'function') {
+    const openData = detailDataCache[window.Pantalla.currentId];
+    if (openData) window.Depos.mountCompact(openData);
+  }
   // Rework tanda 5: las acciones viven DENTRO de la pagebar (barra fusionada).
   // `has-sel` muestra las acciones y atenúa la paginación; sin selección, la
   // pagebar queda con "N de M" + paginador.
@@ -2957,13 +2965,14 @@ $$('.seg').forEach(seg => {
   function maxH() {
     return PL.panelMaxH({ mainH: main.clientHeight, reserve: measuredReserve(), minPanelH: MIN, fallback: 460 });
   }
-  // focusMaxH: tope MÁS GENEROSO, solo mientras La Pantalla está abierta enfocando
-  // una cuenta (2026-07-27). maxH() reserva 10 filas de tabla SIEMPRE visibles —
-  // correcto en reposo, pero cuando el operador está viendo el detalle de una
-  // cuenta, esas 10 filas de fondo importan menos que ver retiro/depósito SIN
-  // scroll (campo, Robert: "todo en un solo sitio sin scrolls, obligatorio").
-  // Reserva solo 3 filas (contexto mínimo de la tabla, no cero) en vez de 10.
-  const FOCUS_MIN_ROWS = 3;
+  // focusMaxH: tope con La Pantalla abierta enfocando una cuenta. Reserva 7 filas
+  // de tabla (contexto real de fondo, no solo 3) — el intento anterior de "3 filas"
+  // dejaba la ficha crecer casi a pantalla completa y se comía la tabla (campo,
+  // Robert 2026-07-28: "mira lo gigante que está, empuja todo"). El "sin scroll
+  // obligatorio" de 2026-07-27 se relaja: identidad/escenario YA tienen su propio
+  // overflow-y:auto (pantalla.css) — que escrolleen ELLOS antes de inflar la ficha
+  // entera es preferible a tapar la tabla de cuentas.
+  const FOCUS_MIN_ROWS = 7;
   function focusMaxH() {
     const fb = document.querySelector('.filterbar-accounts');
     const pb = document.getElementById('pagebar');
@@ -2973,7 +2982,7 @@ $$('.seg').forEach(seg => {
       rowH: rowH(),
       minRows: FOCUS_MIN_ROWS,
     });
-    return PL.panelMaxH({ mainH: main.clientHeight, reserve, minPanelH: MIN, fallback: 620 });
+    return PL.panelMaxH({ mainH: main.clientHeight, reserve, minPanelH: MIN, fallback: 460 });
   }
   function currentH() { return panel.getBoundingClientRect().height; }
 

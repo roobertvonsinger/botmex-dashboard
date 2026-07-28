@@ -15,27 +15,31 @@
    #pantalla (absolute) se ancle a su caja sin cubrir tabla ni topbar. ── */
 #accountsMain { position: relative; }
 
-/* ═══════════════ LÁMINA — contenedor raíz ═══════════════ */
+/* ═══════════════ LÁMINA — contenedor raíz ═══════════════
+   REDISEÑO 2026-07-28 (campo, Robert: "ya no quiero esos looks de líneas verdes,
+   que todo parece esqueleto digital de pre-interfaz... algo más premium"). Se
+   ELIMINA el sistema de hue-rotación por grade (--pat-gold/--pat-edge cambiando
+   de color en TODA la lámina según A+/A/B/C/D/U) — era la causa mecánica del
+   "esqueleto": cada línea, borde y glow de la superficie llevaba un tinte de
+   color de fondo, todo el tiempo, en las 6 variantes. Un solo acento fijo
+   (--gold real de style.css, el MISMO que ya usa el resto de la app para dinero/
+   CTAs — brand commitment, no un color inventado para esta superficie) + hairline
+   neutro para el chrome. El grade sigue siendo legible: vive en el badge (chip
+   "D"/"A+", style.css, intacto) — no necesita repetirse en cada línea de la UI. */
 .pantalla {
-  /* Vars locales VERDE botmexico suavizado (hue 160, mismo hue que --accent pero
-     más claro/menos saturado — se lee como tinte de vidrio premium, no como
-     el verde de acción de la nav). Deriva del hue real del tema, no inventa uno nuevo.
-     ── Grade-color (Robert 2026-07-09): el tinte de acento (--pat-gold y derivados)
-     refleja el grade de la cuenta. .pat-wrap lleva data-grade="APlus|A|B|C|D|U"
-     (seteado por pantalla.js) y reescribe estas vars. El mesh de fondo (pantalla-sheet
-     background) NO cambia — el vidrio templado es siempre el mismo, el acento sí varía.
-     Paleta: A+ verde vivo, A verde, B azul grisáceo (oklch .80 .05 235), C ámbar
-     warn, D rojo danger, U neutro (default verde). --pat-3ds NO se toca (semántica
-     de transacción, no de tema). */
-  --pat-gold:      oklch(0.80 0.085 160);             /* default = A (verde) */
-  --pat-gold-soft: oklch(0.80 0.085 160 / 0.14);
-  --pat-edge:      oklch(0.80 0.085 160 / 0.28);      /* borde hairline verde */
-  --pat-edge-h:    oklch(0.80 0.085 160 / 0.45);      /* borde en hover/foco */
-  --pat-warm:      oklch(0.68 0.09 165);              /* acento verde profundo (2ª capa) */
-  --pat-tint:      oklch(0.80 0.085 160 / 0.10);      /* tinte verde sobre el vidrio */
-  --pat-tint-2:    oklch(0.68 0.09 165 / 0.06);       /* segunda capa (pecera) */
-  --pat-3ds:       oklch(0.82 0.14 85);                /* ÁMBAR preservado — SOLO semántica 3DS (no tema) */
-  --pat-3ds-soft:  oklch(0.82 0.14 85 / 0.14);
+  --pat-gold:      var(--gold);           /* acento único — dinero/CTA, fijo, NO por grade */
+  --pat-gold-soft: var(--gold-soft);
+  --pat-edge:      var(--hairline);       /* chrome neutro — divisores, bordes de reposo */
+  --pat-edge-h:    rgba(255,255,255,.22); /* chrome neutro — bordes en hover/foco */
+  --pat-3ds:       oklch(0.82 0.14 85);   /* ÁMBAR preservado — SOLO semántica 3DS (no tema) */
+  --pat-money:     var(--gold);           /* el SALDO siempre lee igual, nunca se recolorea por grade */
+  /* Tipografía propia (2026-07-28, campo: "las fuentes no me agradan") — La
+     Pantalla ya es su propio mundo visual (grafito+oro, ver arriba); IBM Plex
+     rompe con el geométrico genérico (Space Grotesk/Inter) que usa el resto de
+     la app sin desentonar: sigue siendo una familia de trabajo, no decorativa,
+     apropiada para un panel de operación (Operate, no Persuade). */
+  --pat-font-display: 'IBM Plex Sans', var(--font-display);
+  --pat-font-mono:    'IBM Plex Mono', var(--font-mono);
   --pat-r: 13px;                                      /* radius de la sheet */
   /* Tamaño FIJO, sin controles PROPIOS (decisión de Robert, campo 2026-07-09): La
      Pantalla no se arrastra ni se pliega por su cuenta — pero SÍ espeja el alto real
@@ -50,113 +54,8 @@
   z-index: 40;                    /* sobre el strip, bajo modales/drawer (z alto) */
 }
 
-/* ── Grade-color overrides: data-grade en .pat-wrap (hijo de .pantalla-sheet).
-   Reescriben --pat-gold + derivados. --pat-3ds intacto (semántica 3DS, no tema). */
-.pat-wrap[data-grade="APlus"] {
-  --pat-gold:      oklch(0.78 0.18 152);
-  --pat-gold-soft: oklch(0.78 0.18 152 / 0.14);
-  --pat-edge:      oklch(0.78 0.18 152 / 0.28);
-  --pat-edge-h:    oklch(0.78 0.18 152 / 0.45);
-  --pat-warm:      oklch(0.55 0.14 150);
-  --pat-tint:      oklch(0.78 0.18 152 / 0.10);
-  --pat-tint-2:    oklch(0.55 0.14 150 / 0.06);
-}
-.pat-wrap[data-grade="A"] {
-  /* default — verde h160, ya declarado en .pantalla */
-}
-.pat-wrap[data-grade="B"] {
-  --pat-gold:      oklch(0.80 0.05 235);
-  --pat-gold-soft: oklch(0.80 0.05 235 / 0.14);
-  --pat-edge:      oklch(0.80 0.05 235 / 0.28);
-  --pat-edge-h:    oklch(0.80 0.05 235 / 0.45);
-  --pat-warm:      oklch(0.60 0.04 240);
-  --pat-tint:      oklch(0.80 0.05 235 / 0.10);
-  --pat-tint-2:    oklch(0.60 0.04 240 / 0.06);
-}
-.pat-wrap[data-grade="C"] {
-  --pat-gold:      oklch(0.80 0.16 75);
-  --pat-gold-soft: oklch(0.80 0.16 75 / 0.14);
-  --pat-edge:      oklch(0.80 0.16 75 / 0.28);
-  --pat-edge-h:    oklch(0.80 0.16 75 / 0.45);
-  --pat-warm:      oklch(0.58 0.14 70);
-  --pat-tint:      oklch(0.80 0.16 75 / 0.10);
-  --pat-tint-2:    oklch(0.58 0.14 70 / 0.06);
-}
-.pat-wrap[data-grade="D"] {
-  --pat-gold:      oklch(0.72 0.18 24);
-  --pat-gold-soft: oklch(0.72 0.18 24 / 0.14);
-  --pat-edge:      oklch(0.72 0.18 24 / 0.28);
-  --pat-edge-h:    oklch(0.72 0.18 24 / 0.45);
-  --pat-warm:      oklch(0.48 0.14 20);
-  --pat-tint:      oklch(0.72 0.18 24 / 0.10);
-  --pat-tint-2:    oklch(0.48 0.14 20 / 0.06);
-}
-.pat-wrap[data-grade="U"] {
-  --pat-gold:      oklch(0.80 0.02 95);
-  --pat-gold-soft: oklch(0.80 0.02 95 / 0.12);
-  --pat-edge:      oklch(0.80 0.02 95 / 0.22);
-  --pat-edge-h:    oklch(0.80 0.02 95 / 0.38);
-  --pat-warm:      oklch(0.55 0.01 95);
-  --pat-tint:      oklch(0.80 0.02 95 / 0.08);
-  --pat-tint-2:    oklch(0.55 0.01 95 / 0.05);
-}
-
 /* El atributo [hidden] gana siempre: sin ver, sin interceptar clics. */
 .pantalla[hidden] { display: none; }
-
-/* ── Tinte por GRADE (Robert 2026-07-10, campo): "el color de la pantalla sea el
-   color del grading... sutil". La Pantalla no tiene un color fijo — hereda el hue
-   de la cuenta abierta. MISMO mapeo hue que grade-dot/r-grade-X (style.css): A+152
-   A160 B235 C75 D24 — y MISMA fórmula L/C que el verde default de arriba (sutil =
-   no reinventar saturación por grade, solo rotar hue, así el "peso" visual del
-   tinte es idéntico en los 6 grados). pantalla.js pone data-grade en #pantalla en
-   cada render (renderPantallaHead). A y sin-grade quedan en el verde base (H160,
-   ya declarado arriba) — no hace falta override. */
-.pantalla[data-grade="Aplus"] {
-  --pat-gold:      oklch(0.80 0.085 152);
-  --pat-gold-soft: oklch(0.80 0.085 152 / 0.14);
-  --pat-edge:      oklch(0.80 0.085 152 / 0.28);
-  --pat-edge-h:    oklch(0.80 0.085 152 / 0.45);
-  --pat-warm:      oklch(0.68 0.09 152);
-  --pat-tint:      oklch(0.80 0.085 152 / 0.10);
-  --pat-tint-2:    oklch(0.68 0.09 152 / 0.06);
-}
-.pantalla[data-grade="B"] {
-  --pat-gold:      oklch(0.80 0.085 235);
-  --pat-gold-soft: oklch(0.80 0.085 235 / 0.14);
-  --pat-edge:      oklch(0.80 0.085 235 / 0.28);
-  --pat-edge-h:    oklch(0.80 0.085 235 / 0.45);
-  --pat-warm:      oklch(0.68 0.09 235);
-  --pat-tint:      oklch(0.80 0.085 235 / 0.10);
-  --pat-tint-2:    oklch(0.68 0.09 235 / 0.06);
-}
-.pantalla[data-grade="C"] {
-  --pat-gold:      oklch(0.80 0.085 75);
-  --pat-gold-soft: oklch(0.80 0.085 75 / 0.14);
-  --pat-edge:      oklch(0.80 0.085 75 / 0.28);
-  --pat-edge-h:    oklch(0.80 0.085 75 / 0.45);
-  --pat-warm:      oklch(0.68 0.09 75);
-  --pat-tint:      oklch(0.80 0.085 75 / 0.10);
-  --pat-tint-2:    oklch(0.68 0.09 75 / 0.06);
-}
-.pantalla[data-grade="D"] {
-  --pat-gold:      oklch(0.80 0.085 24);
-  --pat-gold-soft: oklch(0.80 0.085 24 / 0.14);
-  --pat-edge:      oklch(0.80 0.085 24 / 0.28);
-  --pat-edge-h:    oklch(0.80 0.085 24 / 0.45);
-  --pat-warm:      oklch(0.68 0.09 24);
-  --pat-tint:      oklch(0.80 0.085 24 / 0.10);
-  --pat-tint-2:    oklch(0.68 0.09 24 / 0.06);
-}
-.pantalla[data-grade="U"] {
-  --pat-gold:      oklch(0.78 0.015 160);
-  --pat-gold-soft: oklch(0.78 0.015 160 / 0.14);
-  --pat-edge:      oklch(0.78 0.015 160 / 0.28);
-  --pat-edge-h:    oklch(0.78 0.015 160 / 0.45);
-  --pat-warm:      oklch(0.62 0.015 160);
-  --pat-tint:      oklch(0.78 0.015 160 / 0.10);
-  --pat-tint-2:    oklch(0.62 0.015 160 / 0.06);
-}
 
 /* La banda inferior (plegar/desplegar) se ELIMINÓ (2026-07-09, Robert: alto fijo,
    sin drag ni collapse). El único scroll dentro de La Pantalla es .pat-txn-col. */
@@ -184,46 +83,32 @@
   border-radius: var(--pat-r);
   overflow: hidden;
 
-  /* VIDRIO TEMPLADO — MATERIAL, no color flotando (Robert 2026-07-10, 7ª ronda: "sigue
-     sin convencerme ese acabado medio satinado... elige un buen fondo, textura para
-     que se vea integrada y no como un cristal raro que sale de la nada"). Pulir el
-     brillo 3 rondas seguidas ya tocó techo (rendimientos decrecientes) — el problema
-     no era "muy brillante", era que el material no tenía relación con el FONDO real
-     de la app. Fix: la 1ª capa (más al fondo) es el MISMO glow ambiental que usa
-     --bg-accent (style.css, radial 12%/-8%, hue160) — la Pantalla ahora lee como una
-     ventana esmerilada tallada en ese mismo campo de luz, no un vidrio ajeno pegado
-     encima. Se quita el reflejo diagonal (capa satinada) por completo — la textura
-     de grano (::before, abajo) hace ese trabajo con una superficie física, no una
-     capa de brillo. El resto conserva el lenguaje (oscurecer izq/datos, diluir al
-     tinte del grade der/movimientos) con menos capas, más peso por capa. */
-  /* Vidrio OSCURO UNIFORME en toda la sheet (Robert 2026-07-17: "que toda la pantalla
-     tuviera ese acabado oscuro y de vidrio transparente de la izquierda, que no se
-     fuera a gradiente con más luz"). Se quitó la capa que aclaraba izq→der hacia el
-     tinte del grade y la que oscurecía SOLO la izquierda; ahora el oscurecido es plano
-     (mismo tono a lo ancho). El grade sigue tiñendo bordes/CTA (border + box-shadow),
-     no el fondo. */
+  /* LACA GRAFITO — material premium neutro (Robert 2026-07-28, campo: "ya no quiero
+     esos looks de líneas verdes... algo más premium"). Se quita el tinte verde
+     hue160 heredado del glow ambiental de la app: esta superficie es su propio
+     panel (caja fuerte / terminal de operación), no una ventana tallada en el
+     verde de marca. Grafito oscuro parejo + un solo destello cálido (oro, MUY
+     tenue) abajo-derecha, del lado donde vive la acción de dinero — el resto es
+     negro neutro denso, sin gradiente decorativo. */
   background:
-    radial-gradient(ellipse 130% 160% at 10% -18%, oklch(0.34 0.10 160 / 0.14), transparent 58%),   /* glow ambiental sutil — ancla la sheet al fondo real de la app */
-    linear-gradient(90deg, oklch(0.04 0.008 160 / 0.34), oklch(0.04 0.008 160 / 0.34)),              /* oscurecido UNIFORME a lo ancho (sin gradiente a más luz) */
-    radial-gradient(90% 70% at 30% 112%, oklch(0.28 0.05 170 / 0.20), transparent 60%),              /* sombra verde profunda abajo (ancla al piso) */
-    linear-gradient(180deg, oklch(0.12 0.015 160 / 0.66), oklch(0.075 0.010 160 / 0.80));            /* cuerpo del vidrio templado, denso y parejo */
+    radial-gradient(70% 55% at 85% 108%, oklch(0.82 0.14 85 / 0.05), transparent 62%),  /* destello cálido sutil, ancla del lado del CTA */
+    linear-gradient(180deg, oklch(0.15 0.006 260 / 0.90), oklch(0.09 0.005 260 / 0.94)); /* cuerpo grafito, denso y parejo */
   /* Marco COMPLETO de la sheet entera (Robert 2026-07-10: "marco completo para la
      pantalla no para el recuadro solamente") — antes solo el filo superior/inferior
      tenían refuerzo inset; izquierda/derecha dependían solo del border 1px, que se
      lavaba contra el nuevo overlay oscuro/tinte de grade (ver background arriba).
      Border sube a --pat-edge-h (más firme) + insets en los 4 lados. */
   border: 1px solid var(--pat-edge-h);
+  /* Sombra reducida a 2 capas con offset real (craft-floor: un halo sin offset es
+     decoración, no profundidad) — antes eran 8 capas apiladas, la mayoría insets
+     de 0 offset que solo sumaban ruido visual sin leerse como material distinto
+     (campo, Robert 2026-07-28: "se siente torpe"). */
   box-shadow:
-    0 34px 100px -34px rgba(0,0,0,.70),
-    0 0 64px -24px var(--pat-gold-soft),                          /* halo verde flotante */
-    inset 0 1px 0 rgba(255,255,255,.06),                          /* filo superior nacarado (perla) — Robert 2026-07-10 3ª ronda: aun mas mate, antes .10 */
-    inset 0 -1px 0 rgba(0,0,0,.25),                               /* filo inferior */
-    inset 1px 0 0 rgba(255,255,255,.05),                          /* filo izquierdo — cierra el marco */
-    inset -1px 0 0 rgba(0,0,0,.20),                                /* filo derecho — cierra el marco */
-    inset 0 0 40px -24px oklch(0.86 0.025 320 / 0.025),            /* PERLA (mate): halo nácar interno muy tenue, solo en el borde */
-    inset 0 0 0 1px var(--pat-edge);                               /* borde interno, color de grade */
+    0 24px 60px -24px rgba(0,0,0,.65),
+    inset 0 1px 0 rgba(255,255,255,.05);
   backdrop-filter: blur(34px) saturate(1.2);    /* 2026-07-06: saturate 1.45→1.2 — menos vividez/brillo del fondo filtrado */
   -webkit-backdrop-filter: blur(34px) saturate(1.2);
+  max-height: 480px;   /* techo duro — ver SOFT_CAP en pantalla.js _syncFichaHeight */
 
   /* Estado replegado por default (la animación de entrada lo despliega). */
   transform-origin: top center;
@@ -249,9 +134,9 @@
   z-index: 4; pointer-events: none; opacity: 0;
   background: linear-gradient(100deg,
     transparent,
-    oklch(0.80 0.085 160 / 0.10) 40%,
-    oklch(0.84 0.09 160 / 0.28) 50%,
-    oklch(0.80 0.085 160 / 0.10) 60%,
+    oklch(0.82 0.14 85 / 0.08) 40%,
+    oklch(0.85 0.12 85 / 0.20) 50%,
+    oklch(0.82 0.14 85 / 0.08) 60%,
     transparent);
   transform: skewX(-14deg);
 }
@@ -358,7 +243,6 @@
   color: var(--pat-gold);
   border-color: var(--pat-edge-h);
   background: var(--pat-gold-soft);
-  box-shadow: 0 0 18px -6px var(--pat-gold-soft);
 }
 .pantalla-close i { display: block; }
 
@@ -366,7 +250,7 @@
 .pantalla-log {
   position: relative; z-index: 2;
   padding: 6px 24px 18px;
-  font-family: var(--font-mono); font-size: 11px;
+  font-family: var(--pat-font-mono); font-size: 11px;
   color: var(--text-dim);
 }
 .pantalla-log[hidden] { display: none; }
@@ -379,44 +263,50 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* Raíz del detalle: columna que LLENA el alto del strip sin scroll. */
-.pat-wrap { display: flex; flex-direction: column; height: 100%; gap: 9px; min-height: 0; }
+/* font-family EN LA RAÍZ: todo hijo hereda IBM Plex Sans por default — sin esto,
+   texto plano (.pat-name, metadata) caía al Inter heredado del body (bug de campo
+   2026-07-28: el cambio de fuente no se veía en el nombre/meta, solo donde
+   font-family se declaraba explícito). */
+.pat-wrap { display: flex; flex-direction: column; height: 100%; gap: 9px; min-height: 0; font-family: var(--pat-font-display); }
 
 /* Barra superior — full width, ÚNICA fila por encima de las 3 columnas. Nombre+edad+
    grade a la izquierda; Estado/cumpleaños/CURP (.pat-topbar-meta) fluyen a la derecha
-   del grade (Robert 2026-07-10, 2ª ronda: "subieramos [esos datos] a la linea donde
-   esta el nombre... hacia la derecha"). Los controles de acción (Fijar/En uso/
-   Depositar) siguen FUERA de aquí (esquina inferior derecha, ver .pat-actions).
-   padding-right reserva el hueco de .pantalla-close (30px + 12px offset = 42px, +8px
-   de aire). */
+   del grade. padding-right reserva el hueco de .pantalla-close (30px + 12px offset
+   = 42px, +8px de aire). */
 .pat-topbar { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; padding-right: 50px; }
-/* Nombre: "un poquito mas de contraste" — de --text-muted (apenas legible, mismo
-   tono que la meta secundaria) a --text-dim + peso 600, sin gritar. */
-.pat-name { font-size: 11.5px; color: var(--text-dim); font-weight: 600; letter-spacing: .3px; }
-.pat-topbar-meta { display: flex; align-items: center; gap: 14px; margin-left: 14px; flex-wrap: wrap; }
-/* Controles (Fijar/En uso/Depositar) anclados a la ESQUINA INFERIOR DERECHA dentro
-   de La Pantalla (Robert 2026-07-09, campo: "adentro de la pantalla, pero pegado a
-   la esquina inferior derecha"). Absolutos contra .pantalla-view (position:relative).
-   Cuelgan de .pat-wrap (NO de .pat-topbar): el cuaje líquido deja un transform
-   permanente en .pat-topbar (fill-mode both) que lo volvería contenedor de
-   posicionamiento y anclaría los botones a la fila superior — .pat-wrap no anima,
-   así el ancla es la vista. z-index 6 = sobre el escenario/contenido (z5). La ✕ de
-   cerrar SÍ se queda arriba-derecha (convención de cierre). */
-.pat-actions {
-  position: absolute; right: 18px; bottom: 14px; z-index: 6;
-  display: flex; align-items: center; gap: 6px;
+/* Nombre = ancla de la fila, un escalón de peso/tamaño por encima de la meta
+   secundaria (2026-07-28: antes eran del mismo tamaño/peso que ubicación,
+   nacimiento y CURP — leía como una sola oración plana, sin jerarquía). */
+.pat-name { font-size: 13px; color: var(--text); font-weight: 700; letter-spacing: .1px; }
+.pat-topbar-meta { display: flex; align-items: center; gap: 12px; margin-left: 14px; flex-wrap: wrap; }
+/* "Fijar" — único control que quedó sin un campo propio al que pegarse cuando
+   Depositar/Retirar se mudaron adentro del panel único (ver .pat-dep-fire-row).
+   Sube a la topbar en vez de flotar solo en la esquina — deja de reservar el
+   hueco de "acción flotante" (antes 44px de margin-bottom en .pat-columns, ver
+   ACTIONS_CLEARANCE en pantalla.js), que ahora se recupera para que el
+   contenido quepa con menos scroll. */
+.pat-topbar-pin {
+  -webkit-appearance: none; appearance: none; cursor: pointer; margin-left: auto; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 8px;
+  border: 1px solid var(--hairline); background: rgba(255,255,255,.03);
+  color: var(--text-dim); font-size: 13px;
+  transition: color var(--ease-fast), border-color var(--ease-fast), background var(--ease-fast);
 }
+.pat-topbar-pin:hover { color: var(--pat-gold); border-color: var(--pat-edge); background: var(--pat-gold-soft); }
+.pat-topbar-pin.on { color: var(--pat-gold); border-color: var(--pat-edge-h); background: var(--pat-gold-soft); }
 .pat-act {
   -webkit-appearance: none; appearance: none; cursor: pointer;
   display: inline-flex; align-items: center; gap: 5px;
   height: 26px; padding: 0 9px; border-radius: 8px;
   border: 1px solid var(--hairline); background: rgba(255,255,255,.03);
-  color: var(--text-dim); font-family: var(--font-display); font-size: 11px; font-weight: 600;
+  color: var(--text-dim); font-family: var(--pat-font-display); font-size: 11px; font-weight: 600;
   transition: color var(--ease-fast), border-color var(--ease-fast),
               background var(--ease-fast), box-shadow var(--ease-fast);
 }
 .pat-act i { font-size: 14px; }
 .pat-act:hover { color: var(--pat-gold); border-color: var(--pat-edge); background: var(--pat-gold-soft); }
-.pat-act.inuse.on { color: var(--pat-gold); border-color: var(--pat-edge-h); background: var(--pat-gold-soft); box-shadow: 0 0 14px -4px var(--pat-gold-soft); }
+.pat-act.inuse.on { color: var(--pat-gold); border-color: var(--pat-edge-h); background: var(--pat-gold-soft); }
 /* Depositar = CTA principal: relleno sólido + glow SUTIL en reposo (no solo hover)
    para que salte a la vista sin gritar. Se intensifica al hover. */
 .pat-act-dep {
@@ -424,7 +314,7 @@
   box-shadow: 0 0 14px -5px var(--pat-gold), 0 1px 2px oklch(0 0 0 / 0.25);
 }
 .pat-act-dep:hover {
-  background: oklch(0.86 0.09 160); color: #08090c;
+  filter: brightness(1.08); color: #08090c;
   box-shadow: 0 0 20px -3px var(--pat-gold), 0 1px 2px oklch(0 0 0 / 0.25);
 }
 .pat-act-wd {
@@ -450,10 +340,13 @@
 .pat-combo {
   -webkit-appearance: none; appearance: none; border: 0; background: transparent;
   cursor: pointer; text-align: left; padding: 0;
-  font-family: var(--font-mono); font-size: 15px; font-weight: 600;
+  font-family: var(--pat-font-mono); font-size: 15px; font-weight: 600;
   color: oklch(0.93 0.022 90); letter-spacing: .2px; text-decoration: none;   /* perla nacarada (el amarillo se reserva al saldo) */
   border-bottom: 1px dashed oklch(0.90 0.03 90 / 0.32);
-  white-space: nowrap;
+  /* La columna ahora es un tercio fijo del ancho (3 columnas iguales, 2026-07-28),
+     ya no max-content — un combo largo debe ENVOLVER, nunca truncarse
+     (feedback_no_masking: el combo completo siempre visible/copiable). */
+  white-space: normal; overflow-wrap: anywhere; word-break: break-word;
   transition: color var(--ease-fast), border-color var(--ease-fast);
 }
 .pat-combo:hover { color: oklch(0.98 0.015 90); border-bottom-color: oklch(0.92 0.03 90 / 0.7); }
@@ -470,38 +363,31 @@
    no scrollea) + su contenido, con un hairline dorado CONTINUO (header→contenido)
    marcando cada frontera — visible pero sutil, mismo lenguaje visual que ya
    existía (border-left + glow), no un elemento nuevo. */
-/* margin-bottom 44px = despeje del CTA flotante (.pat-actions, ver más abajo:
-   position:absolute, bottom:14px, height:26px = 40px de huella + 4px de aire) —
-   SIN esto, .pat-columns llena TODO el alto de .pantalla-view y su borde inferior
-   cae exactamente donde vive el botón "Depositar"/"Retirar" anclado a la esquina.
-   Con el panel compacto de depósito ahora viviendo dentro de .pat-col-stage (antes
-   esa esquina inferior estaba vacía en reposo), cualquier contenido que caiga ahí
-   queda TAPADO por el botón — medido en vivo (getBoundingClientRect, campo
-   2026-07-26): .pat-columns terminaba en y=265, .pat-actions empezaba en y=238,
-   27px de overlap real. El valor es fijo en px (no %) porque .pat-actions también
-   usa insets fijos — se sostiene a cualquier alto de ficha.
-
-   GRID (reemplaza el flex 3-en-fila + .pat-cramped stack de abajo, 2026-07-27):
-   identidad + escenario (retiro/depósito) SIEMPRE lado a lado en la fila de
-   arriba — son los controles ACCIONABLES, tienen que verse sin scroll (campo,
-   Robert: "no se donde se pone el monto de retiro... todo en un solo sitio sin
-   scrolls"). Movimientos (sin cap, puede ser larguísimo — MV_CAP=400) baja a su
-   propia fila ABAJO, con su scroll propio (ya lo tenía, .pat-txn-col) — es la
-   ÚNICA zona con scroll interno (regla original 2026-07-09). `auto` en la 1ª fila
-   = alto real del contenido (identidad/escenario nunca se aplastan); `1fr` en la
-   2ª = lo que sobre del alto real de la ficha (ver initLpVResize→apply() en
-   app.js, que ahora crece la ficha para que la fila de arriba quepa completa). */
+/* 3 COLUMNAS IGUALES, una sola fila (2026-07-28, campo, 4ª ronda: "ahora son 3
+   secciones verticales del mismo tamaño... DATOS DE LA CUENTA | DEPOSITOS Y
+   RETIROS | HISTORIAL"). Antes movimientos vivía en su propia fila ABAJO,
+   spanneando el ancho completo — eso era el "espacio vacío" que Robert señaló:
+   el escenario/depósito (stage) sobraba ancho en su columna mientras historial
+   pedía una fila entera propia. Mover historial a la 3ª columna deja las 3
+   igual de anchas (1fr cada una) y la ficha se ACORTA (ver _syncFichaHeight,
+   pantalla.js: ya no suma la fila de movimientos, toma el máximo de las 3). */
 .pat-columns {
   display: grid;
-  grid-template-columns: max-content minmax(380px, 1fr);
-  grid-template-rows: auto minmax(64px, 1fr);
-  grid-template-areas: "ident stage" "txns txns";
+  /* minmax(0,1fr), NO 1fr a secas: un `1fr` solo hereda min-width:auto (= el
+     min-content de su contenido), así que la columna con el contenido "menos
+     encogible" se roba espacio y rompe la igualdad (medido: 341/341/416px con
+     1fr simple). minmax(0,1fr) fuerza las 3 EXACTAMENTE iguales sin importar
+     qué tan largo sea el combo o una descripción de movimiento — cada columna
+     ya maneja su propio overflow (wrap en el combo, ellipsis en movimientos). */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: 1fr;
+  grid-template-areas: "ident stage txns";
   column-gap: 0; row-gap: 14px;
-  flex: 1 1 auto; min-height: 0; margin-bottom: 44px;
+  flex: 1 1 auto; min-height: 0; margin-bottom: 8px;
 }
-/* Fallback SOLO si ni siquiera identidad+escenario caben lado a lado (combo/email
-   muy largo en un viewport angosto) — apila las 3, último recurso. `.pat-cramped`
-   lo sigue marcando pantalla.js (_syncColumnsFit, scrollWidth vs clientWidth). */
+/* Fallback SOLO si las 3 columnas no caben lado a lado en un viewport angosto —
+   apila, último recurso. `.pat-cramped` lo sigue marcando pantalla.js
+   (_syncColumnsFit, scrollWidth vs clientWidth). */
 .pat-wrap.pat-cramped .pat-columns {
   grid-template-columns: 1fr;
   grid-template-rows: auto auto minmax(64px, 1fr);
@@ -523,8 +409,7 @@
    max-content puro, solo el alto gana scroll. */
 .pat-col-ident {
   grid-area: ident;
-  flex: 0 0 auto; width: max-content;
-  display: flex; flex-direction: column; gap: 7px; padding-right: 34px;
+  display: flex; flex-direction: column; gap: 7px; padding-right: 22px;
   overflow-y: auto; min-height: 0;
 }
 .pat-col-ident::-webkit-scrollbar { width: 5px; }
@@ -535,10 +420,10 @@
    columna de datos (Robert: "el saldo esta muy grande"). 26px lo baja a segundo
    plano frente al combo/nombre sin perder la lectura rápida del monto. */
 .pat-balance {
-  font-family: var(--font-display); font-weight: 700;
+  font-family: var(--pat-font-display); font-weight: 700;
   font-size: 26px; line-height: 1.1; letter-spacing: .2px;
-  color: var(--pat-gold);
-  text-shadow: 0 0 20px var(--pat-gold-soft), 0 1px 2px rgba(0,0,0,.6), 0 0 2px rgba(0,0,0,.5);
+  color: var(--pat-money);
+  text-shadow: 0 1px 2px rgba(0,0,0,.6), 0 0 2px rgba(0,0,0,.5);
 }
 /* Divisor bajo el saldo — separa combo+saldo de guardado (tarjetas/notas), que ahora
    vive directo debajo (Robert 2026-07-10: "a partir de la linea de division...
@@ -546,13 +431,16 @@
    empujaba .pat-saved al fondo de una columna que ya no tiene espacio muerto en medio
    (Estado/cumpleaños/CURP subieron al topbar). */
 .pat-ident-div { flex: 0 0 auto; height: 1px; margin: 2px 0 1px; background: var(--hairline); }
-/* Estado/cumpleaños/CURP viven ahora en .pat-topbar-meta (arriba, junto al nombre). */
-.pat-meta-item { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-dim); min-width: 0; }
-.pat-meta-item.dim { color: var(--text-muted); }
-.pat-meta-item i { font-size: 13px; color: var(--pat-gold); opacity: .8; flex: 0 0 auto; }
+/* Estado/cumpleaños/CURP viven ahora en .pat-topbar-meta (arriba, junto al nombre).
+   Un escalón por debajo del nombre (10.5px, muted, íconos neutros) — el dorado se
+   reserva para dinero/acción, no para decorar cada ítem de metadata secundaria
+   (2026-07-28: 3 íconos dorados en fila competían con el CTA por atención). */
+.pat-meta-item { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--text-muted); min-width: 0; }
+.pat-meta-item.dim { color: var(--text-faint); }
+.pat-meta-item i { font-size: 12px; color: var(--text-faint); flex: 0 0 auto; }
 .pat-curp {
   -webkit-appearance: none; appearance: none; border: 0; background: transparent;
-  cursor: pointer; padding: 0; font: inherit; font-family: var(--font-mono);
+  cursor: pointer; padding: 0; font: inherit; font-family: var(--pat-font-mono);
   color: inherit; text-decoration: none;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -583,51 +471,53 @@
      por los ~9.6px/char de esa fuente vs ~6.3px/char de mono) fuerza a la fila
      de botones a envolver (`.pat-form-row` ya tiene flex-wrap:wrap) DENTRO del
      ancho justo de un CURP, en vez de estirarlo. */
-  font-family: var(--font-mono); font-size: 11px;
+  font-family: var(--pat-font-mono); font-size: 11px;
   width: 19ch;
   padding: 8px; border-radius: 9px;
-  background: oklch(0.10 0.012 160 / 0.72);
+  background: oklch(0.11 0.006 260 / 0.85);
   border: 1px solid var(--pat-edge);
   backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 10px 28px -12px rgba(0,0,0,.55);
 }
 .pat-curp-pop[hidden] { display: none; }
-/* Panel de retiro en col 3 — llena el espacio vacío en reposo (SA). Glassmorphism
-   lo envuelve .pantalla-sheet; aquí solo estructura + tipografía. */
-.pat-wd-stage {
-  display: flex; flex-direction: column; gap: 7px;
-  padding: 14px 4px 4px 0;
-  color: var(--text);
-}
 /* Coexistencia: si hay misión de depósito activa (#depStage visible en #patStageSlot),
-   oculta el panel de retiro. depos.js intacto — la prioridad visual la resuelve el CSS. */
-.pat-col-stage:has(#depStage:not([hidden])) .pat-wd-stage,
+   oculta el panel compacto entero (Depositar+Retirar comparten uno solo ahora —
+   ocultar .pat-dep-stage ya oculta también el botón/estado de retiro que vive
+   DENTRO). depos.js intacto — la prioridad visual la resuelve el CSS. */
 .pat-col-stage:has(#depStage:not([hidden])) .pat-dep-stage { display: none; }
-.pat-wd-head { font-size: 12px; font-weight: 600; display: flex; gap: 5px; align-items: center; }
-.pat-wd-email { color: var(--text-dim); font-weight: 400; }
+
 .pat-wd-balance { font-size: 10.5px; color: var(--text-dim); }
-.pat-wd-balance-v, .pat-wd-balance b { color: var(--pat-gold); font-family: var(--font-mono); }
-.pat-wd-stage .pat-input { width: 100%; }
-.pat-wd-status { margin-top: 4px; }
+.pat-wd-balance[hidden] { display: none; }
+.pat-wd-balance-v, .pat-wd-balance b { color: var(--pat-money); font-family: var(--pat-font-mono); }
+.pat-wd-status { margin-top: 2px; }
 .pat-wd-status:empty { display: none; }
-/* Panel de depósito compacto — mismo motor de depos.js (window.Depos.mountCompact),
-   montado en #patDepSlot. Estructura reusa las clases que renderAccounts/renderCards/
-   setPresets ya generan (chip, chip-x, amt-preset, hdot) — se re-skinnean AQUÍ, scoped
-   a .pat-dep-stage, para NO tocar depos.css (spec: no reutilizar el look del panel viejo). */
+/* Panel único Depositar+Retirar (2026-07-28, campo, 3ª ronda: "reutilizando el
+   cuadro de texto de monto, botón depositar junto a retirar... en lugar de dos
+   pestañas" — Robert prefirió esto sobre el tab-switch de la ronda anterior).
+   Mismo motor de depos.js (window.Depos.mountCompact), montado en #patDepSlot.
+   Estructura reusa las clases que renderAccounts/renderCards/setPresets ya
+   generan (chip, chip-x, amt-preset, hdot) — se re-skinnean AQUÍ, scoped a
+   .pat-dep-stage, para NO tocar depos.css (spec: no reutilizar el look del panel
+   viejo). El botón/saldo/estado de Retirar viven DENTRO de esta misma plantilla
+   (index.html #deposCompactTpl) y los rellena pantalla.js (_applyWithdrawToCompact). */
 .pat-dep-stage {
   display: flex; flex-direction: column; gap: 7px;
-  padding: 12px 4px 4px 0; margin-top: 4px;
-  border-top: 1px solid var(--pat-edge);
+  padding: 8px 4px 4px 0; max-width: 300px;
   color: var(--text);
 }
 .pat-dep-head { font-size: 12px; font-weight: 600; display: flex; gap: 5px; align-items: center; }
 .pat-dep-mode { font-weight: 400; color: var(--text-dim); font-size: 10px; margin-left: auto; }
 .pat-dep-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* Fila "Cuentas": oculta salvo que haya de verdad más de 1 (2026-07-28: el multi
+   se muda a su propia vista — ver DESIGN.md §Pendiente — así que en el panel de
+   1 cuenta esta fila es redundante con la identidad ya visible arriba; toggle
+   real vía JS en depos.js renderAccounts(), no solo CSS). */
+.pat-dep-row-multi.pat-dep-row-hidden { display: none; }
 .pat-dep-label { font-size: 10px; color: var(--text-dim); flex: 0 0 auto; }
-.pat-dep-cnt { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-muted); }
+.pat-dep-cnt { font-family: var(--pat-font-mono); font-size: 9.5px; color: var(--text-muted); }
 .pat-dep-chips { display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto; }
 .pat-dep-stage .chip {
-  background: oklch(0.80 0.085 160 / 0.08); border: 1px solid var(--pat-edge);
+  background: rgba(255,255,255,.045); border: 1px solid var(--pat-edge);
   border-radius: 20px; padding: 2px 8px; font-size: 10px;
   display: inline-flex; align-items: center; gap: 4px;
 }
@@ -636,7 +526,7 @@
 .pat-dep-amt-row { gap: 8px; }
 .pat-dep-stage .amt-preset {
   border: 1px solid var(--pat-edge); border-radius: 6px; padding: 2px 8px;
-  font-family: var(--font-mono); font-size: 10.5px; cursor: pointer;
+  font-family: var(--pat-font-mono); font-size: 10.5px; cursor: pointer;
 }
 .pat-dep-stage .amt-preset.on { background: var(--pat-gold-soft); color: var(--pat-gold); border-color: var(--pat-edge-h); }
 .pat-dep-amt.dis input { opacity: .45; pointer-events: none; }
@@ -651,9 +541,18 @@
   color: var(--text-dim); font-size: 9.5px; padding: 2px 8px; border-radius: 6px; cursor: pointer;
 }
 .pat-dep-newproc:hover { color: var(--pat-gold); border-color: var(--pat-gold); }
+/* CTAs "Depositar" + "Retirar" LADO A LADO (2026-07-28, campo, 3ª ronda: Robert
+   prefirió esto sobre el tab-switch — "botón depositar junto a retirar"). Ambos
+   viven junto al monto/presets, no en una barra de acciones lejana. Retirar
+   arranca `hidden` (JS lo revela solo si el rol/estado lo permite, ver
+   _applyWithdrawToCompact) — con un solo botón visible, ocupa el 100%. */
+.pat-dep-fire-row { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.pat-dep-fire-row .pat-act-dep,
+.pat-dep-fire-row .pat-act-wd { flex: 1 1 0; justify-content: center; height: 30px; }
+.pat-dep-newproc { margin-top: 2px; }
 .pat-curp-pop .pat-input {
   width: 19ch; text-align: center; letter-spacing: 1px;
-  background: oklch(0.20 0.02 160 / 0.22); border-color: var(--hairline);
+  background: oklch(0.16 0.006 260 / 0.45); border-color: var(--hairline);
   padding: 4px 6px; font-size: 10.5px;
 }
 .pat-curp-pop .pat-form-row { justify-content: space-between; gap: 4px; margin-top: 1px; }
@@ -673,12 +572,16 @@
    padding-right) y se ANGOSTA por su derecha (cede al escenario) — el reparto
    objetivo marcado por Robert es más parejo (~55:45 movimientos:escenario), no 2:1.
    min-width 340 = piso para que las descripciones no queden en elipsis constante. */
+/* 3ª columna (2026-07-28, 4ª ronda): historial deja de ser una fila que se
+   estiraba a TODO el ancho debajo de las otras dos — ahora es su propia
+   columna, mismo ancho que datos/depósito (1fr cada una). Divisor vertical
+   (border-left), igual lenguaje que el de .pat-col-stage. */
 .pat-col-txns {
   grid-area: txns;
   display: flex; flex-direction: column;
-  min-height: 0; padding-top: 14px;
-  border-top: 1px solid var(--pat-edge);
-  box-shadow: 0 -1px 16px -12px var(--pat-gold-soft);
+  min-height: 0; padding-left: 22px;
+  border-left: 1px solid var(--pat-edge);
+  box-shadow: -1px 0 16px -12px var(--pat-gold-soft);
 }
 
 /* Columna 3 (derecha) — ESCENARIO del progreso de depósito. En reposo va vacía; el
@@ -689,6 +592,12 @@
 /* min-width 380 = viewBox real de las escenas SVG del depósito (ver depos.js
    #depStage .scene svg viewBox="0 0 380 200") — no un número inventado, es el ancho
    nativo del arte; por debajo de eso las escenas se ven proporcionalmente apretadas. */
+/* La columna ahora es 1fr fijo (mismo ancho que datos/historial, 2026-07-28,
+   4ª ronda) — el max-width que antes limitaba el TRACK se quita de aquí y
+   pasa a .pat-dep-stage (el contenido real: input+presets+botones), para que
+   ese control no se estire gigante en pantallas anchas aunque la columna sí
+   ocupe su tercio completo (misma lección que el fix anterior, aplicada al
+   contenido en vez de al contenedor). */
 .pat-col-stage {
   grid-area: stage;
   min-height: 0;
@@ -705,7 +614,8 @@
    .pat-col-ident pierde el padding-right (era aire hacia .pat-col-txns, que ya
    no es su vecino directo en modo apilado). */
 .pat-wrap.pat-cramped .pat-col-ident { padding-right: 0; }
-.pat-wrap.pat-cramped .pat-col-stage {
+.pat-wrap.pat-cramped .pat-col-stage,
+.pat-wrap.pat-cramped .pat-col-txns {
   border-left: none; padding-left: 0;
   border-top: 1px solid var(--pat-edge); padding-top: 14px;
 }
@@ -721,11 +631,11 @@
 .pat-txn-emo { font-size: 12px; line-height: 1; filter: saturate(1.1); }
 .pat-txn-h {
   display: flex; align-items: center; gap: 7px; margin-bottom: 5px; flex: 0 0 auto;
-  font-family: var(--font-display); font-weight: 600; font-size: 10.5px;
+  font-family: var(--pat-font-display); font-weight: 600; font-size: 10.5px;
   text-transform: uppercase; letter-spacing: .6px; color: var(--text-dim);
 }
 .pat-txn-h i { font-size: 13px; color: var(--pat-gold); }
-.pat-txn-h .cnt { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); background: oklch(0.80 0.085 160 / 0.10); border-radius: 20px; padding: 1px 7px; }
+.pat-txn-h .cnt { margin-left: auto; font-family: var(--pat-font-mono); font-size: 10px; color: var(--text-muted); background: rgba(255,255,255,.06); border-radius: 20px; padding: 1px 7px; }
 /* Rueda de scroll nativa (overflow-y) + click-y-jala (JS, pantalla.js) — cursor
    grab en reposo, grabbing mientras arrastra. Scrollbar propia, delgada, discreta
    (Robert: "que pueda usar la rueda... o click y jalar... microanimaciones"). */
@@ -740,18 +650,24 @@
 .pat-txn-col::-webkit-scrollbar-thumb:hover { background: var(--pat-edge-h); }
 
 /* Fila de movimiento compacta (una línea). COLORES INTUITIVOS por resultado —
-   barra lateral + tinte de fondo suave (semántica del historial viejo, más
-   compacto y sin romper la UI: el color es el acento, no el relleno). */
+   un punto de estado + tinte de fondo suave (2026-07-28: se quita la barra
+   lateral de color — craft-floor la marca como decoración de "admin genérico",
+   no material; un punto de 6px antes de la hora comunica lo mismo sin la línea
+   de acento que hacía ver la lista como un ecualizador). */
 .pat-mv {
   display: flex; flex-direction: column; font-size: 11.5px;
   padding: 3px 8px; border-radius: 7px;
-  border-left: 2px solid transparent; cursor: pointer;
-  transition: background var(--ease-fast), border-color var(--ease-fast);
+  cursor: pointer;
+  transition: background var(--ease-fast);
 }
 /* Fila visible (siempre montada) — antes eran hijos directos de .pat-mv; ahora
    .pat-mv es columna (fila + detalle expandible) y esta es la fila en sí. */
 .pat-mv-row { display: flex; align-items: center; gap: 8px; }
-.pat-mv-t { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); white-space: nowrap; flex: 0 0 auto; }
+.pat-mv-row::before {
+  content: ''; flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text-faint);
+}
+.pat-mv-t { font-family: var(--pat-font-mono); font-size: 10px; color: var(--text-muted); white-space: nowrap; flex: 0 0 auto; }
 .pat-mv-src {
   display: inline-flex; align-items: center; justify-content: center;
   width: 17px; height: 17px; flex: 0 0 auto; border-radius: 5px;
@@ -765,21 +681,24 @@
 .pat-mv-src--dash { background: oklch(0.72 0.16 292 / 0.16); color: oklch(0.78 0.16 292); }
 .pat-mv-src--bet  { background: oklch(0.74 0.13 228 / 0.16); color: oklch(0.80 0.12 228); }
 .pat-mv-d { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
-.pat-mv-a { font-family: var(--font-mono); font-weight: 700; white-space: nowrap; flex: 0 0 auto; }
+.pat-mv-a { font-family: var(--pat-font-mono); font-weight: 700; white-space: nowrap; flex: 0 0 auto; }
 /* Verde = aprobado · rojo nítido = rechazado · dorado = 3DS · tenue = pendiente/retiro */
-.pat-mv.ok      { border-left-color: oklch(0.74 0.16 155 / 0.55); background: oklch(0.74 0.16 155 / 0.045); }
+.pat-mv.ok      { background: oklch(0.74 0.16 155 / 0.045); }
+.pat-mv.ok .pat-mv-row::before { background: oklch(0.74 0.16 155); }
 .pat-mv.ok .pat-mv-a { color: oklch(0.74 0.16 155); }
-.pat-mv.fail    { border-left-color: var(--danger); background: var(--danger-soft); }
+.pat-mv.fail    { background: var(--danger-soft); }
+.pat-mv.fail .pat-mv-row::before { background: var(--danger); }
 .pat-mv.fail .pat-mv-a { color: oklch(0.68 0.22 24); }
 .pat-mv.fail .pat-mv-d { color: oklch(0.72 0.12 24); }
-.pat-mv.threeds { border-left-color: var(--pat-3ds); background: oklch(0.82 0.14 85 / 0.06); }
+.pat-mv.threeds { background: oklch(0.82 0.14 85 / 0.06); }
+.pat-mv.threeds .pat-mv-row::before { background: var(--pat-3ds); }
 .pat-mv.threeds .pat-mv-a { color: var(--pat-3ds); }
 .pat-mv.threeds .pat-mv-d { color: oklch(0.82 0.11 85); }
-.pat-mv.pending { border-left-color: oklch(0.82 0.11 85 / 0.30); }
+.pat-mv.pending .pat-mv-row::before { background: oklch(0.82 0.11 85 / 0.55); }
 .pat-mv.pending .pat-mv-a { color: var(--text-muted); }
-.pat-mv.wd      { border-left-color: var(--text-faint); }
+.pat-mv.wd .pat-mv-row::before { background: var(--text-faint); }
 .pat-mv.wd .pat-mv-a { color: var(--text-dim); }
-.pat-mv:hover   { background: oklch(0.80 0.085 160 / 0.09); }
+.pat-mv:hover   { background: rgba(255,255,255,.045); }
 .pat-mv-more { font-size: 10px; color: var(--text-muted); padding: 4px 0 0 8px; }
 .pat-mv-empty { font-size: 11px; color: var(--text-muted); padding: 6px 8px; }
 
@@ -795,8 +714,8 @@
 .pat-mv.exp .pat-mv-exp-in { padding: 6px 2px 2px 25px; } /* alinea bajo .pat-mv-d, no bajo la hora */
 .pat-mv-exp-row { display: flex; align-items: baseline; gap: 8px; font-size: 10.5px; padding: 1px 0; }
 .pat-mv-exp-row .k { flex: 0 0 auto; width: 62px; color: var(--text-faint); text-transform: uppercase; font-size: 9.5px; letter-spacing: .4px; }
-.pat-mv-exp-row .v { color: var(--text-dim); font-family: var(--font-mono); overflow-wrap: anywhere; }
-.pat-mv-exp-row .v.dim { color: var(--text-faint); font-family: var(--font-display); font-style: italic; }
+.pat-mv-exp-row .v { color: var(--text-dim); font-family: var(--pat-font-mono); overflow-wrap: anywhere; }
+.pat-mv-exp-row .v.dim { color: var(--text-faint); font-family: var(--pat-font-display); font-style: italic; }
 .pat-mv-exp-copy { cursor: pointer; border-radius: 4px; transition: color var(--ease-fast); }
 .pat-mv-exp-copy:hover { color: var(--pat-gold); }
 .pat-mv-exp-copy.copied { color: var(--pat-gold); }
@@ -812,13 +731,13 @@
 .pat-sv-group { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .pat-sv-h {
   display: inline-flex; align-items: center; gap: 5px;
-  font-family: var(--font-display); font-weight: 600; font-size: 9.5px;
+  font-family: var(--pat-font-display); font-weight: 600; font-size: 9.5px;
   text-transform: uppercase; letter-spacing: .6px; color: var(--text-muted);
 }
 .pat-sv-h i { font-size: 12px; color: var(--pat-gold); opacity: .8; }
 .pat-sv-emo { font-size: 11px; line-height: 1; }
-.pat-sv-cnt { font-family: var(--font-mono); font-size: 9px; color: var(--text-dim); }
-.pat-sv-more { margin-left: auto; font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); }
+.pat-sv-cnt { font-family: var(--pat-font-mono); font-size: 9px; color: var(--text-dim); }
+.pat-sv-more { margin-left: auto; font-family: var(--pat-font-mono); font-size: 9px; color: var(--text-muted); }
 .pat-sv-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
 
 /* Tarjeta: pipe copiable tipo liga (mismo lenguaje que el combo). */
@@ -828,21 +747,21 @@
 }
 .pat-sv-pipe {
   flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim);
-  border-bottom: 1px dashed oklch(0.80 0.085 160 / 0.22);
+  font-family: var(--pat-font-mono); font-size: 10.5px; color: var(--text-dim);
+  border-bottom: 1px dashed var(--hairline);
   transition: color var(--ease-fast), border-color var(--ease-fast);
 }
 .pat-sv-card:hover .pat-sv-pipe { color: var(--pat-gold); border-bottom-color: var(--pat-gold); }
 .pat-sv-card.copied .pat-sv-pipe { color: oklch(0.75 0.16 155); border-bottom-color: transparent; }
 .pat-sv-stat {
-  flex: 0 0 auto; margin-left: auto; font-family: var(--font-mono); font-size: 9.5px;
-  color: var(--text-muted); background: oklch(0.80 0.085 160 / 0.08);
+  flex: 0 0 auto; margin-left: auto; font-family: var(--pat-font-mono); font-size: 9.5px;
+  color: var(--text-muted); background: rgba(255,255,255,.06);
   border-radius: 10px; padding: 0 6px;
 }
 /* Nota: 2 líneas (texto + meta), truncadas. */
 .pat-sv-note { flex-direction: column; align-items: flex-start; gap: 0; position: relative; padding-right: 14px; }
 .pat-sv-ntext { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--text-dim); }
-.pat-sv-nmeta { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); }
+.pat-sv-nmeta { font-family: var(--pat-font-mono); font-size: 9px; color: var(--text-muted); }
 
 /* ── Edición inline: nota nueva + validar CURP (portado del acordeón viejo) ── */
 .pat-sv-add {
@@ -870,21 +789,27 @@
    línea amarilla" — la línea amarilla es el borde derecho de .pat-col-ident.
    Fallback 300px solo por si el JS aún no corrió (primer paint). */
 .pat-form { display: flex; flex-direction: column; gap: 5px; margin-top: 2px; width: var(--pat-ident-w, 300px); box-sizing: border-box; }
+/* Sin esto, [hidden] no ganaba (author `display:flex` empataba en especificidad
+   con el `[hidden]{display:none}` del UA stylesheet y el form de notas cerrado
+   seguía ocupando 300px de layout invisible — no se veía porque no tiene fondo,
+   pero SÍ desbordaba .pat-col-ident en columnas angostas, encontrado al medir
+   scrollWidth tras el cambio a 3 columnas iguales de 2026-07-28). */
+.pat-form[hidden] { display: none; }
 .pat-input, .pat-textarea {
   -webkit-appearance: none; appearance: none; width: 100%; box-sizing: border-box;
-  background: oklch(0.20 0.02 160 / 0.35); border: 1px solid var(--pat-edge);
+  background: oklch(0.16 0.006 260 / 0.55); border: 1px solid var(--pat-edge);
   border-radius: 6px; padding: 5px 7px; font-size: 11px; color: var(--text-dim);
   font-family: inherit; transition: border-color var(--ease-fast);
 }
 .pat-input:focus, .pat-textarea:focus { outline: none; border-color: var(--pat-gold); }
 .pat-textarea { resize: vertical; min-height: 40px; }
-.pat-input.pat-input-mono { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .5px; }
+.pat-input.pat-input-mono { font-family: var(--pat-font-mono); text-transform: uppercase; letter-spacing: .5px; }
 .pat-input.pat-input-err { border-color: oklch(0.68 0.22 24 / 0.6); }
 .pat-form-row { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
 .pat-btn {
   -webkit-appearance: none; appearance: none; border: 0; cursor: pointer;
   border-radius: 6px; padding: 4px 10px; font-size: 10.5px; font-weight: 600;
-  font-family: var(--font-display); transition: background var(--ease-fast), opacity var(--ease-fast);
+  font-family: var(--pat-font-display); transition: background var(--ease-fast), opacity var(--ease-fast);
 }
 .pat-btn-save { background: var(--pat-gold-soft); color: var(--pat-gold); }
 .pat-btn-save:hover { background: var(--pat-edge); }
@@ -916,7 +841,7 @@
   cursor: pointer; text-align: left; padding: 1px 0; width: 100%;
 }
 .pat-clabe-rail {
-  flex: 0 0 auto; font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+  flex: 0 0 auto; font-family: var(--pat-font-mono); font-size: 9px; font-weight: 600;
   color: var(--pat-gold); background: var(--pat-gold-soft);
   border-radius: 8px; padding: 1px 6px; white-space: nowrap;
   text-transform: uppercase; letter-spacing: .3px;
@@ -926,8 +851,8 @@
 /* La clabe misma: mono, truncable, dashed underline como las tarjetas. */
 .pat-clabe-num {
   flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim);
-  border-bottom: 1px dashed oklch(0.80 0.085 160 / 0.22);
+  font-family: var(--pat-font-mono); font-size: 10.5px; color: var(--text-dim);
+  border-bottom: 1px dashed var(--hairline);
   transition: color var(--ease-fast), border-color var(--ease-fast);
 }
 .pat-clabe:hover .pat-clabe-num { color: var(--pat-gold); border-bottom-color: var(--pat-gold); }
@@ -937,7 +862,7 @@
 .pat-clabe-get {
   -webkit-appearance: none; appearance: none; border: 1px dashed var(--pat-edge);
   background: transparent; cursor: pointer; padding: 4px 8px; border-radius: 6px;
-  font-family: var(--font-display); font-size: 10px; color: var(--text-muted);
+  font-family: var(--pat-font-display); font-size: 10px; color: var(--text-muted);
   display: inline-flex; align-items: center; gap: 4px; width: fit-content;
   transition: color var(--ease-fast), border-color var(--ease-fast), background var(--ease-fast);
 }
@@ -954,7 +879,7 @@
 .pat-wd.pending .pat-input, .pat-wd.pending .pat-btn-save { opacity: .7; }
 .pat-wd-status:empty { display: none; }
 .pat-wd-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
-.pat-wd-amt { font-family: var(--font-mono); font-size: 10.5px; color: var(--pat-gold); font-weight: 600; }
+.pat-wd-amt { font-family: var(--pat-font-mono); font-size: 10.5px; color: var(--pat-money); font-weight: 600; }
 .pat-wd-line { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--text-dim); }
 .pat-wd-line i { font-size: 12px; }
 .pat-wd-line.pat-wd-ok i { color: oklch(0.75 0.16 155); }
@@ -1064,7 +989,7 @@
   .pat-col-stage { display: none; }
   .pat-txn-col { flex: 1 1 auto; min-width: 0; }
   .pat-topbar { padding-right: 44px; flex-wrap: wrap; }
-  .pat-actions { position: static; margin-top: 8px; flex-wrap: wrap; }
+  .pat-topbar-pin { width: 44px; height: 44px; }
   .pat-act { height: 44px; padding: 0 14px; }
   .pantalla-close { width: 44px; height: 44px; }
 }

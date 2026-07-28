@@ -295,13 +295,6 @@
     const grade = d.grade || null;
     const gCls = (typeof gradeClass === 'function') ? gradeClass(grade) : '';
 
-    // Tinte de La Pantalla por GRADE (Robert 2026-07-10, campo): data-grade en la
-    // raíz retinta bordes/glow/CTA/saldo vía las mismas CSS vars (--pat-gold family),
-    // ver pantalla.css. Se pone en CADA render (cache-hit y fetch fresco) para que
-    // nunca quede desfasado si el grade cambió entre aperturas.
-    const patRoot = $('#pantalla');
-    if (patRoot) patRoot.dataset.grade = gCls || 'U';
-
     // --i = orden de cuaje del bloque (idrow→combo→balance→divisor→columnas txns).
     // CSS lo lee para escalonar el reveal líquido; inofensivo cuando no hay .pat-liquid.
     // Controles principales: MISMOS data-* que renderDetail (d-deposit-btn/inuse/det-mark)
@@ -335,6 +328,7 @@
             </div>
           </span>
         </div>
+        <button type="button" class="pat-topbar-pin det-mark" data-mark-email="${g(email)}" title="Fijar"><i class="ph-bold ph-push-pin"></i></button>
       </div>
       <div class="pat-columns">
         <div class="pat-col-ident">
@@ -347,17 +341,16 @@
           ${renderPantallaClabes(d)}
         </div>
         ${renderPantallaTxns(d)}
-        <div class="pat-col-stage">
-          ${renderPantallaWithdrawStage(d)}
-          <div id="patStageSlot"></div>
-          <div id="patDepSlot"></div>
-        </div>
-      </div>
-      <div class="pat-actions">
-        <button type="button" class="pat-act det-mark" data-mark-email="${g(email)}" title="Fijar"><i class="ph-bold ph-push-pin"></i></button>
-        <button type="button" class="pat-act pat-act-dep d-deposit-btn" data-acc-id="${d.id}" title="Depositar"><i class="ph-duotone ph-credit-card"></i><span>Depositar</span></button>
-        ${renderPantallaWithdrawButton(d)}
+        ${renderPantallaStageCol(d)}
       </div>`;
+      // "Depositar"/"Retirar" YA NO viven en una barra de acciones flotante en la
+      // esquina (Robert 2026-07-28: "no se entiende qué hacen hasta allá lejos de
+      // donde se ponen las cantidades") — cada botón se movió DENTRO de su propio
+      // panel, junto al monto que dispara (ver renderPantallaWithdrawStage / el
+      // template #deposCompactTpl). "Fijar" (única acción que sobraba sin campo al
+      // que pegarse) subió a la topbar — esto también libera el hueco que
+      // .pat-columns reservaba abajo para el CTA flotante (ver ACTIONS_CLEARANCE
+      // en _syncFichaHeight, app.js).
       // Candadito "En uso" (lock manual) ELIMINADO de La Pantalla (Robert 2026-07-17):
       // era un 2º control de lock, redundante con el auto-lock que ya se pone al
       // DEPOSITAR (deposits.py _auto_lock_for_deposit). Como SA creaba RESERVADA_SA
@@ -533,41 +526,64 @@
   }
 
   // Botón de retiro dedicado en .pat-actions (derecha de Depositar). Dispara directo
-  // con el monto del input de col 3 — no abre popup. Gris/disabled si saldo < $100.
-  function renderPantallaWithdrawButton(d) {
-    const L = window.PantallaLogic || {};
-    const st_ = L._withdrawBtnState ? L._withdrawBtnState(d, (state.user || {}).role)
-      : { render: false, disabled: true, tooltip: '' };
-    // el render de pantalla.js calcula _wd_pending aquí mismo (desacopla de la lógica pura):
-    const st = _wdStatusFromRow(d && d.last_withdrawal);
-    d && (d._wd_pending = !!(st && !WD_TERMINAL.has(st.status)));
-    const s2 = L._withdrawBtnState ? L._withdrawBtnState(d, (state.user || {}).role) : st_;
-    if (!s2.render) return '';
-    const g = window.esc || (s => s);
-    return `<button type="button" class="pat-act pat-act-wd d-withdraw-fire" data-acc-id="${g(d.id)}"${s2.disabled ? ' disabled' : ''} title="${g(s2.tooltip)}"><i class="ph-duotone ph-bank"></i><span>Retirar</span></button>`;
-  }
-
   // Panel de monto + estado 2-fases en col 3 (.pat-col-stage). Visible en reposo para SA
   // (llena el espacio que antes quedaba vacío). Si hay misión de depósito (#depStage visible),
   // CSS :has() lo oculta — depos.js intacto.
-  function renderPantallaWithdrawStage(d) {
+  // El botón "Retirar" vive JUNTO al campo de monto (Robert 2026-07-28, campo: "no se
+  // entiende qué hacen hasta allá lejos de donde se ponen las cantidades") — antes
+  // disparaba desde `.pat-actions`, en la esquina, sin relación visual con su propio
+  // input. Se fusiona lo que antes era renderPantallaWithdrawButton() aquí mismo.
+  // Estado puro de retiro para esta cuenta — sin tocar el DOM (2026-07-28: antes
+  // esto armaba su propio bloque HTML `.pat-wd-stage`; ahora Depositar/Retirar
+  // comparten UN panel — ver _applyWithdrawToCompact). Muta d._wd_pending como
+  // antes (otros callers lo leen).
+  function _withdrawState(d) {
     const L = window.PantallaLogic || {};
     const role = (state.user || {}).role;
     const st = _wdStatusFromRow(d && d.last_withdrawal);
     d && (d._wd_pending = !!(st && !WD_TERMINAL.has(st.status)));
     const s2 = L._withdrawBtnState ? L._withdrawBtnState(d, role) : { render: false, disabled: true, tooltip: '' };
-    if (!s2.render) return '';
+    return { s2, st, pending: !!(d && d._wd_pending) };
+  }
+
+  // Columna 3: SOLO los slots que depos.js monta — ya no arma su propio bloque de
+  // retiro aquí (campo, Robert 2026-07-28, 3ª ronda: "reutilizando el cuadro de
+  // texto de monto, botón depositar junto a retirar... en lugar de dos pestañas").
+  // El botón/estado de retiro vive DENTRO de #deposCompactTpl (index.html) y se
+  // rellena en _applyWithdrawToCompact() justo después de montar el panel.
+  function renderPantallaStageCol(d) {
+    return `<div class="pat-col-stage">
+      <div id="patStageSlot"></div>
+      <div id="patDepSlot"></div>
+    </div>`;
+  }
+
+  // Rellena los elementos de retiro que YA existen en la plantilla del depósito
+  // compacto (#wd, #wdBalance, #wdStatus, #wdErr) — un solo panel, un solo campo
+  // de monto (#amtInput, propiedad del motor de depósitos) que ambos botones leen.
+  // Se llama en cada render, después de _mountStage() (que ya clonó/montó la
+  // plantilla). Idempotente: solo lectura+atributos, nunca innerHTML del panel
+  // completo (eso lo hace depos.js, no lo duplicamos).
+  function _applyWithdrawToCompact(d) {
+    const root = document.getElementById('depCompact');
+    if (!root) return;
     const g = window.esc || (s => s);
     const money = window.fmtMoney || (v => `$${(v || 0).toFixed(2)}`);
-    const statusHtml = st ? _withdrawStatusHtml(st) : '';
-    const inputDisabled = s2.disabled || (d && d._wd_pending) ? ' disabled' : '';
-    return `<div class="pat-wd-stage" data-wd-stage>
-    <span class="pat-wd-head"><span class="pat-sv-emo">🏧</span> Retirar — <span class="pat-wd-email">${g(d.email || '')}</span></span>
-    <div class="pat-wd-balance">Saldo Real: <b class="pat-wd-balance-v">${money(d.balance_real || 0)}</b></div>
-    <input class="pat-input pat-wd-amount" type="number" min="100" step="0.01" placeholder="monto (min $100)" data-wd-amount${inputDisabled}>
-    <div class="pat-form-err" data-wd-err hidden></div>
-    <div class="pat-wd-status">${statusHtml}</div>
-  </div>`;
+    const { s2, st, pending } = _withdrawState(d);
+    const btn = root.querySelector('#wd');
+    const balEl = root.querySelector('#wdBalance');
+    const statusEl = root.querySelector('#wdStatus');
+    if (btn) {
+      btn.hidden = !s2.render;
+      btn.disabled = !!s2.disabled || pending;
+      btn.dataset.accId = d.id;
+      btn.title = s2.tooltip || '';
+    }
+    if (balEl) {
+      balEl.hidden = !s2.render;
+      balEl.innerHTML = s2.render ? `Saldo Real: <b class="pat-wd-balance-v">${money(d.balance_real || 0)}</b>` : '';
+    }
+    if (statusEl) statusEl.innerHTML = (s2.render && st) ? _withdrawStatusHtml(st) : '';
   }
 
   function _stopWithdrawPoll(accId) {
@@ -576,19 +592,19 @@
   }
 
   async function _fetchWithdrawStatus(accId, txId) {
-    const wrap = document.querySelector('[data-wd-stage]');
+    const wrap = document.getElementById('depCompact');
     try {
       const r = await fetch(`/api/accounts/${accId}/withdraw/status/${txId}`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const st = await r.json();
       if (wrap) {
-        const statusEl = wrap.querySelector('.pat-wd-status');
+        const statusEl = wrap.querySelector('#wdStatus');
         if (statusEl) statusEl.innerHTML = _withdrawStatusHtml(st);
         wrap.classList.toggle('alert', !!(st.alerts && (st.alerts.gatewayMismatch || st.alerts.digitsMismatch)));
         const done = WD_TERMINAL.has(st.status);
         wrap.classList.toggle('pending', !done);
-        const input = wrap.querySelector('[data-wd-amount]');
-        const btn = document.querySelector(`.d-withdraw-fire[data-acc-id="${accId}"]`);
+        const input = wrap.querySelector('#amtInput');
+        const btn = wrap.querySelector('#wd');
         if (input) input.disabled = !done;
         if (btn) btn.disabled = !done;
         if (done) {
@@ -839,43 +855,47 @@
     });
   }
 
-  // Alto dinámico de la ficha (2026-07-27, campo — Robert: "todo en un solo sitio
-  // sin scrolls sin fricción, ADHD friendly, obligatorio"). Identidad + escenario
-  // (retiro/depósito) viven ahora lado a lado en la fila de arriba de .pat-columns
-  // (grid, ver pantalla.css) y NUNCA deben necesitar scroll propio — pero
-  // ANCHOR_H (app.js) se calculó SOLO para alinear "Sistema" con "Cuentas", sin
-  // saber que el panel de depósito compacto existiría. Medimos el alto REAL de
-  // contenido (scrollHeight, no una constante inventada) y crecemos #adminPanel+
-  // #pantalla JUNTOS via el mismo apply() de siempre (NO desacoplamos su alto —
-  // eso rompería el ResizeObserver de DeposWindow y el ancla del sidebar, ver
-  // docs/ERRORS.md). Movimientos (.pat-col-txns) se queda como la ÚNICA zona con
-  // scroll propio — regla original 2026-07-09, TXNS_MIN solo le da un piso visible.
+  // Alto dinámico de la ficha (2026-07-27/28, campo). Las 3 columnas (datos |
+  // depósito/retiro | historial) viven en UNA sola fila de .pat-columns (grid,
+  // ver pantalla.css, 4ª ronda 2026-07-28: historial dejó de ser una fila propia
+  // abajo). Por eso la ficha ya NO suma la altura de movimientos aparte — toma
+  // el MÁXIMO de las 3 columnas, igual que antes hacía solo con ident/stage.
+  // Historial sigue siendo la única con scroll propio (.pat-txn-col), así que no
+  // necesita declarar su scrollHeight completo — TXNS_MIN solo le da un piso.
   function _syncFichaHeight() {
     requestAnimationFrame(() => {
       if (!window.KpiPanel || typeof window.KpiPanel.apply !== 'function') return;
       const wrap = document.querySelector('.pat-wrap');
       const ident = wrap && wrap.querySelector('.pat-col-ident');
       const stage = wrap && wrap.querySelector('.pat-col-stage');
+      const txns = wrap && wrap.querySelector('.pat-col-txns');
       const topbar = wrap && wrap.querySelector('.pat-topbar');
-      if (!wrap || !ident || !stage) return;
+      if (!wrap || !ident || !stage || !txns) return;
       const SHEET_INSETS = 18 + 14;    // .pantalla-sheet top+bottom (pantalla.css)
       const WRAP_GAP = 9;              // .pat-wrap gap (pantalla.css)
-      const ROW_GAP = 14;              // .pat-columns row-gap (grid)
-      // Modo apilado (.pat-cramped, ident no cabe junto a stage): la fila de
-      // arriba es la SUMA (uno debajo del otro), no el máximo — a diferencia del
-      // modo lado a lado. Sin esto, la ficha crecía poco y stage (con overflow-y:
-      // auto + min-height:0) se comprimía otra vez por debajo de su contenido real.
-      const topRowH = wrap.classList.contains('pat-cramped')
-        ? ident.scrollHeight + ROW_GAP + stage.scrollHeight
-        : Math.max(ident.scrollHeight, stage.scrollHeight);
+      const ROW_GAP = 14;              // .pat-columns row-gap (grid) — solo aplica apilado
+      const TXNS_MIN = 120;            // piso visible de movimientos (su scroll propio hace el resto)
+      // Modo apilado (.pat-cramped, las 3 no caben lado a lado): la fila es la
+      // SUMA (una debajo de otra), no el máximo — a diferencia del modo lado a
+      // lado. Sin esto, la ficha crecía poco y stage/txns (overflow-y:auto +
+      // min-height:0) se comprimían por debajo de su contenido real.
+      const cramped = wrap.classList.contains('pat-cramped');
+      const rowH = cramped
+        ? ident.scrollHeight + ROW_GAP + stage.scrollHeight + ROW_GAP + Math.max(txns.scrollHeight, TXNS_MIN)
+        : Math.max(ident.scrollHeight, stage.scrollHeight, TXNS_MIN);
       const topbarH = topbar ? Math.ceil(topbar.getBoundingClientRect().height) : 0;
-      const ACTIONS_CLEARANCE = 44;    // .pat-columns margin-bottom (despeje del CTA)
-      const TXNS_MIN = 140;            // piso visible de movimientos (su scroll propio hace el resto)
-      const needed = topbarH + WRAP_GAP + topRowH + ROW_GAP + ACTIONS_CLEARANCE + TXNS_MIN + SHEET_INSETS;
-      // focusMaxH() (no maxH()): con La Pantalla abierta y enfocada, ceder el
-      // "10 filas de tabla siempre visibles" a solo 3 — el objetivo aquí es que
-      // retiro/depósito NUNCA necesiten scroll propio.
-      const cap = typeof window.KpiPanel.focusMaxH === 'function' ? window.KpiPanel.focusMaxH() : window.KpiPanel.maxH();
+      const ACTIONS_CLEARANCE = 8;     // .pat-columns margin-bottom (ya no hay CTA flotante que despejar)
+      const needed = topbarH + WRAP_GAP + rowH + ACTIONS_CLEARANCE + SHEET_INSETS;
+      // SOFT_CAP: techo duro (campo, Robert 2026-07-28: "mira lo gigante que está,
+      // empuja todo"). El "sin scroll obligatorio" de 2026-07-27 se relaja — más
+      // allá de este techo, identidad/escenario absorben el resto con SU PROPIO
+      // overflow-y:auto (ya lo tenían, pantalla.css .pat-col-ident/.pat-col-stage)
+      // en vez de inflar la ficha entera hasta tapar la tabla de cuentas. Cuentas
+      // con muchas tarjetas/notas ocasionalmente necesitarán ese scroll propio —
+      // aceptable: el costo lo paga la cuenta rara, no cada apertura.
+      const SOFT_CAP = 480;
+      const focusCap = typeof window.KpiPanel.focusMaxH === 'function' ? window.KpiPanel.focusMaxH() : window.KpiPanel.maxH();
+      const cap = Math.min(SOFT_CAP, focusCap);
       const h = Math.min(Math.max(Math.ceil(needed), window.KpiPanel.DEFAULT_H), cap);
       window.KpiPanel.apply(h);
     });
@@ -896,9 +916,9 @@
     try {
       _rescueStage(detail);        // saca #depStage de `detail` ANTES del wipe de abajo (ver _rescueStage)
       const liquid = animate ? ' pat-liquid' : '';
-      const gVar = (d.grade || 'U').replace('+', 'Plus');
-      detail.innerHTML = `<div class="pat-wrap${liquid}" data-grade="${gVar}">${renderPantallaHead(d)}</div>`;
+      detail.innerHTML = `<div class="pat-wrap${liquid}">${renderPantallaHead(d)}</div>`;
       _mountStage(d);              // re-parenta el escenario + monta/reseedea el panel de depósito compacto
+      _applyWithdrawToCompact(d);  // rellena botón/saldo/estado de retiro DENTRO del mismo panel (2026-07-28)
       _syncIdentWidth();           // ancla --pat-ident-w a la medida REAL de la columna (form CURP la usa)
       _syncColumnsFit();           // marca .pat-cramped si las 3 columnas no caben lado a lado
       _wireColumnsFitResize();     // re-mide al redimensionar la ventana
@@ -1088,9 +1108,9 @@
     const wdFire = e.target.closest('.d-withdraw-fire');
     if (wdFire) {
       e.preventDefault();
-      const wrap = document.querySelector('[data-wd-stage]');
+      const wrap = document.getElementById('depCompact');
       const accId = parseInt(wdFire.dataset.accId) || _currentId;
-      const input = wrap && wrap.querySelector('[data-wd-amount]');
+      const input = wrap && wrap.querySelector('#amtInput');
       const amount = input ? parseFloat(input.value) : NaN;
       if (!accId || wdFire.disabled) return;
       if (!amount || isNaN(amount) || amount < 100) {
@@ -1109,7 +1129,7 @@
       }
       wdFire.disabled = true;
       if (input) input.disabled = true;
-      const statusEl = wrap && wrap.querySelector('.pat-wd-status');
+      const statusEl = wrap && wrap.querySelector('#wdStatus');
       if (statusEl) statusEl.innerHTML = `<div class="pat-wd-row"><span class="dep-spinner"></span> Disparando retiro…</div>`;
       try {
         const r = await fetch(`/api/accounts/${accId}/withdraw`, {

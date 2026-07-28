@@ -99,7 +99,7 @@ prewarm.py (router)
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 145 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2722 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2752 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 325 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 410 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 901 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -227,6 +227,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `e74a470` | fix(ux): humanizar errores, distinguir vacío de roto, guardarriles y accesibilidad |
 | `63f5287` | refactor(auto): robust stratified round-robin selection and test coverage |
 | `321d208` | feat(auto): stratified round-robin + instant rate-limit quarantine + live login SSE feedback |
 | `83822b1` | feat(auto): reglas anti-rafagueo de Robert — cooldown 60s/5s + tope declines + cap cuentas por tarjetas |
@@ -238,7 +239,6 @@ prewarm.py (router)
 | `9cd1c23` | feat(db): tabla auto_missions + reaper zombie (bitácora de corridas auto) + docs ARCHITECTURE/AUDIT |
 | `e9ccb20` | docs(plan): modo auto v2 — anclajes corregidos post-auditoría + gate Claude APROBADO |
 | `0a4611d` | docs(next-session): cierre sesión Modo Auto — plan aprobado, arranque = /Smartexe |
-| `c173940` | docs(plan): Modo Auto — depósito automatizado con autoselección (aprobado por Robert, listo para /Smartexe) |
 <!-- GEN:end:recientes -->
 
 ---
