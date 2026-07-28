@@ -197,11 +197,12 @@ def _fetch_looks_empty(details: Optional[dict]) -> bool:
     has_name = bool(fn and str(fn).strip() not in ("", "N/A"))
     txns = details.get("transactions") or {}
     has_txns = bool(txns.get("items")) or int(txns.get("total_rows", 0) or 0) > 0
+    txn_fetched = bool(txns.get("fetched"))
     bal_bonos = float(details.get("balance_bonos", 0) or 0)
     bal_real = float(details.get("balance_real", 0) or 0)
     new_amt = details.get("last_deposit_amount")
     has_dep = bool(new_amt and float(new_amt) > 0)
-    return not (has_name or has_txns or bal_bonos > 0 or bal_real > 0 or has_dep)
+    return not (has_name or has_txns or txn_fetched or bal_bonos > 0 or bal_real > 0 or has_dep)
 
 
 def _db_upsert_balance(email: str, details: dict) -> None:

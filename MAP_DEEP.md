@@ -298,19 +298,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_db_account_prewarms_today` | def | L130–L145 |
 | `_account_minutes_since_check` | def | L148–L157 |
 | `_db_get_recent_log` | def | L160–L175 |
-| `_fetch_looks_empty` | def | L178–L204 |
-| `_db_upsert_balance` | def | L207–L262 |
-| `_db_save_txns_and_recalc` | def | L265–L318 |
-| `_db_update_last_checked` | def | L321–L333 |
-| `_db_invalidate_jwt` | def | L336–L347 |
-| `_db_mark_dead` | def | L350–L373 |
-| `_is_balance_fresh` | def | L376–L384 |
-| `_capmonster_balance` | def | L389–L405 |
-| `_run_prewarm` | def | L410–L585 |
-| `prewarm_select` | def | L591–L672 |
-| `prewarm_cancel` | def | L676–L686 |
-| `prewarm_status` | def | L690–L705 |
-| `prewarm_refresh_stream` | def | L711–L891 |
+| `_fetch_looks_empty` | def | L178–L205 |
+| `_db_upsert_balance` | def | L208–L263 |
+| `_db_save_txns_and_recalc` | def | L266–L319 |
+| `_db_update_last_checked` | def | L322–L334 |
+| `_db_invalidate_jwt` | def | L337–L348 |
+| `_db_mark_dead` | def | L351–L374 |
+| `_is_balance_fresh` | def | L377–L385 |
+| `_capmonster_balance` | def | L390–L406 |
+| `_run_prewarm` | def | L411–L586 |
+| `prewarm_select` | def | L592–L673 |
+| `prewarm_cancel` | def | L677–L687 |
+| `prewarm_status` | def | L691–L706 |
+| `prewarm_refresh_stream` | def | L712–L892 |
 
 ### `proxy_pool.py`
 

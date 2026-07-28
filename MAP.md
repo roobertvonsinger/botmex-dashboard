@@ -102,7 +102,7 @@ prewarm.py (router)
 | `deposits.py` | 2744 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 323 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 416 | `betmexico.dashboard.login_orch` | _[completar]_ |
-| `prewarm.py` | 891 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
+| `prewarm.py` | 892 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 364 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
@@ -227,6 +227,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `016a1aa` | docs(next-session): flag cambios ajenos sin commitear en deposits.py/login_orchestrator.py |
 | `06e40d5` | optimization(captcha): lazy initialization of captcha pool in gentle_login |
 | `ead496e` | docs(next-session): cierre — vista multi-cuenta animada como objetivo, Modo Auto ya ejecutado (falta smoke Robert) |
 | `d991642` | docs(bitacora): registrar rediseño de La Pantalla + candado anti-reuso en AUDIT/FRONTEND/ERRORS |
@@ -238,7 +239,6 @@ prewarm.py (router)
 | `103e1a0` | feat(ui): drawer Modo Auto — escenas matching/scheduling + bus auto_mission |
 | `9c5e731` | feat(api): endpoints modo auto — POST /api/deposits/auto + cancel + status |
 | `c0bc47d` | feat(auto): orquestador de misión auto (matchmaking + scheduled) |
-| `9074c5c` | feat(ui): botón Modo Auto brillante en paginador + docs FRONTEND |
 <!-- GEN:end:recientes -->
 
 ---

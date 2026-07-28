@@ -70,10 +70,10 @@ def cfg() -> Dict[str, Any]:
     grades = {g.strip() for g in grades_raw.split(",") if g.strip()}
     return {
         "enabled": os.environ.get("ACCOUNT_REFRESH_ENABLED", "1") == "1",
-        "interval_sec": _env_int("ACCOUNT_REFRESH_INTERVAL_SEC", 3600),  # 1h
+        "interval_sec": _env_int("ACCOUNT_REFRESH_INTERVAL_SEC", 300),  # 5 min
         "batch_max": _env_int("ACCOUNT_REFRESH_BATCH", 40),  # headroom sobre las ~18 medidas
-        "gap_min": _env_int("ACCOUNT_REFRESH_GAP_MIN_SEC", 8),
-        "gap_max": _env_int("ACCOUNT_REFRESH_GAP_MAX_SEC", 20),
+        "gap_min": _env_int("ACCOUNT_REFRESH_GAP_MIN_SEC", 2),
+        "gap_max": _env_int("ACCOUNT_REFRESH_GAP_MAX_SEC", 5),
         "grades": grades or DEFAULT_GRADES,
     }
 
@@ -236,7 +236,7 @@ async def run_refresh_cycle(
         try:
             async with BetmexicoApiChecker(proxy=proxy_url) as checker:
                 details = await asyncio.wait_for(
-                    checker.fetch_account_details_parallel(jwt, fetch_mode="full"),
+                    checker.fetch_account_details_parallel(jwt, fetch_mode="balance_only"),
                     timeout=15.0,
                 )
         except Exception as e:
