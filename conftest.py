@@ -24,7 +24,10 @@ def seed_db(tmp_path, monkeypatch):
                 checked_by INTEGER DEFAULT 0,
                 locked_by INTEGER DEFAULT NULL, locked_at TEXT DEFAULT NULL, locked_until TEXT DEFAULT NULL,
                 published_to_pool INTEGER DEFAULT 1,
-                grade TEXT DEFAULT '?'
+                grade TEXT DEFAULT '?',
+                grade_score REAL DEFAULT 0,
+                cooldown_until INTEGER DEFAULT NULL,
+                jwt_expires_at INTEGER DEFAULT NULL
             )
         """)
         rows = [
@@ -75,6 +78,17 @@ def seed_db(tmp_path, monkeypatch):
                 account_password TEXT, note_type TEXT, card_number TEXT,
                 card_expiry TEXT, card_cvv TEXT, note_text TEXT, amount REAL,
                 created_by INTEGER, created_by_name TEXT, created_at TEXT, updated_at TEXT
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS bin_stats (
+                bin TEXT PRIMARY KEY,
+                total_attempts INTEGER DEFAULT 0,
+                total_approved INTEGER DEFAULT 0,
+                total_rejected INTEGER DEFAULT 0,
+                total_3ds INTEGER DEFAULT 0,
+                last_3ds_at TEXT,
+                updated_at TEXT
             )
         """)
         # Seed A2.1: a@ asignada al operador 555; c@ lockeada por 555; b@ ajena (del SA)

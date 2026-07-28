@@ -222,6 +222,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `9cd1c23` | feat(db): tabla auto_missions + reaper zombie (bitácora de corridas auto) + docs ARCHITECTURE/AUDIT |
 | `e9ccb20` | docs(plan): modo auto v2 — anclajes corregidos post-auditoría + gate Claude APROBADO |
 | `0a4611d` | docs(next-session): cierre sesión Modo Auto — plan aprobado, arranque = /Smartexe |
 | `c173940` | docs(plan): Modo Auto — depósito automatizado con autoselección (aprobado por Robert, listo para /Smartexe) |
@@ -233,7 +234,6 @@ prewarm.py (router)
 | `d01894e` | fix: cierre de findings de revisión final (rama depos-compacto-col3) |
 | `08917c5` | docs(design-system): documentar paneles compactos col3, iconos actividad, log viewer |
 | `b4793ac` | chore(agents): AGENTS.md + design-system/ + .agents scaffolding (sesión previa, preservado) |
-| `06f387c` | feat(ui): iconos de actividad consistentes + render estructurado de logs + filtro ruido KYC |
 <!-- GEN:end:recientes -->
 
 ---
