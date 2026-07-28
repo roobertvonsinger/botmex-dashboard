@@ -169,19 +169,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_threeds_recent` | def | L85–L99 |
 | `_rank_key` | def | L102–L105 |
 | `_pipe_str` | def | L108–L113 |
-| `select_accounts_for_auto` | def | L120–L247 |
-| `select_card_for_account` | def | L251–L273 |
-| `_max_accounts_for_cards` | def | L277–L281 |
-| `plan_auto_mission` | def | L284–L444 |
-| `_iso` | def | L485–L486 |
-| `_m_load` | def | L489–L496 |
-| `_m_status` | def | L499–L501 |
-| `_m_update` | def | L504–L513 |
-| `_fetch_account` | def | L516–L522 |
-| `_unlock` | def | L525–L533 |
-| `_broadcast_mission` | def | L536–L545 |
-| `_stop_pool` | def | L548–L555 |
-| `run_auto_mission` | def | L559–L844 |
+| `select_accounts_for_auto` | def | L120–L248 |
+| `select_card_for_account` | def | L252–L274 |
+| `_max_accounts_for_cards` | def | L278–L282 |
+| `plan_auto_mission` | def | L285–L445 |
+| `_iso` | def | L486–L487 |
+| `_m_load` | def | L490–L497 |
+| `_m_status` | def | L500–L502 |
+| `_m_update` | def | L505–L514 |
+| `_fetch_account` | def | L517–L523 |
+| `_unlock` | def | L526–L534 |
+| `_broadcast_mission` | def | L537–L546 |
+| `_stop_pool` | def | L549–L556 |
+| `run_auto_mission` | def | L560–L845 |
 
 ### `autoexclusion.py`
 

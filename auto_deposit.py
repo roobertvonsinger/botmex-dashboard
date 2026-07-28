@@ -213,9 +213,10 @@ def select_accounts_for_auto(
 
     # Estratificación en 3 Tiers (Top, Mid, Low) + Selección Intercalada (Round-Robin)
     # Robert 2026-07-28: No agotar solo las A+, intercalar 1 Top, 1 Mid, 1 Low...
+    # Excepción: si se piden <= 3 cuentas (ej. count=1, 2 o 3), prioriza las mejores absolutas (Top first).
     out.sort(key=_calc_rank_score)
 
-    if len(out) <= 3:
+    if count <= 3 or len(out) <= 3:
         return out[:count]
 
     # Dividir en 3 estratos

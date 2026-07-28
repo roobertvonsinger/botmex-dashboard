@@ -72,8 +72,26 @@ def test_select_orders_by_grade_then_score():
         _row("a_high@t.com", grade="A", grade_score=90),
     ]
     emails = [r["email"] for r in rows]
-    sel = select_accounts_for_auto(rows, 150, 9, _win(*emails))
-    assert [r["email"] for r in sel] == ["ap@t.com", "a_high@t.com", "a_low@t.com", "b@t.com"]
+    # Con count=2 (count <= 3), no estratifica en round-robin y devuelve las mejores absolutas
+    sel = select_accounts_for_auto(rows, 150, 2, _win(*emails))
+    assert [r["email"] for r in sel] == ["ap@t.com", "a_high@t.com"]
+
+
+def test_select_stratified_round_robin():
+    rows = [
+        _row(f"top_{i}@t.com", grade="A+", grade_score=90) for i in range(3)
+    ] + [
+        _row(f"mid_{i}@t.com", grade="A", grade_score=50) for i in range(3)
+    ] + [
+        _row(f"low_{i}@t.com", grade="B", grade_score=10) for i in range(3)
+    ]
+    emails = [r["email"] for r in rows]
+    sel = select_accounts_for_auto(rows, 150, 6, _win(*emails))
+    selected_emails = [r["email"] for r in sel]
+    # Debe intercalar un Top, un Mid, un Low
+    assert selected_emails[0].startswith("top_")
+    assert selected_emails[1].startswith("mid_")
+    assert selected_emails[2].startswith("low_")
 
 
 def test_select_respects_count():

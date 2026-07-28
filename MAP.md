@@ -95,7 +95,7 @@ prewarm.py (router)
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
 | `app.py` | 3907 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 844 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 845 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 145 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -227,6 +227,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `321d208` | feat(auto): stratified round-robin + instant rate-limit quarantine + live login SSE feedback |
 | `83822b1` | feat(auto): reglas anti-rafagueo de Robert — cooldown 60s/5s + tope declines + cap cuentas por tarjetas |
 | `103e1a0` | feat(ui): drawer Modo Auto — escenas matching/scheduling + bus auto_mission |
 | `9c5e731` | feat(api): endpoints modo auto — POST /api/deposits/auto + cancel + status |
@@ -238,7 +239,6 @@ prewarm.py (router)
 | `0a4611d` | docs(next-session): cierre sesión Modo Auto — plan aprobado, arranque = /Smartexe |
 | `c173940` | docs(plan): Modo Auto — depósito automatizado con autoselección (aprobado por Robert, listo para /Smartexe) |
 | `a3acf5c` | fix: retiro/depósito en La Pantalla — grid sin scroll + guiado a campos ocultos |
-| `4b483bc` | fix: botón flotante Depositar/Retirar tapaba el panel compacto de La Pantalla |
 <!-- GEN:end:recientes -->
 
 ---
