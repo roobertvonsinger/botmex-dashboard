@@ -232,33 +232,33 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `bin_stats_overview` | def | L298–L357 |
 | `_auto_lock_for_deposit` | def | L360–L415 |
 | `_window_status` | def | L418–L460 |
-| `_check_caps` | def | L463–L476 |
-| `_load_deps` | def | L479–L490 |
-| `_parse_pipe` | def | L493–L514 |
-| `_check_card_velocity` | def | L534–L581 |
-| `_has_recent_approved_deposit` | def | L584–L600 |
-| `_record_attempt` | def | L603–L723 |
-| `_safe_phase` | def | L733–L740 |
-| `_now_mx_str` | def | L748–L757 |
-| `_deposit_step_payload` | def | L766–L774 |
-| `_wrap_deposit_step` | def | L777–L796 |
-| `_build_admin_proxy_url` | def | L799–L803 |
-| `_refresh_account_after_deposit` | def | L806–L865 |
-| `_should_relogin_after_401` | def | L868–L872 |
-| `_acquire_session_and_begin` | def | L875–L1124 |
-| `_run_deposit_with_phases` | def | L1127–L1471 |
-| `deposit_execute_stream` | def | L1475–L1673 |
-| `cap_status` | def | L1677–L1689 |
-| `_mm_is_real_decline` | def | L1726–L1732 |
-| `_mm_is_ambiguous_charge` | def | L1735–L1745 |
-| `classify_deposit_status` | def | L1748–L1779 |
-| `_mm_session_get` | def | L1829–L1833 |
-| `_mm_session_update` | def | L1836–L1845 |
-| `multi_stream` | def | L1849–L2363 |
-| `multi_cancel` | def | L2367–L2372 |
-| `scheduled_create` | def | L2385–L2743 |
-| `scheduled_list` | def | L2747–L2769 |
-| `scheduled_cancel` | def | L2773–L2781 |
+| `_check_caps` | def | L463–L479 |
+| `_load_deps` | def | L482–L493 |
+| `_parse_pipe` | def | L496–L517 |
+| `_check_card_velocity` | def | L537–L584 |
+| `_has_recent_approved_deposit` | def | L587–L603 |
+| `_record_attempt` | def | L606–L726 |
+| `_safe_phase` | def | L736–L743 |
+| `_now_mx_str` | def | L751–L760 |
+| `_deposit_step_payload` | def | L769–L777 |
+| `_wrap_deposit_step` | def | L780–L799 |
+| `_build_admin_proxy_url` | def | L802–L806 |
+| `_refresh_account_after_deposit` | def | L809–L868 |
+| `_should_relogin_after_401` | def | L871–L875 |
+| `_acquire_session_and_begin` | def | L878–L1127 |
+| `_run_deposit_with_phases` | def | L1130–L1474 |
+| `deposit_execute_stream` | def | L1478–L1677 |
+| `cap_status` | def | L1681–L1693 |
+| `_mm_is_real_decline` | def | L1730–L1736 |
+| `_mm_is_ambiguous_charge` | def | L1739–L1749 |
+| `classify_deposit_status` | def | L1752–L1783 |
+| `_mm_session_get` | def | L1833–L1837 |
+| `_mm_session_update` | def | L1840–L1849 |
+| `multi_stream` | def | L1853–L2368 |
+| `multi_cancel` | def | L2372–L2377 |
+| `scheduled_create` | def | L2390–L2749 |
+| `scheduled_list` | def | L2753–L2775 |
+| `scheduled_cancel` | def | L2779–L2787 |
 
 ### `jwt_keeper.py`
 
@@ -706,9 +706,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_update_caches_on_first_success` | def | L13–L17 |
 | `test_update_does_not_overwrite_existing` | def | L20–L24 |
 | `test_update_invalidates_on_401` | def | L27–L32 |
-| `test_update_keeps_session_on_normal_rejection` | def | L35–L41 |
-| `test_update_invalidates_on_bare_401` | def | L44–L48 |
-| `test_update_invalidates_on_redirectlogin` | def | L51–L55 |
+| `test_update_keeps_session_on_normal_rejection` | def | L35–L40 |
+| `test_check_caps_sa_bypass` | def | L43–L57 |
+| `test_update_invalidates_on_bare_401` | def | L60–L64 |
+| `test_update_invalidates_on_redirectlogin` | def | L67–L71 |
 
 ### `test_withdrawals.py`
 

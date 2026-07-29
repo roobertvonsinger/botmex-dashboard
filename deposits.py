@@ -460,11 +460,14 @@ def _window_status(email: str) -> dict:
     return out
 
 
-def _check_caps(email: str, amount: float, projected_extra: float = 0.0) -> Optional[str]:
+def _check_caps(email: str, amount: float, projected_extra: float = 0.0, is_sa: bool = False) -> Optional[str]:
     """Devuelve string de error si viola cap, None si OK.
-    `projected_extra` = monto adicional ya proyectado (ej. schedule: amount * reps_extra)."""
+    `projected_extra` = monto adicional ya proyectado (ej. schedule: amount * reps_extra).
+    `is_sa` = True si el operador es SuperAdmin. Omite el cap acumulado 24h ($1,499) para SA."""
     if amount > DEP_MAX_PER_TXN:
         return f"Máximo ${DEP_MAX_PER_TXN:.0f} por intento (>${DEP_MAX_PER_TXN:.0f} dispara 3DS)"
+    if is_sa:
+        return None
     win = _window_status(email)
     needed = amount + projected_extra
     if needed > win["available"]:
@@ -1521,14 +1524,15 @@ async def deposit_execute_stream(request: Request, user: dict = Depends(require_
     password = row["password"]
     operator_id = int(user.get("telegram_id") or 0)
 
-    # Cap check
-    cap_err = _check_caps(email, amount)
-    if cap_err:
-        raise HTTPException(400, cap_err)
-
     # Velocity check (saltarse con force=true, solo SA) — mismo orden que /execute
     force = bool(body.get("force"))
     is_sa = (user.get("role") == "superadmin")
+
+    # Cap check (SA omite cap 24h $1,499)
+    cap_err = _check_caps(email, amount, is_sa=is_sa)
+    if cap_err:
+        raise HTTPException(400, cap_err)
+
     if not (force and is_sa):
         vel = _check_card_velocity(card_pipe, email)
         if vel:
@@ -1920,11 +1924,12 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
         )
 
     accounts = valid_accounts
+    is_sa = (user.get("role") == "superadmin")
 
     # Cap check por cuenta — si alguna está full, abortar antes de empezar
     cap_errors = []
     for a in accounts:
-        err = _check_caps(a["email"], amount)
+        err = _check_caps(a["email"], amount, is_sa=is_sa)
         if err:
             cap_errors.append(f"{a['email']}: {err}")
     if cap_errors:
@@ -2417,18 +2422,19 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
     password = row["password"]
     cap_key = os.environ.get("CAPMONSTER_KEY", "") or os.environ.get("BMX_CAPMONSTER_KEY", "")
 
-    # M1 (fix 2026-07-02): el cap agregado 24h (DEP_MAX_24H) NO se validaba en
-    # scheduled — solo el por-txn (arriba). Una misión de N reps × monto podía
-    # exceder el tope diario (ej. 4×$490=$1960 > $1499, o 20 reps ≈ $9980). Se
-    # proyecta el total de la misión (reps-1 extra sobre el intento base).
-    cap_err = _check_caps(email, amount, projected_extra=amount * (repetitions - 1))
-    if cap_err:
-        raise HTTPException(400, cap_err)
-
     # Velocity check al crear el schedule (no en cada iter — misma cuenta+tarjeta
     # no dispara velocity, solo si la tarjeta se usó en OTRA cuenta hace <60s).
     force = bool(body.get("force"))
     is_sa = (user.get("role") == "superadmin")
+
+    # M1 (fix 2026-07-02): el cap agregado 24h (DEP_MAX_24H) NO se validaba en
+    # scheduled — solo el por-txn (arriba). Una misión de N reps × monto podía
+    # exceder el tope diario (ej. 4×$490=$1960 > $1499, o 20 reps ≈ $9980). Se
+    # proyecta el total de la misión (reps-1 extra sobre el intento base).
+    cap_err = _check_caps(email, amount, projected_extra=amount * (repetitions - 1), is_sa=is_sa)
+    if cap_err:
+        raise HTTPException(400, cap_err)
+
     if not (force and is_sa):
         vel = _check_card_velocity(card_pipe, email)
         if vel:

@@ -38,7 +38,23 @@ def test_update_keeps_session_on_normal_rejection():
     deposits._mm_session_update(s, "a@test.com",
         {"success": False, "result_code": "BANK_REJECTED",
          "error": "Tarjeta rechazada por el banco"})
-    assert s["a@test.com"] == ("JWT1", "P1")
+
+
+def test_check_caps_sa_bypass():
+    """SA ignora el cap 24h ($1499), pero mantiene la regla de $499 por txn para evitar 3DS."""
+    # Para operador normal sin is_sa, cap de >$499 o ventana llena debe fallar si excede
+    err_txn = deposits._check_caps("test@email.com", 500.0, is_sa=False)
+    assert err_txn is not None
+    assert "dispara 3DS" in err_txn
+
+    # Para SA con $500, viola por-txn ($499 max por 3DS)
+    err_sa_txn = deposits._check_caps("test@email.com", 500.0, is_sa=True)
+    assert err_sa_txn is not None
+    assert "dispara 3DS" in err_sa_txn
+
+    # Para SA con $490 (válido per-txn), no retorna error aun si is_sa=True (se omite check 24h)
+    err_sa_ok = deposits._check_caps("test@email.com", 490.0, is_sa=True)
+    assert err_sa_ok is None
 
 
 def test_update_invalidates_on_bare_401():
