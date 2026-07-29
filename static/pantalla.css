@@ -680,6 +680,12 @@
    colores fuera de la paleta ok/fail/3DS (155/24/85) para no confundir fuente con resultado */
 .pat-mv-src--dash { background: oklch(0.72 0.16 292 / 0.16); color: oklch(0.78 0.16 292); }
 .pat-mv-src--bet  { background: oklch(0.74 0.13 228 / 0.16); color: oklch(0.80 0.12 228); }
+
+/* Contorno amarillo sutil para transacciones iniciadas desde el Dashboard (TDAH visual) */
+.pat-mv.pat-mv-src--dash {
+  border-left: 3px solid #ffca28 !important;
+  background: rgba(255, 202, 40, 0.06) !important;
+}
 .pat-mv-d { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
 .pat-mv-a { font-family: var(--pat-font-mono); font-weight: 700; white-space: nowrap; flex: 0 0 auto; }
 /* Verde = aprobado · rojo nítido = rechazado · dorado = 3DS · tenue = pendiente/retiro */

@@ -739,12 +739,13 @@
     const g = window.esc || (s => s);
     const money = window.fmtMoney || (v => `$${(v || 0).toFixed(2)}`);
     const cls = _mvResultCls(m);
+    const srcCls = _mvSrcCls(m);
     const sign = m.kind === 'withdrawal' ? '−' : (m.state === 'ok' ? '+' : '');
     const title = m.reason ? ` title="${g(m.reason)}"` : '';
-    return `<div class="pat-mv ${cls}" data-mv-idx="${idx}" style="--j:${pos}"${title}>
+    return `<div class="pat-mv ${cls} ${srcCls}" data-mv-idx="${idx}" style="--j:${pos}"${title}>
       <div class="pat-mv-row">
         <span class="pat-mv-t">${g(_mvTime(m))}</span>
-        <span class="pat-mv-src ${_mvSrcCls(m)}" title="${g(_mvSrcLabel(m))}">${_mvSrcBadge(m)}</span>
+        <span class="pat-mv-src ${srcCls}" title="${g(_mvSrcLabel(m))}">${_mvSrcBadge(m)}</span>
         <span class="pat-mv-d">${g(_mvDesc(m))}</span>
         <span class="pat-mv-a">${sign}${money(m.amount)}</span>
       </div>

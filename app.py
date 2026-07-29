@@ -3023,11 +3023,24 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
             # account_transactions → betmex. txn_type 1=dep, 2=retiro.
             # gateway 1=tarjeta, 2=SPEI, 3=OXXO. status 6=ok,0=pending,-4/5=fail.
             _gw_method = {1: "Pago con tarjeta", 2: "SPEI", 3: "OXXO"}
+            # Resolver etiquetas de integración para SPEI si existen en clabes
+            spei_integrations = []
+            for c_item in (result.get("clabes") or []):
+                integ = str(c_item.get("integration") or "").upper() if isinstance(c_item, dict) else ""
+                ord_v = c_item.get("clabe_order") if isinstance(c_item, dict) else None
+                if integ:
+                    label = f"SPEI · {integ}" + (f" · {ord_v}" if ord_v else "")
+                    if label not in spei_integrations:
+                        spei_integrations.append(label)
+            spei_default_label = spei_integrations[0] if spei_integrations else "SPEI · STP"
+
             for t in result.get("transactions", []):
                 is_wd = t.get("txn_type") == 2
                 kind = "withdrawal" if is_wd else "deposit"
+                gw = t.get("gateway")
                 if is_wd:
                     state = "wd"
+                    method_label = "TARJETA" if gw == 1 else spei_default_label
                 else:
                     s = t.get("status")
                     if s == 6:
@@ -3038,13 +3051,15 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                         state = "fail"
                     else:
                         state = "pending"
+                    method_label = _gw_method.get(gw)
+
                 # DEDUP: si este depósito con tarjeta coincide (mismo monto + hora ±3min
                 # + MISMO ESTADO) con un intento hecho desde el dashboard, es el MISMO
                 # evento → omitir el eco de BetMexico (ya está como movimiento nuestro).
                 # La coincidencia de ESTADO es clave: sin ella una firma 'fail' podía
                 # consumir un depósito APROBADO real y ocultarlo (fix 2026-07-03, hallazgo
                 # #2). Empareja con la firma MÁS CERCANA en tiempo del MISMO estado y la consume.
-                if (not is_wd and t.get("gateway") == 1 and state in ("ok", "fail") and _dash_sigs):
+                if (not is_wd and gw == 1 and state in ("ok", "fail") and _dash_sigs):
                     _tw = _parse_when(t.get("txn_date"))
                     try:
                         _ta = float(t.get("amount") or 0)
@@ -3065,7 +3080,8 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                     "when": t.get("txn_date"),
                     "source": "betmex",
                     "kind": kind,
-                    "method": _gw_method.get(t.get("gateway")),
+                    "method": method_label,
+                    "gateway": gw,
                     "amount": t.get("amount"),
                     "state": state,
                     "who": None,

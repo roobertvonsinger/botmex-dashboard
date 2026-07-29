@@ -93,7 +93,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 3911 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3927 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 888 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -227,6 +227,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `e982651` | feat(deposits): permitir bypass del cap 24h ($1,499) exclusivamente a SuperAdmin |
 | `7b47b23` | docs(next-session): actualizar NEXT-SESSION.md con correcciones de matchmaking y logs |
 | `2c8e226` | fix(matchmaking): prevenir re-depósito a cuentas completadas y ajustar scrollbar en chips UI |
 | `fb9ae44` | logging(auto): inyectar logs estructurados con emojis en run_auto_mission |
@@ -238,7 +239,6 @@ prewarm.py (router)
 | `ead496e` | docs(next-session): cierre — vista multi-cuenta animada como objetivo, Modo Auto ya ejecutado (falta smoke Robert) |
 | `d991642` | docs(bitacora): registrar rediseño de La Pantalla + candado anti-reuso en AUDIT/FRONTEND/ERRORS |
 | `8caf392` | redesign(pantalla): rediseño completo — 3 columnas iguales, panel único depósito/retiro, candado anti-reuso de tarjeta |
-| `e74a470` | fix(ux): humanizar errores, distinguir vacío de roto, guardarriles y accesibilidad |
 <!-- GEN:end:recientes -->
 
 ---
