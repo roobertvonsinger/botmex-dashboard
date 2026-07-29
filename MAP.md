@@ -227,6 +227,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `2c8e226` | fix(matchmaking): prevenir re-depósito a cuentas completadas y ajustar scrollbar en chips UI |
 | `fb9ae44` | logging(auto): inyectar logs estructurados con emojis en run_auto_mission |
 | `e824898` | fix(auto): integrar a main el fix de ValueError en parseo de pipes de 4 partes |
 | `d30e826` | docs(errors): document definitive fix for _fetch_looks_empty regression |
@@ -238,7 +239,6 @@ prewarm.py (router)
 | `8caf392` | redesign(pantalla): rediseño completo — 3 columnas iguales, panel único depósito/retiro, candado anti-reuso de tarjeta |
 | `e74a470` | fix(ux): humanizar errores, distinguir vacío de roto, guardarriles y accesibilidad |
 | `63f5287` | refactor(auto): robust stratified round-robin selection and test coverage |
-| `321d208` | feat(auto): stratified round-robin + instant rate-limit quarantine + live login SSE feedback |
 <!-- GEN:end:recientes -->
 
 ---
