@@ -949,6 +949,9 @@ function statusPill(e) {
             : 'var(--text-muted)';
     return `<span style="color:${c}">${esc(e.status || '—')}</span>${e.reason ? `<span class="dim mono"> · ${esc(e.reason).slice(0, 40)}</span>` : ''}`;
   }
+  if (e.kind === 'telegram_bot_bet') {
+    return `<span style="color:var(--accent,#00d4aa)">🤖 /bet enviado</span>${e.card_count ? `<span class="dim mono"> · ${e.card_count} tarjeta(s)</span>` : ''}`;
+  }
   if (e.kind === 'lock') return `<span class="dim">activo</span>`;
   if (e.kind === 'unlock') return `<span class="dim">liberado</span>`;
   if (e.kind === 'note') return `<span class="dim mono" title="${esc(e.text || '')}">${esc((e.text || '').slice(0, 60))}</span>`;
@@ -1774,6 +1777,37 @@ async function reload() {
     for (const id of selectedIds) if (!valid.has(id)) selectedIds.delete(id);
     renderTable();
     renderStats(stats);
+
+    // Filtrado por match de Telegram al aterrizar en Dashboard (?match=MISSION_ID o ?match=email)
+    const urlParams = new URLSearchParams(window.location.search);
+    const matchParam = urlParams.get('match');
+    if (matchParam && !window._matchFilteredDone) {
+      window._matchFilteredDone = true;
+      if (matchParam.includes('@')) {
+        searchQuery = matchParam.toLowerCase();
+        if ($('#searchInput')) $('#searchInput').value = matchParam;
+        _reflectSearchUI();
+        renderTable();
+        toast(`🎯 Enfocando cuenta de match: ${matchParam}`, 'info');
+      } else {
+        // Consultar los correos de la misión vía la API
+        fetch(`/api/deposits/auto/${matchParam}/status`)
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (data && data.matches && data.matches.length) {
+              const matchedEmails = data.matches.map(m => m.email).filter(Boolean);
+              if (matchedEmails.length) {
+                searchQuery = matchedEmails[0].toLowerCase();
+                if ($('#searchInput')) $('#searchInput').value = searchQuery;
+                _reflectSearchUI();
+                renderTable();
+                toast(`🎯 Cuentas enfocadas por match Telegram (${matchedEmails.length})`, 'info');
+              }
+            }
+          })
+          .catch(() => {});
+      }
+    }
   } catch (e) {
     $('#accTable').querySelector('tbody').innerHTML =
       `<tr><td colspan="9" class="loading" style="color:var(--danger)">${esc(humanizeApiError(e))}</td></tr>`;
@@ -2543,6 +2577,35 @@ $('#btnCardsOnly')?.addEventListener('click', () => {
   $('#btnCardsOnly').classList.toggle('on', state.cardsOnly);
   reload();
   toast(state.cardsOnly ? '💳 Filtro: solo cuentas con tarjeta' : '↺ Filtro tarjetas removido', 'success');
+});
+
+// Tab de logs: Dashboard vs Telegram Bot
+let _activeLogsTab = 'dashboard';
+$('#tabLogsDashboard')?.addEventListener('click', () => {
+  _activeLogsTab = 'dashboard';
+  $('#tabLogsDashboard').classList.add('on');
+  $('#tabLogsBot').classList.remove('on');
+  // Re-filtrar feed visual
+  document.querySelectorAll('#lpActivity .lp-feed-row').forEach(row => {
+    if (row.dataset.kind === 'telegram_bot_bet') {
+      row.style.display = 'none';
+    } else {
+      row.style.display = '';
+    }
+  });
+});
+$('#tabLogsBot')?.addEventListener('click', () => {
+  _activeLogsTab = 'bot';
+  $('#tabLogsBot').classList.add('on');
+  $('#tabLogsDashboard').classList.remove('on');
+  // Mostrar únicamente logs del bot
+  document.querySelectorAll('#lpActivity .lp-feed-row').forEach(row => {
+    if (row.dataset.kind === 'telegram_bot_bet') {
+      row.style.display = '';
+    } else {
+      row.style.display = 'none';
+    }
+  });
 });
 
 // Logs handlers

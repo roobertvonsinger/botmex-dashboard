@@ -418,6 +418,20 @@ def _migrate():
     except sqlite3.OperationalError:
         pass
 
+    # Tabla de tracking de penalizaciones y strikes por operador para el Bot de Telegram
+    try:
+        with db(write=True) as c:
+            c.execute(
+                "CREATE TABLE IF NOT EXISTS operator_penalties ("
+                "telegram_id INTEGER PRIMARY KEY, "
+                "strikes_count INTEGER NOT NULL DEFAULT 0, "
+                "penalty_until TEXT, "
+                "last_attempts TEXT, "
+                "updated_at TEXT NOT NULL)"
+            )
+    except sqlite3.OperationalError:
+        pass
+
     _backfill_grades_v10_m7()
 
 
@@ -3995,6 +4009,179 @@ def auto_deposit_status(mission_id: str,
     for k in ("card_pipes", "accounts_selected", "matches"):
         d[k] = _json.loads(d.get(k) or "[]")
     return d
+
+
+@app.post("/api/bot/bet")
+async def bot_bet_create(request: Request, user: dict = Depends(require_session)):
+    """Endpoint para el comando /bet del bot de Telegram.
+
+    Reglas operativas actualizadas:
+    - 1 INTENTO = 1 iniciación completa del flujo en automático (no por tarjeta individual).
+    - Límite de STRIKES = 5 por día por operador (1 strike = 3 tarjetas con 3 rechazos fallidos acumulados, O 3 intentos de spam/ráfaga).
+    - Descarte de Tarjetas Repetidas: Si la tarjeta ya existe en BD (account_cards), se descarta antes de iniciar.
+    - Confirmación previa con resumen e información de strikes restantes.
+    """
+    from card_checker import precheck_card_liveness, format_ruthopia_liveness_summary
+    from auto_deposit import plan_auto_mission, run_auto_mission
+    from deposits import _mission_sem, DEP_MAX_PER_TXN, DEP_MAX_24H
+
+    body = await request.json()
+    card_pipes = body.get("card_pipes", [])
+    amount = float(body.get("amount", 150))
+    target_count = int(body.get("target_count", 9))
+    confirmed = body.get("confirmed", False)
+    operator_id = user.get("telegram_id") or body.get("telegram_id") or 0
+
+    if not card_pipes or len(card_pipes) > 4:
+        raise HTTPException(400, "Se requieren de 1 a 4 tarjetas por intento (card_pipes)")
+
+    now_dt = datetime.now(timezone.utc)
+    now_iso = now_dt.isoformat()
+
+    # Guardarraíl 1: Verificación de Strikes (Máximo 5 strikes por día por operador)
+    MAX_DAILY_STRIKES = 5
+    with db(write=True) as c:
+        row = c.execute(
+            "SELECT strikes_count, penalty_until, last_attempts FROM operator_penalties WHERE telegram_id=?",
+            (operator_id,)
+        ).fetchone()
+        strikes_count = row["strikes_count"] if row else 0
+        penalty_until = row["penalty_until"] if row else None
+        if penalty_until:
+            try:
+                p_dt = datetime.fromisoformat(penalty_until)
+                if p_dt > now_dt:
+                    secs_left = int((p_dt - now_dt).total_seconds())
+                    mins_left = max(1, secs_left // 60)
+                    raise HTTPException(
+                        429, f"Operador en penalización por spam (1 strike acumulado). Intenta en {mins_left} min."
+                    )
+            except ValueError:
+                pass
+
+        if strikes_count >= MAX_DAILY_STRIKES:
+            raise HTTPException(
+                403, f"Límite de {MAX_DAILY_STRIKES} strikes diarios alcanzado (3 rechazos fallidos o spam = 1 strike). Solicita reset al SuperAdmin."
+            )
+
+    # Guardarraíl 2: Comprobar si las tarjetas YA existen asociadas en BD (account_cards)
+    existing_cards = set()
+    try:
+        with db() as c:
+            rows = c.execute("SELECT card_number FROM account_cards").fetchall()
+            for r in rows:
+                if r["card_number"]:
+                    existing_cards.add(str(r["card_number"]).strip())
+    except Exception:
+        pass
+
+    # Guardarraíl 3: Pre-check de Liveness con descartes por duplicidad + liveness
+    valid_pipes = []
+    liveness_records = []
+    for pipe in card_pipes:
+        parts = [p.strip() for p in str(pipe).split("|") if p.strip()]
+        card_num = parts[0] if parts else ""
+        if card_num and card_num in existing_cards:
+            liveness_records.append({
+                "pipe": pipe,
+                "ok": False,
+                "status_label": "🔴 DESCARTADA - Tarjeta ya existe asociada a otra cuenta en la BD"
+            })
+            continue
+
+        ok, reason, parsed = precheck_card_liveness(pipe)
+        liveness_records.append({
+            "pipe": pipe,
+            "ok": ok,
+            "status_label": reason
+        })
+        if ok:
+            valid_pipes.append(parsed["pipe_3parts"])
+            bin_code = parsed["bin"]
+            try:
+                with db(write=True) as c:
+                    c.execute(
+                        "INSERT INTO bin_stats (bin, total_attempts, updated_at) VALUES (?, 1, ?) "
+                        "ON CONFLICT(bin) DO UPDATE SET total_attempts = total_attempts + 1, updated_at = ?",
+                        (bin_code, now_iso, now_iso)
+                    )
+            except Exception:
+                pass
+
+    summary_text = format_ruthopia_liveness_summary(liveness_records)
+    strikes_left = MAX_DAILY_STRIKES - strikes_count
+
+    if not valid_pipes:
+        raise HTTPException(400, f"Ninguna tarjeta superó las validaciones iniciales:\n\n{summary_text}")
+
+    # Si NO ha confirmado, solicita la última confirmación amigable
+    if not confirmed:
+        confirm_msg = (
+            f"<b>⚠️ ÚLTIMA CONFIRMACIÓN REQUERIDA ANTES DE INICIAR</b>\n\n"
+            f"• <b>Flujo:</b> 1 intento automático de matchmaking con {len(valid_pipes)} tarjeta(s) válida(s).\n"
+            f"• <b>Strikes del Operador:</b> Tienes derecho a {MAX_DAILY_STRIKES} strikes/día. Te quedan <b>{strikes_left}</b> strike(s).\n"
+            f"• <b>Regla:</b> Cada 3 rechazos con 3 fallos acumulados = 1 strike. Cada 3 ráfagas de spam = 1 strike.\n\n"
+            f"{summary_text}\n\n"
+            f"<i>Responde o envía la confirmación con `confirmed: true` para iniciar los depósitos.</i>"
+        )
+        return {
+            "require_confirmation": True,
+            "strikes_left": strikes_left,
+            "valid_cards_count": len(valid_pipes),
+            "liveness_summary": summary_text,
+            "message": confirm_msg
+        }
+
+    # Guardarraíl 4: Concurrencia (máximo 1 intento a la vez)
+    if _mission_sem.locked():
+        raise HTTPException(429, "Ya hay un intento de matchmaking activo en el sistema.")
+
+    plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count)
+    if not plan["feasible"]:
+        raise HTTPException(409, plan["reason"])
+
+    from uuid import uuid4
+    mission_id = str(uuid4())[:8]
+    _persist_auto_mission(mission_id, operator_id, valid_pipes, amount, target_count, plan)
+    asyncio.create_task(run_auto_mission(mission_id, plan, user))
+
+    # Log para la pestaña de logs de Telegram Bot
+    _broadcast({
+        "type": "activity",
+        "kind": "telegram_bot_bet",
+        "ts": now_iso,
+        "mission_id": mission_id,
+        "card_count": len(valid_pipes),
+        "status": "started",
+        "liveness_summary": summary_text,
+        "accounts": [a.get("email") for a in plan.get("accounts", [])],
+        **_resolve_who(operator_id)
+    })
+
+    top_bines = []
+    try:
+        with db() as c:
+            rows = c.execute(
+                "SELECT bin, total_approved, total_attempts FROM bin_stats "
+                "WHERE total_attempts >= 2 ORDER BY (total_approved * 1.0 / total_attempts) DESC LIMIT 3"
+            ).fetchall()
+            top_bines = [r["bin"] for r in rows if r["bin"]]
+    except Exception:
+        pass
+
+    matched_emails = [a.get("email") for a in plan.get("accounts", [])]
+    return {
+        "ok": True,
+        "mission_id": mission_id,
+        "accounts_selected": len(matched_emails),
+        "matched_emails": matched_emails,
+        "total_estimated": plan["total_estimated"],
+        "recommended_bines": top_bines,
+        "strikes_left": strikes_left,
+        "liveness_summary": summary_text,
+        "dashboard_link": f"https://botmexico.net/?match={mission_id}",
+        "message": f"🚀 Intento automático /bet INICIADO con {len(valid_pipes)} tarjeta(s).\n\n{summary_text}"
+    }
 
 
 if __name__ == "__main__":

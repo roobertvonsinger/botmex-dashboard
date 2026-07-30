@@ -93,10 +93,11 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 4004 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 4191 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 888 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
+| `card_checker.py` | 170 | `—` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 145 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `deposits.py` | 2787 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
@@ -157,6 +158,7 @@ prewarm.py (router)
 | `MATCH_TRANSIENT_RETRIES` | `4` | `auto_deposit.py` |
 | `MM_CROSS_ACCOUNT_GAP` | `5` | `auto_deposit.py` |
 | `MM_MAX_ACCOUNT_DECLINES_PER_RUN` | `2` | `auto_deposit.py` |
+| `WABOX_STRIPE_PK` | `"pk_live_WQNz0qa1BmBu47grZwTpj8BR"` | `card_checker.py` |
 | `BETMEXICO_PAYMENTS_API` | `"https://paymentsapi.betmexico.mx"` | `clabe_fetch.py` |
 | `BEGIN_DEPOSIT_PATH` | `"/api/stp/BeginDeposit"` | `clabe_fetch.py` |
 | `DEP_MAX_PER_TXN` | `499.0` | `deposits.py` |
@@ -228,6 +230,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `72f43b0` | feat(maintenance): pantalla de mantenimiento con redireccion y bypass SA |
 | `a8583dc` | feat(maintenance): pantalla de mantenimiento con redireccion y bypass SA |
 | `8034a90` | feat(pantalla): diferenciacion visual SPEI/Tarjeta, contorno amarillo dashboard y tarjeta en desc |
 | `e982651` | feat(deposits): permitir bypass del cap 24h ($1,499) exclusivamente a SuperAdmin |
@@ -239,7 +242,6 @@ prewarm.py (router)
 | `72f92b0` | feat(refresh): fast 5-minute background refresh with balance_only mode |
 | `016a1aa` | docs(next-session): flag cambios ajenos sin commitear en deposits.py/login_orchestrator.py |
 | `06e40d5` | optimization(captcha): lazy initialization of captcha pool in gentle_login |
-| `ead496e` | docs(next-session): cierre — vista multi-cuenta animada como objetivo, Modo Auto ya ejecutado (falta smoke Robert) |
 <!-- GEN:end:recientes -->
 
 ---
