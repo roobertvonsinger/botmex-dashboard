@@ -78,6 +78,7 @@ def parse_and_validate_card_pipe(pipe_str: str) -> Tuple[bool, Optional[Dict[str
         "card_cvv": cvv,
         "bin": card_num[:6],
         "pipe_3parts": f"{card_num}|{exp}|{cvv}",
+        "pipe_4parts": f"{card_num}|{exp[:2]}|20{exp[2:]}|{cvv}",
     }
     return True, parsed, "OK"
 

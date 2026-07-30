@@ -144,11 +144,12 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `auto_deposit_create` | def | L3958–L3994 |
 | `auto_deposit_cancel` | def | L3998–L4024 |
 | `auto_deposit_status` | def | L4028–L4039 |
-| `bot_start_info` | def | L4043–L4079 |
-| `bot_operator_info` | def | L4083–L4122 |
-| `bot_help_info` | def | L4126–L4140 |
-| `bot_cancel_mission` | def | L4144–L4164 |
-| `bot_bet_create` | def | L4168–L4337 |
+| `register_operator_strike` | def | L4042–L4075 |
+| `bot_start_info` | def | L4079–L4115 |
+| `bot_operator_info` | def | L4119–L4158 |
+| `bot_help_info` | def | L4162–L4176 |
+| `bot_cancel_mission` | def | L4180–L4200 |
+| `bot_bet_create` | def | L4204–L4373 |
 
 ### `auth.py`
 
@@ -212,10 +213,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
 | `check_luhn` | def | L18–L31 |
-| `parse_and_validate_card_pipe` | def | L34–L82 |
-| `perform_wabox_liveness_check` | def | L85–L133 |
-| `precheck_card_liveness` | def | L136–L152 |
-| `format_ruthopia_liveness_summary` | def | L155–L170 |
+| `parse_and_validate_card_pipe` | def | L34–L83 |
+| `perform_wabox_liveness_check` | def | L86–L134 |
+| `precheck_card_liveness` | def | L137–L153 |
+| `format_ruthopia_liveness_summary` | def | L156–L171 |
 
 ### `clabe_fetch.py`
 

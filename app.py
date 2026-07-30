@@ -4039,6 +4039,42 @@ def auto_deposit_status(mission_id: str,
     return d
 
 
+def register_operator_strike(operator_id: int, reason: str = "bank_rejected"):
+    """Registra o incrementa strikes para un operador (1 strike = 3 declines acumulados o 3 spams)."""
+    if not operator_id:
+        return
+    now_dt = datetime.now(timezone.utc)
+    now_iso = now_dt.isoformat()
+    with db(write=True) as c:
+        row = c.execute(
+            "SELECT strikes_count, penalty_until, last_attempts FROM operator_penalties WHERE telegram_id=?",
+            (operator_id,)
+        ).fetchone()
+        if not row:
+            strikes = 1 if reason == "spam" else 0
+            attempts = 1
+            pen_until = (now_dt + timedelta(minutes=5)).isoformat() if reason == "spam" else None
+            c.execute(
+                "INSERT INTO operator_penalties (telegram_id, strikes_count, penalty_until, last_attempts, updated_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (operator_id, strikes, pen_until, str(attempts), now_iso)
+            )
+        else:
+            strikes = row["strikes_count"]
+            attempts = (int(row["last_attempts"] or 0)) + 1
+            pen_until = row["penalty_until"]
+            if reason == "spam":
+                strikes += 1
+                pen_until = (now_dt + timedelta(minutes=5)).isoformat()
+            elif attempts >= 3:
+                strikes += 1
+                attempts = 0
+            c.execute(
+                "UPDATE operator_penalties SET strikes_count=?, penalty_until=?, last_attempts=?, updated_at=? WHERE telegram_id=?",
+                (strikes, pen_until, str(attempts), now_iso, operator_id)
+            )
+
+
 @app.get("/api/bot/start")
 def bot_start_info(user: dict = Depends(require_session)):
     """Menú principal /start adaptado con saludos dinámicos y comandos limitados."""
