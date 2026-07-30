@@ -97,6 +97,7 @@ from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from typing import Optional, Union
 
 import auth as _auth
 from auth import require_session
@@ -4458,6 +4459,97 @@ def filter_and_sanitize_check_combos(combos: list[str]) -> dict:
         "in_db_cards": in_db_cards,
         "invalid_cards": invalid_cards,
         "valid_combos": valid_combos
+    }
+
+
+class BotCheckRequest(BaseModel):
+    operator_id: Union[int, str]
+    combos: list[str]
+    source_type: Optional[str] = "text"  # "text" o "file"
+    confirmed: Optional[bool] = False
+
+@app.post("/api/bot/check")
+async def bot_check(req: BotCheckRequest, user: dict = Depends(require_session)):
+    op_id = req.operator_id
+    SUPERADMIN_ID = 1341812706
+    if str(op_id) != str(SUPERADMIN_ID):
+        now_dt = datetime.now(timezone.utc)
+        MAX_DAILY_STRIKES = 5
+        with db(write=True) as c:
+            row = c.execute(
+                "SELECT strikes_count, penalty_until FROM operator_penalties WHERE telegram_id=?",
+                (op_id,)
+            ).fetchone()
+            strikes_count = row["strikes_count"] if row else 0
+            penalty_until = row["penalty_until"] if row else None
+            if penalty_until:
+                try:
+                    p_dt = datetime.fromisoformat(penalty_until)
+                    if p_dt > now_dt:
+                        secs_left = int((p_dt - now_dt).total_seconds())
+                        mins_left = max(1, secs_left // 60)
+                        raise HTTPException(
+                            429, f"Operador en penalización por spam. Intenta en {mins_left} min."
+                        )
+                except ValueError:
+                    pass
+
+            if strikes_count >= MAX_DAILY_STRIKES:
+                raise HTTPException(
+                    403, f"Límite de {MAX_DAILY_STRIKES} strikes diarios alcanzado. Solicita reset al SuperAdmin."
+                )
+
+    combos = req.combos or []
+    stype = (req.source_type or "text").lower()
+
+    if stype == "text" and len(combos) > 100:
+        raise HTTPException(400, "El mensaje supera el límite de 100 combos en chat plano. Por favor adjunta un archivo .txt con hasta 5,000 líneas.")
+
+    if len(combos) > 5000:
+        raise HTTPException(400, "El archivo excede el límite máximo de 5,000 combos.")
+
+    if not combos:
+        raise HTTPException(400, "No se recibieron combos para procesar.")
+
+    filtered = filter_and_sanitize_check_combos(combos)
+    valid_list = filtered["valid_combos"]
+
+    if not valid_list:
+        summary_msg = (
+            f"<b>❌ NINGÚN COMBO SUPERÓ LAS VALIDACIONES</b>\n\n"
+            f"• <b>Recibidos:</b> {filtered['total_received']}\n"
+            f"• <b>Duplicados:</b> {filtered['dupes_count']}\n"
+            f"• <b>Pre-existentes en BD (Correo):</b> {len(filtered['in_db_emails'])}\n"
+            f"• <b>Pre-existentes en BD (Tarjeta):</b> {len(filtered['in_db_cards'])}\n"
+            f"• <b>Tarjetas Inválidas:</b> {len(filtered['invalid_cards'])}\n\n"
+            f"💡 <i>Las cuentas ya registradas se pueden consultar y gestionar en https://botmexico.net</i>"
+        )
+        raise HTTPException(400, summary_msg)
+
+    if not req.confirmed:
+        confirm_msg = (
+            f"<b>⚠️ CONFIRMACIÓN DE CHECK SOLICITADA</b>\n\n"
+            f"• <b>Combos Recibidos:</b> {filtered['total_received']}\n"
+            f"• <b>Descartados (Duplicados):</b> {filtered['dupes_count']}\n"
+            f"• <b>Descartados (Ya existen en BD):</b> {len(filtered['in_db_emails']) + len(filtered['in_db_cards'])}\n"
+            f"• <b>Tarjetas Inválidas / Luhn:</b> {len(filtered['invalid_cards'])}\n"
+            f"• <b>Combos Válidos a Verificar:</b> {len(valid_list)}\n\n"
+            f"💡 <i>Las cuentas omitidas por ya existir en BD se gestionan directamente en https://botmexico.net</i>\n\n"
+            f"<i>Responde o envía la confirmación con `confirmed: true` para iniciar la verificación.</i>"
+        )
+        return {
+            "require_confirmation": True,
+            "total_received": filtered["total_received"],
+            "valid_count": len(valid_list),
+            "message": confirm_msg,
+            "dashboard_link": "https://botmexico.net"
+        }
+
+    return {
+        "ok": True,
+        "valid_count": len(valid_list),
+        "message": f"🚀 Verificación /check INICIADA para {len(valid_list)} combo(s) nuevos.\n\nDashboard: https://botmexico.net",
+        "dashboard_link": "https://botmexico.net"
     }
 
 
