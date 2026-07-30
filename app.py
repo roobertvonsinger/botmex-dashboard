@@ -4373,6 +4373,94 @@ async def bot_bet_create(request: Request, user: dict = Depends(require_session)
     }
 
 
+def filter_and_sanitize_check_combos(combos: list[str]) -> dict:
+    total_received = len(combos)
+    seen_combos = set()
+    cleaned_combos = []
+    dupes_count = 0
+
+    for line in combos:
+        raw = str(line).strip()
+        if not raw:
+            continue
+        if raw in seen_combos:
+            dupes_count += 1
+            continue
+        seen_combos.add(raw)
+        cleaned_combos.append(raw)
+
+    existing_emails = set()
+    existing_cards = set()
+
+    with db() as c:
+        rows_m = c.execute("SELECT email FROM accounts WHERE email IS NOT NULL AND email != ''").fetchall()
+        for r in rows_m:
+            existing_emails.add(str(r["email"]).strip().lower())
+
+        rows_c = c.execute("SELECT card_number FROM account_cards WHERE card_number IS NOT NULL AND card_number != ''").fetchall()
+        for r in rows_c:
+            existing_cards.add(str(r["card_number"]).strip())
+
+    in_db_emails = []
+    in_db_cards = []
+    invalid_cards = []
+    valid_combos = []
+
+    from card_checker import precheck_card_liveness
+
+    for item in cleaned_combos:
+        parts = [p.strip() for p in item.split(":") if p.strip()]
+        if not parts:
+            continue
+        email = parts[0].lower()
+        password = parts[1] if len(parts) > 1 else ""
+
+        # Si la línea tiene 4 partes separadas por ':', el card_pipe se reconstruye con ':'
+        card_pipe = ""
+        if len(parts) >= 6:
+            # Format: email:password:card:MM:YY:CVV -> card_pipe = card|MM|YY|CVV
+            card_pipe = f"{parts[2]}|{parts[3]}|{parts[4]}|{parts[5]}"
+        elif len(parts) > 2:
+            card_pipe = ":".join(parts[2:])
+
+        card_num = ""
+        if card_pipe:
+            c_parts = [cp.strip() for cp in card_pipe.replace(":", "|").split("|") if cp.strip()]
+            card_num = c_parts[0] if c_parts else ""
+
+        if email in existing_emails:
+            in_db_emails.append(email)
+            if card_num and card_num in existing_cards:
+                in_db_cards.append(card_num)
+            continue
+
+        if card_num and card_num in existing_cards:
+            in_db_cards.append(card_num)
+            continue
+
+        if card_pipe:
+            ok, reason, parsed = precheck_card_liveness(card_pipe)
+            if not ok:
+                invalid_cards.append({"pipe": card_pipe, "reason": reason})
+                continue
+
+        valid_combos.append({
+            "raw": item,
+            "email": email,
+            "password": password,
+            "card_pipe": card_pipe
+        })
+
+    return {
+        "total_received": total_received,
+        "dupes_count": dupes_count,
+        "in_db_emails": in_db_emails,
+        "in_db_cards": in_db_cards,
+        "invalid_cards": invalid_cards,
+        "valid_combos": valid_combos
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("BMX_WEB_PORT", "5001"))

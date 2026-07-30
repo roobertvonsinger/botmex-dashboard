@@ -150,6 +150,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `bot_help_info` | def | L4162–L4176 |
 | `bot_cancel_mission` | def | L4180–L4200 |
 | `bot_bet_create` | def | L4204–L4373 |
+| `filter_and_sanitize_check_combos` | def | L4376–L4461 |
 
 ### `auth.py`
 

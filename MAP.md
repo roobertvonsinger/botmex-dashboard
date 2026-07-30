@@ -93,7 +93,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 4380 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 4468 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 888 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -230,6 +230,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `fa328a9` | docs(plan): agregar plan de implementacion para superpoder /check telegram |
 | `12380c0` | docs(spec): agregar spec para superpoder /check en telegram (archivos 5k, filtrado BD) |
 | `aaffa28` | docs(next-session): actualizar NEXT-SESSION.md con el cierre de la sesion /bet telegram |
 | `1cb0161` | fix(audit): agregar register_operator_strike y normalizar formato de tarjeta a 4 partes |
@@ -241,7 +242,6 @@ prewarm.py (router)
 | `a8583dc` | feat(maintenance): pantalla de mantenimiento con redireccion y bypass SA |
 | `8034a90` | feat(pantalla): diferenciacion visual SPEI/Tarjeta, contorno amarillo dashboard y tarjeta en desc |
 | `e982651` | feat(deposits): permitir bypass del cap 24h ($1,499) exclusivamente a SuperAdmin |
-| `7b47b23` | docs(next-session): actualizar NEXT-SESSION.md con correcciones de matchmaking y logs |
 <!-- GEN:end:recientes -->
 
 ---
