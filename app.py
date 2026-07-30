@@ -593,6 +593,36 @@ app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
 @app.middleware("http")
+async def _maintenance_gate_middleware(request: Request, call_next):
+    """Bloquea acceso a usuarios no SuperAdmin durante Modo Mantenimiento.
+
+    Si BMX_MAINTENANCE=1:
+    - SA (Robert / robertvs) mantiene acceso total e ininterrumpido.
+    - Demás usuarios/sesiones son bloqueados antes de login o dashboard.
+    - Se permite servir asset de mantenimiento, logo y favicon.
+    """
+    maint_active = os.environ.get("BMX_MAINTENANCE", "").strip() in ("1", "true", "True")
+    if maint_active:
+        path = request.url.path
+        # Excepciones que siempre se sirven en mantenimiento
+        allowed_paths = ("/maintenance", "/favicon.ico", "/static/assets/botmexico_logo.png", "/static/maintenance.html")
+        if not any(path == p or path.startswith("/static/assets/") for p in allowed_paths):
+            bmx_cookie = request.cookies.get("bmx_session")
+            user_session = _auth.get_session(bmx_cookie) if bmx_cookie else None
+            user_role = user_session.get("role") if user_session else None
+
+            if user_role != "superadmin":
+                if path.startswith("/api/"):
+                    return JSONResponse(
+                        {"error": "Sistema en mantenimiento", "maintenance": True},
+                        status_code=530
+                    )
+                return RedirectResponse("/maintenance", status_code=302)
+
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def _no_cache_static_assets(request, call_next):
     """Fuerza no-cache en .js/.css/.html servidos por StaticFiles.
 
@@ -615,6 +645,11 @@ app.include_router(_deposits_router)
 @app.get("/favicon.ico")
 def favicon():
     return FileResponse(STATIC / "assets" / "botmexico_logo.png", media_type="image/png")
+
+
+@app.get("/maintenance")
+def maintenance_page():
+    return FileResponse(STATIC / "maintenance.html")
 
 
 @app.get("/login")

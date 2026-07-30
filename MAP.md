@@ -93,7 +93,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 3927 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 3962 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 888 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -122,6 +122,7 @@ prewarm.py (router)
 | `test_deposit_step.py` | 132 | `—` | _[completar]_ |
 | `test_grading_a_plus_m7.py` | 184 | `—` | _[completar]_ |
 | `test_jwt_keeper.py` | 136 | `—` | _[completar]_ |
+| `test_maintenance_mode.py` | 39 | `—` | _[completar]_ |
 | `test_marks.py` | 32 | `—` | _[completar]_ |
 | `test_migrate_status_no_banco.py` | 103 | `—` | _[completar]_ |
 | `test_mission_sem_leak.py` | 97 | `—` | _[completar]_ |
@@ -227,6 +228,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `8034a90` | feat(pantalla): diferenciacion visual SPEI/Tarjeta, contorno amarillo dashboard y tarjeta en desc |
 | `e982651` | feat(deposits): permitir bypass del cap 24h ($1,499) exclusivamente a SuperAdmin |
 | `7b47b23` | docs(next-session): actualizar NEXT-SESSION.md con correcciones de matchmaking y logs |
 | `2c8e226` | fix(matchmaking): prevenir re-depósito a cuentas completadas y ajustar scrollbar en chips UI |
@@ -238,7 +240,6 @@ prewarm.py (router)
 | `06e40d5` | optimization(captcha): lazy initialization of captcha pool in gentle_login |
 | `ead496e` | docs(next-session): cierre — vista multi-cuenta animada como objetivo, Modo Auto ya ejecutado (falta smoke Robert) |
 | `d991642` | docs(bitacora): registrar rediseño de La Pantalla + candado anti-reuso en AUDIT/FRONTEND/ERRORS |
-| `8caf392` | redesign(pantalla): rediseño completo — 3 columnas iguales, panel único depósito/retiro, candado anti-reuso de tarjeta |
 <!-- GEN:end:recientes -->
 
 ---
