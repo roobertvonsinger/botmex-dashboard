@@ -2650,15 +2650,36 @@ _setupPoolDropZone('#poolInside', 'inside');
 async function loadAdminState() {
   try {
     const r = await fetch('/api/admin/pause-state');
-    if (!r.ok) return;
-    const s = await r.json();
-    const lbl = $('#adminPauseStatus');
-    if (s.paused) {
-      lbl.textContent = `⏸ PAUSADO por ${s.by} (${s.reason})`;
-      lbl.style.color = 'var(--warn)';
-    } else {
-      lbl.textContent = '▶ Activo';
-      lbl.style.color = 'var(--accent)';
+    if (r.ok) {
+      const s = await r.json();
+      const lbl = $('#adminPauseStatus');
+      if (lbl) {
+        if (s.paused) {
+          lbl.textContent = `⏸ PAUSADO por ${s.by} (${s.reason})`;
+          lbl.style.color = 'var(--warn)';
+        } else {
+          lbl.textContent = '▶ Activo';
+          lbl.style.color = 'var(--accent)';
+        }
+      }
+    }
+  } catch {}
+  try {
+    const rm = await fetch('/api/admin/maintenance-state');
+    if (rm.ok) {
+      const sm = await rm.json();
+      const btnM = $('#btnAdminMaintToggle');
+      if (btnM) {
+        if (sm.enabled) {
+          btnM.textContent = '🚧 Desactivar Mantenimiento (ACTIVO)';
+          btnM.className = 'seg-btn danger';
+          btnM.title = 'El sistema está en mantenimiento. Click para desactivar.';
+        } else {
+          btnM.textContent = '🚧 Activar Mantenimiento';
+          btnM.className = 'seg-btn';
+          btnM.title = 'Click para activar modo mantenimiento para operadores.';
+        }
+      }
     }
   } catch {}
 }
@@ -2738,6 +2759,20 @@ $('#btnAdminEmergency')?.addEventListener('click', async () => {
   try {
     const data = await _adminPost('/api/admin/emergency-stop');
     toast(`🛑 Stop: ${data.cancelled_prewarms} prewarms, ${data.cancelled_schedules} misiones canceladas`, 'success');
+    loadAdminState();
+  } catch (e) { toast(humanizeApiError(e), 'error'); }
+});
+$('#btnAdminMaintToggle')?.addEventListener('click', async () => {
+  const btn = $('#btnAdminMaintToggle');
+  const active = btn.classList.contains('danger');
+  const nextState = !active;
+  const msg = nextState
+    ? '🚧 ¿ACTIVAR MODO MANTENIMIENTO?\n\nLos demás usuarios/operadores serán bloqueados y redireccionados a la pantalla de mantenimiento.\n\nTú (SuperAdmin) mantendrás acceso completo.'
+    : '▶ ¿DESACTIVAR MODO MANTENIMIENTO?\n\nLos operadores podrán volver a ingresar normalmente.';
+  if (!confirm(msg)) return;
+  try {
+    const data = await _adminPost('/api/admin/maintenance', { enabled: nextState });
+    toast(data.enabled ? '🚧 Modo Mantenimiento ACTIVADO' : '▶ Modo Mantenimiento DESACTIVADO', 'success');
     loadAdminState();
   } catch (e) { toast(humanizeApiError(e), 'error'); }
 });

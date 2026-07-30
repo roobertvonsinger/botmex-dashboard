@@ -592,17 +592,23 @@ app = FastAPI(title="Botmexico v2")
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
+_MAINTENANCE_FLAG_FILE = Path("/data/maintenance.flag")
+
+def _is_maintenance_active() -> bool:
+    if os.environ.get("BMX_MAINTENANCE", "").strip() in ("1", "true", "True"):
+        return True
+    return _MAINTENANCE_FLAG_FILE.exists()
+
 @app.middleware("http")
 async def _maintenance_gate_middleware(request: Request, call_next):
     """Bloquea acceso a usuarios no SuperAdmin durante Modo Mantenimiento.
 
-    Si BMX_MAINTENANCE=1:
+    Si BMX_MAINTENANCE=1 o /data/maintenance.flag existe:
     - SA (Robert / robertvs) mantiene acceso total e ininterrumpido.
     - Demás usuarios/sesiones son bloqueados antes de login o dashboard.
     - Se permite servir asset de mantenimiento, logo y favicon.
     """
-    maint_active = os.environ.get("BMX_MAINTENANCE", "").strip() in ("1", "true", "True")
-    if maint_active:
+    if _is_maintenance_active():
         path = request.url.path
         # Excepciones que siempre se sirven en mantenimiento
         allowed_paths = ("/maintenance", "/favicon.ico", "/static/assets/botmexico_logo.png", "/static/maintenance.html")
@@ -3868,6 +3874,42 @@ def _persist_auto_mission(mission_id, operator_id, card_pipes, amount,
                 now,
             ),
         )
+
+
+@app.get("/api/admin/maintenance-state")
+def admin_maintenance_state(user: dict = Depends(require_session)):
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Solo superadmin")
+    return {"enabled": _is_maintenance_active()}
+
+
+class MaintenanceToggleRequest(BaseModel):
+    enabled: bool
+
+
+@app.post("/api/admin/maintenance")
+def admin_maintenance_toggle(req: MaintenanceToggleRequest, user: dict = Depends(require_session)):
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Solo superadmin")
+    enabled = req.enabled
+    os.environ["BMX_MAINTENANCE"] = "1" if enabled else "0"
+    try:
+        if enabled:
+            _MAINTENANCE_FLAG_FILE.parent.mkdir(parents=True, exist_ok=True)
+            _MAINTENANCE_FLAG_FILE.write_text("1\n", encoding="utf-8")
+        else:
+            if _MAINTENANCE_FLAG_FILE.exists():
+                _MAINTENANCE_FLAG_FILE.unlink()
+    except Exception as e:
+        print(f"[maintenance] error guardando flag file: {e}")
+
+    _broadcast({
+        "type": "activity", "kind": "maintenance_toggle",
+        "enabled": enabled,
+        "ts": datetime.now(timezone.utc).isoformat(),
+        **_resolve_who(user.get("telegram_id")),
+    })
+    return {"enabled": enabled}
 
 
 @app.post("/api/deposits/auto")
