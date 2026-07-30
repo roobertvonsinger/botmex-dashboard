@@ -230,6 +230,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `12380c0` | docs(spec): agregar spec para superpoder /check en telegram (archivos 5k, filtrado BD) |
 | `aaffa28` | docs(next-session): actualizar NEXT-SESSION.md con el cierre de la sesion /bet telegram |
 | `1cb0161` | fix(audit): agregar register_operator_strike y normalizar formato de tarjeta a 4 partes |
 | `688cadb` | feat(telegram): endpoints REST /start, /info, /help y /cancel adaptados para el bot |
@@ -241,7 +242,6 @@ prewarm.py (router)
 | `8034a90` | feat(pantalla): diferenciacion visual SPEI/Tarjeta, contorno amarillo dashboard y tarjeta en desc |
 | `e982651` | feat(deposits): permitir bypass del cap 24h ($1,499) exclusivamente a SuperAdmin |
 | `7b47b23` | docs(next-session): actualizar NEXT-SESSION.md con correcciones de matchmaking y logs |
-| `2c8e226` | fix(matchmaking): prevenir re-depósito a cuentas completadas y ajustar scrollbar en chips UI |
 <!-- GEN:end:recientes -->
 
 ---
