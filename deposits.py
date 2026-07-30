@@ -1783,12 +1783,10 @@ def classify_deposit_status(result_code: str, success: bool) -> str:
     return "incomplete"                          # catch-all NEUTRAL — nuestro lado, NO banco
 
 
-MM_COOLDOWN = 60
-# Segundos. Piso entre reusos de la MISMA tarjeta o cuenta (se evalúa al armar el
-# batch: una tarjeta/cuenta no vuelve a entrar antes de MM_COOLDOWN desde su último
-# uso). NO BAJAR: a 5s el matchmaker reusaba la misma tarjeta cada 5s → el velocity
-# check de la pasarela la quemaba. 60s = máx 1 depósito/minuto por tarjeta (Robert
-# 2026-06-28). Domina al velocity-check de 60s (CARD_VELOCITY_*), que queda de red.
+MM_COOLDOWN = 45
+MM_CARD_COOLDOWN = 5
+# Segundos. Piso entre reusos de la MISMA cuenta (MM_COOLDOWN = 45s) y entre cuentas
+# distintas para una MISMA tarjeta (MM_CARD_COOLDOWN = 5s) (Robert 2026-07-30).
 # Límites separados (Robert 2026-05-29): máx 2 DECLINES REALES por CUENTA, 3 por
 # TARJETA. Una cuenta sale del run a los 2 declines reales (su pasarela rechaza 2
 # tarjetas distintas); una tarjeta se retira a los 3 declines reales (3 cuentas
@@ -2116,7 +2114,7 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                         if (acc["id"] not in card["assigned"]
                                 and len(card["assigned"]) >= MM_MAX_ACCOUNTS_PER_CARD):
                             continue
-                        if now - card["last_used"] < MM_COOLDOWN and card["last_used"] > 0:
+                        if now - card["last_used"] < MM_CARD_COOLDOWN and card["last_used"] > 0:
                             continue
                         attempts += 1
                         batch.append((acc, card, attempts))
@@ -2140,7 +2138,7 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                     waits = []
                     for c in live_cards:
                         if c["last_used"] > 0:
-                            waits.append(MM_COOLDOWN - (now - c["last_used"]))
+                            waits.append(MM_CARD_COOLDOWN - (now - c["last_used"]))
                     for a in live_accs:
                         if a["last_used"] > 0:
                             waits.append(MM_COOLDOWN - (now - a["last_used"]))

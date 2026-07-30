@@ -278,13 +278,13 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_mm_is_real_decline` | def | L1730–L1736 |
 | `_mm_is_ambiguous_charge` | def | L1739–L1749 |
 | `classify_deposit_status` | def | L1752–L1783 |
-| `_mm_session_get` | def | L1833–L1837 |
-| `_mm_session_update` | def | L1840–L1849 |
-| `multi_stream` | def | L1853–L2368 |
-| `multi_cancel` | def | L2372–L2377 |
-| `scheduled_create` | def | L2390–L2749 |
-| `scheduled_list` | def | L2753–L2775 |
-| `scheduled_cancel` | def | L2779–L2787 |
+| `_mm_session_get` | def | L1831–L1835 |
+| `_mm_session_update` | def | L1838–L1847 |
+| `multi_stream` | def | L1851–L2366 |
+| `multi_cancel` | def | L2370–L2375 |
+| `scheduled_create` | def | L2388–L2747 |
+| `scheduled_list` | def | L2751–L2773 |
+| `scheduled_cancel` | def | L2777–L2785 |
 
 ### `jwt_keeper.py`
 
