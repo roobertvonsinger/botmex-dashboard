@@ -93,7 +93,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 4560 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 4631 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 888 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -231,6 +231,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `862e111` | feat(deposits): igualar threshold de descarte a 3 declines en cuentas (simetrico con tarjetas) |
 | `dd16d32` | feat(deposits): actualizar MM_COOLDOWN a 45s por cuenta y 5s por tarjeta entre cuentas distintas |
 | `c0cd8e2` | fix(auth): unificar modelo de visibilidad de cuentas e independizar seleccion de pool para /bet |
 | `4f71bc8` | docs: actualizar MAP.md y conftest.py con fixture account_transactions |
@@ -242,7 +243,6 @@ prewarm.py (router)
 | `1cb0161` | fix(audit): agregar register_operator_strike y normalizar formato de tarjeta a 4 partes |
 | `688cadb` | feat(telegram): endpoints REST /start, /info, /help y /cancel adaptados para el bot |
 | `37fe1e1` | feat(auth): simplificar roles a SuperAdmin u Operator, acotar endpoints de lectura y retiros |
-| `1a78a59` | feat(telegram): mensaje de inicio adaptado al bot de botmexico exclusivo para Robert (1341812706) |
 <!-- GEN:end:recientes -->
 
 ---

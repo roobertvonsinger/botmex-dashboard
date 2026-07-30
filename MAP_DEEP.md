@@ -148,11 +148,13 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `bot_start_info` | def | L4080–L4116 |
 | `bot_operator_info` | def | L4120–L4159 |
 | `bot_help_info` | def | L4163–L4177 |
-| `bot_cancel_mission` | def | L4181–L4201 |
-| `bot_bet_create` | def | L4205–L4374 |
-| `filter_and_sanitize_check_combos` | def | L4377–L4462 |
-| `BotCheckRequest` | class | L4465–L4469 |
-| `bot_check` | def | L4472–L4553 |
+| `bot_pause_mission` | def | L4181–L4210 |
+| `bot_resume_mission` | def | L4214–L4232 |
+| `bot_cancel_mission` | def | L4237–L4272 |
+| `bot_bet_create` | def | L4276–L4445 |
+| `filter_and_sanitize_check_combos` | def | L4448–L4533 |
+| `BotCheckRequest` | class | L4536–L4540 |
+| `bot_check` | def | L4543–L4624 |
 
 ### `auth.py`
 
@@ -950,6 +952,9 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `GET` | `/api/bot/start` | `app.py` |
 | `GET` | `/api/bot/info` | `app.py` |
 | `GET` | `/api/bot/help` | `app.py` |
+| `POST` | `/api/bot/pause` | `app.py` |
+| `POST` | `/api/bot/resume` | `app.py` |
+| `POST` | `/api/bot/stop` | `app.py` |
 | `POST` | `/api/bot/cancel` | `app.py` |
 | `POST` | `/api/bot/bet` | `app.py` |
 | `POST` | `/api/bot/check` | `app.py` |

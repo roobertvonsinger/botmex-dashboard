@@ -4177,28 +4177,99 @@ def bot_help_info():
     return {"ok": True, "message": msg}
 
 
+@app.post("/api/bot/pause")
+def bot_pause_mission(user: dict = Depends(require_session)):
+    """Pausa la misión activa del operador y devuelve resumen corto de avance."""
+    operator_id = user.get("telegram_id") or 0
+    now = datetime.now(timezone.utc).isoformat()
+    with db(write=True) as c:
+        cur = c.execute(
+            "UPDATE auto_missions SET status='paused', updated_at=? "
+            "WHERE operator_id=? AND status='running'",
+            (now, operator_id)
+        )
+        row = c.execute(
+            "SELECT mission_id, target_count, current_count, approved_count, failed_count "
+            "FROM auto_missions WHERE operator_id=? ORDER BY id DESC LIMIT 1",
+            (operator_id,)
+        ).fetchone()
+
+    stats_msg = ""
+    if row:
+        stats_msg = (
+            f"\n\n📊 <b>Resumen de Avance:</b>\n"
+            f"• Misión: <code>{row['mission_id']}</code>\n"
+            f"• Aprobados: {row['approved_count'] or 0} / {row['target_count']}\n"
+            f"• Rechazos: {row['failed_count'] or 0}"
+        )
+
+    _broadcast({
+        "type": "activity", "kind": "telegram_bot_pause",
+        "ts": now, **_resolve_who(operator_id)
+    })
+    return {"ok": True, "paused": True, "message": f"⏸ <b>PROCESO PAUSADO</b>{stats_msg}\n\n<i>Usa /resume o presiona Reanudar para continuar.</i>"}
+
+
+@app.post("/api/bot/resume")
+def bot_resume_mission(user: dict = Depends(require_session)):
+    """Reanuda la misión pausada del operador."""
+    operator_id = user.get("telegram_id") or 0
+    now = datetime.now(timezone.utc).isoformat()
+    with db(write=True) as c:
+        cur = c.execute(
+            "UPDATE auto_missions SET status='running', updated_at=? "
+            "WHERE operator_id=? AND status='paused'",
+            (now, operator_id)
+        )
+        resumed = cur.rowcount > 0
+
+    _broadcast({
+        "type": "activity", "kind": "telegram_bot_resume",
+        "ts": now, **_resolve_who(operator_id)
+    })
+    if resumed:
+        return {"ok": True, "resumed": True, "message": "▶ <b>PROCESO REANUDADO</b>. El matchmaking continuará con los depósitos."}
+    return {"ok": True, "resumed": False, "message": "ℹ️ No tienes misiones pausadas por reanudar."}
+
+
+@app.post("/api/bot/stop")
 @app.post("/api/bot/cancel")
 def bot_cancel_mission(user: dict = Depends(require_session)):
-    """Aborta cualquier proceso o misión de matchmaking activa del operador (/cancel)."""
+    """Aborta cualquier proceso o misión activa de inmediato y devuelve resumen de avance."""
     operator_id = user.get("telegram_id") or 0
     now = datetime.now(timezone.utc).isoformat()
     cancelled_count = 0
     with db(write=True) as c:
+        row = c.execute(
+            "SELECT mission_id, target_count, current_count, approved_count, failed_count "
+            "FROM auto_missions WHERE operator_id=? AND status IN ('pending', 'running', 'paused') ORDER BY id DESC LIMIT 1",
+            (operator_id,)
+        ).fetchone()
+
         cur = c.execute(
             "UPDATE auto_missions SET status='cancelled', updated_at=?, completed_at=? "
-            "WHERE operator_id=? AND status IN ('pending', 'running')",
+            "WHERE operator_id=? AND status IN ('pending', 'running', 'paused')",
             (now, now, operator_id)
         )
         cancelled_count = cur.rowcount
+
+    stats_msg = ""
+    if row:
+        stats_msg = (
+            f"\n\n📊 <b>Resumen Final de Avance:</b>\n"
+            f"• Misión: <code>{row['mission_id']}</code>\n"
+            f"• Aprobados: {row['approved_count'] or 0} / {row['target_count']}\n"
+            f"• Rechazos: {row['failed_count'] or 0}"
+        )
 
     if cancelled_count > 0:
         _broadcast({
             "type": "activity", "kind": "telegram_bot_cancel",
             "ts": now, **_resolve_who(operator_id)
         })
-        return {"ok": True, "message": "🛑 <b>Proceso abortado con éxito.</b> No hay depósitos ni misiones pendientes en ejecución."}
+        return {"ok": True, "message": f"🛑 <b>PROCESO DETENIDO DE INMEDIATO</b>{stats_msg}\n\n<i>Gestiona tus cuentas en https://botmexico.net</i>"}
     else:
-        return {"ok": True, "message": "ℹ️ No tienes ninguna misión ni proceso de matchmaking activo por cancelar."}
+        return {"ok": True, "message": "ℹ️ No tienes ninguna misión ni proceso de matchmaking activo por detener."}
 
 
 @app.post("/api/bot/bet")
