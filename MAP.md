@@ -93,7 +93,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 4191 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 4217 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 888 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -230,6 +230,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b2cbf68` | feat(telegram): cablear comando /bet con pre-check Ruthopia Gate, guardarrailes y pestaña de logs web |
 | `72f43b0` | feat(maintenance): pantalla de mantenimiento con redireccion y bypass SA |
 | `a8583dc` | feat(maintenance): pantalla de mantenimiento con redireccion y bypass SA |
 | `8034a90` | feat(pantalla): diferenciacion visual SPEI/Tarjeta, contorno amarillo dashboard y tarjeta en desc |
@@ -241,7 +242,6 @@ prewarm.py (router)
 | `d30e826` | docs(errors): document definitive fix for _fetch_looks_empty regression |
 | `72f92b0` | feat(refresh): fast 5-minute background refresh with balance_only mode |
 | `016a1aa` | docs(next-session): flag cambios ajenos sin commitear en deposits.py/login_orchestrator.py |
-| `06e40d5` | optimization(captcha): lazy initialization of captcha pool in gentle_login |
 <!-- GEN:end:recientes -->
 
 ---

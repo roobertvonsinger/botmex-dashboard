@@ -2513,6 +2513,31 @@ async def _account_refresh_loop():
         await asyncio.sleep(account_refresh.cfg()["interval_sec"])
 
 
+async def _startup_telegram_notify():
+    """Envía la notificación de inicio estilo Ruthopia al Telegram personal de Robert (SuperAdmin)."""
+    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    target_chat_id = 1341812706  # ID exclusivo de Robert (SuperAdmin)
+    if not bot_token:
+        return
+    msg = (
+        "◢ ━━━━━━━ ◣\n"
+        "  ∷ ʙ.ᴏᴛᴍᴇxɪᴄᴏ ∷  ◎\n"
+        "◥ ━━━━━━━ ◤\n\n"
+        "✓ runtime online\n\n"
+        "Online. Gates listos.\n"
+        "Otra sesión sin aviso previo. Muy tú.\n\n"
+        "⊢ ʙ.ᴏᴛᴍᴇx"
+    )
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            await client.post(
+                f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                json={"chat_id": target_chat_id, "text": msg, "parse_mode": "HTML"}
+            )
+    except Exception as e:
+        print(f"[telegram_startup_notify] Error notificando inicio: {e}")
+
+
 @app.on_event("startup")
 async def _start_bg_tasks():
     asyncio.create_task(_health_loop())
@@ -2521,6 +2546,7 @@ async def _start_bg_tasks():
     asyncio.create_task(_release_watchdog_loop())
     asyncio.create_task(_jwt_keepalive_loop())
     asyncio.create_task(_account_refresh_loop())
+    asyncio.create_task(_startup_telegram_notify())
 
 
 class LockRequest(BaseModel):
