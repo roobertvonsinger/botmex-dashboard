@@ -4039,6 +4039,131 @@ def auto_deposit_status(mission_id: str,
     return d
 
 
+@app.get("/api/bot/start")
+def bot_start_info(user: dict = Depends(require_session)):
+    """Menú principal /start adaptado con saludos dinámicos y comandos limitados."""
+    import random
+    greetings = [
+        "Un día más en la trinchera. A darle con fe.",
+        "Listos para mover cuentas y mantener la pasarela limpia.",
+        "Monitoreo activo. La disciplina le gana al desmadre.",
+        "Otra sesión sin aviso previo. Muy tú.",
+        "Todo listo para la acción. Vamos por esos matches."
+    ]
+    greeting = random.choice(greetings)
+    tg_id = user.get("telegram_id") or 0
+    display_name = user.get("display") or user.get("username") or "Operador"
+
+    msg = (
+        f"┏ 🌵🇲🇽 <b>Botmexico.net</b> 🇲🇽🌵━┓\n\n"
+        f"Hola, {display_name} 🌮\n"
+        f"Telegram ID: <code>{tg_id}</code>\n\n"
+        f"<i>\"{greeting}\"</i>\n\n"
+        f"📎 <b>Comandos Habilitados:</b>\n"
+        f"• <b>/start</b>: Inicia el panel principal.\n"
+        f"• <b>/check</b>: Ingresar y alimentar cuentas con chequeo (Mín: 10, Máx texto: 100, Máx archivo: 1000).\n"
+        f"• <b>/bet</b>: Iniciar el proceso de matchmaking y depósitos automáticos (1 a 4 tarjetas por intento).\n"
+        f"• <b>/info</b>: Ver tus estadísticas personales de depósitos exitosos, BINes efectivos y cuentas alimentadas.\n"
+        f"• <b>/help</b>: Guía informativa y consejos operativos sobre el uso responsable de captchas y proxies.\n"
+        f"• <b>/cancel</b>: Aborta el proceso o misión activa actual.\n\n"
+        f"⚠️ <b>Límites de Carga:</b>\n"
+        f"• Mínimo 10 combos por check.\n"
+        f"• Máximo 100 combos pegados en texto.\n"
+        f"• Máximo 1,000 combos en archivos (.txt/.csv).\n\n"
+        f"📊 <b>Estados de Cuentas:</b>\n"
+        f"• <b>LIVE ✅</b>: Cuenta activa y verificada, lista para trabajar.\n"
+        f"• <b>DEAD ❌</b>: No sirve (login falló o bloqueada por pasarela).\n\n"
+        f"🌐 <b>Web Dashboard:</b>\n"
+        f"Búsqueda, historial, depósitos y gestión completa desde https://botmexico.net"
+    )
+    return {"ok": True, "message": msg}
+
+
+@app.get("/api/bot/info")
+def bot_operator_info(user: dict = Depends(require_session)):
+    """Estadísticas operativas personalizadas para /info (resumen compacto sin internals)."""
+    operator_id = user.get("telegram_id") or 0
+    with db() as c:
+        # Cuentas con depósitos exitosos del operador
+        dep_rows = c.execute(
+            "SELECT COUNT(DISTINCT account_email) as count, COALESCE(SUM(amount), 0) as total "
+            "FROM deposit_attempts WHERE operator_id=? AND status='SUCCESS'",
+            (operator_id,)
+        ).fetchone()
+
+        # Cuentas alimentadas/checkeadas
+        live_count = c.execute("SELECT COUNT(*) as c FROM accounts WHERE status='LIVE'").fetchone()["c"]
+
+        # Penalizaciones/strikes actuales
+        pen_row = c.execute(
+            "SELECT strikes_count FROM operator_penalties WHERE telegram_id=?", (operator_id,)
+        ).fetchone()
+        strikes_used = pen_row["strikes_count"] if pen_row else 0
+
+        # Top 3 BINes con mejor tasa de aprobación histórica
+        top_bines = c.execute(
+            "SELECT bin, approved_count, total_attempts, "
+            "(CAST(approved_count AS FLOAT) / MAX(total_attempts, 1)) * 100 as rate "
+            "FROM bin_stats WHERE total_attempts >= 3 ORDER BY rate DESC, approved_count DESC LIMIT 3"
+        ).fetchall()
+
+    bines_text = ", ".join([f"<code>{b['bin']}</code> ({int(b['rate'])}%)" for b in top_bines]) if top_bines else "Sin data suficiente"
+
+    msg = (
+        f"📊 <b>ESTADÍSTICAS DEL OPERADOR</b>\n"
+        f"----------------------------------------\n"
+        f"👤 <b>Telegram ID:</b> <code>{operator_id}</code>\n"
+        f"✅ <b>Cuentas depositadas exitosamente:</b> <b>{dep_rows['count']}</b> (${dep_rows['total']:,.2f} MXN)\n"
+        f"⚡ <b>BINes más efectivos:</b> {bines_text}\n"
+        f"🌐 <b>Cuentas LIVE disponibles en Pool:</b> <b>{live_count}</b>\n"
+        f"🎯 <b>Strikes usados hoy:</b> <b>{strikes_used}/5</b>\n"
+        f"----------------------------------------"
+    )
+    return {"ok": True, "message": msg}
+
+
+@app.get("/api/bot/help")
+def bot_help_info():
+    """Guía informativa /help orientada al uso operativo responsable."""
+    msg = (
+        f"💡 <b>GUÍA INFORMATIVA OPERATIVA (/help)</b>\n"
+        f"----------------------------------------\n"
+        f"<b>1. ¿Qué hace el /check?</b>\n"
+        f"Verifica las credenciales de las cuentas contra BetMexico. Cada check consume recursos (resolución de captchas y rotación de proxies de alta calidad).\n\n"
+        f"<b>2. Buenas prácticas para cuidar el sistema:</b>\n"
+        f"• <b>No espamear:</b> Hacer más de 3 intentos inválidos o en ráfaga rápida provocará una penalización automática de 5 minutos.\n"
+        f"• <b>Formatos aceptados:</b> Envía mínimo 10 combos en texto (máx 100) o adjunta un archivo .txt/.csv (máx 1,000).\n"
+        f"• <b>Limpieza de Tarjetas:</b> Antes de depositar con /bet, las tarjetas pasan por un liveness check. Si una tarjeta ya está en la BD, se descartará automáticamente para no duplicar intentos.\n\n"
+        f"<b>3. Transparencia y Sincronización Web:</b>\n"
+        f"Cualquier cuenta verificable (LIVE) cargada mediante el bot se reflejará en tiempo real en el Dashboard Web (https://botmexico.net)."
+    )
+    return {"ok": True, "message": msg}
+
+
+@app.post("/api/bot/cancel")
+def bot_cancel_mission(user: dict = Depends(require_session)):
+    """Aborta cualquier proceso o misión de matchmaking activa del operador (/cancel)."""
+    operator_id = user.get("telegram_id") or 0
+    now = datetime.now(timezone.utc).isoformat()
+    cancelled_count = 0
+    with db(write=True) as c:
+        cur = c.execute(
+            "UPDATE auto_missions SET status='cancelled', updated_at=?, completed_at=? "
+            "WHERE operator_id=? AND status IN ('pending', 'running')",
+            (now, now, operator_id)
+        )
+        cancelled_count = cur.rowcount
+
+    if cancelled_count > 0:
+        _broadcast({
+            "type": "activity", "kind": "telegram_bot_cancel",
+            "ts": now, **_resolve_who(operator_id)
+        })
+        return {"ok": True, "message": "🛑 <b>Proceso abortado con éxito.</b> No hay depósitos ni misiones pendientes en ejecución."}
+    else:
+        return {"ok": True, "message": "ℹ️ No tienes ninguna misión ni proceso de matchmaking activo por cancelar."}
+
+
 @app.post("/api/bot/bet")
 async def bot_bet_create(request: Request, user: dict = Depends(require_session)):
     """Endpoint para el comando /bet del bot de Telegram.

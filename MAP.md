@@ -93,7 +93,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 4219 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 4344 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 888 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -230,6 +230,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `37fe1e1` | feat(auth): simplificar roles a SuperAdmin u Operator, acotar endpoints de lectura y retiros |
 | `1a78a59` | feat(telegram): mensaje de inicio adaptado al bot de botmexico exclusivo para Robert (1341812706) |
 | `b2cbf68` | feat(telegram): cablear comando /bet con pre-check Ruthopia Gate, guardarrailes y pestaña de logs web |
 | `72f43b0` | feat(maintenance): pantalla de mantenimiento con redireccion y bypass SA |
@@ -241,7 +242,6 @@ prewarm.py (router)
 | `fb9ae44` | logging(auto): inyectar logs estructurados con emojis en run_auto_mission |
 | `e824898` | fix(auto): integrar a main el fix de ValueError en parseo de pipes de 4 partes |
 | `d30e826` | docs(errors): document definitive fix for _fetch_looks_empty regression |
-| `72f92b0` | feat(refresh): fast 5-minute background refresh with balance_only mode |
 <!-- GEN:end:recientes -->
 
 ---

@@ -144,7 +144,11 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `auto_deposit_create` | def | L3958–L3994 |
 | `auto_deposit_cancel` | def | L3998–L4024 |
 | `auto_deposit_status` | def | L4028–L4039 |
-| `bot_bet_create` | def | L4043–L4212 |
+| `bot_start_info` | def | L4043–L4079 |
+| `bot_operator_info` | def | L4083–L4122 |
+| `bot_help_info` | def | L4126–L4140 |
+| `bot_cancel_mission` | def | L4144–L4164 |
+| `bot_bet_create` | def | L4168–L4337 |
 
 ### `auth.py`
 
@@ -939,6 +943,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `POST` | `/api/deposits/auto` | `app.py` |
 | `POST` | `/api/deposits/auto/{mission_id}/cancel` | `app.py` |
 | `GET` | `/api/deposits/auto/{mission_id}/status` | `app.py` |
+| `GET` | `/api/bot/start` | `app.py` |
+| `GET` | `/api/bot/info` | `app.py` |
+| `GET` | `/api/bot/help` | `app.py` |
+| `POST` | `/api/bot/cancel` | `app.py` |
 | `POST` | `/api/bot/bet` | `app.py` |
 | `GET` | `/bin-check/{bin6}` | `deposits.py` |
 | `GET` | `/bin-stats` | `deposits.py` |
