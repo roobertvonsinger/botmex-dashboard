@@ -1787,12 +1787,10 @@ MM_COOLDOWN = 45
 MM_CARD_COOLDOWN = 5
 # Segundos. Piso entre reusos de la MISMA cuenta (MM_COOLDOWN = 45s) y entre cuentas
 # distintas para una MISMA tarjeta (MM_CARD_COOLDOWN = 5s) (Robert 2026-07-30).
-# Límites separados (Robert 2026-05-29): máx 2 DECLINES REALES por CUENTA, 3 por
-# TARJETA. Una cuenta sale del run a los 2 declines reales (su pasarela rechaza 2
-# tarjetas distintas); una tarjeta se retira a los 3 declines reales (3 cuentas
-# distintas la declinan). SOLO declines reales cuentan — los errores nuestros
-# (login/captcha/proxy/gateway) NO suman: se reintentan.
-MM_MAX_ACCOUNT_FAILS = 2
+# Límites igualados a 3 DECLINES REALES por CUENTA y por TARJETA (Robert 2026-07-30).
+# Una cuenta sale del run a los 3 declines reales (su pasarela rechaza 3 tarjetas distintas);
+# una tarjeta se retira a los 3 declines reales (3 cuentas distintas la declinan).
+MM_MAX_ACCOUNT_FAILS = 3
 MM_MAX_CARD_FAILS = 3
 # Tope de cuentas DISTINTAS que una tarjeta puede tocar en el run (Robert 2026-06-28).
 # Al alcanzar resultado terminal (aprobado/decline/3ds) en 3 cuentas, la tarjeta se

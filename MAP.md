@@ -100,7 +100,7 @@ prewarm.py (router)
 | `card_checker.py` | 171 | `—` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 152 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2785 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2783 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 323 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 416 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 892 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -153,7 +153,7 @@ prewarm.py (router)
 | `PERSISTENT_USERS` | `{"robertvs"}` | `auth.py` |
 | `PERSISTENT_TTL` | `60 * 60 * 24 * 365 * 10` | `auth.py` |
 | `THREEDS_RECENT_H` | `24` | `auto_deposit.py` |
-| `MM_ACCOUNT_RECENT_DECLINE_LIMIT` | `2` | `auto_deposit.py` |
+| `MM_ACCOUNT_RECENT_DECLINE_LIMIT` | `3` | `auto_deposit.py` |
 | `PROBE_AMOUNT` | `10.0` | `auto_deposit.py` |
 | `MATCH_TRANSIENT_RETRIES` | `4` | `auto_deposit.py` |
 | `MM_CROSS_ACCOUNT_GAP` | `5` | `auto_deposit.py` |
@@ -176,7 +176,7 @@ prewarm.py (router)
 | `CARD_VELOCITY_COOLDOWN_SEC` | `60` | `deposits.py` |
 | `MM_COOLDOWN` | `45` | `deposits.py` |
 | `MM_CARD_COOLDOWN` | `5` | `deposits.py` |
-| `MM_MAX_ACCOUNT_FAILS` | `2` | `deposits.py` |
+| `MM_MAX_ACCOUNT_FAILS` | `3` | `deposits.py` |
 | `MM_MAX_CARD_FAILS` | `3` | `deposits.py` |
 | `MM_MAX_ACCOUNTS_PER_CARD` | `3` | `deposits.py` |
 | `MM_MAX_PAIR_TRANSIENT` | `4` | `deposits.py` |
@@ -231,6 +231,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `dd16d32` | feat(deposits): actualizar MM_COOLDOWN a 45s por cuenta y 5s por tarjeta entre cuentas distintas |
 | `c0cd8e2` | fix(auth): unificar modelo de visibilidad de cuentas e independizar seleccion de pool para /bet |
 | `4f71bc8` | docs: actualizar MAP.md y conftest.py con fixture account_transactions |
 | `4243699` | feat(bot): endpoint REST /api/bot/check con soporte para archivos 5k y filtro BD |
@@ -242,7 +243,6 @@ prewarm.py (router)
 | `688cadb` | feat(telegram): endpoints REST /start, /info, /help y /cancel adaptados para el bot |
 | `37fe1e1` | feat(auth): simplificar roles a SuperAdmin u Operator, acotar endpoints de lectura y retiros |
 | `1a78a59` | feat(telegram): mensaje de inicio adaptado al bot de botmexico exclusivo para Robert (1341812706) |
-| `b2cbf68` | feat(telegram): cablear comando /bet con pre-check Ruthopia Gate, guardarrailes y pestaña de logs web |
 <!-- GEN:end:recientes -->
 
 ---

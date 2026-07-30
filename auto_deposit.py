@@ -143,7 +143,7 @@ def _normalize_pipe_to_3part(p: str) -> str:
 
 
 # ── B1 — selección de cuentas (pura) ─────────────────────────────────────────
-MM_ACCOUNT_RECENT_DECLINE_LIMIT = 2  # >= N declines en 12h → cuenta fuera de selección (Robert 2026-07-28)
+MM_ACCOUNT_RECENT_DECLINE_LIMIT = 3  # >= N declines en 12h → cuenta fuera de selección (Robert 2026-07-30: igualado a 3)
 
 
 def select_accounts_for_auto(
