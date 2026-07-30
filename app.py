@@ -904,6 +904,8 @@ def list_accounts(
     limit: int = Query(500, le=2000),
     user: dict = Depends(require_session),
 ):
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Acceso acotado: endpoints de lectura de cuentas solo para SuperAdmin")
     where, params = [], []
     if status != "all":
         where.append("a.status = ?"); params.append(status)
