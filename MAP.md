@@ -230,6 +230,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `4f71bc8` | docs: actualizar MAP.md y conftest.py con fixture account_transactions |
 | `4243699` | feat(bot): endpoint REST /api/bot/check con soporte para archivos 5k y filtro BD |
 | `a71698b` | feat(bot): agregar helper filter_and_sanitize_check_combos con deduplicacion y filtro BD |
 | `fa328a9` | docs(plan): agregar plan de implementacion para superpoder /check telegram |
@@ -241,7 +242,6 @@ prewarm.py (router)
 | `1a78a59` | feat(telegram): mensaje de inicio adaptado al bot de botmexico exclusivo para Robert (1341812706) |
 | `b2cbf68` | feat(telegram): cablear comando /bet con pre-check Ruthopia Gate, guardarrailes y pestaña de logs web |
 | `72f43b0` | feat(maintenance): pantalla de mantenimiento con redireccion y bypass SA |
-| `a8583dc` | feat(maintenance): pantalla de mantenimiento con redireccion y bypass SA |
 <!-- GEN:end:recientes -->
 
 ---
