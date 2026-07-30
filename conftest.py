@@ -91,6 +91,13 @@ def seed_db(tmp_path, monkeypatch):
                 updated_at TEXT
             )
         """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS account_transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_email TEXT, txn_date TEXT, status INTEGER,
+                txn_type INTEGER, gateway INTEGER, amount REAL
+            )
+        """)
         # Seed A2.1: a@ asignada al operador 555; c@ lockeada por 555; b@ ajena (del SA)
         con.execute("INSERT INTO account_assignments (email,user_id,assigned_by,assigned_at) VALUES (?,?,?,?)",
                     ("a@test.com", 555, 1341812706, "2026-06-01 00:00:00"))

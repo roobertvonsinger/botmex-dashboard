@@ -230,6 +230,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `4243699` | feat(bot): endpoint REST /api/bot/check con soporte para archivos 5k y filtro BD |
 | `a71698b` | feat(bot): agregar helper filter_and_sanitize_check_combos con deduplicacion y filtro BD |
 | `fa328a9` | docs(plan): agregar plan de implementacion para superpoder /check telegram |
 | `12380c0` | docs(spec): agregar spec para superpoder /check en telegram (archivos 5k, filtrado BD) |
@@ -241,7 +242,6 @@ prewarm.py (router)
 | `b2cbf68` | feat(telegram): cablear comando /bet con pre-check Ruthopia Gate, guardarrailes y pestaña de logs web |
 | `72f43b0` | feat(maintenance): pantalla de mantenimiento con redireccion y bypass SA |
 | `a8583dc` | feat(maintenance): pantalla de mantenimiento con redireccion y bypass SA |
-| `8034a90` | feat(pantalla): diferenciacion visual SPEI/Tarjeta, contorno amarillo dashboard y tarjeta en desc |
 <!-- GEN:end:recientes -->
 
 ---
