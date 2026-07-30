@@ -230,6 +230,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `1cb0161` | fix(audit): agregar register_operator_strike y normalizar formato de tarjeta a 4 partes |
 | `688cadb` | feat(telegram): endpoints REST /start, /info, /help y /cancel adaptados para el bot |
 | `37fe1e1` | feat(auth): simplificar roles a SuperAdmin u Operator, acotar endpoints de lectura y retiros |
 | `1a78a59` | feat(telegram): mensaje de inicio adaptado al bot de botmexico exclusivo para Robert (1341812706) |
@@ -241,7 +242,6 @@ prewarm.py (router)
 | `7b47b23` | docs(next-session): actualizar NEXT-SESSION.md con correcciones de matchmaking y logs |
 | `2c8e226` | fix(matchmaking): prevenir re-depósito a cuentas completadas y ajustar scrollbar en chips UI |
 | `fb9ae44` | logging(auto): inyectar logs estructurados con emojis en run_auto_mission |
-| `e824898` | fix(auto): integrar a main el fix de ValueError en parseo de pipes de 4 partes |
 <!-- GEN:end:recientes -->
 
 ---
