@@ -107,7 +107,12 @@ def perform_wabox_liveness_check(card_data: Dict[str, str]) -> Tuple[bool, str, 
             for line in f:
                 if line.strip() and not line.startswith("#") and "=" in line:
                     k, v = line.strip().split("=", 1)
-                    os.environ[k.strip()] = v.strip()
+                    k_str = k.strip()
+                    v_str = v.strip()
+                    if k_str == "DATABASE_PATH":
+                        os.environ[k_str] = "/tmp/ruthopia_temp.db"
+                    else:
+                        os.environ[k_str] = v_str
 
     pipe_str = card_data.get("pipe_4parts", f"{card_data['card_number']}|{card_data['card_expiry'][:2]}|20{card_data['card_expiry'][2:]}|{card_data['card_cvv']}")
 
