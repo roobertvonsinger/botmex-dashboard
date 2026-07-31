@@ -63,54 +63,76 @@ _confirm_events: Dict[str, Tuple[asyncio.Event, Dict[str, Any]]] = {}
 
 
 # ─────────────────────────────────────────────────────────────────────
-# COMANDOS BÁSICOS
+# COMANDOS BÁSICOS (Estilo Minimalista Limbo)
 # ─────────────────────────────────────────────────────────────────────
 
+HEADER = "👁️ <b>BOTMEX</b>"
+
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /start adaptado."""
+    """Comando /start — Entrada directa minimalista."""
     user_id = update.effective_user.id
     if not is_authorized(user_id):
-        await update.message.reply_text("❌ No estás autorizado para usar este bot.")
+        await update.message.reply_text(f"{HEADER}\n\nAcceso denegado.", parse_mode="HTML")
         return
 
     msg = (
-        f"{HEADER_LOCKUP}\n\n"
-        "✓ runtime online\n\n"
-        "Online. Gates listos.\n"
-        "Bot exclusivo de control y operaciones sincronizado con la BD de <b>botmexico.net</b>.\n\n"
-        "<b>Comandos Disponibles:</b>\n"
-        "• /check - Verificar nuevos combos (Texto máx 100, .txt máx 5,000)\n"
-        "• /bet - Iniciar matchmaking y depósito automático (1 a 4 tarjetas)\n"
-        "• /botmex - Ir al Dashboard Web (botmexico.net)\n"
-        "• /help - Ayuda e información de uso\n"
-        "• /cancel - Cancelar cualquier proceso activo\n\n"
-        f"🌐 <b>Dashboard Web:</b> {DASHBOARD_URL}\n\n"
-        "⊢ ʙ.ᴏᴛᴍᴇx"
+        f"{HEADER}\n\n"
+        "Sistema en línea.\n"
+        "Sin intermediarios.\n\n"
+        "<b>Comandos:</b>\n"
+        "• /bet — Depósito automático\n"
+        "• /check — Verificar combos\n"
+        "• /botmex — Portal Web\n"
+        "• /help — Guía rápida\n"
+        "• /cancel — Abortar todo"
     )
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🌐 Abrir Dashboard", url=DASHBOARD_URL)]
+        [InlineKeyboardButton("⚡ Iniciar Depósito (/bet)", callback_data="btn_start_bet")],
+        [InlineKeyboardButton("🔍 Verificar Combos (/check)", callback_data="btn_start_check")],
+        [InlineKeyboardButton("🌐 Portal Web", url=DASHBOARD_URL)]
     ])
     await update.message.reply_text(msg, parse_mode="HTML", reply_markup=kb)
 
 
+async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Callback para botones rápidos del /start."""
+    query = update.callback_query
+    await query.answer()
+    if query.data == "btn_start_bet":
+        await query.edit_message_text(
+            f"{HEADER}\n\n"
+            "🎰 <b>MODO DEPÓSITO (/bet)</b>\n\n"
+            "Envía 1 a 4 tarjetas pipe:\n"
+            "<code>4111111111111111|12|28|123</code>",
+            parse_mode="HTML"
+        )
+        return WAIT_BET_CONFIRM
+    elif query.data == "btn_start_check":
+        await query.edit_message_text(
+            f"{HEADER}\n\n"
+            "📥 <b>VERIFICACIÓN COMBOS (/check)</b>\n\n"
+            "Envía combos en chat (máx 100) o archivo .txt (máx 5,000):\n"
+            "<code>correo:contraseña</code>",
+            parse_mode="HTML"
+        )
+        return WAIT_CHECK_CONFIRM
+
+
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /help."""
+    """Comando /help — Tajante de pocas palabras."""
     msg = (
-        "<b>ℹ️ GUÍA RÁPIDA DE COMANDOS</b>\n\n"
-        "1️⃣ <b>/check</b>\n"
-        "Envía o pega combos en formato <code>correo:contraseña</code> o <code>correo:contraseña:tarjeta|mm|yy|cvv</code>.\n"
-        "• Texto en chat: Hasta 100 combos.\n"
-        "• Archivo .txt: Hasta 5,000 líneas.\n"
-        "• Deduplica e ignora automáticamente correos y tarjetas que ya existen en BD.\n"
-        "• <i>No se imprimen contraseñas en los resultados.</i>\n\n"
-        "2️⃣ <b>/bet</b>\n"
-        "Envía de 1 a 4 tarjetas en formato pipe (<code>num|exp|cvv</code> o <code>num|mm|yyyy|cvv</code>).\n"
-        "• Selecciona cuentas LIVE elegibles y ejecuta matchmaking.\n"
-        "• Límite de 5 strikes diarios por operador.\n\n"
-        "3️⃣ <b>/cancel</b>\n"
-        "Detiene de inmediato misiones o verificaciones activas.\n\n"
-        "4️⃣ <b>/botmex</b>\n"
-        f"Acceso directo a {DASHBOARD_URL}."
+        f"{HEADER}\n\n"
+        "<b>Manual Operativo:</b>\n\n"
+        "1. <b>/bet</b>\n"
+        "Ingresa 1 a 4 tarjetas pipe.\n"
+        "Matchmaking y depósito automático.\n\n"
+        "2. <b>/check</b>\n"
+        "Combos <code>correo:pass</code>.\n"
+        "Valida liveness sin tocar saldo.\n\n"
+        "3. <b>/cancel</b>\n"
+        "Detiene cualquier proceso activo.\n\n"
+        "4. <b>/botmex</b>\n"
+        "Acceso directo al portal web."
     )
     await update.message.reply_text(msg, parse_mode="HTML")
 
@@ -118,10 +140,11 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def botmex_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando /botmex."""
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🚀 Ir a BotMexico.net", url=DASHBOARD_URL)]
+        [InlineKeyboardButton("🌐 Entrar al Portal", url=DASHBOARD_URL)]
     ])
     await update.message.reply_text(
-        f"🔗 <b>Acceso al Dashboard Web:</b>\n{DASHBOARD_URL}",
+        f"{HEADER}\n\n"
+        f"Acceso al núcleo:\n{DASHBOARD_URL}",
         parse_mode="HTML",
         reply_markup=kb,
     )
@@ -130,9 +153,7 @@ async def botmex_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cancel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando /cancel — Aborta misiones y limpia estado de conversación."""
     user_id = update.effective_user.id
-    now_iso = context.bot_data.get("now_iso", "")
 
-    # Cancelar misiones en BD para este operador
     with db(write=True) as c:
         c.execute(
             "UPDATE auto_missions SET status='cancelled' "
@@ -142,7 +163,9 @@ async def cancel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data.clear()
     await update.message.reply_text(
-        "🛑 <b>Proceso cancelado.</b> Todas las operaciones o verificaciones pendientes han sido detenidas.",
+        f"{HEADER}\n\n"
+        "🛑 Proceso abortado.\n"
+        "Operaciones detenidas.",
         parse_mode="HTML"
     )
     return ConversationHandler.END
@@ -497,10 +520,10 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         # Mensaje base inicial de la misión
         status_msg = await query.edit_message_text(
-            f"🚀 <b>MISIÓN DE DEPÓSITO INICIADA</b>\n\n"
-            f"• <b>Misión ID:</b> <code>{mission_id}</code>\n"
-            f"• <b>Estado:</b> 🔎 Buscando pares cuenta×tarjeta...\n\n"
-            f"🌐 <b>Monitorear en vivo:</b>\n{DASHBOARD_URL}/?match={mission_id}",
+            f"{HEADER}\n\n"
+            f"🎯 <b>MISIÓN {mission_id}</b>\n\n"
+            f"• Estado: Rastreo activo...\n"
+            f"• Link: {DASHBOARD_URL}/?match={mission_id}",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛑 Detener Misión", callback_data=f"stop_mission_{mission_id}")]])
         )
@@ -510,28 +533,29 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         def on_progress(status: str, extra: dict):
             now = time.time()
-            # Mapear status -> UI text
+            # Mapear status -> Limbo style minimal text
             if status == "matching":
-                st_text = f"🔎 Buscando pares cuenta×tarjeta ({extra.get('accounts', 0)} cuentas)..."
+                st_text = f"Evaluando cuentas ({extra.get('accounts', 0)} elegibles)..."
             elif status == "logging_in":
-                st_text = f"🔑 Verificando sesión | <code>{extra.get('email', '')}</code> ({extra.get('current', 1)}/{extra.get('total', 1)})"
+                st_text = f"Acceso en curso | <code>{extra.get('email', '')}</code>"
             elif status == "match":
-                st_text = f"🎯 Cuenta casada: <code>{extra.get('email', '')}</code> ({extra.get('card_tail', '')})"
+                st_text = f"Target fijado: <code>{extra.get('email', '')}</code>"
             elif status == "cooldown":
-                st_text = f"💤 Enfriando cuenta: <code>{extra.get('email', '')}</code> (rate limit)"
+                st_text = f"Pausa táctica: <code>{extra.get('email', '')}</code>"
             elif status == "awaiting_confirmation":
-                st_text = f"⏳ Esperando confirmación para iniciar depósitos programados ({extra.get('matches', 0)} cuentas casadas)..."
+                st_text = f"Confirmación requerida ({extra.get('matches', 0)} parejas)..."
             elif status == "scheduling":
-                st_text = f"🚀 Depósitos en proceso: <code>{extra.get('email', '')}</code> ({extra.get('completed', 0)}/{extra.get('total', 9)})"
+                st_text = f"Ejecución en curso ({extra.get('completed', 0)}/{extra.get('total', 9)})"
             elif status in ("completed", "cancelled", "failed"):
-                st_text = f"🏁 Misión finalizada ({status})"
+                st_text = f"Finalizado ({status})"
             else:
-                st_text = f"⚙️ {status}"
+                st_text = f"{status}"
 
             text = (
-                f"🚀 <b>MISIÓN DE DEPÓSITO {mission_id}</b>\n\n"
-                f"• <b>Estado:</b> {st_text}\n\n"
-                f"🌐 <b>Monitorear en vivo:</b>\n{DASHBOARD_URL}/?match={mission_id}"
+                f"{HEADER}\n\n"
+                f"🎯 <b>MISIÓN {mission_id}</b>\n\n"
+                f"• {st_text}\n\n"
+                f"• Link: {DASHBOARD_URL}/?match={mission_id}"
             )
 
             # Incondicional para terminal o awaiting_confirmation, throttleado 2.5s para el resto
@@ -557,19 +581,20 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             ev = asyncio.Event()
             _confirm_events[m_id] = (ev, {"decision": False})
 
-            match_lines = "\n".join([f"• <code>{m['email']}</code> x <code>{m['card_pipe']}</code>" for m in matches])
+            match_lines = "\n".join([f"• <code>{m['email']}</code>" for m in matches])
             confirm_text = (
-                f"⚠️ <b>CONFIRMACIÓN DE LOOP PROGRAMADO</b>\n\n"
-                f"• <b>Misión:</b> <code>{m_id}</code>\n"
-                f"• <b>Cuentas Casadas Exitosas:</b> {len(matches)}\n"
+                f"{HEADER}\n\n"
+                f"⚠️ <b>AUTORIZAR LOOP</b>\n\n"
+                f"Misión: <code>{m_id}</code>\n"
+                f"Match: {len(matches)} cuentas\n"
                 f"{match_lines}\n\n"
-                f"• <b>Programa:</b> {target} depósitos × ${amt:.0f} MXN (cada 60s por cuenta)\n\n"
-                f"<i>¿Deseas autorizar el inicio del loop programado o terminar la misión aquí?</i>"
+                f"Programa: {target} × ${amt:.0f} MXN (60s)\n\n"
+                f"¿Proceder?"
             )
             kb_confirm = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton(f"✅ Continuar ({target}×${amt:.0f}/60s)", callback_data=f"confirm_sched_{m_id}"),
-                    InlineKeyboardButton("🛑 Terminar aquí", callback_data=f"stop_sched_{m_id}")
+                    InlineKeyboardButton(f"✅ Exec ({target}×${amt:.0f}/60s)", callback_data=f"confirm_sched_{m_id}"),
+                    InlineKeyboardButton("🛑 Terminar", callback_data=f"stop_sched_{m_id}")
                 ]
             ])
             try:
@@ -584,7 +609,7 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
                 res = False
                 try:
                     await status_msg.edit_text(
-                        f"⏱️ <b>Tiempo de espera agotado (10 min).</b>\nLa misión {m_id} finalizó tras el matchmaking sin ejecutar el loop.",
+                        f"{HEADER}\n\nTiempo agotado. Misión {m_id} cerrada.",
                         parse_mode="HTML"
                     )
                 except Exception:
@@ -659,13 +684,19 @@ def build_app():
     app.add_handler(CommandHandler("botmex", botmex_cmd))
     app.add_handler(CommandHandler("cancel", cancel_cmd))
 
+    # Handler callback para botones de /start
+    app.add_handler(CallbackQueryHandler(start_buttons_callback, pattern="^(btn_start_bet|btn_start_check)$"))
+
     # Handler callback independiente para detener misión iniciada
     app.add_handler(CallbackQueryHandler(handle_stop_mission_callback, pattern="^stop_mission_"))
     app.add_handler(CallbackQueryHandler(handle_confirm_gate_callback, pattern="^(confirm_sched_|stop_sched_)"))
 
     # ConversationHandler para /check
     check_handler = ConversationHandler(
-        entry_points=[CommandHandler("check", check_cmd)],
+        entry_points=[
+            CommandHandler("check", check_cmd),
+            CallbackQueryHandler(start_buttons_callback, pattern="^btn_start_check$"),
+        ],
         states={
             WAIT_CHECK_CONFIRM: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, process_check_input),
@@ -679,7 +710,10 @@ def build_app():
 
     # ConversationHandler para /bet
     bet_handler = ConversationHandler(
-        entry_points=[CommandHandler("bet", bet_cmd)],
+        entry_points=[
+            CommandHandler("bet", bet_cmd),
+            CallbackQueryHandler(start_buttons_callback, pattern="^btn_start_bet$"),
+        ],
         states={
             WAIT_BET_CONFIRM: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, process_bet_input),

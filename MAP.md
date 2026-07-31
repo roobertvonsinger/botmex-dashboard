@@ -234,6 +234,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `06d23ab` | feat(bet): live feedback, confirmacion de loop y portal de operador |
 | `50856bc` | docs(bet): plan definitivo para feedback en vivo, confirmacion y portal operador |
 | `ab19c08` | fix(logs): pasada impeccable (audit/colorize/layout/optimize/polish) sobre la consola de Logs |
 | `35e3bd4` | feat(logs): consola de Logs con categorías, auditoría de tarjetas y vista dual de bots Telegram |
@@ -245,7 +246,6 @@ prewarm.py (router)
 | `89d531f` | fix(checker): vincular DATABASE_PATH a /app/ruthopia_data/ruthopia.db montado de Ruthopia |
 | `e587507` | fix(checker): asegurar DATABASE_PATH escribible /tmp para invocacion de Ruthopia |
 | `cc878fd` | fix(checker): forzar carga de variables de entorno de Ruthopia para WaboxGate |
-| `1d7a136` | feat(checker): integrar llamada directa al motor oficial WaboxGate de Ruthopia |
 <!-- GEN:end:recientes -->
 
 ---
