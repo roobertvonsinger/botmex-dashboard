@@ -231,6 +231,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c600b71` | test(telegram-mock): agregar tests de edge cases (documentos invalidos, texto vacio, /cancel, auth) |
 | `927cfcf` | fix(telegram-mock): corregir validacion estricta de DB_PATH sin romper test runner y validar footer de marca |
 | `7daf0c9` | feat(telegram): usar layout oficial de marca BotMexico con header lockup y firma de runtime |
 | `f4595c1` | fix(telegram): corregir encoding unicode y sys.path en el arranque del bot mock |
@@ -242,7 +243,6 @@ prewarm.py (router)
 | `4f71bc8` | docs: actualizar MAP.md y conftest.py con fixture account_transactions |
 | `4243699` | feat(bot): endpoint REST /api/bot/check con soporte para archivos 5k y filtro BD |
 | `a71698b` | feat(bot): agregar helper filter_and_sanitize_check_combos con deduplicacion y filtro BD |
-| `fa328a9` | docs(plan): agregar plan de implementacion para superpoder /check telegram |
 <!-- GEN:end:recientes -->
 
 ---

