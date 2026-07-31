@@ -55,9 +55,9 @@ HEADER_LOCKUP = (
 MOCK_BOT_TOKEN = os.getenv("BMX_MOCK_BOT_TOKEN", "8823043859:AAEWnv2aVYopE7qsNVACA24sW_Tei7o1nnI")
 DASHBOARD_URL = os.getenv("BMX_DASHBOARD_URL", "https://botmexico.net")
 
-# Usuarios autorizados — Exclusivo SuperAdmin (Robert)
+# Usuarios autorizados (coincide con auth.py del dashboard y betmexico_config)
 SUPERADMIN_ID = 1341812706
-AUTHORIZED_USERS = {1341812706}
+AUTHORIZED_USERS = {1341812706, 7599631505, 7847239854, 1059367082, 753020051}
 
 def is_authorized(user_id: int) -> bool:
-    return user_id == SUPERADMIN_ID
+    return user_id in AUTHORIZED_USERS or user_id == SUPERADMIN_ID
