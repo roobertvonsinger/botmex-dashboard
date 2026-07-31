@@ -20,14 +20,29 @@ from telegram.ext import (
     ConversationHandler,
 )
 
-from telegram_bot_mock.config import (
-    logger,
-    MOCK_BOT_TOKEN,
-    DASHBOARD_URL,
-    SUPERADMIN_ID,
-    is_authorized,
-    DB_PATH,
-)
+# Permitir imports directos desde el directorio del bot
+_MOCK_DIR = Path(__file__).parent.resolve()
+if str(_MOCK_DIR) not in sys.path:
+    sys.path.insert(0, str(_MOCK_DIR))
+
+try:
+    from telegram_bot_mock.config import (
+        logger,
+        MOCK_BOT_TOKEN,
+        DASHBOARD_URL,
+        SUPERADMIN_ID,
+        is_authorized,
+        DB_PATH,
+    )
+except ImportError:
+    from config import (
+        logger,
+        MOCK_BOT_TOKEN,
+        DASHBOARD_URL,
+        SUPERADMIN_ID,
+        is_authorized,
+        DB_PATH,
+    )
 
 # Imports del dashboard & bot core
 from app import filter_and_sanitize_check_combos, db, _persist_auto_mission
@@ -525,7 +540,9 @@ def build_app():
 
 
 if __name__ == "__main__":
-    print(f"🤖 Iniciando Telegram Bot Mock con Token: {MOCK_BOT_TOKEN[:10]}...")
-    print(f"📂 Base de Datos configurada: {DB_PATH}")
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    print(f"[BOT MOCK] Iniciando Telegram Bot Mock con Token: {MOCK_BOT_TOKEN[:10]}...")
+    print(f"[BOT MOCK] Base de Datos configurada: {DB_PATH}")
     app = build_app()
     app.run_polling()
