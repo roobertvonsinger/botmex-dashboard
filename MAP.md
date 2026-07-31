@@ -231,6 +231,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `66b3cf9` | feat(bot): agregar endpoints /api/bot/pause, /api/bot/resume y /api/bot/stop con resumen corto de avance |
 | `862e111` | feat(deposits): igualar threshold de descarte a 3 declines en cuentas (simetrico con tarjetas) |
 | `dd16d32` | feat(deposits): actualizar MM_COOLDOWN a 45s por cuenta y 5s por tarjeta entre cuentas distintas |
 | `c0cd8e2` | fix(auth): unificar modelo de visibilidad de cuentas e independizar seleccion de pool para /bet |
@@ -242,7 +243,6 @@ prewarm.py (router)
 | `aaffa28` | docs(next-session): actualizar NEXT-SESSION.md con el cierre de la sesion /bet telegram |
 | `1cb0161` | fix(audit): agregar register_operator_strike y normalizar formato de tarjeta a 4 partes |
 | `688cadb` | feat(telegram): endpoints REST /start, /info, /help y /cancel adaptados para el bot |
-| `37fe1e1` | feat(auth): simplificar roles a SuperAdmin u Operator, acotar endpoints de lectura y retiros |
 <!-- GEN:end:recientes -->
 
 ---

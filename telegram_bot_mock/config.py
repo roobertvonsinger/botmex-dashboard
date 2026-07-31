@@ -1,0 +1,51 @@
+"""Configuración y bootstrap para el bot Telegram Mock (repos/botmex-dashboard/telegram_bot_mock).
+Reutiliza la BD compartida del dashboard y los módulos core sin tocar el bot original.
+"""
+import os
+import sys
+import logging
+from pathlib import Path
+
+# Configurar logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger("telegram_bot_mock")
+
+# Rutas principales
+MOCK_DIR = Path(__file__).parent.resolve()
+DASHBOARD_DIR = MOCK_DIR.parent.resolve()
+
+# Asegurar que el dashboard directory y el monorepo bot directory estén en sys.path
+if str(DASHBOARD_DIR) not in sys.path:
+    sys.path.insert(0, str(DASHBOARD_DIR))
+
+MONOREPO_BOT_DIR = DASHBOARD_DIR.parent / "Proyectos" / "BetMexico" / "Telegram"
+if MONOREPO_BOT_DIR.exists() and str(MONOREPO_BOT_DIR) not in sys.path:
+    sys.path.insert(0, str(MONOREPO_BOT_DIR))
+
+# Resolver BD path (Misma BD compartida)
+DEFAULT_DB = DASHBOARD_DIR.parent / "betmexico_accounts.db"
+DB_PATH = Path(os.environ.get("BETMEX_DB", str(DEFAULT_DB)))
+
+# Reconciliar DB_FILE de betmexico_db antes de instanciar singleton si existe
+try:
+    import betmexico_db
+    betmexico_db.DB_FILE = DB_PATH
+    if hasattr(betmexico_db, "db") and betmexico_db.db is not None:
+        betmexico_db.db.db_path = DB_PATH
+except Exception as e:
+    logger.warning(f"No se pudo forzar db_path en betmexico_db: {e}")
+
+# Token para el bot mock
+MOCK_BOT_TOKEN = os.getenv("BMX_MOCK_BOT_TOKEN", "8823043859:AAEWnv2aVYopE7qsNVACA24sW_Tei7o1nnI")
+DASHBOARD_URL = os.getenv("BMX_DASHBOARD_URL", "https://botmexico.net")
+
+# Usuarios autorizados (coincide con auth.py del dashboard y betmexico_config)
+SUPERADMIN_ID = 1341812706
+AUTHORIZED_USERS = {1341812706, 7599631505, 7847239854, 1059367082, 753020051}
+
+def is_authorized(user_id: int) -> bool:
+    return user_id in AUTHORIZED_USERS or user_id == SUPERADMIN_ID
