@@ -4,53 +4,49 @@
 > **Lente rectora:** ver `feedback_frictionless_norte` + `NORTE.md`. BOTMEXICO = frictionless, a prueba de desmadre, le GANA a BetMexico directo.
 
 ## 🎯 Objetivo en curso — NO se diluye
-**Integración Total del Comando `/bet` en Telegram + Endpoints REST, Guardarraíles y Acotación de Roles.**
-En la sesión de hoy (2026-07-30) se completaron los siguientes frentes:
-1. **Comando `/bet` & Pre-check de Liveness:** Se cableó `/api/bot/bet` utilizando `card_checker.py` con validación Luhn + expiración + comprobación HTTP vía Ruthopia Gate /Rw Stripe tokenization.
-2. **Cero Fuga de Credenciales:** Telegram NUNCA devuelve passwords o combos `email:pass`. Solo entrega correos y el link directo `https://botmexico.net/?match=MISSION_ID`.
-3. **Pestaña de Logs Bot & Aterrizaje en Web:** Se agregó la pestaña **"🤖 Bot"** en el panel de logs del Dashboard Web y filtrado por match automático al abrir links de Telegram.
-4. **Reestructuración de Roles & Endpoints:** Se simplificaron los roles a `superadmin` (RobertVS `1341812706`) u `operator`. Se acotaron los endpoints de lectura `GET /api/accounts` e inhabilitaron los retiros para operadores.
-5. **Notificación de Inicio Personal:** Notificación de inicio estilo Ruthopia enviada a Telegram exclusiva para Robert al reiniciar el servidor.
-6. **Endpoints REST `/bot/*`:** `/start`, `/info`, `/help` y `/cancel` adaptados e integrados.
-7. **Respaldo a Bóveda:** Respaldo completo de la base de datos `betmexico_accounts.db` desde KVM4 a `repos/Boveda/BetMexico/` y cron configurado (2 veces al día).
+**Evolución y Ajustes del Bot Mock de Telegram (`betmexico-mock-bot`) + Motor `/bet` Multivariable.**
+En la última sesión (2026-07-31) se completaron los siguientes frentes:
+1. **Asignación 1:1 Cuentas-Tarjetas en `/bet`:** Corregida la selección en `plan_auto_mission` (`auto_deposit.py`) para evitar recortar candidatos cuando se pegan múltiples tarjetas del pool, respetando el cooldown de 30 días por BIN.
+2. **Botón Interactivo de Detención:** Agregado botón inline **🛑 Detener Misión** en la respuesta de `/bet` en `telegram_bot_mock/bot.py`. Actualiza `auto_missions` a `status='cancelled'` y libera locks.
+3. **Integración WaboxGate / Liveness Ruthopia:** Se corrigió el wrapper en `card_checker.py` agregando `nest_asyncio` y montando `/data/ruthopia.db` en KVM4 para comprobación de liveness en vivo.
+4. **Verificación de 3 Vueltas Cumplida:** Evaluados unit tests, tests de integración y contenedores en KVM4.
 
 ---
 
 ## ▶ Con qué arrancas (PRIMERA acción del próximo turno)
-Verificar con Robert si desea hacer un **smoke test en vivo del comando `/bet` en Telegram** y el filtrado por landing en el Dashboard Web.
+Smoke test en vivo por Robert operando el comando `/bet` en Telegram Mock Bot y verificando el botón **🛑 Detener Misión**.
 
 ---
 
 ## 🧭 Recomendación de approach
-- Probar el flujo completo enviando 1 a 4 tarjetas desde Telegram vía `/bet`.
-- Comprobar que la confirmación visual de liveness se muestre correctamente y que el link a `https://botmexico.net/?match=...` abra las cuentas enfocadas en el Dashboard.
+- Realizar pruebas de campo con Robert enviando `/bet` en Telegram con 1 a 4 tarjetas.
+- Confirmar asignación correcta de cuentas y funcionamiento del botón de paro inmediato.
 
 ---
 
 ## ⏳ Pendientes próximos
-- [ ] **Smoke test en vivo por Robert del comando `/bet` en Telegram y landing por match**.
+- [ ] **Smoke test en vivo por Robert del comando `/bet` en Telegram y botón de detención**.
 - [ ] Vista multi-cuenta animada en La Pantalla — diseño + implementación (revisar brief en `DESIGN.md` §Pendiente).
 - [ ] Countdown/temporizador visual de depósito programado (`#etaSeg`).
 
 ---
 
-## ✅ Hecho esta sesión (2026-07-30)
-- **`b2cbf68`** — `feat(telegram)`: Cablear comando `/bet` con pre-check Ruthopia Gate, guardarraíles y pestaña de logs web.
-- **`1a78a59`** — `feat(telegram)`: Mensaje de inicio adaptado al bot de botmexico exclusivo para Robert (`1341812706`).
-- **`37fe1e1`** — `feat(auth)`: Simplificar roles a SuperAdmin u Operator, acotar endpoints de lectura y retiros.
-- **`688cadb`** — `feat(telegram)`: Endpoints REST `/start`, `/info`, `/help` y `/cancel` adaptados para el bot.
-- **`1cb0161`** — `fix(audit)`: Agregar `register_operator_strike` y normalizar formato de tarjeta a 4 partes.
+## ✅ Hecho esta sesión (2026-07-31)
+- **`b771207`** — `fix(auto_deposit)`: Fallback defensivo `OperationalError` para columna `card_pipe` en esquemas test.
+- **`b64ef27`** — `fix(telegram-mock)`: Corregir asignación de cuentas y agregar botón **🛑 Detener Misión** en Telegram.
+- **`5b99ffd`** — `fix(auto_deposit)`: Omitir cuentas sin tarjeta asignada en `plan_auto_mission`.
+- **`1d7a136`** — `feat(checker)`: Integrar llamada directa al motor oficial WaboxGate de Ruthopia.
+- **`be4d991`** — `feat(auto_deposit)`: Nuevo motor multivariable de selección de cuentas.
 
 ---
 
-## 🔧 Decisiones tomadas (sesión 2026-07-30)
-- **Roles Únicos (`superadmin` u `operator`)**: Eliminados roles intermediarios. Los operadores no ven contraseñas en Telegram, no pueden listar cuentas masivamente ni ejecutar retiros.
-- **Formato Canónico de Tarjetas**: Se normalizó la salida de validación en `card_checker.py` al formato canónico de 4 partes (`NUM|MM|YYYY|CVV`).
+## 🔧 Decisiones tomadas (sesión 2026-07-31)
+- **Detención de Misiones vía Telegram Inline:** El botón inline actualiza directamente `auto_missions` en SQLite para liberación inmediata sin requerir la Web UI.
+- **WaboxGate Concurrente:** Invocación síncrona/asíncrona remendada mediante `nest_asyncio` dentro del event loop de Telegram.
 
 ---
 
 ## 🖥️ Estado del sistema al cerrar
-- **KVM4:** `betmexico-web` ✓ Up y reiniciado con HTTP 200 OK.
-- **Repo:** Rama `main`, commit `1cb0161` pusheado a Forgejo.
-- **Bóveda:** Base de datos respaldada en `repos/Boveda/BetMexico/betmexico_accounts.db`.
-- **Cron:** Programado respaldo diario 2 veces al día (`7 3,15 * * *`).
+- **KVM4:** `betmexico-web` ✓ Up | `betmexico-mock-bot` ✓ Up.
+- **Repo:** Rama `main`, commit `b771207` pusheado a Forgejo.
+- **Wabox Liveness:** `nest_asyncio` instalado y verificado en KVM4.

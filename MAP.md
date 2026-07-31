@@ -232,6 +232,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b771207` | fix(auto_deposit): agregar fallback defensivo OperationalError si falta columna card_pipe en esquema test |
 | `b64ef27` | fix(telegram-mock): corregir asignacion de cuentas y agregar boton detener mision |
 | `5b99ffd` | fix(auto_deposit): omitir cuentas sin tarjeta asignada en plan_auto_mission |
 | `f444ed2` | fix(checker): apuntar DATABASE_PATH a /data/ruthopia.db en el volumen compartido |
@@ -243,7 +244,6 @@ prewarm.py (router)
 | `90f4cba` | fix(telegram-mock): restaurar lista completa de usuarios autorizados en el bot mock |
 | `0989117` | fix(telegram-mock): restringir acceso exclusivamente al SuperAdmin Robert (1341812706) |
 | `6a65660` | fix(telegram-mock): agregar null-safety en lectura de strikes_count de SQLite |
-| `ca712ef` | infra(docker): agregar container betmexico-mock-bot a docker-compose.yml |
 <!-- GEN:end:recientes -->
 
 ---
