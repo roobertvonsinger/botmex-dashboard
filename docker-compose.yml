@@ -1,0 +1,56 @@
+services:
+  bot:
+    build: .
+    image: betmexico:latest
+    container_name: betmexico-bot
+    env_file: .env
+    volumes:
+      - ./data:/data
+      - ./code:/app
+    working_dir: /app
+    command: python betmexico_bot.py
+    restart: unless-stopped
+    networks:
+      - bmx
+
+  web:
+    image: betmexico:latest
+    container_name: betmexico-web
+    env_file: .env
+    volumes:
+      - ./data:/data
+      - ./code:/app
+    working_dir: /app
+    expose:
+      - '8080'
+    command: python web/app.py
+    restart: unless-stopped
+    depends_on:
+      - bot
+    networks:
+      - bmx
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.betmexico.rule=Host(`botmexico.com.mx`) || Host(`www.botmexico.com.mx`) || Host(`botmexico.net`)'
+      - 'traefik.http.routers.betmexico.entrypoints=websecure'
+      - 'traefik.http.routers.betmexico.tls.certresolver=letsencrypt'
+      - 'traefik.http.services.betmexico.loadbalancer.server.port=8080'
+
+  telegram-mock:
+    image: betmexico:latest
+    container_name: betmexico-mock-bot
+    env_file: .env
+    volumes:
+      - ./data:/data
+      - ./code:/app
+    working_dir: /app/web
+    command: python telegram_bot_mock/bot.py
+    restart: unless-stopped
+    depends_on:
+      - web
+    networks:
+      - bmx
+
+networks:
+  bmx:
+    driver: bridge

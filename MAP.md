@@ -231,6 +231,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `3b27c3a` | feat(telegram-mock): mostrar tarjeta completa en respuesta de HITs para el operador |
 | `c600b71` | test(telegram-mock): agregar tests de edge cases (documentos invalidos, texto vacio, /cancel, auth) |
 | `927cfcf` | fix(telegram-mock): corregir validacion estricta de DB_PATH sin romper test runner y validar footer de marca |
 | `7daf0c9` | feat(telegram): usar layout oficial de marca BotMexico con header lockup y firma de runtime |
@@ -242,7 +243,6 @@ prewarm.py (router)
 | `c0cd8e2` | fix(auth): unificar modelo de visibilidad de cuentas e independizar seleccion de pool para /bet |
 | `4f71bc8` | docs: actualizar MAP.md y conftest.py con fixture account_transactions |
 | `4243699` | feat(bot): endpoint REST /api/bot/check con soporte para archivos 5k y filtro BD |
-| `a71698b` | feat(bot): agregar helper filter_and_sanitize_check_combos con deduplicacion y filtro BD |
 <!-- GEN:end:recientes -->
 
 ---
