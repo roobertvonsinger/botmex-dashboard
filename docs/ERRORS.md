@@ -2,6 +2,22 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## Contador de depósitos aprobados por operador siempre da 0 — mismatch de valor de status (detectado 2026-07-31, fix PENDIENTE)
+
+- **Síntoma**: cualquier conteo de "depósitos exitosos por operador" que use la query de `app.py:4168`
+  (`SELECT ... FROM deposit_attempts WHERE operator_id=? AND status='SUCCESS'`) siempre devuelve 0,
+  para cualquier operador, aunque tenga depósitos aprobados reales en BD.
+- **Causa raíz**: `classify_deposit_status()` (`deposits.py:1786-1787`, fuente única de verdad del
+  `status` que se persiste en `deposit_attempts` desde los 4 flujos — single/matchmaker/scheduled/auto)
+  escribe el literal `'approved'` (minúsculas) en éxito. El string `'SUCCESS'` no lo escribe NINGÚN
+  punto del repo (verificado por grep global) — es un valor que alguien esperó pero que el pipeline
+  real nunca produjo.
+- **Fix**: cambiar `app.py:4168` a `status='approved'`. Incluido como parte del Frente 3 del plan
+  `docs/plans/2026-07-31-bet-live-feedback-confirmacion-portal-operador.md` (mismo archivo/zona que se
+  toca para el nuevo endpoint `/api/operator/my-accounts` — ese endpoint SÍ usa `'approved'` desde el
+  día uno, no repetir el bug).
+- **Verificado**: confirmado por lectura de código + grep, no reproducido en runtime (no requiere).
+
 ## Modo Auto abortaba inmediatamente por ValueError al procesar tarjetas de 4 partes (2026-07-28)
 
 - **Síntoma**: Al iniciar el Modo Auto en el dashboard, pegar las tarjetas en el formato normal de la UI (`numero|MM|YYYY|CVV`) e iniciar la confirmación, el proceso se cancelaba de inmediato en la pantalla sin mostrar ningún error (la UI regresaba a su estado inicial en milisegundos).

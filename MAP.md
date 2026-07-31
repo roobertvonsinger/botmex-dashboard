@@ -233,6 +233,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `ab19c08` | fix(logs): pasada impeccable (audit/colorize/layout/optimize/polish) sobre la consola de Logs |
 | `35e3bd4` | feat(logs): consola de Logs con categorías, auditoría de tarjetas y vista dual de bots Telegram |
 | `e5975f9` | docs(next-session): actualizar estado de cierre y pendientes del bot mock |
 | `b771207` | fix(auto_deposit): agregar fallback defensivo OperationalError si falta columna card_pipe en esquema test |
@@ -244,7 +245,6 @@ prewarm.py (router)
 | `cc878fd` | fix(checker): forzar carga de variables de entorno de Ruthopia para WaboxGate |
 | `1d7a136` | feat(checker): integrar llamada directa al motor oficial WaboxGate de Ruthopia |
 | `be4d991` | feat(auto_deposit): nuevo motor multivariable de seleccion sin grading visible |
-| `90f4cba` | fix(telegram-mock): restaurar lista completa de usuarios autorizados en el bot mock |
 <!-- GEN:end:recientes -->
 
 ---

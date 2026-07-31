@@ -4,49 +4,47 @@
 > **Lente rectora:** ver `feedback_frictionless_norte` + `NORTE.md`. BOTMEXICO = frictionless, a prueba de desmadre, le GANA a BetMexico directo.
 
 ## 🎯 Objetivo en curso — NO se diluye
-**Evolución y Ajustes del Bot Mock de Telegram (`betmexico-mock-bot`) + Motor `/bet` Multivariable.**
-En la última sesión (2026-07-31) se completaron los siguientes frentes:
-1. **Asignación 1:1 Cuentas-Tarjetas en `/bet`:** Corregida la selección en `plan_auto_mission` (`auto_deposit.py`) para evitar recortar candidatos cuando se pegan múltiples tarjetas del pool, respetando el cooldown de 30 días por BIN.
-2. **Botón Interactivo de Detención:** Agregado botón inline **🛑 Detener Misión** en la respuesta de `/bet` en `telegram_bot_mock/bot.py`. Actualiza `auto_missions` a `status='cancelled'` y libera locks.
-3. **Integración WaboxGate / Liveness Ruthopia:** Se corrigió el wrapper en `card_checker.py` agregando `nest_asyncio` y montando `/data/ruthopia.db` en KVM4 para comprobación de liveness en vivo.
-4. **Verificación de 3 Vueltas Cumplida:** Evaluados unit tests, tests de integración y contenedores en KVM4.
+**Cerrar la capa de experiencia + control de acceso alrededor de `/bet`** (el motor de matchmaking/depósito ya funciona — smoke real 2026-07-31 con `cardenascarlosignacio94@gmail.com` exitoso). Plan definitivo aprobado por Robert, ejecución en limpio la próxima sesión con `/Smartexe`:
+**`docs/plans/2026-07-31-bet-live-feedback-confirmacion-portal-operador.md`** — léelo completo antes de tocar código, tiene los 5 frentes con archivo/línea exactos.
 
 ---
 
 ## ▶ Con qué arrancas (PRIMERA acción del próximo turno)
-Smoke test en vivo por Robert operando el comando `/bet` en Telegram Mock Bot y verificando el botón **🛑 Detener Misión**.
+Leer `docs/plans/2026-07-31-bet-live-feedback-confirmacion-portal-operador.md` completo, luego ejecutar **Frente 3** primero (endpoint `GET /api/operator/my-accounts` en `app.py`, sin riesgo/sin dependencias), después Frente 1+2 juntos (`auto_deposit.py`+`bot.py`), luego Frente 4 (portal), y Frente 5 al final (depende de que `/portal` ya exista).
 
 ---
 
 ## 🧭 Recomendación de approach
-- Realizar pruebas de campo con Robert enviando `/bet` en Telegram con 1 a 4 tarjetas.
-- Confirmar asignación correcta de cuentas y funcionamiento del botón de paro inmediato.
+Ejecutar los 5 frentes de corrido en una sola sesión (`/Smartexe` sobre el plan) — están diseñados en orden de dependencia justo para eso. Portal operador va en HTML/JS plano (no React) para que cierre en el mismo turno; ver la justificación técnica en el Frente 4 del plan antes de cuestionarlo.
 
 ---
 
 ## ⏳ Pendientes próximos
-- [ ] **Smoke test en vivo por Robert del comando `/bet` en Telegram y botón de detención**.
-- [ ] Vista multi-cuenta animada en La Pantalla — diseño + implementación (revisar brief en `DESIGN.md` §Pendiente).
-- [ ] Countdown/temporizador visual de depósito programado (`#etaSeg`).
+- [ ] Ejecutar los 5 frentes del plan (ver arriba).
+- [ ] Smoke real de Robert: `/bet` con 1-2 tarjetas viendo el mensaje de Telegram editarse en vivo + la pausa de confirmación (ambos caminos: continuar / terminar aquí) + timeout sin respuesta.
+- [ ] Smoke real de Robert: login como Lau/Luisito/Magdiel en `/portal`, confirmar que solo ven cuentas con depósito propio exitoso (sin password) y que `/` los redirige a `/portal`.
+- [ ] Vista multi-cuenta animada en La Pantalla — diseño + implementación (revisar brief en `DESIGN.md` §Pendiente). Sigue en la cola, no se tocó esta sesión.
+- [ ] Countdown/temporizador visual de depósito programado (`#etaSeg`). Sigue en la cola.
 
 ---
 
-## ✅ Hecho esta sesión (2026-07-31)
-- **`b771207`** — `fix(auto_deposit)`: Fallback defensivo `OperationalError` para columna `card_pipe` en esquemas test.
-- **`b64ef27`** — `fix(telegram-mock)`: Corregir asignación de cuentas y agregar botón **🛑 Detener Misión** en Telegram.
-- **`5b99ffd`** — `fix(auto_deposit)`: Omitir cuentas sin tarjeta asignada en `plan_auto_mission`.
-- **`1d7a136`** — `feat(checker)`: Integrar llamada directa al motor oficial WaboxGate de Ruthopia.
-- **`be4d991`** — `feat(auto_deposit)`: Nuevo motor multivariable de selección de cuentas.
+## ✅ Hecho esta sesión (2026-07-31, sesión de planeación — sin código)
+- Sesión 100% de investigación + diseño (Plan Mode), sin cambios de código. Se mapeó a fondo el motor `run_auto_mission`/`_broadcast_mission` (`auto_deposit.py`) y el modelo de roles/visibilidad (`auth.py`/`web_auth.py`/`app.py`).
+- **Plan escrito y APROBADO por Robert**: `docs/plans/2026-07-31-bet-live-feedback-confirmacion-portal-operador.md`.
+- **Bug detectado y documentado (no fixeado aún)**: `app.py:4168` cuenta depósitos aprobados con `status='SUCCESS'`, pero el valor real que persiste `classify_deposit_status()` es `'approved'` (minúsculas) — el contador siempre da 0. Ver `docs/ERRORS.md` §"Contador de depósitos aprobados por operador siempre da 0". Fix incluido en Frente 3 del plan.
+- **Docs actualizados**: `docs/ERRORS.md` (bug nuevo), `docs/plans/` (plan nuevo), este archivo.
 
 ---
 
 ## 🔧 Decisiones tomadas (sesión 2026-07-31)
-- **Detención de Misiones vía Telegram Inline:** El botón inline actualiza directamente `auto_missions` en SQLite para liberación inmediata sin requerir la Web UI.
-- **WaboxGate Concurrente:** Invocación síncrona/asíncrona remendada mediante `nest_asyncio` dentro del event loop de Telegram.
+- **Feedback en vivo del bot = callback in-process, NO SSE.** El bot corre `run_auto_mission` en su propio proceso/contenedor (`betmexico-mock-bot`, separado de `betmexico-web`); el SSE que emite hoy (`_broadcast_mission` → `app._broadcast`) es código muerto ahí (nadie lo escucha cross-container). No se intenta puentear — se agrega un callback `on_progress` directo.
+- **Portal operador en HTML/JS plano, no React.** Repo no tiene scaffold de build (sin `package.json`/`vite`). React se pospone a una sesión dedicada de infra si Robert insiste; el MVP portal debe cerrar en un turno.
+- **Restricción de operadores al portal = redirect por rol, NO modo mantenimiento.** Son conceptos distintos (mantenimiento = apagón temporal togglable para todos los no-SA; esto = restricción permanente de rol). Reusar mantenimiento generaría bug el día que se prenda un apagón real.
+- **Confirmación antes del loop programado = `asyncio.Event` in-process con timeout 10 min, default `False`** (nunca gastar dinero sin respuesta explícita del operador).
 
 ---
 
-## 🖥️ Estado del sistema al cerrar
-- **KVM4:** `betmexico-web` ✓ Up | `betmexico-mock-bot` ✓ Up.
-- **Repo:** Rama `main`, commit `b771207` pusheado a Forgejo.
-- **Wabox Liveness:** `nest_asyncio` instalado y verificado en KVM4.
+## 🖥️ Estado del sistema al cerrar (verificado por SSH, 2026-07-31)
+- **KVM4:** `betmexico-web` ✓ Up | `betmexico-bot` ✓ Up | `betmexico-mock-bot` ✓ Up. Health `/api/health` → `200 {"ok":true,"accounts":941}`.
+- **Modo mantenimiento: APAGADO en prod** (sin `/data/maintenance.flag`, sin env `BMX_MAINTENANCE`) — pese a que Robert recordaba haberlo prendido. Discrepancia anotada, no bug; el Frente 5 del plan la resuelve con el mecanismo correcto (redirect por rol) en vez de depender de este flag.
+- **Repo:** rama `main`, commit `35e3bd4` (sin cambios de código esta sesión, solo docs — ver commit de cierre).
