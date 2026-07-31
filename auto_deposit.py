@@ -419,22 +419,25 @@ def plan_auto_mission(
             ).fetchone()["n"]
 
             # 6. Historial de BINs aprobados en los últimos 30 días para esta cuenta: {bin: set(card_pipes_aprobados)}
-            bin_app_rows = con.execute(
-                "SELECT card_pipe FROM deposit_attempts "
-                "WHERE account_email=? AND UPPER(status)='APPROVED' AND card_pipe IS NOT NULL "
-                "AND created_at >= datetime('now','-30 days')",
-                (email,),
-            ).fetchall()
-
             approved_bin_pipes: Dict[str, set] = {}
-            for row in bin_app_rows:
-                p_raw = str(row["card_pipe"]).strip()
-                p_norm = _normalize_pipe_to_3part(p_raw)
-                b_code = p_norm[:6] if len(p_norm) >= 6 else ""
-                if b_code:
-                    if b_code not in approved_bin_pipes:
-                        approved_bin_pipes[b_code] = set()
-                    approved_bin_pipes[b_code].add(p_norm)
+            try:
+                bin_app_rows = con.execute(
+                    "SELECT card_pipe FROM deposit_attempts "
+                    "WHERE account_email=? AND UPPER(status)='APPROVED' AND card_pipe IS NOT NULL "
+                    "AND created_at >= datetime('now','-30 days')",
+                    (email,),
+                ).fetchall()
+
+                for row in bin_app_rows:
+                    p_raw = str(row["card_pipe"]).strip()
+                    p_norm = _normalize_pipe_to_3part(p_raw)
+                    b_code = p_norm[:6] if len(p_norm) >= 6 else ""
+                    if b_code:
+                        if b_code not in approved_bin_pipes:
+                            approved_bin_pipes[b_code] = set()
+                        approved_bin_pipes[b_code].add(p_norm)
+            except sqlite3.OperationalError:
+                approved_bin_pipes = {}
 
             # Minutos desde el último intento/movimiento
             last_att = con.execute(

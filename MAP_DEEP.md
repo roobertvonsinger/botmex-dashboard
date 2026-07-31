@@ -192,16 +192,16 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `select_accounts_for_auto` | def | L149–L281 |
 | `select_card_for_account` | def | L285–L307 |
 | `_max_accounts_for_cards` | def | L311–L315 |
-| `plan_auto_mission` | def | L318–L533 |
-| `_iso` | def | L574–L575 |
-| `_m_load` | def | L578–L585 |
-| `_m_status` | def | L588–L590 |
-| `_m_update` | def | L593–L602 |
-| `_fetch_account` | def | L605–L611 |
-| `_unlock` | def | L614–L622 |
-| `_broadcast_mission` | def | L625–L634 |
-| `_stop_pool` | def | L637–L644 |
-| `run_auto_mission` | def | L648–L951 |
+| `plan_auto_mission` | def | L318–L536 |
+| `_iso` | def | L577–L578 |
+| `_m_load` | def | L581–L588 |
+| `_m_status` | def | L591–L593 |
+| `_m_update` | def | L596–L605 |
+| `_fetch_account` | def | L608–L614 |
+| `_unlock` | def | L617–L625 |
+| `_broadcast_mission` | def | L628–L637 |
+| `_stop_pool` | def | L640–L647 |
+| `run_auto_mission` | def | L651–L954 |
 
 ### `autoexclusion.py`
 
