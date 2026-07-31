@@ -154,30 +154,24 @@ def select_accounts_for_auto(
     decline_map: Optional[Dict[str, int]] = None,
     meta_map: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
-    """Filtra + ordena + limita cuentas candidatas al depósito auto.
+    """Filtra + clasifica internamente (Top, Mid, Low) + limita cuentas candidatas al depósito auto.
 
-    Filtros en orden (replica jwt_keeper.select_refresh_candidates con tweaks):
+    Filtros de Exclusión Dura:
       1. status == 'LIVE'
-      2. grade IN ('A+','A','B')
-      3. published_to_pool == 1 (o excepción RESERVADA_SA: pool=0 + locked_by
-         del SA — igual que jwt_keeper:85-95)
-      4. locked_by IS NULL
-      5. cooldown_until no activo (epoch, vía deposits._cooldown_active)
-      6. jwt_expires_at > now + 60 (aquí se exige JWT VIVO, no por expirar)
-      7. window_map[email]["available"] >= amount * count (cap 24h alcanza;
-         email ausente del map → sin restricción, el caller decide)
-      8. decline_map[email] < MM_ACCOUNT_RECENT_DECLINE_LIMIT (Robert 2026-07-28:
-         cuenta con >=2 declines en las últimas 12h no se taladra de nuevo;
-         decline_map=None → sin restricción, backward-compat)
+      2. published_to_pool == 1 (o excepción RESERVADA_SA)
+      3. locked_by IS NULL
+      4. cooldown_until no activo
+      5. Cooldown de 48h por depósito APROBADO en el dashboard
+      6. window_map[email]["available"] >= amount * count
+      7. decline_map[email] < MM_ACCOUNT_RECENT_DECLINE_LIMIT (3 declines en 12h)
+      8. Cero IsUserInValidationProcess o DEAD reciente en meta_map
 
-    Orden (Reglas de priorización Robert 2026-07-28):
-      1. 3DS reciente / Grade 'A+' (bonificación top)
-      2. Ponderación de declines por antigüedad (recientes pesan más que viejos)
-      3. Recuencia de intentos/movimientos recientes (penaliza cuentas intentadas recientemente)
-      4. Cantidad de tarjetas asociadas en dashboard (>=3 tarjetas bajan de prioridad)
-      5. Grade rank y score base.
+    Estratificación Oculta Backend (sin badges ni labels visuales):
+      - Tier TOP: 3DS reciente (<24h) o (<5 rechazos históricos + reposo >24h sin depósitos externos)
+      - Tier MID: Reposo >48h sin rechazos recientes ni depósitos externos
+      - Tier LOW: Depósitos SPEI/externos recientes (<24h) o reposo corto (1-24h)
 
-    Corta en `count`.
+    Selección: 1 TOP, 2 MID, resto LOW (round-robin con fall-through).
     """
     now = _now_epoch()
     sa = _sa_tokens()
@@ -188,8 +182,7 @@ def select_accounts_for_auto(
         email = r.get("email")
         if (r.get("status") or "") != "LIVE":
             continue
-        if (r.get("grade") or "") not in ("A+", "A", "B"):
-            continue
+
         locked_by = r.get("locked_by")
         # RESERVADA_SA (pool=0 + locked_by del SA) → candidata.
         is_sa_reserved = (
@@ -201,78 +194,89 @@ def select_accounts_for_auto(
                 continue
             if locked_by is not None:
                 continue
+
         if _cd_active(r.get("cooldown_until"), now):
             continue
-        if _exp_int(r.get("jwt_expires_at")) <= now + 60:
+
+        meta = meta_map.get(email) or {}
+        # 1. Enfriamiento 48h por depósito APROBADO en dashboard
+        if meta.get("has_dashboard_approved_48h"):
             continue
+
+        # 2. Errores de validación o DEAD
+        if meta.get("is_validation_blocked") or meta.get("is_dead_blocked"):
+            continue
+
         win = (window_map or {}).get(email) or {}
         avail = win.get("available")
         if avail is not None and float(avail) < amount * count:
             continue
+
         if decline_map is not None:
             if (decline_map.get(email) or 0) >= MM_ACCOUNT_RECENT_DECLINE_LIMIT:
                 continue
+
         out.append(r)
 
-    def _calc_rank_score(r: Dict[str, Any]) -> float:
+    # Clasificar internamente en 3 Tiers (Top, Mid, Low)
+    tier_top: List[Dict[str, Any]] = []
+    tier_mid: List[Dict[str, Any]] = []
+    tier_low: List[Dict[str, Any]] = []
+
+    for r in out:
         email = r.get("email")
         meta = meta_map.get(email) or {}
 
-        # 1. 3DS / Grade A+ (Prioridad superior -> menor score en la tupla de sort)
-        grade = r.get("grade") or ""
-        is_3ds = 1 if grade == "A+" else 0
+        has_spei_24h = meta.get("has_spei_24h", False)
+        has_3ds_24h = meta.get("has_3ds_24h", False)
+        total_fails = meta.get("total_fails", 0)
+        mins_since_attempt = meta.get("mins_since_last_attempt", 99999)
 
-        # 2. Declines acumulados con peso por antigüedad
-        # weighted_declines: recs <2h (1.0), 2-12h (0.4), >12h (0.1)
-        w_declines = meta.get("weighted_declines", 0.0)
+        # Regla de degradación anti-atropello: depósitos SPEI/externos recientes -> LOW directo
+        if has_spei_24h:
+            tier_low.append(r)
+        elif has_3ds_24h:
+            tier_top.append(r)
+        elif total_fails < 5 and mins_since_attempt > 1440: # > 24h
+            tier_top.append(r)
+        elif mins_since_attempt > 2880: # > 48h
+            tier_mid.append(r)
+        else:
+            tier_low.append(r)
 
-        # 3. Recuencia de intento / movimiento reciente (minutos desde el último intento)
-        # Menos minutos (muy reciente) -> mayor penalización
-        last_min = meta.get("mins_since_last_attempt", 99999)
-        recency_penalty = 50.0 / (last_min + 1)  # recientísimo = penalty ~50
+    # Si count <= 3 o hay muy pocas cuentas, entregar las mejores disponibles (TOP -> MID -> LOW)
+    if count <= 3:
+        combined = tier_top + tier_mid + tier_low
+        return combined[:count]
 
-        # 4. Tarjetas asociadas en dashboard (>=3 bajan prioridad)
-        card_count = meta.get("card_count", 0)
-        card_penalty = 20.0 if card_count >= 3 else 0.0
-
-        # Tupla de ordenamiento: menor score global va primero
-        # -is_3ds (-1 primero), luego peso acumulado de penalización, luego grade base
-        total_penalty = (w_declines * 15.0) + recency_penalty + card_penalty + (_grade_rank(grade) * 5.0) - (r.get("grade_score") or 0) * 0.1
-        return (-is_3ds, total_penalty)
-
-    # Estratificación en 3 Tiers (Top, Mid, Low) + Selección Intercalada (Round-Robin)
-    # Robert 2026-07-28: No agotar solo las A+, intercalar 1 Top, 1 Mid, 1 Low...
-    # Excepción: si se piden <= 3 cuentas (ej. count=1, 2 o 3), prioriza las mejores absolutas (Top first).
-    out.sort(key=_calc_rank_score)
-
-    if count <= 3 or len(out) <= 3:
-        return out[:count]
-
-    # Dividir en 3 estratos
-    n = len(out)
-    t1_end = max(1, n // 3)
-    t2_end = max(t1_end + 1, (2 * n) // 3)
-
-    tier_top = out[:t1_end]
-    tier_mid = out[t1_end:t2_end]
-    tier_low = out[t2_end:]
-
-    stratified = []
+    # Distribución intercalada ocultando etiquetas (1 TOP, 2 MID, resto LOW)
+    stratified: List[Dict[str, Any]] = []
     i_top, i_mid, i_low = 0, 0, 0
 
     while len(stratified) < count and (i_top < len(tier_top) or i_mid < len(tier_mid) or i_low < len(tier_low)):
+        # 1 TOP
         if i_top < len(tier_top):
             stratified.append(tier_top[i_top])
             i_top += 1
             if len(stratified) == count: break
-        if i_mid < len(tier_mid):
-            stratified.append(tier_mid[i_mid])
-            i_mid += 1
-            if len(stratified) == count: break
+
+        # 2 MID
+        for _ in range(2):
+            if i_mid < len(tier_mid):
+                stratified.append(tier_mid[i_mid])
+                i_mid += 1
+                if len(stratified) == count: break
+
+        # Resto LOW
         if i_low < len(tier_low):
             stratified.append(tier_low[i_low])
             i_low += 1
             if len(stratified) == count: break
+
+    # Si aún falta para completar count (fall-through de seguridad)
+    if len(stratified) < count:
+        remaining = [r for r in out if r not in stratified]
+        stratified.extend(remaining[:count - len(stratified)])
 
     return stratified
 
@@ -366,28 +370,73 @@ def plan_auto_mission(
             ).fetchone()["n"]
             decline_map[email] = int(declines or 0)
 
-            # Métricas avanzadas para la fórmula de priorización
-            # 1. Ponderación de declines por antigüedad
-            d_recent = con.execute(
-                "SELECT created_at FROM deposit_attempts "
-                "WHERE account_email=? AND UPPER(status)='REJECTED' "
-                "ORDER BY created_at DESC LIMIT 20",
+            # Métricas avanzadas para la fórmula de priorización multivariable
+            now_dt = datetime.now(timezone.utc)
+
+            # 1. Depósito APROBADO en el dashboard en las últimas 48h (Cooldown 48h)
+            # Normalizar fechas SQLite sin formato UTC
+            app_48h = con.execute(
+                "SELECT COUNT(*) AS n FROM deposit_attempts "
+                "WHERE account_email=? AND UPPER(status)='APPROVED' "
+                "AND (julianday('now') - julianday(created_at)) <= 2.0",
+                (email,),
+            ).fetchone()["n"]
+
+            # 2. Depósitos por SPEI / externos recientes (<24h) en account_transactions (gateway=2, status=6, txn_type=1)
+            spei_24h = con.execute(
+                "SELECT COUNT(*) AS n FROM account_transactions "
+                "WHERE account_email=? AND gateway=2 AND status=6 AND txn_type=1 "
+                "AND txn_date >= datetime('now','-24 hours')",
+                (email,),
+            ).fetchone()["n"]
+
+            # 3. Evento 3DS_REQUIRED reciente (<24h)
+            threeds_24h = con.execute(
+                "SELECT COUNT(*) AS n FROM deposit_attempts "
+                "WHERE account_email=? AND UPPER(status) LIKE '%3DS%' "
+                "AND created_at >= datetime('now','-24 hours')",
+                (email,),
+            ).fetchone()["n"]
+
+            # 4. Total rechazos históricos
+            tot_fails = con.execute(
+                "SELECT COUNT(*) AS n FROM deposit_attempts "
+                "WHERE account_email=? AND UPPER(status) IN ('REJECTED', 'GATEWAY_ERROR')",
+                (email,),
+            ).fetchone()["n"]
+
+            # 5. IsUserInValidationProcess o DEAD reciente
+            val_blocked = con.execute(
+                "SELECT COUNT(*) AS n FROM deposit_attempts "
+                "WHERE account_email=? AND rejection_reason LIKE '%IsUserInValidationProcess%'",
+                (email,),
+            ).fetchone()["n"]
+
+            dead_blocked = con.execute(
+                "SELECT COUNT(*) AS n FROM deposit_attempts "
+                "WHERE account_email=? AND (rejection_reason LIKE '%DEAD%' OR rejection_reason LIKE '%UNAUTHORIZED%')",
+                (email,),
+            ).fetchone()["n"]
+
+            # 6. Historial de BINs aprobados en los últimos 30 días para esta cuenta: {bin: set(card_pipes_aprobados)}
+            bin_app_rows = con.execute(
+                "SELECT card_pipe FROM deposit_attempts "
+                "WHERE account_email=? AND UPPER(status)='APPROVED' AND card_pipe IS NOT NULL "
+                "AND created_at >= datetime('now','-30 days')",
                 (email,),
             ).fetchall()
-            now_dt = datetime.now(timezone.utc)
-            w_declines = 0.0
-            for d_row in d_recent:
-                try:
-                    dt = datetime.fromisoformat(str(d_row["created_at"]).replace(" ", "T").replace("Z", "+00:00"))
-                    if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
-                    hrs = (now_dt - dt).total_seconds() / 3600.0
-                    if hrs < 2: w_declines += 1.0
-                    elif hrs < 12: w_declines += 0.4
-                    else: w_declines += 0.1
-                except Exception:
-                    w_declines += 0.2
 
-            # 2. Minutos desde el último intento/movimiento (evita taladrar recientemente intentadas)
+            approved_bin_pipes: Dict[str, set] = {}
+            for row in bin_app_rows:
+                p_raw = str(row["card_pipe"]).strip()
+                p_norm = _normalize_pipe_to_3part(p_raw)
+                b_code = p_norm[:6] if len(p_norm) >= 6 else ""
+                if b_code:
+                    if b_code not in approved_bin_pipes:
+                        approved_bin_pipes[b_code] = set()
+                    approved_bin_pipes[b_code].add(p_norm)
+
+            # Minutos desde el último intento/movimiento
             last_att = con.execute(
                 "SELECT created_at FROM deposit_attempts "
                 "WHERE account_email=? ORDER BY created_at DESC LIMIT 1",
@@ -402,16 +451,15 @@ def plan_auto_mission(
                 except Exception:
                     pass
 
-            # 3. Tarjetas asociadas en dashboard (>=3 bajan prioridad)
-            card_cnt = con.execute(
-                "SELECT COUNT(*) AS c FROM account_cards WHERE account_email=? AND status='ACTIVE'",
-                (email,),
-            ).fetchone()["c"]
-
             meta_map[email] = {
-                "weighted_declines": w_declines,
+                "has_dashboard_approved_48h": bool(app_48h),
+                "has_spei_24h": bool(spei_24h),
+                "has_3ds_24h": bool(threeds_24h),
+                "total_fails": int(tot_fails or 0),
+                "is_validation_blocked": bool(val_blocked),
+                "is_dead_blocked": bool(dead_blocked),
+                "approved_bin_pipes": approved_bin_pipes,
                 "mins_since_last_attempt": mins_since,
-                "card_count": int(card_cnt or 0),
             }
 
         try:
@@ -434,9 +482,13 @@ def plan_auto_mission(
         pool.sort(key=lambda c: _rank_key(c, bin_stats_map))
 
         accounts_out: List[Dict[str, Any]] = []
-        pool_i = 0
+        used_pipes_in_mission: set = set()
+
         for r in selected:
             email = r.get("email")
+            meta = meta_map.get(email) or {}
+            app_bin_pipes = meta.get("approved_bin_pipes") or {}
+
             married = [
                 dict(c) for c in con.execute(
                     "SELECT * FROM account_cards "
@@ -444,10 +496,29 @@ def plan_auto_mission(
                     (email,),
                 ).fetchall()
             ]
+
             pipe = select_card_for_account(email, married, bin_stats_map, amount)
-            if pipe is None and pool:
-                pipe = _pipe_str(pool[pool_i % len(pool)])
-                pool_i += 1
+
+            # Si no hay tarjeta casada o la casada ya fue usada en la misión, buscar en el pool
+            if (pipe is None or pipe in used_pipes_in_mission) and pool:
+                pipe = None
+                for cand in pool:
+                    cand_pipe_str = _pipe_str(cand)
+                    if cand_pipe_str in used_pipes_in_mission:
+                        continue  # 1:1 Estricto en la misión
+
+                    cand_bin = cand_pipe_str[:6] if len(cand_pipe_str) >= 6 else ""
+                    # Cooldown 30d del BIN: Si el BIN aprobó con OTRO pipe en los últimos 30d en esta cuenta -> omitir
+                    if cand_bin in app_bin_pipes:
+                        if cand_pipe_str not in app_bin_pipes[cand_bin]:
+                            continue  # Mismo BIN pero otra tarjeta -> bloquear por 30 días
+
+                    pipe = cand_pipe_str
+                    break
+
+            if pipe:
+                used_pipes_in_mission.add(pipe)
+
             accounts_out.append({
                 "id": r.get("id"), "email": email,
                 "grade": r.get("grade"), "card_pipe": pipe,

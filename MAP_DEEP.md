@@ -189,19 +189,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_pipe_str` | def | L108–L113 |
 | `_parse_card_pipe` | def | L116–L137 |
 | `_normalize_pipe_to_3part` | def | L140–L142 |
-| `select_accounts_for_auto` | def | L149–L277 |
-| `select_card_for_account` | def | L281–L303 |
-| `_max_accounts_for_cards` | def | L307–L311 |
-| `plan_auto_mission` | def | L314–L470 |
-| `_iso` | def | L511–L512 |
-| `_m_load` | def | L515–L522 |
-| `_m_status` | def | L525–L527 |
-| `_m_update` | def | L530–L539 |
-| `_fetch_account` | def | L542–L548 |
-| `_unlock` | def | L551–L559 |
-| `_broadcast_mission` | def | L562–L571 |
-| `_stop_pool` | def | L574–L581 |
-| `run_auto_mission` | def | L585–L888 |
+| `select_accounts_for_auto` | def | L149–L281 |
+| `select_card_for_account` | def | L285–L307 |
+| `_max_accounts_for_cards` | def | L311–L315 |
+| `plan_auto_mission` | def | L318–L541 |
+| `_iso` | def | L582–L583 |
+| `_m_load` | def | L586–L593 |
+| `_m_status` | def | L596–L598 |
+| `_m_update` | def | L601–L610 |
+| `_fetch_account` | def | L613–L619 |
+| `_unlock` | def | L622–L630 |
+| `_broadcast_mission` | def | L633–L642 |
+| `_stop_pool` | def | L645–L652 |
+| `run_auto_mission` | def | L656–L959 |
 
 ### `autoexclusion.py`
 
@@ -547,6 +547,17 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_operator_does_not_see_foreign_account` | def | L44–L50 |
 | `test_sa_sees_own_recent_and_pinned` | def | L53–L64 |
 | `test_every_row_has_id_field_present` | def | L67–L73 |
+
+### `test_auto_deposit_selection.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `_make_db` | def | L19–L75 |
+| `test_gate_duro_published_to_pool` | def | L78–L91 |
+| `test_cooldown_48h_dashboard_approved` | def | L97–L117 |
+| `test_spei_external_deposit_relegates_to_low` | def | L120–L136 |
+| `test_boost_3ds_recent_to_top` | def | L139–L153 |
+| `test_bin_cooldown_30d_on_approval` | def | L156–L187 |
 
 ### `test_auto_missions_migrate.py`
 

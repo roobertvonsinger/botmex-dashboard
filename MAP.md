@@ -95,7 +95,7 @@ prewarm.py (router)
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
 | `app.py` | 4631 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 888 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 959 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `card_checker.py` | 171 | `—` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
@@ -118,6 +118,7 @@ prewarm.py (router)
 | `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
 | `test_anti_rate_limit.py` | 271 | `—` | _[completar]_ |
 | `test_at_hand.py` | 73 | `—` | _[completar]_ |
+| `test_auto_deposit_selection.py` | 187 | `—` | _[completar]_ |
 | `test_auto_missions_migrate.py` | 120 | `—` | _[completar]_ |
 | `test_deposit_status_classify.py` | 95 | `—` | _[completar]_ |
 | `test_deposit_step.py` | 132 | `—` | _[completar]_ |
@@ -231,6 +232,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `90f4cba` | fix(telegram-mock): restaurar lista completa de usuarios autorizados en el bot mock |
 | `0989117` | fix(telegram-mock): restringir acceso exclusivamente al SuperAdmin Robert (1341812706) |
 | `6a65660` | fix(telegram-mock): agregar null-safety en lectura de strikes_count de SQLite |
 | `ca712ef` | infra(docker): agregar container betmexico-mock-bot a docker-compose.yml |
@@ -242,7 +244,6 @@ prewarm.py (router)
 | `a5b719b` | feat(telegram): nuevo bot mock desacoplado con comandos minimos y proteccion de credenciales |
 | `66b3cf9` | feat(bot): agregar endpoints /api/bot/pause, /api/bot/resume y /api/bot/stop con resumen corto de avance |
 | `862e111` | feat(deposits): igualar threshold de descarte a 3 declines en cuentas (simetrico con tarjetas) |
-| `dd16d32` | feat(deposits): actualizar MM_COOLDOWN a 45s por cuenta y 5s por tarjeta entre cuentas distintas |
 <!-- GEN:end:recientes -->
 
 ---
