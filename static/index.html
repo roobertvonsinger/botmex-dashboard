@@ -644,18 +644,42 @@
     <div id="logsMain" style="display:none;flex-direction:column;flex:1;min-height:0">
       <section class="filterbar">
         <h2>Logs <span class="dim mono" id="logsCount">—</span><span class="log-level-counts" id="logsLevelCounts"></span></h2>
+        <div class="seg logs-mode-seg" data-seg="logsmode" title="Fuente de logs">
+          <button data-v="dashboard" class="on">Dashboard</button>
+          <button data-v="telegram">🤖 Bots Telegram</button>
+        </div>
         <div class="grow"></div>
-        <div class="seg" data-seg="loglevel" title="Filtra por nivel de severidad">
+        <div class="seg" data-seg="loglevel" title="Filtra por nivel de severidad" id="logsLevelSeg">
           <button data-v="ALL" class="on" title="Todas las líneas">Todo</button>
           <button data-v="ERROR" title="Solo errores">✗ Error</button>
           <button data-v="WARNING" title="Solo advertencias">⚠ Warn</button>
         </div>
+        <button class="seg-btn on" id="btnLogsHideRefresh" title="Oculta account_refresh / prewarm / jwt_keeper rutinarios">🙈 Ocultar refrescos</button>
         <button class="seg-btn" id="btnLogsCopy" title="Copiar todo al portapapeles">📋 Copiar</button>
         <button class="seg-btn" id="btnLogsScrollEnd" title="Ir al final + reanudar auto-scroll">⤓ Final</button>
         <button class="seg-btn" id="btnLogsClear" title="Borra el contenido visible (no afecta servidor)">Limpiar</button>
         <button class="seg-btn" id="btnLogsPause" title="Detener / reanudar el polling automático">⏸ Pausar</button>
       </section>
-      <section class="tablewrap"><pre id="logsView" class="logs-view">Conectando…</pre></section>
+      <section class="tablewrap" id="logsDashboardWrap" style="position:relative;">
+        <pre id="logsView" class="logs-view hide-refresh">Conectando…</pre>
+        <div class="logs-float-bottom" id="logsFloatBottom"><span class="ic">↓</span> Ir al fondo <span class="cnt" id="logsFloatCount"></span></div>
+      </section>
+      <section class="logs-bots-grid" id="logsBotsWrap" style="display:none;">
+        <div class="logs-bot-panel">
+          <div class="logs-bot-head"><span class="dot"></span> Bot Principal (prod) <span class="grow"></span>
+            <button class="seg-btn" id="btnBotMainPause" style="padding:1px 6px;font-size:10px;">⏸</button>
+            <button class="seg-btn" id="btnBotMainClear" style="padding:1px 6px;font-size:10px;">Limpiar</button>
+          </div>
+          <pre class="logs-view logs-bot-view" id="logsBotMainView">Conectando…</pre>
+        </div>
+        <div class="logs-bot-panel">
+          <div class="logs-bot-head"><span class="dot"></span> Bot Mock (test) <span class="grow"></span>
+            <button class="seg-btn" id="btnBotMockPause" style="padding:1px 6px;font-size:10px;">⏸</button>
+            <button class="seg-btn" id="btnBotMockClear" style="padding:1px 6px;font-size:10px;">Limpiar</button>
+          </div>
+          <pre class="logs-view logs-bot-view" id="logsBotMockView">Conectando…</pre>
+        </div>
+      </section>
     </div>
 
     <!-- Vista: Salud -->

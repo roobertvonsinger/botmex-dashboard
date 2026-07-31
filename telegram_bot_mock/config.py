@@ -4,14 +4,27 @@ Reutiliza la BD compartida del dashboard y los módulos core sin tocar el bot or
 import os
 import sys
 import logging
+import logging.handlers
 from pathlib import Path
 
-# Configurar logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
-    handlers=[logging.StreamHandler()]
-)
+# Configurar logging — StreamHandler (stdout → `docker logs`) + FileHandler
+# a /data/logs/telegram_mock_bot.log (volumen compartido con betmexico-web,
+# mismo patrón que app.py) para que la consola "Logs" web pueda leer la
+# actividad del bot mock sin acceso a docker.
+_LOG_FORMAT = "%(asctime)s [%(levelname)s] [%(name)s] %(message)s"
+_handlers = [logging.StreamHandler()]
+try:
+    _LOGS_DIR = Path("/data/logs")
+    _LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    _fh = logging.handlers.RotatingFileHandler(
+        str(_LOGS_DIR / "telegram_mock_bot.log"), maxBytes=10 * 1024 * 1024,
+        backupCount=3, encoding="utf-8",
+    )
+    _handlers.append(_fh)
+except Exception as _e:
+    print(f"[boot] telegram_mock_bot.log FileHandler init failed: {_e}")
+
+logging.basicConfig(level=logging.INFO, format=_LOG_FORMAT, handlers=_handlers)
 logger = logging.getLogger("telegram_bot_mock")
 
 # Rutas principales

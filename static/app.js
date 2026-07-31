@@ -1578,7 +1578,12 @@ function showSection(name) {
   if (name === 'pool') reloadPool();
   if (name === 'activity') reloadActivity();
   if (name === 'notifications') renderNotifs();
-  if (name === 'logs') startLogsPolling(); else stopLogsPolling();
+  if (name === 'logs') {
+    _navLogsAlertCount = 0;
+    const b = $('#navLogsBadge');
+    if (b) { b.textContent = ''; b.classList.remove('warn'); }
+    startLogsPolling();
+  } else stopLogsPolling();
   if (name === 'health') loadHealth(false);
   if (name === 'admin') loadAdminState();
   if (name === 'bin-stats') reloadBinStats();
@@ -1855,6 +1860,7 @@ function connectSSE() {
         if (ev.kind === 'withdrawal_status') {
           _onAccountRefreshed({ email: ev.target });
           const ok = ev.status === 'successful' || ev.status === 'completed';
+          if (!ok) _bumpLogsAlert();
           pushNotif({
             icon: ok ? '✅' : '❌',
             msg: `Retiro de ${fmtMoney(ev.amount)} en ${ev.target} → ${ok ? 'completado' : 'fallido'}`,
@@ -1874,6 +1880,7 @@ function connectSSE() {
           loadRecientes();
         } else if (ev.kind === 'deposit') {
           const ok = ev.status === 'approved';
+          if (!ok) _bumpLogsAlert();
           pushNotif({
             icon: ok ? '✅' : '❌',
             msg: `${ev.who} depositó ${fmtMoney(ev.amount)} en ${ev.target} → ${ev.status}`,
@@ -2296,10 +2303,31 @@ async function refreshVisible(opts = {}) {
 }
 
 // ─── Logs view ───
+// Rediseño 2026-07-31 (Robert): jerarquía por categoría de dominio, cero
+// líneas enmascaradas/truncadas, chips copiables con 1 click, click-through
+// a la cuenta relevante, batching incremental (evita el reflow de re-pintar
+// 300 líneas cada 4s) y vista dual de los 2 bots de Telegram.
 let _logsTimer = null;
 let _logsPaused = false;
 let _logsAutoScroll = true;
 let _logsLevel = 'ALL';
+let _logsMode = 'dashboard'; // 'dashboard' | 'telegram'
+let _logsHideRefresh = localStorage.getItem('bmx_logs_hide_refresh') !== '0'; // default ON
+let _logsLastTs = null;          // ts (19 chars) de la última línea ya renderizada — permite pedir solo "since"
+let _logsSeenAtBoundary = new Set(); // líneas exactas del último ts límite, para no duplicar al re-pedir "since"
+let _logsPendingHidden = 0;      // líneas nuevas llegadas mientras el operador scrolleó arriba
+const LOGS_DOM_CAP = 700;        // tope de <span class="log-line"> vivos — evita crecer indefinido en sesiones largas
+let _navLogsAlertCount = 0;      // badge de nav: depósitos/retiros fallidos mientras Logs no está abierto
+// Badge silencioso (sin toast — Robert ya vetó el spam de alertas por SSE,
+// ver handler de 'health_warning'/'alert' más abajo). Solo cuenta mientras
+// el operador NO está viendo la sección Logs.
+function _bumpLogsAlert() {
+  if (state.section === 'logs') return;
+  _navLogsAlertCount++;
+  const b = $('#navLogsBadge');
+  if (b) { b.textContent = _navLogsAlertCount; b.classList.add('warn'); }
+}
+
 // Parsea una línea de log en componentes estructurados.
 // Formato: "2026-07-26 12:34:56,789 [INFO] [betmexico.dashboard.db] message"
 const _LOG_LINE_RE = /^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d{3})\s+\[(\w+)\]\s+\[([^\]]+)\]\s+(.*)$/;
@@ -2308,102 +2336,290 @@ function _parseLogLine(line) {
   if (!m) return { raw: line };
   return { ts: m[1], level: m[2], logger: m[3], msg: m[4] };
 }
+
+// Categoriza por criterio de DOMINIO (no por nivel de log): reusa los
+// marcadores que YA emiten deposits.py/auto_deposit.py/withdrawals.py
+// (SUBMIT SUCCESS/REJECTED, DEAD ACCOUNT, RATE-LIMIT, "disparado"…) — no
+// inventa taxonomía nueva. `refresh` = ruido rutinario (solo a nivel INFO;
+// un WARNING/ERROR del propio refresh nunca se oculta).
+function _categorizeLog(p) {
+  if (p.raw != null) return null;
+  const lvl = (p.level || '').toUpperCase();
+  const lg = (p.logger || '').toLowerCase();
+  const msg = p.msg || '';
+  if (lvl === 'INFO' && /account_refresh|\bprewarm\b|jwt_keeper/.test(lg)) return 'refresh';
+  if (/submit success|match found|\baprobad[oa]/i.test(msg)) return 'deposit_ok';
+  if (/submit rejected|dead account|bank_rejected|\brechazad[oa]/i.test(msg)) return 'deposit_fail';
+  if (lg.includes('withdrawals')) {
+    if (lvl === 'ERROR' || /insuficiente/i.test(msg)) return 'withdraw_fail';
+    if (/disparado/i.test(msg)) return 'withdraw_ok';
+  }
+  if (/rate-limit|rate_limited|login_failed|login_denied|\b429\b/i.test(msg)) return 'login_fail';
+  if (lvl === 'ERROR' || lvl === 'CRITICAL') return 'system_error';
+  return null;
+}
+function _cardStatusCat(status) {
+  const s = (status || '').toLowerCase();
+  if (s === 'approved' || s === 'live') return 'deposit_ok';
+  if (s === 'rejected' || s === 'account_dead' || s === 'dead') return 'deposit_fail';
+  if (s === 'rate_limited' || s === 'login_lost') return 'login_fail';
+  return null;
+}
+const _LOG_CAT_LABEL = {
+  deposit_ok: 'depósito ok', deposit_fail: 'depósito fail', withdraw_ok: 'retiro ok',
+  withdraw_fail: 'retiro fail', login_fail: 'login/rate', system_error: 'error', refresh: 'refresh',
+};
+// Líneas [CARD_TOUCH] (deposits._record_attempt / bot mock precheck) — único
+// marcador que cubre single+matchmaker+scheduled+bot: "key=value | key=value…"
+function _parseCardTouch(msg) {
+  const idx = msg.indexOf('[CARD_TOUCH]');
+  if (idx === -1) return null;
+  const kv = {};
+  msg.slice(idx + 12).split('|').forEach(part => {
+    const eq = part.indexOf('=');
+    if (eq === -1) return;
+    kv[part.slice(0, eq).trim()] = part.slice(eq + 1).trim();
+  });
+  return kv;
+}
+function _chip(cls, icon, val, { nav } = {}) {
+  const navAttr = nav ? ` data-nav-account="${esc(val)}"` : '';
+  return `<span class="log-chip ${cls}" data-copy="${esc(val)}"${navAttr} title="click para copiar"><span class="ic">${icon}</span>${esc(val)}</span>`;
+}
+function _renderCardTouchLine(p, kv) {
+  const shortTs = p.ts && p.ts.length >= 19 ? p.ts.slice(11, 19) : (p.ts || '');
+  const ccat = _cardStatusCat(kv.status);
+  const badge = ccat ? `<span class="log-cat log-cat-${ccat}">${_LOG_CAT_LABEL[ccat]}</span>` : '';
+  const hasAccount = kv.account && !kv.account.startsWith('N/A');
+  const chips = [];
+  if (kv.operator) chips.push(_chip('chip-op', '👤', kv.operator));
+  if (hasAccount) chips.push(_chip('chip-account', '📧', kv.account, { nav: true }));
+  if (kv.pipe) chips.push(_chip('chip-pipe', '💳', kv.pipe));
+  if (kv.amount) chips.push(_chip('chip-amt', '', kv.amount));
+  const tail = esc([kv.status, kv.reason].filter(Boolean).join(' · '));
+  const navAttr = hasAccount ? ` data-nav-account="${esc(kv.account)}"` : '';
+  return `<span class="log-line log-card-touch log-enter${hasAccount ? ' log-clickable' : ''}"${navAttr}>` +
+    `<span class="log-ts">${esc(shortTs)}</span>${badge}<b>💳</b> ${chips.join(' ')} ` +
+    `<span class="log-msg dim">${tail}</span></span>`;
+}
 function _renderLogLine(p) {
-  if (p.raw != null) return `<span class="log-raw">${esc(p.raw)}</span>`;
+  if (p.raw != null) return `<span class="log-line log-raw log-enter">${esc(p.raw)}</span>`;
+  const cardKv = _parseCardTouch(p.msg);
+  if (cardKv) return _renderCardTouchLine(p, cardKv);
+
   const lvl = p.level.toUpperCase();
   const cls = lvl === 'ERROR' || lvl === 'CRITICAL' ? 'log-err'
     : lvl === 'WARNING' ? 'log-warn'
     : lvl === 'DEBUG' ? 'log-debug'
-    : lvl === 'INFO' ? 'log-info'
     : 'log-info';
-  // Hora corta: HH:MM:SS (sin fecha)
   const shortTs = p.ts.length >= 19 ? p.ts.slice(11, 19) : p.ts;
-  // Último segmento del logger: "betmexico.dashboard.db" → "db"
   const shortLog = p.logger.includes('.') ? p.logger.split('.').pop() : p.logger;
-
-  let msg = p.msg;
-  let lineCls = 'log-line';
-
-  // Aplastar check verdes en texto plano para evitar confusión con status real de depósito
-  msg = msg.replace(/✅/g, '✔️');
-
-  // Resaltar [DETAILS] de BetMexico (línea amarilla tenue, texto blanco, balance subrayado)
-  if (msg.includes('[DETAILS]')) {
-    lineCls += ' log-details';
-    msg = msg.replace(/\[DETAILS\]\s*/i, '');
-    msg = msg.replace(/(Balance:\s*[\d\.,]+)/i, '<span class="log-balance">$1</span>');
-  }
-
-  // Se usa innerHTML directo en _renderLogLine así que hay que escapar msg CUIDADOSAMENTE,
-  // pero ya le inyectamos HTML (<span class="log-balance">).
-  // Estrategia: escapar primero TODO, y luego reinyectar el HTML seguro.
-  // Pero lo más fácil: escapar antes de aplicar los replaces de HTML.
+  const cat = _categorizeLog(p);
+  const catBadge = cat ? `<span class="log-cat log-cat-${cat}">${_LOG_CAT_LABEL[cat]}</span>` : '';
 
   let safeMsg = esc(p.msg).replace(/✅/g, '✔️');
+  let lineCls = 'log-line log-enter';
   if (safeMsg.includes('[DETAILS]')) {
     lineCls += ' log-details';
     safeMsg = safeMsg.replace(/\[DETAILS\]\s*/i, '');
     safeMsg = safeMsg.replace(/(Balance:\s*[\d\.,]+)/i, '<span class="log-balance">$1</span>');
   }
-
-  return `<span class="${lineCls}"><span class="log-ts">${esc(shortTs)}</span><span class="log-level ${cls}">${esc(lvl)}</span><span class="log-logger">${esc(shortLog)}</span><span class="log-msg">${safeMsg}</span></span>`;
+  // Email suelto en líneas de dominio (depósito/retiro/login) → chip copiable
+  // + click-through a la cuenta. No se reescribe nada más del mensaje.
+  const emailM = p.msg.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+  if (emailM && (cat === 'deposit_ok' || cat === 'deposit_fail' || cat === 'withdraw_ok' || cat === 'withdraw_fail' || cat === 'login_fail')) {
+    safeMsg = safeMsg.replace(esc(emailM[1]), _chip('chip-account', '📧', emailM[1], { nav: true }));
+  }
+  const isRefresh = cat === 'refresh';
+  return `<span class="${lineCls}${isRefresh ? ' is-refresh' : ''}"><span class="log-ts">${esc(shortTs)}</span>${catBadge}<span class="log-level ${cls}">${esc(lvl)}</span><span class="log-logger">${esc(shortLog)}</span><span class="log-msg">${safeMsg}</span></span>`;
 }
+
+// Cuenta ERROR/WARNING de un batch de líneas crudas (para el header).
+function _countLevels(lines) {
+  let eC = 0, wC = 0;
+  for (const ln of lines) {
+    if (ln.includes('[ERROR]') || ln.includes('[CRITICAL]')) eC++;
+    else if (ln.includes('[WARNING]')) wC++;
+  }
+  return { eC, wC };
+}
+
+// Aplica el tope de nodos vivos en el DOM — poda los más viejos primero.
+function _pruneLogDom(v) {
+  while (v.children.length > LOGS_DOM_CAP) v.removeChild(v.firstChild);
+}
+
+// Append incremental por lotes (rAF) — NUNCA reemplaza innerHTML completo.
+// `lines` ya viene filtrado por "since" desde el backend: solo las nuevas.
+function _appendLogLines(v, lines, { isFirstLoad } = {}) {
+  if (!lines.length) return;
+  // Dedup contra el límite exacto del `since` anterior (mismo segundo).
+  const fresh = isFirstLoad ? lines : lines.filter(ln => !_logsSeenAtBoundary.has(ln));
+  if (!fresh.length && !isFirstLoad) return;
+  const html = fresh.map(ln => _renderLogLine(_parseLogLine(ln))).join('');
+  const wasAtBottom = _logsAutoScroll;
+  requestAnimationFrame(() => {
+    if (isFirstLoad) v.innerHTML = html; else v.insertAdjacentHTML('beforeend', html);
+    _pruneLogDom(v);
+    if (wasAtBottom) {
+      v.scrollTop = v.scrollHeight;
+    } else if (!isFirstLoad) {
+      _logsPendingHidden += fresh.length;
+      _updateLogsFloatBtn();
+    }
+  });
+  // Recalcular el límite "since" con la última línea del batch completo (no solo `fresh`)
+  const lastLine = lines[lines.length - 1];
+  const lastTs = lastLine.slice(0, 19);
+  _logsLastTs = lastTs;
+  _logsSeenAtBoundary = new Set(lines.filter(ln => ln.slice(0, 19) === lastTs));
+}
+
+function _updateLogsFloatBtn() {
+  const btn = $('#logsFloatBottom');
+  if (!btn) return;
+  if (_logsPendingHidden > 0 && !_logsAutoScroll) {
+    btn.classList.add('show');
+    $('#logsFloatCount').textContent = _logsPendingHidden;
+  } else {
+    btn.classList.remove('show');
+  }
+}
+
 async function reloadLogs() {
   const v = $('#logsView');
   if (!v) return;
   try {
-    const r = await fetch(`/api/logs?limit=300&level=${encodeURIComponent(_logsLevel)}`);
+    const params = new URLSearchParams({ limit: '300', level: _logsLevel });
+    if (_logsLastTs) params.set('since', _logsLastTs);
+    const r = await fetch(`/api/logs?${params}`);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
-    // Contar por nivel
-    let eC = 0, wC = 0;
-    for (const ln of data.lines) {
-      if (ln.includes('[ERROR]') || ln.includes('[CRITICAL]')) eC++;
-      else if (ln.includes('[WARNING]')) wC++;
-    }
-    const total = data.lines.length;
-    $('#logsCount').textContent = `${total} líneas${_logsAutoScroll ? '' : ' · 🔒 scroll bloqueado'}`;
+    const { eC, wC } = _countLevels(data.lines);
+    $('#logsCount').textContent = `${v.children.length} líneas${_logsAutoScroll ? '' : ' · 🔒 scroll bloqueado'}`;
     const lcEl = $('#logsLevelCounts');
-    if (lcEl) {
+    if (lcEl && (eC || wC || !_logsLastTs)) {
       const parts = [];
       if (eC) parts.push(`<span class="lc-e">✗${eC}</span>`);
       if (wC) parts.push(`<span class="lc-w">⚠${wC}</span>`);
       lcEl.innerHTML = parts.join(' ');
     }
-    // Preserve selection — solo actualiza si nada está seleccionado
     const sel = window.getSelection();
-    const hasSelection = sel && sel.toString().length > 0 && v.contains(sel.anchorNode);
-    if (hasSelection) return;
-    const wasAtBottom = (v.scrollHeight - v.scrollTop - v.clientHeight) < 50;
-    v.innerHTML = data.lines.map(ln => _renderLogLine(_parseLogLine(ln))).join('\n');
-    // Solo auto-scroll si el usuario no se ha movido manualmente
-    if (_logsAutoScroll && wasAtBottom) {
-      v.scrollTop = v.scrollHeight;
-    }
+    if (sel && sel.toString().length > 0 && v.contains(sel.anchorNode)) return; // preserva selección
+    _appendLogLines(v, data.lines, { isFirstLoad: !_logsLastTs });
   } catch (e) {
-    v.textContent = humanizeApiError(e);
+    if (!_logsLastTs) v.textContent = humanizeApiError(e);
   }
 }
 // Detecta si el user scrolleó manualmente → desactiva auto-scroll temporal
-function _attachLogsScrollDetect() {
-  const v = $('#logsView');
+function _attachLogsScrollDetect(sel) {
+  const v = $(sel);
   if (!v || v.dataset.scrollBound) return;
   v.dataset.scrollBound = '1';
   v.addEventListener('scroll', () => {
     const atBottom = (v.scrollHeight - v.scrollTop - v.clientHeight) < 30;
-    _logsAutoScroll = atBottom;
+    if (sel === '#logsView') {
+      _logsAutoScroll = atBottom;
+      if (atBottom) { _logsPendingHidden = 0; _updateLogsFloatBtn(); }
+    }
   });
 }
+// Delegación de click: chips copian, líneas con cuenta navegan al detalle.
+function _attachLogsClickDelegate(sel) {
+  const container = $(sel);
+  if (!container || container.dataset.clickBound) return;
+  container.dataset.clickBound = '1';
+  container.addEventListener('click', (e) => {
+    const chip = e.target.closest('.log-chip');
+    if (chip) {
+      e.stopPropagation();
+      if (chip.dataset.copy) _copyText(chip.dataset.copy);
+      return;
+    }
+    const navLine = e.target.closest('.log-clickable[data-nav-account], .log-chip[data-nav-account]');
+    if (navLine && navLine.dataset.navAccount) _navigateToAccountByEmail(navLine.dataset.navAccount);
+  });
+}
+async function _navigateToAccountByEmail(email) {
+  if (!email) return;
+  try {
+    const r = await fetch(`/api/accounts/find-id?email=${encodeURIComponent(email)}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    if (!data.id) { toast(`Cuenta ${email} no está en la BD`, 'error'); return; }
+    showSection('accounts');
+    setTimeout(() => openDetailModal(data.id), 60); // deja pintar la tabla antes de expandir el detalle
+  } catch (e) { toast(humanizeApiError(e), 'error'); }
+}
+
+// ─── Vista dual: Bots de Telegram ───
+const _botLogsState = {
+  main: { ts: null, boundary: new Set(), timer: null, paused: false },
+  mock: { ts: null, boundary: new Set(), timer: null, paused: false },
+};
+async function _reloadBotLog(which) {
+  const st = _botLogsState[which];
+  const v = $(which === 'main' ? '#logsBotMainView' : '#logsBotMockView');
+  if (!v || !st) return;
+  try {
+    const params = new URLSearchParams({ bot: which, limit: '300' });
+    if (st.ts) params.set('since', st.ts);
+    const r = await fetch(`/api/logs/telegram?${params}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    const isFirstLoad = !st.ts;
+    const fresh = isFirstLoad ? data.lines : data.lines.filter(ln => !st.boundary.has(ln));
+    if (fresh.length || isFirstLoad) {
+      let html = fresh.map(ln => _renderLogLine(_parseLogLine(ln))).join('');
+      // Resalta comandos de operador para escaneo rápido
+      html = html.replace(/(\/(?:botmex|check|bet)\b)/g, '<span class="log-cat-cmd">$1</span>');
+      requestAnimationFrame(() => {
+        if (isFirstLoad) v.innerHTML = html; else v.insertAdjacentHTML('beforeend', html);
+        _pruneLogDom(v);
+        v.scrollTop = v.scrollHeight;
+      });
+    }
+    if (data.lines.length) {
+      const lastLine = data.lines[data.lines.length - 1];
+      const lastTs = lastLine.slice(0, 19);
+      st.ts = lastTs;
+      st.boundary = new Set(data.lines.filter(ln => ln.slice(0, 19) === lastTs));
+    }
+  } catch (e) {
+    if (!st.ts) v.textContent = humanizeApiError(e);
+  }
+}
+function _startBotLogsPolling() {
+  _stopBotLogsPolling();
+  _attachLogsClickDelegate('#logsBotMainView');
+  _attachLogsClickDelegate('#logsBotMockView');
+  ['main', 'mock'].forEach(which => {
+    const st = _botLogsState[which];
+    if (st.paused) return;
+    _reloadBotLog(which);
+    st.timer = setInterval(() => _reloadBotLog(which), 4000);
+  });
+}
+function _stopBotLogsPolling() {
+  ['main', 'mock'].forEach(which => {
+    const st = _botLogsState[which];
+    if (st.timer) { clearInterval(st.timer); st.timer = null; }
+  });
+}
+
 function startLogsPolling() {
   stopLogsPolling();
-  if (state.section === 'logs' && !_logsPaused) {
-    _attachLogsScrollDetect();
-    reloadLogs();
-    _logsTimer = setInterval(reloadLogs, 4000);
-  }
+  if (state.section !== 'logs' || _logsPaused) return;
+  if (_logsMode === 'telegram') { _startBotLogsPolling(); return; }
+  _attachLogsScrollDetect('#logsView');
+  _attachLogsClickDelegate('#logsView');
+  $('#logsView')?.classList.toggle('hide-refresh', _logsHideRefresh);
+  reloadLogs();
+  _logsTimer = setInterval(reloadLogs, 4000);
 }
 function stopLogsPolling() {
   if (_logsTimer) { clearInterval(_logsTimer); _logsTimer = null; }
+  _stopBotLogsPolling();
 }
 
 // ─── Health view ───
@@ -2628,8 +2844,52 @@ $('#btnLogsScrollEnd')?.addEventListener('click', () => {
   const v = $('#logsView');
   if (!v) return;
   _logsAutoScroll = true;
+  _logsPendingHidden = 0;
+  _updateLogsFloatBtn();
   v.scrollTop = v.scrollHeight;
 });
+$('#logsFloatBottom')?.addEventListener('click', () => {
+  const v = $('#logsView');
+  if (!v) return;
+  _logsAutoScroll = true;
+  _logsPendingHidden = 0;
+  _updateLogsFloatBtn();
+  v.scrollTop = v.scrollHeight;
+});
+$('#btnLogsHideRefresh')?.addEventListener('click', () => {
+  _logsHideRefresh = !_logsHideRefresh;
+  localStorage.setItem('bmx_logs_hide_refresh', _logsHideRefresh ? '1' : '0');
+  $('#btnLogsHideRefresh').classList.toggle('on', _logsHideRefresh);
+  $('#logsView')?.classList.toggle('hide-refresh', _logsHideRefresh);
+});
+// Modo: Dashboard | Bots Telegram (dentro de #logsMain)
+$('.logs-mode-seg')?.querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $('.logs-mode-seg').querySelectorAll('button').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    _logsMode = btn.dataset.v;
+    $('#logsDashboardWrap').style.display = _logsMode === 'dashboard' ? '' : 'none';
+    $('#logsLevelSeg').style.display = _logsMode === 'dashboard' ? '' : 'none';
+    $('#btnLogsHideRefresh').style.display = _logsMode === 'dashboard' ? '' : 'none';
+    $('#logsBotsWrap').style.display = _logsMode === 'telegram' ? 'grid' : 'none';
+    startLogsPolling();
+  });
+});
+function _toggleBotLogPause(which, btnSel) {
+  const st = _botLogsState[which];
+  st.paused = !st.paused;
+  $(btnSel).textContent = st.paused ? '▶' : '⏸';
+  if (st.paused) {
+    clearInterval(st.timer); st.timer = null;
+  } else {
+    _reloadBotLog(which);
+    st.timer = setInterval(() => _reloadBotLog(which), 4000);
+  }
+}
+$('#btnBotMainPause')?.addEventListener('click', () => _toggleBotLogPause('main', '#btnBotMainPause'));
+$('#btnBotMockPause')?.addEventListener('click', () => _toggleBotLogPause('mock', '#btnBotMockPause'));
+$('#btnBotMainClear')?.addEventListener('click', () => { $('#logsBotMainView').textContent = ''; });
+$('#btnBotMockClear')?.addEventListener('click', () => { $('#logsBotMockView').textContent = ''; });
 
 // Mobile drawer
 $('#btnMobileMenu')?.addEventListener('click', () => {

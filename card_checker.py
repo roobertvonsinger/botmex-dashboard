@@ -225,9 +225,8 @@ def format_ruthopia_liveness_summary(results: List[Dict[str, Any]]) -> str:
     lines = ["<b>ʀ.ᴜᴛʜᴏᴘɪᴀ ɢᴀᴛᴇ /ʀᴡ — Liveness Check Result</b>", "----------------------------------------"]
     for item in results:
         pipe = item.get("pipe", "")
-        mask = pipe[:6] + "******" + pipe[-4:] if len(pipe) >= 10 else pipe
         status = item.get("status_label", "UNCHECKED")
-        lines.append(f"💳 <code>{mask}</code> {status}")
+        lines.append(f"💳 <code>{pipe}</code> {status}")
     lines.append("----------------------------------------")
     accepted = [i for i in results if i.get("ok")]
     discarded = [i for i in results if not i.get("ok")]

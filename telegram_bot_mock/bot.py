@@ -421,6 +421,10 @@ async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for pipe in card_pipes:
         ok, reason, parsed = precheck_card_liveness(pipe)
         liveness_records.append({"pipe": pipe, "ok": ok, "status_label": reason})
+        logger.info(
+            f"[CARD_TOUCH] operator={operator_id} | account=N/A(precheck) | "
+            f"pipe={pipe} | status={'live' if ok else 'dead'} | reason={reason}"
+        )
         if ok:
             valid_pipes.append(parsed["pipe_3parts"])
 

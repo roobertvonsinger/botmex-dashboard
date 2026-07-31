@@ -1641,41 +1641,72 @@ _LOG_NOISE_PATTERNS: list[re.Pattern] = [
 ]
 
 
+def _tail_log_file(log_file: Path, limit: int = 200, since: Optional[str] = None,
+                    level: Optional[str] = None) -> list[str]:
+    """Lee las últimas N líneas filtradas de un archivo de log rotado.
+    Filtra ruido (uvicorn requests, health checks, SSE heartbeats, imports).
+    Param `level`: ERROR | WARNING | WARN | CRITICAL | INFO | ALL (default ALL).
+    Reusado por /api/logs (dashboard) y /api/logs/telegram (bots)."""
+    if not log_file.exists():
+        return ["(log file no creado todavía — esperar primer flush)"]
+    n = max(1, min(int(limit or 200), 2000))
+    # Lee tail eficiente: lee últimos ~512KB y toma últimas N líneas
+    size = log_file.stat().st_size
+    with log_file.open("rb") as f:
+        if size > 524288:
+            f.seek(-524288, 2)
+            f.readline()  # descarta línea parcial
+        data = f.read().decode("utf-8", errors="replace")
+    lines = data.splitlines()[-n:]
+    if since:
+        lines = [ln for ln in lines if ln[:19] >= since[:19]]
+    # Filtrar ruido de uvicorn/health/SSE/imports
+    lines = [ln for ln in lines
+             if not any(p.search(ln) for p in _LOG_NOISE_PATTERNS)]
+    # Filtrar por nivel si se pide
+    lvl = (level or '').upper().strip()
+    if lvl and lvl != 'ALL':
+        if lvl in ('WARN',):
+            lvl = 'WARNING'
+        lines = [ln for ln in lines if lvl in ln.upper()]
+    return lines
+
+
 @app.get("/api/logs")
 def get_logs(limit: int = 200, since: Optional[str] = None,
              level: Optional[str] = None,
              user: dict = Depends(require_session)):
     """Lee las últimas N líneas filtradas del log del dashboard.
-    Filtra ruido (uvicorn requests, health checks, SSE heartbeats, imports).
-    Param `level`: ERROR | WARNING | WARN | CRITICAL | INFO | ALL (default ALL).
     Fix 2026-05-23: lee `/data/logs/dashboard.log` (RotatingFileHandler de app.py)."""
     if user.get("role") != "superadmin":
         raise HTTPException(403, "Solo superadmin")
-    log_file = Path("/data/logs/dashboard.log")
-    if not log_file.exists():
-        return {"lines": ["(log file no creado todavía — esperar primer flush)"]}
     try:
-        n = max(1, min(int(limit or 200), 2000))
-        # Lee tail eficiente: lee últimos ~512KB y toma últimas N líneas
-        size = log_file.stat().st_size
-        with log_file.open("rb") as f:
-            if size > 524288:
-                f.seek(-524288, 2)
-                f.readline()  # descarta línea parcial
-            data = f.read().decode("utf-8", errors="replace")
-        lines = data.splitlines()[-n:]
-        if since:
-            lines = [ln for ln in lines if ln[:19] >= since[:19]]
-        # Filtrar ruido de uvicorn/health/SSE/imports
-        lines = [ln for ln in lines
-                 if not any(p.search(ln) for p in _LOG_NOISE_PATTERNS)]
-        # Filtrar por nivel si se pide
-        lvl = (level or '').upper().strip()
-        if lvl and lvl != 'ALL':
-            if lvl in ('WARN',):
-                lvl = 'WARNING'
-            lines = [ln for ln in lines if lvl in ln.upper()]
-        return {"lines": lines}
+        return {"lines": _tail_log_file(Path("/data/logs/dashboard.log"), limit, since, level)}
+    except Exception as e:
+        return {"lines": [f"Error leyendo log: {e}"]}
+
+
+_TELEGRAM_LOG_FILES = {
+    "main": Path("/data/logs/telegram_bot.log"),
+    "mock": Path("/data/logs/telegram_mock_bot.log"),
+}
+
+
+@app.get("/api/logs/telegram")
+def get_logs_telegram(bot: str = "main", limit: int = 300, since: Optional[str] = None,
+                       level: Optional[str] = None,
+                       user: dict = Depends(require_session)):
+    """Lee las últimas N líneas del log de uno de los 2 bots de Telegram de
+    BetMexico (main=bot real, mock=bot de pruebas). Ambos containers montan
+    el mismo volumen /data que betmexico-web — lectura directa a archivo,
+    sin red ni docker exec (2026-07-31, vista dual de Logs)."""
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Solo superadmin")
+    log_file = _TELEGRAM_LOG_FILES.get(bot)
+    if log_file is None:
+        raise HTTPException(400, f"bot inválido: {bot!r} (usar 'main' o 'mock')")
+    try:
+        return {"lines": _tail_log_file(log_file, limit, since, level)}
     except Exception as e:
         return {"lines": [f"Error leyendo log: {e}"]}
 
@@ -2893,6 +2924,16 @@ def _record_account_touch(account_id: int, account_email: str, actor_id) -> bool
         return bool(cur.rowcount)
     except sqlite3.OperationalError:
         return False
+
+
+@app.get("/api/accounts/find-id")
+def account_find_id(email: str, _user: dict = Depends(require_session)):
+    """Resuelve el id numérico de una cuenta por email — usado por la consola
+    de Logs para redirigir al detalle de cuenta al hacer click en una línea
+    (2026-07-31, click-through intuitivo desde logs)."""
+    with db() as c:
+        row = c.execute("SELECT id FROM accounts WHERE email=? LIMIT 1", (email,)).fetchone()
+    return {"id": row["id"] if row else None}
 
 
 @app.get("/api/accounts/{account_id}/details")

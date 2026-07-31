@@ -2034,6 +2034,92 @@ td.sel-cell:hover { background: rgba(255,255,255,0.04); }
 .log-level-counts .lc-e { color: var(--danger); font-weight: 600; }
 .log-level-counts .lc-w { color: var(--warn); font-weight: 600; }
 
+/* ─── Log categorías de dominio (badges) — 2026-07-31 ───────────────────── */
+/* Paleta fija pedida por Robert: alto contraste, un vistazo basta. */
+.log-cat {
+  display: inline-block; font-weight: 700; font-size: 9px; letter-spacing: .3px;
+  padding: 1px 6px; border-radius: 3px; margin-right: 5px; vertical-align: middle;
+  text-transform: uppercase; white-space: nowrap;
+}
+.log-cat-deposit_ok    { color: #10b981; background: color-mix(in oklch, #10b981 16%, transparent); }
+.log-cat-deposit_fail  { color: #ef4444; background: color-mix(in oklch, #ef4444 16%, transparent); }
+.log-cat-withdraw_ok   { color: #06b6d4; background: color-mix(in oklch, #06b6d4 16%, transparent); }
+.log-cat-withdraw_fail { color: #f97316; background: color-mix(in oklch, #f97316 16%, transparent); }
+.log-cat-login_fail    { color: #a855f7; background: color-mix(in oklch, #a855f7 16%, transparent); }
+.log-cat-system_error  {
+  color: #fff; background: #a855f7;
+  animation: logCritPulse 1.4s ease-in-out infinite;
+}
+@keyframes logCritPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, #a855f7 55%, transparent); }
+  50%      { box-shadow: 0 0 0 4px color-mix(in oklch, #a855f7 0%, transparent); }
+}
+.log-cat-refresh { color: var(--text-dim); opacity: .5; background: transparent; }
+
+/* Línea que tocó una tarjeta — resalte ámbar + estructura en chips, no texto plano */
+.log-line.log-card-touch {
+  background: color-mix(in oklch, var(--warn) 9%, transparent);
+  border-left: 2px solid var(--warn);
+  padding: 2px 6px 2px 8px; margin: 1px 0 1px -8px; border-radius: 0 4px 4px 0;
+}
+.log-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: oklch(0.20 0.02 160 / 0.55); border: 1px solid var(--accent-soft-2);
+  color: var(--text); font-weight: 600; padding: 0 5px; border-radius: 3px;
+  margin: 0 3px; cursor: pointer; font-size: 10.5px;
+  transition: transform 150ms ease-out, background 150ms ease-out, border-color 150ms ease-out;
+}
+.log-chip:hover { background: var(--accent-soft); border-color: var(--accent); }
+.log-chip:active { transform: scale(0.94); }
+.log-chip .ic { font-size: 9px; opacity: .6; }
+.log-chip.chip-pipe { color: var(--warn); border-color: color-mix(in oklch, var(--warn) 40%, transparent); }
+.log-chip.chip-account { color: var(--accent); }
+/* Línea clickeable → navega a detalle de cuenta */
+.log-line.log-clickable { cursor: pointer; }
+.log-line.log-clickable:hover { background: var(--accent-soft); border-radius: 3px; }
+
+/* Toggle "Ocultar refrescos" — oculto por defecto */
+.logs-view.hide-refresh .log-line.is-refresh { display: none; }
+
+/* Botón flotante "↓ Ir al fondo" — aparece solo si el operador scrolleó arriba */
+.logs-float-bottom {
+  position: absolute; right: 22px; bottom: 18px; z-index: 5;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 999px; border: 1px solid var(--accent-soft-2);
+  background: oklch(0.14 0.02 160 / 0.92); color: var(--accent); font-size: 12px; font-weight: 600;
+  cursor: pointer; backdrop-filter: blur(6px); box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  opacity: 0; transform: translateY(8px) scale(0.96); pointer-events: none;
+  transition: opacity 150ms ease-out, transform 150ms ease-out;
+}
+.logs-float-bottom.show { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+.logs-float-bottom:hover { background: var(--accent-soft); }
+.logs-float-bottom .cnt {
+  background: var(--accent); color: #06120b; border-radius: 999px; padding: 0 6px; font-size: 10.5px;
+}
+
+/* Nueva línea entrando — micro fade-in, sin saltos de layout */
+.log-line.log-enter { animation: logLineIn 180ms ease-out; }
+@keyframes logLineIn {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Vista dual: Bots de Telegram ─── */
+.logs-mode-seg { margin-left: 10px; }
+.logs-bots-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1px; flex: 1; min-height: 0;
+  background: var(--border);
+}
+.logs-bot-panel { display: flex; flex-direction: column; min-height: 0; background: var(--bg); position: relative; }
+.logs-bot-head {
+  display: flex; align-items: center; gap: 8px; padding: 8px 14px;
+  border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600;
+}
+.logs-bot-head .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
+.logs-bot-head .grow { flex: 1; }
+.logs-bot-view { flex: 1; overflow-y: auto; }
+.log-cat-cmd { color: var(--accent); font-weight: 700; }
+
 /* ─── Health view ─── */
 .health-view { padding: 18px 22px 80px; }
 .health-ok, .health-bad {

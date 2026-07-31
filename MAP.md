@@ -93,14 +93,14 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 4631 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 4672 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 954 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
-| `card_checker.py` | 235 | `—` | _[completar]_ |
+| `card_checker.py` | 234 | `—` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 152 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
-| `deposits.py` | 2783 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2805 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 323 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 416 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 892 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -120,6 +120,7 @@ prewarm.py (router)
 | `test_at_hand.py` | 73 | `—` | _[completar]_ |
 | `test_auto_deposit_selection.py` | 187 | `—` | _[completar]_ |
 | `test_auto_missions_migrate.py` | 120 | `—` | _[completar]_ |
+| `test_card_touch_log.py` | 61 | `—` | _[completar]_ |
 | `test_deposit_status_classify.py` | 95 | `—` | _[completar]_ |
 | `test_deposit_step.py` | 132 | `—` | _[completar]_ |
 | `test_grading_a_plus_m7.py` | 184 | `—` | _[completar]_ |
@@ -232,6 +233,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `e5975f9` | docs(next-session): actualizar estado de cierre y pendientes del bot mock |
 | `b771207` | fix(auto_deposit): agregar fallback defensivo OperationalError si falta columna card_pipe en esquema test |
 | `b64ef27` | fix(telegram-mock): corregir asignacion de cuentas y agregar boton detener mision |
 | `5b99ffd` | fix(auto_deposit): omitir cuentas sin tarjeta asignada en plan_auto_mission |
@@ -243,7 +245,6 @@ prewarm.py (router)
 | `be4d991` | feat(auto_deposit): nuevo motor multivariable de seleccion sin grading visible |
 | `90f4cba` | fix(telegram-mock): restaurar lista completa de usuarios autorizados en el bot mock |
 | `0989117` | fix(telegram-mock): restringir acceso exclusivamente al SuperAdmin Robert (1341812706) |
-| `6a65660` | fix(telegram-mock): agregar null-safety en lectura de strikes_count de SQLite |
 <!-- GEN:end:recientes -->
 
 ---

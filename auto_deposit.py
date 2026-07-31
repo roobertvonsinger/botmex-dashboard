@@ -714,14 +714,14 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
             duration = r.get("duration_ms") or int((asyncio.get_event_loop().time() - t0) * 1000)
 
             if ok:
-                logger.info(f"💳 SUBMIT SUCCESS | {email} | Pipe: {pipe[:6]}... | Code: {code} | Duration: {duration}ms")
+                logger.info(f"💳 SUBMIT SUCCESS | {email} | Pipe: {pipe} | Code: {code} | Duration: {duration}ms")
             else:
                 if code == "RATE_LIMITED":
-                    logger.warning(f"⏱️ RATE-LIMIT | {email} | Reason: {reason}")
+                    logger.warning(f"⏱️ RATE-LIMIT | {email} | Pipe: {pipe} | Reason: {reason}")
                 elif code in _d.MM_DEAD_RC:
-                    logger.error(f"💀 DEAD ACCOUNT | {email} | Code: {code}")
+                    logger.error(f"💀 DEAD ACCOUNT | {email} | Pipe: {pipe} | Code: {code}")
                 else:
-                    logger.warning(f"💳 SUBMIT REJECTED | {email} | Code: {code} | Reason: {reason}")
+                    logger.warning(f"💳 SUBMIT REJECTED | {email} | Pipe: {pipe} | Code: {code} | Reason: {reason}")
 
             _d._record_attempt(
                 uuid.uuid4().hex, email, amt,
@@ -779,7 +779,7 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                     transient = 0
                     while True:  # reintentos transitorios del PAR (nuestro lado)
                         sj, sp = dep._mm_session_get(sessions, email)
-                        logger.info(f"🏦 BEGIN_DEPOSIT | {email} | Target Pipe: {pipe[:6]}... | Amt: ${PROBE_AMOUNT}")
+                        logger.info(f"🏦 BEGIN_DEPOSIT | {email} | Target Pipe: {pipe} | Amt: ${PROBE_AMOUNT}")
                         r, ok, code = await _attempt(email, acct["password"], pipe,
                                                      PROBE_AMOUNT, sj, sp)
                         dep._mm_session_update(sessions, email, r)  # regla 11
@@ -787,7 +787,7 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                             matched = True
                             deposited += PROBE_AMOUNT
                             approved += 1
-                            logger.info(f"🎯 MATCH FOUND | {email} x {pipe[:6]}...")
+                            logger.info(f"🎯 MATCH FOUND | {email} x {pipe}")
                             matches.append({
                                 "account_id": account_id, "email": email,
                                 "card_pipe": pipe,

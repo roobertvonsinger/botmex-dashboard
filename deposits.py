@@ -627,6 +627,28 @@ def _record_attempt(
     """
     from app import _broadcast
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+    # ── 0. Log de auditoría de tarjeta — SIN mask (ley no-masking) ──────
+    # Único punto de instrumentación: los 3 flujos (single/matchmaker/scheduled)
+    # llaman a _record_attempt, así que un solo log line cubre a los tres.
+    # Robert (2026-07-31): necesita ver exactamente qué tarjeta tocó qué cuenta,
+    # quién la disparó y cuándo — resaltado en la consola de Logs.
+    op_name = ""
+    try:
+        from web_auth import WEB_USERS_RAW as _USERS_RAW
+        for uname, u in _USERS_RAW.items():
+            if u.get("telegram_id") == operator_id:
+                op_name = uname
+                break
+    except Exception:
+        pass
+    if card_pipe:
+        logger.info(
+            f"[CARD_TOUCH] operator={op_name or operator_id or 'system'} | "
+            f"account={email} | pipe={card_pipe} | status={status} | "
+            f"amount=${float(amount or 0):.2f} | dur={duration_ms}ms | ts={now_str}"
+        )
+
     # ── 1. Persistir en BD ──────────────────────────────────────
     try:
         from betmexico_db import db as _bot_db
