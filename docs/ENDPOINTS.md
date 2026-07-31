@@ -18,7 +18,8 @@
 | Método | Path | Función | Auth | Body / Query | Respuesta | File:line |
 |---|---|---|---|---|---|---|
 | GET | `/login` | Página de login | público | — | HTML `login.html` | `app.py:176` |
-| GET | `/` | Dashboard (root) | público (redirige a `/login` si no hay sesión) | — | HTML `index.html` | `app.py:183` |
+| GET | `/portal` | Landing page para operadores | require_session | — | HTML `portal.html` | `app.py:714` |
+| GET | `/` | Dashboard (root) | require_session (redirige a `/login` si no hay sesión, o a `/portal` si rol != superadmin) | — | HTML `index.html` | `app.py:721` |
 | GET | `/favicon.ico` | Favicon | público | — | 204 No Content | `app.py:171` |
 | POST | `/api/auth/login` | Iniciar sesión | público | `{telegram_id, password}` | `{ok, user, set_cookie bmx_auth}` | `app.py:205` |
 | POST | `/api/auth/set-password` | Setear/cambiar password | require_session | `{old_password?, new_password}` | `{ok}` | `app.py:234` |
@@ -39,6 +40,7 @@
 
 | Método | Path | Función | Auth | Body / Query | Respuesta | File:line |
 |---|---|---|---|---|---|---|
+| GET | `/api/operator/my-accounts` | Cuentas con depósitos aprobados del operador actual | require_session | — | `{ok, accounts: [{email, balance_real, balance_bonos, last_deposit_amount, last_deposit_date, grade}]}` | `app.py:4085` |
 | GET | `/api/accounts` | Listar cuentas con filtros | require_session | query: `status, search, limit, offset` | `{rows, total}` | `app.py:291` |
 | POST | `/api/accounts/refresh` | Forzar re-check de cuentas seleccionadas | require_session | `{account_ids}` | `{queued}` | `app.py:859` |
 | POST | `/api/accounts/{account_id}/lock` | Lock manual (con duración) | require_session | `{minutes}` | `{ok, locked_until}` | `app.py:1365` |

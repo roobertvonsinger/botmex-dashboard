@@ -7,7 +7,7 @@ import asyncio
 import os
 import sys
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -56,6 +56,10 @@ from deposits import _mission_sem
 
 # Estados de Conversación
 (WAIT_CHECK_CONFIRM, WAIT_BET_CONFIRM) = range(2)
+
+
+# Eventos de confirmación en espera para /bet confirm_gate
+_confirm_events: Dict[str, Tuple[asyncio.Event, Dict[str, Any]]] = {}
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -490,23 +494,137 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         user_info = {"telegram_id": operator_id, "username": update.effective_user.username or "operator"}
 
         _persist_auto_mission(mission_id, operator_id, valid_pipes, amount, target_count, plan)
-        asyncio.create_task(run_auto_mission(mission_id, plan, user_info))
 
-        matched_emails = [a.get("email") for a in plan.get("accounts", [])]
-        email_list_str = "\n".join([f"• <code>{em}</code>" for em in matched_emails])
-
-        msg_success = (
+        # Mensaje base inicial de la misión
+        status_msg = await query.edit_message_text(
             f"🚀 <b>MISIÓN DE DEPÓSITO INICIADA</b>\n\n"
             f"• <b>Misión ID:</b> <code>{mission_id}</code>\n"
-            f"• <b>Cuentas Asignadas:</b> {len(matched_emails)}\n"
-            f"{email_list_str}\n\n"
-            f"🌐 <b>Monitorear avance en vivo:</b>\n{DASHBOARD_URL}/?match={mission_id}"
+            f"• <b>Estado:</b> 🔎 Buscando pares cuenta×tarjeta...\n\n"
+            f"🌐 <b>Monitorear en vivo:</b>\n{DASHBOARD_URL}/?match={mission_id}",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛑 Detener Misión", callback_data=f"stop_mission_{mission_id}")]])
         )
-        kb_stop = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🛑 Detener Misión", callback_data=f"stop_mission_{mission_id}")]
-        ])
-        await query.edit_message_text(msg_success, parse_mode="HTML", reply_markup=kb_stop)
+
+        last_edit_ts = [0.0]
+        loop = asyncio.get_running_loop()
+
+        def on_progress(status: str, extra: dict):
+            now = time.time()
+            # Mapear status -> UI text
+            if status == "matching":
+                st_text = f"🔎 Buscando pares cuenta×tarjeta ({extra.get('accounts', 0)} cuentas)..."
+            elif status == "logging_in":
+                st_text = f"🔑 Verificando sesión | <code>{extra.get('email', '')}</code> ({extra.get('current', 1)}/{extra.get('total', 1)})"
+            elif status == "match":
+                st_text = f"🎯 Cuenta casada: <code>{extra.get('email', '')}</code> ({extra.get('card_tail', '')})"
+            elif status == "cooldown":
+                st_text = f"💤 Enfriando cuenta: <code>{extra.get('email', '')}</code> (rate limit)"
+            elif status == "awaiting_confirmation":
+                st_text = f"⏳ Esperando confirmación para iniciar depósitos programados ({extra.get('matches', 0)} cuentas casadas)..."
+            elif status == "scheduling":
+                st_text = f"🚀 Depósitos en proceso: <code>{extra.get('email', '')}</code> ({extra.get('completed', 0)}/{extra.get('total', 9)})"
+            elif status in ("completed", "cancelled", "failed"):
+                st_text = f"🏁 Misión finalizada ({status})"
+            else:
+                st_text = f"⚙️ {status}"
+
+            text = (
+                f"🚀 <b>MISIÓN DE DEPÓSITO {mission_id}</b>\n\n"
+                f"• <b>Estado:</b> {st_text}\n\n"
+                f"🌐 <b>Monitorear en vivo:</b>\n{DASHBOARD_URL}/?match={mission_id}"
+            )
+
+            # Incondicional para terminal o awaiting_confirmation, throttleado 2.5s para el resto
+            is_priority = status in ("awaiting_confirmation", "completed", "cancelled", "failed")
+            if not is_priority and (now - last_edit_ts[0] < 2.5):
+                return
+            last_edit_ts[0] = now
+
+            async def _edit():
+                try:
+                    await status_msg.edit_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛑 Detener Misión", callback_data=f"stop_mission_{mission_id}")]]))
+                except Exception:
+                    pass
+
+            asyncio.run_coroutine_threadsafe(_edit(), loop)
+
+        async def confirm_gate(gate_info: dict) -> bool:
+            m_id = gate_info["mission_id"]
+            matches = gate_info["matches"]
+            amt = gate_info.get("amount", 150.0)
+            target = gate_info.get("target_count", 9)
+
+            ev = asyncio.Event()
+            _confirm_events[m_id] = (ev, {"decision": False})
+
+            match_lines = "\n".join([f"• <code>{m['email']}</code> x <code>{m['card_pipe']}</code>" for m in matches])
+            confirm_text = (
+                f"⚠️ <b>CONFIRMACIÓN DE LOOP PROGRAMADO</b>\n\n"
+                f"• <b>Misión:</b> <code>{m_id}</code>\n"
+                f"• <b>Cuentas Casadas Exitosas:</b> {len(matches)}\n"
+                f"{match_lines}\n\n"
+                f"• <b>Programa:</b> {target} depósitos × ${amt:.0f} MXN (cada 60s por cuenta)\n\n"
+                f"<i>¿Deseas autorizar el inicio del loop programado o terminar la misión aquí?</i>"
+            )
+            kb_confirm = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton(f"✅ Continuar ({target}×${amt:.0f}/60s)", callback_data=f"confirm_sched_{m_id}"),
+                    InlineKeyboardButton("🛑 Terminar aquí", callback_data=f"stop_sched_{m_id}")
+                ]
+            ])
+            try:
+                await status_msg.edit_text(confirm_text, parse_mode="HTML", reply_markup=kb_confirm)
+            except Exception as ex:
+                logger.warning(f"[Bot] No pude editar mensaje a confirm_gate: {ex}")
+
+            try:
+                await asyncio.wait_for(ev.wait(), timeout=600.0)
+                res = _confirm_events.get(m_id, (None, {"decision": False}))[1].get("decision", False)
+            except asyncio.TimeoutError:
+                res = False
+                try:
+                    await status_msg.edit_text(
+                        f"⏱️ <b>Tiempo de espera agotado (10 min).</b>\nLa misión {m_id} finalizó tras el matchmaking sin ejecutar el loop.",
+                        parse_mode="HTML"
+                    )
+                except Exception:
+                    pass
+            finally:
+                _confirm_events.pop(m_id, None)
+
+            return res
+
+        asyncio.create_task(run_auto_mission(mission_id, plan, user_info, on_progress=on_progress, confirm_gate=confirm_gate))
         return ConversationHandler.END
+
+
+async def handle_confirm_gate_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja las respuestas de confirmación explícita (confirm_sched / stop_sched)."""
+    query = update.callback_query
+    await query.answer()
+    data = query.data or ""
+    if data.startswith("confirm_sched_"):
+        mission_id = data.replace("confirm_sched_", "").strip()
+        item = _confirm_events.get(mission_id)
+        if item:
+            ev, state = item
+            state["decision"] = True
+            ev.set()
+        await query.edit_message_text(
+            f"✅ <b>Loop programado AUTORIZADO para misión {mission_id}.</b>\nIniciando depósitos...",
+            parse_mode="HTML"
+        )
+    elif data.startswith("stop_sched_"):
+        mission_id = data.replace("stop_sched_", "").strip()
+        item = _confirm_events.get(mission_id)
+        if item:
+            ev, state = item
+            state["decision"] = False
+            ev.set()
+        await query.edit_message_text(
+            f"🛑 <b>Loop programado CANCELADO para misión {mission_id}.</b>\nMisión finalizada tras matchmaking.",
+            parse_mode="HTML"
+        )
 
 
 async def handle_stop_mission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -543,6 +661,7 @@ def build_app():
 
     # Handler callback independiente para detener misión iniciada
     app.add_handler(CallbackQueryHandler(handle_stop_mission_callback, pattern="^stop_mission_"))
+    app.add_handler(CallbackQueryHandler(handle_confirm_gate_callback, pattern="^(confirm_sched_|stop_sched_)"))
 
     # ConversationHandler para /check
     check_handler = ConversationHandler(

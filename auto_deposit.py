@@ -13,7 +13,7 @@ suficiente para amount × count.
 """
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 THREEDS_RECENT_H = 24  # 3DS en las últimas N horas → BIN penalizado
 
@@ -625,7 +625,7 @@ def _unlock(account_id: int) -> None:
         )
 
 
-def _broadcast_mission(mission_id: str, status: str, user: dict, **extra) -> None:
+def _broadcast_mission(mission_id: str, status: str, user: dict, on_progress: Optional[Callable[[str, dict], None]] = None, **extra) -> None:
     from app import _broadcast, _resolve_who
     try:
         _broadcast({
@@ -635,6 +635,11 @@ def _broadcast_mission(mission_id: str, status: str, user: dict, **extra) -> Non
         })
     except Exception as e:
         logger.warning(f"[Auto {mission_id}] broadcast falló ({status}): {e}")
+    if on_progress:
+        try:
+            on_progress(status, extra)
+        except Exception as e:
+            logger.warning(f"[Auto {mission_id}] on_progress falló ({status}): {e}")
 
 
 async def _stop_pool(pool, mission_id: str) -> None:
@@ -648,7 +653,13 @@ async def _stop_pool(pool, mission_id: str) -> None:
 
 
 # ── orquestador ──────────────────────────────────────────────────────────────
-async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) -> None:
+async def run_auto_mission(
+    mission_id: str,
+    plan: Dict[str, Any],
+    user: dict,
+    on_progress: Optional[Callable[[str, dict], None]] = None,
+    confirm_gate: Optional[Callable[[dict], Awaitable[bool]]] = None,
+) -> None:
     """Orquesta Fase 1 (matchmaking probe $10) + Fase 2 (scheduled N×amount/60s)
     + Fase 3 (cierre). Lee amount/target_count/card_pipes de la fila de la misión
     (self-sufficient: no depende del shape exacto de `plan`)."""
@@ -734,7 +745,7 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
             # ── FASE 1 — MATCHMAKING (probe $10 real, D1) ────────────────────
             _m_update(mission_id, status="matching",
                       phase_detail="buscando pares cuenta×tarjeta")
-            _broadcast_mission(mission_id, "matching", user,
+            _broadcast_mission(mission_id, "matching", user, on_progress=on_progress,
                                accounts=len(plan.get("accounts", [])))
             accounts_list = plan.get("accounts", [])
             for acc_idx, acc in enumerate(accounts_list):
@@ -751,6 +762,7 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                     mission_id,
                     "logging_in",
                     user,
+                    on_progress=on_progress,
                     email=email,
                     current=acc_idx + 1,
                     total=len(accounts_list),
@@ -796,7 +808,7 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                             _m_update(mission_id, matches=json.dumps(matches),
                                       total_deposited=deposited, total_approved=approved,
                                       phase_detail=f"match {email}")
-                            _broadcast_mission(mission_id, "match", user,
+                            _broadcast_mission(mission_id, "match", user, on_progress=on_progress,
                                                email=email, card_tail=f"···{pipe[:6]}")
                             break
                         if code in dep.MM_THREEDS_RC:
@@ -816,6 +828,7 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                                 mission_id,
                                 "cooldown",
                                 user,
+                                on_progress=on_progress,
                                 email=email,
                                 reason="rate_limited",
                             )
@@ -856,7 +869,7 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                           total_deposited=deposited, total_approved=approved,
                           total_failed=failed, completed_at=_iso())
                 _broadcast_mission(mission_id, "failed" if not cancelled else "cancelled",
-                                   user, reason="sin matches")
+                                   user, on_progress=on_progress, reason="sin matches")
                 return
 
             # Si TODOS los matches capturaron sesión, el pool ya no se necesita (regla 9)
@@ -864,10 +877,42 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                 await _stop_pool(pool, mission_id)
                 pool = None
 
+            # ── FASE 1.5 — CONFIRMACIÓN EXPLÍCITA ANTES DE FASE 2 ──────────────
+            if confirm_gate and not _cancelled():
+                _m_update(
+                    mission_id,
+                    status="awaiting_confirmation",
+                    phase_detail=f"{len(matches)} cuentas casadas — esperando confirmación",
+                )
+                _broadcast_mission(
+                    mission_id,
+                    "awaiting_confirmation",
+                    user,
+                    on_progress=on_progress,
+                    matches=len(matches),
+                )
+                proceed = False
+                try:
+                    proceed = await confirm_gate({"mission_id": mission_id, "matches": matches, "amount": amount, "target_count": target_count})
+                except Exception as ex:
+                    logger.warning(f"[Auto {mission_id}] confirm_gate falló: {ex}")
+                if not proceed:
+                    cancelled = True
+
+            if cancelled:
+                _m_update(mission_id, status="completed",
+                          phase_detail="detenido por el operador tras matchmaking",
+                          total_deposited=deposited, total_approved=approved,
+                          total_failed=failed, completed_at=_iso())
+                _broadcast_mission(mission_id, "completed", user, on_progress=on_progress,
+                                   deposited=deposited, approved=approved, failed=failed,
+                                   accounts=len(matches), stopped_by_user=True)
+                return
+
             # ── FASE 2 — SCHEDULED por match (N×amount cada 60s, SP-2) ───────
             _m_update(mission_id, status="scheduling",
                       phase_detail=f"{len(matches)} matches — {target_count}×${amount:.0f}/60s")
-            _broadcast_mission(mission_id, "scheduling", user, matches=len(matches))
+            _broadcast_mission(mission_id, "scheduling", user, on_progress=on_progress, matches=len(matches))
             for m in matches:
                 if _cancelled():
                     cancelled = True
@@ -900,7 +945,7 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                         _m_update(mission_id, total_deposited=deposited,
                                   total_approved=approved,
                                   phase_detail=f"{email} {completed}/{target_count}")
-                        _broadcast_mission(mission_id, "scheduling", user,
+                        _broadcast_mission(mission_id, "scheduling", user, on_progress=on_progress,
                                            email=email, completed=completed,
                                            total=target_count)
                         if completed < target_count:
@@ -915,7 +960,7 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                         failed += 1
                         _m_update(mission_id, total_failed=failed,
                                   phase_detail=f"{email} abortada ({code})")
-                        _broadcast_mission(mission_id, "scheduling", user,
+                        _broadcast_mission(mission_id, "scheduling", user, on_progress=on_progress,
                                            email=email, aborted=code)
                         break
                     # Transitorio → retry (SCHED_MAX_TRANSIENT_RETRIES=4, backoff 25s)
@@ -942,7 +987,7 @@ async def run_auto_mission(mission_id: str, plan: Dict[str, Any], user: dict) ->
                                     else f"${deposited:.0f} en {len(matches)} cuentas"),
                       total_deposited=deposited, total_approved=approved,
                       total_failed=failed, completed_at=_iso())
-            _broadcast_mission(mission_id, final, user,
+            _broadcast_mission(mission_id, final, user, on_progress=on_progress,
                                deposited=deposited, approved=approved, failed=failed,
                                accounts=len(matches))
         finally:

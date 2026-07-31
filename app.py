@@ -633,6 +633,9 @@ async def _maintenance_gate_middleware(request: Request, call_next):
             user_role = user_session.get("role") if user_session else None
 
             if user_role != "superadmin":
+                # Exceptuar el portal y sus APIs si es operador en mantenimiento
+                if user_role == "operator" and (path == "/portal" or path.startswith("/api/operator/") or path.startswith("/static/portal")):
+                    return await call_next(request)
                 if path.startswith("/api/"):
                     return JSONResponse(
                         {"error": "Sistema en mantenimiento", "maintenance": True},
@@ -710,10 +713,21 @@ def _frontend_version(mtimes=None):
     return str(max(mtimes.values(), default=0))
 
 
+@app.get("/portal")
+def portal_page(bmx_session: str = Cookie(default=None)):
+    session = _auth.get_session(bmx_session) if bmx_session else None
+    if not session:
+        return RedirectResponse("/login", status_code=302)
+    return FileResponse(STATIC / "portal.html")
+
+
 @app.get("/")
 def index(bmx_session: str = Cookie(default=None)):
-    if not bmx_session or not _auth.get_session(bmx_session):
+    session = _auth.get_session(bmx_session) if bmx_session else None
+    if not session:
         return RedirectResponse("/login", status_code=302)
+    if session.get("role") != "superadmin":
+        return RedirectResponse("/portal", status_code=302)
     # Cache-bust: añadir mtime de cada asset a su propio src/href para forzar
     # re-fetch tras deploy. Regex (no string fijo): index.html ya trae un
     # `?v=YYYYMMDDx` hardcodeado a mano, así que un replace de string exacto
@@ -4066,6 +4080,21 @@ def auto_deposit_cancel(mission_id: str,
     return {"mission_id": mission_id, "status": "cancelled", "changed": True}
 
 
+@app.get("/api/operator/my-accounts")
+def operator_my_accounts(user: dict = Depends(require_session)):
+    """Devuelve la lista de cuentas con depósitos aprobados para el operador actual."""
+    operator_id = user.get("telegram_id") or 0
+    with db() as c:
+        rows = c.execute(
+            "SELECT DISTINCT a.email, a.balance_real, a.balance_bonos, "
+            "a.last_deposit_amount, a.last_deposit_date, a.grade "
+            "FROM deposit_attempts d JOIN accounts a ON d.account_email = a.email "
+            "WHERE d.operator_id=? AND d.status='approved' ORDER BY a.last_deposit_date DESC",
+            (operator_id,)
+        ).fetchall()
+    return {"ok": True, "accounts": [dict(r) for r in rows]}
+
+
 @app.get("/api/deposits/auto/{mission_id}/status")
 def auto_deposit_status(mission_id: str,
                         _user: dict = Depends(require_session)):
@@ -4165,7 +4194,7 @@ def bot_operator_info(user: dict = Depends(require_session)):
         # Cuentas con depósitos exitosos del operador
         dep_rows = c.execute(
             "SELECT COUNT(DISTINCT account_email) as count, COALESCE(SUM(amount), 0) as total "
-            "FROM deposit_attempts WHERE operator_id=? AND status='SUCCESS'",
+            "FROM deposit_attempts WHERE operator_id=? AND status='approved'",
             (operator_id,)
         ).fetchone()
 

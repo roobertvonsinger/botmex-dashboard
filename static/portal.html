@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal Operador — BotMexico</title>
+  <link rel="stylesheet" href="/static/style.css?v=1785281972">
+  <style>
+    body {
+      background-color: var(--bg-dark, #0d1117);
+      color: var(--text-main, #c9d1d9);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+    .portal-container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .portal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-color, #30363d);
+      margin-bottom: 24px;
+    }
+    .portal-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: #58a6ff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logout-btn {
+      background: #21262d;
+      border: 1px solid #363b42;
+      color: #c9d1d9;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .logout-btn:hover {
+      background: #30363d;
+    }
+    .accounts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .account-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .acc-email {
+      font-weight: 600;
+      font-size: 14px;
+      word-break: break-all;
+      color: #f0f6fc;
+    }
+    .acc-balance {
+      font-size: 22px;
+      font-weight: 700;
+      color: #2ea043;
+    }
+    .acc-meta {
+      font-size: 12px;
+      color: #8b949e;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .empty-msg {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 40px;
+      color: #8b949e;
+      font-size: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="portal-container">
+    <div class="portal-header">
+      <div class="portal-title">
+        <span>🤖</span>
+        <span>Portal de Operador — Mis Cuentas</span>
+      </div>
+      <button class="logout-btn" id="logoutBtn">Cerrar Sesión</button>
+    </div>
+
+    <div id="accountsGrid" class="accounts-grid">
+      <div class="empty-msg">Cargando tus cuentas...</div>
+    </div>
+  </div>
+
+  <script src="/static/portal.js?v=1785281972"></script>
+</body>
+</html>
