@@ -95,7 +95,7 @@ prewarm.py (router)
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
 | `app.py` | 4631 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 959 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 958 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `card_checker.py` | 235 | `—` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
@@ -232,6 +232,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `f444ed2` | fix(checker): apuntar DATABASE_PATH a /data/ruthopia.db en el volumen compartido |
 | `89d531f` | fix(checker): vincular DATABASE_PATH a /app/ruthopia_data/ruthopia.db montado de Ruthopia |
 | `e587507` | fix(checker): asegurar DATABASE_PATH escribible /tmp para invocacion de Ruthopia |
 | `cc878fd` | fix(checker): forzar carga de variables de entorno de Ruthopia para WaboxGate |
@@ -243,7 +244,6 @@ prewarm.py (router)
 | `ca712ef` | infra(docker): agregar container betmexico-mock-bot a docker-compose.yml |
 | `3b27c3a` | feat(telegram-mock): mostrar tarjeta completa en respuesta de HITs para el operador |
 | `c600b71` | test(telegram-mock): agregar tests de edge cases (documentos invalidos, texto vacio, /cancel, auth) |
-| `927cfcf` | fix(telegram-mock): corregir validacion estricta de DB_PATH sin romper test runner y validar footer de marca |
 <!-- GEN:end:recientes -->
 
 ---

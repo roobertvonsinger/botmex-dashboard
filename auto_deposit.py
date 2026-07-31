@@ -518,11 +518,10 @@ def plan_auto_mission(
 
             if pipe:
                 used_pipes_in_mission.add(pipe)
-
-            accounts_out.append({
-                "id": r.get("id"), "email": email,
-                "grade": r.get("grade"), "card_pipe": pipe,
-            })
+                accounts_out.append({
+                    "id": r.get("id"), "email": email,
+                    "grade": r.get("grade"), "card_pipe": pipe,
+                })
     finally:
         con.close()
 

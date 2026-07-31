@@ -176,7 +176,7 @@ def test_bin_cooldown_30d_on_approval(tmp_path):
 
     # 1. Probar asignación enviando solo pipe_nuevo_mismo_bin (debe fallar la asignación porque el BIN está enfriando para tarjetas nuevas)
     res1 = ad.plan_auto_mission(db, card_pipes=[pipe_nuevo_mismo_bin], amount=150, target_count=1)
-    assert res1["accounts"][0]["card_pipe"] is None or res1["feasible"] is False
+    assert not res1["accounts"] or res1["feasible"] is False
 
     # 2. Probar asignación enviando pipe_distinto_bin (debe pasar)
     res2 = ad.plan_auto_mission(db, card_pipes=[pipe_distinto_bin], amount=150, target_count=1)
