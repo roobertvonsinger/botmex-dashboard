@@ -482,8 +482,6 @@ def plan_auto_mission(
         pool.sort(key=lambda c: _rank_key(c, bin_stats_map))
 
         accounts_out: List[Dict[str, Any]] = []
-        used_pipes_in_mission: set = set()
-
         for r in selected:
             email = r.get("email")
             meta = meta_map.get(email) or {}
@@ -499,14 +497,10 @@ def plan_auto_mission(
 
             pipe = select_card_for_account(email, married, bin_stats_map, amount)
 
-            # Si no hay tarjeta casada o la casada ya fue usada en la misión, buscar en el pool
-            if (pipe is None or pipe in used_pipes_in_mission) and pool:
-                pipe = None
+            # Si no hay tarjeta casada, asignar la mejor tarjeta candidata del pool que no viole el cooldown de 30d de BIN
+            if pipe is None and pool:
                 for cand in pool:
                     cand_pipe_str = _pipe_str(cand)
-                    if cand_pipe_str in used_pipes_in_mission:
-                        continue  # 1:1 Estricto en la misión
-
                     cand_bin = cand_pipe_str[:6] if len(cand_pipe_str) >= 6 else ""
                     # Cooldown 30d del BIN: Si el BIN aprobó con OTRO pipe en los últimos 30d en esta cuenta -> omitir
                     if cand_bin in app_bin_pipes:
@@ -517,7 +511,6 @@ def plan_auto_mission(
                     break
 
             if pipe:
-                used_pipes_in_mission.add(pipe)
                 accounts_out.append({
                     "id": r.get("id"), "email": email,
                     "grade": r.get("grade"), "card_pipe": pipe,

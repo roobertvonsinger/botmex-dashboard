@@ -498,8 +498,29 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             f"{email_list_str}\n\n"
             f"🌐 <b>Monitorear avance en vivo:</b>\n{DASHBOARD_URL}/?match={mission_id}"
         )
-        await query.edit_message_text(msg_success, parse_mode="HTML")
+        kb_stop = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🛑 Detener Misión", callback_data=f"stop_mission_{mission_id}")]
+        ])
+        await query.edit_message_text(msg_success, parse_mode="HTML", reply_markup=kb_stop)
         return ConversationHandler.END
+
+
+async def handle_stop_mission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja el botón '🛑 Detener Misión' enviado en el mensaje de éxito."""
+    query = update.callback_query
+    await query.answer()
+    if query.data.startswith("stop_mission_"):
+        mission_id = query.data.replace("stop_mission_", "").strip()
+        user_id = update.effective_user.id
+        with db(write=True) as c:
+            c.execute(
+                "UPDATE auto_missions SET status='cancelled' WHERE mission_id=?",
+                (mission_id,)
+            )
+        await query.edit_message_text(
+            f"🛑 <b>Misión {mission_id} detenida por el operador.</b>\nCuentas liberadas.",
+            parse_mode="HTML"
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -515,6 +536,9 @@ def build_app():
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("botmex", botmex_cmd))
     app.add_handler(CommandHandler("cancel", cancel_cmd))
+
+    # Handler callback independiente para detener misión iniciada
+    app.add_handler(CallbackQueryHandler(handle_stop_mission_callback, pattern="^stop_mission_"))
 
     # ConversationHandler para /check
     check_handler = ConversationHandler(
