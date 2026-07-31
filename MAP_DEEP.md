@@ -217,11 +217,11 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `check_luhn` | def | L18–L31 |
-| `parse_and_validate_card_pipe` | def | L34–L83 |
-| `perform_wabox_liveness_check` | def | L86–L134 |
-| `precheck_card_liveness` | def | L137–L153 |
-| `format_ruthopia_liveness_summary` | def | L156–L171 |
+| `check_luhn` | def | L22–L35 |
+| `parse_and_validate_card_pipe` | def | L38–L87 |
+| `perform_wabox_liveness_check` | def | L90–L192 |
+| `precheck_card_liveness` | def | L195–L211 |
+| `format_ruthopia_liveness_summary` | def | L214–L229 |
 
 ### `clabe_fetch.py`
 

