@@ -231,6 +231,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `6a65660` | fix(telegram-mock): agregar null-safety en lectura de strikes_count de SQLite |
 | `ca712ef` | infra(docker): agregar container betmexico-mock-bot a docker-compose.yml |
 | `3b27c3a` | feat(telegram-mock): mostrar tarjeta completa en respuesta de HITs para el operador |
 | `c600b71` | test(telegram-mock): agregar tests de edge cases (documentos invalidos, texto vacio, /cancel, auth) |
@@ -242,7 +243,6 @@ prewarm.py (router)
 | `862e111` | feat(deposits): igualar threshold de descarte a 3 declines en cuentas (simetrico con tarjetas) |
 | `dd16d32` | feat(deposits): actualizar MM_COOLDOWN a 45s por cuenta y 5s por tarjeta entre cuentas distintas |
 | `c0cd8e2` | fix(auth): unificar modelo de visibilidad de cuentas e independizar seleccion de pool para /bet |
-| `4f71bc8` | docs: actualizar MAP.md y conftest.py con fixture account_transactions |
 <!-- GEN:end:recientes -->
 
 ---
