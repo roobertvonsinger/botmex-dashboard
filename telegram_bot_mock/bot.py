@@ -406,7 +406,7 @@ async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "SELECT strikes_count, penalty_until FROM operator_penalties WHERE telegram_id=?",
             (operator_id,)
         ).fetchone()
-        strikes_count = row["strikes_count"] if row else 0
+        strikes_count = (row["strikes_count"] or 0) if row else 0
 
     if strikes_count >= MAX_DAILY_STRIKES:
         await update.message.reply_text(
