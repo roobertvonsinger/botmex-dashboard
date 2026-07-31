@@ -232,6 +232,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `89d531f` | fix(checker): vincular DATABASE_PATH a /app/ruthopia_data/ruthopia.db montado de Ruthopia |
 | `e587507` | fix(checker): asegurar DATABASE_PATH escribible /tmp para invocacion de Ruthopia |
 | `cc878fd` | fix(checker): forzar carga de variables de entorno de Ruthopia para WaboxGate |
 | `1d7a136` | feat(checker): integrar llamada directa al motor oficial WaboxGate de Ruthopia |
@@ -243,7 +244,6 @@ prewarm.py (router)
 | `3b27c3a` | feat(telegram-mock): mostrar tarjeta completa en respuesta de HITs para el operador |
 | `c600b71` | test(telegram-mock): agregar tests de edge cases (documentos invalidos, texto vacio, /cancel, auth) |
 | `927cfcf` | fix(telegram-mock): corregir validacion estricta de DB_PATH sin romper test runner y validar footer de marca |
-| `7daf0c9` | feat(telegram): usar layout oficial de marca BotMexico con header lockup y firma de runtime |
 <!-- GEN:end:recientes -->
 
 ---
