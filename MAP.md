@@ -97,7 +97,7 @@ prewarm.py (router)
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 959 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
-| `card_checker.py` | 234 | `—` | _[completar]_ |
+| `card_checker.py` | 235 | `—` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 152 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `deposits.py` | 2783 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
@@ -232,6 +232,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `e587507` | fix(checker): asegurar DATABASE_PATH escribible /tmp para invocacion de Ruthopia |
 | `cc878fd` | fix(checker): forzar carga de variables de entorno de Ruthopia para WaboxGate |
 | `1d7a136` | feat(checker): integrar llamada directa al motor oficial WaboxGate de Ruthopia |
 | `be4d991` | feat(auto_deposit): nuevo motor multivariable de seleccion sin grading visible |
@@ -243,7 +244,6 @@ prewarm.py (router)
 | `c600b71` | test(telegram-mock): agregar tests de edge cases (documentos invalidos, texto vacio, /cancel, auth) |
 | `927cfcf` | fix(telegram-mock): corregir validacion estricta de DB_PATH sin romper test runner y validar footer de marca |
 | `7daf0c9` | feat(telegram): usar layout oficial de marca BotMexico con header lockup y firma de runtime |
-| `f4595c1` | fix(telegram): corregir encoding unicode y sys.path en el arranque del bot mock |
 <!-- GEN:end:recientes -->
 
 ---
