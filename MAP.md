@@ -232,6 +232,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `1d7a136` | feat(checker): integrar llamada directa al motor oficial WaboxGate de Ruthopia |
 | `be4d991` | feat(auto_deposit): nuevo motor multivariable de seleccion sin grading visible |
 | `90f4cba` | fix(telegram-mock): restaurar lista completa de usuarios autorizados en el bot mock |
 | `0989117` | fix(telegram-mock): restringir acceso exclusivamente al SuperAdmin Robert (1341812706) |
@@ -243,7 +244,6 @@ prewarm.py (router)
 | `7daf0c9` | feat(telegram): usar layout oficial de marca BotMexico con header lockup y firma de runtime |
 | `f4595c1` | fix(telegram): corregir encoding unicode y sys.path en el arranque del bot mock |
 | `a5b719b` | feat(telegram): nuevo bot mock desacoplado con comandos minimos y proteccion de credenciales |
-| `66b3cf9` | feat(bot): agregar endpoints /api/bot/pause, /api/bot/resume y /api/bot/stop con resumen corto de avance |
 <!-- GEN:end:recientes -->
 
 ---
