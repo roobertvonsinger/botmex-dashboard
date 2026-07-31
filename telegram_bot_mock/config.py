@@ -39,6 +39,13 @@ try:
 except Exception as e:
     logger.warning(f"No se pudo forzar db_path en betmexico_db: {e}")
 
+# Lockup de marca oficial BotMexico (estilo Ruthopia lockup)
+HEADER_LOCKUP = (
+    "◢ ━━━━━━━ ◣\n"
+    "  ∷ ʙ.ᴏᴛᴍᴇxɪᴄᴏ ∷\n"
+    "◥ ━━━━━━━ ◤"
+)
+
 # Token para el bot mock
 MOCK_BOT_TOKEN = os.getenv("BMX_MOCK_BOT_TOKEN", "8823043859:AAEWnv2aVYopE7qsNVACA24sW_Tei7o1nnI")
 DASHBOARD_URL = os.getenv("BMX_DASHBOARD_URL", "https://botmexico.net")

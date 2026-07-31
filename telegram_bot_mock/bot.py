@@ -33,6 +33,7 @@ try:
         SUPERADMIN_ID,
         is_authorized,
         DB_PATH,
+        HEADER_LOCKUP,
     )
 except ImportError:
     from config import (
@@ -42,6 +43,7 @@ except ImportError:
         SUPERADMIN_ID,
         is_authorized,
         DB_PATH,
+        HEADER_LOCKUP,
     )
 
 # Imports del dashboard & bot core
@@ -68,15 +70,18 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     msg = (
-        "<b>┏ ◍ B🤖T MEXICO ━┓</b>\n\n"
-        "¡Hola! Bot de control y operaciones sincronizado con la BD de <b>botmexico.net</b>.\n\n"
+        f"{HEADER_LOCKUP}\n\n"
+        "✓ runtime online\n\n"
+        "Online. Gates listos.\n"
+        "Bot exclusivo de control y operaciones sincronizado con la BD de <b>botmexico.net</b>.\n\n"
         "<b>Comandos Disponibles:</b>\n"
         "• /check - Verificar nuevos combos (Texto máx 100, .txt máx 5,000)\n"
         "• /bet - Iniciar matchmaking y depósito automático (1 a 4 tarjetas)\n"
         "• /botmex - Ir al Dashboard Web (botmexico.net)\n"
         "• /help - Ayuda e información de uso\n"
         "• /cancel - Cancelar cualquier proceso activo\n\n"
-        f"🌐 <b>Dashboard Web:</b> {DASHBOARD_URL}"
+        f"🌐 <b>Dashboard Web:</b> {DASHBOARD_URL}\n\n"
+        "⊢ ʙ.ᴏᴛᴍᴇx"
     )
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🌐 Abrir Dashboard", url=DASHBOARD_URL)]
