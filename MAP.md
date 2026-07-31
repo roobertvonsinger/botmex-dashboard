@@ -231,6 +231,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `7daf0c9` | feat(telegram): usar layout oficial de marca BotMexico con header lockup y firma de runtime |
 | `f4595c1` | fix(telegram): corregir encoding unicode y sys.path en el arranque del bot mock |
 | `a5b719b` | feat(telegram): nuevo bot mock desacoplado con comandos minimos y proteccion de credenciales |
 | `66b3cf9` | feat(bot): agregar endpoints /api/bot/pause, /api/bot/resume y /api/bot/stop con resumen corto de avance |
@@ -242,7 +243,6 @@ prewarm.py (router)
 | `a71698b` | feat(bot): agregar helper filter_and_sanitize_check_combos con deduplicacion y filtro BD |
 | `fa328a9` | docs(plan): agregar plan de implementacion para superpoder /check telegram |
 | `12380c0` | docs(spec): agregar spec para superpoder /check en telegram (archivos 5k, filtrado BD) |
-| `aaffa28` | docs(next-session): actualizar NEXT-SESSION.md con el cierre de la sesion /bet telegram |
 <!-- GEN:end:recientes -->
 
 ---

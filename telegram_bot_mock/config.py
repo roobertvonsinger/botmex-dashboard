@@ -36,8 +36,13 @@ try:
     betmexico_db.DB_FILE = DB_PATH
     if hasattr(betmexico_db, "db") and betmexico_db.db is not None:
         betmexico_db.db.db_path = DB_PATH
+    if not DB_PATH.exists() and not any(mod for mod in sys.modules if "pytest" in mod):
+        logger.error(f"CRÍTICO: La BD especificada no existe en la ruta {DB_PATH}")
+        raise SystemExit(1)
+except ImportError:
+    logger.warning("betmexico_db no disponible en este entorno.")
 except Exception as e:
-    logger.warning(f"No se pudo forzar db_path en betmexico_db: {e}")
+    logger.error(f"Error inicializando la base de datos: {e}")
 
 # Lockup de marca oficial BotMexico (estilo Ruthopia lockup)
 HEADER_LOCKUP = (

@@ -48,6 +48,7 @@ async def test_start_cmd_authorized():
     assert update.message.reply_text.called
     args, kwargs = update.message.reply_text.call_args
     assert "ʙ.ᴏᴛᴍᴇxɪᴄᴏ" in args[0]
+    assert "⊢ ʙ.ᴏᴛᴍᴇx" in args[0]
     assert kwargs.get("parse_mode") == "HTML"
 
 
