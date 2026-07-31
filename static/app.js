@@ -2384,7 +2384,8 @@ function _parseCardTouch(msg) {
 }
 function _chip(cls, icon, val, { nav } = {}) {
   const navAttr = nav ? ` data-nav-account="${esc(val)}"` : '';
-  return `<span class="log-chip ${cls}" data-copy="${esc(val)}"${navAttr} title="click para copiar"><span class="ic">${icon}</span>${esc(val)}</span>`;
+  const label = nav ? `${val} — copiar, o abrir cuenta` : `${val} — copiar`;
+  return `<span class="log-chip ${cls}" data-copy="${esc(val)}"${navAttr} role="button" tabindex="0" aria-label="${esc(label)}" title="click para copiar"><span class="ic">${icon}</span>${esc(val)}</span>`;
 }
 function _renderCardTouchLine(p, kv) {
   const shortTs = p.ts && p.ts.length >= 19 ? p.ts.slice(11, 19) : (p.ts || '');
@@ -2538,6 +2539,15 @@ function _attachLogsClickDelegate(sel) {
     }
     const navLine = e.target.closest('.log-clickable[data-nav-account], .log-chip[data-nav-account]');
     if (navLine && navLine.dataset.navAccount) _navigateToAccountByEmail(navLine.dataset.navAccount);
+  });
+  // Teclado: los chips llevan role="button" tabindex="0" — Enter/Espacio
+  // deben poder copiar igual que un click, sin exigir mouse.
+  container.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const chip = e.target.closest('.log-chip');
+    if (!chip) return;
+    e.preventDefault();
+    chip.click();
   });
 }
 async function _navigateToAccountByEmail(email) {
@@ -2860,6 +2870,7 @@ $('#btnLogsHideRefresh')?.addEventListener('click', () => {
   _logsHideRefresh = !_logsHideRefresh;
   localStorage.setItem('bmx_logs_hide_refresh', _logsHideRefresh ? '1' : '0');
   $('#btnLogsHideRefresh').classList.toggle('on', _logsHideRefresh);
+  $('#btnLogsHideRefresh').setAttribute('aria-pressed', String(_logsHideRefresh));
   $('#logsView')?.classList.toggle('hide-refresh', _logsHideRefresh);
 });
 // Modo: Dashboard | Bots Telegram (dentro de #logsMain)

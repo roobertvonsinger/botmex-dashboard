@@ -654,7 +654,7 @@
           <button data-v="ERROR" title="Solo errores">✗ Error</button>
           <button data-v="WARNING" title="Solo advertencias">⚠ Warn</button>
         </div>
-        <button class="seg-btn on" id="btnLogsHideRefresh" title="Oculta account_refresh / prewarm / jwt_keeper rutinarios">🙈 Ocultar refrescos</button>
+        <button class="seg-btn on" id="btnLogsHideRefresh" aria-pressed="true" title="Oculta account_refresh / prewarm / jwt_keeper rutinarios">🙈 Ocultar refrescos</button>
         <button class="seg-btn" id="btnLogsCopy" title="Copiar todo al portapapeles">📋 Copiar</button>
         <button class="seg-btn" id="btnLogsScrollEnd" title="Ir al final + reanudar auto-scroll">⤓ Final</button>
         <button class="seg-btn" id="btnLogsClear" title="Borra el contenido visible (no afecta servidor)">Limpiar</button>
@@ -662,7 +662,7 @@
       </section>
       <section class="tablewrap" id="logsDashboardWrap" style="position:relative;">
         <pre id="logsView" class="logs-view hide-refresh">Conectando…</pre>
-        <div class="logs-float-bottom" id="logsFloatBottom"><span class="ic">↓</span> Ir al fondo <span class="cnt" id="logsFloatCount"></span></div>
+        <button type="button" class="logs-float-bottom" id="logsFloatBottom"><span class="ic">↓</span> Ir al fondo <span class="cnt" id="logsFloatCount"></span></button>
       </section>
       <section class="logs-bots-grid" id="logsBotsWrap" style="display:none;">
         <div class="logs-bot-panel">

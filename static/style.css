@@ -2035,32 +2035,49 @@ td.sel-cell:hover { background: rgba(255,255,255,0.04); }
 .log-level-counts .lc-w { color: var(--warn); font-weight: 600; }
 
 /* ─── Log categorías de dominio (badges) — 2026-07-31 ───────────────────── */
-/* Paleta fija pedida por Robert: alto contraste, un vistazo basta. */
+/* Tokens locales: paleta fija pedida por Robert (alto contraste, un vistazo
+   basta), nombrados como el resto del sistema de tokens en vez de hex sueltos
+   en cada regla. */
+.logs-view, .logs-bot-view {
+  --log-ok: #10b981; --log-fail: #ef4444; --log-wd-ok: #06b6d4;
+  --log-wd-fail: #f97316; --log-crit: #a855f7;
+}
 .log-cat {
   display: inline-block; font-weight: 700; font-size: 9px; letter-spacing: .3px;
   padding: 1px 6px; border-radius: 3px; margin-right: 5px; vertical-align: middle;
   text-transform: uppercase; white-space: nowrap;
 }
-.log-cat-deposit_ok    { color: #10b981; background: color-mix(in oklch, #10b981 16%, transparent); }
-.log-cat-deposit_fail  { color: #ef4444; background: color-mix(in oklch, #ef4444 16%, transparent); }
-.log-cat-withdraw_ok   { color: #06b6d4; background: color-mix(in oklch, #06b6d4 16%, transparent); }
-.log-cat-withdraw_fail { color: #f97316; background: color-mix(in oklch, #f97316 16%, transparent); }
-.log-cat-login_fail    { color: #a855f7; background: color-mix(in oklch, #a855f7 16%, transparent); }
+.log-cat-deposit_ok    { color: var(--log-ok); background: color-mix(in oklch, var(--log-ok) 16%, transparent); }
+.log-cat-deposit_fail  { color: var(--log-fail); background: color-mix(in oklch, var(--log-fail) 16%, transparent); }
+.log-cat-withdraw_ok   { color: var(--log-wd-ok); background: color-mix(in oklch, var(--log-wd-ok) 16%, transparent); }
+.log-cat-withdraw_fail { color: var(--log-wd-fail); background: color-mix(in oklch, var(--log-wd-fail) 16%, transparent); }
+.log-cat-login_fail    { color: var(--log-crit); background: color-mix(in oklch, var(--log-crit) 16%, transparent); }
 .log-cat-system_error  {
-  color: #fff; background: #a855f7;
+  color: #fff; background: var(--log-crit);
   animation: logCritPulse 1.4s ease-in-out infinite;
 }
 @keyframes logCritPulse {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, #a855f7 55%, transparent); }
-  50%      { box-shadow: 0 0 0 4px color-mix(in oklch, #a855f7 0%, transparent); }
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--log-crit) 55%, transparent); }
+  50%      { box-shadow: 0 0 0 4px color-mix(in oklch, var(--log-crit) 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* El estado (badge sólido púrpura) se conserva — solo se quita el pulso. */
+  .log-cat-system_error { animation: none; }
 }
 .log-cat-refresh { color: var(--text-dim); opacity: .5; background: transparent; }
 
-/* Línea que tocó una tarjeta — resalte ámbar + estructura en chips, no texto plano */
+/* Línea que tocó una tarjeta — punto de estado + estructura en chips (mismo
+   patrón que "Movimientos" en La Pantalla: NUNCA border-left de acento, es
+   el anti-patrón de "admin genérico" ya identificado en ese componente). */
 .log-line.log-card-touch {
   background: color-mix(in oklch, var(--warn) 9%, transparent);
-  border-left: 2px solid var(--warn);
-  padding: 2px 6px 2px 8px; margin: 1px 0 1px -8px; border-radius: 0 4px 4px 0;
+  padding: 2px 6px; border-radius: 4px;
+  display: inline-flex; align-items: center; gap: 2px;
+}
+.log-line.log-card-touch::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--warn); box-shadow: 0 0 5px color-mix(in oklch, var(--warn) 60%, transparent);
+  margin-right: 4px; flex-shrink: 0;
 }
 .log-chip {
   display: inline-flex; align-items: center; gap: 3px;
@@ -2071,6 +2088,9 @@ td.sel-cell:hover { background: rgba(255,255,255,0.04); }
 }
 .log-chip:hover { background: var(--accent-soft); border-color: var(--accent); }
 .log-chip:active { transform: scale(0.94); }
+.log-chip:focus-visible, .log-line.log-clickable:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px;
+}
 .log-chip .ic { font-size: 9px; opacity: .6; }
 .log-chip.chip-pipe { color: var(--warn); border-color: color-mix(in oklch, var(--warn) 40%, transparent); }
 .log-chip.chip-account { color: var(--accent); }
@@ -2093,6 +2113,7 @@ td.sel-cell:hover { background: rgba(255,255,255,0.04); }
 }
 .logs-float-bottom.show { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
 .logs-float-bottom:hover { background: var(--accent-soft); }
+.logs-float-bottom:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .logs-float-bottom .cnt {
   background: var(--accent); color: #06120b; border-radius: 999px; padding: 0 6px; font-size: 10.5px;
 }
@@ -2102,6 +2123,10 @@ td.sel-cell:hover { background: rgba(255,255,255,0.04); }
 @keyframes logLineIn {
   from { opacity: 0; transform: translateY(-2px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .log-line.log-enter { animation: none; }
+  .log-chip, .logs-float-bottom { transition: none; }
 }
 
 /* ─── Vista dual: Bots de Telegram ─── */
@@ -2119,6 +2144,12 @@ td.sel-cell:hover { background: rgba(255,255,255,0.04); }
 .logs-bot-head .grow { flex: 1; }
 .logs-bot-view { flex: 1; overflow-y: auto; }
 .log-cat-cmd { color: var(--accent); font-weight: 700; }
+/* Angosto (mobile/tablet vertical): dos consolas lado a lado dejan de caber
+   con cualquier señal legible — apilar es la única forma de conservarlas
+   ambas sin recortar la más ancha (regla dura del proyecto: no quitar). */
+@media (max-width: 860px) {
+  .logs-bots-grid { grid-template-columns: 1fr; grid-auto-rows: 1fr; }
+}
 
 /* ─── Health view ─── */
 .health-view { padding: 18px 22px 80px; }
