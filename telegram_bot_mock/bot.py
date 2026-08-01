@@ -69,17 +69,17 @@ POC_GREETINGS = [
     "¡Échale,",
 ]
 
-# Tiraderas freestyle estilo Aczino (Punchlines + Métrica + Flow Mexa de Batalla)
+# Barras en 2a Persona Directa con Variación de Métricas (Estructuras de Rap Complejas)
 RAP_DISCLAIMERS = [
-    "Le pidió doscientos a su jefa pa' pagarse el bot en Telegram,\npresume su 'método' y las LIVE solitas se le van.\nMe trae puro carbón a la asada y quiere comer como rey:\naquí se COMASOLO, morro, respeta la ley. 🎤🔥",
+    "Buenas compa carder, qué bueno que traes feria, ya te habías tardado.\nDijiste que ibas a sacar billete de algún lado,\npero le bajaste a tu mamá los doscientos del mandado\ny me trajiste puro carbón en lugar de un LIVE bien cargado. 🥩🔥",
 
-    "Se siente hacker de élite porque a ChatGPT le pide la abliteración,\npero no sabe livear una CC ni ejecutar una sola petición.\nCompró tres CCs muertas en un checker de dos pesos,\nBoTMexico liquida en mudo y a los noobs les rompe los huesos. 💀⚡",
+    "Llegaste muy picudo presumiendo que traías el truco aprendido,\nte gastaste la feria del mandado pa' meterte en este ruido.\nTraes tres CCs quemadas de un checker sin sentido\ny crees que con ChatGPT vas a salir del olvido. 💀⚡",
 
-    "Soñando con su Airbnb en automático sin saber tirar ni un cURL,\npresumiendo configs en Discord mientras su saldo se va a cero full.\nTrae la pasarela quemada y la discada apagada,\naquí se cobra directo sin andar de mamada. 🚀💸",
+    "Soñabas con tu Airbnb en automático y tu cashout de revista,\nandabas de mamador en Discord dándotela de artista.\nTe vendieron puro carbón esos vagos de la lista\ny en BoTMexico te dejamos sin saldo y fuera de vista. 🚀💸",
 
-    "Te vendieron la 'fórmula mágica' y te dejaron en ceros el canal,\ncreyéndote binerito top y no sabes ni qué es un proxy funcional.\nTraes la bolsa de carbón pero el fuego nunca encendió,\nel cashout se cobra en silencio y tu estafa ya se murió. 🎤🥩",
+    "Creíste que con abliteración ya eras el dueño del circuito,\nte gastaste los últimos doscientos pesitos en un mito.\nTus combos de Telegram salieron muertos de a bonito\ny te apagué el asador antes de empezar tu escrito. 🎤🥩",
 
-    "Compró tarjetas quemadas en Telegram y anda chillando en la red,\nse cree patrón del circuito y se está muriendo de sed.\nBoTMexico no pide fe ni te regala consuelo:\ntiras la CC correcta o te vas directo al suelo. 🌵⚡"
+    "Traes la cara de hacker y el bolsillo pelado en ceros,\nte quemaste la feria del mandado con estafadores rateros.\nAquí BoTMexico no consuela noobs ni escucha tus peros:\no tiras la CC correcta o te regresas a los primeros. 🌵⚡"
 ]
 
 def get_random_greeting() -> str:

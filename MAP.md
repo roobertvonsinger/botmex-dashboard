@@ -261,6 +261,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `51439c7` | style(telegram-mock): pulir tiradera freestyle estilo Aczino con remates exactos de rima consonante |
 | `e70a23a` | style(telegram-mock): rimas cuadradas de tiradera rapera mexa en disclaimers de start |
 | `e485193` | style(telegram-mock): pulir metrica y ritmo organico de los raps de bienvenida |
 | `2e31fba` | feat(telegram-mock): tiradera rap de bineros rediseñada y boton cancelar eliminado del menu start |
@@ -272,7 +273,6 @@ prewarm.py (router)
 | `94f47c5` | style(telegram-mock): limpiar separadores de puntos y actualizar botones start/help |
 | `ace6ecc` | test(telegram-mock): actualizar assertion de membrete al nuevo formato monospaced |
 | `0e3969c` | feat(graphify): registrar hooks de graphify y gitignore local |
-| `a3c3fba` | docs(plan): añadir plan de implementación Graphify con orquestación Haiku |
 <!-- GEN:end:recientes -->
 
 ---
