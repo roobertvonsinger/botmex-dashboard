@@ -260,6 +260,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `94f47c5` | style(telegram-mock): limpiar separadores de puntos y actualizar botones start/help |
 | `ace6ecc` | test(telegram-mock): actualizar assertion de membrete al nuevo formato monospaced |
 | `0e3969c` | feat(graphify): registrar hooks de graphify y gitignore local |
 | `a3c3fba` | docs(plan): añadir plan de implementación Graphify con orquestación Haiku |
@@ -271,7 +272,6 @@ prewarm.py (router)
 | `097e56c` | feat(telegram-mock): rediseño layouts, apodos por ID, menu lateral de 3 botones y liveness feedback animado |
 | `be180f6` | feat(logs): jerarquizacion visual de logs, combos y tarjetas completas copiables en 1-click |
 | `f3b4243` | feat(bet): clabe stp 1-tap copy, query param redirect preservation and portal landing banner |
-| `30ddd01` | style(telegram-mock): minimal Limbo-style UI, interactive start buttons and mysterious concise copy |
 <!-- GEN:end:recientes -->
 
 ---

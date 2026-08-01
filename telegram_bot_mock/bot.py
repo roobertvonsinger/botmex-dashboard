@@ -134,7 +134,7 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("💳 CC Auto-Match", callback_data="btn_start_bet")],
         [InlineKeyboardButton("🔑 Check Combos/Accesos", callback_data="btn_start_check")],
-        [InlineKeyboardButton("Directo: /bet <tarjetas>", callback_data="btn_start_help")],
+        [InlineKeyboardButton("❔ Ayuda", callback_data="btn_start_help")],
         [InlineKeyboardButton("🛑 Cancelar/Detener proceso", callback_data="btn_start_cancel")],
         [InlineKeyboardButton("🇲🇽 botmexico.net (Dashboard)", url=DASHBOARD_URL)]
     ])
@@ -146,6 +146,9 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
     query = update.callback_query
     await query.answer()
     if query.data == "btn_start_bet":
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]
+        ])
         await query.edit_message_text(
             f"{HEADER}\n\n"
             "💳 <b>Auto Deposito [CC Auto-match] (/BET)</b>\n\n"
@@ -155,17 +158,22 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
             "🇲🇽 <b>BoTMexico</b> encuentra una cuenta para tu CC 💳\n"
             "🤖 One Click & Watcha la magia...\n\n"
             f"<i>{get_random_greeting()}</i>",
-            parse_mode="HTML"
+            parse_mode="HTML",
+            reply_markup=kb
         )
         return WAIT_BET_CONFIRM
     elif query.data == "btn_start_check":
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]
+        ])
         await query.edit_message_text(
             f"{HEADER}\n\n"
             "📥 <b>VERIFICACIÓN COMBOS (/check)</b>\n\n"
             "Envía combos en chat (máx 100) o archivo .txt (máx 5,000):\n"
             "<code>correo:contraseña</code>\n\n"
             f"<i>{get_random_greeting()}</i>",
-            parse_mode="HTML"
+            parse_mode="HTML",
+            reply_markup=kb
         )
         return WAIT_CHECK_CONFIRM
     elif query.data == "btn_start_help":
@@ -286,7 +294,8 @@ async def check_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• Pegados en chat: Máximo 100 líneas.\n"
         "• Archivo .txt: Adjunta el documento (máximo 5,000 líneas).\n\n"
         "<i>Formato: correo:contraseña (opcional :tarjeta|mm|yy|cvv)</i>",
-        parse_mode="HTML"
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Volver al inicio", callback_data="cancel_check")]])
     )
     return WAIT_CHECK_CONFIRM
 
@@ -360,7 +369,7 @@ async def process_check_input(update: Update, context: ContextTypes.DEFAULT_TYPE
     kb = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("✅ Iniciar Check", callback_data="confirm_check"),
-            InlineKeyboardButton("❌ Cancelar", callback_data="cancel_check")
+            InlineKeyboardButton("🏠 Volver al inicio", callback_data="cancel_check")
         ]
     ])
     await update.message.reply_text(confirm_msg, parse_mode="HTML", reply_markup=kb)
@@ -534,7 +543,7 @@ async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🤖 One Click & Watcha la magia...\n\n"
         f"🌵 {get_random_greeting()}"
     )
-    await update.message.reply_text(msg, parse_mode="HTML")
+    await update.message.reply_text(msg, parse_mode="HTML", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Volver al inicio", callback_data="cancel_bet")]]))
     return WAIT_BET_CONFIRM
 
 
@@ -637,7 +646,7 @@ async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kb = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🚀 De Una / Iniciar Depósitos", callback_data="confirm_bet"),
-            InlineKeyboardButton("🛑 Cancelar", callback_data="cancel_bet")
+            InlineKeyboardButton("🏠 Volver al inicio", callback_data="cancel_bet")
         ]
     ])
     try:
@@ -777,7 +786,7 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             kb_confirm = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton(f"✅ Exec ({target}×${amt:.0f}/60s)", callback_data=f"confirm_sched_{m_id}"),
-                    InlineKeyboardButton("🛑 Terminar", callback_data=f"stop_sched_{m_id}")
+                    InlineKeyboardButton("🛑 Cancelar y Volver al inicio", callback_data=f"stop_sched_{m_id}")
                 ]
             ])
             try:
