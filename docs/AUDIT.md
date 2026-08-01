@@ -3,7 +3,6 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
-<<<<<<< HEAD
 ## Captura: 2026-08-01 (agente de soporte b.soporte + 3 bugs pre-existentes reparados)
 
 **Motivo**: Robert pidió un agente de soporte para los 3 bots, embebido en el dashboard como chat,
@@ -33,7 +32,7 @@ modelo primario por prueba real de tool-calling ni correr el smoke end-to-end.
 add --detach`), que da exactamente los mismos 86. La memoria previa decía "3 archivos fallan
 siempre"; el número real es mayor. Muchos son `assert 530 == 400`, o sea el middleware de
 mantenimiento respondiendo en tests que esperan validación.
-=======
+
 ## Captura: 2026-08-01 (auditoría de interacción — Fitts' Law + jerarquía en Depositar/Retirar)
 
 **Motivo**: Robert reportó el panel de depósito/retiro "muy inoperable a nivel interacción... controles muy pequeños, ambiguos, sin jerarquización visual... se desmorona la interfaz". Auditoría hands-on (dev server aislado en worktree, medición real vía `getComputedStyle`/`getBoundingClientRect` — no estimado) sobre `.pat-dep-stage`. Detalle completo del criterio + hallazgos en `docs/FRONTEND.md` §"AUDITORÍA DE INTERACCIÓN 2026-08-01".
@@ -50,7 +49,6 @@ mantenimiento respondiendo en tests que esperan validación.
 **Limitación de esta sesión**: el entorno de browser automation de este agente (subagente aislado) no compone frames para screenshot (`the Browser pane is not displayed`) — la verificación visual se hizo con medición de geometría real (`getComputedStyle`/`getBoundingClientRect`) contra un servidor dev propio del worktree (puerto 5099, DB SQLite seedeada a mano con 1 cuenta rica), no con capturas de pantalla. Los números reportados arriba son medidos, no estimados.
 
 **Fuera de alcance a propósito**: la posición/orden de `.pat-columns` (otro agente en paralelo la está reasignando) y el patrón de chips "Tarjetas"/reps (funcional, no ambiguo — no tocado).
->>>>>>> worktree-agent-aff587ba3e20d1ab6
 
 ## Captura: 2026-07-28 (rediseño completo La Pantalla + candado anti-reuso de tarjeta entre cuentas)
 

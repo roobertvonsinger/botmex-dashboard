@@ -69,17 +69,17 @@ POC_GREETINGS = [
     "¡Échale,",
 ]
 
-# Tiradera rap pesado / sátira bineros (máx 4 líneas, slang cultura Telegram/noobs)
+# Tiraderas breves con rima y flow mexa real (2 a 4 líneas)
 RAP_DISCLAIMERS = [
-    "Pidiéndole doscientos a mamá pa' pagar su bot chafa,\narmó fiesta en Telegram creyendo que trae la estafa.\nPuro carbón pa' la carne asada te dejas caer,\n¡no te apendejes mi noob, apúntale bien y COMASOLO al comer! 🥩🔥",
+    "Pide doscientos a su jefa y compra un bot en Telegram,\ntrae puro carbón pa' la asada mientras las LIVE se le van.\nNo te apendejes mi noob, tira la tarjeta que acomoda,\naquí se cobra en mudo y se COMASOLO a la moda. 🔥🥩",
 
-    "Se cree hacker de elite porque usa ChatGPT con abliteración,\ny no sabe livear una CC ni armar un prompt con intención.\nTe vendieron puro carbón en tu checker de tres pesos,\ndesquicia tu cashout, mijito, antes que te dejen sin huesos. 💀⚡",
+    "Mucho hacker de ChatGPT presumiendo su abliteración,\npero no sabe livear una CC ni armar una sola petición.\nLe vendieron puro carbón en un checker de dos pesos,\nBoTMexico liquida directo y los deja sin huesos. 💀⚡",
 
-    "Soñando con su Airbnb jalando en piloto automático,\ny no sabe ni scrapear un sitio ni doxear a su fanático.\nPuro mitote en el grupo de Telegram buscando milagros,\naquí se liquida sin chillar, tragándote tus propios estragos. 🚀💸",
+    "Soñando con su Airbnb en automático y ni un cURL sabe tirar,\ncompra combos quemados y luego se pone a chillar.\nTrae la discada apagada y la pasarela en llamas,\naquí se opera en silencio sin andar con dramas. 🚀💸",
 
-    "Mucho binerito en Discord presumiendo config heredada,\nque no sabe ni qué es Heretics y se queda con la cara helada.\nTraes la bolsa llena de carbón pa' armar la discada,\nempárate al cashout solito y deja la bronca saldada. 🎤🥩",
+    "Creyéndose binerito top con config heredada,\nno sabe meter un proxy limpio y se queda con la cara helada.\nTrae la bolsa de carbón pero la carne nunca prendió,\nel cashout se cobra solo y tu método se murió. 🎤🥩",
 
-    "Niño rata que no sabe ni qué es levantar una cuenta,\nle vendieron un scam en Telegram y ya ni se da cuenta.\nPuro carbón prendido y la carne tirada en el suelo,\nrasca tu propio plato, morro, que aquí nadie te da consuelo. 🌵⚡"
+    "Compró tres CCs muertas en un canal que lo estafó,\nse cree patrón del circuito y a la primera declinada se cayó.\nRasca tu propio plato, morro, deja la novela,\nBoTMexico no consuela, liquida la quiniela. 🌵⚡"
 ]
 
 def get_random_greeting() -> str:

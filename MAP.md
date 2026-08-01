@@ -263,6 +263,7 @@ prewarm.py (router)
 |------|---------|
 | `e485193` | style(telegram-mock): pulir metrica y ritmo organico de los raps de bienvenida |
 | `2e31fba` | feat(telegram-mock): tiradera rap de bineros rediseñada y boton cancelar eliminado del menu start |
+| `ff6cfde` | fix(pantalla): jerarquia e interaccion del panel Depositar/Retirar (Fitts Law) |
 | `4fea30f` | fix(pantalla): intercambiar orden visual Movimientos <-> Deposito/Retiro |
 | `d89c282` | feat(telegram-mock): refactorizar flujo /bet con streaming, lenguaje carding, llenado automatico y resumen |
 | `62f7794` | fix(telegram-mock): corregir interceptacion de callbacks bet/check en ConversationHandler |
@@ -272,7 +273,6 @@ prewarm.py (router)
 | `0e3969c` | feat(graphify): registrar hooks de graphify y gitignore local |
 | `a3c3fba` | docs(plan): añadir plan de implementación Graphify con orquestación Haiku |
 | `2610b2e` | docs(spec): añadir diseño de integración Graphify MCP global |
-| `6d39d51` | fix(commands): simplificar abrir-bmx y cerrar-bmx a flujo ultrarrapido local-first |
 <!-- GEN:end:recientes -->
 
 ---
