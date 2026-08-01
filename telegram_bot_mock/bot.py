@@ -906,8 +906,8 @@ def build_app():
     app.add_handler(CommandHandler("botmex", botmex_cmd))
     app.add_handler(CommandHandler("cancel", cancel_cmd))
 
-    # Handler callback para botones de /start
-    app.add_handler(CallbackQueryHandler(start_buttons_callback, pattern="^(btn_start_bet|btn_start_check|btn_start_help|btn_start_cancel)$"))
+    # Handler callback para botones standalone del /start (help y cancel)
+    app.add_handler(CallbackQueryHandler(start_buttons_callback, pattern="^(btn_start_help|btn_start_cancel)$"))
 
     # Handler callback independiente para detener misión iniciada
     app.add_handler(CallbackQueryHandler(handle_stop_mission_callback, pattern="^stop_mission_"))
