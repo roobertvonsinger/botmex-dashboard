@@ -112,7 +112,7 @@
     return { render: true, disabled: false, tooltip: 'Retirar' };
   }
 
-  const api = { splitTransactions, estadoFrom, formatHito, panelReserve, panelMaxH, toggleTarget, anchoredPanelH, _withdrawBtnState };
+  const api = { splitTransactions, estadoFrom, formatHito, panelReserve, panelMaxH, toggleTarget, anchoredPanelH, _withdrawBtnState, MX_STATES, MX_ABBR };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PantallaLogic = api;
 })(typeof window !== 'undefined' ? window : globalThis);

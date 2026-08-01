@@ -82,4 +82,8 @@ assert.strictEqual(_withdrawBtnState(_acc(500, true), 'superadmin').tooltip, 'Re
 
 assert.strictEqual(_withdrawBtnState(_acc(500, false), 'superadmin').tooltip, 'Retirar', 'sin pendiente = Retirar');
 
+// ── Exportación de MX_STATES y MX_ABBR ──
+assert.ok(Array.isArray(P.MX_STATES) && P.MX_STATES.length === 32, 'MX_STATES contiene los 32 estados');
+assert.strictEqual(P.MX_ABBR['JAL'], 'Jalisco', 'MX_ABBR mapea JAL a Jalisco');
+
 console.log('OK pantalla_logic');

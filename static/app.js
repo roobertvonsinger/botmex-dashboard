@@ -325,7 +325,20 @@ function _curpVerifier(curp17) {
   const ver = (10 - (sum % 10)) % 10;
   return String(ver);
 }
-function computeCurp(fullname, birthdate, address, sexOverride) {
+const _CURP_STATE_NAMES = {
+  'AS': 'Aguascalientes', 'BC': 'Baja California', 'BS': 'Baja California Sur',
+  'CC': 'Campeche', 'CL': 'Coahuila', 'CM': 'Colima', 'CS': 'Chiapas',
+  'CH': 'Chihuahua', 'DF': 'Ciudad de México', 'DG': 'Durango',
+  'GT': 'Guanajuato', 'GR': 'Guerrero', 'HG': 'Hidalgo', 'JC': 'Jalisco',
+  'MC': 'Estado de México', 'MN': 'Michoacán', 'MS': 'Morelos',
+  'NT': 'Nayarit', 'NL': 'Nuevo León', 'OC': 'Oaxaca', 'PL': 'Puebla',
+  'QT': 'Querétaro', 'QR': 'Quintana Roo', 'SP': 'San Luis Potosí',
+  'SL': 'Sinaloa', 'SR': 'Sonora', 'TC': 'Tabasco', 'TS': 'Tamaulipas',
+  'TL': 'Tlaxcala', 'VZ': 'Veracruz', 'YN': 'Yucatán', 'ZS': 'Zacatecas',
+  'NE': 'Nacido en el Extranjero'
+};
+
+function computeCurp(fullname, birthdate, address, sexOverride, stateCodeOverride) {
   const split = _splitFullname(fullname);
   if (!split || !split.ap1 || !split.nombre || !birthdate) return null;
   // Fecha: acepta YYYY-MM-DD o YYYY-MM-DDT...
@@ -352,7 +365,7 @@ function computeCurp(fullname, birthdate, address, sexOverride) {
 
   const sex = (sexOverride === 'H' || sexOverride === 'M')
     ? sexOverride : _inferSex(split.nombre);
-  const state = _detectStateCode(address);
+  const state = stateCodeOverride || _detectStateCode(address);
   const c1 = _firstInternalConsonant(split.ap1);
   const c2 = split.ap2 ? _firstInternalConsonant(split.ap2) : 'X';
   const c3 = _firstInternalConsonant(split.nombre);
@@ -363,6 +376,33 @@ function computeCurp(fullname, birthdate, address, sexOverride) {
   const curp17 = `${prefix}${yy}${mm}${dd}${sex}${state}${c1}${c2}${c3}${homo}`;
   const ver = _curpVerifier(curp17);
   return curp17 + ver;
+}
+
+function generateCurpCandidates(fullname, birthdate, address, sexOverride) {
+  if (!fullname || !birthdate) return [];
+  const detectedCode = _detectStateCode(address);
+  const candidates = [];
+
+  for (const code of _CURP_STATE_CODES) {
+    const curp = computeCurp(fullname, birthdate, address, sexOverride, code);
+    if (curp) {
+      candidates.push({
+        code,
+        name: _CURP_STATE_NAMES[code] || code,
+        curp,
+        isDetected: code === detectedCode
+      });
+    }
+  }
+
+  // Ordenar: el estado detectado primero, seguido del resto ordenados alfabéticamente por nombre
+  candidates.sort((a, b) => {
+    if (a.isDetected) return -1;
+    if (b.isDetected) return 1;
+    return a.name.localeCompare(b.name, 'es');
+  });
+
+  return candidates;
 }
 // Tiers de saldo:
 //   ≥ $50      → hot   (verde radiactivo + glow + flicker)
@@ -1865,6 +1905,14 @@ function connectSSE() {
             icon: ok ? '✅' : '❌',
             msg: `Retiro de ${fmtMoney(ev.amount)} en ${ev.target} → ${ok ? 'completado' : 'fallido'}`,
           });
+          return;
+        }
+        if (ev.kind === 'curp_validated' || ev.type === 'account_updated') {
+          const accId = ev.account_id || ev.id;
+          const curpVal = ev.curp;
+          if (accId && curpVal && window.Pantalla && typeof window.Pantalla.updateAccount === 'function') {
+            window.Pantalla.updateAccount(accId, { curp: curpVal });
+          }
           return;
         }
         // Feed de Actividad

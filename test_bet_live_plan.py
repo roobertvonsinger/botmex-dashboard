@@ -24,6 +24,10 @@ def test_operator_my_accounts_endpoint(client, monkeypatch):
             "VALUES (991, 'opacc1@test.com', 'p1', 'LIVE', 500.0, 50.0, 150.0, '2026-07-31T12:00:00Z', 'A', '2026-07-31T10:00:00Z', '2026-07-31T10:00:00Z')"
         )
         c.execute(
+            "INSERT OR REPLACE INTO account_deposit_clabes (account_id, account_email, reference, user_id, full_name, clabe, integration, clabe_order, blocked, fetched_at) "
+            "VALUES (991, 'opacc1@test.com', 'ref1', 'u1', 'Test Name', '646180001234567890', 'STP', 1, 0, '2026-07-31T12:00:00Z')"
+        )
+        c.execute(
             "INSERT OR REPLACE INTO accounts (id, email, password, status, balance_real, balance_bonos, last_deposit_amount, last_deposit_date, grade, first_checked_at, last_checked_at) "
             "VALUES (992, 'opacc2@test.com', 'p2', 'LIVE', 100.0, 0.0, 10.0, '2026-07-30T12:00:00Z', 'B', '2026-07-31T10:00:00Z', '2026-07-31T10:00:00Z')"
         )
@@ -54,6 +58,7 @@ def test_operator_my_accounts_endpoint(client, monkeypatch):
     assert accs[0]["email"] == "opacc1@test.com"
     assert accs[0]["balance_real"] == 500.0
     assert accs[0]["grade"] == "A"
+    assert accs[0]["clabe_stp"] == "646180001234567890"
     # Asegurar que password/jwt/proxy no estén presentes en la respuesta
     assert "password" not in accs[0]
     assert "jwt" not in accs[0]

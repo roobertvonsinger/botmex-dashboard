@@ -15,6 +15,8 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
+from curp_utils import compute_curp, generate_curp_candidates
+from renapo_validator import validate_renapo_curp
 
 # ── FIX CRÍTICO: doble-import de este archivo ───────────────────────────────
 # El container arranca con `python web/app.py` → este script se carga como
@@ -722,12 +724,14 @@ def portal_page(bmx_session: str = Cookie(default=None)):
 
 
 @app.get("/")
-def index(bmx_session: str = Cookie(default=None)):
+def index(request: Request, bmx_session: str = Cookie(default=None)):
     session = _auth.get_session(bmx_session) if bmx_session else None
     if not session:
-        return RedirectResponse("/login", status_code=302)
+        q = request.url.query
+        return RedirectResponse(f"/login?{q}" if q else "/login", status_code=302)
     if session.get("role") != "superadmin":
-        return RedirectResponse("/portal", status_code=302)
+        q = request.url.query
+        return RedirectResponse(f"/portal?{q}" if q else "/portal", status_code=302)
     # Cache-bust: añadir mtime de cada asset a su propio src/href para forzar
     # re-fetch tras deploy. Regex (no string fijo): index.html ya trae un
     # `?v=YYYYMMDDx` hardcodeado a mano, así que un replace de string exacto
@@ -2966,6 +2970,46 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
             raise HTTPException(404, "Cuenta no encontrada")
         result = dict(acc)
 
+        # Si no hay CURP guardado o es 'N/A', calcular e iniciar autovalidación RENAPO en backend
+        curp_stored = result.get("curp")
+        if not curp_stored or curp_stored == "N/A":
+            calc_curp = compute_curp(
+                fullname=result.get("fullname", ""),
+                birthdate=result.get("birthdate", ""),
+                address=result.get("address", "")
+            )
+            result["curp_calc"] = calc_curp
+            result["curp_candidates"] = generate_curp_candidates(
+                fullname=result.get("fullname", ""),
+                birthdate=result.get("birthdate", ""),
+                address=result.get("address", "")
+            )
+
+            # Tarea asíncrona en segundo plano para validar con RENAPO vía proxies y guardar en BD
+            def _async_val_renapo(acc_id, fn, bd, addr):
+                try:
+                    val_curp = validate_renapo_curp(fn, bd, addr)
+                    if val_curp:
+                        with db(write=True) as c_val:
+                            c_val.execute("UPDATE accounts SET curp=? WHERE id=?", (val_curp, acc_id))
+                        _broadcast({
+                            "type": "account_updated",
+                            "kind": "curp_validated",
+                            "account_id": acc_id,
+                            "curp": val_curp
+                        })
+                except Exception as ex_renapo:
+                    _logging.getLogger("betmexico.dashboard").warning(f"Error autovalidando RENAPO para acc {acc_id}: {ex_renapo}")
+
+            threading.Thread(
+                target=_async_val_renapo,
+                args=(account_id, result.get("fullname", ""), result.get("birthdate", ""), result.get("address", "")),
+                daemon=True
+            ).start()
+        else:
+            result["curp_calc"] = None
+            result["curp_candidates"] = []
+
         # Tarjetas guardadas
         try:
             rows = c.execute(
@@ -4082,13 +4126,15 @@ def auto_deposit_cancel(mission_id: str,
 
 @app.get("/api/operator/my-accounts")
 def operator_my_accounts(user: dict = Depends(require_session)):
-    """Devuelve la lista de cuentas con depósitos aprobados para el operador actual."""
+    """Devuelve la lista de cuentas con depósitos aprobados para el operador actual, incluyendo CLABE STP."""
     operator_id = user.get("telegram_id") or 0
     with db() as c:
         rows = c.execute(
-            "SELECT DISTINCT a.email, a.balance_real, a.balance_bonos, "
-            "a.last_deposit_amount, a.last_deposit_date, a.grade "
+            "SELECT DISTINCT a.id, a.email, a.balance_real, a.balance_bonos, "
+            "a.last_deposit_amount, a.last_deposit_date, a.grade, "
+            "c.clabe AS clabe_stp "
             "FROM deposit_attempts d JOIN accounts a ON d.account_email = a.email "
+            "LEFT JOIN account_deposit_clabes c ON (a.id = c.account_id AND (c.integration = 'STP' OR c.integration = '2')) "
             "WHERE d.operator_id=? AND d.status='approved' ORDER BY a.last_deposit_date DESC",
             (operator_id,)
         ).fetchall()

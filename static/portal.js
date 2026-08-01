@@ -11,6 +11,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Resaltar misión activa si viene query param ?match=ID o ?mission=ID
+  const urlParams = new URLSearchParams(window.location.search);
+  const matchId = urlParams.get('match') || urlParams.get('mission');
+  if (matchId) {
+    const container = document.querySelector('.portal-container');
+    const header = document.querySelector('.portal-header');
+    if (container && header) {
+      const banner = document.createElement('div');
+      banner.className = 'mission-banner';
+      banner.innerHTML = `<span>🎯 <b>MISIÓN ACTIVA:</b> <code>${matchId}</code></span> <span style="font-size:12px; opacity:0.8;">Cuentas filtradas y monitoreadas</span>`;
+      container.insertBefore(banner, header.nextSibling);
+    }
+  }
+
   async function loadMyAccounts() {
     try {
       const res = await fetch('/api/operator/my-accounts');
@@ -30,6 +44,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const lastDepAmt = parseFloat(acc.last_deposit_amount || 0).toFixed(2);
         const lastDepDate = acc.last_deposit_date ? new Date(acc.last_deposit_date).toLocaleString() : 'N/A';
         const grade = acc.grade || 'N/A';
+        const clabeStp = acc.clabe_stp || 'Pendiente';
+
+        const clabeHtml = clabeStp !== 'Pendiente'
+          ? `<div class="clabe-box">
+              <span class="clabe-code">${clabeStp}</span>
+              <button class="copy-clabe-btn" onclick="navigator.clipboard.writeText('${clabeStp}'); this.innerText='¡Copiado!'; setTimeout(() => this.innerText='Copiar', 2000)">Copiar</button>
+             </div>`
+          : `<div class="clabe-box" style="opacity:0.6;"><span class="clabe-code" style="color:#8b949e;">CLABE STP: Pendiente</span></div>`;
 
         return `
           <div class="account-card">
@@ -40,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <div>• Último depósito: $${lastDepAmt} MXN (${lastDepDate})</div>
               <div>• Calificación: <b>${grade}</b></div>
             </div>
+            ${clabeHtml}
           </div>
         `;
       }).join('');

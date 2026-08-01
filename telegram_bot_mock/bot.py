@@ -581,14 +581,24 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             ev = asyncio.Event()
             _confirm_events[m_id] = (ev, {"decision": False})
 
-            match_lines = "\n".join([f"• <code>{m['email']}</code>" for m in matches])
+            match_lines = []
+            for m in matches:
+                em = m.get("email", "")
+                c_stp = m.get("clabe_stp")
+                if c_stp:
+                    match_lines.append(f"• <code>{em}</code>\n  CLABE STP: <code>{c_stp}</code>")
+                else:
+                    match_lines.append(f"• <code>{em}</code>")
+
+            match_text_block = "\n".join(match_lines)
             confirm_text = (
                 f"{HEADER}\n\n"
                 f"⚠️ <b>AUTORIZAR LOOP</b>\n\n"
                 f"Misión: <code>{m_id}</code>\n"
                 f"Match: {len(matches)} cuentas\n"
-                f"{match_lines}\n\n"
+                f"{match_text_block}\n\n"
                 f"Programa: {target} × ${amt:.0f} MXN (60s)\n\n"
+                f"🌐 Enlace: {DASHBOARD_URL}/portal?match={m_id}\n\n"
                 f"¿Proceder?"
             )
             kb_confirm = InlineKeyboardMarkup([

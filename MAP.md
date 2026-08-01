@@ -93,18 +93,20 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 4701 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 4747 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 999 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1022 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `card_checker.py` | 234 | `—` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 152 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
+| `curp_utils.py` | 267 | `—` | _[completar]_ |
 | `deposits.py` | 2805 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 323 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 416 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 892 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 364 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `renapo_validator.py` | 90 | `betmexico.renapo_validator` | _[completar]_ |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/migrate_status_no_banco.py` | 80 | `—` | _[completar]_ |
@@ -120,8 +122,9 @@ prewarm.py (router)
 | `test_at_hand.py` | 73 | `—` | _[completar]_ |
 | `test_auto_deposit_selection.py` | 187 | `—` | _[completar]_ |
 | `test_auto_missions_migrate.py` | 120 | `—` | _[completar]_ |
-| `test_bet_live_plan.py` | 103 | `—` | _[completar]_ |
+| `test_bet_live_plan.py` | 108 | `—` | _[completar]_ |
 | `test_card_touch_log.py` | 61 | `—` | _[completar]_ |
+| `test_curp_utils.py` | 28 | `—` | _[completar]_ |
 | `test_deposit_status_classify.py` | 95 | `—` | _[completar]_ |
 | `test_deposit_step.py` | 132 | `—` | _[completar]_ |
 | `test_grading_a_plus_m7.py` | 184 | `—` | _[completar]_ |
@@ -132,6 +135,7 @@ prewarm.py (router)
 | `test_mission_sem_leak.py` | 97 | `—` | _[completar]_ |
 | `test_pool_manage.py` | 52 | `—` | _[completar]_ |
 | `test_refresh_single_guard.py` | 77 | `—` | _[completar]_ |
+| `test_renapo_validator.py` | 50 | `—` | _[completar]_ |
 | `test_search.py` | 70 | `—` | _[completar]_ |
 | `test_sse_visibility.py` | 88 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
@@ -234,6 +238,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `30ddd01` | style(telegram-mock): minimal Limbo-style UI, interactive start buttons and mysterious concise copy |
 | `06d23ab` | feat(bet): live feedback, confirmacion de loop y portal de operador |
 | `50856bc` | docs(bet): plan definitivo para feedback en vivo, confirmacion y portal operador |
 | `ab19c08` | fix(logs): pasada impeccable (audit/colorize/layout/optimize/polish) sobre la consola de Logs |
@@ -245,7 +250,6 @@ prewarm.py (router)
 | `f444ed2` | fix(checker): apuntar DATABASE_PATH a /data/ruthopia.db en el volumen compartido |
 | `89d531f` | fix(checker): vincular DATABASE_PATH a /app/ruthopia_data/ruthopia.db montado de Ruthopia |
 | `e587507` | fix(checker): asegurar DATABASE_PATH escribible /tmp para invocacion de Ruthopia |
-| `cc878fd` | fix(checker): forzar carga de variables de entorno de Ruthopia para WaboxGate |
 <!-- GEN:end:recientes -->
 
 ---

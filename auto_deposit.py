@@ -800,9 +800,32 @@ async def run_auto_mission(
                             deposited += PROBE_AMOUNT
                             approved += 1
                             logger.info(f"🎯 MATCH FOUND | {email} x {pipe}")
+
+                            # Obtener CLABE STP para la cuenta casada (sin frenar si falla)
+                            clabe_stp = None
+                            try:
+                                import clabe_fetch
+                                saved_clabes = clabe_fetch.get_saved_clabes(DB_PATH, account_id)
+                                stp_item = next((c for c in saved_clabes if c.get("integration") in ("STP", 2, "2")), None)
+                                if stp_item:
+                                    clabe_stp = stp_item.get("clabe")
+                                else:
+                                    # Intentar fetch fresco si tenemos JWT
+                                    jwt_token = r.get("jwt")
+                                    used_proxy = r.get("used_proxy")
+                                    if jwt_token:
+                                        fetched_data = await clabe_fetch.fetch_clabes_from_betmexico(jwt_token, used_proxy)
+                                        clabe_fetch._persist_clabes(DB_PATH, account_id, email, fetched_data)
+                                        accounts_stp = fetched_data.get("accounts") or []
+                                        stp_acc = next((a for a in accounts_stp if str(a.get("integration")) in ("STP", "2")), None)
+                                        if stp_acc:
+                                            clabe_stp = str(stp_acc.get("account"))
+                            except Exception as ex_clabe:
+                                logger.warning(f"[Auto {mission_id}] No se pudo obtener CLABE STP para {email}: {ex_clabe}")
+
                             matches.append({
                                 "account_id": account_id, "email": email,
-                                "card_pipe": pipe,
+                                "card_pipe": pipe, "clabe_stp": clabe_stp,
                                 "jwt": r.get("jwt"), "proxy": r.get("used_proxy"),
                             })
                             _m_update(mission_id, matches=json.dumps(matches),

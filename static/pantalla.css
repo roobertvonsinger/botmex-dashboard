@@ -446,6 +446,21 @@
 }
 .pat-curp:hover { color: var(--pat-gold); }
 
+.pat-curp-badge.ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: oklch(0.74 0.16 155);
+  background: oklch(0.74 0.16 155 / 0.15);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid oklch(0.74 0.16 155 / 0.35);
+  font-family: var(--pat-font-sans);
+  margin-left: 4px;
+}
+
 /* ── Popover de CURP (Robert 2026-07-10, 7ª ronda): "que hacer la línea de datos
    personales mero arriba no haga que se vaya más para abajo los movimientos" — el
    form ya NO vive en el flujo (antes era hermano de .pat-columns, empujaba todo
@@ -472,12 +487,23 @@
      de botones a envolver (`.pat-form-row` ya tiene flex-wrap:wrap) DENTRO del
      ancho justo de un CURP, en vez de estirarlo. */
   font-family: var(--pat-font-mono); font-size: 11px;
-  width: 19ch;
+  width: 24ch;
   padding: 8px; border-radius: 9px;
   background: oklch(0.11 0.006 260 / 0.85);
   border: 1px solid var(--pat-edge);
   backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 10px 28px -12px rgba(0,0,0,.55);
+}
+.pat-curp-state-row {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
+}
+.pat-label-sm {
+  font-size: 10px; color: var(--text-dim, #888); white-space: nowrap; font-family: var(--pat-font-display);
+}
+.pat-select-sm {
+  font-size: 10.5px; padding: 2px 4px; height: 24px; flex: 1; min-width: 0;
+  background: oklch(0.16 0.006 260 / 0.6); color: var(--text-main, #fff);
+  border: 1px solid var(--hairline); border-radius: 4px; font-family: var(--pat-font-sans);
 }
 .pat-curp-pop[hidden] { display: none; }
 /* Coexistencia: si hay misión de depósito activa (#depStage visible en #patStageSlot),

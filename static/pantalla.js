@@ -289,7 +289,9 @@
     const curpStored = (d.curp && d.curp !== 'N/A') ? d.curp : null;
     const curpCalc = (!curpStored && typeof computeCurp === 'function') ? computeCurp(d.fullname, bdate, d.address) : null;
     const curpShown = curpStored || curpCalc || null;
-    const curpTag = curpStored ? '' : (curpCalc ? ' <span class="est">est</span>' : '');
+    const curpTag = curpStored
+      ? ' <span class="pat-curp-badge ok" title="Validado en RENAPO"><i class="ph-bold ph-check"></i> RENAPO</span>'
+      : (curpCalc ? ' <span class="est" title="Estimado por domicilio">est</span>' : '');
 
     const balance = d.balance_total != null ? d.balance_total : (d.balance_real || 0);
     const grade = d.grade || null;
@@ -318,6 +320,12 @@
               : ''}
             <button type="button" class="pat-curp-add" data-curp-toggle="${g(curpStored || '')}" title="${curpStored ? 'Editar CURP guardado' : 'Guardar CURP validado'}"><i class="ph-bold ${curpStored ? 'ph-pencil-simple' : 'ph-plus'}"></i>${curpStored ? '' : ' CURP'}</button>
             <div class="pat-form pat-curp-pop" data-curp-form hidden>
+              <div class="pat-form-row pat-curp-state-row">
+                <label class="pat-label-sm">Estado:</label>
+                <select class="pat-input pat-select-sm" data-curp-state-select title="Seleccionar estado para recalcular CURP">
+                  <option value="">-- Seleccionar Estado --</option>
+                </select>
+              </div>
               <input type="text" class="pat-input pat-input-mono" data-curp-input maxlength="18" placeholder="CURP">
               <div class="pat-form-err" data-curp-err hidden></div>
               <div class="pat-form-row">
@@ -1177,7 +1185,34 @@
       form.hidden = !form.hidden;
       if (!form.hidden) {
         const input = form.querySelector('[data-curp-input]');
-        input.value = curpToggle.dataset.curpToggle || '';
+        const stateSelect = form.querySelector('[data-curp-state-select]');
+        const d = _cacheGet(_currentId) || {};
+        const bdate = d.birthdate ? d.birthdate.split('T')[0] : '';
+        const candidates = (typeof generateCurpCandidates === 'function')
+          ? generateCurpCandidates(d.fullname, bdate, d.address)
+          : [];
+
+        if (stateSelect) {
+          stateSelect.innerHTML = candidates.map(c =>
+            `<option value="${c.code}" ${c.isDetected ? 'selected' : ''}>${c.name} (${c.curp})</option>`
+          ).join('');
+
+          // Listener change único para actualizar el input con el candidato elegido
+          stateSelect.onchange = () => {
+            const selectedCode = stateSelect.value;
+            const cand = candidates.find(c => c.code === selectedCode);
+            if (cand && input) {
+              input.value = cand.curp;
+              input.classList.remove('pat-input-err');
+              const err = form.querySelector('[data-curp-err]');
+              if (err) err.hidden = true;
+            }
+          };
+        }
+
+        // Si ya hay un valor o candidato inicial, asignarlo al input
+        const initialCand = candidates.find(c => c.isDetected) || candidates[0];
+        input.value = curpToggle.dataset.curpToggle || (initialCand ? initialCand.curp : '');
         input.focus();
         input.classList.remove('pat-input-err');
         const err = form.querySelector('[data-curp-err]'); if (err) err.hidden = true;
@@ -1274,8 +1309,18 @@
   // debería haber drag/collapse ni de los KPI ni de la pantalla, se quedan fijos").
   // El alto es fijo (ANCHOR_H, app.js) — nada que togglear.
 
+  function updateAccount(accId, patch) {
+    const cache = _cacheGet(accId);
+    if (cache) {
+      Object.assign(cache, patch);
+      if (_currentId === accId) {
+        _renderDetailView(cache, false);
+      }
+    }
+  }
+
   // currentId expuesto para que renderTable() (app.js) pueda re-aplicar el glow
   // fila-fuente en cada re-render (SSE/sort/filtro reconstruyen el tbody y
   // borrarían la clase imperativa si no se recalcula desde acá).
-  window.Pantalla = { open, close, showTxn, back, get currentId() { return _currentId; } };
+  window.Pantalla = { open, close, showTxn, back, updateAccount, get currentId() { return _currentId; } };
 })();
