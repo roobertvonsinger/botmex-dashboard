@@ -238,6 +238,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `f3b4243` | feat(bet): clabe stp 1-tap copy, query param redirect preservation and portal landing banner |
 | `30ddd01` | style(telegram-mock): minimal Limbo-style UI, interactive start buttons and mysterious concise copy |
 | `06d23ab` | feat(bet): live feedback, confirmacion de loop y portal de operador |
 | `50856bc` | docs(bet): plan definitivo para feedback en vivo, confirmacion y portal operador |
@@ -249,7 +250,6 @@ prewarm.py (router)
 | `5b99ffd` | fix(auto_deposit): omitir cuentas sin tarjeta asignada en plan_auto_mission |
 | `f444ed2` | fix(checker): apuntar DATABASE_PATH a /data/ruthopia.db en el volumen compartido |
 | `89d531f` | fix(checker): vincular DATABASE_PATH a /app/ruthopia_data/ruthopia.db montado de Ruthopia |
-| `e587507` | fix(checker): asegurar DATABASE_PATH escribible /tmp para invocacion de Ruthopia |
 <!-- GEN:end:recientes -->
 
 ---

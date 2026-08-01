@@ -2093,6 +2093,8 @@ td.sel-cell:hover { background: rgba(255,255,255,0.04); }
 }
 .log-chip .ic { font-size: 9px; opacity: .6; }
 .log-chip.chip-pipe { color: var(--warn); border-color: color-mix(in oklch, var(--warn) 40%, transparent); }
+.log-chip.chip-pipe-full { color: #f5a623; font-weight: 700; border-color: oklch(0.80 0.16 75 / 0.6); background: oklch(0.80 0.16 75 / 0.15); box-shadow: 0 0 6px oklch(0.80 0.16 75 / 0.25); }
+.log-chip.chip-combo { color: var(--accent); font-weight: 700; border-color: var(--accent-soft-2); background: var(--accent-soft); }
 .log-chip.chip-account { color: var(--accent); }
 /* Línea clickeable → navega a detalle de cuenta */
 .log-line.log-clickable { cursor: pointer; }

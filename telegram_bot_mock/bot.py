@@ -6,6 +6,7 @@ Usa la misma BD compartida y los motores de login / matchmaking del dashboard.
 import asyncio
 import os
 import sys
+import time
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
 
@@ -533,23 +534,32 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         def on_progress(status: str, extra: dict):
             now = time.time()
-            # Mapear status -> Limbo style minimal text
+            # Mapear status -> Limbo style minimal text con animación/pasos
+            step = extra.get('current', 1)
+            total = extra.get('total', 1)
+            pct = int((step / total) * 100) if total > 0 else 0
+
             if status == "matching":
-                st_text = f"Evaluando cuentas ({extra.get('accounts', 0)} elegibles)..."
+                st_text = f"⏳ Evaluando cuentas ({extra.get('accounts', 0)} elegibles)..."
             elif status == "logging_in":
-                st_text = f"Acceso en curso | <code>{extra.get('email', '')}</code>"
+                email = extra.get('email', '')
+                st_text = f"🔄 Acceso en curso [{step}/{total}] ({pct}%)\n  └ <code>{email}</code>"
             elif status == "match":
-                st_text = f"Target fijado: <code>{extra.get('email', '')}</code>"
+                email = extra.get('email', '')
+                st_text = f"🎯 Target fijado [{step}/{total}]\n  └ <code>{email}</code>"
             elif status == "cooldown":
-                st_text = f"Pausa táctica: <code>{extra.get('email', '')}</code>"
+                email = extra.get('email', '')
+                st_text = f"⏳ Pausa táctica [{step}/{total}]\n  └ <code>{email}</code>"
             elif status == "awaiting_confirmation":
-                st_text = f"Confirmación requerida ({extra.get('matches', 0)} parejas)..."
+                st_text = f"⚠️ Confirmación requerida ({extra.get('matches', 0)} parejas en standby)"
             elif status == "scheduling":
-                st_text = f"Ejecución en curso ({extra.get('completed', 0)}/{extra.get('total', 9)})"
+                comp = extra.get('completed', 0)
+                tot = extra.get('total', 9)
+                st_text = f"⚡ Ejecución en curso ({comp}/{tot} depósitos)"
             elif status in ("completed", "cancelled", "failed"):
-                st_text = f"Finalizado ({status})"
+                st_text = f"🏁 Finalizado ({status})"
             else:
-                st_text = f"{status}"
+                st_text = f"⏳ {status}"
 
             text = (
                 f"{HEADER}\n\n"

