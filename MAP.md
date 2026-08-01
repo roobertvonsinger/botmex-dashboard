@@ -260,6 +260,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `0e3969c` | feat(graphify): registrar hooks de graphify y gitignore local |
 | `a3c3fba` | docs(plan): añadir plan de implementación Graphify con orquestación Haiku |
 | `2610b2e` | docs(spec): añadir diseño de integración Graphify MCP global |
 | `6d39d51` | fix(commands): simplificar abrir-bmx y cerrar-bmx a flujo ultrarrapido local-first |
@@ -271,7 +272,6 @@ prewarm.py (router)
 | `f3b4243` | feat(bet): clabe stp 1-tap copy, query param redirect preservation and portal landing banner |
 | `30ddd01` | style(telegram-mock): minimal Limbo-style UI, interactive start buttons and mysterious concise copy |
 | `06d23ab` | feat(bet): live feedback, confirmacion de loop y portal de operador |
-| `50856bc` | docs(bet): plan definitivo para feedback en vivo, confirmacion y portal operador |
 <!-- GEN:end:recientes -->
 
 ---

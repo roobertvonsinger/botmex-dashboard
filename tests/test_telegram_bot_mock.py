@@ -101,7 +101,7 @@ async def test_start_cmd_authorized():
     await start_cmd(update, None)
     assert update.message.reply_text.called
     args, kwargs = update.message.reply_text.call_args
-    assert "BoTMexico" in args[0]
+    assert "ʙ ᴏ ᴛ · ᴍ ᴇ x ɪ ᴄ ᴏ" in args[0]
     assert kwargs.get("parse_mode") == "HTML"
 
 
