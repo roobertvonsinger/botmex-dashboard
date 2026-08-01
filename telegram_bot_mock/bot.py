@@ -620,32 +620,36 @@ async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not valid_pipes:
         fail_msg = (
             f"{HEADER}\n\n"
-            f"⚠️ <b>NO SE DETECTARON TARJETAS LIVE</b>\n\n"
+            f"🏴‍☠️ <b>CARDING FALLIDO — CCs SIN VIDA</b>\n\n"
             f"• 💳 CCs LIVE: <b>0</b>\n"
-            f"• ⚠️ Strikes: <b>{strikes_count} / {MAX_DAILY_STRIKES}</b>\n"
-            f"  <i>(Strikes acumulados hoy por tarjetas muertas/inválidas)</i>\n\n"
-            f"{summary_text}"
+            f"• ⚠️ Strikes acumulados: <b>{strikes_count} / {MAX_DAILY_STRIKES}</b>\n"
+            f"  <i>(Ojo: no quemes la pasarela tirando CCs quemadas)</i>\n\n"
+            f"{summary_text}\n\n"
+            f"🌵 <i>{get_random_greeting()}</i>"
         )
+        kb_fail = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🏠 Volver al inicio", callback_data="cancel_bet")],
+            [InlineKeyboardButton("🇲🇽 Abrir Dashboard Web", url=DASHBOARD_URL)]
+        ])
         try:
-            await status_msg.edit_text(fail_msg, parse_mode="HTML")
+            await status_msg.edit_text(fail_msg, parse_mode="HTML", reply_markup=kb_fail)
         except Exception:
-            await update.message.reply_text(fail_msg, parse_mode="HTML")
+            await update.message.reply_text(fail_msg, parse_mode="HTML", reply_markup=kb_fail)
         return ConversationHandler.END
 
     context.user_data["pending_bet_pipes"] = valid_pipes
 
     confirm_msg = (
         f"{HEADER}\n\n"
-        f"El 🌵 de la Suerte y la v... te acompañan! >>> WARD!! 🛡️✨\n\n"
+        f"El 🌵 de la Suerte te acompaña... CCs vivas y al tiro! 🛡️✨\n\n"
         f" • 💳 <b>CCs LIVE: {live_count}</b>\n"
-        f" • ⚠️ <b>Strikes: {strikes_left} / {MAX_DAILY_STRIKES} restantes</b>\n"
-        f"   <i>(Margen de tolerancia diario antes de bloqueo por reintentos)</i>\n\n"
+        f" • ⚠️ <b>Strikes: {strikes_left} / {MAX_DAILY_STRIKES} disponibles</b>\n\n"
         f"{summary_text}\n\n"
-        f"<b>¿Ya le damos? de una...</b> 🚀"
+        f"<b>¿Le damos un llenado automático a la cuenta? de una...</b> 🚀"
     )
     kb = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🚀 De Una / Iniciar Depósitos", callback_data="confirm_bet"),
+            InlineKeyboardButton("🚀 De Una / Llenado Automático", callback_data="confirm_bet"),
             InlineKeyboardButton("🏠 Volver al inicio", callback_data="cancel_bet")
         ]
     ])
@@ -706,41 +710,39 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         def on_progress(status: str, extra: dict):
             now = time.time()
-            # Mapear status -> Limbo style minimal text con animación/pasos
             step = extra.get('current', 1)
             total = extra.get('total', 1)
             pct = int((step / total) * 100) if total > 0 else 0
 
             if status == "matching":
-                st_text = f"⏳ Evaluando cuentas ({extra.get('accounts', 0)} elegibles)..."
+                st_text = f"⏳ Rastreando cuentas aptas en el pool ({extra.get('accounts', 0)} disponibles)..."
             elif status == "logging_in":
                 email = extra.get('email', '')
-                st_text = f"🔄 Acceso en curso [{step}/{total}] ({pct}%)\n  └ <code>{email}</code>"
+                st_text = f"🔄 Acceso seguro en curso [{step}/{total}] ({pct}%)\n  └ <code>{email}</code>"
             elif status == "match":
                 email = extra.get('email', '')
-                st_text = f"🎯 Target fijado [{step}/{total}]\n  └ <code>{email}</code>"
+                st_text = f"🎯 Cuenta objetivo lista [{step}/{total}]\n  └ <code>{email}</code>"
             elif status == "cooldown":
                 email = extra.get('email', '')
-                st_text = f"⏳ Pausa táctica [{step}/{total}]\n  └ <code>{email}</code>"
+                st_text = f"⏳ Enfriamiento táctico [{step}/{total}]\n  └ <code>{email}</code>"
             elif status == "awaiting_confirmation":
-                st_text = f"⚠️ Confirmación requerida ({extra.get('matches', 0)} parejas en standby)"
+                st_text = f"⚠️ Llenado automático listo para confirmación"
             elif status == "scheduling":
                 comp = extra.get('completed', 0)
                 tot = extra.get('total', 9)
-                st_text = f"⚡ Ejecución en curso ({comp}/{tot} depósitos)"
+                st_text = f"⚡ Llenado en curso ({comp}/{tot} abonos)"
             elif status in ("completed", "cancelled", "failed"):
-                st_text = f"🏁 Finalizado ({status})"
+                st_text = f"🏁 Proceso concluido"
             else:
                 st_text = f"⏳ {status}"
 
             text = (
                 f"{HEADER}\n\n"
-                f"🎯 <b>MISIÓN {mission_id}</b>\n\n"
+                f"⚡ <b>Rastreando y Procesando Cuentas</b>\n\n"
                 f"• {st_text}\n\n"
-                f"• Link: {DASHBOARD_URL}/?match={mission_id}"
+                f"🇲🇽 <i>Operando en segundo plano...</i>"
             )
 
-            # Incondicional para terminal o awaiting_confirmation, throttleado 2.5s para el resto
             is_priority = status in ("awaiting_confirmation", "completed", "cancelled", "failed")
             if not is_priority and (now - last_edit_ts[0] < 2.5):
                 return
@@ -775,17 +777,14 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             match_text_block = "\n".join(match_lines)
             confirm_text = (
                 f"{HEADER}\n\n"
-                f"⚠️ <b>AUTORIZAR LOOP</b>\n\n"
-                f"Misión: <code>{m_id}</code>\n"
-                f"Match: {len(matches)} cuentas\n"
+                f"⚡ <b>LLENADO AUTOMÁTICO DE CUENTA</b>\n\n"
+                f"Cuentas encontradas: {len(matches)}\n"
                 f"{match_text_block}\n\n"
-                f"Programa: {target} × ${amt:.0f} MXN (60s)\n\n"
-                f"🌐 Enlace: {DASHBOARD_URL}/portal?match={m_id}\n\n"
-                f"¿Proceder?"
+                f"¿Iniciar llenado automático en paralelo?"
             )
             kb_confirm = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton(f"✅ Exec ({target}×${amt:.0f}/60s)", callback_data=f"confirm_sched_{m_id}"),
+                    InlineKeyboardButton("🚀 De Una / Iniciar Llenado", callback_data=f"confirm_sched_{m_id}"),
                     InlineKeyboardButton("🛑 Cancelar y Volver al inicio", callback_data=f"stop_sched_{m_id}")
                 ]
             ])
@@ -801,8 +800,10 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
                 res = False
                 try:
                     await status_msg.edit_text(
-                        f"{HEADER}\n\nTiempo agotado. Misión {m_id} cerrada.",
-                        parse_mode="HTML"
+                        f"{HEADER}\n\nTiempo agotado. Operación cancelada.\n\n"
+                        f"🌵 {get_random_greeting()}",
+                        parse_mode="HTML",
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]])
                     )
                 except Exception:
                     pass
@@ -828,7 +829,7 @@ async def handle_confirm_gate_callback(update: Update, context: ContextTypes.DEF
             state["decision"] = True
             ev.set()
         await query.edit_message_text(
-            f"✅ <b>Loop programado AUTORIZADO para misión {mission_id}.</b>\nIniciando depósitos...",
+            f"✅ <b>Llenado automático iniciado.</b>\nProcesando depósitos en segundo plano...",
             parse_mode="HTML"
         )
     elif data.startswith("stop_sched_"):
@@ -839,8 +840,9 @@ async def handle_confirm_gate_callback(update: Update, context: ContextTypes.DEF
             state["decision"] = False
             ev.set()
         await query.edit_message_text(
-            f"🛑 <b>Loop programado CANCELADO para misión {mission_id}.</b>\nMisión finalizada tras matchmaking.",
-            parse_mode="HTML"
+            f"🛑 <b>Llenado automático cancelado.</b>\nOperación finalizada.",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]])
         )
 
 
