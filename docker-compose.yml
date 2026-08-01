@@ -51,6 +51,23 @@ services:
     networks:
       - bmx
 
+  # Mediador hacia el socket de Docker, para el agente de soporte.
+  # Es el ÚNICO contenedor con el socket montado: betmexico-web está publicado
+  # en internet, y montárselo ahí convertiría cualquier RCE en root del host.
+  # Solo expone listar y reiniciar, y solo los 3 contenedores de la lista blanca
+  # en support_dockerd.py. Reusa la imagen existente: no hay build extra.
+  docker-proxy:
+    image: betmexico:latest
+    container_name: betmexico-docker-proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./code:/app
+    working_dir: /app/web
+    command: python support_dockerd.py
+    restart: unless-stopped
+    networks:
+      - bmx
+
 networks:
   bmx:
     driver: bridge

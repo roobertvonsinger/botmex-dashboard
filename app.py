@@ -665,6 +665,13 @@ async def _no_cache_static_assets(request, call_next):
 app.include_router(_prewarm_router)
 app.include_router(_deposits_router)
 
+# Agente de soporte (b.soporte). SA-only; ver docs/AGENTE_SOPORTE.md.
+try:
+    from support_routes import router as _support_router
+    app.include_router(_support_router)
+except Exception as _e:  # nunca tumbar el dashboard por el agente
+    _logging.getLogger("betmexico.dashboard").warning(f"[support] router no cargado: {_e}")
+
 
 # ── Páginas ────────────────────────────────────────────────────────────────────
 
@@ -692,9 +699,10 @@ def login_page(bmx_session: str = Cookie(default=None)):
 # campo: deploy hecho, md5 correcto en prod, pero nadie refrescaba solo). Agregar
 # aquí CUALQUIER .css/.js nuevo que index.html cargue desde /static/.
 FRONTEND_ASSETS = [
-    "style.css", "depos.css", "pantalla.css",
+    "style.css", "depos.css", "pantalla.css", "soporte.css",
     "activity_logic.js", "pantalla_logic.js", "strip_logic.js",
     "app.js", "depos_logic.js", "depos_window.js", "depos.js", "pantalla.js",
+    "soporte.js",
 ]
 
 
@@ -1861,19 +1869,26 @@ def admin_refresh_proxy(user: dict = Depends(require_session)):
 
 @app.post("/api/admin/services/restart")
 def admin_services_restart(target: str, user: dict = Depends(require_session)):
-    """Reinicia bot, web, o ambos."""
+    """Reinicia bot, web, mock o todos.
+
+    Antes usaba `systemctl restart`, que en KVM4 no existe: corremos en Docker
+    sin systemd, así que este endpoint devolvía ok=False en silencio desde la
+    migración. Misma causa raíz que el bug de los logs (ver arriba, L40).
+    Ahora va por el docker-socket-proxy, que solo permite listar y reiniciar
+    contenedores — el socket nunca se monta en este contenedor.
+    """
     _require_sa(user)
-    if target not in ("bot", "web", "all"):
-        raise HTTPException(400, "target debe ser bot|web|all")
-    services = {"bot": ["betmexico-bot"], "web": ["betmexico-web"],
-                "all": ["betmexico-bot", "betmexico-web"]}[target]
+    grupos = {"bot": ["betmexico-bot"], "web": ["betmexico-web"],
+              "mock": ["betmexico-mock-bot"],
+              "all": ["betmexico-bot", "betmexico-mock-bot", "betmexico-web"]}
+    if target not in grupos:
+        raise HTTPException(400, f"target debe ser {'|'.join(grupos)}")
+    import support_tools as _stools
     out = []
-    for s in services:
-        try:
-            r = _sp.run(["systemctl", "restart", s], capture_output=True, text=True, timeout=15)
-            out.append({"service": s, "ok": r.returncode == 0, "stderr": (r.stderr or "")[:200]})
-        except Exception as e:
-            out.append({"service": s, "ok": False, "error": str(e)[:100]})
+    for s in grupos[target]:
+        r = _stools._exec_reiniciar_servicio({"nombre": s}, {"user": user.get("display")})
+        out.append({"service": s, "ok": bool(r.get("ok")),
+                    "detalle": r.get("detalle") or r.get("error")})
     return {"restarted": out}
 
 
@@ -1882,11 +1897,15 @@ def admin_export_logs(lines: int = Query(500, le=5000),
                       user: dict = Depends(require_session)):
     """Descarga logs recientes (text/plain)."""
     _require_sa(user)
+    # Antes: journalctl. KVM4 es Docker sin systemd → siempre devolvía vacío.
+    # Ahora se sirve el mismo archivo que alimenta /api/logs.
     try:
-        cmd = ["journalctl", "-u", "betmexico-web", "-u", "betmexico-bot",
-               "-n", str(lines), "--no-pager", "--output=short-iso"]
-        r = _sp.run(cmd, capture_output=True, text=True, timeout=15)
-        body = r.stdout or r.stderr
+        with open(str(_LOG_FILE), "r", encoding="utf-8", errors="replace") as f:
+            body = "".join(f.readlines()[-lines:])
+        if not body:
+            body = "(el log está vacío)"
+    except FileNotFoundError:
+        body = f"No existe {_LOG_FILE} todavía."
     except Exception as e:
         body = f"Error: {e}"
     return Response(content=body, media_type="text/plain",
@@ -2565,11 +2584,46 @@ async def _account_refresh_loop():
         await asyncio.sleep(account_refresh.cfg()["interval_sec"])
 
 
+ROBERT_CHAT_ID = 1341812706  # ID exclusivo de Robert (SuperAdmin)
+
+
+def _bot_token() -> str | None:
+    """Token del bot Telegram LEGACY (`betmexico-bot`) — el canal de avisos.
+
+    Ojo: hasta 2026-08-01 esto leía `TELEGRAM_BOT_TOKEN`, variable que NUNCA ha
+    existido en el .env de KVM4 (ahí están `BMX_BOT_TOKEN` y `BMX_MOCK_BOT_TOKEN`).
+    El `if not token: return` silencioso hacía que la notificación de arranque
+    jamás se enviara desde la migración a Docker. Se acepta el nombre viejo como
+    alias por si algún entorno lo define.
+    """
+    return os.environ.get("BMX_BOT_TOKEN") or os.environ.get("TELEGRAM_BOT_TOKEN")
+
+
+def _notify_robert(msg: str, parse_mode: str | None = "HTML") -> dict:
+    """Manda un mensaje al Telegram de Robert por el bot legacy. Punto único."""
+    token = _bot_token()
+    if not token:
+        return {"ok": False, "error": "BMX_BOT_TOKEN no configurado"}
+    payload = {"chat_id": ROBERT_CHAT_ID, "text": msg}
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
+    try:
+        r = httpx.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                       json=payload, timeout=10.0)
+        if r.status_code != 200:
+            return {"ok": False, "error": f"Telegram HTTP {r.status_code}: {r.text[:160]}"}
+        return {"ok": True, "detalle": "aviso enviado por el bot legacy"}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:160]}"}
+
+
 async def _startup_telegram_notify():
-    """Envía la notificación de inicio estilo Ruthopia al Telegram personal de Robert (SuperAdmin)."""
-    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    target_chat_id = 1341812706  # ID exclusivo de Robert (SuperAdmin)
+    """Notificación de inicio al Telegram personal de Robert (SuperAdmin)."""
+    bot_token = _bot_token()
+    target_chat_id = ROBERT_CHAT_ID
     if not bot_token:
+        _logging.getLogger("betmexico.dashboard").warning(
+            "[telegram_startup_notify] sin BMX_BOT_TOKEN: no se notifica el arranque")
         return
     msg = (
         "◢ ━━━━━━━ ◣\n"

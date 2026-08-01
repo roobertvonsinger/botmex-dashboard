@@ -97,9 +97,9 @@ def get_random_greeting() -> str:
 
 # Membrete Oficial BoTMexico
 HEADER_DECORATIVE = (
-    " · · · · · · · · · · · · · · · · · ·  · · · · · · · · · · · ·\n"
-    "🇲🇽🌵━━ · <b>BoTMexico</b> · ━━🌵🇲🇽\n"
-    " · · · · · · · · · · · · · · · · · · · · · · · · · · ·  · · · · · · · · · · · · · · · · · · · ·"
+    "<code>═════════════════════════</code>\n"
+    "🇲🇽  🌵 ·  <b>ʙ ᴏ ᴛ · ᴍ ᴇ x ɪ ᴄ ᴏ</b>  · 🌵  🇲🇽\n"
+    "<code>═════════════════════════</code>"
 )
 
 HEADER = HEADER_DECORATIVE

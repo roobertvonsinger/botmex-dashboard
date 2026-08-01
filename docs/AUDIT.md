@@ -3,6 +3,36 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-08-01 (agente de soporte b.soporte + 3 bugs pre-existentes reparados)
+
+**Motivo**: Robert pidió un agente de soporte para los 3 bots, embebido en el dashboard como chat,
+solo para él, capaz de revisar, actuar, delegar y avisar. Al verificar el terreno aparecieron tres
+bugs previos que este trabajo repara (detalle en `docs/ERRORS.md`).
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **`support_tools.sanitize_sql`** | Solo `SELECT`/`WITH`; rechaza multi-statement, comentarios de guarda (`/* */ DELETE`), y toda palabra de escritura. Fuerza `LIMIT 200` y recorta límites mayores. | ✅ implementado | ✅ 20 tests parametrizados en `test_support_tools.py` |
+| **`support_tools._ro_connection`** | 2ª muralla: `sqlite3.connect("file:…?mode=ro", uri=True)`. El rechazo lo hace SQLite, no un regex nuestro — cubre un eventual bypass del sanitizer. | ✅ implementado | ✅ test que verifica `OperationalError` al intentar `DELETE` |
+| **`support_tools.redact_for_model`** | Oculta columnas sensibles (password/jwt/token/proxy/cvv/card_number) **solo** en lo que viaja al LLM de terceros. La UI recibe el crudo: Robert ve todo sin máscara (regla `feedback_no_masking`). | ✅ implementado | ✅ tests de crudo-vs-redactado y catálogo de columnas |
+| **Gate de confirmación** (`run_tool` + `redeem`) | Las 4 tools de escritura no ejecutan al ser llamadas: encolan en `support_pending` y devuelven token. Solo `POST /api/support/confirm` (SA) lo redime. Un solo uso, TTL 10 min. | ✅ implementado | ✅ 11 tests: no-ejecución, un-solo-uso, token inventado, token expirado, y que toda write tool declarada tenga executor |
+| **`support_llm.LLMClient`** | Cliente httpx del 9router (OpenAI-compatible). Reensambla `tool_calls` fragmentados por índice; cadena de fallback ante 502/error de red; **no** hace fallback si ya emitió texto (evitaría dos respuestas pegadas). | ✅ implementado | ✅ 10 tests con `MockTransport`, incluido un corte real de stream a media lectura |
+| **`support_agent.SupportAgent.run`** | Loop modelo↔tools, máx 6 vueltas. Snapshot del sistema en el mensaje `user` (no en `system`, para no romper el prefijo cacheado). Persiste en `support_chat`. | ✅ implementado | 🔵 sin smoke real contra el router (bloqueado: el 9router está sin red, ver ERRORS.md) |
+| **`support_dockerd.py`** (contenedor `betmexico-docker-proxy`) | Único proceso con el socket de Docker montado. Lista blanca de 3 contenedores y 2 rutas (`/containers/json`, `/containers/{n}/restart`). Descartado `tecnativa/docker-socket-proxy`: para permitir restart hay que abrir `CONTAINERS=1 POST=1`, lo que deja expuesto `/containers/create` → contenedor privilegiado → escape al host. | ✅ implementado | 🔵 sin desplegar |
+| **`app._notify_robert`** | Punto único de salida a Telegram, por el bot **legacy** (`BMX_BOT_TOKEN`). Repara que `_startup_telegram_notify` leyera `TELEGRAM_BOT_TOKEN`, variable inexistente en prod. | ✅ implementado | 🔵 pendiente confirmar en vivo que llega el mensaje de arranque |
+| **`/api/admin/services/restart`** | Reparado: iba por `systemctl` (inexistente en Docker) → ahora por el mediador. Acepta `bot\|web\|mock\|all`. | ✅ implementado | 🔵 sin desplegar |
+| **`/api/admin/export-logs`** | Reparado: iba por `journalctl` → ahora lee `/data/logs/dashboard.log`. | ✅ implementado | 🔵 sin desplegar |
+
+**Bloqueante abierto**: el 9router (`openclaw-ruth-ninerouter-1`) está sin ninguna red Docker desde
+~2026-08-01 00:47 y devuelve 502 en todo. Es un contenedor del stack `openclaw-ruth` (Ruthopia), así
+que reconectarlo requiere autorización explícita de Robert. Hasta entonces no se puede elegir el
+modelo primario por prueba real de tool-calling ni correr el smoke end-to-end.
+
+**Nota de campo sobre la suite**: `pytest` completo da **86 failed / 334 passed**. Los 86 son
+**pre-existentes** — verificado corriendo la suite en un worktree limpio de `HEAD` (`git worktree
+add --detach`), que da exactamente los mismos 86. La memoria previa decía "3 archivos fallan
+siempre"; el número real es mayor. Muchos son `assert 530 == 400`, o sea el middleware de
+mantenimiento respondiendo en tests que esperan validación.
+
 ## Captura: 2026-07-28 (rediseño completo La Pantalla + candado anti-reuso de tarjeta entre cuentas)
 
 **Motivo**: 4 rondas de campo en vivo (Robert, screenshots reales) sobre el look "esqueleto verde" rotando por grade, espacio horizontal desperdiciado, tabs Depositar/Retirar percibidos como 2 mundos separados, y un pedido de seguridad explícito ("si ya se aprobó en una cuenta una tarjeta debe de haber un freno ahí"). Detalle de criterio de diseño en `DESIGN.md` §"Surface: La Pantalla".

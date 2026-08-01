@@ -2,6 +2,57 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## 9router (`openclaw-ruth-ninerouter-1`) sin ninguna red Docker → 502 en todos los modelos (detectado 2026-08-01)
+
+- **Síntoma**: el 9router responde `/v1/models` normalmente (parece sano, `Up` en `docker ps`),
+  pero **toda** completion devuelve `502` con `fetch failed (cause: EAI_AGAIN: getaddrinfo …)`
+  contra `daily-cloudcode-pa.googleapis.com` (Antigravity) y `api.mistral.ai`. Sus logs muestran
+  un último stream exitoso a las `00:47` y después solo arranques repetidos de Next.js
+  (`✓ Ready in 0ms` ×6).
+- **Causa raíz**: `docker inspect openclaw-ruth-ninerouter-1 --format '{{json .NetworkSettings.Networks}}'`
+  devuelve **`{}`** — el contenedor no está conectado a **ninguna** red, pese a que
+  `HostConfig.NetworkMode` dice `openclaw-ruth_default`. Confirmado por el otro lado:
+  `docker network inspect openclaw-ruth_default` lista solo `bridge-1`, `ruthopia-bot` y
+  `openclaw-1`. Sin red no hay DNS ni salida a internet: `EAI_AGAIN` es fallo de resolución,
+  no de tool-calling ni del modelo.
+- **Por qué despista**: `/v1/models` sigue respondiendo porque es un catálogo **estático** que
+  el router sirve desde su config, sin tocar el upstream. El contenedor se ve vivo y sano.
+- **Fix**: `docker network connect openclaw-ruth_default openclaw-ruth-ninerouter-1` (aditivo,
+  no recrea el contenedor). Para que `betmexico-web` lo alcance, además:
+  `docker network connect betmexico_bmx openclaw-ruth-ninerouter-1`.
+- **Lección**: `Up` en `docker ps` no implica conectividad. Ante `EAI_AGAIN`/`EAI_NODATA` en
+  cualquier contenedor, revisar `.NetworkSettings.Networks` **antes** de investigar el upstream.
+- **Ojo**: afecta a todo consumidor del router, no solo al agente de soporte — el bot de
+  Ruthopia también se queda sin LLM.
+
+## La notificación de arranque a Telegram nunca funcionó en KVM4 (detectado 2026-08-01)
+
+- **Síntoma**: `_startup_telegram_notify()` existe y está registrada en `_start_bg_tasks`, pero
+  el mensaje de arranque jamás llega al Telegram de Robert. Sin error en logs.
+- **Causa raíz**: leía `os.environ.get("TELEGRAM_BOT_TOKEN")`, variable que **no existe** en el
+  `.env` de KVM4. Verificado: las que hay son `BMX_BOT_TOKEN` (bot legacy) y `BMX_MOCK_BOT_TOKEN`.
+  El guard `if not bot_token: return` la mataba en silencio en cada arranque desde la migración
+  a Docker. Un `return` mudo convierte un error de configuración en una función que "no hace nada".
+- **Fix**: helper único `app._bot_token()` que lee `BMX_BOT_TOKEN` (con `TELEGRAM_BOT_TOKEN` como
+  alias por compatibilidad) + `app._notify_robert(msg)` como punto único de salida a Telegram, y
+  `log.warning` en vez de `return` mudo cuando falta el token.
+- **Lección**: un `if not X: return` sobre config debe loguear. Si no, un typo en el nombre de una
+  env var es indistinguible de "la feature está apagada a propósito".
+
+## `services/restart` y `export-logs` muertos desde la migración a Docker (detectado 2026-08-01)
+
+- **Síntoma**: `POST /api/admin/services/restart` siempre devolvía `ok:false`; `GET
+  /api/admin/export-logs` bajaba un archivo vacío.
+- **Causa raíz**: usaban `systemctl restart` y `journalctl` respectivamente. KVM4 corre Docker
+  **sin systemd**: ambos binarios no existen dentro del contenedor. Es la **misma causa raíz** del
+  gotcha #3 de `MAP.md` (logs que no cargaban), que se arregló para `/api/logs` en su momento pero
+  no para estos dos endpoints — quedaron huérfanos.
+- **Fix**: `restart` ahora va por el mediador Docker (`support_dockerd.py`, contenedor
+  `betmexico-docker-proxy`); `export-logs` lee el mismo `/data/logs/dashboard.log` que alimenta
+  `/api/logs`.
+- **Lección**: al arreglar una causa raíz, hay que buscar **todos** los llamadores del patrón roto
+  (`grep systemctl journalctl`), no solo el que reportó el síntoma.
+
 ## Contador de depósitos aprobados por operador siempre da 0 — mismatch de valor de status (detectado 2026-07-31, fix PENDIENTE)
 
 - **Síntoma**: cualquier conteo de "depósitos exitosos por operador" que use la query de `app.py:4168`

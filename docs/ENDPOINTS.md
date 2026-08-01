@@ -8,6 +8,7 @@
 |---|---|---|---|
 | `_prewarm_router` | `/api/prewarm` | `prewarm.py` | ✅ `app.py:165` |
 | `_deposits_router` | `/api/deposits` | `deposits.py` | ✅ `app.py:166` |
+| `_support_router` | `/api/support` | `support_routes.py` | ✅ `app.py` (en `try/except`: si falla el import, el dashboard arranca igual) |
 
 > Routers legacy (`web_routes_cards/missions/logs/notifications`) archivados en `_legacy/` (SP-1). Ver sección "Módulos archivados" abajo.
 
@@ -35,6 +36,45 @@
 | GET | `/api/health/last` | Último healthcheck cacheado | require_session | — | `{ts, summary}` | `app.py:1159` |
 | POST | `/api/health/dismiss` | Marcar issue como dismisseada | superadmin | `{kind}` | `{ok}` | `app.py:1164` |
 | GET | `/api/version` | Versión = mtime MÁS RECIENTE entre TODOS los `FRONTEND_ASSETS` (`app.py`, lista completa de .css/.js propios servidos por index.html — 2026-07-06: antes solo trackeaba app.js+style.css, un deploy de cualquier otro asset no disparaba el auto-reload). Frontend la compara vs `window.BMX_VERSION` cada 5min/al volver a la pestaña → auto-reload sin Ctrl+Shift+R | público | — | `{v: "<mtime>"}` | `app.py:395` |
+
+## Soporte — agente b.soporte (`support_routes.py`)
+
+> Todos **superadmin-only** (`require_session` + guard `role == "superadmin"`).
+> El cerebro es el 9router de KVM4 (OpenAI-compatible), no una API de Anthropic.
+> Instrucciones del agente: `docs/AGENTE_SOPORTE.md`. Herramientas: `support_tools.py`.
+
+| Método | Path | Función | Auth | Body / Query | Respuesta |
+|---|---|---|---|---|---|
+| POST | `/api/support/chat` | Turno de conversación. Corre el loop modelo↔tools. | superadmin | `{mensaje, imagen?}` (`imagen` = data URI) | **SSE** por-request (no el bus global). Ver eventos abajo. |
+| POST | `/api/support/confirm` | **Único** punto donde se ejecuta una acción de escritura. Redime un token pendiente. | superadmin | `{token}` | `{ok, detalle}` · 400 si el token es desconocido, ya se usó o expiró (TTL 10 min) |
+| GET | `/api/support/history` | Historial de la conversación (últimos 60). | superadmin | — | `{mensajes: [{role, content, created_at}]}` |
+| DELETE | `/api/support/history` | Borra la conversación. | superadmin | — | `{borrados: N}` |
+| GET | `/api/support/config` | Diagnóstico: qué router y cadena de modelos está usando. | superadmin | — | `{router, cadena, docker_proxy}` |
+
+**Eventos del SSE de `/chat`** (una línea `data: {...}` por evento):
+
+| `kind` | Payload | Para qué |
+|---|---|---|
+| `text` | `{delta}` | Texto incremental de la respuesta |
+| `tool` | `{name, status: start\|done, label?, summary?}` | Chip de actividad ("consultando la BD…") |
+| `table` | `{columns, rows}` | Resultado **crudo** de `consultar_bd` — Robert lo ve completo, sin máscara |
+| `confirm` | `{token, label, tool}` | Pinta el botón de confirmación de una acción de escritura |
+| `brief` | `{markdown}` | Informe copiable para pegar en Claude Code |
+| `done` | `{model, tokens_in, tokens_out}` | Qué modelo respondió y cuánto costó (medido, no estimado) |
+| `error` | `{message}` | Fallo del router o del loop |
+
+**Gate de confirmación** — las tools de escritura (`reiniciar_servicio`, `pausar_sistema`,
+`reanudar_sistema`, `desbloquear_cuenta`) **no se ejecutan** cuando el modelo las llama: dejan una
+fila en `support_pending` y devuelven un token. Solo `POST /confirm` (sesión SA) las dispara, y el
+token es de un solo uso. El modelo nunca sostiene el permiso — si alucina "ya lo reinicié", no pasó
+nada.
+
+**Privacidad hacia el proveedor LLM** — el resultado de `consultar_bd` se emite **crudo** a la UI
+pero **redactado** al modelo (`support_tools.redact_for_model`): passwords, JWT, tokens, proxies,
+`card_number` y `card_cvv` viajan como `‹oculto›`. No es enmascarar a Robert (él ve todo, y puede
+copiar en 1 tap): es que la conversación pasa por un LLM de terceros.
+
+---
 
 ## Cuentas
 
