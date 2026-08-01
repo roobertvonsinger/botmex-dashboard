@@ -260,6 +260,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `8d44a95` | fix(commands): actualizar abrir-bmx con comando SSH robusto sin fallos de parsing PowerShell |
 | `7ff8599` | style(telegram-mock): pasar lineas a texto plano y code mono a botmexico |
 | `8b8e911` | style(telegram-mock): actualizar membrete oficial a placa industrial con lineas dobles |
 | `097e56c` | feat(telegram-mock): rediseño layouts, apodos por ID, menu lateral de 3 botones y liveness feedback animado |
@@ -271,7 +272,6 @@ prewarm.py (router)
 | `ab19c08` | fix(logs): pasada impeccable (audit/colorize/layout/optimize/polish) sobre la consola de Logs |
 | `35e3bd4` | feat(logs): consola de Logs con categorías, auditoría de tarjetas y vista dual de bots Telegram |
 | `e5975f9` | docs(next-session): actualizar estado de cierre y pendientes del bot mock |
-| `b771207` | fix(auto_deposit): agregar fallback defensivo OperationalError si falta columna card_pipe en esquema test |
 <!-- GEN:end:recientes -->
 
 ---
