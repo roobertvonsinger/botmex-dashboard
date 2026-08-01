@@ -589,7 +589,15 @@
     }
     if (balEl) {
       balEl.hidden = !s2.render;
-      balEl.innerHTML = s2.render ? `Saldo Real: <b class="pat-wd-balance-v">${money(d.balance_real || 0)}</b>` : '';
+      // Motivo de "Retirar" deshabilitado (p.ej. "Saldo < $100") visible SIEMPRE,
+      // no solo al hover del botón (2026-08-01, auditoría: bajo presión no hay
+      // tiempo de pasar el mouse para enterarse de por qué el botón no responde —
+      // ver Nielsen #1 visibilidad de estado). Solo se agrega si está deshabilitado
+      // por una razón real (no cuando ya está "Retirar" listo/redundante, ni
+      // mientras hay un retiro en curso — ese caso ya lo cubre #wdStatus).
+      const note = (s2.render && s2.disabled && s2.tooltip && !pending)
+        ? ` <span class="pat-wd-balance-note">· ${g(s2.tooltip)}</span>` : '';
+      balEl.innerHTML = s2.render ? `Saldo Real: <b class="pat-wd-balance-v">${money(d.balance_real || 0)}</b>${note}` : '';
     }
     if (statusEl) statusEl.innerHTML = (s2.render && st) ? _withdrawStatusHtml(st) : '';
   }

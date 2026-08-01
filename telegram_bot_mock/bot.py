@@ -69,15 +69,17 @@ POC_GREETINGS = [
     "¡Échale,",
 ]
 
-# Tiradera rap pesado para bineros / niños rata (máx 4 líneas, tiradera orgánica mexicana)
+# Tiradera rap pesado / sátira bineros (máx 4 líneas, slang cultura Telegram/noobs)
 RAP_DISCLAIMERS = [
-    "Llegó el niño rata tirando crema en el chat,\ncon tres tarjetas muertas jugando a ser el capo del club.\nAquí no hay merolico ni chisme de novela,\n¡aprovecha mijito, no te apendejes y COMASOLO sin secuela! 🔥🚀",
+    "Pidiéndole doscientos a mamá pa' pagar su bot chafa,\narmó fiesta en Telegram creyendo que trae la estafa.\nPuro carbón pa' la carne asada te dejas caer,\n¡no te apendejes mi noob, apúntale bien y COMASOLO al comer! 🥩🔥",
 
-    "Puro morro de Discord presumiendo un saldo chafa,\na la primera declinada se le cae la estafa.\nBoTMexico no habla, les liquida la pasarela sola,\n¡aprovecha carnal, no te apendejes y COMASOLO a la primera! 🎤⚡",
+    "Se cree hacker de elite porque usa ChatGPT con abliteración,\ny no sabe livear una CC ni armar un prompt con intención.\nTe vendieron puro carbón en tu checker de tres pesos,\ndesquicia tu cashout, mijito, antes que te dejen sin huesos. 💀⚡",
 
-    "Mucho binerito creyendo que trae la receta,\nse le quema el inventario y anda chillando en la banqueta.\nAquí se cobra mudo, la feria se desborda y vuela,\n¡aprovecha mijito, no te apendejes y COMASOLO la quiniela! 💸💥",
+    "Soñando con su Airbnb jalando en piloto automático,\ny no sabe ni scrapear un sitio ni doxear a su fanático.\nPuro mitote en el grupo de Telegram buscando milagros,\naquí se liquida sin chillar, tragándote tus propios estragos. 🚀💸",
 
-    "Traes el hocico suelto pero la cuenta pelada,\nse te frena el sistema y te quedas sin mirada.\nBoTMexico no pide fe, liquida directo de una toma,\n¡aprovecha carnal, no te apendejes y COMASOLO en la zona! 🌵🔥"
+    "Mucho binerito en Discord presumiendo config heredada,\nque no sabe ni qué es Heretics y se queda con la cara helada.\nTraes la bolsa llena de carbón pa' armar la discada,\nempárate al cashout solito y deja la bronca saldada. 🎤🥩",
+
+    "Niño rata que no sabe ni qué es levantar una cuenta,\nle vendieron un scam en Telegram y ya ni se da cuenta.\nPuro carbón prendido y la carne tirada en el suelo,\nrasca tu propio plato, morro, que aquí nadie te da consuelo. 🌵⚡"
 ]
 
 def get_random_greeting() -> str:

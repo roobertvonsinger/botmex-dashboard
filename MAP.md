@@ -261,6 +261,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `e485193` | style(telegram-mock): pulir metrica y ritmo organico de los raps de bienvenida |
 | `2e31fba` | feat(telegram-mock): tiradera rap de bineros rediseñada y boton cancelar eliminado del menu start |
 | `4fea30f` | fix(pantalla): intercambiar orden visual Movimientos <-> Deposito/Retiro |
 | `d89c282` | feat(telegram-mock): refactorizar flujo /bet con streaming, lenguaje carding, llenado automatico y resumen |
@@ -272,7 +273,6 @@ prewarm.py (router)
 | `a3c3fba` | docs(plan): añadir plan de implementación Graphify con orquestación Haiku |
 | `2610b2e` | docs(spec): añadir diseño de integración Graphify MCP global |
 | `6d39d51` | fix(commands): simplificar abrir-bmx y cerrar-bmx a flujo ultrarrapido local-first |
-| `8d44a95` | fix(commands): actualizar abrir-bmx con comando SSH robusto sin fallos de parsing PowerShell |
 <!-- GEN:end:recientes -->
 
 ---
