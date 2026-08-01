@@ -260,6 +260,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `7ff8599` | style(telegram-mock): pasar lineas a texto plano y code mono a botmexico |
 | `8b8e911` | style(telegram-mock): actualizar membrete oficial a placa industrial con lineas dobles |
 | `097e56c` | feat(telegram-mock): rediseño layouts, apodos por ID, menu lateral de 3 botones y liveness feedback animado |
 | `be180f6` | feat(logs): jerarquizacion visual de logs, combos y tarjetas completas copiables en 1-click |
@@ -271,7 +272,6 @@ prewarm.py (router)
 | `35e3bd4` | feat(logs): consola de Logs con categorías, auditoría de tarjetas y vista dual de bots Telegram |
 | `e5975f9` | docs(next-session): actualizar estado de cierre y pendientes del bot mock |
 | `b771207` | fix(auto_deposit): agregar fallback defensivo OperationalError si falta columna card_pipe en esquema test |
-| `b64ef27` | fix(telegram-mock): corregir asignacion de cuentas y agregar boton detener mision |
 <!-- GEN:end:recientes -->
 
 ---

@@ -21,12 +21,11 @@ La memoria del proyecto (`MEMORY.md` + vinculados) ya está auto-cargada por el 
 Key `C:\Users\rober\Dropbox\TESTING DEV\SSH KEYS\kvm4_hostinger`, host `root@100.77.154.31`. Un solo SSH que traiga:
 
 ```bash
-KEY="C:\Users\rober\Dropbox\TESTING DEV\SSH KEYS\kvm4_hostinger"; HOST="root@100.77.154.31"
-ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -i "$KEY" $HOST '
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -i "C:\Users\rober\Dropbox\TESTING DEV\SSH KEYS\kvm4_hostinger" root@100.77.154.31 '
 echo "=== CONTENEDORES ==="; docker ps -a --format "{{.Names}} | {{.Status}}" | grep -i betmex
-echo "=== HEALTH ==="; docker exec betmexico-web python3 -c "import httpx;r=httpx.get(\"http://localhost:8080/api/health\",timeout=10);print(r.status_code,r.text[:140])"
+echo "=== HEALTH ==="; docker exec betmexico-web curl -s http://localhost:8080/api/health
 echo "=== POOL PROXIES ==="; docker exec betmexico-web python3 -c "import sys;sys.path.insert(0,\"/app/web\");sys.path.insert(0,\"/app\");import proxy_pool as pp,collections;ps=pp.all_proxies();print(\"total\",len(ps),dict(collections.Counter(p[\"server\"].split(\":\")[0] for p in ps)))"
-echo "=== ERRORES ult 12h ==="; docker logs --since 12h betmexico-web 2>&1 | grep -iE "ProxyError|504|406|Traceback|RETRY_LATER|pool seco|SIN PROXY" | tail -15
+echo "=== ERRORES ult 12h ==="; docker logs --since 12h betmexico-web 2>&1 | grep -iE "ProxyError|504|406|Traceback|RETRY_LATER|pool seco|SIN PROXY" | tail -10
 '
 ```
 
