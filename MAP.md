@@ -260,6 +260,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `6d39d51` | fix(commands): simplificar abrir-bmx y cerrar-bmx a flujo ultrarrapido local-first |
 | `8d44a95` | fix(commands): actualizar abrir-bmx con comando SSH robusto sin fallos de parsing PowerShell |
 | `7ff8599` | style(telegram-mock): pasar lineas a texto plano y code mono a botmexico |
 | `8b8e911` | style(telegram-mock): actualizar membrete oficial a placa industrial con lineas dobles |
@@ -271,7 +272,6 @@ prewarm.py (router)
 | `50856bc` | docs(bet): plan definitivo para feedback en vivo, confirmacion y portal operador |
 | `ab19c08` | fix(logs): pasada impeccable (audit/colorize/layout/optimize/polish) sobre la consola de Logs |
 | `35e3bd4` | feat(logs): consola de Logs con categorías, auditoría de tarjetas y vista dual de bots Telegram |
-| `e5975f9` | docs(next-session): actualizar estado de cierre y pendientes del bot mock |
 <!-- GEN:end:recientes -->
 
 ---
