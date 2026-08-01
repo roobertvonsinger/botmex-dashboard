@@ -69,17 +69,17 @@ POC_GREETINGS = [
     "¡Échale,",
 ]
 
-# Tiraderas breves con rima y flow mexa real (2 a 4 líneas)
+# Tiraderas freestyle estilo Aczino (Punchlines + Métrica + Flow Mexa de Batalla)
 RAP_DISCLAIMERS = [
-    "Pide doscientos a su jefa y compra un bot en Telegram,\ntrae puro carbón pa' la asada mientras las LIVE se le van.\nNo te apendejes mi noob, tira la tarjeta que acomoda,\naquí se cobra en mudo y se COMASOLO a la moda. 🔥🥩",
+    "Le pidió doscientos a su jefa pa' pagarse el bot en Telegram,\npresume su 'método' y las LIVE solitas se le van.\nMe trae puro carbón a la asada y quiere comer como rey:\naquí se COMASOLO, morro, respeta la ley. 🎤🔥",
 
-    "Mucho hacker de ChatGPT presumiendo su abliteración,\npero no sabe livear una CC ni armar una sola petición.\nLe vendieron puro carbón en un checker de dos pesos,\nBoTMexico liquida directo y los deja sin huesos. 💀⚡",
+    "Se siente hacker de élite porque a ChatGPT le pide la abliteración,\npero no sabe livear una CC ni ejecutar una sola petición.\nCompró tres CCs muertas en un checker de dos pesos,\nBoTMexico liquida en mudo y a los noobs les rompe los huesos. 💀⚡",
 
-    "Soñando con su Airbnb en automático y ni un cURL sabe tirar,\ncompra combos quemados y luego se pone a chillar.\nTrae la discada apagada y la pasarela en llamas,\naquí se opera en silencio sin andar con dramas. 🚀💸",
+    "Soñando con su Airbnb en automático sin saber tirar ni un cURL,\npresumiendo configs en Discord mientras su saldo se va a cero full.\nTrae la pasarela quemada y la discada apagada,\naquí se cobra directo sin andar de mamada. 🚀💸",
 
-    "Creyéndose binerito top con config heredada,\nno sabe meter un proxy limpio y se queda con la cara helada.\nTrae la bolsa de carbón pero la carne nunca prendió,\nel cashout se cobra solo y tu método se murió. 🎤🥩",
+    "Te vendieron la 'fórmula mágica' y te dejaron en ceros el canal,\ncreyéndote binerito top y no sabes ni qué es un proxy funcional.\nTraes la bolsa de carbón pero el fuego nunca encendió,\nel cashout se cobra en silencio y tu estafa ya se murió. 🎤🥩",
 
-    "Compró tres CCs muertas en un canal que lo estafó,\nse cree patrón del circuito y a la primera declinada se cayó.\nRasca tu propio plato, morro, deja la novela,\nBoTMexico no consuela, liquida la quiniela. 🌵⚡"
+    "Compró tarjetas quemadas en Telegram y anda chillando en la red,\nse cree patrón del circuito y se está muriendo de sed.\nBoTMexico no pide fe ni te regala consuelo:\ntiras la CC correcta o te vas directo al suelo. 🌵⚡"
 ]
 
 def get_random_greeting() -> str:
