@@ -260,6 +260,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d89c282` | feat(telegram-mock): refactorizar flujo /bet con streaming, lenguaje carding, llenado automatico y resumen |
 | `62f7794` | fix(telegram-mock): corregir interceptacion de callbacks bet/check en ConversationHandler |
 | `c866964` | fix(telegram-mock): corregir etiqueta del boton de ayuda en start_cmd |
 | `94f47c5` | style(telegram-mock): limpiar separadores de puntos y actualizar botones start/help |
@@ -271,7 +272,6 @@ prewarm.py (router)
 | `8d44a95` | fix(commands): actualizar abrir-bmx con comando SSH robusto sin fallos de parsing PowerShell |
 | `7ff8599` | style(telegram-mock): pasar lineas a texto plano y code mono a botmexico |
 | `8b8e911` | style(telegram-mock): actualizar membrete oficial a placa industrial con lineas dobles |
-| `097e56c` | feat(telegram-mock): rediseño layouts, apodos por ID, menu lateral de 3 botones y liveness feedback animado |
 <!-- GEN:end:recientes -->
 
 ---

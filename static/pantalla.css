@@ -381,7 +381,14 @@
      ya maneja su propio overflow (wrap en el combo, ellipsis en movimientos). */
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
   grid-template-rows: 1fr;
-  grid-template-areas: "ident stage txns";
+  /* Orden visual ident → txns (Movimientos) → stage (Depósito/Retiro), swap
+     2026-08-01 (Robert): "Movimientos" pasa a la 2ª columna y "Depósito/Retiro"
+     a la 3ª — invierte el orden que dejó la ronda 2026-07-28 (ver comentario
+     arriba). Puramente visual: grid-area en .pat-col-txns/.pat-col-stage no
+     cambia, solo dónde cae cada área nombrada — el orden del DOM en pantalla.js
+     (renderPantallaTxns antes que renderPantallaStageCol) es irrelevante para
+     grid con áreas nombradas, así que el swap vive aquí, no en el JS. */
+  grid-template-areas: "ident txns stage";
   column-gap: 0; row-gap: 14px;
   flex: 1 1 auto; min-height: 0; margin-bottom: 8px;
 }
@@ -391,7 +398,8 @@
 .pat-wrap.pat-cramped .pat-columns {
   grid-template-columns: 1fr;
   grid-template-rows: auto auto minmax(64px, 1fr);
-  grid-template-areas: "ident" "stage" "txns";
+  /* Mismo swap que arriba (ident → txns → stage) para el fallback apilado. */
+  grid-template-areas: "ident" "txns" "stage";
 }
 
 /* Ancho = el del combo en una línea (max-content). El divisor de .pat-col-txns cae
