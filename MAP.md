@@ -260,6 +260,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `2610b2e` | docs(spec): añadir diseño de integración Graphify MCP global |
 | `6d39d51` | fix(commands): simplificar abrir-bmx y cerrar-bmx a flujo ultrarrapido local-first |
 | `8d44a95` | fix(commands): actualizar abrir-bmx con comando SSH robusto sin fallos de parsing PowerShell |
 | `7ff8599` | style(telegram-mock): pasar lineas a texto plano y code mono a botmexico |
@@ -271,7 +272,6 @@ prewarm.py (router)
 | `06d23ab` | feat(bet): live feedback, confirmacion de loop y portal de operador |
 | `50856bc` | docs(bet): plan definitivo para feedback en vivo, confirmacion y portal operador |
 | `ab19c08` | fix(logs): pasada impeccable (audit/colorize/layout/optimize/polish) sobre la consola de Logs |
-| `35e3bd4` | feat(logs): consola de Logs con categorías, auditoría de tarjetas y vista dual de bots Telegram |
 <!-- GEN:end:recientes -->
 
 ---
