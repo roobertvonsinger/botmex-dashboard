@@ -129,15 +129,14 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{HEADER}\n\n"
         f"¡Qué onda, <b>{nickname}</b>! 👋\n"
         f"• ID Telegram: <code>{user_id}</code>\n\n"
-        f"  🌵 {get_random_greeting()}\n\n"
-        " · · · · · · · · · · · · · · · · · · · · · · · · · · ·  · · · · · · · · · · · · · · · · · · · ·"
+        f"  🌵 {get_random_greeting()}\n"
     )
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⚡ Auto Depósito (/bet)", callback_data="btn_start_bet")],
-        [InlineKeyboardButton("🔍 Verificar Combos (/check)", callback_data="btn_start_check")],
-        [InlineKeyboardButton("📖 Manual / Guía (/help)", callback_data="btn_start_help")],
-        [InlineKeyboardButton("🛑 Cancelar Proceso (/cancel)", callback_data="btn_start_cancel")],
-        [InlineKeyboardButton("🌐 Portal Web Operador", url=DASHBOARD_URL)]
+        [InlineKeyboardButton("💳 CC Auto-Match", callback_data="btn_start_bet")],
+        [InlineKeyboardButton("🔑 Check Combos/Accesos", callback_data="btn_start_check")],
+        [InlineKeyboardButton("Directo: /bet <tarjetas>", callback_data="btn_start_help")],
+        [InlineKeyboardButton("🛑 Cancelar/Detener proceso", callback_data="btn_start_cancel")],
+        [InlineKeyboardButton("🇲🇽 botmexico.net (Dashboard)", url=DASHBOARD_URL)]
     ])
     await update.message.reply_text(msg, parse_mode="HTML", reply_markup=kb)
 
@@ -173,25 +172,23 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
         msg = (
             f"{HEADER}\n\n"
             "<b>Manual Operativo BoTMexico:</b>\n\n"
-            "• <b>/bet</b> — 💳 Auto Depósito [CC Auto-match]\n"
+            "• <b>/bet</b> — 💳 CC Auto-Match\n"
             "  Pega 1 a 4 tarjetas <code>num|mm|yy|cvv</code> (o escribe <code>/bet &lt;tarjetas&gt;</code> directo).\n"
             "  <i>Valida liveness vía Ruthopia gate, hace match y liquida de una.</i>\n\n"
-            "• <b>/check</b> — 🔍 Verificación de Combos\n"
+            "• <b>/check</b> — 🔑 Check Combos/Accesos\n"
             "  Envía combos <code>correo:pass</code> en chat (máx 100) o adjunta <code>.txt</code> (máx 5,000).\n"
             "  <i>Valida balance y estado sin tocar saldo ni quemar cuentas.</i>\n\n"
-            "• <b>/botmex</b> — 🌐 Portal Web\n"
+            "• <b>/botmex</b> — 🇲🇽 botmexico.net (Dashboard)\n"
             "  Enlace directo al núcleo del Dashboard de Operador.\n\n"
-            "• <b>/help</b> — 📖 Manual Operativo\n"
+            "• <b>/help</b> — ❔ Ayuda\n"
             "  Muestra esta guía rápida de instrucciones.\n\n"
-            "• <b>/cancel</b> — 🛑 Abortar Operación\n"
+            "• <b>/cancel</b> — 🛑 Cancelar/Detener proceso\n"
             "  Cancela cualquier misión activa y libera cuentas de inmediato.\n\n"
-            " · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · ·\n"
             f"  🌵 {get_random_greeting()}\n"
-            " · · · · · · · · · · · · · · · · · · · · · · · · · · ·  · · · · · · · · · · · · · · · · · · · ·"
         )
         kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⚡ Ir a /bet Directo", callback_data="btn_start_bet")],
-            [InlineKeyboardButton("🌐 Abrir Portal Web", url=DASHBOARD_URL)]
+            [InlineKeyboardButton("💳 CC Auto-Match", callback_data="btn_start_bet")],
+            [InlineKeyboardButton("🇲🇽 botmexico.net (Dashboard)", url=DASHBOARD_URL)]
         ])
         await query.edit_message_text(msg, parse_mode="HTML", reply_markup=kb)
     elif query.data == "btn_start_cancel":
@@ -217,25 +214,23 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
         f"{HEADER}\n\n"
         "<b>Manual Operativo BoTMexico:</b>\n\n"
-        "• <b>/bet</b> — 💳 Auto Depósito [CC Auto-match]\n"
+        "• <b>/bet</b> — 💳 CC Auto-Match\n"
         "  Pega 1 a 4 tarjetas <code>num|mm|yy|cvv</code> (o escribe <code>/bet &lt;tarjetas&gt;</code> directo).\n"
         "  <i>Valida liveness vía Ruthopia gate, hace match y liquida de una.</i>\n\n"
-        "• <b>/check</b> — 🔍 Verificación de Combos\n"
+        "• <b>/check</b> — 🔑 Check Combos/Accesos\n"
         "  Envía combos <code>correo:pass</code> en chat (máx 100) o adjunta <code>.txt</code> (máx 5,000).\n"
         "  <i>Valida balance y estado sin tocar saldo ni quemar cuentas.</i>\n\n"
-        "• <b>/botmex</b> — 🌐 Portal Web\n"
+        "• <b>/botmex</b> — 🇲🇽 botmexico.net (Dashboard)\n"
         "  Enlace directo al núcleo del Dashboard de Operador.\n\n"
-        "• <b>/help</b> — 📖 Manual Operativo\n"
+        "• <b>/help</b> — ❔ Ayuda\n"
         "  Muestra esta guía rápida de instrucciones.\n\n"
-        "• <b>/cancel</b> — 🛑 Abortar Operación\n"
+        "• <b>/cancel</b> — 🛑 Cancelar/Detener proceso\n"
         "  Cancela cualquier misión activa y libera cuentas de inmediato.\n\n"
-        " · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · ·\n"
         f"  🌵 {get_random_greeting()}\n"
-        " · · · · · · · · · · · · · · · · · · · · · · · · · · ·  · · · · · · · · · · · · · · · · · · · ·"
     )
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⚡ Ir a /bet Directo", callback_data="btn_start_bet")],
-        [InlineKeyboardButton("🌐 Abrir Portal Web", url=DASHBOARD_URL)]
+        [InlineKeyboardButton("💳 CC Auto-Match", callback_data="btn_start_bet")],
+        [InlineKeyboardButton("🇲🇽 botmexico.net (Dashboard)", url=DASHBOARD_URL)]
     ])
     await update.message.reply_text(msg, parse_mode="HTML", reply_markup=kb)
 
@@ -879,8 +874,7 @@ async def setup_bot_commands(application):
     startup_msg = (
         f"{HEADER}\n\n"
         "⚡ <b>Telegram Bot Online</b>\n\n"
-        "Sistema listo. A darle...\n\n"
-        " · · · · · · · · · · · · · · · · · · · · · · · · · · ·  · · · · · · · · · · · · · · · · · · · ·"
+        "Sistema listo. A darle..."
     )
     try:
         await application.bot.send_message(
