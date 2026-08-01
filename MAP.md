@@ -24,6 +24,10 @@
 | Agregar evento SSE | `app.py` → `_broadcast()` + `docs/SSE_EVENTS.md` | |
 | Cambiar caps duros de depósito | `deposits.py` L28–L35 | DEP_MAX_PER_TXN, DEP_MAX_24H, AUTOLOCK_HOURS_* |
 | Analizar si una tarjeta/pasarela está quemada | `shared/betmexico_payment_analyzer.py` | Algoritmo V10 |
+| Cambiar el comportamiento del agente de soporte | `docs/AGENTE_SOPORTE.md` | Es el system prompt literal — se edita sin tocar Python |
+| Agregar/quitar una herramienta del agente | `support_tools.py` | Escritura → agregar a `_EXECUTORS` (un test verifica que no falte) |
+| Cambiar el modelo del agente | env `SUPPORT_MODEL_CHAIN="a,b,c"` | Cadena con fallback; default en `support_llm.DEFAULT_CHAIN` |
+| Reiniciar contenedores desde el código | `support_dockerd.py` | Lista blanca; el socket NO se monta en `betmexico-web` |
 | Ver estado funcional de features | `docs/AUDIT.md` | ✅❌⚠️🔵❓ |
 | Ver errores conocidos + fix | `docs/ERRORS.md` | |
 | Deploy a KVM4 | `DEPLOY.md` + `docs/protocols/deploy-protocol.md` | |
@@ -82,6 +86,7 @@ prewarm.py (router)
 | 6 | BANK_REJECTED ≠ error de captcha | BANK_REJECTED = banco rechazó la tarjeta, no el captcha | No reintentar en BANK_REJECTED |
 | 7 | LitPort falla 0% | Reputación IP baja para BetMexico | Excluido via `_EXCLUDED_PROXY_HOSTS` en `proxy_pool.py` |
 | 8 | `402 Payment Required` masivo en login (sin `[API] Status:` previo) | **Proxy sin saldo** (IPRoyal). El 402 es del CONNECT al proxy (`X-Response-Origin: proxy-server`), NO de BetMexico ni proxyless. | IPRoyal en `_EXCLUDED_PROXY_HOSTS`. Recargar saldo y quitarlo. Ver `docs/ERRORS.md` §"402 Payment Required". |
+| 9 | Un contenedor se ve `Up` y hasta responde HTTP, pero toda llamada saliente falla con `EAI_AGAIN: getaddrinfo` | **Sin red Docker**: `.NetworkSettings.Networks` == `{}`. Sin red no hay DNS ni egress; los endpoints que sirven datos estáticos siguen respondiendo y disimulan el problema. Le pasó al 9router (13 h caído sirviendo `/v1/models` normal). | `docker inspect <c> --format '{{json .NetworkSettings.Networks}}'` **antes** de culpar al upstream → `docker network connect <red> <c>` (aditivo, no recrea). Ver `docs/ERRORS.md` §"9router sin ninguna red Docker". |
 
 ---
 
@@ -93,7 +98,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 4747 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 4801 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1022 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -112,6 +117,11 @@ prewarm.py (router)
 | `scripts/migrate_status_no_banco.py` | 80 | `—` | _[completar]_ |
 | `scripts/recalc_grades.py` | 136 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `shared/betmexico_payment_analyzer.py` | 593 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
+| `support_agent.py` | 227 | `—` | _[completar]_ |
+| `support_dockerd.py` | 92 | `betmexico.dockerd` | _[completar]_ |
+| `support_llm.py` | 160 | `—` | _[completar]_ |
+| `support_routes.py` | 103 | `—` | _[completar]_ |
+| `support_tools.py` | 512 | `—` | _[completar]_ |
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
 | `test_account_refresh.py` | 122 | `—` | _[completar]_ |
@@ -138,6 +148,10 @@ prewarm.py (router)
 | `test_renapo_validator.py` | 50 | `—` | _[completar]_ |
 | `test_search.py` | 70 | `—` | _[completar]_ |
 | `test_sse_visibility.py` | 88 | `—` | _[completar]_ |
+| `test_support_gate.py` | 114 | `—` | _[completar]_ |
+| `test_support_llm.py` | 189 | `—` | _[completar]_ |
+| `test_support_routes.py` | 83 | `—` | _[completar]_ |
+| `test_support_tools.py` | 117 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 71 | `—` | _[completar]_ |
 | `test_withdrawals.py` | 361 | `—` | _[completar]_ |
@@ -156,6 +170,7 @@ prewarm.py (router)
 <!-- GEN:start:constantes -->
 | Constante | Valor | Módulo |
 |-----------|-------|--------|
+| `ROBERT_CHAT_ID` | `1341812706` | `app.py` |
 | `SESSION_TTL` | `86_400` | `auth.py` |
 | `PERSISTENT_USERS` | `{"robertvs"}` | `auth.py` |
 | `PERSISTENT_TTL` | `60 * 60 * 24 * 365 * 10` | `auth.py` |
@@ -210,6 +225,13 @@ prewarm.py (router)
 | `C_DEEP_REST_DAYS` | `30` | `shared/betmexico_payment_analyzer.py` |
 | `SCORE_FLOOR` | `{"A": 80, "B": 60, "C": 40, "D": 0}` | `shared/betmexico_payment_analyzer.py` |
 | `SCORE_CEIL` | `{"A": 100, "B": 79, "C": 59, "D": 39}` | `shared/betmexico_payment_analyzer.py` |
+| `MAX_ROUNDS` | `6` | `support_agent.py` |
+| `HISTORY_TURNS` | `12` | `support_agent.py` |
+| `PERMITIDOS` | `{"betmexico-web", "betmexico-bot", "betmexico-mock-bot"}` | `support_dockerd.py` |
+| `REDACTED` | `"‹oculto›"` | `support_tools.py` |
+| `MAX_ROWS` | `200` | `support_tools.py` |
+| `PENDING_TTL_SEC` | `600` | `support_tools.py` |
+| `ROBERT_CHAT_ID` | `1341812706` | `support_tools.py` |
 | `SCHEMA` | `"""` | `test_a1_estados.py` |
 | `NOW` | `1_800_000_000` | `test_account_refresh.py` |
 | `OP_A` | `{"role": "user", "telegram_id": 555, "display": "Lau"}` | `test_account_touch.py` |
@@ -238,6 +260,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `be180f6` | feat(logs): jerarquizacion visual de logs, combos y tarjetas completas copiables en 1-click |
 | `f3b4243` | feat(bet): clabe stp 1-tap copy, query param redirect preservation and portal landing banner |
 | `30ddd01` | style(telegram-mock): minimal Limbo-style UI, interactive start buttons and mysterious concise copy |
 | `06d23ab` | feat(bet): live feedback, confirmacion de loop y portal de operador |
@@ -249,7 +272,6 @@ prewarm.py (router)
 | `b64ef27` | fix(telegram-mock): corregir asignacion de cuentas y agregar boton detener mision |
 | `5b99ffd` | fix(auto_deposit): omitir cuentas sin tarjeta asignada en plan_auto_mission |
 | `f444ed2` | fix(checker): apuntar DATABASE_PATH a /data/ruthopia.db en el volumen compartido |
-| `89d531f` | fix(checker): vincular DATABASE_PATH a /app/ruthopia_data/ruthopia.db montado de Ruthopia |
 <!-- GEN:end:recientes -->
 
 ---

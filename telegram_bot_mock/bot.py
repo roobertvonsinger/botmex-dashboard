@@ -5,12 +5,13 @@ Usa la misma BD compartida y los motores de login / matchmaking del dashboard.
 
 import asyncio
 import os
+import random
 import sys
 import time
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -35,6 +36,7 @@ try:
         is_authorized,
         DB_PATH,
         HEADER_LOCKUP,
+        get_user_nickname,
     )
 except ImportError:
     from config import (
@@ -45,6 +47,7 @@ except ImportError:
         is_authorized,
         DB_PATH,
         HEADER_LOCKUP,
+        get_user_nickname,
     )
 
 # Imports del dashboard & bot core
@@ -55,6 +58,52 @@ from card_checker import precheck_card_liveness, format_ruthopia_liveness_summar
 from auto_deposit import plan_auto_mission, run_auto_mission
 from deposits import _mission_sem
 
+# Frases del greeting del dashboard web
+DASHBOARD_GREETINGS = [
+    "El saldo habla; los demás, que murmuren.",
+    "Calladito, cargadito, y a la siguiente cuenta.",
+    "Que sude el banco — nosotros a cuadrar. 🇲🇽",
+    "Hoy el panel se ve verde, y no es de envidia.",
+    "El que madruga agarra las LIVE.",
+    "Menos ansiedad, más actividad.",
+    "Disciplina de monje, hambre de tianguis.",
+    "Cada cuenta cuenta y cada peso pesa.",
+    "Si el proxy aguanta, aquí aguantamos todos.",
+    "No es suerte, mi rey: es que le sabemos.",
+    "Trabaja en silencio y deja que el saldo grite.",
+    "Las cuentas no se cuadran solas, éntrale.",
+    "Respira hondo: hay LIVE pa' rato.",
+    "El billete es penoso; invítalo con confianza.",
+    "Aquí se chambea bonito, no se sufre feo.",
+    "Un día más en la trinchera. A darle con fe.",
+    "Listos para mover cuentas y mantener la pasarela limpia.",
+    "Monitoreo activo. La disciplina le gana al desmadre.",
+    "Otra sesión sin aviso previo. Muy tú.",
+    "Todo listo para la acción. Vamos por esos matches.",
+    "Que el banco afloje",
+    "Hoy se cosecha verde",
+    "Calladito y bonito",
+    "Tú deposita nomás",
+    "Que caiga la feria",
+    "Menos fe, más tarjeta",
+    "Puro saldo, mi rey",
+    "Aquí se deposita fino",
+    "Verdecito y al tiro",
+    "El billete no espera",
+]
+
+def get_random_greeting() -> str:
+    return f"<i>\"{random.choice(DASHBOARD_GREETINGS)}\"</i>"
+
+# Membrete Oficial BoTMexico
+HEADER_DECORATIVE = (
+    " · · · · · · · · · · · · · · · · · ·  · · · · · · · · · · · ·\n"
+    "🇲🇽🌵━━ · <b>BoTMexico</b> · ━━🌵🇲🇽\n"
+    " · · · · · · · · · · · · · · · · · · · · · · · · · · ·  · · · · · · · · · · · · · · · · · · · ·"
+)
+
+HEADER = HEADER_DECORATIVE
+
 # Estados de Conversación
 (WAIT_CHECK_CONFIRM, WAIT_BET_CONFIRM) = range(2)
 
@@ -64,33 +113,31 @@ _confirm_events: Dict[str, Tuple[asyncio.Event, Dict[str, Any]]] = {}
 
 
 # ─────────────────────────────────────────────────────────────────────
-# COMANDOS BÁSICOS (Estilo Minimalista Limbo)
+# COMANDOS BÁSICOS (Estilo BoTMexico)
 # ─────────────────────────────────────────────────────────────────────
 
-HEADER = "👁️ <b>BOTMEX</b>"
-
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /start — Entrada directa minimalista."""
+    """Comando /start — Entrada con membrete oficial, saludo por apodo e ID."""
     user_id = update.effective_user.id
     if not is_authorized(user_id):
         await update.message.reply_text(f"{HEADER}\n\nAcceso denegado.", parse_mode="HTML")
         return
 
+    nickname = get_user_nickname(user_id, update.effective_user.first_name)
+
     msg = (
         f"{HEADER}\n\n"
-        "Sistema en línea.\n"
-        "Sin intermediarios.\n\n"
-        "<b>Comandos:</b>\n"
-        "• /bet — Depósito automático\n"
-        "• /check — Verificar combos\n"
-        "• /botmex — Portal Web\n"
-        "• /help — Guía rápida\n"
-        "• /cancel — Abortar todo"
+        f"¡Qué onda, <b>{nickname}</b>! 👋\n"
+        f"• ID Telegram: <code>{user_id}</code>\n\n"
+        f"  🌵 {get_random_greeting()}\n\n"
+        " · · · · · · · · · · · · · · · · · · · · · · · · · · ·  · · · · · · · · · · · · · · · · · · · ·"
     )
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⚡ Iniciar Depósito (/bet)", callback_data="btn_start_bet")],
+        [InlineKeyboardButton("⚡ Auto Depósito (/bet)", callback_data="btn_start_bet")],
         [InlineKeyboardButton("🔍 Verificar Combos (/check)", callback_data="btn_start_check")],
-        [InlineKeyboardButton("🌐 Portal Web", url=DASHBOARD_URL)]
+        [InlineKeyboardButton("📖 Manual / Guía (/help)", callback_data="btn_start_help")],
+        [InlineKeyboardButton("🛑 Cancelar Proceso (/cancel)", callback_data="btn_start_cancel")],
+        [InlineKeyboardButton("🌐 Portal Web Operador", url=DASHBOARD_URL)]
     ])
     await update.message.reply_text(msg, parse_mode="HTML", reply_markup=kb)
 
@@ -102,9 +149,13 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
     if query.data == "btn_start_bet":
         await query.edit_message_text(
             f"{HEADER}\n\n"
-            "🎰 <b>MODO DEPÓSITO (/bet)</b>\n\n"
-            "Envía 1 a 4 tarjetas pipe:\n"
-            "<code>4111111111111111|12|28|123</code>",
+            "💳 <b>Auto Deposito [CC Auto-match] (/BET)</b>\n\n"
+            "Pega tus CeCes en formato:\n"
+            "<code>4111111111111111|12|28|123</code>\n\n"
+            "🌵 Una por línea (máximo 4 tarjetas por intento).\n"
+            "🇲🇽 <b>BoTMexico</b> encuentra una cuenta para tu CC 💳\n"
+            "🤖 One Click & Watcha la magia...\n\n"
+            f"<i>{get_random_greeting()}</i>",
             parse_mode="HTML"
         )
         return WAIT_BET_CONFIRM
@@ -113,29 +164,80 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
             f"{HEADER}\n\n"
             "📥 <b>VERIFICACIÓN COMBOS (/check)</b>\n\n"
             "Envía combos en chat (máx 100) o archivo .txt (máx 5,000):\n"
-            "<code>correo:contraseña</code>",
+            "<code>correo:contraseña</code>\n\n"
+            f"<i>{get_random_greeting()}</i>",
             parse_mode="HTML"
         )
         return WAIT_CHECK_CONFIRM
+    elif query.data == "btn_start_help":
+        msg = (
+            f"{HEADER}\n\n"
+            "<b>Manual Operativo BoTMexico:</b>\n\n"
+            "• <b>/bet</b> — 💳 Auto Depósito [CC Auto-match]\n"
+            "  Pega 1 a 4 tarjetas <code>num|mm|yy|cvv</code> (o escribe <code>/bet &lt;tarjetas&gt;</code> directo).\n"
+            "  <i>Valida liveness vía Ruthopia gate, hace match y liquida de una.</i>\n\n"
+            "• <b>/check</b> — 🔍 Verificación de Combos\n"
+            "  Envía combos <code>correo:pass</code> en chat (máx 100) o adjunta <code>.txt</code> (máx 5,000).\n"
+            "  <i>Valida balance y estado sin tocar saldo ni quemar cuentas.</i>\n\n"
+            "• <b>/botmex</b> — 🌐 Portal Web\n"
+            "  Enlace directo al núcleo del Dashboard de Operador.\n\n"
+            "• <b>/help</b> — 📖 Manual Operativo\n"
+            "  Muestra esta guía rápida de instrucciones.\n\n"
+            "• <b>/cancel</b> — 🛑 Abortar Operación\n"
+            "  Cancela cualquier misión activa y libera cuentas de inmediato.\n\n"
+            " · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · ·\n"
+            f"  🌵 {get_random_greeting()}\n"
+            " · · · · · · · · · · · · · · · · · · · · · · · · · · ·  · · · · · · · · · · · · · · · · · · · ·"
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⚡ Ir a /bet Directo", callback_data="btn_start_bet")],
+            [InlineKeyboardButton("🌐 Abrir Portal Web", url=DASHBOARD_URL)]
+        ])
+        await query.edit_message_text(msg, parse_mode="HTML", reply_markup=kb)
+    elif query.data == "btn_start_cancel":
+        user_id = update.effective_user.id
+        with db(write=True) as c:
+            c.execute(
+                "UPDATE auto_missions SET status='cancelled' "
+                "WHERE operator_id=? AND status IN ('pending', 'running', 'paused')",
+                (user_id,)
+            )
+        context.user_data.clear()
+        await query.edit_message_text(
+            f"{HEADER}\n\n"
+            "🛑 <b>Proceso abortado.</b>\n"
+            "Operaciones detenidas limpiamente.",
+            parse_mode="HTML"
+        )
+        return ConversationHandler.END
 
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /help — Tajante de pocas palabras."""
+    """Comando /help — Guía rápida con membrete oficial y jerga de operador."""
     msg = (
         f"{HEADER}\n\n"
-        "<b>Manual Operativo:</b>\n\n"
-        "1. <b>/bet</b>\n"
-        "Ingresa 1 a 4 tarjetas pipe.\n"
-        "Matchmaking y depósito automático.\n\n"
-        "2. <b>/check</b>\n"
-        "Combos <code>correo:pass</code>.\n"
-        "Valida liveness sin tocar saldo.\n\n"
-        "3. <b>/cancel</b>\n"
-        "Detiene cualquier proceso activo.\n\n"
-        "4. <b>/botmex</b>\n"
-        "Acceso directo al portal web."
+        "<b>Manual Operativo BoTMexico:</b>\n\n"
+        "• <b>/bet</b> — 💳 Auto Depósito [CC Auto-match]\n"
+        "  Pega 1 a 4 tarjetas <code>num|mm|yy|cvv</code> (o escribe <code>/bet &lt;tarjetas&gt;</code> directo).\n"
+        "  <i>Valida liveness vía Ruthopia gate, hace match y liquida de una.</i>\n\n"
+        "• <b>/check</b> — 🔍 Verificación de Combos\n"
+        "  Envía combos <code>correo:pass</code> en chat (máx 100) o adjunta <code>.txt</code> (máx 5,000).\n"
+        "  <i>Valida balance y estado sin tocar saldo ni quemar cuentas.</i>\n\n"
+        "• <b>/botmex</b> — 🌐 Portal Web\n"
+        "  Enlace directo al núcleo del Dashboard de Operador.\n\n"
+        "• <b>/help</b> — 📖 Manual Operativo\n"
+        "  Muestra esta guía rápida de instrucciones.\n\n"
+        "• <b>/cancel</b> — 🛑 Abortar Operación\n"
+        "  Cancela cualquier misión activa y libera cuentas de inmediato.\n\n"
+        " · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · ·\n"
+        f"  🌵 {get_random_greeting()}\n"
+        " · · · · · · · · · · · · · · · · · · · · · · · · · · ·  · · · · · · · · · · · · · · · · · · · ·"
     )
-    await update.message.reply_text(msg, parse_mode="HTML")
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⚡ Ir a /bet Directo", callback_data="btn_start_bet")],
+        [InlineKeyboardButton("🌐 Abrir Portal Web", url=DASHBOARD_URL)]
+    ])
+    await update.message.reply_text(msg, parse_mode="HTML", reply_markup=kb)
 
 
 async def botmex_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -145,7 +247,8 @@ async def botmex_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
     await update.message.reply_text(
         f"{HEADER}\n\n"
-        f"Acceso al núcleo:\n{DASHBOARD_URL}",
+        f"Acceso directo al portal web:\n{DASHBOARD_URL}\n\n"
+        f"🌵 {get_random_greeting()}",
         parse_mode="HTML",
         reply_markup=kb,
     )
@@ -165,8 +268,8 @@ async def cancel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     await update.message.reply_text(
         f"{HEADER}\n\n"
-        "🛑 Proceso abortado.\n"
-        "Operaciones detenidas.",
+        "🛑 <b>Proceso abortado.</b>\n"
+        "Operaciones detenidas limpiamente.",
         parse_mode="HTML"
     )
     return ConversationHandler.END
@@ -396,32 +499,65 @@ async def _run_check_task(chat_id: int, bot, valid_combos: List[Dict[str, Any]],
 # FLUJO /BET
 # ─────────────────────────────────────────────────────────────────────
 
+async def _animate_loading_dots(message, base_text: str, total_seconds: float = 10.0):
+    """Muestra una animación fluida de puntos suspensivos ("Espera.", "Espera..", "Espera...") durante un tiempo determinado."""
+    start_time = time.time()
+    dots_state = 1
+    while time.time() - start_time < total_seconds:
+        dots = "." * dots_state
+        dots_state = (dots_state % 3) + 1
+        text = f"{base_text}\n\n  Espera{dots}"
+        try:
+            await message.edit_text(text, parse_mode="HTML")
+        except Exception:
+            pass
+        await asyncio.sleep(1.2)
+
+
 async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Punto de entrada para /bet — Solicita tarjetas."""
+    """Punto de entrada para /bet — Acepta tarjetas adjuntas o las solicita."""
     user_id = update.effective_user.id
     if not is_authorized(user_id):
         await update.message.reply_text("❌ No autorizado.")
         return ConversationHandler.END
 
-    await update.message.reply_text(
-        "🎰 <b>MODO AUTOMÁTICO DE DEPÓSITO (/BET)</b>\n\n"
-        "Envía de 1 a 4 tarjetas en formato pipe:\n"
+    # Verificar si el usuario envió tarjetas directamente junto al comando: /bet 4111...|12|28|123
+    args = context.args
+    if args:
+        raw_text = " ".join(args)
+        # Inyectar texto simulado para procesar directo
+        update.message.text = raw_text
+        return await process_bet_input(update, context)
+
+    msg = (
+        f"{HEADER}\n\n"
+        "💳 <b>Auto Deposito [CC Auto-match] (/BET)</b>\n\n"
+        "Pega tus CeCes en formato:\n"
         "<code>4111111111111111|12|28|123</code>\n\n"
-        "<i>Una por línea (máximo 4 tarjetas por intento).</i>",
-        parse_mode="HTML"
+        "🌵 Una por línea (máximo 4 tarjetas por intento).\n"
+        "🇲🇽 <b>BoTMexico</b> encuentra una cuenta para tu CC 💳\n"
+        "🤖 One Click & Watcha la magia...\n\n"
+        f"🌵 {get_random_greeting()}"
     )
+    await update.message.reply_text(msg, parse_mode="HTML")
     return WAIT_BET_CONFIRM
 
 
 async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Procesa las tarjetas ingresadas para /bet."""
+    """Procesa las tarjetas ingresadas para /bet con feedback animado y liveness premium."""
     text = update.message.text.strip() if update.message.text else ""
-    if text.startswith("/"):
+    if text.startswith("/") and not any(char.isdigit() for char in text):
         await update.message.reply_text("❌ Envía las tarjetas, no un comando.")
         return WAIT_BET_CONFIRM
 
-    card_pipes = [line.strip() for line in text.splitlines() if line.strip()]
-    if not card_pipes or len(card_pipes) > 4:
+    # Limpiar líneas de tarjetas
+    lines = [line.strip() for line in text.splitlines() if line.strip() and not line.startswith("/")]
+    if not lines and text.startswith("/bet"):
+        parts = text.split(maxsplit=1)
+        if len(parts) > 1:
+            lines = [line.strip() for line in parts[1].splitlines() if line.strip()]
+
+    if not lines or len(lines) > 4:
         await update.message.reply_text("❌ Debes enviar entre 1 y 4 tarjetas por intento.")
         return WAIT_BET_CONFIRM
 
@@ -438,15 +574,29 @@ async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if strikes_count >= MAX_DAILY_STRIKES:
         await update.message.reply_text(
-            f"❌ <b>Límite de {MAX_DAILY_STRIKES} strikes diarios alcanzado.</b> Contacta al SuperAdmin.",
+            f"{HEADER}\n\n"
+            f"❌ <b>Límite de {MAX_DAILY_STRIKES} strikes diarios alcanzado.</b> Contacta al SuperAdmin.\n"
+            f"<i>Los strikes previenen el quema de pasarelas con tarjetas inválidas.</i>",
             parse_mode="HTML"
         )
         return ConversationHandler.END
 
+    # 1. Enviar mensaje inicial de feedback de liveness
+    greeting = get_random_greeting()
+    loading_base_text = (
+        f"{HEADER}\n\n"
+        f"  🌵 {greeting}\n\n"
+        f"  Checando que las CCs estén vivas, cortesía de  ∷ <b>ʀᴜᴛʜᴏᴘɪᴀ</b> ∷  ◎  chk"
+    )
+    status_msg = await update.message.reply_text(f"{loading_base_text}\n\n  Espera...", parse_mode="HTML")
+
+    # 2. Correr la animación de puntos suspensivos y el liveness
+    liveness_task = asyncio.create_task(_animate_loading_dots(status_msg, loading_base_text, total_seconds=10.0))
+
     # Validar liveness
     valid_pipes = []
     liveness_records = []
-    for pipe in card_pipes:
+    for pipe in lines:
         ok, reason, parsed = precheck_card_liveness(pipe)
         liveness_records.append({"pipe": pipe, "ok": ok, "status_label": reason})
         logger.info(
@@ -456,31 +606,49 @@ async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if ok:
             valid_pipes.append(parsed["pipe_3parts"])
 
+    # Esperar a que concluya la animación de 10s para lectura óptima del operador
+    await liveness_task
+
     summary_text = format_ruthopia_liveness_summary(liveness_records)
+    strikes_left = MAX_DAILY_STRIKES - strikes_count
+    live_count = len(valid_pipes)
+
     if not valid_pipes:
-        await update.message.reply_text(
-            f"❌ Ninguna tarjeta es válida:\n\n{summary_text}",
-            parse_mode="HTML"
+        fail_msg = (
+            f"{HEADER}\n\n"
+            f"⚠️ <b>NO SE DETECTARON TARJETAS LIVE</b>\n\n"
+            f"• 💳 CCs LIVE: <b>0</b>\n"
+            f"• ⚠️ Strikes: <b>{strikes_count} / {MAX_DAILY_STRIKES}</b>\n"
+            f"  <i>(Strikes acumulados hoy por tarjetas muertas/inválidas)</i>\n\n"
+            f"{summary_text}"
         )
+        try:
+            await status_msg.edit_text(fail_msg, parse_mode="HTML")
+        except Exception:
+            await update.message.reply_text(fail_msg, parse_mode="HTML")
         return ConversationHandler.END
 
     context.user_data["pending_bet_pipes"] = valid_pipes
 
-    strikes_left = MAX_DAILY_STRIKES - strikes_count
     confirm_msg = (
-        f"<b>⚠️ CONFIRMACIÓN DE DEPÓSITO AUTOMÁTICO</b>\n\n"
-        f"• <b>Tarjetas Válidas:</b> {len(valid_pipes)}\n"
-        f"• <b>Strikes Restantes:</b> {strikes_left} / {MAX_DAILY_STRIKES}\n\n"
+        f"{HEADER}\n\n"
+        f"El 🌵 de la Suerte y la v... te acompañan! >>> WARD!! 🛡️✨\n\n"
+        f" • 💳 <b>CCs LIVE: {live_count}</b>\n"
+        f" • ⚠️ <b>Strikes: {strikes_left} / {MAX_DAILY_STRIKES} restantes</b>\n"
+        f"   <i>(Margen de tolerancia diario antes de bloqueo por reintentos)</i>\n\n"
         f"{summary_text}\n\n"
-        f"<i>¿Deseas iniciar el proceso de matchmaking y depósito?</i>"
+        f"<b>¿Ya le damos? de una...</b> 🚀"
     )
     kb = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🚀 Iniciar Depósitos", callback_data="confirm_bet"),
-            InlineKeyboardButton("❌ Cancelar", callback_data="cancel_bet")
+            InlineKeyboardButton("🚀 De Una / Iniciar Depósitos", callback_data="confirm_bet"),
+            InlineKeyboardButton("🛑 Cancelar", callback_data="cancel_bet")
         ]
     ])
-    await update.message.reply_text(confirm_msg, parse_mode="HTML", reply_markup=kb)
+    try:
+        await status_msg.edit_text(confirm_msg, parse_mode="HTML", reply_markup=kb)
+    except Exception:
+        await update.message.reply_text(confirm_msg, parse_mode="HTML", reply_markup=kb)
     return WAIT_BET_CONFIRM
 
 
@@ -694,9 +862,40 @@ async def handle_stop_mission_callback(update: Update, context: ContextTypes.DEF
 # CONFIGURACIÓN Y MAIN
 # ─────────────────────────────────────────────────────────────────────
 
+async def setup_bot_commands(application):
+    """Configura el menú nativo de comandos de Telegram (únicamente /start, /help y /cancel)."""
+    commands = [
+        BotCommand("start", "🚀 Menú Principal"),
+        BotCommand("help", "📖 Guía Rápida / Manual"),
+        BotCommand("cancel", "🛑 Cancelar / Abortar Proceso"),
+    ]
+    try:
+        await application.bot.set_my_commands(commands)
+        logger.info("[Bot] Menú nativo de comandos en Telegram configurado exitosamente.")
+    except Exception as ex:
+        logger.warning(f"[Bot] No se pudo registrar menú nativo de comandos: {ex}")
+
+    # Enviar mensaje startup exclusivo al SuperAdmin (Robert)
+    startup_msg = (
+        f"{HEADER}\n\n"
+        "⚡ <b>Telegram Bot Online</b>\n\n"
+        "Sistema listo. A darle...\n\n"
+        " · · · · · · · · · · · · · · · · · · · · · · · · · · ·  · · · · · · · · · · · · · · · · · · · ·"
+    )
+    try:
+        await application.bot.send_message(
+            chat_id=SUPERADMIN_ID,
+            text=startup_msg,
+            parse_mode="HTML"
+        )
+        logger.info(f"[Bot] Notificación de arranque enviada exclusivamente a SuperAdmin ({SUPERADMIN_ID}).")
+    except Exception as ex:
+        logger.warning(f"[Bot] No se pudo enviar notificación de arranque a SuperAdmin: {ex}")
+
+
 def build_app():
     """Construye la aplicación python-telegram-bot."""
-    app = ApplicationBuilder().token(MOCK_BOT_TOKEN).build()
+    app = ApplicationBuilder().token(MOCK_BOT_TOKEN).post_init(setup_bot_commands).build()
 
     # Handlers directos
     app.add_handler(CommandHandler("start", start_cmd))
@@ -705,7 +904,7 @@ def build_app():
     app.add_handler(CommandHandler("cancel", cancel_cmd))
 
     # Handler callback para botones de /start
-    app.add_handler(CallbackQueryHandler(start_buttons_callback, pattern="^(btn_start_bet|btn_start_check)$"))
+    app.add_handler(CallbackQueryHandler(start_buttons_callback, pattern="^(btn_start_bet|btn_start_check|btn_start_help|btn_start_cancel)$"))
 
     # Handler callback independiente para detener misión iniciada
     app.add_handler(CallbackQueryHandler(handle_stop_mission_callback, pattern="^stop_mission_"))

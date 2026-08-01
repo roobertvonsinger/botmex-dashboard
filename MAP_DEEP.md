@@ -42,124 +42,126 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_is_maintenance_active` | def | L614–L617 |
 | `_maintenance_gate_middleware` | def | L620–L648 |
 | `_no_cache_static_assets` | def | L652–L664 |
-| `favicon` | def | L672–L673 |
-| `maintenance_page` | def | L677–L678 |
-| `login_page` | def | L682–L685 |
-| `_asset_mtimes` | def | L701–L708 |
-| `_frontend_version` | def | L711–L715 |
-| `portal_page` | def | L719–L723 |
-| `index` | def | L727–L756 |
-| `api_version` | def | L760–L770 |
-| `auth_login` | def | L779–L810 |
-| `auth_set_password` | def | L814–L838 |
-| `auth_logout` | def | L842–L846 |
-| `auth_me` | def | L850–L855 |
-| `health` | def | L861–L867 |
-| `_build_search_clause` | def | L870–L914 |
-| `list_accounts` | def | L918–L1040 |
-| `list_users` | def | L1046–L1054 |
-| `list_assignments` | def | L1058–L1079 |
-| `AssignRequest` | class | L1082–L1084 |
-| `assign_accounts` | def | L1088–L1107 |
-| `unassign_accounts` | def | L1111–L1122 |
-| `stats` | def | L1126–L1133 |
-| `_wsai_status` | def | L1148–L1173 |
-| `_maybe_alert_broadcast` | def | L1180–L1197 |
-| `_check_one_proxy` | def | L1200–L1226 |
-| `_proxy_health` | def | L1229–L1278 |
-| `_capmonster_balance` | def | L1281–L1301 |
-| `_operator_color` | def | L1306–L1321 |
-| `_resolve_who` | def | L1324–L1337 |
-| `_event_visible_to` | def | L1340–L1366 |
-| `superadmin_kpis` | def | L1370–L1613 |
-| `RefreshRequest` | class | L1618–L1619 |
-| `accounts_refresh` | def | L1623–L1642 |
-| `_tail_log_file` | def | L1662–L1690 |
-| `get_logs` | def | L1694–L1704 |
-| `get_logs_telegram` | def | L1714–L1729 |
-| `_run_health_checks` | def | L1737–L1773 |
-| `health_full` | def | L1777–L1778 |
-| `_require_sa` | def | L1786–L1788 |
-| `admin_diag` | def | L1792–L1823 |
-| `admin_ping` | def | L1827–L1848 |
-| `admin_refresh_proxy` | def | L1852–L1859 |
-| `admin_services_restart` | def | L1863–L1877 |
-| `admin_export_logs` | def | L1881–L1893 |
-| `admin_pause_state` | def | L1901–L1903 |
-| `admin_pause` | def | L1907–L1919 |
-| `admin_resume` | def | L1923–L1929 |
-| `admin_emergency_stop` | def | L1933–L1968 |
-| `admin_vps_reboot` | def | L1972–L1984 |
-| `health_last` | def | L1988–L1989 |
-| `health_dismiss` | def | L1993–L1996 |
-| `api_marks_list` | def | L2000–L2007 |
-| `api_marks_toggle` | def | L2011–L2029 |
-| `api_recent` | def | L2033–L2105 |
-| `api_accounts_at_hand` | def | L2109–L2217 |
-| `_health_loop` | def | L2220–L2230 |
-| `_release_account` | def | L2233–L2254 |
-| `_run_lock_janitor` | def | L2257–L2305 |
-| `_janitor_loop` | def | L2308–L2318 |
-| `_run_window_watcher` | def | L2327–L2399 |
-| `_window_watcher_loop` | def | L2402–L2411 |
-| `_release_watchdog_tick` | def | L2414–L2513 |
-| `_release_watchdog_loop` | def | L2516–L2524 |
-| `_jwt_keepalive_loop` | def | L2527–L2544 |
-| `_account_refresh_loop` | def | L2547–L2565 |
-| `_startup_telegram_notify` | def | L2568–L2590 |
-| `_start_bg_tasks` | def | L2594–L2601 |
-| `LockRequest` | class | L2604–L2606 |
-| `lock_account` | def | L2610–L2649 |
-| `PublishRequest` | class | L2652–L2654 |
-| `publish_accounts` | def | L2658–L2687 |
-| `hide_all_accounts` | def | L2691–L2706 |
-| `pool_accounts` | def | L2710–L2728 |
-| `api_pool_split` | def | L2732–L2746 |
-| `api_pool_publish` | def | L2750–L2784 |
-| `unlock_account` | def | L2788–L2806 |
-| `_sse_generator` | def | L2809–L2835 |
-| `events` | def | L2839–L2849 |
-| `account_cards_pipe` | def | L2853–L2879 |
-| `account_notes_summary` | def | L2883–L2908 |
-| `_record_account_touch` | def | L2911–L2944 |
-| `account_find_id` | def | L2948–L2954 |
-| `account_details` | def | L2958–L3338 |
-| `NoteCreate` | class | L3341–L3342 |
-| `create_note` | def | L3346–L3375 |
-| `CurpUpdate` | class | L3378–L3379 |
-| `update_curp` | def | L3383–L3394 |
-| `get_clabes` | def | L3404–L3413 |
-| `refresh_clabes` | def | L3417–L3427 |
-| `_persist_withdrawal` | def | L3436–L3482 |
-| `withdraw` | def | L3486–L3531 |
-| `withdraw_status` | def | L3535–L3692 |
-| `delete_note` | def | L3696–L3708 |
-| `CombosRequest` | class | L3711–L3712 |
-| `accounts_combos` | def | L3716–L3729 |
-| `accounts_pass_map` | def | L3733–L3738 |
-| `list_all_cards` | def | L3742–L3817 |
-| `activity_feed` | def | L3821–L3918 |
-| `list_deposits` | def | L3922–L3951 |
-| `deposits_stats` | def | L3955–L3980 |
-| `_persist_auto_mission` | def | L3988–L4018 |
-| `admin_maintenance_state` | def | L4022–L4025 |
-| `MaintenanceToggleRequest` | class | L4028–L4029 |
-| `admin_maintenance_toggle` | def | L4033–L4054 |
-| `auto_deposit_create` | def | L4058–L4094 |
-| `auto_deposit_cancel` | def | L4098–L4124 |
-| `operator_my_accounts` | def | L4128–L4141 |
-| `auto_deposit_status` | def | L4145–L4156 |
-| `register_operator_strike` | def | L4159–L4192 |
-| `bot_start_info` | def | L4196–L4232 |
-| `bot_operator_info` | def | L4236–L4275 |
-| `bot_help_info` | def | L4279–L4293 |
-| `bot_pause_mission` | def | L4297–L4326 |
-| `bot_resume_mission` | def | L4330–L4348 |
-| `bot_cancel_mission` | def | L4353–L4388 |
-| `bot_bet_create` | def | L4392–L4561 |
-| `filter_and_sanitize_check_combos` | def | L4564–L4649 |
-| `BotCheckRequest` | class | L4652–L4656 |
-| `bot_check` | def | L4659–L4740 |
+| `favicon` | def | L679–L680 |
+| `maintenance_page` | def | L684–L685 |
+| `login_page` | def | L689–L692 |
+| `_asset_mtimes` | def | L709–L716 |
+| `_frontend_version` | def | L719–L723 |
+| `portal_page` | def | L727–L731 |
+| `index` | def | L735–L764 |
+| `api_version` | def | L768–L778 |
+| `auth_login` | def | L787–L818 |
+| `auth_set_password` | def | L822–L846 |
+| `auth_logout` | def | L850–L854 |
+| `auth_me` | def | L858–L863 |
+| `health` | def | L869–L875 |
+| `_build_search_clause` | def | L878–L922 |
+| `list_accounts` | def | L926–L1048 |
+| `list_users` | def | L1054–L1062 |
+| `list_assignments` | def | L1066–L1087 |
+| `AssignRequest` | class | L1090–L1092 |
+| `assign_accounts` | def | L1096–L1115 |
+| `unassign_accounts` | def | L1119–L1130 |
+| `stats` | def | L1134–L1141 |
+| `_wsai_status` | def | L1156–L1181 |
+| `_maybe_alert_broadcast` | def | L1188–L1205 |
+| `_check_one_proxy` | def | L1208–L1234 |
+| `_proxy_health` | def | L1237–L1286 |
+| `_capmonster_balance` | def | L1289–L1309 |
+| `_operator_color` | def | L1314–L1329 |
+| `_resolve_who` | def | L1332–L1345 |
+| `_event_visible_to` | def | L1348–L1374 |
+| `superadmin_kpis` | def | L1378–L1621 |
+| `RefreshRequest` | class | L1626–L1627 |
+| `accounts_refresh` | def | L1631–L1650 |
+| `_tail_log_file` | def | L1670–L1698 |
+| `get_logs` | def | L1702–L1712 |
+| `get_logs_telegram` | def | L1722–L1737 |
+| `_run_health_checks` | def | L1745–L1781 |
+| `health_full` | def | L1785–L1786 |
+| `_require_sa` | def | L1794–L1796 |
+| `admin_diag` | def | L1800–L1831 |
+| `admin_ping` | def | L1835–L1856 |
+| `admin_refresh_proxy` | def | L1860–L1867 |
+| `admin_services_restart` | def | L1871–L1892 |
+| `admin_export_logs` | def | L1896–L1912 |
+| `admin_pause_state` | def | L1920–L1922 |
+| `admin_pause` | def | L1926–L1938 |
+| `admin_resume` | def | L1942–L1948 |
+| `admin_emergency_stop` | def | L1952–L1987 |
+| `admin_vps_reboot` | def | L1991–L2003 |
+| `health_last` | def | L2007–L2008 |
+| `health_dismiss` | def | L2012–L2015 |
+| `api_marks_list` | def | L2019–L2026 |
+| `api_marks_toggle` | def | L2030–L2048 |
+| `api_recent` | def | L2052–L2124 |
+| `api_accounts_at_hand` | def | L2128–L2236 |
+| `_health_loop` | def | L2239–L2249 |
+| `_release_account` | def | L2252–L2273 |
+| `_run_lock_janitor` | def | L2276–L2324 |
+| `_janitor_loop` | def | L2327–L2337 |
+| `_run_window_watcher` | def | L2346–L2418 |
+| `_window_watcher_loop` | def | L2421–L2430 |
+| `_release_watchdog_tick` | def | L2433–L2532 |
+| `_release_watchdog_loop` | def | L2535–L2543 |
+| `_jwt_keepalive_loop` | def | L2546–L2563 |
+| `_account_refresh_loop` | def | L2566–L2584 |
+| `_bot_token` | def | L2590–L2599 |
+| `_notify_robert` | def | L2602–L2617 |
+| `_startup_telegram_notify` | def | L2620–L2644 |
+| `_start_bg_tasks` | def | L2648–L2655 |
+| `LockRequest` | class | L2658–L2660 |
+| `lock_account` | def | L2664–L2703 |
+| `PublishRequest` | class | L2706–L2708 |
+| `publish_accounts` | def | L2712–L2741 |
+| `hide_all_accounts` | def | L2745–L2760 |
+| `pool_accounts` | def | L2764–L2782 |
+| `api_pool_split` | def | L2786–L2800 |
+| `api_pool_publish` | def | L2804–L2838 |
+| `unlock_account` | def | L2842–L2860 |
+| `_sse_generator` | def | L2863–L2889 |
+| `events` | def | L2893–L2903 |
+| `account_cards_pipe` | def | L2907–L2933 |
+| `account_notes_summary` | def | L2937–L2962 |
+| `_record_account_touch` | def | L2965–L2998 |
+| `account_find_id` | def | L3002–L3008 |
+| `account_details` | def | L3012–L3392 |
+| `NoteCreate` | class | L3395–L3396 |
+| `create_note` | def | L3400–L3429 |
+| `CurpUpdate` | class | L3432–L3433 |
+| `update_curp` | def | L3437–L3448 |
+| `get_clabes` | def | L3458–L3467 |
+| `refresh_clabes` | def | L3471–L3481 |
+| `_persist_withdrawal` | def | L3490–L3536 |
+| `withdraw` | def | L3540–L3585 |
+| `withdraw_status` | def | L3589–L3746 |
+| `delete_note` | def | L3750–L3762 |
+| `CombosRequest` | class | L3765–L3766 |
+| `accounts_combos` | def | L3770–L3783 |
+| `accounts_pass_map` | def | L3787–L3792 |
+| `list_all_cards` | def | L3796–L3871 |
+| `activity_feed` | def | L3875–L3972 |
+| `list_deposits` | def | L3976–L4005 |
+| `deposits_stats` | def | L4009–L4034 |
+| `_persist_auto_mission` | def | L4042–L4072 |
+| `admin_maintenance_state` | def | L4076–L4079 |
+| `MaintenanceToggleRequest` | class | L4082–L4083 |
+| `admin_maintenance_toggle` | def | L4087–L4108 |
+| `auto_deposit_create` | def | L4112–L4148 |
+| `auto_deposit_cancel` | def | L4152–L4178 |
+| `operator_my_accounts` | def | L4182–L4195 |
+| `auto_deposit_status` | def | L4199–L4210 |
+| `register_operator_strike` | def | L4213–L4246 |
+| `bot_start_info` | def | L4250–L4286 |
+| `bot_operator_info` | def | L4290–L4329 |
+| `bot_help_info` | def | L4333–L4347 |
+| `bot_pause_mission` | def | L4351–L4380 |
+| `bot_resume_mission` | def | L4384–L4402 |
+| `bot_cancel_mission` | def | L4407–L4442 |
+| `bot_bet_create` | def | L4446–L4615 |
+| `filter_and_sanitize_check_combos` | def | L4618–L4703 |
+| `BotCheckRequest` | class | L4706–L4710 |
+| `bot_check` | def | L4713–L4794 |
 
 ### `auth.py`
 
@@ -447,6 +449,77 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `analyze_gateway_ban_pattern` | def | L437–L507 |
 | `generate_payment_analysis_summary` | def | L514–L562 |
 | `generate_payment_ready_txt` | def | L565–L593 |
+
+### `support_agent.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `_now` | def | L47–L48 |
+| `load_system_prompt` | def | L51–L57 |
+| `build_snapshot` | def | L60–L80 |
+| `load_history` | def | L85–L102 |
+| `save_message` | def | L105–L117 |
+| `clear_history` | def | L120–L128 |
+| `SupportAgent` | class | L133–L227 |
+
+### `support_dockerd.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `_cli` | def | L34–L36 |
+| `health` | def | L40–L46 |
+| `listar` | def | L50–L69 |
+| `reiniciar` | def | L73–L86 |
+
+### `support_llm.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `chain_from_env` | def | L39–L43 |
+| `LLMClient` | class | L46–L160 |
+
+### `support_routes.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `_sa_only` | def | L27–L29 |
+| `ChatIn` | class | L32–L34 |
+| `ConfirmIn` | class | L37–L38 |
+| `chat` | def | L42–L66 |
+| `confirm` | def | L70–L78 |
+| `history` | def | L82–L87 |
+| `borrar_history` | def | L91–L94 |
+| `config` | def | L98–L103 |
+
+### `support_tools.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `_db_path` | def | L44–L45 |
+| `_now` | def | L48–L49 |
+| `is_sensitive_col` | def | L58–L60 |
+| `_strip_comments` | def | L63–L66 |
+| `sanitize_sql` | def | L69–L103 |
+| `_ro_connection` | def | L106–L109 |
+| `consultar_bd` | def | L112–L122 |
+| `redact_for_model` | def | L125–L136 |
+| `ensure_schema` | def | L141–L167 |
+| `_docker` | def | L172–L176 |
+| `_exec_reiniciar_servicio` | def | L179–L189 |
+| `_exec_pausar_sistema` | def | L192–L200 |
+| `_exec_reanudar_sistema` | def | L203–L209 |
+| `_exec_desbloquear_cuenta` | def | L212–L225 |
+| `_encolar` | def | L247–L260 |
+| `redeem` | def | L263–L292 |
+| `tool_result_text` | def | L295–L307 |
+| `_tool_estado_sistema` | def | L312–L345 |
+| `_tool_leer_logs` | def | L355–L375 |
+| `_tool_avisar_telegram` | def | L378–L387 |
+| `_tool_brief_para_claude_code` | def | L390–L408 |
+| `_tool_registrar_incidente` | def | L411–L425 |
+| `_tool_consultar_bd` | def | L428–L429 |
+| `run_tool` | def | L444–L455 |
+| `_f` | def | L460–L463 |
 
 ### `test_a1_estados.py`
 
@@ -789,6 +862,75 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_resolve_who_carries_who_id` | def | L72–L76 |
 | `test_broadcast_operator_receives_own` | def | L79–L88 |
 
+### `test_support_gate.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `gate_db` | def | L14–L16 |
+| `sin_efectos` | def | L20–L31 |
+| `test_tool_de_escritura_no_ejecuta_solo_encola` | def | L42–L46 |
+| `test_toda_write_tool_declarada_tiene_ejecutor` | def | L49–L51 |
+| `test_el_resultado_para_el_modelo_no_afirma_exito` | def | L54–L59 |
+| `test_redeem_ejecuta_una_vez` | def | L64–L69 |
+| `test_token_es_de_un_solo_uso` | def | L72–L78 |
+| `test_token_inventado_es_rechazado` | def | L81–L84 |
+| `test_token_expirado_es_rechazado` | def | L87–L93 |
+| `test_tool_de_lectura_si_ejecuta_sola` | def | L98–L102 |
+| `test_tool_desconocida_no_revienta_el_loop` | def | L105–L107 |
+| `test_sql_invalido_devuelve_error_no_excepcion` | def | L110–L114 |
+
+### `test_support_llm.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `sse` | def | L18–L19 |
+| `delta` | def | L22–L23 |
+| `tool_delta` | def | L26–L35 |
+| `cliente` | def | L38–L40 |
+| `drenar` | def | L43–L44 |
+| `test_acumula_texto_y_reporta_modelo` | def | L50–L57 |
+| `test_reensambla_tool_call_partido_en_varios_chunks` | def | L63–L76 |
+| `test_soporta_dos_tool_calls_en_paralelo` | def | L80–L89 |
+| `test_argumentos_vacios_quedan_como_objeto_valido` | def | L93–L99 |
+| `test_cae_al_siguiente_modelo_ante_502` | def | L105–L117 |
+| `test_cae_al_siguiente_ante_error_de_red` | def | L121–L127 |
+| `test_si_todos_fallan_emite_error_no_excepcion` | def | L131–L137 |
+| `test_no_hace_fallback_despues_de_emitir_texto` | def | L141–L162 |
+| `test_ignora_lineas_basura_y_keepalives` | def | L168–L175 |
+| `test_reporta_uso_de_tokens_si_el_router_lo_manda` | def | L179–L189 |
+
+### `test_support_routes.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `test_el_router_esta_montado` | def | L12–L17 |
+| `test_config_reporta_router_y_cadena` | def | L20–L25 |
+| `test_history_arranca_vacio_y_crea_su_esquema` | def | L28–L31 |
+| `test_borrar_history_responde` | def | L34–L37 |
+| `test_no_superadmin_recibe_403` | def | L48–L50 |
+| `test_chat_no_superadmin_recibe_403` | def | L53–L56 |
+| `test_confirm_no_superadmin_recibe_403` | def | L59–L62 |
+| `test_chat_rechaza_mensaje_vacio` | def | L67–L69 |
+| `test_chat_rechaza_imagen_que_no_es_data_uri` | def | L72–L77 |
+| `test_confirm_con_token_inventado_da_400` | def | L80–L83 |
+
+### `test_support_tools.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `test_sql_no_lectura_es_rechazado` | def | L29–L31 |
+| `test_select_y_with_pasan` | def | L39–L40 |
+| `test_limit_se_fuerza_si_falta` | def | L43–L45 |
+| `test_limit_propio_se_respeta_si_es_menor` | def | L48–L51 |
+| `test_limit_excesivo_se_recorta` | def | L54–L56 |
+| `test_bd_es_read_only_de_verdad` | def | L59–L68 |
+| `test_consulta_real_devuelve_filas` | def | L71–L75 |
+| `test_password_no_sale_al_modelo` | def | L80–L86 |
+| `test_cvv_y_tarjeta_no_salen_al_modelo` | def | L89–L96 |
+| `test_columnas_normales_no_se_redactan` | def | L99–L103 |
+| `test_catalogo_de_columnas_sensibles` | def | L111–L112 |
+| `test_columnas_inocuas_no_marcadas` | def | L116–L117 |
+
 ### `test_unificacion_sp1.py`
 
 | Símbolo | Tipo | Líneas |
@@ -1039,6 +1181,14 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `POST` | `/cancel` | `prewarm.py` |
 | `GET` | `/status` | `prewarm.py` |
 | `POST` | `/refresh-stream` | `prewarm.py` |
+| `GET` | `/health` | `support_dockerd.py` |
+| `GET` | `/containers/json` | `support_dockerd.py` |
+| `POST` | `/containers/{nombre}/restart` | `support_dockerd.py` |
+| `POST` | `/chat` | `support_routes.py` |
+| `POST` | `/confirm` | `support_routes.py` |
+| `GET` | `/history` | `support_routes.py` |
+| `DELETE` | `/history` | `support_routes.py` |
+| `GET` | `/config` | `support_routes.py` |
 <!-- GEN:end:endpoints -->
 
 ---
@@ -1061,6 +1211,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `betmexico.dashboard.prewarm` | `prewarm.py` |
 | `betmexico.dashboard.sse` | `app.py` |
 | `betmexico.dashboard.withdrawals` | `withdrawals.py` |
+| `betmexico.dockerd` | `support_dockerd.py` |
 | `betmexico.renapo_validator` | `renapo_validator.py` |
 | `betmexico.web.auth` | `web_auth.py` |
 | `betmexico.web.grading` | `web_grading.py` |

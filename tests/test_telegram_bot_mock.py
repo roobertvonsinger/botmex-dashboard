@@ -86,7 +86,8 @@ async def test_start_cmd_unauthorized():
     update.message = AsyncMock(spec=Message)
 
     await start_cmd(update, None)
-    update.message.reply_text.assert_called_once_with("❌ No estás autorizado para usar este bot.")
+    args, kwargs = update.message.reply_text.call_args
+    assert "Acceso denegado" in args[0]
 
 
 @pytest.mark.asyncio
@@ -100,8 +101,7 @@ async def test_start_cmd_authorized():
     await start_cmd(update, None)
     assert update.message.reply_text.called
     args, kwargs = update.message.reply_text.call_args
-    assert "ʙ.ᴏᴛᴍᴇxɪᴄᴏ" in args[0]
-    assert "⊢ ʙ.ᴏᴛᴍᴇx" in args[0]
+    assert "BoTMexico" in args[0]
     assert kwargs.get("parse_mode") == "HTML"
 
 
@@ -112,7 +112,7 @@ async def test_help_cmd():
 
     await help_cmd(update, None)
     args, kwargs = update.message.reply_text.call_args
-    assert "GUÍA RÁPIDA DE COMANDOS" in args[0]
+    assert "Manual Operativo BoTMexico" in args[0]
 
 
 @pytest.mark.asyncio
@@ -122,7 +122,7 @@ async def test_botmex_cmd():
 
     await botmex_cmd(update, None)
     args, kwargs = update.message.reply_text.call_args
-    assert "Acceso al Dashboard Web" in args[0]
+    assert "Acceso directo al portal web" in args[0]
 
 
 @pytest.mark.asyncio
@@ -430,8 +430,9 @@ async def test_bet_card_invalid_or_cooldown(seed_db):
 
     res = await process_bet_input(update, context)
     assert res == ConversationHandler.END
-    args, kwargs = update.message.reply_text.call_args
-    assert "Ninguna tarjeta es válida" in args[0]
+    status_msg = update.message.reply_text.return_value
+    args, kwargs = status_msg.edit_text.call_args
+    assert "NO SE DETECTARON TARJETAS LIVE" in args[0]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
