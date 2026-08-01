@@ -69,15 +69,15 @@ POC_GREETINGS = [
     "¡Échale,",
 ]
 
-# Tiradera rap pesado para bineros / niños rata (máx 4 líneas, tiradera sin tecnicismos)
+# Tiradera rap pesado para bineros / niños rata (máx 4 líneas, tiradera orgánica mexicana)
 RAP_DISCLAIMERS = [
-    "Llegó el binerito a pedir su milagro,\ncon CCs regaladas queriéndose hacer el perro agrio.\nBoTMexico no da consuelo ni le pide paro a la flota,\naprovecha mijo, ¡NO TE APENDEJES Y COMASOLO sin ver gota! 🔥💥",
+    "Llegó el niño rata tirando crema en el chat,\ncon tres tarjetas muertas jugando a ser el capo del club.\nAquí no hay merolico ni chisme de novela,\n¡aprovecha mijito, no te apendejes y COMASOLO sin secuela! 🔥🚀",
 
-    "Puro morro de Discord presumiendo un LIVE chafa,\naquí no se viene a mamar, se les revienta la estafa.\nSi venías a llorar mejor pícale a otra bola,\naprovecha mijito, ¡NO TE APENDEJES Y COMASOLO a la primera sola! 🎤⚡",
+    "Puro morro de Discord presumiendo un saldo chafa,\na la primera declinada se le cae la estafa.\nBoTMexico no habla, les liquida la pasarela sola,\n¡aprovecha carnal, no te apendejes y COMASOLO a la primera! 🎤⚡",
 
-    "Mucho chamaco mamador jugando a ser el patrón,\ncon tres tarjetas quemadas tirando la de gran varón.\nBoTMexico no dice nada, nomás liquida sin demora,\naprovecha mijo, ¡NO TE APENDEJES Y COMASOLO desde ahora! 💸⚡",
+    "Mucho binerito creyendo que trae la receta,\nse le quema el inventario y anda chillando en la banqueta.\nAquí se cobra mudo, la feria se desborda y vuela,\n¡aprovecha mijito, no te apendejes y COMASOLO la quiniela! 💸💥",
 
-    "Ahí viene el niño rata creyendo que trae la receta,\ny a la primera declinada ya anda chillando en la libreta.\nAquí se opera en mudo, no me vengas con tu drama,\naprovecha mijito, ¡NO TE APENDEJES Y COMASOLO en la toma! 🌵💥"
+    "Traes el hocico suelto pero la cuenta pelada,\nse te frena el sistema y te quedas sin mirada.\nBoTMexico no pide fe, liquida directo de una toma,\n¡aprovecha carnal, no te apendejes y COMASOLO en la zona! 🌵🔥"
 ]
 
 def get_random_greeting() -> str:
