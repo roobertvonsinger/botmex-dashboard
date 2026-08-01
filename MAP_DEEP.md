@@ -306,9 +306,9 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_mm_session_update` | def | L1858–L1867 |
 | `multi_stream` | def | L1871–L2386 |
 | `multi_cancel` | def | L2390–L2395 |
-| `scheduled_create` | def | L2408–L2767 |
-| `scheduled_list` | def | L2771–L2793 |
-| `scheduled_cancel` | def | L2797–L2805 |
+| `scheduled_create` | def | L2408–L2774 |
+| `scheduled_list` | def | L2778–L2800 |
+| `scheduled_cancel` | def | L2804–L2812 |
 
 ### `jwt_keeper.py`
 
@@ -833,6 +833,15 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
 | `TestRenapoValidator` | class | L7–L47 |
+
+### `test_scheduled_deposit_3ds_logging.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `_FakePool` | class | L14–L22 |
+| `_FakeRequest` | class | L25–L30 |
+| `sched_harness` | def | L34–L65 |
+| `test_scheduled_3ds_abort_logs_it` | def | L69–L93 |
 
 ### `test_search.py`
 

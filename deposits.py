@@ -2626,6 +2626,13 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                 if code in MM_THREEDS_RC:
                     # 3DS → la cuenta es premium (pasarela robusta): grade 'A+' y para
                     # la misión (no es decline; misma lógica del matchmaker).
+                    # Antes esta rama no logueaba nada (solo el SSE) — si el operador
+                    # no estaba viendo la pantalla en ese instante, no había forma de
+                    # reconstruir el corte desde `docker logs` (caso ALBERTOcr7).
+                    logger.info(
+                        f"[Scheduled {sched_id}] rep {iter_num} 3DS_REQUIRED — "
+                        f"{email} pasa a A+, misión detenida"
+                    )
                     try:
                         from app import db as _appdb
                         with _appdb(write=True) as cdb:

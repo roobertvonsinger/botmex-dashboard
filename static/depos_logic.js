@@ -119,6 +119,19 @@
     return 'No se pudo completar, intenta de nuevo'; // error nuestro: humanizado, sin tripas
   }
 
+  // Mensaje del operador cuando el depósito PROGRAMADO aborta a media corrida
+  // (kind: scheduled_aborted). 3DS y rate-limit no son "fallo nuestro" — pero
+  // el mensaje debe decir la causa real y explícita (antes 3DS solo mostraba
+  // "Cuenta premium A+ ✓", sin la palabra 3DS — el operador no podía saber
+  // por qué se detuvo sin ir a revisar logs/BD a mano).
+  function schedAbortedMessage(code) {
+    const c = (code || '').toUpperCase();
+    if (c === 'RATE_LIMITED') return 'Cuenta en pausa por seguridad · reintenta luego';
+    if (c.indexOf('3DS') >= 0) return '3DS detectado · cuenta pasó a A+ · misión detenida';
+    if (isRealRejection(code)) return humanError(code);
+    return 'Misión detenida';
+  }
+
   // Formato CANÓNICO ÚNICO de la UI: NNNN|MM|YYYY|CVV (año 4 dígitos, sin /).
   // Normaliza cualquier pipe (3 o 4 partes, año 2 o 4 díg) a ese formato.
   function canonicalPipe(s) {
@@ -135,5 +148,5 @@
     return nd + '|' + mm + '|' + yyyy + '|' + cd;
   }
 
-  return { deriveMode, presetsForMode, mapPhaseToScene, phaseToPct, validatePipe, parseCombo, fmtMoney, isRealRejection, humanError, canonicalPipe };
+  return { deriveMode, presetsForMode, mapPhaseToScene, phaseToPct, validatePipe, parseCombo, fmtMoney, isRealRejection, humanError, schedAbortedMessage, canonicalPipe };
 });

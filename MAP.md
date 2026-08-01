@@ -106,7 +106,7 @@ prewarm.py (router)
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 152 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
-| `deposits.py` | 2805 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2812 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 323 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 416 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 892 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -146,6 +146,7 @@ prewarm.py (router)
 | `test_pool_manage.py` | 52 | `—` | _[completar]_ |
 | `test_refresh_single_guard.py` | 77 | `—` | _[completar]_ |
 | `test_renapo_validator.py` | 50 | `—` | _[completar]_ |
+| `test_scheduled_deposit_3ds_logging.py` | 93 | `—` | _[completar]_ |
 | `test_search.py` | 70 | `—` | _[completar]_ |
 | `test_sse_visibility.py` | 88 | `—` | _[completar]_ |
 | `test_support_gate.py` | 114 | `—` | _[completar]_ |
@@ -260,6 +261,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `4fea30f` | fix(pantalla): intercambiar orden visual Movimientos <-> Deposito/Retiro |
 | `d89c282` | feat(telegram-mock): refactorizar flujo /bet con streaming, lenguaje carding, llenado automatico y resumen |
 | `62f7794` | fix(telegram-mock): corregir interceptacion de callbacks bet/check en ConversationHandler |
 | `c866964` | fix(telegram-mock): corregir etiqueta del boton de ayuda en start_cmd |
@@ -271,7 +273,6 @@ prewarm.py (router)
 | `6d39d51` | fix(commands): simplificar abrir-bmx y cerrar-bmx a flujo ultrarrapido local-first |
 | `8d44a95` | fix(commands): actualizar abrir-bmx con comando SSH robusto sin fallos de parsing PowerShell |
 | `7ff8599` | style(telegram-mock): pasar lineas a texto plano y code mono a botmexico |
-| `8b8e911` | style(telegram-mock): actualizar membrete oficial a placa industrial con lineas dobles |
 <!-- GEN:end:recientes -->
 
 ---

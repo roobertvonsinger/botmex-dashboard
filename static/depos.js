@@ -616,12 +616,10 @@
     } else if (ev.kind === 'scheduled_retry') {
       setScene('retry'); setSub('Reintentando · intento ' + (ev.attempt || '') + '/' + (ev.max || ''));
     } else if (ev.kind === 'scheduled_aborted') {
-      // Mensaje específico: enfriamiento y 3DS NO son "fallo" — comunican estado real.
-      let msg = 'Misión detenida';
-      if (ev.code === 'RATE_LIMITED') msg = 'Cuenta en pausa por seguridad · reintenta luego';
-      else if (/3DS/i.test(ev.code || '')) msg = 'Cuenta premium A+ ✓';
-      else if (D.isRealRejection(ev.code)) msg = humanError(ev.code);
-      setSub(msg); schedFinish();
+      // Mensaje específico: enfriamiento y 3DS NO son "fallo" — comunican estado
+      // real, y punto de partida SIEMPRE explícito para reconstruir la causa
+      // (D.schedAbortedMessage, testeado en depos_logic.test.js).
+      setSub(D.schedAbortedMessage(ev.code)); schedFinish();
     } else if (ev.kind === 'scheduled_cancelled') {
       setSub('Misión cancelada'); schedFinish();
     }

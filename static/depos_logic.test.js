@@ -135,3 +135,11 @@ test('humanError: nunca expone el código crudo', () => {
   assert.equal(D.humanError('RETRY_CAPTCHA'), 'No se pudo completar, intenta de nuevo');
   assert.equal(D.humanError('PROXY_504'), 'No se pudo completar, intenta de nuevo');
 });
+test('schedAbortedMessage: 3DS dice "3DS" explícito (antes decía solo "Cuenta premium A+ ✓")', () => {
+  assert.match(D.schedAbortedMessage('3DS_REQUIRED'), /3DS/);
+});
+test('schedAbortedMessage: rate limit y rechazo real mantienen su mensaje', () => {
+  assert.equal(D.schedAbortedMessage('RATE_LIMITED'), 'Cuenta en pausa por seguridad · reintenta luego');
+  assert.equal(D.schedAbortedMessage('BANK_REJECTED'), D.humanError('BANK_REJECTED'));
+  assert.equal(D.schedAbortedMessage('ALGO_RARO'), 'Misión detenida');
+});
