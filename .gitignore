@@ -45,6 +45,10 @@ Thumbs.db
 .claude/launch.json
 static/_depos_preview.html
 
+# Graphify
+graphify-out/
+.graphify/
+
 # CDP capture — tráfico real con JWTs/clabes, NUNCA commitear (solo scripts .py)
 tools/*.jsonl
 tools/*.log
