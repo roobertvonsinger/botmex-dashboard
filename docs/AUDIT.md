@@ -3,6 +3,23 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-08-01 (auditoría de interacción — Fitts' Law + jerarquía en Depositar/Retirar)
+
+**Motivo**: Robert reportó el panel de depósito/retiro "muy inoperable a nivel interacción... controles muy pequeños, ambiguos, sin jerarquización visual... se desmorona la interfaz". Auditoría hands-on (dev server aislado en worktree, medición real vía `getComputedStyle`/`getBoundingClientRect` — no estimado) sobre `.pat-dep-stage`. Detalle completo del criterio + hallazgos en `docs/FRONTEND.md` §"AUDITORÍA DE INTERACCIÓN 2026-08-01".
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Botones Depositar/Retirar más grandes** (`.pat-act`, `pantalla.css`) | 26-30px → 40px de alto (44px en mobile), 11px→13px/700. Único uso de `.pat-act` en el repo, confirmado por grep antes de tocar el CSS base. | ✅ implementado | ✅ medido: `getComputedStyle('#dep').height === '40px'` desktop, `'44px'` en viewport 375px |
+| **Campo de monto (`#amtInput`/`.pat-dep-amt`) como campo ancla** | Contenedor bordeado propio (antes heredaba el molde de un input de popover secundario, 23px/11px) a 40px/17px/700 con `:focus-within`. | ✅ implementado | ✅ medido: `getComputedStyle('.pat-dep-amt').height === '40px'`, `#amtInput` font-size 17px/700 |
+| **Presets de monto (`.amt-preset`) a piso de acierto** | 18px → min-height 30px (36px mobile), 10.5px→12px/600. | ✅ implementado | ✅ medido: `getComputedStyle('.amt-preset').height === '30px'` |
+| **Motivo de Retirar deshabilitado visible sin hover** (`_applyWithdrawToCompact`, `pantalla.js`) | El motivo (p.ej. "Saldo < $100") se agrega como texto siempre visible junto a `#wdBalance`, ya no solo en `title`. | ✅ implementado | ✅ verificado con cuenta de prueba a $45.00: `#wdBalance.innerHTML` incluye `"· Saldo < $100"` |
+| **BUG cerrado: `.pat-col-stage{display:none}` en mobile** | Regla heredada de antes del CSS Grid (2026-07-28) ocultaba TODO el panel Depositar/Retirar bajo ~768px — violaba "no quitar, compactar". Reemplazado por el mismo apilado en grid que usa `.pat-cramped`. | ✅ implementado | ✅ verificado en viewport 375×812: `#dep`/`#wd`/`#amtInput` presentes en el DOM y con texto visible (`get_page_text` incluye "Depositar"/"Retirar"), `.pat-col-stage` computed `display:flex` (no `none`) |
+| Tests de regresión | `node --test static/depos_logic.test.js static/depos_window.test.js` (lógica pura, no tocada por este cambio — solo CSS + 1 función DOM) | ✅ | ✅ 30/30 pass, 0 fail |
+
+**Limitación de esta sesión**: el entorno de browser automation de este agente (subagente aislado) no compone frames para screenshot (`the Browser pane is not displayed`) — la verificación visual se hizo con medición de geometría real (`getComputedStyle`/`getBoundingClientRect`) contra un servidor dev propio del worktree (puerto 5099, DB SQLite seedeada a mano con 1 cuenta rica), no con capturas de pantalla. Los números reportados arriba son medidos, no estimados.
+
+**Fuera de alcance a propósito**: la posición/orden de `.pat-columns` (otro agente en paralelo la está reasignando) y el patrón de chips "Tarjetas"/reps (funcional, no ambiguo — no tocado).
+
 ## Captura: 2026-07-28 (rediseño completo La Pantalla + candado anti-reuso de tarjeta entre cuentas)
 
 **Motivo**: 4 rondas de campo en vivo (Robert, screenshots reales) sobre el look "esqueleto verde" rotando por grade, espacio horizontal desperdiciado, tabs Depositar/Retirar percibidos como 2 mundos separados, y un pedido de seguridad explícito ("si ya se aprobó en una cuenta una tarjeta debe de haber un freno ahí"). Detalle de criterio de diseño en `DESIGN.md` §"Surface: La Pantalla".

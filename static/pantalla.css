@@ -295,16 +295,29 @@
 }
 .pat-topbar-pin:hover { color: var(--pat-gold); border-color: var(--pat-edge); background: var(--pat-gold-soft); }
 .pat-topbar-pin.on { color: var(--pat-gold); border-color: var(--pat-edge-h); background: var(--pat-gold-soft); }
+/* .pat-act SOLO existe en Depositar/Retirar (verificado: único uso en todo el
+   repo, index.html #deposCompactTpl) — son los dos controles que mueven dinero
+   real e irreversible (memoria: cada depósito/retiro cuesta dinero de verdad si
+   sale mal). 2026-08-01, auditoría de campo (Robert: "muy inoperable... los
+   controles se sienten amontonados"): medido en vivo, el botón vivía a 26px de
+   alto (30px con el override de .pat-dep-fire-row) — por DEBAJO del piso de
+   Fitts' Law de escritorio (32px) y lejos del target ADHD-friendly preferido
+   (44px), pese a ser el control de MAYOR consecuencia del panel. Compartía
+   además la MISMA clase/tamaño que cualquier ghost button secundario (Fijar,
+   Otro depósito) — cero diferenciación de peso entre "dispara dinero" y
+   "acción de cortesía". Sube a 40px/13px — el control accionable más grande de
+   .pat-dep-stage, por encima incluso del saldo (26px, solo texto informativo). */
 .pat-act {
   -webkit-appearance: none; appearance: none; cursor: pointer;
-  display: inline-flex; align-items: center; gap: 5px;
-  height: 26px; padding: 0 9px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 40px; padding: 0 14px; border-radius: 9px;
   border: 1px solid var(--hairline); background: rgba(255,255,255,.03);
-  color: var(--text-dim); font-family: var(--pat-font-display); font-size: 11px; font-weight: 600;
+  color: var(--text-dim); font-family: var(--pat-font-display); font-size: 13px; font-weight: 700;
   transition: color var(--ease-fast), border-color var(--ease-fast),
-              background var(--ease-fast), box-shadow var(--ease-fast);
+              background var(--ease-fast), box-shadow var(--ease-fast), transform var(--ease-fast);
 }
-.pat-act i { font-size: 14px; }
+.pat-act:active { transform: scale(0.97); }
+.pat-act i { font-size: 16px; }
 .pat-act:hover { color: var(--pat-gold); border-color: var(--pat-edge); background: var(--pat-gold-soft); }
 .pat-act.inuse.on { color: var(--pat-gold); border-color: var(--pat-edge-h); background: var(--pat-gold-soft); }
 /* Depositar = CTA principal: relleno sólido + glow SUTIL en reposo (no solo hover)
@@ -515,6 +528,11 @@
 .pat-wd-balance { font-size: 10.5px; color: var(--text-dim); }
 .pat-wd-balance[hidden] { display: none; }
 .pat-wd-balance-v, .pat-wd-balance b { color: var(--pat-money); font-family: var(--pat-font-mono); }
+/* Motivo de "Retirar" deshabilitado — visible SIEMPRE, no solo en el title del
+   botón (2026-08-01: bajo presión no hay tiempo de pasar el mouse a averiguar
+   por qué un botón no responde — visibilidad de estado sin hover, ver
+   _applyWithdrawToCompact en pantalla.js). */
+.pat-wd-balance-note { color: var(--text-faint); }
 .pat-wd-status { margin-top: 2px; }
 .pat-wd-status:empty { display: none; }
 /* Panel único Depositar+Retirar (2026-07-28, campo, 3ª ronda: "reutilizando el
@@ -550,13 +568,40 @@
 .pat-dep-stage .chip-x { cursor: pointer; opacity: .6; }
 .pat-dep-stage .chip-x:hover { opacity: 1; color: var(--danger); }
 .pat-dep-amt-row { gap: 8px; }
-.pat-dep-stage .amt-preset {
-  border: 1px solid var(--pat-edge); border-radius: 6px; padding: 2px 8px;
-  font-family: var(--pat-font-mono); font-size: 10.5px; cursor: pointer;
+/* Monto — campo ANCLA del panel: el número que ambos CTAs (Depositar/Retirar)
+   leen para disparar. 2026-08-01, auditoría de campo: heredaba el mismo molde
+   que un input de popover secundario (CURP/notas, 23px/11px) — el dato que el
+   operador edita a mano más veces por sesión no puede pesar menos que una
+   etiqueta. Criterio: el campo que ALIMENTA la acción va un escalón bajo el
+   CTA mismo, pero por encima de cualquier label/nota. Contenedor bordeado (no
+   solo el <input>) para que el "$" y el número se lean como una sola pieza. */
+.pat-dep-amt {
+  display: flex; align-items: center; gap: 6px;
+  background: oklch(0.16 0.006 260 / 0.55); border: 1px solid var(--pat-edge);
+  border-radius: 8px; padding: 0 11px; height: 40px;
+  transition: border-color var(--ease-fast);
 }
-.pat-dep-stage .amt-preset.on { background: var(--pat-gold-soft); color: var(--pat-gold); border-color: var(--pat-edge-h); }
+.pat-dep-amt:focus-within { border-color: var(--pat-gold); }
+.pat-dep-amt > span { font-size: 15px; font-weight: 700; color: var(--text-dim); font-family: var(--pat-font-mono); }
+.pat-dep-amt input#amtInput {
+  border: 0; background: transparent; padding: 0; width: 100%;
+  font-size: 17px; font-weight: 700; color: var(--pat-money);
+}
+.pat-dep-amt input#amtInput:focus { outline: none; }
 .pat-dep-amt.dis input { opacity: .45; pointer-events: none; }
-.pat-dep-presets { display: flex; gap: 4px; flex-wrap: wrap; }
+/* Presets — la ruta de UN click deliberada para saltarse el teclado. Medido en
+   vivo: 18px de alto, más chico que el dedo/cursor puede acertar rápido bajo
+   presión — un preset que falla el click cuesta MÁS que escribir el monto, que
+   es justo lo que existe para evitar. Sube a piso de acierto (~30px). */
+.pat-dep-stage .amt-preset {
+  border: 1px solid var(--pat-edge); border-radius: 7px; padding: 6px 12px;
+  min-height: 30px; display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--pat-font-mono); font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: color var(--ease-fast), border-color var(--ease-fast), background var(--ease-fast);
+}
+.pat-dep-stage .amt-preset:hover { border-color: var(--pat-edge-h); }
+.pat-dep-stage .amt-preset.on { background: var(--pat-gold-soft); color: var(--pat-gold); border-color: var(--pat-edge-h); }
+.pat-dep-presets { display: flex; gap: 5px; flex-wrap: wrap; }
 .pat-dep-note { font-size: 9.5px; color: var(--text-faint); }
 .pat-dep-reps { display: flex; align-items: center; gap: 6px; }
 .pat-dep-reps.hide { display: none; }
@@ -572,9 +617,9 @@
    viven junto al monto/presets, no en una barra de acciones lejana. Retirar
    arranca `hidden` (JS lo revela solo si el rol/estado lo permite, ver
    _applyWithdrawToCompact) — con un solo botón visible, ocupa el 100%. */
-.pat-dep-fire-row { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.pat-dep-fire-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
 .pat-dep-fire-row .pat-act-dep,
-.pat-dep-fire-row .pat-act-wd { flex: 1 1 0; justify-content: center; height: 30px; }
+.pat-dep-fire-row .pat-act-wd { flex: 1 1 0; }
 .pat-dep-newproc { margin-top: 2px; }
 .pat-curp-pop .pat-input {
   width: 19ch; text-align: center; letter-spacing: 1px;
@@ -1007,21 +1052,40 @@
   }
 }
 
-/* ═══════════════ RESPONSIVE MOBILE (F3, auditoría 2026-07-18) ═══════════════
-   .pat-columns es flex-row con .pat-col-ident (max-content) + .pat-txn-col
-   (flex:1) + .pat-col-stage (min-width:380px) — desborda garantizado bajo
-   ~768px (solo el stage ya pide 380px). Fix: apilar a 1 columna, ocultar el
-   escenario de depósito (misión activa en mobile → modal aparte, fuera de
-   alcance esta sesión, ver plan §Riesgos) y subir los botones de acción a
-   touch target ≥44px (eran 26px). */
+/* ═══════════════ RESPONSIVE MOBILE (F3, auditoría 2026-07-18; corregido
+   2026-08-01) ═══════════════
+   BUG DE CAMPO cerrado 2026-08-01: esta regla es de ANTES de que .pat-columns
+   pasara a CSS Grid (2026-07-28, ver .pat-cramped más arriba) — seguía
+   apagando .pat-col-stage con `display:none`, es decir, bajo ~768px (o
+   cualquier ventana angosta: varios monitores, panel lateral abierto — el
+   escenario real de Robert, ver PRODUCT.md §Operating Context) Depositar Y
+   Retirar DESAPARECÍAN del DOM entero. Eso viola la regla dura "no quitar,
+   compactar" y es, con datos, la causa más probable de "la interfaz se
+   desmorona": no es que los controles se vean mal en mobile, es que dejan de
+   existir. Fix: la MISMA estrategia de apilado en grid que ya usa
+   .pat-cramped (ident/stage/txns en 1 columna) en vez de un flex-column
+   fantasma que ya no aplicaba a un contenedor grid. Los targets ≥44px de
+   depósito/retiro (heredados de .pat-act, ver arriba) se completan aquí para
+   el input de monto y los presets — mismo criterio Fitts', aplicado también
+   al breakpoint táctil. */
 @media (max-width: 767px) {
   .pantalla-sheet { left: 8px; right: 8px; top: 10px; bottom: 8px; }
-  .pat-columns { flex-direction: column; overflow-y: auto; gap: 10px; }
+  .pat-columns {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto minmax(64px, 1fr);
+    grid-template-areas: "ident" "stage" "txns";
+    overflow-y: auto; row-gap: 14px;
+  }
   .pat-col-ident { width: 100%; padding-right: 0; overflow-y: visible; }
-  .pat-col-stage { display: none; }
+  .pat-col-stage,
+  .pat-col-txns { border-left: none; padding-left: 0; border-top: 1px solid var(--pat-edge); padding-top: 14px; }
+  .pat-dep-stage { max-width: none; }
   .pat-txn-col { flex: 1 1 auto; min-width: 0; }
   .pat-topbar { padding-right: 44px; flex-wrap: wrap; }
   .pat-topbar-pin { width: 44px; height: 44px; }
-  .pat-act { height: 44px; padding: 0 14px; }
+  .pat-act { height: 44px; padding: 0 16px; font-size: 14px; }
+  .pat-dep-amt { height: 44px; }
+  .pat-dep-amt input#amtInput { font-size: 18px; }
+  .pat-dep-stage .amt-preset { min-height: 36px; padding: 8px 14px; font-size: 13px; }
   .pantalla-close { width: 44px; height: 44px; }
 }
