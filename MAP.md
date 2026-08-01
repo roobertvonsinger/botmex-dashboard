@@ -260,6 +260,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `8b8e911` | style(telegram-mock): actualizar membrete oficial a placa industrial con lineas dobles |
 | `097e56c` | feat(telegram-mock): rediseño layouts, apodos por ID, menu lateral de 3 botones y liveness feedback animado |
 | `be180f6` | feat(logs): jerarquizacion visual de logs, combos y tarjetas completas copiables en 1-click |
 | `f3b4243` | feat(bet): clabe stp 1-tap copy, query param redirect preservation and portal landing banner |
@@ -271,7 +272,6 @@ prewarm.py (router)
 | `e5975f9` | docs(next-session): actualizar estado de cierre y pendientes del bot mock |
 | `b771207` | fix(auto_deposit): agregar fallback defensivo OperationalError si falta columna card_pipe en esquema test |
 | `b64ef27` | fix(telegram-mock): corregir asignacion de cuentas y agregar boton detener mision |
-| `5b99ffd` | fix(auto_deposit): omitir cuentas sin tarjeta asignada en plan_auto_mission |
 <!-- GEN:end:recientes -->
 
 ---
