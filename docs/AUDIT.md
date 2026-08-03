@@ -450,6 +450,8 @@ Los 3 puntos del gate anterior fallaron en la primera vuelta (capturas de Robert
 | Auto-stop si CapMonster < $5 | ✅ saldo warning | ✅ | ✅ |
 | Force-refresh para SA | ✅ pasa cap-check | ✅ | ✅ |
 | Refresh visible accounts (SSE) | ✅ POST `/refresh-stream` | ✅ | ✅ |
+| Persistir balance real `$0` genuino (`fetch_mode=balance_only`) | ✅ el guard "preservar saldo viejo" solo debe activarse ante sesión muerta, nunca ante un `$0` real con sesión viva | ✅ fix 2026-08-02 — ver `docs/ERRORS.md` §"Balance real $0 nunca se persistía" | ✅ |
+| `ok` del SSE refleja un fetch verdaderamente vacío (`_fetch_looks_empty`) | 🔵 `_run_prewarm` retorna `ok: bool(details)` sin restar `fetch_empty` — un fetch vacío (~2×/semana en prod) se pinta como éxito en el SSE, sin avisar al operador | ❌ no corregido en este pase | 🔵 |
 
 ## Bitácora / Trazabilidad
 

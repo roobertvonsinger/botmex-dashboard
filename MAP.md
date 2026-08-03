@@ -109,7 +109,7 @@ prewarm.py (router)
 | `deposits.py` | 2812 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 323 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 416 | `betmexico.dashboard.login_orch` | _[completar]_ |
-| `prewarm.py` | 892 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
+| `prewarm.py` | 901 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 364 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_validator.py` | 90 | `betmexico.renapo_validator` | _[completar]_ |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
@@ -117,11 +117,6 @@ prewarm.py (router)
 | `scripts/migrate_status_no_banco.py` | 80 | `—` | _[completar]_ |
 | `scripts/recalc_grades.py` | 136 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `shared/betmexico_payment_analyzer.py` | 593 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
-| `support_agent.py` | 227 | `—` | _[completar]_ |
-| `support_dockerd.py` | 92 | `betmexico.dockerd` | _[completar]_ |
-| `support_llm.py` | 160 | `—` | _[completar]_ |
-| `support_routes.py` | 103 | `—` | _[completar]_ |
-| `support_tools.py` | 512 | `—` | _[completar]_ |
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
 | `test_account_refresh.py` | 122 | `—` | _[completar]_ |
@@ -132,6 +127,7 @@ prewarm.py (router)
 | `test_at_hand.py` | 73 | `—` | _[completar]_ |
 | `test_auto_deposit_selection.py` | 187 | `—` | _[completar]_ |
 | `test_auto_missions_migrate.py` | 120 | `—` | _[completar]_ |
+| `test_balance_only_real_zero_preserved.py` | 89 | `—` | _[completar]_ |
 | `test_bet_live_plan.py` | 108 | `—` | _[completar]_ |
 | `test_card_touch_log.py` | 61 | `—` | _[completar]_ |
 | `test_curp_utils.py` | 28 | `—` | _[completar]_ |
@@ -149,10 +145,6 @@ prewarm.py (router)
 | `test_scheduled_deposit_3ds_logging.py` | 93 | `—` | _[completar]_ |
 | `test_search.py` | 70 | `—` | _[completar]_ |
 | `test_sse_visibility.py` | 88 | `—` | _[completar]_ |
-| `test_support_gate.py` | 114 | `—` | _[completar]_ |
-| `test_support_llm.py` | 189 | `—` | _[completar]_ |
-| `test_support_routes.py` | 83 | `—` | _[completar]_ |
-| `test_support_tools.py` | 117 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 71 | `—` | _[completar]_ |
 | `test_withdrawals.py` | 361 | `—` | _[completar]_ |
@@ -226,13 +218,6 @@ prewarm.py (router)
 | `C_DEEP_REST_DAYS` | `30` | `shared/betmexico_payment_analyzer.py` |
 | `SCORE_FLOOR` | `{"A": 80, "B": 60, "C": 40, "D": 0}` | `shared/betmexico_payment_analyzer.py` |
 | `SCORE_CEIL` | `{"A": 100, "B": 79, "C": 59, "D": 39}` | `shared/betmexico_payment_analyzer.py` |
-| `MAX_ROUNDS` | `6` | `support_agent.py` |
-| `HISTORY_TURNS` | `12` | `support_agent.py` |
-| `PERMITIDOS` | `{"betmexico-web", "betmexico-bot", "betmexico-mock-bot"}` | `support_dockerd.py` |
-| `REDACTED` | `"‹oculto›"` | `support_tools.py` |
-| `MAX_ROWS` | `200` | `support_tools.py` |
-| `PENDING_TTL_SEC` | `600` | `support_tools.py` |
-| `ROBERT_CHAT_ID` | `1341812706` | `support_tools.py` |
 | `SCHEMA` | `"""` | `test_a1_estados.py` |
 | `NOW` | `1_800_000_000` | `test_account_refresh.py` |
 | `OP_A` | `{"role": "user", "telegram_id": 555, "display": "Lau"}` | `test_account_touch.py` |
@@ -261,6 +246,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `69887c2` | test(deposits): agregar regresion del log de aborto 3DS en scheduled_create + doc de handoff |
 | `e5c5056` | style(telegram-mock): pulir tiradera aczino en segunda persona directa con estructuras rítmicas complejas |
 | `51439c7` | style(telegram-mock): pulir tiradera freestyle estilo Aczino con remates exactos de rima consonante |
 | `e70a23a` | style(telegram-mock): rimas cuadradas de tiradera rapera mexa en disclaimers de start |
@@ -272,7 +258,6 @@ prewarm.py (router)
 | `62f7794` | fix(telegram-mock): corregir interceptacion de callbacks bet/check en ConversationHandler |
 | `c866964` | fix(telegram-mock): corregir etiqueta del boton de ayuda en start_cmd |
 | `94f47c5` | style(telegram-mock): limpiar separadores de puntos y actualizar botones start/help |
-| `ace6ecc` | test(telegram-mock): actualizar assertion de membrete al nuevo formato monospaced |
 <!-- GEN:end:recientes -->
 
 ---

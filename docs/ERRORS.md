@@ -2,6 +2,22 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## [CRÍTICO] Balance real $0 nunca se persistía en `balance_only` — guard `api_succeeded` no reconocía sesión viva (2026-08-02)
+
+**Síntoma**: Robert reportó "no se están actualizando los balances de las cuentas correctamente aunque lo haga manual" — clic en ↻ (refresh individual) o "Actualizar visibles" mostraba `✓ Cuenta actualizada` pero el número no cambiaba.
+
+**Forense (KVM4, `process_log` + BD)**: cuenta `cardenascarlosignacio94@gmail.com` con `balance_real=$1181.02` en BD. Cuatro refrescos (`process_log` fase=`complete`, `jwt_from_cache=true`) entre 2026-08-02 17:44 y 2026-08-03 02:16 reportaron `balance_real=0.0` desde la API — pero la BD siguió mostrando `$1181.02` horas después, pese a refrescos manuales explícitos.
+
+**Causa raíz** (`prewarm.py` `_db_upsert_balance`): el guard "preservar saldo viejo" (existe para no pisar un balance real con un fetch fallido por JWT muerto/401 silencioso) decide con `api_succeeded = has_dep or has_valid_name or bool(txns.get('items')) or bal_bonos>0`. En `fetch_mode='balance_only'` (el modo real que usan tanto el botón ↻ individual como el ciclo automático de `account_refresh.py`) la API **nunca** trae `fullname` ni `transactions.items` por diseño (confirmado leyendo `betmexico_login_api.py` en el server) — solo balance + página 1 de txns. Por lo tanto `api_succeeded` solo podía ser `True` con un depósito nuevo o bonos > 0. Cualquier cuenta con saldo real genuino `$0` (sin depósito nuevo, sin bonos) quedaba atrapada: **cada** refresh subsecuente descartaba el `$0` real y preservaba el saldo viejo indefinidamente, aunque la sesión estuviera perfectamente viva.
+
+El fix `2026-07-28` de `_fetch_looks_empty()` (ver entry de arriba, "Regresión por invalidación de JWT") ya había resuelto el mismo problema de raíz para OTRO propósito (evitar invalidar JWTs vivos) agregando la señal `transactions.get('fetched')` — pero esa señal nunca se propagó al `api_succeeded` de `_db_upsert_balance`, que seguía usando la heurística vieja.
+
+**Fix**: `prewarm.py` `_db_upsert_balance` — se agrega `bool(txns.get('fetched'))` al `api_succeeded`, igual que ya hace `_fetch_looks_empty`. Con `transactions.fetched=True` (sesión viva, la API sí respondió) el guard ya no descarta un balance real `$0`.
+
+**Diagnóstico**: `superpowers:systematic-debugging` — reproducido con TDD (`test_balance_only_real_zero_preserved.py`, 2 tests: RED confirmaba el descarte del `$0` real; control verifica que el guard SIGUE protegiendo ante sesión realmente muerta `fetched=False`). Suite completa: 82 pre-existentes sin regresión (verificado con `git stash` antes/después, mismo conteo de fallos).
+
+**Nota**: la fase `no_details` de `process_log` (fetch verdaderamente vacío, `_fetch_looks_empty()==True`) también reveló un `ok: bool(details)` en `_run_prewarm` que ignora `fetch_empty` — el caller nunca ve `ok=False` en ese caso, así que un fetch genuinamente vacío se pinta igual como éxito en el SSE. Ocurre ~2×/semana en prod (vs. el bug de arriba, que afectaba cualquier cuenta con saldo real en `$0`). Pendiente 🔵 — no se tocó en este pase para no mezclar dos fixes distintos en un mismo commit.
+
 ## 9router (`openclaw-ruth-ninerouter-1`) sin ninguna red Docker → 502 en todos los modelos (detectado 2026-08-01)
 
 - **Síntoma**: el 9router responde `/v1/models` normalmente (parece sano, `Up` en `docker ps`),

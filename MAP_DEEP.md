@@ -352,18 +352,18 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_account_minutes_since_check` | def | L148–L157 |
 | `_db_get_recent_log` | def | L160–L175 |
 | `_fetch_looks_empty` | def | L178–L205 |
-| `_db_upsert_balance` | def | L208–L263 |
-| `_db_save_txns_and_recalc` | def | L266–L319 |
-| `_db_update_last_checked` | def | L322–L334 |
-| `_db_invalidate_jwt` | def | L337–L348 |
-| `_db_mark_dead` | def | L351–L374 |
-| `_is_balance_fresh` | def | L377–L385 |
-| `_capmonster_balance` | def | L390–L406 |
-| `_run_prewarm` | def | L411–L586 |
-| `prewarm_select` | def | L592–L673 |
-| `prewarm_cancel` | def | L677–L687 |
-| `prewarm_status` | def | L691–L706 |
-| `prewarm_refresh_stream` | def | L712–L892 |
+| `_db_upsert_balance` | def | L208–L272 |
+| `_db_save_txns_and_recalc` | def | L275–L328 |
+| `_db_update_last_checked` | def | L331–L343 |
+| `_db_invalidate_jwt` | def | L346–L357 |
+| `_db_mark_dead` | def | L360–L383 |
+| `_is_balance_fresh` | def | L386–L394 |
+| `_capmonster_balance` | def | L399–L415 |
+| `_run_prewarm` | def | L420–L595 |
+| `prewarm_select` | def | L601–L682 |
+| `prewarm_cancel` | def | L686–L696 |
+| `prewarm_status` | def | L700–L715 |
+| `prewarm_refresh_stream` | def | L721–L901 |
 
 ### `proxy_pool.py`
 
@@ -449,77 +449,6 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `analyze_gateway_ban_pattern` | def | L437–L507 |
 | `generate_payment_analysis_summary` | def | L514–L562 |
 | `generate_payment_ready_txt` | def | L565–L593 |
-
-### `support_agent.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `_now` | def | L47–L48 |
-| `load_system_prompt` | def | L51–L57 |
-| `build_snapshot` | def | L60–L80 |
-| `load_history` | def | L85–L102 |
-| `save_message` | def | L105–L117 |
-| `clear_history` | def | L120–L128 |
-| `SupportAgent` | class | L133–L227 |
-
-### `support_dockerd.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `_cli` | def | L34–L36 |
-| `health` | def | L40–L46 |
-| `listar` | def | L50–L69 |
-| `reiniciar` | def | L73–L86 |
-
-### `support_llm.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `chain_from_env` | def | L39–L43 |
-| `LLMClient` | class | L46–L160 |
-
-### `support_routes.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `_sa_only` | def | L27–L29 |
-| `ChatIn` | class | L32–L34 |
-| `ConfirmIn` | class | L37–L38 |
-| `chat` | def | L42–L66 |
-| `confirm` | def | L70–L78 |
-| `history` | def | L82–L87 |
-| `borrar_history` | def | L91–L94 |
-| `config` | def | L98–L103 |
-
-### `support_tools.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `_db_path` | def | L44–L45 |
-| `_now` | def | L48–L49 |
-| `is_sensitive_col` | def | L58–L60 |
-| `_strip_comments` | def | L63–L66 |
-| `sanitize_sql` | def | L69–L103 |
-| `_ro_connection` | def | L106–L109 |
-| `consultar_bd` | def | L112–L122 |
-| `redact_for_model` | def | L125–L136 |
-| `ensure_schema` | def | L141–L167 |
-| `_docker` | def | L172–L176 |
-| `_exec_reiniciar_servicio` | def | L179–L189 |
-| `_exec_pausar_sistema` | def | L192–L200 |
-| `_exec_reanudar_sistema` | def | L203–L209 |
-| `_exec_desbloquear_cuenta` | def | L212–L225 |
-| `_encolar` | def | L247–L260 |
-| `redeem` | def | L263–L292 |
-| `tool_result_text` | def | L295–L307 |
-| `_tool_estado_sistema` | def | L312–L345 |
-| `_tool_leer_logs` | def | L355–L375 |
-| `_tool_avisar_telegram` | def | L378–L387 |
-| `_tool_brief_para_claude_code` | def | L390–L408 |
-| `_tool_registrar_incidente` | def | L411–L425 |
-| `_tool_consultar_bd` | def | L428–L429 |
-| `run_tool` | def | L444–L455 |
-| `_f` | def | L460–L463 |
 
 ### `test_a1_estados.py`
 
@@ -668,6 +597,13 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_auto_missions_defaults` | def | L64–L82 |
 | `test_reaper_fails_zombie_and_releases_lock` | def | L85–L113 |
 | `test_migrate_idempotent` | def | L116–L120 |
+
+### `test_balance_only_real_zero_preserved.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `test_db_upsert_balance_persists_real_zero_when_session_alive` | def | L25–L56 |
+| `test_db_upsert_balance_still_preserves_old_balance_on_truly_dead_session` | def | L59–L89 |
 
 ### `test_bet_live_plan.py`
 
@@ -870,75 +806,6 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_broadcast_only_enqueues_visible` | def | L59–L69 |
 | `test_resolve_who_carries_who_id` | def | L72–L76 |
 | `test_broadcast_operator_receives_own` | def | L79–L88 |
-
-### `test_support_gate.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `gate_db` | def | L14–L16 |
-| `sin_efectos` | def | L20–L31 |
-| `test_tool_de_escritura_no_ejecuta_solo_encola` | def | L42–L46 |
-| `test_toda_write_tool_declarada_tiene_ejecutor` | def | L49–L51 |
-| `test_el_resultado_para_el_modelo_no_afirma_exito` | def | L54–L59 |
-| `test_redeem_ejecuta_una_vez` | def | L64–L69 |
-| `test_token_es_de_un_solo_uso` | def | L72–L78 |
-| `test_token_inventado_es_rechazado` | def | L81–L84 |
-| `test_token_expirado_es_rechazado` | def | L87–L93 |
-| `test_tool_de_lectura_si_ejecuta_sola` | def | L98–L102 |
-| `test_tool_desconocida_no_revienta_el_loop` | def | L105–L107 |
-| `test_sql_invalido_devuelve_error_no_excepcion` | def | L110–L114 |
-
-### `test_support_llm.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `sse` | def | L18–L19 |
-| `delta` | def | L22–L23 |
-| `tool_delta` | def | L26–L35 |
-| `cliente` | def | L38–L40 |
-| `drenar` | def | L43–L44 |
-| `test_acumula_texto_y_reporta_modelo` | def | L50–L57 |
-| `test_reensambla_tool_call_partido_en_varios_chunks` | def | L63–L76 |
-| `test_soporta_dos_tool_calls_en_paralelo` | def | L80–L89 |
-| `test_argumentos_vacios_quedan_como_objeto_valido` | def | L93–L99 |
-| `test_cae_al_siguiente_modelo_ante_502` | def | L105–L117 |
-| `test_cae_al_siguiente_ante_error_de_red` | def | L121–L127 |
-| `test_si_todos_fallan_emite_error_no_excepcion` | def | L131–L137 |
-| `test_no_hace_fallback_despues_de_emitir_texto` | def | L141–L162 |
-| `test_ignora_lineas_basura_y_keepalives` | def | L168–L175 |
-| `test_reporta_uso_de_tokens_si_el_router_lo_manda` | def | L179–L189 |
-
-### `test_support_routes.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `test_el_router_esta_montado` | def | L12–L17 |
-| `test_config_reporta_router_y_cadena` | def | L20–L25 |
-| `test_history_arranca_vacio_y_crea_su_esquema` | def | L28–L31 |
-| `test_borrar_history_responde` | def | L34–L37 |
-| `test_no_superadmin_recibe_403` | def | L48–L50 |
-| `test_chat_no_superadmin_recibe_403` | def | L53–L56 |
-| `test_confirm_no_superadmin_recibe_403` | def | L59–L62 |
-| `test_chat_rechaza_mensaje_vacio` | def | L67–L69 |
-| `test_chat_rechaza_imagen_que_no_es_data_uri` | def | L72–L77 |
-| `test_confirm_con_token_inventado_da_400` | def | L80–L83 |
-
-### `test_support_tools.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `test_sql_no_lectura_es_rechazado` | def | L29–L31 |
-| `test_select_y_with_pasan` | def | L39–L40 |
-| `test_limit_se_fuerza_si_falta` | def | L43–L45 |
-| `test_limit_propio_se_respeta_si_es_menor` | def | L48–L51 |
-| `test_limit_excesivo_se_recorta` | def | L54–L56 |
-| `test_bd_es_read_only_de_verdad` | def | L59–L68 |
-| `test_consulta_real_devuelve_filas` | def | L71–L75 |
-| `test_password_no_sale_al_modelo` | def | L80–L86 |
-| `test_cvv_y_tarjeta_no_salen_al_modelo` | def | L89–L96 |
-| `test_columnas_normales_no_se_redactan` | def | L99–L103 |
-| `test_catalogo_de_columnas_sensibles` | def | L111–L112 |
-| `test_columnas_inocuas_no_marcadas` | def | L116–L117 |
 
 ### `test_unificacion_sp1.py`
 
@@ -1190,14 +1057,6 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `POST` | `/cancel` | `prewarm.py` |
 | `GET` | `/status` | `prewarm.py` |
 | `POST` | `/refresh-stream` | `prewarm.py` |
-| `GET` | `/health` | `support_dockerd.py` |
-| `GET` | `/containers/json` | `support_dockerd.py` |
-| `POST` | `/containers/{nombre}/restart` | `support_dockerd.py` |
-| `POST` | `/chat` | `support_routes.py` |
-| `POST` | `/confirm` | `support_routes.py` |
-| `GET` | `/history` | `support_routes.py` |
-| `DELETE` | `/history` | `support_routes.py` |
-| `GET` | `/config` | `support_routes.py` |
 <!-- GEN:end:endpoints -->
 
 ---
@@ -1220,7 +1079,6 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `betmexico.dashboard.prewarm` | `prewarm.py` |
 | `betmexico.dashboard.sse` | `app.py` |
 | `betmexico.dashboard.withdrawals` | `withdrawals.py` |
-| `betmexico.dockerd` | `support_dockerd.py` |
 | `betmexico.renapo_validator` | `renapo_validator.py` |
 | `betmexico.web.auth` | `web_auth.py` |
 | `betmexico.web.grading` | `web_grading.py` |

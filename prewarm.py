@@ -224,12 +224,21 @@ def _db_upsert_balance(email: str, details: dict) -> None:
     has_dep = (new_amt is not None and float(new_amt or 0) > 0
                and new_date and str(new_date).strip() not in ("", "N/A"))
     # Señales de que la API respondió de verdad (no es 401 silencioso):
+    # `transactions.fetched` (misma señal que usa `_fetch_looks_empty` desde
+    # el fix 2026-07-28) certifica sesión viva incluso sin items — sin esto,
+    # en fetch_mode='balance_only' (fullname/items SIEMPRE ausentes por
+    # diseño de la API) ninguna cuenta con balance real $0 y sin depósito/
+    # bonos nuevos podía nunca persistir ese $0: el guard preservaba el saldo
+    # viejo por siempre pese a refrescos manuales explícitos (forense
+    # 2026-08-02: cardenascarlosignacio94@gmail.com atascada en $1181.02).
     fn = details.get("fullname")
     has_valid_name = bool(fn and str(fn).strip() not in ("", "N/A"))
+    txns = details.get("transactions") or {}
     api_succeeded = (
         has_dep
         or has_valid_name
-        or bool((details.get("transactions") or {}).get("items"))
+        or bool(txns.get("items"))
+        or bool(txns.get("fetched"))
         or bal_bonos > 0
     )
     now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
