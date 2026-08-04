@@ -5,26 +5,40 @@
 
 ## 🎯 Objetivo en curso
 
-Sesión 2026-08-04 (segunda mitad) cerrada. **Flujo `/bet` (portal del operador en `/user/{id}`)
-operativo y verificado end-to-end en navegador real** — se encontraron y corrigieron 3 bugs reales
-que nadie había detectado: cache-busting/auto-reload ausente en el portal, fecha corrupta en el
-grid de cuentas, y el auto-reload recién agregado podía cortar una misión `/bet` en curso (fix de
-seguimiento tras revisión, commit `4da665d`). 362/362 tests pasando. Deploy a KVM4 verificado en vivo
-(3 restarts, logs limpios cada vez, mtimes dinámicos confirmados por curl).
+Sesión 2026-08-04 (tercera parte, EN CURSO — Robert pidió compactar antes de ejecutar Track B).
+Branch activo: `feature/retiro-manual-gateado-spei` (NO mergeado a main).
 
-Lo que sigue: **Motor de auto-retiro** (spec lista, no implementado) o seguir afilando visual del
-portal/login. Ninguno de los dos bloquea que `/bet` funcione hoy.
+**Track A (bugs, cerrado esta sesión):** fuga de cadencia real de depósitos en la vista de misión
+del portal (`portal.js` mostraba "Depósitos cada 60s" + countdown exacto en vivo al operador) —
+corregido, commit `cdc208e`. 347/347 tests pasando (excluyendo `test_account_refresh.py`, que tiene
+TDD de Track B sin commitear en el working tree).
+
+**Track B (implementaciones, PLANEADO pero NO ejecutado):** plan completo y auto-revisado en
+[`docs/superpowers/plans/2026-08-04-retiro-manual-gateado-spei-y-tiempo-real.md`](docs/superpowers/plans/2026-08-04-retiro-manual-gateado-spei-y-tiempo-real.md) —
+11 tasks: gate del botón Retirar por SPEI real (campo `withdrawal_ready` cacheado), refresh en
+tiempo real para cuentas calientes (balance>$50 / depósito sin asentar / retiro en curso — bug real:
+hoy `account_refresh.py` EXCLUYE cuentas lockeadas, que es el caso normal durante depósito/retiro),
+poll de estado de retiro extendido a operadores (hoy SA-only), animación anti-detección tipo
+odómetro para la misión de depósito, y confirmación de que el "fetch mínimo" contra BetMexico ya
+está satisfecho (`fetch_mode=balance_only`, sin cambio de código).
+
+**Task #1 original (auditoría E2E bot Telegram → matchmaking → grading) NO se ejecutó todavía** —
+quedó pausada para priorizar el plan de Track B. Retomar tras `/Smartexe`, o antes si se prefiere.
 
 ---
 
 ## ▶ Con qué arrancas (PRIMERA acción)
 
-1. Ejecutar `python -m pytest` para re-confirmar que los 362 tests pasan sin problemas.
-2. Si se va a implementar algo nuevo: revisar spec de auto-retiro en
-   `docs/plans/2026-08-03-spec-auto-retiro-obfuscado.md`.
-3. Menor/no bloqueante: `POST /api/auth/login` (`app.py:842`) tira 500 (JSONDecodeError) en vez de
-   400 si el body no es JSON válido — solo lo pega un cliente no-browser (curl sin `-d`), login.html
-   siempre manda JSON válido. Hardening cosmético, no urgente.
+1. Ejecutar `python -m pytest` — debe dar 347 passed (excluyendo el WIP de `test_account_refresh.py`,
+   que tiene tests de `is_hot_account`/hot-bypass sin implementar aún — fallan a propósito, son RED
+   de TDD para la Task 2-3 del plan de Track B).
+2. **Ejecutar `/Smartexe` sobre** `docs/superpowers/plans/2026-08-04-retiro-manual-gateado-spei-y-tiempo-real.md`
+   — el plan ya trae orden de dependencias, modelos por subagente, goals medibles y vigilancia
+   anti-cuelgue. Está en `feature/retiro-manual-gateado-spei`, NO mergear a main hasta checkpoint estable.
+3. Después (o en paralelo con subagente si el hilo principal sigue en Track B): retomar la auditoría
+   E2E del flujo `/bet` completo (bot Telegram → matchmaking → grading) — no se llegó a hacer esta sesión.
+4. Menor/no bloqueante (arrastrado de sesión anterior): `POST /api/auth/login` (`app.py:842`) tira 500
+   (JSONDecodeError) en vez de 400 si el body no es JSON válido. Hardening cosmético, no urgente.
 
 ---
 
