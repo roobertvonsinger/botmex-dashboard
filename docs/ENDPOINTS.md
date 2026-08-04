@@ -80,7 +80,10 @@ copiar en 1 tap): es que la conversación pasa por un LLM de terceros.
 
 | Método | Path | Función | Auth | Body / Query | Respuesta | File:line |
 |---|---|---|---|---|---|---|
-| GET | `/api/operator/my-accounts` | Cuentas con depósitos aprobados del operador actual | require_session | — | `{ok, accounts: [{email, balance_real, balance_bonos, last_deposit_amount, last_deposit_date, grade}]}` | `app.py:4085` |
+| GET | `/api/operator/my-accounts` | Cuentas con depósitos aprobados del operador actual (SA ve todas). Incluye `is_locked`, `status`, `clabe_stp`. | require_session | — | `{ok, accounts: [{id, email, balance_real, balance_bonos, last_deposit_amount, last_deposit_date, grade, is_locked, status, clabe_stp}]}` | `app.py:4181` |
+| POST | `/api/operator/accounts/{account_id}/release` | Libera el lock de una cuenta propia (operador) o cualquiera (SA). Sin password. | require_session | — | `{ok, account_id, released}` | `app.py` |
+| POST | `/api/operator/accounts/{account_id}/withdraw` | Retiro sin password — valida ownership vía `_visible_emails`, usa JWT en BD. | require_session | `{amount}` | `{transactionId, reference, accountId, accountDigits, institutionName, amount, account_email, warnings, persisted}` / 409 | `app.py` |
+| GET | `/api/operator/missions` | Misiones del operador (o todas si SA, últimas 50/20). | require_session | — | `{ok, missions: [{mission_id, status, phase_detail, total_deposited, total_approved, total_failed, created_at, completed_at, operator_id}]}` | `app.py` |
 | GET | `/api/accounts` | Listar cuentas con filtros | require_session | query: `status, search, limit, offset` | `{rows, total}` | `app.py:291` |
 | POST | `/api/accounts/refresh` | Forzar re-check de cuentas seleccionadas | require_session | `{account_ids}` | `{queued}` | `app.py:859` |
 | POST | `/api/accounts/{account_id}/lock` | Lock manual (con duración) | require_session | `{minutes}` | `{ok, locked_until}` | `app.py:1365` |

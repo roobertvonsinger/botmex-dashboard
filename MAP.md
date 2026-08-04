@@ -97,8 +97,12 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
+| `_diag_inspector.py` | 62 | `—` | _[completar]_ |
+| `_screenshot_inspector.py` | 193 | `—` | _[completar]_ |
+| `_screenshot_inspector_v2.py` | 125 | `—` | _[completar]_ |
+| `_screenshot_inspector_v3.py` | 133 | `—` | _[completar]_ |
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 4801 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 4919 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1022 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -163,6 +167,11 @@ prewarm.py (router)
 <!-- GEN:start:constantes -->
 | Constante | Valor | Módulo |
 |-----------|-------|--------|
+| `PORT` | `5099` | `_diag_inspector.py` |
+| `PORT` | `5099` | `_screenshot_inspector.py` |
+| `INJECT_JS` | `"""` | `_screenshot_inspector.py` |
+| `PORT` | `5099` | `_screenshot_inspector_v2.py` |
+| `PORT` | `5099` | `_screenshot_inspector_v3.py` |
 | `ROBERT_CHAT_ID` | `1341812706` | `app.py` |
 | `SESSION_TTL` | `86_400` | `auth.py` |
 | `PERSISTENT_USERS` | `{"robertvs"}` | `auth.py` |
@@ -246,6 +255,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `6f2332e` | fix(prewarm): persistir balance real $0 en fetch_mode=balance_only |
 | `69887c2` | test(deposits): agregar regresion del log de aborto 3DS en scheduled_create + doc de handoff |
 | `e5c5056` | style(telegram-mock): pulir tiradera aczino en segunda persona directa con estructuras rítmicas complejas |
 | `51439c7` | style(telegram-mock): pulir tiradera freestyle estilo Aczino con remates exactos de rima consonante |
@@ -257,7 +267,6 @@ prewarm.py (router)
 | `d89c282` | feat(telegram-mock): refactorizar flujo /bet con streaming, lenguaje carding, llenado automatico y resumen |
 | `62f7794` | fix(telegram-mock): corregir interceptacion de callbacks bet/check en ConversationHandler |
 | `c866964` | fix(telegram-mock): corregir etiqueta del boton de ayuda en start_cmd |
-| `94f47c5` | style(telegram-mock): limpiar separadores de puntos y actualizar botones start/help |
 <!-- GEN:end:recientes -->
 
 ---

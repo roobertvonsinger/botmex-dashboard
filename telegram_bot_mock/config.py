@@ -27,6 +27,11 @@ except Exception as _e:
 logging.basicConfig(level=logging.INFO, format=_LOG_FORMAT, handlers=_handlers)
 logger = logging.getLogger("telegram_bot_mock")
 
+# Silenciar reconexiones ruidosas de red de python-telegram-bot y httpx/httpcore
+logging.getLogger("telegram.ext._utils.networkloop").setLevel(logging.ERROR)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 # Rutas principales
 MOCK_DIR = Path(__file__).parent.resolve()
 DASHBOARD_DIR = MOCK_DIR.parent.resolve()

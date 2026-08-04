@@ -4180,19 +4180,137 @@ def auto_deposit_cancel(mission_id: str,
 
 @app.get("/api/operator/my-accounts")
 def operator_my_accounts(user: dict = Depends(require_session)):
-    """Devuelve la lista de cuentas con depósitos aprobados para el operador actual, incluyendo CLABE STP."""
+    """Cuentas con depósitos aprobados del operador + CLABE STP + estado de lock."""
     operator_id = user.get("telegram_id") or 0
+    is_sa = user.get("role") == "superadmin"
     with db() as c:
-        rows = c.execute(
-            "SELECT DISTINCT a.id, a.email, a.balance_real, a.balance_bonos, "
-            "a.last_deposit_amount, a.last_deposit_date, a.grade, "
-            "c.clabe AS clabe_stp "
-            "FROM deposit_attempts d JOIN accounts a ON d.account_email = a.email "
-            "LEFT JOIN account_deposit_clabes c ON (a.id = c.account_id AND (c.integration = 'STP' OR c.integration = '2')) "
-            "WHERE d.operator_id=? AND d.status='approved' ORDER BY a.last_deposit_date DESC",
-            (operator_id,)
-        ).fetchall()
-    return {"ok": True, "accounts": [dict(r) for r in rows]}
+        if is_sa:
+            rows = c.execute(
+                "SELECT DISTINCT a.id, a.email, a.balance_real, a.balance_bonos, "
+                "a.last_deposit_amount, a.last_deposit_date, a.grade, "
+                "a.locked_by, a.locked_until, a.status, "
+                "c.clabe AS clabe_stp "
+                "FROM deposit_attempts d JOIN accounts a ON d.account_email = a.email "
+                "LEFT JOIN account_deposit_clabes c ON (a.id = c.account_id AND (c.integration = 'STP' OR c.integration = '2')) "
+                "WHERE d.status='approved' ORDER BY a.last_deposit_date DESC"
+            ).fetchall()
+        else:
+            rows = c.execute(
+                "SELECT DISTINCT a.id, a.email, a.balance_real, a.balance_bonos, "
+                "a.last_deposit_amount, a.last_deposit_date, a.grade, "
+                "a.locked_by, a.locked_until, a.status, "
+                "c.clabe AS clabe_stp "
+                "FROM deposit_attempts d JOIN accounts a ON d.account_email = a.email "
+                "LEFT JOIN account_deposit_clabes c ON (a.id = c.account_id AND (c.integration = 'STP' OR c.integration = '2')) "
+                "WHERE d.operator_id=? AND d.status='approved' ORDER BY a.last_deposit_date DESC",
+                (operator_id,)
+            ).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["is_locked"] = bool(d.get("locked_by"))
+            d.pop("locked_by", None)
+            d.pop("locked_until", None)
+            result.append(d)
+    return {"ok": True, "accounts": result}
+
+
+@app.post("/api/operator/accounts/{account_id}/release")
+def operator_release_account(account_id: int,
+                             user: dict = Depends(require_session)):
+    """Libera el lock de una cuenta propia (operador) o cualquiera (SA). Sin password."""
+    with db() as c:
+        acc = c.execute(
+            "SELECT email, locked_by FROM accounts WHERE id=?", (account_id,)
+        ).fetchone()
+    if not acc:
+        raise HTTPException(404, "Cuenta no encontrada")
+    if user.get("role") != "superadmin":
+        vis = _visible_emails(user, c)
+        if vis is not None and acc["email"] not in vis:
+            raise HTTPException(403, "No tienes permiso sobre esta cuenta")
+    prev_locked_by = acc["locked_by"] if acc else None
+    with db(write=True) as c:
+        _release_account(c, account_id, acc["email"], "release operador",
+                         prev_locked_by, kind="unlock", who=user.get("username"))
+    return {"ok": True, "account_id": account_id, "released": True}
+
+
+@app.post("/api/operator/accounts/{account_id}/withdraw")
+async def operator_withdraw(account_id: int,
+                           payload: dict,
+                           user: dict = Depends(require_session)):
+    """Retiro sin password — valida ownership, usa JWT en BD."""
+    from withdrawals import (
+        execute_withdrawal, JwtExpired, InsufficientBalance,
+        NoApprovedWithdrawalAccount, MultipleApprovedAccounts,
+        ConcurrentWithdrawalPending,
+    )
+    with db() as c:
+        acc = c.execute(
+            "SELECT id, email FROM accounts WHERE id=?", (account_id,)
+        ).fetchone()
+    if not acc:
+        raise HTTPException(404, "Cuenta no encontrada")
+    if user.get("role") != "superadmin":
+        with db() as c:
+            vis = _visible_emails(user, c)
+        if vis is not None and acc["email"] not in vis:
+            raise HTTPException(403, "No tienes permiso sobre esta cuenta")
+    try:
+        amount = float(payload.get("amount"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "amount inválido")
+    if amount <= 0:
+        raise HTTPException(400, "amount debe ser > 0")
+    try:
+        result = await execute_withdrawal(str(DB_PATH), account_id, amount)
+    except JwtExpired:
+        raise HTTPException(409, "JWT expirado, requiere refresh")
+    except InsufficientBalance as e:
+        raise HTTPException(409, str(e))
+    except NoApprovedWithdrawalAccount:
+        raise HTTPException(409, "Sin cuenta de retiro aprobada: requiere SPEI de depósito primero")
+    except MultipleApprovedAccounts as e:
+        raise HTTPException(409, str(e))
+    except ConcurrentWithdrawalPending:
+        raise HTTPException(409, "Ya hay un retiro pendiente en esta cuenta")
+    persisted = True
+    try:
+        _persist_withdrawal(account_id, user.get("telegram_id"), result)
+    except sqlite3.OperationalError:
+        persisted = False
+    if persisted:
+        _broadcast({
+            "type": "activity", "kind": "withdrawal",
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "target": result.get("account_email"), "id": account_id,
+            "amount": amount, "transactionId": result["transactionId"],
+            **_resolve_who(user.get("telegram_id")),
+        })
+    return {**result, "persisted": persisted}
+
+
+@app.get("/api/operator/missions")
+def operator_missions(user: dict = Depends(require_session)):
+    """Misiones del operador (o todas si SA)."""
+    operator_id = user.get("telegram_id") or 0
+    is_sa = user.get("role") == "superadmin"
+    with db() as c:
+        if is_sa:
+            rows = c.execute(
+                "SELECT mission_id, status, phase_detail, total_deposited, "
+                "total_approved, total_failed, created_at, completed_at, operator_id "
+                "FROM auto_missions ORDER BY created_at DESC LIMIT 50"
+            ).fetchall()
+        else:
+            rows = c.execute(
+                "SELECT mission_id, status, phase_detail, total_deposited, "
+                "total_approved, total_failed, created_at, completed_at, operator_id "
+                "FROM auto_missions WHERE operator_id=? ORDER BY created_at DESC LIMIT 20",
+                (operator_id,)
+            ).fetchall()
+    return {"ok": True, "missions": [dict(r) for r in rows]}
 
 
 @app.get("/api/deposits/auto/{mission_id}/status")

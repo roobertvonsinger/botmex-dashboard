@@ -13,6 +13,37 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 <!-- GEN:start:simbolos -->
 
+### `_diag_inspector.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `MockHandler` | class | L21–L40 |
+| `main` | def | L42–L59 |
+
+### `_screenshot_inspector.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `Handler` | class | L74–L79 |
+| `start_server` | def | L82–L84 |
+| `capture` | def | L87–L95 |
+| `main` | def | L98–L189 |
+
+### `_screenshot_inspector_v2.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `MockHandler` | class | L46–L71 |
+| `start_server` | def | L74–L76 |
+| `main` | def | L79–L121 |
+
+### `_screenshot_inspector_v3.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `MockHandler` | class | L55–L85 |
+| `main` | def | L87–L130 |
+
 ### `account_refresh.py`
 
 | Símbolo | Tipo | Líneas |
@@ -149,19 +180,22 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `admin_maintenance_toggle` | def | L4087–L4108 |
 | `auto_deposit_create` | def | L4112–L4148 |
 | `auto_deposit_cancel` | def | L4152–L4178 |
-| `operator_my_accounts` | def | L4182–L4195 |
-| `auto_deposit_status` | def | L4199–L4210 |
-| `register_operator_strike` | def | L4213–L4246 |
-| `bot_start_info` | def | L4250–L4286 |
-| `bot_operator_info` | def | L4290–L4329 |
-| `bot_help_info` | def | L4333–L4347 |
-| `bot_pause_mission` | def | L4351–L4380 |
-| `bot_resume_mission` | def | L4384–L4402 |
-| `bot_cancel_mission` | def | L4407–L4442 |
-| `bot_bet_create` | def | L4446–L4615 |
-| `filter_and_sanitize_check_combos` | def | L4618–L4703 |
-| `BotCheckRequest` | class | L4706–L4710 |
-| `bot_check` | def | L4713–L4794 |
+| `operator_my_accounts` | def | L4182–L4215 |
+| `operator_release_account` | def | L4219–L4236 |
+| `operator_withdraw` | def | L4240–L4291 |
+| `operator_missions` | def | L4295–L4313 |
+| `auto_deposit_status` | def | L4317–L4328 |
+| `register_operator_strike` | def | L4331–L4364 |
+| `bot_start_info` | def | L4368–L4404 |
+| `bot_operator_info` | def | L4408–L4447 |
+| `bot_help_info` | def | L4451–L4465 |
+| `bot_pause_mission` | def | L4469–L4498 |
+| `bot_resume_mission` | def | L4502–L4520 |
+| `bot_cancel_mission` | def | L4525–L4560 |
+| `bot_bet_create` | def | L4564–L4733 |
+| `filter_and_sanitize_check_combos` | def | L4736–L4821 |
+| `BotCheckRequest` | class | L4824–L4828 |
+| `bot_check` | def | L4831–L4912 |
 
 ### `auth.py`
 
@@ -1034,6 +1068,9 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `POST` | `/api/deposits/auto` | `app.py` |
 | `POST` | `/api/deposits/auto/{mission_id}/cancel` | `app.py` |
 | `GET` | `/api/operator/my-accounts` | `app.py` |
+| `POST` | `/api/operator/accounts/{account_id}/release` | `app.py` |
+| `POST` | `/api/operator/accounts/{account_id}/withdraw` | `app.py` |
+| `GET` | `/api/operator/missions` | `app.py` |
 | `GET` | `/api/deposits/auto/{mission_id}/status` | `app.py` |
 | `GET` | `/api/bot/start` | `app.py` |
 | `GET` | `/api/bot/info` | `app.py` |

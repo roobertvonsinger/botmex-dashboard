@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import List, Dict, Any, Tuple
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
+from telegram.request import HTTPXRequest
+from telegram.error import NetworkError, TimedOut, Conflict
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -677,14 +679,18 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         _persist_auto_mission(mission_id, operator_id, valid_pipes, amount, target_count, plan)
 
-        # Mensaje base inicial de la misión
+        # Mensaje base inicial de la misión — con link al portal vivo
         status_msg = await query.edit_message_text(
             f"{HEADER}\n\n"
             f"🎯 <b>MISIÓN {mission_id}</b>\n\n"
-            f"• Estado: Rastreo activo...\n"
-            f"• Link: {DASHBOARD_URL}/?match={mission_id}",
+            f"• Estado: Rastreando cuentas aptas…\n"
+            f"• 🌐 <a href=\"{DASHBOARD_URL}/?match={mission_id}\">Ver en vivo en el portal →</a>\n\n"
+            f"<i>El portal se actualiza solo, no necesitas recargar.</i>",
             parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛑 Detener Misión", callback_data=f"stop_mission_{mission_id}")]])
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🌐 Ver en vivo →", url=f"{DASHBOARD_URL}/?match={mission_id}")],
+                [InlineKeyboardButton("🛑 Detener Misión", callback_data=f"stop_mission_{mission_id}")]
+            ])
         )
 
         last_edit_ts = [0.0]
@@ -714,25 +720,52 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
                 tot = extra.get('total', 9)
                 st_text = f"⚡ Llenado en curso ({comp}/{tot} abonos)"
             elif status in ("completed", "cancelled", "failed"):
-                st_text = f"🏁 Proceso concluido"
+                dep = extra.get('deposited', 0)
+                appr = extra.get('approved', 0)
+                fl = extra.get('failed', 0)
+                accts = extra.get('accounts', 0)
+                if status == "completed":
+                    st_text = f"✅ Completado: ${dep:.0f} en {accts} cuentas · {appr} aprobados, {fl} fallidos"
+                elif status == "cancelled":
+                    st_text = f"🛑 Detenido por el operador"
+                else:
+                    reason = extra.get('reason', '')
+                    st_text = f"❌ Misión falló" + (f": {reason}" if reason else "")
             else:
                 st_text = f"⏳ {status}"
 
-            text = (
-                f"{HEADER}\n\n"
-                f"⚡ <b>Rastreando y Procesando Cuentas</b>\n\n"
-                f"• {st_text}\n\n"
-                f"🇲🇽 <i>Operando en segundo plano...</i>"
-            )
-
+            is_terminal = status in ("completed", "cancelled", "failed")
             is_priority = status in ("awaiting_confirmation", "completed", "cancelled", "failed")
             if not is_priority and (now - last_edit_ts[0] < 2.5):
                 return
             last_edit_ts[0] = now
 
+            if is_terminal:
+                text = (
+                    f"{HEADER}\n\n"
+                    f"🎯 <b>MISIÓN {mission_id}</b>\n\n"
+                    f"• {st_text}\n\n"
+                    f"🌐 <a href=\"{DASHBOARD_URL}/?match={mission_id}\">Gestionar cuentas en el portal →</a>"
+                )
+                kb = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🌐 Ver cuentas y gestionar →", url=f"{DASHBOARD_URL}/?match={mission_id}")]
+                ])
+            else:
+                text = (
+                    f"{HEADER}\n\n"
+                    f"⚡ <b>Rastreando y Procesando Cuentas</b>\n\n"
+                    f"• {st_text}\n\n"
+                    f"🌐 <a href=\"{DASHBOARD_URL}/?match={mission_id}\">Ver en vivo →</a>\n"
+                    f"🇲🇽 <i>Actualización automática…</i>"
+                )
+                kb = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🌐 Ver en vivo →", url=f"{DASHBOARD_URL}/?match={mission_id}")],
+                    [InlineKeyboardButton("🛑 Detener Misión", callback_data=f"stop_mission_{mission_id}")]
+                ])
+
             async def _edit():
                 try:
-                    await status_msg.edit_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛑 Detener Misión", callback_data=f"stop_mission_{mission_id}")]]))
+                    await status_msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
                 except Exception:
                     pass
 
@@ -762,13 +795,15 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
                 f"⚡ <b>LLENADO AUTOMÁTICO DE CUENTA</b>\n\n"
                 f"Cuentas encontradas: {len(matches)}\n"
                 f"{match_text_block}\n\n"
+                f"🌐 <a href=\"{DASHBOARD_URL}/?match={m_id}\">Ver detalle en el portal →</a>\n\n"
                 f"¿Iniciar llenado automático en paralelo?"
             )
             kb_confirm = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("🚀 De Una / Iniciar Llenado", callback_data=f"confirm_sched_{m_id}"),
-                    InlineKeyboardButton("🛑 Cancelar y Volver al inicio", callback_data=f"stop_sched_{m_id}")
-                ]
+                    InlineKeyboardButton("🛑 Cancelar", callback_data=f"stop_sched_{m_id}")
+                ],
+                [InlineKeyboardButton("🌐 Ver en vivo →", url=f"{DASHBOARD_URL}/?match={m_id}")]
             ])
             try:
                 await status_msg.edit_text(confirm_text, parse_mode="HTML", reply_markup=kb_confirm)
@@ -877,9 +912,35 @@ async def setup_bot_commands(application):
         logger.warning(f"[Bot] No se pudo enviar notificación de arranque a SuperAdmin: {ex}")
 
 
+async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Manejo centralizado de errores para evitar unhandled exceptions en el bot loop."""
+    err = context.error
+    if isinstance(err, (NetworkError, TimedOut)):
+        logger.warning(f"[Bot Network] Error temporal de conexión: {err}")
+    elif isinstance(err, Conflict):
+        logger.error(f"[Bot Conflict] Conflicto de instancia: otro bot está usando el token {MOCK_BOT_TOKEN[:10]}...")
+    else:
+        logger.error(f"[Bot Error] Excepción no controlada en handler: {err}", exc_info=err)
+
+
 def build_app():
-    """Construye la aplicación python-telegram-bot."""
-    app = ApplicationBuilder().token(MOCK_BOT_TOKEN).post_init(setup_bot_commands).build()
+    """Construye la aplicación python-telegram-bot con resiliencia de red."""
+    req_config = HTTPXRequest(
+        connect_timeout=15.0,
+        read_timeout=30.0,
+        write_timeout=15.0,
+        pool_timeout=15.0,
+        connection_pool_size=10,
+    )
+    app = (
+        ApplicationBuilder()
+        .token(MOCK_BOT_TOKEN)
+        .request(req_config)
+        .post_init(setup_bot_commands)
+        .build()
+    )
+
+    app.add_error_handler(global_error_handler)
 
     # Handlers directos
     app.add_handler(CommandHandler("start", start_cmd))
@@ -936,4 +997,4 @@ if __name__ == "__main__":
     print(f"[BOT MOCK] Iniciando Telegram Bot Mock con Token: {MOCK_BOT_TOKEN[:10]}...")
     print(f"[BOT MOCK] Base de Datos configurada: {DB_PATH}")
     app = build_app()
-    app.run_polling()
+    app.run_polling(bootstrap_retries=-1, poll_interval=1.0)

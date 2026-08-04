@@ -753,4 +753,46 @@ real desde el panel compacto.
 - ~~Mini-widget PiP para procesos en curso~~ ✅ implementado 2026-05-25 (mini-pill flotante `#depMissionPill`)
 - Auditoría de glow verde residual en `style.css`
 
+## Portal de operadores (`/portal`)
+
+> `static/portal.html` + `static/portal.js` — SPA independiente para operadores (no-SA).
+> Acceso: operadores aterrizan aquí tras login; SA es redirigido al dashboard principal (`/`).
+
+### Arquitectura
+
+- **Sin framework** — vanilla JS, mismo patrón que `app.js` pero simplificado
+- **SSE en vivo**: subscribe `/api/events`, maneja eventos `auto_mission` filtrados por `mission_id`
+- **Reusa patrón `_autoOnBus`** de `depos.js` pero simplificado: progress bar + lista de matches + countdown, sin SVG de líneas ni mascota
+- **Mobile-first** — operadores abren desde Telegram en el celular
+
+### Vistas
+
+| Vista | Trigger | Qué muestra |
+|---|---|---|
+| **Misión viva** | `?match=ID` en URL | Progress bar (matching→scheduling→done), matches apareciendo con `slideIn` animation, countdown 60s entre depósitos, resumen final (deposited/approved/failed). Botón "Ver mis cuentas" al terminar. |
+| **Mis Cuentas** | Sin `?match` (default) | Grid de cards con email, balance, grade badge, CLABE STP (botón copiar), botones Retirar/Liberar. Auto-refresh cuando llega evento SSE terminal. |
+
+### Acciones sin password
+
+| Acción | Endpoint | UX |
+|---|---|---|
+| **Retirar** | `POST /api/operator/accounts/{id}/withdraw` | Modal con monto, valida saldo disponible, toast de confirmación con `transactionId` |
+| **Liberar** | `POST /api/operator/accounts/{id}/release` | Botón directo en card (solo si `is_locked`), toast de confirmación |
+| **Copiar CLABE** | — (clipboard) | Botón en cada card, feedback "✓" temporal |
+
+### Transición Telegram → Web
+
+1. Operador usa `/bet` en Telegram
+2. Bot responde con mensaje + botón "🌐 Ver en vivo →" (URL: `botmexico.net/?match=MISSION_ID`)
+3. Operador toca el botón → aterriza en `/portal?match=MISSION_ID`
+4. El `?match=ID` es preservado por el redirect de `/` → `/portal` (operadores no-SA)
+5. Portal carga estado de la misión + SSE en vivo
+6. Al terminar → botón "Ver mis cuentas" → grid con acciones
+
+### Filtrado por rol
+
+- Operadores: solo ven sus propias cuentas (`_visible_emails` server-side)
+- SA: ve todas las cuentas y misiones
+- SSE filtra por `who_id == telegram_id` (operador) o todo (SA)
+
 Ver `AUDIT.md` para gap-analysis spec vs actual.
