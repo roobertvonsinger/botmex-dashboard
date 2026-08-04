@@ -97,12 +97,8 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `_diag_inspector.py` | 62 | `—` | _[completar]_ |
-| `_screenshot_inspector.py` | 193 | `—` | _[completar]_ |
-| `_screenshot_inspector_v2.py` | 125 | `—` | _[completar]_ |
-| `_screenshot_inspector_v3.py` | 133 | `—` | _[completar]_ |
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 4961 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 4962 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 191 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1022 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -167,11 +163,6 @@ prewarm.py (router)
 <!-- GEN:start:constantes -->
 | Constante | Valor | Módulo |
 |-----------|-------|--------|
-| `PORT` | `5099` | `_diag_inspector.py` |
-| `PORT` | `5099` | `_screenshot_inspector.py` |
-| `INJECT_JS` | `"""` | `_screenshot_inspector.py` |
-| `PORT` | `5099` | `_screenshot_inspector_v2.py` |
-| `PORT` | `5099` | `_screenshot_inspector_v3.py` |
 | `ROBERT_CHAT_ID` | `1341812706` | `app.py` |
 | `SESSION_TTL` | `86_400` | `auth.py` |
 | `PERSISTENT_USERS` | `{"robertvs"}` | `auth.py` |
@@ -255,6 +246,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `ef482be` | docs: cierre de sesión — auditoría Impeccable de /portal + /login, NEXT-SESSION actualizado |
 | `7db7ec2` | feat(routing): separar /dashboard (SA) de /user/{id} (bet) + vista "como usuario" para SA |
 | `dff8150` | feat(brand): integrar logo real botmexico.net (mascota robot + wordmark) en portal/login |
 | `7d2365d` | feat(portal,login): rebrand visual botmexico.net (horizonte de sucesos + tricolor MX) |
@@ -266,7 +258,6 @@ prewarm.py (router)
 | `e70a23a` | style(telegram-mock): rimas cuadradas de tiradera rapera mexa en disclaimers de start |
 | `e485193` | style(telegram-mock): pulir metrica y ritmo organico de los raps de bienvenida |
 | `2e31fba` | feat(telegram-mock): tiradera rap de bineros rediseñada y boton cancelar eliminado del menu start |
-| `ff6cfde` | fix(pantalla): jerarquia e interaccion del panel Depositar/Retirar (Fitts Law) |
 <!-- GEN:end:recientes -->
 
 ---

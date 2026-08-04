@@ -22,6 +22,19 @@ Dark operator console — near-black base (`--bg #08090c`, `--surface rgba(18,20
 - **Jerarquía de topbar:** nombre = ancla (13px/700/`--text`); ubicación/nacimiento/CURP = un escalón abajo (10.5px/muted/íconos neutros, sin dorado decorativo — el dorado se reserva para dinero/acción).
 - **Sombra:** 2 capas con offset real (craft-floor: un halo sin offset es decoración, no profundidad) — antes 8 capas apiladas.
 
+## Surface: /portal + /login (`static/portal.html`, `static/login.html`, `static/horizon.js`)
+
+**Construido 2026-08-03/04** — rebrand visual botmexico.net. El portal es la puerta de entrada para usuarios que llegan desde el bot de Telegram (`/user/{id}`), típicamente en celular. El login es el gate de auth previo.
+
+- **THESIS:** Frictionless, de marca, mobile-first. A diferencia del dashboard SA (escritorio, denso, "La Pantalla"), el portal es un portal: una vista limpia de cuentas y misiones para un operador que acaba de usar `/bet` y quiere ver/cobrar.
+- **Horizonte de sucesos** (`horizon.js`): agujero negro + disco de acreción recoloreado tricolor MX (verde/blanco/rojo), SIN campo estelar — el "look espacial" se descartó deliberadamente. WebGL con fail-safe real: si THREE no carga o WebGL falla, el canvas se oculta y queda el fondo CSS (radial-gradients verde/rojo). Respeta `prefers-reduced-motion` (una sola frame, no loop). Pausa con `visibilitychange` (no renderiza en background).
+- **Tokens de marca** (definidos en `portal.html :root`): `--mx-green #2ea043`, `--mx-green-bright #3fb950`, `--mx-white #f0f6fc`, `--mx-red #ef4a45`. Heredan del sistema global pero se nombran con prefijo `mx-` para distinguir "esto es marca, no decoración".
+- **Materialize** (`@keyframes materialize`): la única animación de glow permitida en el portal. Una cuenta "aparece" confirmada con un flash verde (`box-shadow: 0 0 22px -4px rgba(63,185,80,.45)`) que decae a 0 en 0.5s. No es un glow decorativo — confirma "match OK". El detector `dark-glow` lo marca como antipatrón, pero es intencional.
+- **Touch targets >=44px en `.acc-actions`**: los botones de Retirar/Liberar se agrandan a min-height 44px solo dentro de `.acc-actions` (no globalmente — el dashboard SA es de escritorio y no lo necesita). El público real entra desde Telegram en celular.
+- **aria-live**: `#missionView` y `#toastRegion` tienen `aria-live="polite"` — los cambios de estado de misión SSE y los toasts se anuncian a lectores de pantalla. El modal de retiro cierra con Escape y devuelve el foco al botón que lo abrió.
+- **Foco visible**: `:focus-visible` en botones usa el anillo tricolor (`outline: 2px solid var(--mx-green-bright)`) — consistente con el sistema de foco ya construido para `<input>`.
+- **Logo**: mascota robot (`botmexico_icon.png`) + wordmark tricolor (`bot` verde / `mexi` blanco / `co.net` rojo) en `Space Grotesk 700`.
+
 ## Pendiente / próxima sesión
 
 - **Prioridad #1:** vista distinta y animada para depósito multi-cuenta (ver bullet arriba) — reemplaza el plumbing inline actual en `depos.js`/`app.js` (`mountCompact`/`updateCmdBar`). Necesita su propia ronda de diseño (qué contenido mínimo por cuenta, qué feedback de progreso por cuenta en la animación) antes de tocar código.

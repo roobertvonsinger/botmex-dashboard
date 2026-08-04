@@ -2,6 +2,21 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## `httpx` sin importar en `app.py` → notificaciones de Telegram mudas (regresión, detectado 2026-08-04)
+
+- **Síntoma**: logs de KVM4 mostraban `[telegram_startup_notify] Error notificando inicio: name 'httpx' is not defined` en cada arranque. `_notify_robert()` también fallaba en silencio (el `except Exception` captura el `NameError` y lo devuelve como `{"ok": False, "error": "NameError: ..."}` — invisible salvo que se inspeccione el return).
+- **Causa raíz**: las funciones `_notify_robert` (L2644) y `_startup_telegram_notify` (L2662) usan `httpx.post` y `httpx.AsyncClient` respectivamente, pero el `import httpx` nunca se agregó al bloque de imports de `app.py`. `httpx` SÍ está en `infra/requirements.txt` (L5, `httpx>=0.26`), así que el módulo está instalado en el container — solo faltaba el import. Es una regresión posterior al fix de 2026-08-01 que arregló el env var name (`BMX_BOT_TOKEN` vs `TELEGRAM_BOT_TOKEN`): ese fix tocó las funciones pero no verificó que el import existiera.
+- **Fix**: `import httpx` agregado al bloque de imports de `app.py` (L14, junto a `import urllib.request`).
+- **Lección**: un `except Exception` que captura `NameError` lo enmascara como error de negocio — el NameError solo aparece si se lee el mensaje del return o se ve el print del startup. Verificar imports con `py_compile` no atrapa esto (el import se resuelve en runtime, no en compilación).
+
+## Contaminación cruzada en suite de tests — `BMX_MAINTENANCE` pegado entre módulos (detectado 2026-08-04)
+
+- **Síntoma**: `python -m pytest -q` (suite completa, un solo proceso) daba ~80 fallos, casi todos `assert 530 == 200/400/...` — 530 es el código de "Modo Mantenimiento".
+- **Causa raíz**: `test_maintenance_mode.py` seteaba `os.environ["BMX_MAINTENANCE"] = "1"` directo en el cuerpo de 4 tests (L15/21/27/34) sin cleanup. El último test (`test_maintenance_mode_allows_superadmin`) dejaba la env var pegada en `"1"`. Cuando pytest corre la suite completa en un solo proceso, todos los tests posteriores heredan esa env var y reciben 530 en lugar del código esperado.
+- **Fix**: reemplazar `os.environ[X] = "1"` con `monkeypatch.setenv("BMX_MAINTENANCE", "1")` — `monkeypatch` restaura automáticamente el entorno al final de cada test. También se quitó el `import os` que ya no se necesita.
+- **Verificado**: suite completa pasó de ~80 fallos a 31 (todos pre-existentes, ninguno con `assert 530`). Los 31 restantes son fallos reales (NameError en `test_a21_visibilidad`, asserts en `test_grading_a_plus_m7`, tests de integración en `tests/test_api.py` y `tests/test_auto_deposit.py`).
+- **Lección**: NUNCA setear `os.environ` directo en tests sin un `finally`/`monkeypatch` que lo limpie. `monkeypatch.setenv` es la forma canónica — auto-restaura, sin boilerplate.
+
 ## [CRÍTICO] Balance real $0 nunca se persistía en `balance_only` — guard `api_succeeded` no reconocía sesión viva (2026-08-02)
 
 **Síntoma**: Robert reportó "no se están actualizando los balances de las cuentas correctamente aunque lo haga manual" — clic en ↻ (refresh individual) o "Actualizar visibles" mostraba `✓ Cuenta actualizada` pero el número no cambiaba.

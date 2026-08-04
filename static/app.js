@@ -489,6 +489,12 @@ async function loadMe() {
   $('#sbUserName').textContent = me.username || '—';
   $('#sbUserRole').textContent = me.role || '—';
   $('#sbUserAv').textContent = (me.username || '··').slice(0, 2).toUpperCase();
+  // Botón "Mi portal /bet" — link a /user/{mi_telegram_id} para ver mis cuentas como operador
+  const btnPortal = $('#btnMyPortal');
+  if (btnPortal && me.telegram_id) {
+    btnPortal.href = '/user/' + me.telegram_id;
+    btnPortal.style.display = '';
+  }
   // Roles
   const isSuper = me.role === 'superadmin';
   const isAdmin = me.role === 'admin' || isSuper;
@@ -6768,7 +6774,7 @@ $('#lpOps')?.addEventListener('click', e => {
 });
 $('#btnClearNotif').addEventListener('click', () => { notifications = []; renderNotifs(); renderNotifBadge(); });
 
-$$('.sb-user .ico-btn, .ico-btn[title="Salir"], .power').forEach(btn => {
+$$('.sb-user .ico-btn:not(#btnMyPortal), .ico-btn[title="Salir"], .power').forEach(btn => {
   btn.addEventListener('click', async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     window.location.href = '/login';

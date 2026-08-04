@@ -29,10 +29,12 @@
 
   // ── Utils ──────────────────────────────────────────────────────
   function showToast(msg, type) {
+    const region = $('#toastRegion') || document.body;
     const t = document.createElement('div');
     t.className = 'toast ' + (type || '');
     t.textContent = msg;
-    document.body.appendChild(t);
+    t.setAttribute('role', 'status');
+    region.appendChild(t);
     setTimeout(() => t.remove(), 3500);
   }
 
@@ -374,6 +376,7 @@
 
   // ── Withdraw Modal ─────────────────────────────────────────────
   function showWithdrawModal(accountId, email, balance) {
+    const trigger = document.activeElement;
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML =
@@ -392,10 +395,16 @@
     const inp = overlay.querySelector('#wdAmount');
     const cancel = overlay.querySelector('#wdCancel');
     const confirm = overlay.querySelector('#wdConfirm');
-    const close = () => overlay.remove();
+    const close = () => {
+      overlay.remove();
+      document.removeEventListener('keydown', onKeydown);
+      if (trigger && typeof trigger.focus === 'function') trigger.focus();
+    };
+    const onKeydown = (e) => { if (e.key === 'Escape') close(); };
 
     cancel.addEventListener('click', close);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    document.addEventListener('keydown', onKeydown);
     inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') confirm.click(); });
 
     confirm.addEventListener('click', async () => {

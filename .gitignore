@@ -52,3 +52,6 @@ graphify-out/
 # CDP capture — tráfico real con JWTs/clabes, NUNCA commitear (solo scripts .py)
 tools/*.jsonl
 tools/*.log
+
+# Visual inspect — screenshots efímeros del inspector Playwright
+_screenshots/

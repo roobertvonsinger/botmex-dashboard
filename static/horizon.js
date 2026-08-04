@@ -134,6 +134,7 @@
       halo.position.z = -3.2; halo.renderOrder = 0; scene.add(halo);
 
       let mx = 0, my = 0, tx = 0, ty = 0, energy = 0, target = .12;
+      let paused = false;
       addEventListener('pointermove', e => {
         tx = (e.clientX / innerWidth - .5); ty = (e.clientY / innerHeight - .5);
       }, { passive: true });
@@ -149,6 +150,7 @@
 
       const clock = new THREE.Clock();
       function frame() {
+        if (paused) return;
         const t = clock.getElapsedTime();
         mx += (tx - mx) * .04; my += (ty - my) * .04;
         target *= .985; energy += (target - energy) * .06;
@@ -168,6 +170,11 @@
         renderer.render(scene, camera);
         if (!reduce) requestAnimationFrame(frame);
       }
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) { paused = true; }
+        else if (!paused) { /* already running */ }
+        else { paused = false; if (!reduce) frame(); }
+      });
       frame();
     } catch (e) {
       const cv = document.getElementById('horizon');

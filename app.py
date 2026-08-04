@@ -11,6 +11,7 @@ import logging.handlers as _logging_handlers
 import queue as _stdlib_queue
 import threading
 import urllib.request
+import httpx
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -807,7 +808,7 @@ def index(request: Request, bmx_session: str = Cookie(default=None)):
 
 
 @app.get("/api/version")
-def api_version():
+def api_version(user: dict = Depends(require_session)):
     """Versión actual de TODOS los FRONTEND_ASSETS (mtime más reciente entre
     ellos). El frontend la compara contra `window.BMX_VERSION` (fijada al
     cargar la página) para auto-recargar pestañas viejas tras un deploy —
@@ -908,7 +909,7 @@ def auth_me(user: dict = Depends(require_session)):
 # ── API — protegida con sesión ─────────────────────────────────────────────────
 
 @app.get("/api/health")
-def health():
+def health(user: dict = Depends(require_session)):
     try:
         with db() as c:
             n = c.execute("SELECT COUNT(*) FROM accounts").fetchone()[0]
@@ -4490,7 +4491,7 @@ def bot_operator_info(user: dict = Depends(require_session)):
 
 
 @app.get("/api/bot/help")
-def bot_help_info():
+def bot_help_info(user: dict = Depends(require_session)):
     """Guía informativa /help orientada al uso operativo responsable."""
     msg = (
         f"💡 <b>GUÍA INFORMATIVA OPERATIVA (/help)</b>\n"

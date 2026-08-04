@@ -3,6 +3,22 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-08-04 (debugging + auditoría Impeccable fixes)
+
+**Motivo**: Review y debugging del proyecto. Tres bugs activos + auditoría Impeccable del portal/login.
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **`import httpx` en `app.py`** | Agregar `import httpx` al bloque de imports — `_notify_robert` y `_startup_telegram_notify` usaban `httpx` sin import. | ✅ fix aplicado | ✅ `rg -n "import httpx" app.py` confirma 1 match (L14). `httpx>=0.26` ya en `infra/requirements.txt` |
+| **Contaminación de tests por `BMX_MAINTENANCE`** | `test_maintenance_mode.py` seteaba `os.environ` directo sin cleanup → ~80 fallos falsos. Fix: `monkeypatch.setenv`. | ✅ fix aplicado | ✅ suite completa: 80→31 fallos, 0 con `assert 530`. Los 31 restantes son pre-existentes |
+| **5 archivos untracked** | Scripts Playwright de inspección visual (sesión 2026-08-03). v3 conservada en `scripts/visual-inspect/`, v1/v2/_diag borradas, `_screenshots/` al `.gitignore` | ✅ resuelto | ✅ `git status` limpio salvo `scripts/visual-inspect/` |
+| **[P1] aria-live en toasts + misión SSE** | `#toastRegion` con `aria-live="polite"` + `role="status"`. `#missionView` con `aria-live="polite"`. Toasts van al contenedor en vez de `document.body`. | ✅ fix aplicado | 🔵 sin verificar con lector de pantalla real |
+| **[P1] Touch targets 44px en `.acc-actions`** | `min-height: 44px` en `.acc-actions .btn` (no global — dashboard SA es escritorio) | ✅ fix aplicado | 🔵 sin verificar en dispositivo móvil real |
+| **[P2] horizon.js pausa con pestaña oculta** | `visibilitychange` listener corta `requestAnimationFrame` cuando `document.hidden` | ✅ fix aplicado | 🔵 sin verificar en navegador real |
+| **[P2] Modal de retiro: Escape + retorno de foco** | `document.activeElement` capturado al abrir, `Escape` cierra, foco vuelve al trigger | ✅ fix aplicado | 🔵 sin verificar con teclado real |
+| **[P2] Surface brief en `DESIGN.md`** | Sección "Surface: /portal + /login" agregada con todos las decisiones de diseño | ✅ documentado | ✅ lectura de `DESIGN.md` confirma sección presente |
+| **[P3] `:focus-visible` en botones** | `outline: 2px solid var(--mx-green-bright)` en `.btn:focus-visible`, `var(--mx-white)` en primary/danger | ✅ fix aplicado | 🔵 sin verificar en navegador real |
+
 ## Captura: 2026-08-04 (ruteo por rol `/dashboard` vs `/user/{id}` + vista "como usuario" para SA)
 
 **Motivo**: Robert pidió que `botmexico.net` raíz exija login y redirija por rol — SA a
