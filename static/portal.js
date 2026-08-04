@@ -12,8 +12,14 @@
   let sse = null;
   let activeMissionId = null;
   let missionState = null;
-  let countdownTimer = null;
   let userRole = null;
+
+  // ── Withdraw status poll ──────────────────────────────────────
+  // Versión simplificada del patrón de pantalla.js (WD_POLL_FAST_MS/SLOW_MS +
+  // _startWithdrawPoll/_fetchWithdrawStatus): portal.js no necesita degradar a
+  // "slow" ni panel de detalle, solo avisar cuando el retiro llega a terminal.
+  const WD_POLL_FAST_MS = 15000;
+  let wdPollTimer = null;
 
   // ── View-as scope ──────────────────────────────────────────────
   // /user/{id}: {id} identifica de quién es este portal. Si el que mira es
@@ -104,7 +110,7 @@
         onMissionEvent(ev);
       }
     }
-    if (ev.type === 'activity' && (ev.kind === 'account_refreshed' || ev.kind === 'withdrawal' || ev.kind === 'withdrawal_status')) {
+    if (ev.type === 'activity' && (ev.kind === 'account_refreshed' || ev.kind === 'withdrawal' || ev.kind === 'withdrawal_status' || ev.kind === 'withdrawal_ready_changed')) {
       if (!activeMissionId) loadAccounts();
     }
     if (ev.type === 'activity' && ev.kind === 'auto_mission' && ev.status === 'completed') {
@@ -139,6 +145,57 @@
     } catch (_) {}
   }
 
+  // ── Interpolación de progreso (anti-detección) ──────────────────────────
+  // El checkpoint real del backend llega en eventos discretos (cada match /
+  // completed de scheduling); esto interpola visualmente ENTRE checkpoints con
+  // requestAnimationFrame, para que el operador nunca vea el salto discreto
+  // real (que delataría cadencia/monto). Robert, 2026-08-04.
+  let _rafId = null;
+  let _animFrom = 0;
+  let _animTo = 0;
+  let _animStart = 0;
+  const ANIM_DURATION_MS = 2200; // tiempo de "viaje" visual entre checkpoints — NO ligado al intervalo real
+
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function animateProgressTo(targetPct, onFrame) {
+    if (_rafId) cancelAnimationFrame(_rafId);
+    _animFrom = missionState ? (missionState.displayPct || 0) : 0;
+    _animTo = Math.max(_animFrom, targetPct); // nunca retrocede visualmente
+    _animStart = performance.now();
+    // pct sigue guardando el checkpoint real (lo usan los fallbacks de
+    // cancelled/failed); displayPct es lo único que se pinta.
+    if (missionState) missionState.pct = targetPct;
+    // Pestaña en segundo plano: el navegador congela requestAnimationFrame, así
+    // que animar dejaría la tarjeta entera sin repintar (sub, matches, estado)
+    // hasta que el operador vuelva. Nadie está viendo la transición ahí, así
+    // que se salta la interpolación y se pinta el estado real de una.
+    if (document.hidden) {
+      if (missionState) missionState.displayPct = _animTo;
+      onFrame();
+      return;
+    }
+    let first = true;
+    function step(now) {
+      const elapsed = now - _animStart;
+      const t = Math.min(1, elapsed / ANIM_DURATION_MS);
+      const val = _animFrom + (_animTo - _animFrom) * easeOutCubic(t);
+      if (missionState) missionState.displayPct = val;
+      // Re-render completo solo en el primer y el último frame; los frames
+      // intermedios parchan el ancho de la barra directamente para no
+      // reconstruir la tarjeta entera 60 veces por segundo.
+      const fill = mv.querySelector('.mv-progress-fill');
+      if (first || t >= 1 || !fill) { onFrame(); first = false; }
+      else { fill.style.width = val + '%'; }
+      if (t < 1) { _rafId = requestAnimationFrame(step); } else { _rafId = null; }
+    }
+    _rafId = requestAnimationFrame(step);
+  }
+
+  function stopProgressAnim() {
+    if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
+  }
+
   function onMissionEvent(ev) {
     if (!missionState) missionState = { matches: [], deposited: 0, approved: 0, failed: 0, status: 'pending' };
     switch (ev.status) {
@@ -146,13 +203,13 @@
       case 'matching':
         missionState.status = 'matching';
         missionState.sub = 'Buscando cuentas' + (ev.accounts ? ' · ' + ev.accounts + ' candidatas' : '…');
-        missionState.pct = 15;
-        break;
+        animateProgressTo(15, renderMission);
+        return;
       case 'logging_in':
         missionState.status = 'matching';
         missionState.sub = '🔑 Sesión: <span class="email">' + shortEmail(ev.email) + '</span> (' + (ev.current || 1) + '/' + (ev.total || '…') + ')';
-        missionState.pct = Math.min(70, 15 + ((ev.current || 1) / Math.max(ev.total || 1, 1)) * 30);
-        break;
+        animateProgressTo(Math.min(70, 15 + ((ev.current || 1) / Math.max(ev.total || 1, 1)) * 30), renderMission);
+        return;
       case 'cooldown':
         missionState.status = 'matching';
         missionState.sub = '⏳ ' + shortEmail(ev.email) + ' enfriando → siguiente…';
@@ -161,8 +218,8 @@
         missionState.status = 'matching';
         missionState.matches.push({ email: ev.email, card_tail: ev.card_tail });
         missionState.sub = '✅ <span class="email">' + shortEmail(ev.email) + '</span> ↔ ' + (ev.card_tail || '');
-        missionState.pct = Math.min(85, 25 + missionState.matches.length * 15);
-        break;
+        animateProgressTo(Math.min(85, 25 + missionState.matches.length * 15), renderMission);
+        return;
       case 'awaiting_confirmation':
         missionState.status = 'awaiting_confirmation';
         missionState.sub = '⚠️ Listo para confirmar llenado';
@@ -172,34 +229,39 @@
         if (ev.completed != null) {
           const total = ev.total || 9;
           missionState.sub = 'Acreditado ✓ · <span class="email">' + shortEmail(ev.email) + '</span> · ' + ev.completed + '/' + total;
-          missionState.pct = Math.min(95, 30 + (ev.completed / Math.max(total, 1)) * 70);
           missionState.schedDone = ev.completed;
           missionState.schedTotal = total;
-          if (ev.completed < total) startCountdown(60);
+          if (ev.completed < total) startProcessingPulse();
+          else clearProcessingPulse();
+          animateProgressTo(Math.min(95, 30 + (ev.completed / Math.max(total, 1)) * 70), renderMission);
+          return;
         } else if (ev.aborted) {
           missionState.sub = '❌ <span class="email">' + shortEmail(ev.email) + '</span> no jaló (' + ev.aborted + ')';
         } else {
-          missionState.sub = '¡Match! Depósitos cada 60s' + (ev.matches ? ' · ' + ev.matches + ' cuentas' : '');
-          missionState.pct = 30;
+          // No revelar cadencia real (Robert, 2026-08-04): nada de "cada Ns" ni
+          // montos por depósito — solo que el proceso está en curso.
+          missionState.sub = '¡Match! Depositando' + (ev.matches ? ' · ' + ev.matches + ' cuentas' : '');
+          animateProgressTo(30, renderMission);
+          return;
         }
         break;
       case 'completed':
-        clearCountdown();
+        clearProcessingPulse();
         missionState.status = 'completed';
         missionState.deposited = ev.deposited || missionState.deposited;
         missionState.approved = ev.approved || missionState.approved;
         missionState.failed = ev.failed || missionState.failed;
-        missionState.pct = 100;
         missionState.sub = 'Completado';
-        break;
+        animateProgressTo(100, renderMission);
+        return;
       case 'cancelled':
-        clearCountdown();
+        clearProcessingPulse();
         missionState.status = 'cancelled';
         missionState.sub = 'Detenido por el operador';
         missionState.pct = missionState.pct || 50;
         break;
       case 'failed':
-        clearCountdown();
+        clearProcessingPulse();
         missionState.status = 'failed';
         missionState.sub = 'Falló' + (ev.reason ? ' · ' + ev.reason : '');
         missionState.pct = missionState.pct || 50;
@@ -208,22 +270,17 @@
     renderMission();
   }
 
-  function startCountdown(secs) {
-    clearCountdown();
-    let remaining = secs;
-    missionState.countdown = remaining;
+  // Pulso "en proceso" — a propósito SIN número de segundos ni timer atado al
+  // intervalo real (Robert, 2026-08-04): el countdown exacto de 60s dejaba ver
+  // la cadencia real de depósitos al operador. Solo un indicador visual de que
+  // sigue trabajando, desacoplado de cualquier temporizador real.
+  function startProcessingPulse() {
+    if (missionState) missionState.processing = true;
     renderMission();
-    countdownTimer = setInterval(() => {
-      remaining--;
-      missionState.countdown = remaining;
-      renderMission();
-      if (remaining <= 0) clearCountdown();
-    }, 1000);
   }
 
-  function clearCountdown() {
-    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
-    if (missionState) missionState.countdown = null;
+  function clearProcessingPulse() {
+    if (missionState) missionState.processing = false;
   }
 
   function renderMission() {
@@ -237,8 +294,9 @@
         '</div>';
     }).join('');
 
-    const cdHtml = s.countdown != null
-      ? '<span class="mv-countdown"><span class="cd-dot"></span>' + s.countdown + 's</span>'
+    // Sin número: un pulso visual de "sigue trabajando" sin revelar cadencia real.
+    const cdHtml = s.processing
+      ? '<span class="mv-countdown"><span class="cd-dot"></span>en curso…</span>'
       : '';
 
     const summaryHtml = (s.status === 'completed' || s.status === 'failed' || s.status === 'cancelled')
@@ -259,7 +317,7 @@
           cdHtml +
         '</div>' +
         '<div class="mv-progress-wrap">' +
-          '<div class="mv-progress-bar"><div class="mv-progress-fill' + fillClass + '" style="width:' + (s.pct || 0) + '%"></div></div>' +
+          '<div class="mv-progress-bar"><div class="mv-progress-fill' + fillClass + '" style="width:' + (s.displayPct != null ? s.displayPct : (s.pct || 0)) + '%"></div></div>' +
           '<div class="mv-sub">' + (s.sub || '') + '</div>' +
         '</div>' +
         (matchesHtml ? '<div class="mv-matches">' + matchesHtml + '</div>' : '') +
@@ -276,9 +334,9 @@
   }
 
   function exitMission() {
+    stopProgressAnim();
     activeMissionId = null;
     missionState = null;
-    clearCountdown();
     mv.style.display = 'none';
     mv.innerHTML = '';
     accountsSection.style.display = 'block';
@@ -323,6 +381,11 @@
         '<button class="btn btn-sm copy-clabe">Copiar</button></div>'
       : '<div class="clabe-box" style="opacity:.6"><span class="clabe-code" style="color:var(--text-dim)">CLABE pendiente</span></div>';
 
+    const curpHtml = acc.curp ? '<div>• CURP: ' + acc.curp + '</div>' : '';
+    const wdInstHtml = acc.withdrawal_ready
+      ? '<div>• Retiro: <span style="color:var(--accent)">' + (acc.withdrawal_institution || 'Aprobado') + '</span></div>'
+      : '<div style="color:var(--text-dim)">• Retiro: esperando SPEI…</div>';
+
     return '<div class="acc-card' + (isLocked ? ' locked' : '') + '" data-id="' + acc.id + '" data-email="' + (acc.email || '') + '">' +
       '<div class="acc-top">' +
         '<span class="acc-email">' + (acc.email || '') + '</span>' +
@@ -332,11 +395,15 @@
       '<div class="acc-meta">' +
         '<div>• Bonos: ' + fmtMoney(balBonos) + '</div>' +
         '<div>• Último: ' + lastDep + (lastDate ? ' (' + lastDate + ')' : '') + '</div>' +
+        curpHtml +
+        wdInstHtml +
         (isLocked ? '<div class="acc-locked-badge">🔒 Bloqueada</div>' : '') +
       '</div>' +
       clabeHtml +
       '<div class="acc-actions">' +
-        '<button class="btn btn-sm btn-primary btn-withdraw" data-bal="' + balReal + '">💸 Retirar</button>' +
+        '<button class="btn btn-sm btn-primary btn-withdraw"' +
+          (acc.withdrawal_ready ? '' : ' disabled title="Esperando confirmación de SPEI en BetMexico"') +
+          ' data-bal="' + balReal + '">💸 Retirar</button>' +
         (isLocked ? '<button class="btn btn-sm btn-danger btn-release">🔓 Liberar</button>' : '') +
       '</div>' +
     '</div>';
@@ -389,6 +456,31 @@
     });
   }
 
+  function stopWithdrawPoll() {
+    if (wdPollTimer) { clearInterval(wdPollTimer); wdPollTimer = null; }
+  }
+
+  async function fetchWithdrawStatus(accountId, txId) {
+    try {
+      const res = await fetch(apiUrl('/api/accounts/' + accountId + '/withdraw/status/' + txId));
+      if (!res.ok) return;
+      const st = await res.json();
+      const terminal = st.status === 'successful' || st.status === 'completed' || st.status === 'failed';
+      if (terminal) {
+        stopWithdrawPoll();
+        const ok = st.status !== 'failed';
+        showToast(ok ? '✅ Retiro liberado' : '❌ Retiro falló', ok ? 'ok' : 'err');
+        loadAccounts();
+      }
+    } catch (_) { /* best-effort, el próximo tick reintenta */ }
+  }
+
+  function startWithdrawPoll(accountId, txId) {
+    stopWithdrawPoll();
+    fetchWithdrawStatus(accountId, txId);
+    wdPollTimer = setInterval(() => fetchWithdrawStatus(accountId, txId), WD_POLL_FAST_MS);
+  }
+
   // ── Withdraw Modal ─────────────────────────────────────────────
   function showWithdrawModal(accountId, email, balance) {
     const trigger = document.activeElement;
@@ -439,6 +531,7 @@
           showToast('Retiro enviado: ' + (d.transactionId || ''), 'ok');
           close();
           loadAccounts();
+          if (d.transactionId) startWithdrawPoll(accountId, d.transactionId);
         } else {
           const detail = d.detail || 'Error';
           showToast(detail, 'err');

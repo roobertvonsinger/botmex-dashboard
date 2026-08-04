@@ -3,6 +3,56 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-08-04 (Task 9 de `docs/superpowers/plans/2026-08-04-retiro-manual-gateado-spei-y-tiempo-real.md` — poll de estado tras disparar retiro en `portal.js`)
+
+**Motivo**: tras `POST .../withdraw` el portal disparaba el retiro y no volvía a preguntar — el
+operador nunca se enteraba si se liberó. Depende de Task 8 (ya hecha, commit `98613fb`): `GET
+/api/accounts/{id}/withdraw/status/{tx_id}` ahora acepta operadores dueños, antes era SA-only.
+Versión simplificada del patrón `_startWithdrawPoll`/`_fetchWithdrawStatus` de `pantalla.js`
+(`WD_POLL_FAST_MS=15000`, sin degradar a "slow" ni panel de detalle).
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **`startWithdrawPoll`/`fetchWithdrawStatus`/`stopWithdrawPoll`** (`static/portal.js`) | Tras `res.ok` con `transactionId`, arranca `setInterval` de 15s a `GET /api/accounts/{id}/withdraw/status/{tx_id}`; para en `st.status` terminal (`successful`/`completed`/`failed`) con toast ✅/❌ + `loadAccounts()`. | ✅ implementado | ✅ verificado en navegador (server local `app-dev-task9`, temp launch config removida al terminar, DB seed ad-hoc en scratchpad con 1 cuenta `withdrawal_ready=1` + fila `account_withdrawals` fake `status_api=2`, `jwt_token` NULL para no pegarle a la API real de BetMexico). Se interceptó solo el `POST .../withdraw` con un monkey-patch de `window.fetch` en consola (para no disparar un retiro real de dinero) devolviendo `transactionId` fijo; el resto del flujo (confirm→toast→poll) corrió sin mockear nada. Confirmado con `read_network_requests`: primer `GET .../withdraw/status/...` inmediato tras el click, respuesta real del backend `{"status":"idle","transactionStatus":2}` (coincide con la fila seed), poll siguió disparando mientras el status no terminal; al pisar `status_api=-1` en la DB (fuera de banda) el siguiente tick devolvió `{"status":"failed","transactionStatus":-1}` y el poll se detuvo ahí (0 requests nuevos en los 20s posteriores) — confirma el `if (terminal) stopWithdrawPoll()`. |
+| **Shape de `/api/accounts/{id}/withdraw/status/{tx_id}`** | Confirmado leyendo `app.py:3661-3821` (`withdraw_status`): campo `status` (no `transactionStatus`, que es el código numérico crudo de BetMexico) con valores `'successful'`/`'completed'`/`'failed'`/`'pending'`/`'idle'`. Terminales: `successful`/`completed`/`failed`. | ✅ confirmado por lectura + respuesta real observada | ✅ |
+
+**Nota de timing**: en la corrida de prueba se observaron ticks más seguidos que 15s exactos bajo el
+entorno de automatización del navegador (probablemente throttling/quantización del `wait` remoto,
+no del código) — el código en sí solo declara un `setInterval(..., WD_POLL_FAST_MS)` con
+`WD_POLL_FAST_MS=15000`, confirmado por lectura directa del archivo. No se investigó más a fondo por
+no ser bloqueante (el mecanismo de arranque/parada del poll es lo que importa, y ese sí se verificó
+con precisión: 0 requests extra en los 20s posteriores al estado terminal).
+
+## Captura: 2026-08-04 (Task 7 de `docs/superpowers/plans/2026-08-04-retiro-manual-gateado-spei-y-tiempo-real.md` — botón Retirar gateado por `withdrawal_ready`)
+
+**Motivo**: el botón `.btn-withdraw` del portal (`/user/{id}`, `static/portal.js`) era siempre
+clickeable — si BetMexico aún no tenía la cuenta de retiro aprobada (`accountStatus==2`, que solo
+aparece tras un SPEI ya acreditado), el click fallaba server-side con `NoApprovedWithdrawalAccount`
+sin ninguna señal previa en la UI. Depende de Task 6 (ya hecha, commit `7e68635`): `GET
+/api/operator/my-accounts` ahora expone `withdrawal_ready` (bool), `withdrawal_institution`
+(str|null) y `curp` (str|null), cacheados por `account_refresh.py`.
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Botón Retirar deshabilitado si `!withdrawal_ready`** | `renderAccountCard` agrega `disabled` + `title="Esperando confirmación de SPEI en BetMexico"` al `.btn-withdraw` cuando `acc.withdrawal_ready` es falsy. | ✅ implementado | ✅ verificado en navegador (server local `app-dev-task7`, temp launch config removida al terminar, DB seed ad-hoc con 2 cuentas: `withdrawal_ready=1`/`=0`): `getComputedStyle`/`.disabled` confirma botón habilitado en la cuenta `ready` y `disabled=true` + tooltip correcto en la `notready`. |
+| **CURP + estado de retiro visibles en `acc-meta`** | Nuevas líneas `• CURP: ...` (si existe) y `• Retiro: <institución>` (verde/acento) o `• Retiro: esperando SPEI…` (gris) sin reemplazar las líneas existentes (Bonos/Último). | ✅ implementado | ✅ verificado por texto renderizado en navegador: ambas cuentas de prueba muestran su CURP y el estado de retiro correcto. |
+| **SSE `withdrawal_ready_changed` dispara refresh del grid** | `onBusEvent` suma este `kind` a la misma condición que ya dispara `loadAccounts()` para `account_refreshed`/`withdrawal`/`withdrawal_status`, respetando el guard `!activeMissionId` (no interrumpir una misión activa). | ✅ implementado en frontend | 🔵 el emisor de este evento (`account_refresh.py` o el flujo de retiro) no existe todavía en el repo al momento de este commit — es responsabilidad de otra task del mismo plan corriendo en paralelo. Verificado por lectura de `onBusEvent` (`static/portal.js`), no por evento real recibido. |
+
+**Nota de color**: la referencia del plan sugería `var(--green-bright)` para la institución
+aprobada; esa variable no existe en el CSS del repo. Se usó `var(--accent)` (patrón ya usado en
+`portal.js:460`), que en el scope de `portal.html` resuelve a `#58a6ff` (azul-acento propio del
+portal, distinto del verde `oklch(...)` del dashboard SA en `style.css`) — confirmado con
+`getComputedStyle` en navegador, no es una asunción.
+
+**Metodología del smoke**: server local (`app-dev-task7`, agregado temporalmente a
+`.claude/launch.json` y removido al terminar — no queda en el diff) con `BMX_WEB_AUTH_MODE=open` +
+`JWT_KEEPER_ENABLED=0` + `ACCOUNT_REFRESH_ENABLED=0`, apuntando a una DB temporal sembrada a mano
+(`%TEMP%\bmx_dev_task7.db`, fuera del repo) con 2 cuentas de prueba y sus `deposit_attempts`/
+`account_deposit_clabes` correspondientes (requeridos por los JOINs de `/api/operator/my-accounts`).
+Navegado como SA (`robertvs`, sesión persistente ya presente en el sandbox) con `?view_as=` hacia
+el `telegram_id` de un operador real (Lau), replicando el patrón de supervisión SA documentado en
+`app.py` (`user_portal_page`).
+
 ## Captura: 2026-08-04 (flujo `/bet` operativo — smoke real en navegador + 2 bugs nuevos corregidos)
 
 **Motivo**: Robert pidió cerrar todos los pendientes que bloquean que el flujo `/bet` (portal del
@@ -19,6 +69,7 @@ modal de retiro. Esto convierte varios 🔵 de capturas previas (sesión 2026-08
 | **Vista de misión viva (`?match=ID`) con datos reales** | Auto-detecta `mission_id`, carga `/api/deposits/auto/{mid}/status`, renderiza progress/matches/resumen. | ✅ implementado | ✅ verificado con misión real completada (`796aa289`): status COMPLETADO, $1210.00 depositado, 9 aprobados/2 fallidos renderizados correctamente. **Antes 🔵 "sin smoke real con misión viva"** |
 | **Modal de retiro: Escape + retorno de foco** | `Escape` cierra el modal, el foco vuelve al botón que lo abrió. | ✅ implementado | ✅ verificado con teclado real (Escape) en navegador: modal se cierra, `document.activeElement` vuelve a ser el botón "💸 Retirar" original. **Antes 🔵 "sin verificar con teclado real"** |
 | **Touch targets 44px en `.acc-actions`** | `min-height: 44px` en botones de acciones de cuenta. | ✅ implementado | ✅ verificado: `getComputedStyle().minHeight === '44px'` y `offsetHeight === 44` en botón real del grid. **Antes 🔵 "sin verificar en dispositivo móvil real"** |
+| **Fetch mínimo contra BetMexico en refresh periódico** | `account_refresh.py` usa `fetch_mode='balance_only'` (prewarm.py) — nunca re-fetchea fullname/dirección/constantes, por diseño de la API. | ✅ ya implementado | ✅ grep L229/279 (prewarm.py) + L259 (account_refresh.py) confirman: `fetch_mode="balance_only"` SIEMPRE trae solo balance/cuenta_retiro/estado (nunca fullname/items/dirección). Verificado 2026-08-04, sin cambio de código necesario. |
 
 **Suite de tests**: 362/362 siguen pasando tras ambos fixes (`python -m pytest -q`).
 

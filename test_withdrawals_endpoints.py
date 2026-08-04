@@ -229,10 +229,69 @@ def test_withdraw_persist_idempotent_unique_transaction_id(seed_db):
 # ── C2 — GET /api/accounts/{id}/withdraw/status/{tx_id} ──────────────────
 
 def test_status_403_non_sa(make_client, seed_db):
+    """Operador SIN relación con la cuenta (ni account_assignments ni locked_by) -> 403.
+    b@test.com es del SA en el seed (a@/c@ son las relacionadas con 555)."""
     client = make_client(role="user", telegram_id=555)
-    acc_id = _acc_id(seed_db)
+    acc_id = _acc_id(seed_db, "b@test.com")
     r = client.get(f"/api/accounts/{acc_id}/withdraw/status/tx1")
     assert r.status_code == 403
+
+
+def test_withdraw_status_operador_dueno_puede_consultar(make_client, seed_db, monkeypatch):
+    """Operador dueño de la cuenta (via account_assignments) puede consultar su status. a@test.com
+    está asignada a 555 en el seed de conftest.py."""
+    client = make_client(role="user", telegram_id=555)
+    acc_id = _acc_id(seed_db, "a@test.com")
+    _set_jwt(seed_db, "a@test.com")
+
+    import app
+    app._persist_withdrawal(acc_id, 555, {
+        "transactionId": "tx-owner", "reference": "r1", "amount": 100.0,
+        "accountDigits": "1215", "institutionName": "HEY BANCO",
+        "account_email": "a@test.com",
+    })
+
+    async def fake_get_pending(jwt, proxy_url, transport=None):
+        return {"id": "tx-owner", "transactionStatus": 2, "transactionStatusDescription": "En proceso"}
+
+    monkeypatch.setattr(app, "get_pending_withdrawal", fake_get_pending)
+
+    r = client.get(f"/api/accounts/{acc_id}/withdraw/status/tx-owner")
+    assert r.status_code == 200
+    assert r.json()["status"] == "pending"
+
+
+def test_withdraw_status_operador_ajeno_403(make_client, seed_db):
+    """Operador SIN ownership sobre la cuenta -> 403, no filtra status de retiro ajeno.
+    b@test.com no está asignada ni lockeada a 555 en el seed."""
+    client = make_client(role="user", telegram_id=555)
+    acc_id = _acc_id(seed_db, "b@test.com")
+    r = client.get(f"/api/accounts/{acc_id}/withdraw/status/tx-anything")
+    assert r.status_code == 403
+
+
+def test_withdraw_status_operador_no_puede_leer_tx_de_otra_cuenta_via_account_id_propio(make_client, seed_db):
+    """IDOR: operador dueño de a@test.com pasa SU PROPIO account_id (que sí pertenece a
+    su universo visible, pasando el chequeo de ownership) pero el tx_id de un retiro que
+    pertenece a b@test.com (cuenta ajena, no lockeada/asignada a 555). Antes del fix el
+    SELECT de account_withdrawals filtraba SOLO por transaction_id, sin cruzar contra el
+    account_id de la URL -> filtraba dígitos/institución de la cuenta ajena en un 200.
+    Debe dar 404 (retiro no encontrado para ESA cuenta), no 200 con datos ajenos."""
+    client = make_client(role="user", telegram_id=555)
+    a_id = _acc_id(seed_db, "a@test.com")
+    b_id = _acc_id(seed_db, "b@test.com")
+
+    import app
+    app._persist_withdrawal(b_id, 1341812706, {
+        "transactionId": "tx-belongs-to-b", "reference": "r1", "amount": 100.0,
+        "accountDigits": "9999", "institutionName": "SECRET BANK OF B",
+        "account_email": "b@test.com",
+    })
+
+    r = client.get(f"/api/accounts/{a_id}/withdraw/status/tx-belongs-to-b")
+    assert r.status_code == 404
+    assert "9999" not in r.text
+    assert "SECRET BANK OF B" not in r.text
 
 
 def test_status_404_unknown_tx(make_client, seed_db):

@@ -163,3 +163,25 @@ Similar pero:
 | `support_pending` | **El gate de confirmación.** `token TEXT PRIMARY KEY, tool, args_json, created_at, created_ts, used_at`. Una tool de escritura invocada por el LLM escribe aquí y NO ejecuta nada; solo `POST /api/support/confirm` (sesión SA) la dispara. `used_at` la hace de un solo uso; `created_ts` aplica el TTL de 10 min. Es lo que impide que el modelo se autoapruebe una acción destructiva. |
 | `support_incidents` | Memoria del agente: `id, titulo, sintoma, causa, accion, estado, created_at`. Se escribe con la tool `registrar_incidente` para que un problema repetido se reconozca en vez de re-diagnosticarse. |
 | `auto_missions` | Bitácora de corridas del modo auto-depósito (V2, 2026-07-28). `mission_id TEXT UNIQUE NOT NULL` (idempotencia), `operator_id` (nullable — modo open), `card_pipes`/`accounts_selected`/`matches` (JSON), `amount` (default 150), `target_count` (default 9), `status` (`pending`/`matching`/`scheduling`/`completed`/`cancelled`/`failed`), `total_deposited/approved/failed`, `created_at`/`updated_at` (anti-zombie)/`completed_at`. Migración aditiva en `_migrate()` + reaper al startup: misiones en `pending/matching/scheduling` → `failed` y libera locks de sus cuentas (fix auditor B2). Ver `docs/superpowers/plans/2026-07-28-modo-auto-deposito-v2.md`. |
+| `account_withdrawals` | Bitácora de retiros (botón SA). `transaction_id TEXT UNIQUE NOT NULL` (idempotencia), `account_id`, `account_email`, `reference`, `amount`, `account_digits`, `institution_name`, `status_api`, `status_description`, `gateway`, `last_modified_utc`, `disparado_por` (telegram_id del SA), `created_at`. Aditiva. |
+
+## Esquema de la tabla `accounts`
+
+Columnas clave de estado y operativo:
+
+| Columna | Tipo | Default | Función |
+|---------|------|---------|---------|
+| `email` | TEXT PK | — | Email único, clave primaria |
+| `locked_by` | TEXT | NULL | Telegram ID o username del operador que la tiene en uso; NULL = disponible |
+| `locked_until` | TEXT | NULL | ISO timestamp de liberación automática (reloj); NULL = perpetuo (solo SA) |
+| `published_to_pool` | INTEGER | 1 | 1 = disponible en pool; 0 = trastienda (oculta) |
+| `status` | TEXT | — | Estado BetMexico (`LIVE`, `INACTIVE`, `BANNED`, etc.) |
+| `balance` | REAL | — | Saldo (caché, actualizado por `account_refresh.py` cada 5 min) |
+| `jwt_token` | TEXT | NULL | JWT vigente (login exitoso); cacheado, válido ~7 días |
+| `jwt_expires_at` | INTEGER | NULL | Unix timestamp de expiración del JWT actual |
+| `withdrawal_ready` | INTEGER | 0 | Flag: 1 = BetMexico tiene cuenta de retiro aprobada (SPEI aterrizó). Cacheado, poblado por `account_refresh.py`. Gatea el botón de retiro del portal. |
+| `withdrawal_institution` | TEXT | NULL | Nombre de la institución de retiro aprobada (ej. "BBVA México"). Poblado junto con `withdrawal_ready` por `account_refresh.py`. |
+| `grade` | TEXT | — | Calificación de riesgo (`A+`, `A`, `B`, `C`, `D`; ver `web_grading.py`) |
+| `locked_by` + `locked_until` + `published_to_pool` | — | — | **Fuente única de estado** (ver §Modelo de estados de cuenta) |
+
+Nota: `withdrawal_ready` e `withdrawal_institution` son caché de una llamada costosa en BetMexico (endpoint privado de cuenta de retiro). Antes estas columnas no existían; la autorización de retiro se consultaba en vivo en cada render del portal (`withdrawals.get_bank_accounts`). Ahora se persistem para gatear sin round-trip.

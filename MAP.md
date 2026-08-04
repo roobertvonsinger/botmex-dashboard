@@ -97,8 +97,8 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 4974 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `account_refresh.py` | 381 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
+| `app.py` | 4999 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 191 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1041 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -119,7 +119,7 @@ prewarm.py (router)
 | `shared/betmexico_payment_analyzer.py` | 592 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
-| `test_account_refresh.py` | 122 | `—` | _[completar]_ |
+| `test_account_refresh.py` | 332 | `—` | _[completar]_ |
 | `test_account_touch.py` | 51 | `—` | _[completar]_ |
 | `test_account_touch_isolated.py` | 138 | `—` | _[completar]_ |
 | `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
@@ -128,7 +128,7 @@ prewarm.py (router)
 | `test_auto_deposit_selection.py` | 188 | `—` | _[completar]_ |
 | `test_auto_missions_migrate.py` | 120 | `—` | _[completar]_ |
 | `test_balance_only_real_zero_preserved.py` | 89 | `—` | _[completar]_ |
-| `test_bet_live_plan.py` | 108 | `—` | _[completar]_ |
+| `test_bet_live_plan.py` | 114 | `—` | _[completar]_ |
 | `test_card_touch_log.py` | 61 | `—` | _[completar]_ |
 | `test_curp_utils.py` | 28 | `—` | _[completar]_ |
 | `test_deposit_status_classify.py` | 95 | `—` | _[completar]_ |
@@ -148,7 +148,7 @@ prewarm.py (router)
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 71 | `—` | _[completar]_ |
 | `test_withdrawals.py` | 361 | `—` | _[completar]_ |
-| `test_withdrawals_endpoints.py` | 417 | `—` | _[completar]_ |
+| `test_withdrawals_endpoints.py` | 476 | `—` | _[completar]_ |
 | `test_withdrawals_migrate.py` | 46 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
 | `web_grading.py` | 197 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
@@ -220,6 +220,7 @@ prewarm.py (router)
 | `SCORE_CEIL` | `{"A": 100, "B": 79, "C": 59, "D": 39}` | `shared/betmexico_payment_analyzer.py` |
 | `SCHEMA` | `"""` | `test_a1_estados.py` |
 | `NOW` | `1_800_000_000` | `test_account_refresh.py` |
+| `NOW_ISO` | `"2026-08-04T12:00:00+00:00"` | `test_account_refresh.py` |
 | `OP_A` | `{"role": "user", "telegram_id": 555, "display": "Lau"}` | `test_account_touch.py` |
 | `OP_B` | `{"role": "user", "telegram_id": 777, "display": "Otro"}` | `test_account_touch.py` |
 | `NOW` | `1_800_000_000` | `test_jwt_keeper.py` |
@@ -246,18 +247,18 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
-| `4da665d` | fix(portal): no interrumpir el auto-reload durante una misión /bet en curso |
-| `723341c` | docs: NEXT-SESSION actualizado — flujo /bet operativo, deploy verificado en vivo |
-| `232eac7` | fix(portal): flujo /bet operativo — cache-bust/auto-reload + fecha corrupta en grid de cuentas |
-| `a62629d` | fix: reparación integral de los 31 fallos de test arrastrados (362/362 verdes) |
-| `26f7938` | docs: NEXT-SESSION pruned — bugs resueltos, estado actual para Claude Code |
-| `e3ee73a` | fix: httpx import, test contamination, auth hardening + auditoria Impeccable portal/login |
-| `ef482be` | docs: cierre de sesión — auditoría Impeccable de /portal + /login, NEXT-SESSION actualizado |
-| `7db7ec2` | feat(routing): separar /dashboard (SA) de /user/{id} (bet) + vista "como usuario" para SA |
-| `dff8150` | feat(brand): integrar logo real botmexico.net (mascota robot + wordmark) en portal/login |
-| `7d2365d` | feat(portal,login): rebrand visual botmexico.net (horizonte de sucesos + tricolor MX) |
-| `983557f` | feat(portal): mission control SSE + retiro/liberar sin password + resiliencia bot /bet |
-| `6f2332e` | fix(prewarm): persistir balance real $0 en fetch_mode=balance_only |
+| `79c6f3a` | fix(security): cerrar IDOR en GET /api/accounts/{id}/withdraw/status/{tx_id} |
+| `a49cc10` | feat(account_refresh): persistir withdrawal_ready/institution + SSE en cambio |
+| `cd1dde2` | feat(portal): poll de estado tras disparar retiro (15s hasta terminal) |
+| `0a6aff3` | feat(account_refresh): _load_candidate_rows trae balance/lock/retiro-pendiente y computa hot |
+| `b3c9eb1` | feat(portal): gatear botón Retirar por withdrawal_ready + mostrar CURP/institución |
+| `98613fb` | feat(api): permitir a operadores dueños consultar withdraw/status |
+| `1eceac6` | feat(account_refresh): bypass de filtros para cuentas hot en select_refresh_candidates_healthy |
+| `88b3c47` | feat(portal): interpolación visual del progreso de misión (anti-detección) |
+| `7e68635` | feat(api): exponer withdrawal_ready/withdrawal_institution/curp en /api/operator/my-accounts |
+| `5a39b4a` | docs(audit): confirmar que fetch mínimo contra BetMexico ya está satisfecho |
+| `b8c36d5` | feat(account_refresh): agregar is_hot_account (lógica pura, TDD) |
+| `d798ab3` | feat(db): agregar withdrawal_ready/withdrawal_institution + índice account_withdrawals |
 <!-- GEN:end:recientes -->
 
 ---

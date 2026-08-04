@@ -89,47 +89,49 @@ def select_refresh_candidates_healthy(
 ) -> List[Dict[str, Any]]:
     """Filtra + ordena + limita las cuentas a refrescar este ciclo.
 
-    Regla: viva, útil (grade en `grades`, publicada), NO lockeada por un
-    operador, y con JWT que SIGUE vigente ahora (lo opuesto a jwt_keeper:
-    esas cuentas se consultan sin login; las por expirar las re-loguea el
-    keeper). Orden: `last_checked_at` ascendente (la más desactualizada
-    primero) — evita re-tocar una cuenta que un depósito acaba de refrescar.
+    Regla normal: viva, útil (grade en `grades`, publicada), NO lockeada por
+    un operador, y con JWT que SIGUE vigente ahora. Orden: `last_checked_at`
+    ascendente (la más desactualizada primero).
 
-    Excepción: las RESERVADA_SA (`published_to_pool=0 + locked_by` del SA)
-    SÍ son candidatas — el SA las usa y necesita su balance al día.
-    `sa_tokens` lista los valores que identifican al SA en `locked_by`
-    (cubre formatos username y telegram_id, ver `_sa_lock_tokens`).
+    Excepción RESERVADA_SA: pool=0 + locked_by del SA sí es candidata.
+
+    Regla "hot" (Robert, 2026-08-04): una fila con `row["hot"]=True` (ver
+    `is_hot_account`) SIEMPRE es candidata — bypassea lock/grade/pool y NO
+    cuenta contra `batch_max` — solo requiere estar LIVE y tener JWT vigente
+    (sin eso no hay forma de refrescarla). Van primero en el resultado.
     """
     sa_tokens = set(sa_tokens or [])
-    out: List[Dict[str, Any]] = []
+    hot: List[Dict[str, Any]] = []
+    normal: List[Dict[str, Any]] = []
     for r in rows:
         if (r.get("status") or "") != "LIVE":
             continue
+        exp = _exp_int(r.get("jwt_expires_at"))
+        if exp <= now:
+            continue  # sin JWT vigente → no es candidata (la toca jwt_keeper)
+
+        if r.get("hot"):
+            hot.append(r)
+            continue
+
         grade = r.get("grade") or ""
         if grade not in grades:
             continue
         locked_by = r.get("locked_by")
-        # RESERVADA_SA: pool=0 + locked_by del SA → candidata.
         is_sa_reserved = (
             not r.get("published_to_pool")
             and str(locked_by).lower() in sa_tokens
         )
         if not is_sa_reserved:
-            # cuenta pública y libre: ok
             if not r.get("published_to_pool"):
                 continue
             if locked_by is not None:
                 continue
-        exp = _exp_int(r.get("jwt_expires_at"))
-        if exp <= now:
-            continue  # sin JWT vigente → no es candidata (la toca jwt_keeper)
-        out.append(r)
+        normal.append(r)
 
-    out.sort(key=lambda r: (r.get("last_checked_at") or ""))
-    return out[:batch_max]
-
-    out.sort(key=lambda r: (r.get("last_checked_at") or ""))
-    return out[:batch_max]
+    hot.sort(key=lambda r: (r.get("last_checked_at") or ""))
+    normal.sort(key=lambda r: (r.get("last_checked_at") or ""))
+    return hot + normal[:batch_max]
 
 
 def _exp_int(v: Any) -> int:
@@ -141,41 +143,79 @@ def _exp_int(v: Any) -> int:
         return 0
 
 
+def is_hot_account(row: Dict[str, Any], now_iso: str) -> bool:
+    """Cuenta que DEBE refrescarse siempre, sin importar lock/grade/pool/
+    batch_max (Robert, 2026-08-04): balance_real>$50, ventana de autolock
+    post-depósito activa (locked_until en el futuro — dinero de un depósito
+    del mismo proceso aún sin asentar), o retiro en curso sin liberar
+    (has_pending_withdrawal — hasta que status_api==6 lo saca de aquí).
+    `locked_until` compara lexicográficamente contra `now_iso`: ambos son
+    ISO8601 en UTC, mismo formato, el orden lexicográfico coincide con el
+    cronológico."""
+    balance = float(row.get("balance_real") or 0)
+    if balance > 50:
+        return True
+    locked_until = row.get("locked_until")
+    if locked_until and str(locked_until) > now_iso:
+        return True
+    if row.get("has_pending_withdrawal"):
+        return True
+    return False
+
+
 # ── I/O de BD (aislado; usa el context manager de app) ────────────────────────
-_SELECT_COLS = ("email", "status", "grade", "jwt_expires_at",
-                "locked_by", "published_to_pool", "last_checked_at")
+_SELECT_COLS = ("id", "email", "status", "grade", "jwt_expires_at",
+                "locked_by", "published_to_pool", "last_checked_at",
+                "balance_real", "locked_until")
+
+_PENDING_WD_EXISTS_SQL = (
+    "EXISTS(SELECT 1 FROM account_withdrawals w WHERE w.account_id = accounts.id "
+    "AND (w.status_api IS NULL OR (w.status_api >= 0 AND w.status_api != 6)))"
+)
 
 
 def _load_candidate_rows() -> List[Dict[str, Any]]:
-    """Trae de la BD el universo grueso (LIVE + útiles) para que la lógica
-    pura afine. Filtra en SQL lo barato; el resto lo decide
-    `select_refresh_candidates_healthy`.
+    """Trae TODAS las cuentas LIVE y computa `hot` en Python vía
+    `is_hot_account` — el filtro grade/pool/lock para cuentas NO-hot sigue
+    viviendo únicamente en `select_refresh_candidates_healthy` (una sola
+    fuente de verdad, antes estaba parcialmente duplicado en el WHERE de
+    este SELECT).
 
-    Universo: cuentas LIVE publicadas al pool (published_to_pool=1) **más**
-    las RESERVADA_SA (published_to_pool=0 + locked_by del SA) — el SA las usa
-    y necesita su balance al día como a cualquier otra cuenta pública.
-    Los tokens del SA se resuelven vía `_sa_lock_tokens` (formatos username
-    y telegram_id).
+    Antes el WHERE excluía cuentas no publicadas/lockeadas a nivel SQL —
+    eso escondía por completo las cuentas hot que están lockeadas por un
+    operador no-SA (el caso normal durante depósito/retiro en curso).
     """
     import app  # lazy: evita ciclo de import
-    sa_tokens = _sa_lock_tokens()
+    now_iso = datetime.now(timezone.utc).isoformat()
     with app.db() as conn:
-        if sa_tokens:
-            placeholders = ",".join("?" for _ in sa_tokens)
-            cur = conn.execute(
-                f"SELECT {', '.join(_SELECT_COLS)} FROM accounts "
-                "WHERE status='LIVE' "
-                f"AND (published_to_pool=1 "
-                f"OR (published_to_pool=0 AND lower(locked_by) IN ({placeholders})))",
-                [t.lower() for t in sa_tokens],
-            )
-        else:
-            # sin SA tokens (auth caído + sin fallback) → solo pool público
-            cur = conn.execute(
-                f"SELECT {', '.join(_SELECT_COLS)} FROM accounts "
-                "WHERE status='LIVE' AND published_to_pool=1"
-            )
-        return [dict(row) for row in cur.fetchall()]
+        cur = conn.execute(
+            f"SELECT {', '.join(_SELECT_COLS)}, "
+            f"{_PENDING_WD_EXISTS_SQL} AS has_pending_withdrawal "
+            "FROM accounts WHERE status='LIVE'"
+        )
+        rows = [dict(row) for row in cur.fetchall()]
+    for r in rows:
+        r["has_pending_withdrawal"] = bool(r.get("has_pending_withdrawal"))
+        r["hot"] = is_hot_account(r, now_iso)
+    return rows
+
+
+def _db_get_withdrawal_ready(email: str) -> int:
+    import app
+    with app.db() as c:
+        row = c.execute(
+            "SELECT withdrawal_ready FROM accounts WHERE email=?", (email,)
+        ).fetchone()
+    return int(row["withdrawal_ready"] or 0) if row else 0
+
+
+def _db_set_withdrawal_ready(email: str, ready: bool, institution: Optional[str]) -> None:
+    import app
+    with app.db(write=True) as c:
+        c.execute(
+            "UPDATE accounts SET withdrawal_ready=?, withdrawal_institution=? WHERE email=?",
+            (1 if ready else 0, institution, email),
+        )
 
 
 # ── Ciclo (async) ─────────────────────────────────────────────────────────────
@@ -285,6 +325,47 @@ async def run_refresh_cycle(
                 })
             except Exception:
                 pass
+
+            # withdrawal_ready: PASO1 de withdrawals.py es la única fuente de
+            # verdad de "¿aterrizó el SPEI?" — se verifica en el mismo ciclo
+            # que ya refresca balance con el mismo JWT/proxy, sin llamada extra
+            # de login/captcha. Robert, 2026-08-04: gatea el botón de retiro
+            # del portal sin exponer un round-trip vivo a BetMexico en cada render.
+            try:
+                from withdrawals import (
+                    get_bank_accounts, NoApprovedWithdrawalAccount, MultipleApprovedAccounts,
+                )
+                ready: Optional[bool] = None
+                institution: Optional[str] = None
+                try:
+                    approved = await get_bank_accounts(jwt, proxy_url)
+                    ready, institution = True, approved[0].get("institutionName")
+                except NoApprovedWithdrawalAccount:
+                    ready, institution = False, None
+                except MultipleApprovedAccounts:
+                    # SPEI SÍ aterrizó (hay >1 cuenta aprobada) — el operador puede
+                    # intentar retirar; execute_withdrawal decide con más detalle
+                    # en el momento del click. No se puede elegir "la" institución.
+                    ready, institution = True, "Múltiples cuentas — revisar"
+                except Exception as e:
+                    logger.info(f"[account_refresh] {email} check withdrawal_ready falló: {str(e)[:120]}")
+
+                if ready is not None:
+                    prev = _db_get_withdrawal_ready(email)
+                    if prev != (1 if ready else 0):
+                        _db_set_withdrawal_ready(email, ready, institution)
+                        try:
+                            from app import _broadcast
+                            _broadcast({
+                                "type": "activity", "kind": "withdrawal_ready_changed",
+                                "ts": datetime.now(timezone.utc).isoformat(),
+                                "email": email, "withdrawal_ready": ready,
+                                "withdrawal_institution": institution,
+                            })
+                        except Exception:
+                            pass
+            except Exception as e:
+                logger.warning(f"[account_refresh] {email} withdrawal_ready check error: {str(e)[:120]}")
         except Exception as e:
             stats["failed"] += 1
             logger.warning(f"[account_refresh] {email} persist falló: {str(e)[:160]}")

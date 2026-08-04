@@ -268,6 +268,13 @@ def _migrate():
         # (withdrawals.py y clabe_fetch.py las consumen para retiro/clabes).
         ("jwt_token", "ALTER TABLE accounts ADD COLUMN jwt_token TEXT"),
         ("jwt_expires_at", "ALTER TABLE accounts ADD COLUMN jwt_expires_at INTEGER"),
+        # withdrawal_ready/withdrawal_institution: cachea si BetMexico tiene
+        # cuenta de retiro aprobada (accountStatus==2, aparece tras un SPEI
+        # acreditado) — antes esto SOLO existía como llamada viva en
+        # withdrawals.get_bank_accounts (PASO1), sin nada persistido para
+        # gatear el botón del portal sin round-trip. Poblado por account_refresh.py.
+        ("withdrawal_ready", "ALTER TABLE accounts ADD COLUMN withdrawal_ready INTEGER DEFAULT 0"),
+        ("withdrawal_institution", "ALTER TABLE accounts ADD COLUMN withdrawal_institution TEXT"),
     ]:
         try:
             with db(write=True) as c:
@@ -368,6 +375,18 @@ def _migrate():
                 "last_modified_utc TEXT, "
                 "disparado_por INTEGER, "
                 "created_at TEXT NOT NULL)"
+            )
+    except sqlite3.OperationalError:
+        pass
+
+    # Índice para el EXISTS() de has_pending_withdrawal en account_refresh.py
+    # (Task 4 del plan de retiro gateado) — sin esto, cada ciclo de 5min hace
+    # un table scan de account_withdrawals por cada una de ~800 cuentas LIVE.
+    try:
+        with db(write=True) as c:
+            c.execute(
+                "CREATE INDEX IF NOT EXISTS idx_account_withdrawals_account_id "
+                "ON account_withdrawals(account_id)"
             )
     except sqlite3.OperationalError:
         pass
@@ -3641,14 +3660,17 @@ async def withdraw(account_id: int, payload: dict, user: dict = Depends(require_
 
 @app.get("/api/accounts/{account_id}/withdraw/status/{tx_id}")
 async def withdraw_status(account_id: int, tx_id: str, user: dict = Depends(require_session)):
-    if user.get("role") != "superadmin":
-        raise HTTPException(403, "Solo superadmin")
     with db() as c:
         acc = c.execute(
-            "SELECT id, jwt_token FROM accounts WHERE id=?", (account_id,)
+            "SELECT id, email, jwt_token FROM accounts WHERE id=?", (account_id,)
         ).fetchone()
+        if user.get("role") != "superadmin":
+            vis = _visible_emails(user, c)
+            if not acc or (vis is not None and acc["email"] not in vis):
+                raise HTTPException(403, "No tienes permiso sobre esta cuenta")
         row = c.execute(
-            "SELECT * FROM account_withdrawals WHERE transaction_id=?", (tx_id,)
+            "SELECT * FROM account_withdrawals WHERE transaction_id=? AND account_id=?",
+            (tx_id, account_id),
         ).fetchone()
     if not acc or not row:
         raise HTTPException(404, "Retiro no encontrado")
@@ -4244,6 +4266,7 @@ def operator_my_accounts(user: dict = Depends(require_operator_view)):
                 "SELECT DISTINCT a.id, a.email, a.balance_real, a.balance_bonos, "
                 "a.last_deposit_amount, a.last_deposit_date, a.grade, "
                 "a.locked_by, a.locked_until, a.status, "
+                "a.withdrawal_ready, a.withdrawal_institution, a.curp, "
                 "c.clabe AS clabe_stp "
                 "FROM deposit_attempts d JOIN accounts a ON d.account_email = a.email "
                 "LEFT JOIN account_deposit_clabes c ON (a.id = c.account_id AND (c.integration = 'STP' OR c.integration = '2')) "
@@ -4254,6 +4277,7 @@ def operator_my_accounts(user: dict = Depends(require_operator_view)):
                 "SELECT DISTINCT a.id, a.email, a.balance_real, a.balance_bonos, "
                 "a.last_deposit_amount, a.last_deposit_date, a.grade, "
                 "a.locked_by, a.locked_until, a.status, "
+                "a.withdrawal_ready, a.withdrawal_institution, a.curp, "
                 "c.clabe AS clabe_stp "
                 "FROM deposit_attempts d JOIN accounts a ON d.account_email = a.email "
                 "LEFT JOIN account_deposit_clabes c ON (a.id = c.account_id AND (c.integration = 'STP' OR c.integration = '2')) "
@@ -4264,6 +4288,7 @@ def operator_my_accounts(user: dict = Depends(require_operator_view)):
         for r in rows:
             d = dict(r)
             d["is_locked"] = bool(d.get("locked_by"))
+            d["withdrawal_ready"] = bool(d.get("withdrawal_ready"))
             d.pop("locked_by", None)
             d.pop("locked_until", None)
             result.append(d)
