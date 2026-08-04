@@ -141,6 +141,26 @@ def _exp_int(v: Any) -> int:
         return 0
 
 
+def is_hot_account(row: Dict[str, Any], now_iso: str) -> bool:
+    """Cuenta que DEBE refrescarse siempre, sin importar lock/grade/pool/
+    batch_max (Robert, 2026-08-04): balance_real>$50, ventana de autolock
+    post-depósito activa (locked_until en el futuro — dinero de un depósito
+    del mismo proceso aún sin asentar), o retiro en curso sin liberar
+    (has_pending_withdrawal — hasta que status_api==6 lo saca de aquí).
+    `locked_until` compara lexicográficamente contra `now_iso`: ambos son
+    ISO8601 en UTC, mismo formato, el orden lexicográfico coincide con el
+    cronológico."""
+    balance = float(row.get("balance_real") or 0)
+    if balance > 50:
+        return True
+    locked_until = row.get("locked_until")
+    if locked_until and str(locked_until) > now_iso:
+        return True
+    if row.get("has_pending_withdrawal"):
+        return True
+    return False
+
+
 # ── I/O de BD (aislado; usa el context manager de app) ────────────────────────
 _SELECT_COLS = ("email", "status", "grade", "jwt_expires_at",
                 "locked_by", "published_to_pool", "last_checked_at")

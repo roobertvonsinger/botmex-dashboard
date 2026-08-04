@@ -97,8 +97,8 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 4993 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `account_refresh.py` | 320 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
+| `app.py` | 4996 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 191 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1041 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -128,7 +128,7 @@ prewarm.py (router)
 | `test_auto_deposit_selection.py` | 188 | `—` | _[completar]_ |
 | `test_auto_missions_migrate.py` | 120 | `—` | _[completar]_ |
 | `test_balance_only_real_zero_preserved.py` | 89 | `—` | _[completar]_ |
-| `test_bet_live_plan.py` | 108 | `—` | _[completar]_ |
+| `test_bet_live_plan.py` | 114 | `—` | _[completar]_ |
 | `test_card_touch_log.py` | 61 | `—` | _[completar]_ |
 | `test_curp_utils.py` | 28 | `—` | _[completar]_ |
 | `test_deposit_status_classify.py` | 95 | `—` | _[completar]_ |
@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d798ab3` | feat(db): agregar withdrawal_ready/withdrawal_institution + índice account_withdrawals |
 | `f43edfa` | wip(tests): RED tests para is_hot_account + bypass hot (Track B, Task 2-3) |
 | `33a2aba` | docs: plan de Track B listo (retiro gateado por SPEI + refresh caliente + anti-detección) |
 | `cdc208e` | fix(portal): cerrar fuga de cadencia real en la vista de misión |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `26f7938` | docs: NEXT-SESSION pruned — bugs resueltos, estado actual para Claude Code |
 | `e3ee73a` | fix: httpx import, test contamination, auth hardening + auditoria Impeccable portal/login |
 | `ef482be` | docs: cierre de sesión — auditoría Impeccable de /portal + /login, NEXT-SESSION actualizado |
-| `7db7ec2` | feat(routing): separar /dashboard (SA) de /user/{id} (bet) + vista "como usuario" para SA |
 <!-- GEN:end:recientes -->
 
 ---
