@@ -2,6 +2,14 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## IDOR en `GET /api/accounts/{id}/withdraw/status/{tx_id}` — filtraba datos de retiro de cuentas ajenas (detectado y corregido 2026-08-04)
+
+- **Síntoma**: el commit `98613fb` (Track B, Task 8) relajó este endpoint de SA-only a "SA o operador dueño de la cuenta" vía `_visible_emails(user, c)` — el chequeo de ownership sobre `account_id` quedó correcto. Pero el `SELECT * FROM account_withdrawals WHERE transaction_id=?` que resuelve los datos reales de la respuesta (dígitos de cuenta, institución, status) filtraba **solo por `tx_id`**, sin cruzar contra el `account_id` de la URL. Un operador con al menos una cuenta propia podía pasar SU PROPIO `account_id` (pasa el ownership check) junto con el `tx_id` de un retiro de una cuenta AJENA, y recibía 200 con los datos reales de esa cuenta ajena (dígitos de cuenta bancaria, institución, montos).
+- **Causa raíz**: dos validaciones independientes (ownership de `account_id` vs. resolución de `tx_id`) que debían cruzarse y no se cruzaron — gap típico de un cambio de autorización que solo mira "¿quién puede llamar esto?" sin verificar "¿los datos que devuelvo pertenecen a lo que el caller dice que está pidiendo?".
+- **Cómo se detectó**: review adversarial post-implementación (subagente `general-purpose` en rol reviewer), confirmado empíricamente con una llamada real al endpoint antes del fix (200 con datos de cuenta ajena), no solo por lectura de código.
+- **Fix**: `app.py:3671-3673`, el `SELECT` de `account_withdrawals` ahora filtra `WHERE transaction_id=? AND account_id=?` (cruzando contra el `account_id` de la URL, ya validado por ownership). Test de regresión: `test_withdraw_status_operador_no_puede_leer_tx_de_otra_cuenta_via_account_id_propio` en `test_withdrawals_endpoints.py`.
+- **Nota de proceso**: los tests originales de la Task 8 (`..._dueno_puede_consultar`, `..._ajeno_403`) cubrían ownership de `account_id` pero no el caso cruzado (cuenta propia + tx ajeno) — por eso el gap pasó el GREEN de esa task sin detectarse. Cualquier relajación de autorización que resuelva un recurso por un ID secundario (aquí `tx_id`) necesita un test explícito de "ID primario correcto + ID secundario ajeno", no solo "ID primario ajeno".
+
 ## Fuga de cadencia real de depósitos en la vista de misión del portal (detectado 2026-08-04)
 
 - **Síntoma**: `static/portal.js` (vista de misión `/bet` en `/user/{id}`) mostraba al operador el texto literal `"¡Match! Depósitos cada 60s"` y un countdown numérico en vivo (`startCountdown(60)`, segundo a segundo) mientras corría el matchmaking automático. Cualquier operador podía leer directamente la cadencia real del motor de depósitos automáticos ($150 cada 60s), justo el patrón que Robert pidió blindar (`docs/plans/2026-08-03-spec-auto-retiro-obfuscado.md` ya documentaba esta regla para retiros; nunca se había aplicado al lado de depósitos).

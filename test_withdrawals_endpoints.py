@@ -270,6 +270,30 @@ def test_withdraw_status_operador_ajeno_403(make_client, seed_db):
     assert r.status_code == 403
 
 
+def test_withdraw_status_operador_no_puede_leer_tx_de_otra_cuenta_via_account_id_propio(make_client, seed_db):
+    """IDOR: operador dueño de a@test.com pasa SU PROPIO account_id (que sí pertenece a
+    su universo visible, pasando el chequeo de ownership) pero el tx_id de un retiro que
+    pertenece a b@test.com (cuenta ajena, no lockeada/asignada a 555). Antes del fix el
+    SELECT de account_withdrawals filtraba SOLO por transaction_id, sin cruzar contra el
+    account_id de la URL -> filtraba dígitos/institución de la cuenta ajena en un 200.
+    Debe dar 404 (retiro no encontrado para ESA cuenta), no 200 con datos ajenos."""
+    client = make_client(role="user", telegram_id=555)
+    a_id = _acc_id(seed_db, "a@test.com")
+    b_id = _acc_id(seed_db, "b@test.com")
+
+    import app
+    app._persist_withdrawal(b_id, 1341812706, {
+        "transactionId": "tx-belongs-to-b", "reference": "r1", "amount": 100.0,
+        "accountDigits": "9999", "institutionName": "SECRET BANK OF B",
+        "account_email": "b@test.com",
+    })
+
+    r = client.get(f"/api/accounts/{a_id}/withdraw/status/tx-belongs-to-b")
+    assert r.status_code == 404
+    assert "9999" not in r.text
+    assert "SECRET BANK OF B" not in r.text
+
+
 def test_status_404_unknown_tx(make_client, seed_db):
     client = make_client(role="superadmin")
     acc_id = _acc_id(seed_db)

@@ -3669,7 +3669,8 @@ async def withdraw_status(account_id: int, tx_id: str, user: dict = Depends(requ
             if not acc or (vis is not None and acc["email"] not in vis):
                 raise HTTPException(403, "No tienes permiso sobre esta cuenta")
         row = c.execute(
-            "SELECT * FROM account_withdrawals WHERE transaction_id=?", (tx_id,)
+            "SELECT * FROM account_withdrawals WHERE transaction_id=? AND account_id=?",
+            (tx_id, account_id),
         ).fetchone()
     if not acc or not row:
         raise HTTPException(404, "Retiro no encontrado")

@@ -98,7 +98,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 381 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 4998 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 4999 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 191 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1041 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -148,7 +148,7 @@ prewarm.py (router)
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 71 | `—` | _[completar]_ |
 | `test_withdrawals.py` | 361 | `—` | _[completar]_ |
-| `test_withdrawals_endpoints.py` | 452 | `—` | _[completar]_ |
+| `test_withdrawals_endpoints.py` | 476 | `—` | _[completar]_ |
 | `test_withdrawals_migrate.py` | 46 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
 | `web_grading.py` | 197 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a49cc10` | feat(account_refresh): persistir withdrawal_ready/institution + SSE en cambio |
 | `cd1dde2` | feat(portal): poll de estado tras disparar retiro (15s hasta terminal) |
 | `0a6aff3` | feat(account_refresh): _load_candidate_rows trae balance/lock/retiro-pendiente y computa hot |
 | `b3c9eb1` | feat(portal): gatear botón Retirar por withdrawal_ready + mostrar CURP/institución |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `b8c36d5` | feat(account_refresh): agregar is_hot_account (lógica pura, TDD) |
 | `d798ab3` | feat(db): agregar withdrawal_ready/withdrawal_institution + índice account_withdrawals |
 | `f43edfa` | wip(tests): RED tests para is_hot_account + bypass hot (Track B, Task 2-3) |
-| `33a2aba` | docs: plan de Track B listo (retiro gateado por SPEI + refresh caliente + anti-detección) |
 <!-- GEN:end:recientes -->
 
 ---
