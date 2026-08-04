@@ -505,8 +505,19 @@
   // abierta desde antes de un deploy no vuelve a pedir portal.html sola,
   // así que nunca ve el JS/CSS nuevo hasta un Ctrl+Shift+R manual. Compara
   // la versión servida al cargar contra la actual del server y se recarga.
+  //
+  // A diferencia de app.js, aquí SÍ puede haber una misión /bet en curso
+  // (progress bar + SSE en vivo) — recargar a media misión sería el mismo
+  // tipo de bug que este fix corrige, solo que al revés (interrupción en
+  // vez de staleness). Se pospone mientras la misión no llegue a un status
+  // terminal; el siguiente check (5min o próximo visibilitychange) reintenta.
+  function _missionActive() {
+    return !!(activeMissionId && missionState &&
+      !['completed', 'failed', 'cancelled'].includes(missionState.status));
+  }
+
   async function _checkVersion() {
-    if (!window.BMX_VERSION) return;
+    if (!window.BMX_VERSION || _missionActive()) return;
     try {
       const r = await fetch('/api/version', { cache: 'no-store' });
       const { v } = await r.json();
