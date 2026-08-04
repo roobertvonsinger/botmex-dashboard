@@ -268,6 +268,13 @@ def _migrate():
         # (withdrawals.py y clabe_fetch.py las consumen para retiro/clabes).
         ("jwt_token", "ALTER TABLE accounts ADD COLUMN jwt_token TEXT"),
         ("jwt_expires_at", "ALTER TABLE accounts ADD COLUMN jwt_expires_at INTEGER"),
+        # withdrawal_ready/withdrawal_institution: cachea si BetMexico tiene
+        # cuenta de retiro aprobada (accountStatus==2, aparece tras un SPEI
+        # acreditado) — antes esto SOLO existía como llamada viva en
+        # withdrawals.get_bank_accounts (PASO1), sin nada persistido para
+        # gatear el botón del portal sin round-trip. Poblado por account_refresh.py.
+        ("withdrawal_ready", "ALTER TABLE accounts ADD COLUMN withdrawal_ready INTEGER DEFAULT 0"),
+        ("withdrawal_institution", "ALTER TABLE accounts ADD COLUMN withdrawal_institution TEXT"),
     ]:
         try:
             with db(write=True) as c:
@@ -368,6 +375,18 @@ def _migrate():
                 "last_modified_utc TEXT, "
                 "disparado_por INTEGER, "
                 "created_at TEXT NOT NULL)"
+            )
+    except sqlite3.OperationalError:
+        pass
+
+    # Índice para el EXISTS() de has_pending_withdrawal en account_refresh.py
+    # (Task 4 del plan de retiro gateado) — sin esto, cada ciclo de 5min hace
+    # un table scan de account_withdrawals por cada una de ~800 cuentas LIVE.
+    try:
+        with db(write=True) as c:
+            c.execute(
+                "CREATE INDEX IF NOT EXISTS idx_account_withdrawals_account_id "
+                "ON account_withdrawals(account_id)"
             )
     except sqlite3.OperationalError:
         pass
