@@ -164,40 +164,40 @@ def is_hot_account(row: Dict[str, Any], now_iso: str) -> bool:
 
 
 # ── I/O de BD (aislado; usa el context manager de app) ────────────────────────
-_SELECT_COLS = ("email", "status", "grade", "jwt_expires_at",
-                "locked_by", "published_to_pool", "last_checked_at")
+_SELECT_COLS = ("id", "email", "status", "grade", "jwt_expires_at",
+                "locked_by", "published_to_pool", "last_checked_at",
+                "balance_real", "locked_until")
+
+_PENDING_WD_EXISTS_SQL = (
+    "EXISTS(SELECT 1 FROM account_withdrawals w WHERE w.account_id = accounts.id "
+    "AND (w.status_api IS NULL OR (w.status_api >= 0 AND w.status_api != 6)))"
+)
 
 
 def _load_candidate_rows() -> List[Dict[str, Any]]:
-    """Trae de la BD el universo grueso (LIVE + útiles) para que la lógica
-    pura afine. Filtra en SQL lo barato; el resto lo decide
-    `select_refresh_candidates_healthy`.
+    """Trae TODAS las cuentas LIVE y computa `hot` en Python vía
+    `is_hot_account` — el filtro grade/pool/lock para cuentas NO-hot sigue
+    viviendo únicamente en `select_refresh_candidates_healthy` (una sola
+    fuente de verdad, antes estaba parcialmente duplicado en el WHERE de
+    este SELECT).
 
-    Universo: cuentas LIVE publicadas al pool (published_to_pool=1) **más**
-    las RESERVADA_SA (published_to_pool=0 + locked_by del SA) — el SA las usa
-    y necesita su balance al día como a cualquier otra cuenta pública.
-    Los tokens del SA se resuelven vía `_sa_lock_tokens` (formatos username
-    y telegram_id).
+    Antes el WHERE excluía cuentas no publicadas/lockeadas a nivel SQL —
+    eso escondía por completo las cuentas hot que están lockeadas por un
+    operador no-SA (el caso normal durante depósito/retiro en curso).
     """
     import app  # lazy: evita ciclo de import
-    sa_tokens = _sa_lock_tokens()
+    now_iso = datetime.now(timezone.utc).isoformat()
     with app.db() as conn:
-        if sa_tokens:
-            placeholders = ",".join("?" for _ in sa_tokens)
-            cur = conn.execute(
-                f"SELECT {', '.join(_SELECT_COLS)} FROM accounts "
-                "WHERE status='LIVE' "
-                f"AND (published_to_pool=1 "
-                f"OR (published_to_pool=0 AND lower(locked_by) IN ({placeholders})))",
-                [t.lower() for t in sa_tokens],
-            )
-        else:
-            # sin SA tokens (auth caído + sin fallback) → solo pool público
-            cur = conn.execute(
-                f"SELECT {', '.join(_SELECT_COLS)} FROM accounts "
-                "WHERE status='LIVE' AND published_to_pool=1"
-            )
-        return [dict(row) for row in cur.fetchall()]
+        cur = conn.execute(
+            f"SELECT {', '.join(_SELECT_COLS)}, "
+            f"{_PENDING_WD_EXISTS_SQL} AS has_pending_withdrawal "
+            "FROM accounts WHERE status='LIVE'"
+        )
+        rows = [dict(row) for row in cur.fetchall()]
+    for r in rows:
+        r["has_pending_withdrawal"] = bool(r.get("has_pending_withdrawal"))
+        r["hot"] = is_hot_account(r, now_iso)
+    return rows
 
 
 # ── Ciclo (async) ─────────────────────────────────────────────────────────────

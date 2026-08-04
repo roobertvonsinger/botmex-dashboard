@@ -4,7 +4,22 @@ Es la pieza crítica: si selecciona una cuenta CON JWT expirado, el ciclo pega
 un fetch con un token muerto (401 silencioso, gasto sin retorno) en vez de
 dejar esa cuenta a jwt_keeper (que sí re-loguea). Por eso se prueba sin BD ni
 deps del bot, igual que test_jwt_keeper.py.
+
+Excepción: `_load_candidate_rows` sí toca BD (I/O real) — sus tests de
+integración usan el fixture local `db_conn` (abajo), que sigue el mismo
+patrón que `test_a1_estados.py::a1`: BD sqlite temporal propia + reload
+explícito de `app` para que `app.DB_PATH` (y por ende `app.db()`, que
+`_load_candidate_rows` usa por dentro) apunte determinísticamente a ESA BD,
+sin depender de qué otro archivo de test haya importado `app` antes.
 """
+import importlib
+import sqlite3
+import time as _time
+from datetime import datetime, timezone as _tz
+
+import pytest
+
+import account_refresh as _ar
 from account_refresh import (
     select_refresh_candidates_healthy, is_hot_account, DEFAULT_GRADES,
 )
@@ -211,3 +226,86 @@ def test_hot_por_retiro_pendiente():
 
 def test_no_hot_sin_ninguna_señal():
     assert is_hot_account(_row(), NOW_ISO) is False
+
+
+# ── _load_candidate_rows: integración real con BD (I/O) ────────────────────
+# BD sqlite temporal propia + reload de `app` (mismo patrón que
+# test_a1_estados.py::a1) — así `app.DB_PATH` queda determinísticamente
+# apuntando a esta BD para `app.db()`, sin importar el orden de ejecución
+# de archivos de test en la suite completa.
+_SCHEMA = """
+CREATE TABLE accounts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL, password TEXT NOT NULL DEFAULT 'x',
+  status TEXT DEFAULT 'LIVE', grade TEXT DEFAULT '?',
+  jwt_expires_at INTEGER,
+  locked_by TEXT DEFAULT NULL, locked_until TEXT DEFAULT NULL,
+  published_to_pool INTEGER DEFAULT 1, last_checked_at TEXT DEFAULT NULL,
+  balance_real REAL DEFAULT 0
+);
+"""
+
+
+@pytest.fixture
+def db_conn(tmp_path, monkeypatch):
+    dbp = tmp_path / "account_refresh_test.db"
+    monkeypatch.setenv("BETMEX_DB", str(dbp))
+    monkeypatch.setenv("BMX_WEB_AUTH_MODE", "open")
+    con = sqlite3.connect(dbp)
+    con.executescript(_SCHEMA)
+    con.commit()
+    con.close()
+    import app as app_mod
+    importlib.reload(app_mod)  # rebind DB_PATH + corre _migrate() (crea account_withdrawals, etc.)
+    conn = sqlite3.connect(dbp)
+    conn.row_factory = sqlite3.Row
+    yield conn
+    conn.close()
+
+
+def test_load_candidate_rows_marca_hot_por_balance(db_conn):
+    now = int(_time.time())
+    db_conn.execute(
+        "INSERT INTO accounts (email, status, grade, jwt_expires_at, "
+        "published_to_pool, balance_real) VALUES (?,?,?,?,?,?)",
+        ("hot@x.com", "LIVE", "B", now + 3600, 1, 75.0),
+    )
+    db_conn.commit()
+    rows = _ar._load_candidate_rows()
+    row = next(r for r in rows if r["email"] == "hot@x.com")
+    assert row["hot"] is True
+
+
+def test_load_candidate_rows_marca_hot_por_retiro_pendiente(db_conn):
+    now = int(_time.time())
+    cur = db_conn.execute(
+        "INSERT INTO accounts (email, status, grade, jwt_expires_at, "
+        "published_to_pool, balance_real) VALUES (?,?,?,?,?,?)",
+        ("wd@x.com", "LIVE", "B", now + 3600, 1, 0.0),
+    )
+    acc_id = cur.lastrowid
+    db_conn.execute(
+        "INSERT INTO account_withdrawals (account_id, transaction_id, amount, created_at) "
+        "VALUES (?,?,?,?)",
+        (acc_id, "tx1", 100.0, datetime.now(_tz.utc).isoformat()),
+    )
+    db_conn.commit()
+    rows = _ar._load_candidate_rows()
+    row = next(r for r in rows if r["email"] == "wd@x.com")
+    assert row["hot"] is True
+    assert row["has_pending_withdrawal"] is True
+
+
+def test_load_candidate_rows_no_hot_normal(db_conn):
+    # cuenta LIVE, publicada, sin balance/lock/retiro — no hot
+    now = int(_time.time())
+    import app
+    with app.db(write=True) as c:
+        c.execute(
+            "INSERT INTO accounts (email, status, grade, jwt_expires_at, "
+            "published_to_pool, balance_real) VALUES (?,?,?,?,?,?)",
+            ("normal@x.com", "LIVE", "B", now + 3600, 1, 5.0),
+        )
+    rows = _ar._load_candidate_rows()
+    row = next(r for r in rows if r["email"] == "normal@x.com")
+    assert row["hot"] is False

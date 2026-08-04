@@ -119,7 +119,7 @@ prewarm.py (router)
 | `shared/betmexico_payment_analyzer.py` | 592 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
-| `test_account_refresh.py` | 213 | `—` | _[completar]_ |
+| `test_account_refresh.py` | 311 | `—` | _[completar]_ |
 | `test_account_touch.py` | 51 | `—` | _[completar]_ |
 | `test_account_touch_isolated.py` | 138 | `—` | _[completar]_ |
 | `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b3c9eb1` | feat(portal): gatear botón Retirar por withdrawal_ready + mostrar CURP/institución |
 | `98613fb` | feat(api): permitir a operadores dueños consultar withdraw/status |
 | `1eceac6` | feat(account_refresh): bypass de filtros para cuentas hot en select_refresh_candidates_healthy |
 | `88b3c47` | feat(portal): interpolación visual del progreso de misión (anti-detección) |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `33a2aba` | docs: plan de Track B listo (retiro gateado por SPEI + refresh caliente + anti-detección) |
 | `cdc208e` | fix(portal): cerrar fuga de cadencia real en la vista de misión |
 | `a1109a9` | docs: NEXT-SESSION — nota del fix de seguimiento (auto-reload vs misión activa) |
-| `4da665d` | fix(portal): no interrumpir el auto-reload durante una misión /bet en curso |
 <!-- GEN:end:recientes -->
 
 ---
