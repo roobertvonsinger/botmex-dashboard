@@ -5,18 +5,22 @@ un fetch con un token muerto (401 silencioso, gasto sin retorno) en vez de
 dejar esa cuenta a jwt_keeper (que sí re-loguea). Por eso se prueba sin BD ni
 deps del bot, igual que test_jwt_keeper.py.
 """
-from account_refresh import select_refresh_candidates_healthy, DEFAULT_GRADES
+from account_refresh import (
+    select_refresh_candidates_healthy, is_hot_account, DEFAULT_GRADES,
+)
 
 NOW = 1_800_000_000
 H = 3600
+NOW_ISO = "2026-08-04T12:00:00+00:00"
 
 
 def _acc(email, *, status="LIVE", grade="B", jwt_exp=None, locked_by=None,
-         published=1, last_checked_at=None):
+         published=1, last_checked_at=None, hot=False):
     return {
         "email": email, "status": status, "grade": grade,
         "jwt_expires_at": jwt_exp, "locked_by": locked_by,
         "published_to_pool": published, "last_checked_at": last_checked_at,
+        "hot": hot,
     }
 
 
@@ -120,3 +124,90 @@ def test_no_publicada_no_lockeada_no_es_candidata():
     """Cuenta pool=0 sin lock explícito → fuera."""
     got = _run([_acc("floater@x.com", jwt_exp=NOW + H, published=0)])
     assert got == []
+
+
+# ── Cuentas "calientes" (Robert, 2026-08-04): balance>$50, depósito reciente
+# sin asentar (ventana locked_until activa), o retiro en curso hasta liberar
+# — deben refrescarse SIEMPRE, sin importar lock/grade/pool/batch_max. Hoy el
+# loop las EXCLUYE si están lockeadas por un operador (bug real: una cuenta
+# con depósito o retiro en curso normalmente está lockeada). ──────────────
+
+def test_hot_lockeada_por_operador_no_sa_es_candidata():
+    """A diferencia de una cuenta normal lockeada, una HOT sí entra pese al lock."""
+    got = _run([_acc("hot@x.com", jwt_exp=NOW + H, locked_by=555, hot=True)])
+    assert [r["email"] for r in got] == ["hot@x.com"]
+
+
+def test_hot_grade_no_util_es_candidata():
+    got = _run([_acc("hot@x.com", grade="D", jwt_exp=NOW + H, hot=True)])
+    assert [r["email"] for r in got] == ["hot@x.com"]
+
+
+def test_hot_no_publicada_es_candidata():
+    got = _run([_acc("hot@x.com", jwt_exp=NOW + H, published=0, hot=True)])
+    assert [r["email"] for r in got] == ["hot@x.com"]
+
+
+def test_hot_sin_jwt_vigente_no_es_candidata():
+    """Sin JWT vivo no hay forma de refrescar — ni hot la salva."""
+    got = _run([_acc("hot@x.com", jwt_exp=NOW - H, hot=True)])
+    assert got == []
+
+
+def test_hot_no_live_no_es_candidata():
+    got = _run([_acc("hot@x.com", status="DEAD", jwt_exp=NOW + H, hot=True)])
+    assert got == []
+
+
+def test_hot_ignora_batch_max():
+    """Las hot van SIEMPRE, no cuentan contra el batch_max de las normales."""
+    normales = [_acc(f"n{i}@x.com", jwt_exp=NOW + H) for i in range(12)]
+    hots = [_acc(f"h{i}@x.com", jwt_exp=NOW + H, locked_by=1, hot=True) for i in range(3)]
+    got = _run(normales + hots, batch_max=12)
+    assert len(got) == 15
+    assert {r["email"] for r in got if r["email"].startswith("h")} == {f"h{i}@x.com" for i in range(3)}
+
+
+def test_hot_va_primero_en_el_resultado():
+    normal = _acc("normal@x.com", jwt_exp=NOW + H, last_checked_at="2026-01-01")
+    hot = _acc("hot@x.com", jwt_exp=NOW + H, locked_by=1, hot=True, last_checked_at="2026-06-01")
+    got = _run([normal, hot])
+    assert [r["email"] for r in got] == ["hot@x.com", "normal@x.com"]
+
+
+# ── is_hot_account: lógica pura de qué hace a una cuenta "caliente" ───────
+
+def _row(*, balance_real=0, locked_until=None, has_pending_withdrawal=False):
+    return {
+        "balance_real": balance_real,
+        "locked_until": locked_until,
+        "has_pending_withdrawal": has_pending_withdrawal,
+    }
+
+
+def test_hot_por_balance_alto():
+    assert is_hot_account(_row(balance_real=50.01), NOW_ISO) is True
+
+
+def test_no_hot_balance_50_exacto():
+    assert is_hot_account(_row(balance_real=50.0), NOW_ISO) is False
+
+
+def test_no_hot_balance_bajo_sin_lock_sin_retiro():
+    assert is_hot_account(_row(balance_real=10.0), NOW_ISO) is False
+
+
+def test_hot_por_ventana_de_autolock_activa():
+    assert is_hot_account(_row(locked_until="2026-08-04T13:00:00+00:00"), NOW_ISO) is True
+
+
+def test_no_hot_ventana_de_autolock_vencida():
+    assert is_hot_account(_row(locked_until="2026-08-04T11:00:00+00:00"), NOW_ISO) is False
+
+
+def test_hot_por_retiro_pendiente():
+    assert is_hot_account(_row(has_pending_withdrawal=True), NOW_ISO) is True
+
+
+def test_no_hot_sin_ninguna_señal():
+    assert is_hot_account(_row(), NOW_ISO) is False

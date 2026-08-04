@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `33a2aba` | docs: plan de Track B listo (retiro gateado por SPEI + refresh caliente + anti-detección) |
 | `cdc208e` | fix(portal): cerrar fuga de cadencia real en la vista de misión |
 | `a1109a9` | docs: NEXT-SESSION — nota del fix de seguimiento (auto-reload vs misión activa) |
 | `4da665d` | fix(portal): no interrumpir el auto-reload durante una misión /bet en curso |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `ef482be` | docs: cierre de sesión — auditoría Impeccable de /portal + /login, NEXT-SESSION actualizado |
 | `7db7ec2` | feat(routing): separar /dashboard (SA) de /user/{id} (bet) + vista "como usuario" para SA |
 | `dff8150` | feat(brand): integrar logo real botmexico.net (mascota robot + wordmark) en portal/login |
-| `7d2365d` | feat(portal,login): rebrand visual botmexico.net (horizonte de sucesos + tricolor MX) |
 <!-- GEN:end:recientes -->
 
 ---
