@@ -255,6 +255,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `7db7ec2` | feat(routing): separar /dashboard (SA) de /user/{id} (bet) + vista "como usuario" para SA |
 | `dff8150` | feat(brand): integrar logo real botmexico.net (mascota robot + wordmark) en portal/login |
 | `7d2365d` | feat(portal,login): rebrand visual botmexico.net (horizonte de sucesos + tricolor MX) |
 | `983557f` | feat(portal): mission control SSE + retiro/liberar sin password + resiliencia bot /bet |
@@ -266,7 +267,6 @@ prewarm.py (router)
 | `e485193` | style(telegram-mock): pulir metrica y ritmo organico de los raps de bienvenida |
 | `2e31fba` | feat(telegram-mock): tiradera rap de bineros rediseñada y boton cancelar eliminado del menu start |
 | `ff6cfde` | fix(pantalla): jerarquia e interaccion del panel Depositar/Retirar (Fitts Law) |
-| `4fea30f` | fix(pantalla): intercambiar orden visual Movimientos <-> Deposito/Retiro |
 <!-- GEN:end:recientes -->
 
 ---
