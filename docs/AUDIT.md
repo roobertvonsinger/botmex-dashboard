@@ -3,6 +3,26 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-08-04 (Task 9 de `docs/superpowers/plans/2026-08-04-retiro-manual-gateado-spei-y-tiempo-real.md` — poll de estado tras disparar retiro en `portal.js`)
+
+**Motivo**: tras `POST .../withdraw` el portal disparaba el retiro y no volvía a preguntar — el
+operador nunca se enteraba si se liberó. Depende de Task 8 (ya hecha, commit `98613fb`): `GET
+/api/accounts/{id}/withdraw/status/{tx_id}` ahora acepta operadores dueños, antes era SA-only.
+Versión simplificada del patrón `_startWithdrawPoll`/`_fetchWithdrawStatus` de `pantalla.js`
+(`WD_POLL_FAST_MS=15000`, sin degradar a "slow" ni panel de detalle).
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **`startWithdrawPoll`/`fetchWithdrawStatus`/`stopWithdrawPoll`** (`static/portal.js`) | Tras `res.ok` con `transactionId`, arranca `setInterval` de 15s a `GET /api/accounts/{id}/withdraw/status/{tx_id}`; para en `st.status` terminal (`successful`/`completed`/`failed`) con toast ✅/❌ + `loadAccounts()`. | ✅ implementado | ✅ verificado en navegador (server local `app-dev-task9`, temp launch config removida al terminar, DB seed ad-hoc en scratchpad con 1 cuenta `withdrawal_ready=1` + fila `account_withdrawals` fake `status_api=2`, `jwt_token` NULL para no pegarle a la API real de BetMexico). Se interceptó solo el `POST .../withdraw` con un monkey-patch de `window.fetch` en consola (para no disparar un retiro real de dinero) devolviendo `transactionId` fijo; el resto del flujo (confirm→toast→poll) corrió sin mockear nada. Confirmado con `read_network_requests`: primer `GET .../withdraw/status/...` inmediato tras el click, respuesta real del backend `{"status":"idle","transactionStatus":2}` (coincide con la fila seed), poll siguió disparando mientras el status no terminal; al pisar `status_api=-1` en la DB (fuera de banda) el siguiente tick devolvió `{"status":"failed","transactionStatus":-1}` y el poll se detuvo ahí (0 requests nuevos en los 20s posteriores) — confirma el `if (terminal) stopWithdrawPoll()`. |
+| **Shape de `/api/accounts/{id}/withdraw/status/{tx_id}`** | Confirmado leyendo `app.py:3661-3821` (`withdraw_status`): campo `status` (no `transactionStatus`, que es el código numérico crudo de BetMexico) con valores `'successful'`/`'completed'`/`'failed'`/`'pending'`/`'idle'`. Terminales: `successful`/`completed`/`failed`. | ✅ confirmado por lectura + respuesta real observada | ✅ |
+
+**Nota de timing**: en la corrida de prueba se observaron ticks más seguidos que 15s exactos bajo el
+entorno de automatización del navegador (probablemente throttling/quantización del `wait` remoto,
+no del código) — el código en sí solo declara un `setInterval(..., WD_POLL_FAST_MS)` con
+`WD_POLL_FAST_MS=15000`, confirmado por lectura directa del archivo. No se investigó más a fondo por
+no ser bloqueante (el mecanismo de arranque/parada del poll es lo que importa, y ese sí se verificó
+con precisión: 0 requests extra en los 20s posteriores al estado terminal).
+
 ## Captura: 2026-08-04 (Task 7 de `docs/superpowers/plans/2026-08-04-retiro-manual-gateado-spei-y-tiempo-real.md` — botón Retirar gateado por `withdrawal_ready`)
 
 **Motivo**: el botón `.btn-withdraw` del portal (`/user/{id}`, `static/portal.js`) era siempre

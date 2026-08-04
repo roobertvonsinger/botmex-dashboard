@@ -785,6 +785,8 @@ real desde el panel compacto.
 | **Liberar** | `POST /api/operator/accounts/{id}/release` | Botón directo en card (solo si `is_locked`), toast de confirmación |
 | **Copiar CLABE** | — (clipboard) | Botón en cada card, feedback "✓" temporal |
 
+**Poll de estado tras retiro (2026-08-04, Task 9 del plan retiro-manual-gateado-spei):** antes el portal disparaba el retiro y no volvía a preguntar — el operador nunca se enteraba si se liberó, tenía que refrescar a mano o preguntar a un SA. Ahora, si la respuesta de `POST .../withdraw` trae `transactionId`, arranca `startWithdrawPoll(accountId, transactionId)` (`static/portal.js`): GET `/api/accounts/{id}/withdraw/status/{tx_id}` (mismo endpoint que `pantalla.js`, accesible a operadores dueños desde Task 8) cada `WD_POLL_FAST_MS=15000`ms hasta que `st.status` sea `'successful'`, `'completed'` o `'failed'` — entonces detiene el interval, muestra toast (✅/❌) y recarga el grid con `loadAccounts()`. Versión simplificada del patrón de `pantalla.js` (`_startWithdrawPoll`/`_fetchWithdrawStatus`): sin degradación a poll lento (60s) ni panel de detalle, solo el aviso terminal.
+
 ### Transición Telegram → Web
 
 1. Operador usa `/bet` en Telegram

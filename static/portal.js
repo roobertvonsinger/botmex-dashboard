@@ -14,6 +14,13 @@
   let missionState = null;
   let userRole = null;
 
+  // ── Withdraw status poll ──────────────────────────────────────
+  // Versión simplificada del patrón de pantalla.js (WD_POLL_FAST_MS/SLOW_MS +
+  // _startWithdrawPoll/_fetchWithdrawStatus): portal.js no necesita degradar a
+  // "slow" ni panel de detalle, solo avisar cuando el retiro llega a terminal.
+  const WD_POLL_FAST_MS = 15000;
+  let wdPollTimer = null;
+
   // ── View-as scope ──────────────────────────────────────────────
   // /user/{id}: {id} identifica de quién es este portal. Si el que mira es
   // SA, el backend narrowea su sesión (rol/telegram_id) a ese {id} vía
@@ -449,6 +456,31 @@
     });
   }
 
+  function stopWithdrawPoll() {
+    if (wdPollTimer) { clearInterval(wdPollTimer); wdPollTimer = null; }
+  }
+
+  async function fetchWithdrawStatus(accountId, txId) {
+    try {
+      const res = await fetch(apiUrl('/api/accounts/' + accountId + '/withdraw/status/' + txId));
+      if (!res.ok) return;
+      const st = await res.json();
+      const terminal = st.status === 'successful' || st.status === 'completed' || st.status === 'failed';
+      if (terminal) {
+        stopWithdrawPoll();
+        const ok = st.status !== 'failed';
+        showToast(ok ? '✅ Retiro liberado' : '❌ Retiro falló', ok ? 'ok' : 'err');
+        loadAccounts();
+      }
+    } catch (_) { /* best-effort, el próximo tick reintenta */ }
+  }
+
+  function startWithdrawPoll(accountId, txId) {
+    stopWithdrawPoll();
+    fetchWithdrawStatus(accountId, txId);
+    wdPollTimer = setInterval(() => fetchWithdrawStatus(accountId, txId), WD_POLL_FAST_MS);
+  }
+
   // ── Withdraw Modal ─────────────────────────────────────────────
   function showWithdrawModal(accountId, email, balance) {
     const trigger = document.activeElement;
@@ -499,6 +531,7 @@
           showToast('Retiro enviado: ' + (d.transactionId || ''), 'ok');
           close();
           loadAccounts();
+          if (d.transactionId) startWithdrawPoll(accountId, d.transactionId);
         } else {
           const detail = d.detail || 'Error';
           showToast(detail, 'err');

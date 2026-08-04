@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `0a6aff3` | feat(account_refresh): _load_candidate_rows trae balance/lock/retiro-pendiente y computa hot |
 | `b3c9eb1` | feat(portal): gatear botón Retirar por withdrawal_ready + mostrar CURP/institución |
 | `98613fb` | feat(api): permitir a operadores dueños consultar withdraw/status |
 | `1eceac6` | feat(account_refresh): bypass de filtros para cuentas hot en select_refresh_candidates_healthy |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `f43edfa` | wip(tests): RED tests para is_hot_account + bypass hot (Track B, Task 2-3) |
 | `33a2aba` | docs: plan de Track B listo (retiro gateado por SPEI + refresh caliente + anti-detección) |
 | `cdc208e` | fix(portal): cerrar fuga de cadencia real en la vista de misión |
-| `a1109a9` | docs: NEXT-SESSION — nota del fix de seguimiento (auto-reload vs misión activa) |
 <!-- GEN:end:recientes -->
 
 ---
