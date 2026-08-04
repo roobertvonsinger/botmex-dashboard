@@ -3660,12 +3660,14 @@ async def withdraw(account_id: int, payload: dict, user: dict = Depends(require_
 
 @app.get("/api/accounts/{account_id}/withdraw/status/{tx_id}")
 async def withdraw_status(account_id: int, tx_id: str, user: dict = Depends(require_session)):
-    if user.get("role") != "superadmin":
-        raise HTTPException(403, "Solo superadmin")
     with db() as c:
         acc = c.execute(
-            "SELECT id, jwt_token FROM accounts WHERE id=?", (account_id,)
+            "SELECT id, email, jwt_token FROM accounts WHERE id=?", (account_id,)
         ).fetchone()
+        if user.get("role") != "superadmin":
+            vis = _visible_emails(user, c)
+            if not acc or (vis is not None and acc["email"] not in vis):
+                raise HTTPException(403, "No tienes permiso sobre esta cuenta")
         row = c.execute(
             "SELECT * FROM account_withdrawals WHERE transaction_id=?", (tx_id,)
         ).fetchone()

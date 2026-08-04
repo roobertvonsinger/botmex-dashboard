@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `1eceac6` | feat(account_refresh): bypass de filtros para cuentas hot en select_refresh_candidates_healthy |
 | `88b3c47` | feat(portal): interpolación visual del progreso de misión (anti-detección) |
 | `7e68635` | feat(api): exponer withdrawal_ready/withdrawal_institution/curp en /api/operator/my-accounts |
 | `5a39b4a` | docs(audit): confirmar que fetch mínimo contra BetMexico ya está satisfecho |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `a1109a9` | docs: NEXT-SESSION — nota del fix de seguimiento (auto-reload vs misión activa) |
 | `4da665d` | fix(portal): no interrumpir el auto-reload durante una misión /bet en curso |
 | `723341c` | docs: NEXT-SESSION actualizado — flujo /bet operativo, deploy verificado en vivo |
-| `232eac7` | fix(portal): flujo /bet operativo — cache-bust/auto-reload + fecha corrupta en grid de cuentas |
 <!-- GEN:end:recientes -->
 
 ---
