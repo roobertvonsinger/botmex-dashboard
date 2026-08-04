@@ -246,6 +246,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `4da665d` | fix(portal): no interrumpir el auto-reload durante una misión /bet en curso |
 | `723341c` | docs: NEXT-SESSION actualizado — flujo /bet operativo, deploy verificado en vivo |
 | `232eac7` | fix(portal): flujo /bet operativo — cache-bust/auto-reload + fecha corrupta en grid de cuentas |
 | `a62629d` | fix: reparación integral de los 31 fallos de test arrastrados (362/362 verdes) |
@@ -257,7 +258,6 @@ prewarm.py (router)
 | `7d2365d` | feat(portal,login): rebrand visual botmexico.net (horizonte de sucesos + tricolor MX) |
 | `983557f` | feat(portal): mission control SSE + retiro/liberar sin password + resiliencia bot /bet |
 | `6f2332e` | fix(prewarm): persistir balance real $0 en fetch_mode=balance_only |
-| `69887c2` | test(deposits): agregar regresion del log de aborto 3DS en scheduled_create + doc de handoff |
 <!-- GEN:end:recientes -->
 
 ---

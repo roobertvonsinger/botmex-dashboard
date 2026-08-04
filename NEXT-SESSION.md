@@ -6,9 +6,11 @@
 ## 🎯 Objetivo en curso
 
 Sesión 2026-08-04 (segunda mitad) cerrada. **Flujo `/bet` (portal del operador en `/user/{id}`)
-operativo y verificado end-to-end en navegador real** — se encontraron y corrigieron 2 bugs reales
-que nadie había detectado (cache-busting/auto-reload ausente en el portal, fecha corrupta en el
-grid de cuentas). 362/362 tests pasando. Deploy a KVM4 verificado en vivo.
+operativo y verificado end-to-end en navegador real** — se encontraron y corrigieron 3 bugs reales
+que nadie había detectado: cache-busting/auto-reload ausente en el portal, fecha corrupta en el
+grid de cuentas, y el auto-reload recién agregado podía cortar una misión `/bet` en curso (fix de
+seguimiento tras revisión, commit `4da665d`). 362/362 tests pasando. Deploy a KVM4 verificado en vivo
+(3 restarts, logs limpios cada vez, mtimes dinámicos confirmados por curl).
 
 Lo que sigue: **Motor de auto-retiro** (spec lista, no implementado) o seguir afilando visual del
 portal/login. Ninguno de los dos bloquea que `/bet` funcione hoy.
