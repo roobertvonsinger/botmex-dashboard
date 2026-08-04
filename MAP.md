@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `98613fb` | feat(api): permitir a operadores dueños consultar withdraw/status |
 | `1eceac6` | feat(account_refresh): bypass de filtros para cuentas hot en select_refresh_candidates_healthy |
 | `88b3c47` | feat(portal): interpolación visual del progreso de misión (anti-detección) |
 | `7e68635` | feat(api): exponer withdrawal_ready/withdrawal_institution/curp en /api/operator/my-accounts |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `cdc208e` | fix(portal): cerrar fuga de cadencia real en la vista de misión |
 | `a1109a9` | docs: NEXT-SESSION — nota del fix de seguimiento (auto-reload vs misión activa) |
 | `4da665d` | fix(portal): no interrumpir el auto-reload durante una misión /bet en curso |
-| `723341c` | docs: NEXT-SESSION actualizado — flujo /bet operativo, deploy verificado en vivo |
 <!-- GEN:end:recientes -->
 
 ---

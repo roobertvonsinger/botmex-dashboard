@@ -770,13 +770,18 @@ real desde el panel compacto.
 | Vista | Trigger | Qué muestra |
 |---|---|---|
 | **Misión viva** | `?match=ID` en URL | Progress bar (matching→scheduling→done), matches apareciendo con `slideIn` animation, pulso "en curso…" SIN número/segundos (2026-08-04: antes mostraba countdown real de 60s + texto "cada 60s" — filtraba la cadencia real del motor al operador, ver `docs/ERRORS.md`), resumen final (deposited/approved/failed) solo al terminar. Botón "Ver mis cuentas" al terminar. |
-| **Mis Cuentas** | Sin `?match` (default) | Grid de cards con email, balance, grade badge, CLABE STP (botón copiar), botones Retirar/Liberar. Auto-refresh cuando llega evento SSE terminal. |
+| **Mis Cuentas** | Sin `?match` (default) | Grid de cards con email, balance, grade badge, CURP, estado de retiro (institución en verde/azul-acento si `withdrawal_ready`, o "esperando SPEI…" gris si no), CLABE STP (botón copiar), botones Retirar/Liberar. Auto-refresh cuando llega evento SSE terminal. |
+
+**Retirar gateado por `withdrawal_ready` (2026-08-04, Task 7 de `docs/superpowers/plans/2026-08-04-retiro-manual-gateado-spei-y-tiempo-real.md`):** antes el botón `.btn-withdraw` siempre estaba clickeable y podía fallar server-side con `NoApprovedWithdrawalAccount` si BetMexico aún no tenía la cuenta de retiro aprobada (requiere un SPEI ya acreditado). Ahora `renderAccountCard` (`static/portal.js`) lee `acc.withdrawal_ready`/`acc.withdrawal_institution`/`acc.curp` (poblados por `GET /api/operator/my-accounts`, cacheados por `account_refresh.py`) y:
+- Si `withdrawal_ready` es `true`: botón habilitado, meta muestra la institución (o "Aprobado" si no hay institución) en `var(--accent)` (azul en el portal, `#58a6ff` — scope propio de `portal.html`, distinto del verde del dashboard SA).
+- Si es `false`: botón con `disabled` + `title="Esperando confirmación de SPEI en BetMexico"`, meta muestra "esperando SPEI…" en `var(--text-dim)`.
+- `onBusEvent` reacciona también al nuevo `kind: 'withdrawal_ready_changed'` (mismo gate `!activeMissionId` que los demás kinds de refresh) para no dejar el botón deshabilitado tras el aterrizaje del SPEI.
 
 ### Acciones sin password
 
 | Acción | Endpoint | UX |
 |---|---|---|
-| **Retirar** | `POST /api/operator/accounts/{id}/withdraw` | Modal con monto, valida saldo disponible, toast de confirmación con `transactionId` |
+| **Retirar** | `POST /api/operator/accounts/{id}/withdraw` | Modal con monto, valida saldo disponible, toast de confirmación con `transactionId`. Botón gateado por `withdrawal_ready` (ver arriba) — deshabilitado con tooltip si BetMexico aún no aprobó la cuenta de retiro. |
 | **Liberar** | `POST /api/operator/accounts/{id}/release` | Botón directo en card (solo si `is_locked`), toast de confirmación |
 | **Copiar CLABE** | — (clipboard) | Botón en cada card, feedback "✓" temporal |
 

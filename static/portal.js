@@ -103,7 +103,7 @@
         onMissionEvent(ev);
       }
     }
-    if (ev.type === 'activity' && (ev.kind === 'account_refreshed' || ev.kind === 'withdrawal' || ev.kind === 'withdrawal_status')) {
+    if (ev.type === 'activity' && (ev.kind === 'account_refreshed' || ev.kind === 'withdrawal' || ev.kind === 'withdrawal_status' || ev.kind === 'withdrawal_ready_changed')) {
       if (!activeMissionId) loadAccounts();
     }
     if (ev.type === 'activity' && ev.kind === 'auto_mission' && ev.status === 'completed') {
@@ -374,6 +374,11 @@
         '<button class="btn btn-sm copy-clabe">Copiar</button></div>'
       : '<div class="clabe-box" style="opacity:.6"><span class="clabe-code" style="color:var(--text-dim)">CLABE pendiente</span></div>';
 
+    const curpHtml = acc.curp ? '<div>• CURP: ' + acc.curp + '</div>' : '';
+    const wdInstHtml = acc.withdrawal_ready
+      ? '<div>• Retiro: <span style="color:var(--accent)">' + (acc.withdrawal_institution || 'Aprobado') + '</span></div>'
+      : '<div style="color:var(--text-dim)">• Retiro: esperando SPEI…</div>';
+
     return '<div class="acc-card' + (isLocked ? ' locked' : '') + '" data-id="' + acc.id + '" data-email="' + (acc.email || '') + '">' +
       '<div class="acc-top">' +
         '<span class="acc-email">' + (acc.email || '') + '</span>' +
@@ -383,11 +388,15 @@
       '<div class="acc-meta">' +
         '<div>• Bonos: ' + fmtMoney(balBonos) + '</div>' +
         '<div>• Último: ' + lastDep + (lastDate ? ' (' + lastDate + ')' : '') + '</div>' +
+        curpHtml +
+        wdInstHtml +
         (isLocked ? '<div class="acc-locked-badge">🔒 Bloqueada</div>' : '') +
       '</div>' +
       clabeHtml +
       '<div class="acc-actions">' +
-        '<button class="btn btn-sm btn-primary btn-withdraw" data-bal="' + balReal + '">💸 Retirar</button>' +
+        '<button class="btn btn-sm btn-primary btn-withdraw"' +
+          (acc.withdrawal_ready ? '' : ' disabled title="Esperando confirmación de SPEI en BetMexico"') +
+          ' data-bal="' + balReal + '">💸 Retirar</button>' +
         (isLocked ? '<button class="btn btn-sm btn-danger btn-release">🔓 Liberar</button>' : '') +
       '</div>' +
     '</div>';

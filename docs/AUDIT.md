@@ -3,6 +3,36 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-08-04 (Task 7 de `docs/superpowers/plans/2026-08-04-retiro-manual-gateado-spei-y-tiempo-real.md` — botón Retirar gateado por `withdrawal_ready`)
+
+**Motivo**: el botón `.btn-withdraw` del portal (`/user/{id}`, `static/portal.js`) era siempre
+clickeable — si BetMexico aún no tenía la cuenta de retiro aprobada (`accountStatus==2`, que solo
+aparece tras un SPEI ya acreditado), el click fallaba server-side con `NoApprovedWithdrawalAccount`
+sin ninguna señal previa en la UI. Depende de Task 6 (ya hecha, commit `7e68635`): `GET
+/api/operator/my-accounts` ahora expone `withdrawal_ready` (bool), `withdrawal_institution`
+(str|null) y `curp` (str|null), cacheados por `account_refresh.py`.
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Botón Retirar deshabilitado si `!withdrawal_ready`** | `renderAccountCard` agrega `disabled` + `title="Esperando confirmación de SPEI en BetMexico"` al `.btn-withdraw` cuando `acc.withdrawal_ready` es falsy. | ✅ implementado | ✅ verificado en navegador (server local `app-dev-task7`, temp launch config removida al terminar, DB seed ad-hoc con 2 cuentas: `withdrawal_ready=1`/`=0`): `getComputedStyle`/`.disabled` confirma botón habilitado en la cuenta `ready` y `disabled=true` + tooltip correcto en la `notready`. |
+| **CURP + estado de retiro visibles en `acc-meta`** | Nuevas líneas `• CURP: ...` (si existe) y `• Retiro: <institución>` (verde/acento) o `• Retiro: esperando SPEI…` (gris) sin reemplazar las líneas existentes (Bonos/Último). | ✅ implementado | ✅ verificado por texto renderizado en navegador: ambas cuentas de prueba muestran su CURP y el estado de retiro correcto. |
+| **SSE `withdrawal_ready_changed` dispara refresh del grid** | `onBusEvent` suma este `kind` a la misma condición que ya dispara `loadAccounts()` para `account_refreshed`/`withdrawal`/`withdrawal_status`, respetando el guard `!activeMissionId` (no interrumpir una misión activa). | ✅ implementado en frontend | 🔵 el emisor de este evento (`account_refresh.py` o el flujo de retiro) no existe todavía en el repo al momento de este commit — es responsabilidad de otra task del mismo plan corriendo en paralelo. Verificado por lectura de `onBusEvent` (`static/portal.js`), no por evento real recibido. |
+
+**Nota de color**: la referencia del plan sugería `var(--green-bright)` para la institución
+aprobada; esa variable no existe en el CSS del repo. Se usó `var(--accent)` (patrón ya usado en
+`portal.js:460`), que en el scope de `portal.html` resuelve a `#58a6ff` (azul-acento propio del
+portal, distinto del verde `oklch(...)` del dashboard SA en `style.css`) — confirmado con
+`getComputedStyle` en navegador, no es una asunción.
+
+**Metodología del smoke**: server local (`app-dev-task7`, agregado temporalmente a
+`.claude/launch.json` y removido al terminar — no queda en el diff) con `BMX_WEB_AUTH_MODE=open` +
+`JWT_KEEPER_ENABLED=0` + `ACCOUNT_REFRESH_ENABLED=0`, apuntando a una DB temporal sembrada a mano
+(`%TEMP%\bmx_dev_task7.db`, fuera del repo) con 2 cuentas de prueba y sus `deposit_attempts`/
+`account_deposit_clabes` correspondientes (requeridos por los JOINs de `/api/operator/my-accounts`).
+Navegado como SA (`robertvs`, sesión persistente ya presente en el sandbox) con `?view_as=` hacia
+el `telegram_id` de un operador real (Lau), replicando el patrón de supervisión SA documentado en
+`app.py` (`user_portal_page`).
+
 ## Captura: 2026-08-04 (flujo `/bet` operativo — smoke real en navegador + 2 bugs nuevos corregidos)
 
 **Motivo**: Robert pidió cerrar todos los pendientes que bloquean que el flujo `/bet` (portal del
