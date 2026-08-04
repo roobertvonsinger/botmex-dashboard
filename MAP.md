@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `79c6f3a` | fix(security): cerrar IDOR en GET /api/accounts/{id}/withdraw/status/{tx_id} |
 | `a49cc10` | feat(account_refresh): persistir withdrawal_ready/institution + SSE en cambio |
 | `cd1dde2` | feat(portal): poll de estado tras disparar retiro (15s hasta terminal) |
 | `0a6aff3` | feat(account_refresh): _load_candidate_rows trae balance/lock/retiro-pendiente y computa hot |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `5a39b4a` | docs(audit): confirmar que fetch mínimo contra BetMexico ya está satisfecho |
 | `b8c36d5` | feat(account_refresh): agregar is_hot_account (lógica pura, TDD) |
 | `d798ab3` | feat(db): agregar withdrawal_ready/withdrawal_institution + índice account_withdrawals |
-| `f43edfa` | wip(tests): RED tests para is_hot_account + bypass hot (Track B, Task 2-3) |
 <!-- GEN:end:recientes -->
 
 ---
