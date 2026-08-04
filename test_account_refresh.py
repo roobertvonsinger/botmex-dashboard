@@ -309,3 +309,24 @@ def test_load_candidate_rows_no_hot_normal(db_conn):
     rows = _ar._load_candidate_rows()
     row = next(r for r in rows if r["email"] == "normal@x.com")
     assert row["hot"] is False
+
+
+def test_db_set_and_get_withdrawal_ready(db_conn):
+    import app
+    now = int(_time.time())
+    with app.db(write=True) as c:
+        c.execute(
+            "INSERT INTO accounts (email, status, grade, jwt_expires_at, published_to_pool) "
+            "VALUES (?,?,?,?,?)",
+            ("wr@x.com", "LIVE", "B", now + 3600, 1),
+        )
+    assert _ar._db_get_withdrawal_ready("wr@x.com") == 0
+    _ar._db_set_withdrawal_ready("wr@x.com", True, "HEY BANCO")
+    assert _ar._db_get_withdrawal_ready("wr@x.com") == 1
+    with app.db() as c:
+        row = c.execute(
+            "SELECT withdrawal_ready, withdrawal_institution FROM accounts WHERE email=?",
+            ("wr@x.com",),
+        ).fetchone()
+    assert row["withdrawal_ready"] == 1
+    assert row["withdrawal_institution"] == "HEY BANCO"

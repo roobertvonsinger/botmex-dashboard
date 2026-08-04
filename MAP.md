@@ -97,7 +97,7 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `account_refresh.py` | 322 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
+| `account_refresh.py` | 381 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
 | `app.py` | 4998 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 191 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1041 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
@@ -119,7 +119,7 @@ prewarm.py (router)
 | `shared/betmexico_payment_analyzer.py` | 592 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
-| `test_account_refresh.py` | 311 | `—` | _[completar]_ |
+| `test_account_refresh.py` | 332 | `—` | _[completar]_ |
 | `test_account_touch.py` | 51 | `—` | _[completar]_ |
 | `test_account_touch_isolated.py` | 138 | `—` | _[completar]_ |
 | `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `cd1dde2` | feat(portal): poll de estado tras disparar retiro (15s hasta terminal) |
 | `0a6aff3` | feat(account_refresh): _load_candidate_rows trae balance/lock/retiro-pendiente y computa hot |
 | `b3c9eb1` | feat(portal): gatear botón Retirar por withdrawal_ready + mostrar CURP/institución |
 | `98613fb` | feat(api): permitir a operadores dueños consultar withdraw/status |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `d798ab3` | feat(db): agregar withdrawal_ready/withdrawal_institution + índice account_withdrawals |
 | `f43edfa` | wip(tests): RED tests para is_hot_account + bypass hot (Track B, Task 2-3) |
 | `33a2aba` | docs: plan de Track B listo (retiro gateado por SPEI + refresh caliente + anti-detección) |
-| `cdc208e` | fix(portal): cerrar fuga de cadencia real en la vista de misión |
 <!-- GEN:end:recientes -->
 
 ---

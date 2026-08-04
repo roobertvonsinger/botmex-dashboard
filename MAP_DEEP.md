@@ -24,8 +24,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_exp_int` | def | L137–L143 |
 | `is_hot_account` | def | L146–L163 |
 | `_load_candidate_rows` | def | L177–L200 |
-| `run_refresh_cycle` | def | L204–L315 |
-| `run_refresh_cycle_from_env` | def | L318–L322 |
+| `_db_get_withdrawal_ready` | def | L203–L209 |
+| `_db_set_withdrawal_ready` | def | L212–L218 |
+| `run_refresh_cycle` | def | L222–L374 |
+| `run_refresh_cycle_from_env` | def | L377–L381 |
 
 ### `app.py`
 
@@ -531,6 +533,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_load_candidate_rows_marca_hot_por_balance` | def | L266–L276 |
 | `test_load_candidate_rows_marca_hot_por_retiro_pendiente` | def | L279–L296 |
 | `test_load_candidate_rows_no_hot_normal` | def | L299–L311 |
+| `test_db_set_and_get_withdrawal_ready` | def | L314–L332 |
 
 ### `test_account_touch.py`
 

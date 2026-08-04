@@ -200,6 +200,24 @@ def _load_candidate_rows() -> List[Dict[str, Any]]:
     return rows
 
 
+def _db_get_withdrawal_ready(email: str) -> int:
+    import app
+    with app.db() as c:
+        row = c.execute(
+            "SELECT withdrawal_ready FROM accounts WHERE email=?", (email,)
+        ).fetchone()
+    return int(row["withdrawal_ready"] or 0) if row else 0
+
+
+def _db_set_withdrawal_ready(email: str, ready: bool, institution: Optional[str]) -> None:
+    import app
+    with app.db(write=True) as c:
+        c.execute(
+            "UPDATE accounts SET withdrawal_ready=?, withdrawal_institution=? WHERE email=?",
+            (1 if ready else 0, institution, email),
+        )
+
+
 # ── Ciclo (async) ─────────────────────────────────────────────────────────────
 async def run_refresh_cycle(
     *,
@@ -307,6 +325,47 @@ async def run_refresh_cycle(
                 })
             except Exception:
                 pass
+
+            # withdrawal_ready: PASO1 de withdrawals.py es la única fuente de
+            # verdad de "¿aterrizó el SPEI?" — se verifica en el mismo ciclo
+            # que ya refresca balance con el mismo JWT/proxy, sin llamada extra
+            # de login/captcha. Robert, 2026-08-04: gatea el botón de retiro
+            # del portal sin exponer un round-trip vivo a BetMexico en cada render.
+            try:
+                from withdrawals import (
+                    get_bank_accounts, NoApprovedWithdrawalAccount, MultipleApprovedAccounts,
+                )
+                ready: Optional[bool] = None
+                institution: Optional[str] = None
+                try:
+                    approved = await get_bank_accounts(jwt, proxy_url)
+                    ready, institution = True, approved[0].get("institutionName")
+                except NoApprovedWithdrawalAccount:
+                    ready, institution = False, None
+                except MultipleApprovedAccounts:
+                    # SPEI SÍ aterrizó (hay >1 cuenta aprobada) — el operador puede
+                    # intentar retirar; execute_withdrawal decide con más detalle
+                    # en el momento del click. No se puede elegir "la" institución.
+                    ready, institution = True, "Múltiples cuentas — revisar"
+                except Exception as e:
+                    logger.info(f"[account_refresh] {email} check withdrawal_ready falló: {str(e)[:120]}")
+
+                if ready is not None:
+                    prev = _db_get_withdrawal_ready(email)
+                    if prev != (1 if ready else 0):
+                        _db_set_withdrawal_ready(email, ready, institution)
+                        try:
+                            from app import _broadcast
+                            _broadcast({
+                                "type": "activity", "kind": "withdrawal_ready_changed",
+                                "ts": datetime.now(timezone.utc).isoformat(),
+                                "email": email, "withdrawal_ready": ready,
+                                "withdrawal_institution": institution,
+                            })
+                        except Exception:
+                            pass
+            except Exception as e:
+                logger.warning(f"[account_refresh] {email} withdrawal_ready check error: {str(e)[:120]}")
         except Exception as e:
             stats["failed"] += 1
             logger.warning(f"[account_refresh] {email} persist falló: {str(e)[:160]}")
