@@ -12,7 +12,6 @@
   let sse = null;
   let activeMissionId = null;
   let missionState = null;
-  let countdownTimer = null;
   let userRole = null;
 
   // ── View-as scope ──────────────────────────────────────────────
@@ -175,16 +174,19 @@
           missionState.pct = Math.min(95, 30 + (ev.completed / Math.max(total, 1)) * 70);
           missionState.schedDone = ev.completed;
           missionState.schedTotal = total;
-          if (ev.completed < total) startCountdown(60);
+          if (ev.completed < total) startProcessingPulse();
+          else clearProcessingPulse();
         } else if (ev.aborted) {
           missionState.sub = '❌ <span class="email">' + shortEmail(ev.email) + '</span> no jaló (' + ev.aborted + ')';
         } else {
-          missionState.sub = '¡Match! Depósitos cada 60s' + (ev.matches ? ' · ' + ev.matches + ' cuentas' : '');
+          // No revelar cadencia real (Robert, 2026-08-04): nada de "cada Ns" ni
+          // montos por depósito — solo que el proceso está en curso.
+          missionState.sub = '¡Match! Depositando' + (ev.matches ? ' · ' + ev.matches + ' cuentas' : '');
           missionState.pct = 30;
         }
         break;
       case 'completed':
-        clearCountdown();
+        clearProcessingPulse();
         missionState.status = 'completed';
         missionState.deposited = ev.deposited || missionState.deposited;
         missionState.approved = ev.approved || missionState.approved;
@@ -193,13 +195,13 @@
         missionState.sub = 'Completado';
         break;
       case 'cancelled':
-        clearCountdown();
+        clearProcessingPulse();
         missionState.status = 'cancelled';
         missionState.sub = 'Detenido por el operador';
         missionState.pct = missionState.pct || 50;
         break;
       case 'failed':
-        clearCountdown();
+        clearProcessingPulse();
         missionState.status = 'failed';
         missionState.sub = 'Falló' + (ev.reason ? ' · ' + ev.reason : '');
         missionState.pct = missionState.pct || 50;
@@ -208,22 +210,17 @@
     renderMission();
   }
 
-  function startCountdown(secs) {
-    clearCountdown();
-    let remaining = secs;
-    missionState.countdown = remaining;
+  // Pulso "en proceso" — a propósito SIN número de segundos ni timer atado al
+  // intervalo real (Robert, 2026-08-04): el countdown exacto de 60s dejaba ver
+  // la cadencia real de depósitos al operador. Solo un indicador visual de que
+  // sigue trabajando, desacoplado de cualquier temporizador real.
+  function startProcessingPulse() {
+    if (missionState) missionState.processing = true;
     renderMission();
-    countdownTimer = setInterval(() => {
-      remaining--;
-      missionState.countdown = remaining;
-      renderMission();
-      if (remaining <= 0) clearCountdown();
-    }, 1000);
   }
 
-  function clearCountdown() {
-    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
-    if (missionState) missionState.countdown = null;
+  function clearProcessingPulse() {
+    if (missionState) missionState.processing = false;
   }
 
   function renderMission() {
@@ -237,8 +234,9 @@
         '</div>';
     }).join('');
 
-    const cdHtml = s.countdown != null
-      ? '<span class="mv-countdown"><span class="cd-dot"></span>' + s.countdown + 's</span>'
+    // Sin número: un pulso visual de "sigue trabajando" sin revelar cadencia real.
+    const cdHtml = s.processing
+      ? '<span class="mv-countdown"><span class="cd-dot"></span>en curso…</span>'
       : '';
 
     const summaryHtml = (s.status === 'completed' || s.status === 'failed' || s.status === 'cancelled')
@@ -278,7 +276,6 @@
   function exitMission() {
     activeMissionId = null;
     missionState = null;
-    clearCountdown();
     mv.style.display = 'none';
     mv.innerHTML = '';
     accountsSection.style.display = 'block';

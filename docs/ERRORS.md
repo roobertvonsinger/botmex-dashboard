@@ -2,6 +2,14 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## Fuga de cadencia real de depósitos en la vista de misión del portal (detectado 2026-08-04)
+
+- **Síntoma**: `static/portal.js` (vista de misión `/bet` en `/user/{id}`) mostraba al operador el texto literal `"¡Match! Depósitos cada 60s"` y un countdown numérico en vivo (`startCountdown(60)`, segundo a segundo) mientras corría el matchmaking automático. Cualquier operador podía leer directamente la cadencia real del motor de depósitos automáticos ($150 cada 60s), justo el patrón que Robert pidió blindar (`docs/plans/2026-08-03-spec-auto-retiro-obfuscado.md` ya documentaba esta regla para retiros; nunca se había aplicado al lado de depósitos).
+- **Causa raíz**: la vista de misión se escribió reflejando 1:1 los eventos SSE crudos del backend (incluido el intervalo real de 60s) sin ninguna capa de ofuscación — a diferencia de La Pantalla (SA-only), este es el portal del operador, que no debe conocer la mecánica interna.
+- **Fix**: removido el texto de cadencia; `startCountdown(secs)` (temporizador real ligado al intervalo) reemplazado por `startProcessingPulse()`/`clearProcessingPulse()` — un indicador puramente visual ("en curso…", pulso CSS) desacoplado de cualquier timer real. Commit en `feature/retiro-manual-gateado-spei`.
+- **Nota de alcance**: esto cierra la fuga puntual. La versión completa (contador tipo odómetro interpolado, sincronizado con backend solo en checkpoints) queda en el plan `docs/superpowers/plans/2026-08-04-retiro-manual-gateado-spei-y-tiempo-real.md`, Task de animación — no se construyó aún, requiere `requestAnimationFrame`+easing y es trabajo de UI más grande.
+- **Regresión propia detectada y corregida en el mismo pase**: al remover `startCountdown`, `exitMission()` (`portal.js`) seguía llamando `clearCountdown()` (ya no definida) — hubiera tirado `ReferenceError` al salir de una misión. Corregido eliminando la llamada (ya redundante, `missionState` se nulea justo antes).
+
 ## Portal del operador (`/user/{id}`) sin cache-bust ni auto-reload — flujo `/bet` servía JS/CSS viejo tras deploy (detectado 2026-08-04)
 
 - **Síntoma**: `static/portal.html` cargaba `portal.js` y `horizon.js` con un `?v=` **hardcodeado a mano** (nunca cambiaba). `/user/{id}` se servía con `FileResponse` directo, sin pasar por el rewrite de cache-busting que sí tiene `/dashboard`. `portal.js` tampoco tenía el polling de `/api/version` que dispara el auto-reload en `app.js`. Resultado: un operador con el portal abierto de antes de un deploy nunca veía el fix nuevo salvo Ctrl+Shift+R manual — el mismo bug de campo que ya se había resuelto para el dashboard SA (ver `MAP.md` comentario sobre `FRONTEND_ASSETS`), pero nunca se replicó al portal del flujo `/bet`.

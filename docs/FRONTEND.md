@@ -762,14 +762,14 @@ real desde el panel compacto.
 
 - **Sin framework** — vanilla JS, mismo patrón que `app.js` pero simplificado
 - **SSE en vivo**: subscribe `/api/events`, maneja eventos `auto_mission` filtrados por `mission_id`
-- **Reusa patrón `_autoOnBus`** de `depos.js` pero simplificado: progress bar + lista de matches + countdown, sin SVG de líneas ni mascota
+- **Reusa patrón `_autoOnBus`** de `depos.js` pero simplificado: progress bar + lista de matches + pulso "en curso" (SIN cadencia/countdown real — ver nota de seguridad abajo), sin SVG de líneas ni mascota
 - **Mobile-first** — operadores abren desde Telegram en el celular
 
 ### Vistas
 
 | Vista | Trigger | Qué muestra |
 |---|---|---|
-| **Misión viva** | `?match=ID` en URL | Progress bar (matching→scheduling→done), matches apareciendo con `slideIn` animation, countdown 60s entre depósitos, resumen final (deposited/approved/failed). Botón "Ver mis cuentas" al terminar. |
+| **Misión viva** | `?match=ID` en URL | Progress bar (matching→scheduling→done), matches apareciendo con `slideIn` animation, pulso "en curso…" SIN número/segundos (2026-08-04: antes mostraba countdown real de 60s + texto "cada 60s" — filtraba la cadencia real del motor al operador, ver `docs/ERRORS.md`), resumen final (deposited/approved/failed) solo al terminar. Botón "Ver mis cuentas" al terminar. |
 | **Mis Cuentas** | Sin `?match` (default) | Grid de cards con email, balance, grade badge, CLABE STP (botón copiar), botones Retirar/Liberar. Auto-refresh cuando llega evento SSE terminal. |
 
 ### Acciones sin password

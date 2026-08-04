@@ -494,23 +494,38 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `_acc` | def | L14–L20 |
-| `_run` | def | L23–L26 |
-| `test_jwt_vigente_es_candidata` | def | L29–L31 |
-| `test_jwt_expirado_no_es_candidata` | def | L34–L36 |
-| `test_jwt_nulo_no_es_candidata` | def | L39–L41 |
-| `test_jwt_vence_ahora_mismo_no_es_candidata` | def | L44–L46 |
-| `test_lockeada_por_operador_se_excluye` | def | L49–L51 |
-| `test_grade_no_util_se_excluye` | def | L54–L57 |
-| `test_no_live_se_excluye` | def | L60–L62 |
-| `test_no_publicada_se_excluye` | def | L65–L67 |
-| `test_orden_por_last_checked_ascendente` | def | L70–L78 |
-| `test_batch_max_limita` | def | L81–L84 |
-| `test_grades_configurable` | def | L87–L90 |
-| `test_reservada_sa_con_jwt_vigente_es_candidata` | def | L93–L99 |
-| `test_reservada_sa_locked_by_username_es_candidata` | def | L102–L109 |
-| `test_reservada_no_sa_no_es_candidata` | def | L112–L116 |
-| `test_no_publicada_no_lockeada_no_es_candidata` | def | L119–L122 |
+| `_acc` | def | L17–L24 |
+| `_run` | def | L27–L30 |
+| `test_jwt_vigente_es_candidata` | def | L33–L35 |
+| `test_jwt_expirado_no_es_candidata` | def | L38–L40 |
+| `test_jwt_nulo_no_es_candidata` | def | L43–L45 |
+| `test_jwt_vence_ahora_mismo_no_es_candidata` | def | L48–L50 |
+| `test_lockeada_por_operador_se_excluye` | def | L53–L55 |
+| `test_grade_no_util_se_excluye` | def | L58–L61 |
+| `test_no_live_se_excluye` | def | L64–L66 |
+| `test_no_publicada_se_excluye` | def | L69–L71 |
+| `test_orden_por_last_checked_ascendente` | def | L74–L82 |
+| `test_batch_max_limita` | def | L85–L88 |
+| `test_grades_configurable` | def | L91–L94 |
+| `test_reservada_sa_con_jwt_vigente_es_candidata` | def | L97–L103 |
+| `test_reservada_sa_locked_by_username_es_candidata` | def | L106–L113 |
+| `test_reservada_no_sa_no_es_candidata` | def | L116–L120 |
+| `test_no_publicada_no_lockeada_no_es_candidata` | def | L123–L126 |
+| `test_hot_lockeada_por_operador_no_sa_es_candidata` | def | L135–L138 |
+| `test_hot_grade_no_util_es_candidata` | def | L141–L143 |
+| `test_hot_no_publicada_es_candidata` | def | L146–L148 |
+| `test_hot_sin_jwt_vigente_no_es_candidata` | def | L151–L154 |
+| `test_hot_no_live_no_es_candidata` | def | L157–L159 |
+| `test_hot_ignora_batch_max` | def | L162–L168 |
+| `test_hot_va_primero_en_el_resultado` | def | L171–L175 |
+| `_row` | def | L180–L185 |
+| `test_hot_por_balance_alto` | def | L188–L189 |
+| `test_no_hot_balance_50_exacto` | def | L192–L193 |
+| `test_no_hot_balance_bajo_sin_lock_sin_retiro` | def | L196–L197 |
+| `test_hot_por_ventana_de_autolock_activa` | def | L200–L201 |
+| `test_no_hot_ventana_de_autolock_vencida` | def | L204–L205 |
+| `test_hot_por_retiro_pendiente` | def | L208–L209 |
+| `test_no_hot_sin_ninguna_señal` | def | L212–L213 |
 
 ### `test_account_touch.py`
 
