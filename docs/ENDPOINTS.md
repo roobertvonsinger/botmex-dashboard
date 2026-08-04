@@ -18,9 +18,11 @@
 
 | Método | Path | Función | Auth | Body / Query | Respuesta | File:line |
 |---|---|---|---|---|---|---|
-| GET | `/login` | Página de login | público | — | HTML `login.html` | `app.py:176` |
-| GET | `/portal` | Landing page para operadores | require_session | — | HTML `portal.html` | `app.py:714` |
-| GET | `/` | Dashboard (root) | require_session (redirige a `/login` si no hay sesión, o a `/portal` si rol != superadmin) | — | HTML `index.html` | `app.py:721` |
+| GET | `/login` | Página de login (preserva `?match=`/query en el redirect post-login) | público | — | HTML `login.html` | `app.py:688` |
+| GET | `/` | Root — puro gate de auth. Sin sesión → `/login`; SA → `/dashboard`; resto → `/user/{telegram_id}` (query preservada, p.ej. `?match={mission_id}` del handoff `/bet`) | require_session (vía redirect) | — | 302 redirect | `app.py:796` |
+| GET | `/dashboard` | Dashboard SA (renombrado desde `/`, 2026-08-04) | superadmin (no-SA rebota a su propio `/user/{id}`) | — | HTML `index.html` | `app.py:762` |
+| GET | `/user/{user_id}` | Portal `/bet` (`portal.html`), scoped por `telegram_id`. No-SA con `{id}` ajeno se canoniza al propio; SA puede navegar cualquier `{id}` (supervisión / `?view_as=` en las APIs para ver exactamente como ese usuario) | require_session | — | HTML `portal.html` | `app.py:731` |
+| GET | `/portal` | Alias de compatibilidad — redirige a `/dashboard` (SA) o `/user/{id}` (resto), preserva query | require_session | — | 302 redirect | `app.py:751` |
 | GET | `/favicon.ico` | Favicon | público | — | 204 No Content | `app.py:171` |
 | POST | `/api/auth/login` | Iniciar sesión | público | `{telegram_id, password}` | `{ok, user, set_cookie bmx_auth}` | `app.py:205` |
 | POST | `/api/auth/set-password` | Setear/cambiar password | require_session | `{old_password?, new_password}` | `{ok}` | `app.py:234` |
@@ -80,10 +82,10 @@ copiar en 1 tap): es que la conversación pasa por un LLM de terceros.
 
 | Método | Path | Función | Auth | Body / Query | Respuesta | File:line |
 |---|---|---|---|---|---|---|
-| GET | `/api/operator/my-accounts` | Cuentas con depósitos aprobados del operador actual (SA ve todas). Incluye `is_locked`, `status`, `clabe_stp`. | require_session | — | `{ok, accounts: [{id, email, balance_real, balance_bonos, last_deposit_amount, last_deposit_date, grade, is_locked, status, clabe_stp}]}` | `app.py:4181` |
-| POST | `/api/operator/accounts/{account_id}/release` | Libera el lock de una cuenta propia (operador) o cualquiera (SA). Sin password. | require_session | — | `{ok, account_id, released}` | `app.py` |
-| POST | `/api/operator/accounts/{account_id}/withdraw` | Retiro sin password — valida ownership vía `_visible_emails`, usa JWT en BD. | require_session | `{amount}` | `{transactionId, reference, accountId, accountDigits, institutionName, amount, account_email, warnings, persisted}` / 409 | `app.py` |
-| GET | `/api/operator/missions` | Misiones del operador (o todas si SA, últimas 50/20). | require_session | — | `{ok, missions: [{mission_id, status, phase_detail, total_deposited, total_approved, total_failed, created_at, completed_at, operator_id}]}` | `app.py` |
+| GET | `/api/operator/my-accounts` | Cuentas con depósitos aprobados del operador actual (SA ve todas, salvo `?view_as=`). Incluye `is_locked`, `status`, `clabe_stp`. | require_operator_view | `?view_as={telegram_id}` (solo SA; narrowea su propia sesión a ese id, rol degradado a operator) | `{ok, accounts: [{id, email, balance_real, balance_bonos, last_deposit_amount, last_deposit_date, grade, is_locked, status, clabe_stp}]}` | `app.py:4181` |
+| POST | `/api/operator/accounts/{account_id}/release` | Libera el lock de una cuenta propia (operador) o cualquiera (SA, salvo `?view_as=`). Sin password. | require_operator_view | `?view_as=` (idem) | `{ok, account_id, released}` | `app.py` |
+| POST | `/api/operator/accounts/{account_id}/withdraw` | Retiro sin password — valida ownership vía `_visible_emails`, usa JWT en BD. | require_operator_view | `{amount}`, `?view_as=` (idem) | `{transactionId, reference, accountId, accountDigits, institutionName, amount, account_email, warnings, persisted}` / 409 | `app.py` |
+| GET | `/api/operator/missions` | Misiones del operador (o todas si SA, últimas 50/20; o solo las de `view_as` si se manda). | require_operator_view | `?view_as=` (idem) | `{ok, missions: [{mission_id, status, phase_detail, total_deposited, total_approved, total_failed, created_at, completed_at, operator_id}]}` | `app.py` |
 | GET | `/api/accounts` | Listar cuentas con filtros | require_session | query: `status, search, limit, offset` | `{rows, total}` | `app.py:291` |
 | POST | `/api/accounts/refresh` | Forzar re-check de cuentas seleccionadas | require_session | `{account_ids}` | `{queued}` | `app.py:859` |
 | POST | `/api/accounts/{account_id}/lock` | Lock manual (con duración) | require_session | `{minutes}` | `{ok, locked_until}` | `app.py:1365` |
@@ -167,7 +169,7 @@ copiar en 1 tap): es que la conversación pasa por un LLM de terceros.
 
 | Método | Path | Función | Auth | Respuesta | File:line |
 |---|---|---|---|---|---|
-| GET | `/api/events` | Stream SSE de actividad/notificaciones — **filtrado server-side por rol** (cada cliente recibe solo lo visible para él; ver `docs/SSE_EVENTS.md` §Filtrado) | require_session | `text/event-stream` | `app.py` |
+| GET | `/api/events` | Stream SSE de actividad/notificaciones — **filtrado server-side por rol** (cada cliente recibe solo lo visible para él; ver `docs/SSE_EVENTS.md` §Filtrado). SA con `?view_as=` recibe el stream narrowed a ese usuario. | require_operator_view | `?view_as=` (solo SA) | `text/event-stream` | `app.py` |
 
 ## Actividad
 

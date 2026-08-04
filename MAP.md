@@ -102,8 +102,8 @@ prewarm.py (router)
 | `_screenshot_inspector_v2.py` | 125 | `—` | _[completar]_ |
 | `_screenshot_inspector_v3.py` | 133 | `—` | _[completar]_ |
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 4919 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
-| `auth.py` | 164 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
+| `app.py` | 4961 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `auth.py` | 191 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1022 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `card_checker.py` | 234 | `—` | _[completar]_ |
@@ -255,6 +255,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `dff8150` | feat(brand): integrar logo real botmexico.net (mascota robot + wordmark) en portal/login |
 | `7d2365d` | feat(portal,login): rebrand visual botmexico.net (horizonte de sucesos + tricolor MX) |
 | `983557f` | feat(portal): mission control SSE + retiro/liberar sin password + resiliencia bot /bet |
 | `6f2332e` | fix(prewarm): persistir balance real $0 en fetch_mode=balance_only |
@@ -266,7 +267,6 @@ prewarm.py (router)
 | `2e31fba` | feat(telegram-mock): tiradera rap de bineros rediseñada y boton cancelar eliminado del menu start |
 | `ff6cfde` | fix(pantalla): jerarquia e interaccion del panel Depositar/Retirar (Fitts Law) |
 | `4fea30f` | fix(pantalla): intercambiar orden visual Movimientos <-> Deposito/Retiro |
-| `d89c282` | feat(telegram-mock): refactorizar flujo /bet con streaming, lenguaje carding, llenado automatico y resumen |
 <!-- GEN:end:recientes -->
 
 ---

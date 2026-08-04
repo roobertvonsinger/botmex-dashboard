@@ -15,6 +15,18 @@
   let countdownTimer = null;
   let userRole = null;
 
+  // ── View-as scope ──────────────────────────────────────────────
+  // /user/{id}: {id} identifica de quién es este portal. Si el que mira es
+  // SA, el backend narrowea su sesión (rol/telegram_id) a ese {id} vía
+  // ?view_as= — así SA ve exactamente lo que ese usuario vería, incl. sus
+  // propias cuentas depositadas con /bet, sin la omnisciencia de SA.
+  const VIEW_AS = (window.location.pathname.match(/^\/user\/(\d+)/) || [])[1] || null;
+
+  function apiUrl(path) {
+    if (!VIEW_AS) return path;
+    return path + (path.includes('?') ? '&' : '?') + 'view_as=' + VIEW_AS;
+  }
+
   // ── Utils ──────────────────────────────────────────────────────
   function showToast(msg, type) {
     const t = document.createElement('div');
@@ -58,7 +70,7 @@
   // ── SSE ────────────────────────────────────────────────────────
   function connectSSE() {
     if (sse) sse.close();
-    sse = new EventSource('/api/events');
+    sse = new EventSource(apiUrl('/api/events'));
     sse.onmessage = (ev) => {
       try {
         const d = JSON.parse(ev.data);
@@ -265,7 +277,7 @@
   async function loadAccounts() {
     grid.innerHTML = '<div class="empty-msg">Cargando…</div>';
     try {
-      const res = await fetch('/api/operator/my-accounts');
+      const res = await fetch(apiUrl('/api/operator/my-accounts'));
       if (res.status === 401) { window.location.href = '/login'; return; }
       const data = await res.json();
       if (!data.ok || !data.accounts || data.accounts.length === 0) {
@@ -341,7 +353,7 @@
         this.disabled = true;
         this.textContent = '…';
         try {
-          const res = await fetch('/api/operator/accounts/' + id + '/release', { method: 'POST' });
+          const res = await fetch(apiUrl('/api/operator/accounts/' + id + '/release'), { method: 'POST' });
           const d = await res.json();
           if (d.ok) {
             showToast('Cuenta liberada', 'ok');
@@ -393,7 +405,7 @@
       confirm.disabled = true;
       confirm.textContent = 'Procesando…';
       try {
-        const res = await fetch('/api/operator/accounts/' + accountId + '/withdraw', {
+        const res = await fetch(apiUrl('/api/operator/accounts/' + accountId + '/withdraw'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ amount }),
@@ -428,6 +440,20 @@
     });
 
     btnAccounts.addEventListener('click', exitMission);
+
+    // SA viendo /user/{id} (posiblemente el suyo propio, vía view_as): nunca
+    // debe quedar atrapado sin volver a su dashboard — link directo siempre visible.
+    try {
+      const me = await (await fetch('/api/auth/me')).json();
+      if (me.role === 'superadmin') {
+        const back = document.createElement('a');
+        back.className = 'btn btn-sm';
+        back.href = '/dashboard';
+        back.textContent = '← Dashboard';
+        $('#logoutBtn').insertAdjacentElement('beforebegin', back);
+        if (phRole) phRole.textContent = '· viendo como usuario';
+      }
+    } catch (_) {}
 
     // Check for ?match=ID in URL
     const params = new URLSearchParams(window.location.search);

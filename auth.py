@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib, json, os, secrets, time
 from pathlib import Path
 from typing import Optional
-from fastapi import Cookie, HTTPException
+from fastapi import Cookie, HTTPException, Query
 
 # ── Users ─────────────────────────────────────────────────────────────────────
 USERS: dict[str, dict] = {
@@ -162,3 +162,30 @@ def require_session(bmx_session: str = Cookie(default=None)) -> dict:
     if not s:
         raise HTTPException(status_code=401, detail="Sesión expirada")
     return s
+
+
+def require_operator_view(bmx_session: str = Cookie(default=None), view_as: Optional[int] = Query(None)) -> dict:
+    """Como require_session, pero permite a SA angostar su propio scope a un
+    telegram_id via ?view_as=, simulando exactamente la vista de ese usuario
+    (rol degradado a 'operator', username resuelto al del target). Sirve para
+    que el SA vea /user/{id} — incluida su propia cuenta bet — como lo vería
+    ese usuario, sin la omnisciencia de SA colándose en las queries scoped.
+
+    Para cualquier rol no-SA, view_as se ignora: no puede ampliar su propio
+    scope (ya es su propio id), y degradar a alguien ya-degradado es un no-op.
+    """
+    session = require_session(bmx_session)
+    if view_as and session.get("role") == "superadmin":
+        target_username = next(
+            (k for k, v in USERS.items() if v.get("telegram_id") == view_as),
+            session.get("username"),
+        )
+        return {
+            "username": target_username,
+            "display": session.get("display"),
+            "role": "operator",
+            "telegram_id": view_as,
+            "_real_username": session.get("username"),
+            "_real_role": "superadmin",
+        }
+    return session

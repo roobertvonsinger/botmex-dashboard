@@ -3,6 +3,34 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-08-04 (ruteo por rol `/dashboard` vs `/user/{id}` + vista "como usuario" para SA)
+
+**Motivo**: Robert pidió que `botmexico.net` raíz exija login y redirija por rol — SA a
+`/dashboard` (su panel actual), demás usuarios a `/user/{su_id}` (el portal `/bet`). A mitad de
+tarea corrigió el enfoque: no podía probar el flujo con el acceso de Lau porque no controla su
+Telegram — pidió en su lugar poder ver **ambos** paneles con su propia cuenta SA, y que la vista
+`/bet` le muestre *sus propias* cuentas depositadas con `/bet` exactamente como las vería un
+usuario normal (no la omnisciencia de SA), sin quedar nunca atrapado sin acceso a su dashboard.
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Ruteo por rol** (`app.py`) | `/` es puro gate de auth (sin sesión → `/login`; SA → `/dashboard`; resto → `/user/{telegram_id}`, preservando query string p.ej. `?match=` del handoff de `/bet`). `/dashboard` sirve `index.html` (SA-only, no-SA rebota a su propio `/user/{id}`). `/user/{id}` sirve `portal.html`; no-SA que entra a un `{id}` ajeno se canoniza a su propio `/user/{id}`; SA puede navegar cualquier `/user/{id}` (supervisión). `/portal` queda como alias de compatibilidad (links viejos del bot). | ✅ implementado | ✅ `py_compile` OK, ✅ verificado con `TestClient` in-process (sin sesión, SA, operador, canonicalización, preservación de query) — ver detalle abajo |
+| **`/login` preserva `?match=`** (`static/login.html`) | Los 3 puntos de redirect post-login (`doLogin`, `doSetPassword`, chequeo de sesión ya activa) ahora anexan `window.location.search` al ir a `/` — antes se perdía el `?match={mission_id}` del link de Telegram si el usuario no tenía sesión activa (rompía la transición "sin fricción" declarada como objetivo del proyecto). | ✅ implementado | ✅ verificado: `/?match=abc123` (sin sesión) → `/login?match=abc123` → tras login → `/` con query intacto → redirect final a `/dashboard?match=abc123` o `/user/{id}?match=abc123` |
+| **Vista "como usuario" para SA** (`auth.require_operator_view`, nuevo) | Dependency que envuelve `require_session`: si el caller es SA y manda `?view_as={telegram_id}`, degrada su sesión a `role=operator` + ese `telegram_id` (username resuelto al target) para ESE request — así las queries scoped-por-operador (`is_sa` branches) dejan de aplicar y el SA ve exactamente lo que ese usuario vería. Para cualquier rol no-SA, `view_as` se ignora (no puede ampliar su propio scope). Aplicado a `/api/events`, `/api/operator/my-accounts`, `/api/operator/missions`, `/api/operator/accounts/{id}/release`, `/api/operator/accounts/{id}/withdraw`. | ✅ implementado | ✅ verificado con `TestClient`: SA+`view_as=propio` en `/api/operator/missions` devuelve solo sus 20 misiones (vs 39 globales sin `view_as`); Lau con `view_as=id-de-Robert` sigue viendo solo lo suyo (0 misiones) — no puede escalar |
+| **`static/portal.js`** | Lee `{id}` de `/user/{id}` en el path (`VIEW_AS`), lo anexa a las 5 llamadas API relevantes (`apiUrl()` helper) + SSE. En `init()`, si `/api/auth/me` (sesión REAL, no impersonada) devuelve `role=superadmin`, inyecta un link "← Dashboard" junto a "Salir" — el SA nunca queda sin ruta de vuelta a `/dashboard`. | ✅ implementado | ✅ `node --check` OK |
+| **Maintenance-gate middleware** | La excepción de operador en Modo Mantenimiento (`path == "/portal"`) ahora también cubre `path.startswith("/user/")`. | ✅ implementado | ✅ `test_maintenance_mode.py` 5/5 pasan |
+| **Lau habilitada para probar** | Investigado: su password en prod YA coincide (mismo hash) con el de Robert — no requería ningún cambio de credenciales. Pivote de Robert (no usar el Telegram de Lau) hizo el punto discutible: la prueba real la hará el propio Robert vía `/user/{su_id}` con `view_as`. | — sin cambios necesarios | ✅ confirmado leyendo `data/web_passwords.json` de prod por SSH (solo lectura) |
+
+**Tests**: descubierta contaminación cruzada preexistente al correr la suite completa en un solo
+proceso (~80 fallos con `assert 530` — `BMX_MAINTENANCE` queda pegado en `os.environ` de un
+módulo a otro). Confirmado con `git stash` que ocurre IDÉNTICO en el commit base, sin mis cambios
+— no es regresión. Corriendo módulos relevantes de forma aislada: `test_bet_live_plan.py`,
+`test_maintenance_mode.py`, y un batch de 9 módulos de sesión/visibilidad — todos verdes salvo
+los 2 `NameError` ya documentados en `reference_pre_existing_test_failures.md`.
+
+**Deploy**: pendiente a la fecha de este commit — ver siguiente captura o `git log` para confirmar
+si ya se aplicó a KVM4.
+
 ## Captura: 2026-08-03 (rebrand visual portal + login, ventana AFK 30min)
 
 **Motivo**: Robert pidió terminar la implementación visual de `/portal` y `/login` con la marca

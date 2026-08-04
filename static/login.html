@@ -293,7 +293,7 @@ async function doLogin() {
       return;
     }
     showMsg(msg, 'Bienvenido, ' + data.username + ' ✓', 'info');
-    setTimeout(() => { window.location.href = '/'; }, 400);
+    setTimeout(() => { window.location.href = '/' + window.location.search; }, 400);
   } catch (e) {
     showMsg(msg, 'Error de conexión.', 'error');
   } finally {
@@ -324,7 +324,7 @@ async function doSetPassword() {
       return;
     }
     showMsg(msg, 'Contraseña guardada. Entrando…', 'info');
-    setTimeout(() => { window.location.href = '/'; }, 500);
+    setTimeout(() => { window.location.href = '/' + window.location.search; }, 500);
   } catch (e) {
     showMsg(msg, 'Error de conexión.', 'error');
   } finally {
@@ -348,7 +348,7 @@ document.getElementById('ftPassConfirm').addEventListener('keydown', e => {
 
 // Redirect if already logged in (401 check via /api/auth/me)
 fetch('/api/auth/me').then(r => {
-  if (r.ok) window.location.href = '/';
+  if (r.ok) window.location.href = '/' + window.location.search;
 }).catch(() => {});
 </script>
 <script src="/static/horizon.js?v=1"></script>

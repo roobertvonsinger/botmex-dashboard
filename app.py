@@ -102,7 +102,7 @@ from pydantic import BaseModel
 from typing import Optional, Union
 
 import auth as _auth
-from auth import require_session
+from auth import require_session, require_operator_view
 from prewarm import router as _prewarm_router
 from deposits import router as _deposits_router
 from withdrawals import (
@@ -636,7 +636,7 @@ async def _maintenance_gate_middleware(request: Request, call_next):
 
             if user_role != "superadmin":
                 # Exceptuar el portal y sus APIs si es operador en mantenimiento
-                if user_role == "operator" and (path == "/portal" or path.startswith("/api/operator/") or path.startswith("/static/portal")):
+                if user_role == "operator" and (path == "/portal" or path.startswith("/user/") or path.startswith("/api/operator/") or path.startswith("/static/portal")):
                     return await call_next(request)
                 if path.startswith("/api/"):
                     return JSONResponse(
@@ -686,9 +686,10 @@ def maintenance_page():
 
 
 @app.get("/login")
-def login_page(bmx_session: str = Cookie(default=None)):
+def login_page(request: Request, bmx_session: str = Cookie(default=None)):
     if bmx_session and _auth.get_session(bmx_session):
-        return RedirectResponse("/", status_code=302)
+        q = request.url.query
+        return RedirectResponse(f"/?{q}" if q else "/", status_code=302)
     return FileResponse(STATIC / "login.html")
 
 
@@ -723,23 +724,51 @@ def _frontend_version(mtimes=None):
     return str(max(mtimes.values(), default=0))
 
 
-@app.get("/portal")
-def portal_page(bmx_session: str = Cookie(default=None)):
+def _own_portal_path(session: dict) -> str:
+    return f"/user/{session.get('telegram_id')}"
+
+
+@app.get("/user/{user_id}")
+def user_portal_page(user_id: int, request: Request, bmx_session: str = Cookie(default=None)):
+    """Render del flujo /bet (portal.html) — scope por telegram_id.
+
+    Cualquier operador que entre con un {user_id} que no es el suyo se
+    canoniza a su propia URL (los endpoints /api/operator/* ya scopean por
+    la sesión, no por este segmento — esto es solo coherencia de URL). SA
+    puede navegar cualquier /user/{id} para supervisar en vivo.
+    """
     session = _auth.get_session(bmx_session) if bmx_session else None
     if not session:
-        return RedirectResponse("/login", status_code=302)
+        q = request.url.query
+        return RedirectResponse(f"/login?{q}" if q else "/login", status_code=302)
+    if session.get("role") != "superadmin" and user_id != session.get("telegram_id"):
+        q = request.url.query
+        own = _own_portal_path(session)
+        return RedirectResponse(f"{own}?{q}" if q else own, status_code=302)
     return FileResponse(STATIC / "portal.html")
 
 
-@app.get("/")
-def index(request: Request, bmx_session: str = Cookie(default=None)):
+@app.get("/portal")
+def portal_page(request: Request, bmx_session: str = Cookie(default=None)):
+    """Alias de compatibilidad — links viejos (bot, bookmarks) siguen sirviendo."""
+    session = _auth.get_session(bmx_session) if bmx_session else None
+    q = request.url.query
+    if not session:
+        return RedirectResponse(f"/login?{q}" if q else "/login", status_code=302)
+    target = "/dashboard" if session.get("role") == "superadmin" else _own_portal_path(session)
+    return RedirectResponse(f"{target}?{q}" if q else target, status_code=302)
+
+
+@app.get("/dashboard")
+def dashboard_page(request: Request, bmx_session: str = Cookie(default=None)):
     session = _auth.get_session(bmx_session) if bmx_session else None
     if not session:
         q = request.url.query
         return RedirectResponse(f"/login?{q}" if q else "/login", status_code=302)
     if session.get("role") != "superadmin":
         q = request.url.query
-        return RedirectResponse(f"/portal?{q}" if q else "/portal", status_code=302)
+        own = _own_portal_path(session)
+        return RedirectResponse(f"{own}?{q}" if q else own, status_code=302)
     # Cache-bust: añadir mtime de cada asset a su propio src/href para forzar
     # re-fetch tras deploy. Regex (no string fijo): index.html ya trae un
     # `?v=YYYYMMDDx` hardcodeado a mano, así que un replace de string exacto
@@ -762,6 +791,19 @@ def index(request: Request, bmx_session: str = Cookie(default=None)):
                         headers={"Cache-Control": "no-cache, must-revalidate"})
     except Exception:
         return FileResponse(STATIC / "index.html")
+
+
+@app.get("/")
+def index(request: Request, bmx_session: str = Cookie(default=None)):
+    """Root = puro gate de auth. botmexico.net/ nunca renderiza contenido
+    directamente: exige login y reenvía a /dashboard (SA) o /user/{id} (resto),
+    preservando query string (ej. ?match={mission_id} del handoff de /bet)."""
+    session = _auth.get_session(bmx_session) if bmx_session else None
+    q = request.url.query
+    if not session:
+        return RedirectResponse(f"/login?{q}" if q else "/login", status_code=302)
+    target = "/dashboard" if session.get("role") == "superadmin" else _own_portal_path(session)
+    return RedirectResponse(f"{target}?{q}" if q else target, status_code=302)
 
 
 @app.get("/api/version")
@@ -2890,7 +2932,7 @@ async def _sse_generator(ctx: dict):
 
 
 @app.get("/api/events")
-async def events(user: dict = Depends(require_session)):
+async def events(user: dict = Depends(require_operator_view)):
     ctx = {
         "role": user.get("role"),
         "telegram_id": user.get("telegram_id"),
@@ -4179,7 +4221,7 @@ def auto_deposit_cancel(mission_id: str,
 
 
 @app.get("/api/operator/my-accounts")
-def operator_my_accounts(user: dict = Depends(require_session)):
+def operator_my_accounts(user: dict = Depends(require_operator_view)):
     """Cuentas con depósitos aprobados del operador + CLABE STP + estado de lock."""
     operator_id = user.get("telegram_id") or 0
     is_sa = user.get("role") == "superadmin"
@@ -4217,7 +4259,7 @@ def operator_my_accounts(user: dict = Depends(require_session)):
 
 @app.post("/api/operator/accounts/{account_id}/release")
 def operator_release_account(account_id: int,
-                             user: dict = Depends(require_session)):
+                             user: dict = Depends(require_operator_view)):
     """Libera el lock de una cuenta propia (operador) o cualquiera (SA). Sin password."""
     with db() as c:
         acc = c.execute(
@@ -4239,7 +4281,7 @@ def operator_release_account(account_id: int,
 @app.post("/api/operator/accounts/{account_id}/withdraw")
 async def operator_withdraw(account_id: int,
                            payload: dict,
-                           user: dict = Depends(require_session)):
+                           user: dict = Depends(require_operator_view)):
     """Retiro sin password — valida ownership, usa JWT en BD."""
     from withdrawals import (
         execute_withdrawal, JwtExpired, InsufficientBalance,
@@ -4292,7 +4334,7 @@ async def operator_withdraw(account_id: int,
 
 
 @app.get("/api/operator/missions")
-def operator_missions(user: dict = Depends(require_session)):
+def operator_missions(user: dict = Depends(require_operator_view)):
     """Misiones del operador (o todas si SA)."""
     operator_id = user.get("telegram_id") or 0
     is_sa = user.get("role") == "superadmin"
