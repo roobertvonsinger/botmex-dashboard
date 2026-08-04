@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `5a39b4a` | docs(audit): confirmar que fetch mínimo contra BetMexico ya está satisfecho |
 | `b8c36d5` | feat(account_refresh): agregar is_hot_account (lógica pura, TDD) |
 | `d798ab3` | feat(db): agregar withdrawal_ready/withdrawal_institution + índice account_withdrawals |
 | `f43edfa` | wip(tests): RED tests para is_hot_account + bypass hot (Track B, Task 2-3) |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `232eac7` | fix(portal): flujo /bet operativo — cache-bust/auto-reload + fecha corrupta en grid de cuentas |
 | `a62629d` | fix: reparación integral de los 31 fallos de test arrastrados (362/362 verdes) |
 | `26f7938` | docs: NEXT-SESSION pruned — bugs resueltos, estado actual para Claude Code |
-| `e3ee73a` | fix: httpx import, test contamination, auth hardening + auditoria Impeccable portal/login |
 <!-- GEN:end:recientes -->
 
 ---

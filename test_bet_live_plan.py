@@ -59,6 +59,12 @@ def test_operator_my_accounts_endpoint(client, monkeypatch):
     assert accs[0]["balance_real"] == 500.0
     assert accs[0]["grade"] == "A"
     assert accs[0]["clabe_stp"] == "646180001234567890"
+    # Verificar que los campos nuevos están presentes
+    assert "withdrawal_ready" in accs[0]
+    assert "withdrawal_institution" in accs[0]
+    assert "curp" in accs[0]
+    # withdrawal_ready debe ser boolean (por default False/0)
+    assert isinstance(accs[0]["withdrawal_ready"], bool)
     # Asegurar que password/jwt/proxy no estén presentes en la respuesta
     assert "password" not in accs[0]
     assert "jwt" not in accs[0]

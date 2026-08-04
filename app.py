@@ -4263,6 +4263,7 @@ def operator_my_accounts(user: dict = Depends(require_operator_view)):
                 "SELECT DISTINCT a.id, a.email, a.balance_real, a.balance_bonos, "
                 "a.last_deposit_amount, a.last_deposit_date, a.grade, "
                 "a.locked_by, a.locked_until, a.status, "
+                "a.withdrawal_ready, a.withdrawal_institution, a.curp, "
                 "c.clabe AS clabe_stp "
                 "FROM deposit_attempts d JOIN accounts a ON d.account_email = a.email "
                 "LEFT JOIN account_deposit_clabes c ON (a.id = c.account_id AND (c.integration = 'STP' OR c.integration = '2')) "
@@ -4273,6 +4274,7 @@ def operator_my_accounts(user: dict = Depends(require_operator_view)):
                 "SELECT DISTINCT a.id, a.email, a.balance_real, a.balance_bonos, "
                 "a.last_deposit_amount, a.last_deposit_date, a.grade, "
                 "a.locked_by, a.locked_until, a.status, "
+                "a.withdrawal_ready, a.withdrawal_institution, a.curp, "
                 "c.clabe AS clabe_stp "
                 "FROM deposit_attempts d JOIN accounts a ON d.account_email = a.email "
                 "LEFT JOIN account_deposit_clabes c ON (a.id = c.account_id AND (c.integration = 'STP' OR c.integration = '2')) "
@@ -4283,6 +4285,7 @@ def operator_my_accounts(user: dict = Depends(require_operator_view)):
         for r in rows:
             d = dict(r)
             d["is_locked"] = bool(d.get("locked_by"))
+            d["withdrawal_ready"] = bool(d.get("withdrawal_ready"))
             d.pop("locked_by", None)
             d.pop("locked_until", None)
             result.append(d)
