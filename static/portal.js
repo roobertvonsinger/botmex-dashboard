@@ -138,6 +138,57 @@
     } catch (_) {}
   }
 
+  // ── Interpolación de progreso (anti-detección) ──────────────────────────
+  // El checkpoint real del backend llega en eventos discretos (cada match /
+  // completed de scheduling); esto interpola visualmente ENTRE checkpoints con
+  // requestAnimationFrame, para que el operador nunca vea el salto discreto
+  // real (que delataría cadencia/monto). Robert, 2026-08-04.
+  let _rafId = null;
+  let _animFrom = 0;
+  let _animTo = 0;
+  let _animStart = 0;
+  const ANIM_DURATION_MS = 2200; // tiempo de "viaje" visual entre checkpoints — NO ligado al intervalo real
+
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function animateProgressTo(targetPct, onFrame) {
+    if (_rafId) cancelAnimationFrame(_rafId);
+    _animFrom = missionState ? (missionState.displayPct || 0) : 0;
+    _animTo = Math.max(_animFrom, targetPct); // nunca retrocede visualmente
+    _animStart = performance.now();
+    // pct sigue guardando el checkpoint real (lo usan los fallbacks de
+    // cancelled/failed); displayPct es lo único que se pinta.
+    if (missionState) missionState.pct = targetPct;
+    // Pestaña en segundo plano: el navegador congela requestAnimationFrame, así
+    // que animar dejaría la tarjeta entera sin repintar (sub, matches, estado)
+    // hasta que el operador vuelva. Nadie está viendo la transición ahí, así
+    // que se salta la interpolación y se pinta el estado real de una.
+    if (document.hidden) {
+      if (missionState) missionState.displayPct = _animTo;
+      onFrame();
+      return;
+    }
+    let first = true;
+    function step(now) {
+      const elapsed = now - _animStart;
+      const t = Math.min(1, elapsed / ANIM_DURATION_MS);
+      const val = _animFrom + (_animTo - _animFrom) * easeOutCubic(t);
+      if (missionState) missionState.displayPct = val;
+      // Re-render completo solo en el primer y el último frame; los frames
+      // intermedios parchan el ancho de la barra directamente para no
+      // reconstruir la tarjeta entera 60 veces por segundo.
+      const fill = mv.querySelector('.mv-progress-fill');
+      if (first || t >= 1 || !fill) { onFrame(); first = false; }
+      else { fill.style.width = val + '%'; }
+      if (t < 1) { _rafId = requestAnimationFrame(step); } else { _rafId = null; }
+    }
+    _rafId = requestAnimationFrame(step);
+  }
+
+  function stopProgressAnim() {
+    if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
+  }
+
   function onMissionEvent(ev) {
     if (!missionState) missionState = { matches: [], deposited: 0, approved: 0, failed: 0, status: 'pending' };
     switch (ev.status) {
@@ -145,13 +196,13 @@
       case 'matching':
         missionState.status = 'matching';
         missionState.sub = 'Buscando cuentas' + (ev.accounts ? ' · ' + ev.accounts + ' candidatas' : '…');
-        missionState.pct = 15;
-        break;
+        animateProgressTo(15, renderMission);
+        return;
       case 'logging_in':
         missionState.status = 'matching';
         missionState.sub = '🔑 Sesión: <span class="email">' + shortEmail(ev.email) + '</span> (' + (ev.current || 1) + '/' + (ev.total || '…') + ')';
-        missionState.pct = Math.min(70, 15 + ((ev.current || 1) / Math.max(ev.total || 1, 1)) * 30);
-        break;
+        animateProgressTo(Math.min(70, 15 + ((ev.current || 1) / Math.max(ev.total || 1, 1)) * 30), renderMission);
+        return;
       case 'cooldown':
         missionState.status = 'matching';
         missionState.sub = '⏳ ' + shortEmail(ev.email) + ' enfriando → siguiente…';
@@ -160,8 +211,8 @@
         missionState.status = 'matching';
         missionState.matches.push({ email: ev.email, card_tail: ev.card_tail });
         missionState.sub = '✅ <span class="email">' + shortEmail(ev.email) + '</span> ↔ ' + (ev.card_tail || '');
-        missionState.pct = Math.min(85, 25 + missionState.matches.length * 15);
-        break;
+        animateProgressTo(Math.min(85, 25 + missionState.matches.length * 15), renderMission);
+        return;
       case 'awaiting_confirmation':
         missionState.status = 'awaiting_confirmation';
         missionState.sub = '⚠️ Listo para confirmar llenado';
@@ -171,18 +222,20 @@
         if (ev.completed != null) {
           const total = ev.total || 9;
           missionState.sub = 'Acreditado ✓ · <span class="email">' + shortEmail(ev.email) + '</span> · ' + ev.completed + '/' + total;
-          missionState.pct = Math.min(95, 30 + (ev.completed / Math.max(total, 1)) * 70);
           missionState.schedDone = ev.completed;
           missionState.schedTotal = total;
           if (ev.completed < total) startProcessingPulse();
           else clearProcessingPulse();
+          animateProgressTo(Math.min(95, 30 + (ev.completed / Math.max(total, 1)) * 70), renderMission);
+          return;
         } else if (ev.aborted) {
           missionState.sub = '❌ <span class="email">' + shortEmail(ev.email) + '</span> no jaló (' + ev.aborted + ')';
         } else {
           // No revelar cadencia real (Robert, 2026-08-04): nada de "cada Ns" ni
           // montos por depósito — solo que el proceso está en curso.
           missionState.sub = '¡Match! Depositando' + (ev.matches ? ' · ' + ev.matches + ' cuentas' : '');
-          missionState.pct = 30;
+          animateProgressTo(30, renderMission);
+          return;
         }
         break;
       case 'completed':
@@ -191,9 +244,9 @@
         missionState.deposited = ev.deposited || missionState.deposited;
         missionState.approved = ev.approved || missionState.approved;
         missionState.failed = ev.failed || missionState.failed;
-        missionState.pct = 100;
         missionState.sub = 'Completado';
-        break;
+        animateProgressTo(100, renderMission);
+        return;
       case 'cancelled':
         clearProcessingPulse();
         missionState.status = 'cancelled';
@@ -257,7 +310,7 @@
           cdHtml +
         '</div>' +
         '<div class="mv-progress-wrap">' +
-          '<div class="mv-progress-bar"><div class="mv-progress-fill' + fillClass + '" style="width:' + (s.pct || 0) + '%"></div></div>' +
+          '<div class="mv-progress-bar"><div class="mv-progress-fill' + fillClass + '" style="width:' + (s.displayPct != null ? s.displayPct : (s.pct || 0)) + '%"></div></div>' +
           '<div class="mv-sub">' + (s.sub || '') + '</div>' +
         '</div>' +
         (matchesHtml ? '<div class="mv-matches">' + matchesHtml + '</div>' : '') +
@@ -274,6 +327,7 @@
   }
 
   function exitMission() {
+    stopProgressAnim();
     activeMissionId = null;
     missionState = null;
     mv.style.display = 'none';
