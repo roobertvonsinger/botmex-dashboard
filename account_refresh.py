@@ -89,47 +89,49 @@ def select_refresh_candidates_healthy(
 ) -> List[Dict[str, Any]]:
     """Filtra + ordena + limita las cuentas a refrescar este ciclo.
 
-    Regla: viva, útil (grade en `grades`, publicada), NO lockeada por un
-    operador, y con JWT que SIGUE vigente ahora (lo opuesto a jwt_keeper:
-    esas cuentas se consultan sin login; las por expirar las re-loguea el
-    keeper). Orden: `last_checked_at` ascendente (la más desactualizada
-    primero) — evita re-tocar una cuenta que un depósito acaba de refrescar.
+    Regla normal: viva, útil (grade en `grades`, publicada), NO lockeada por
+    un operador, y con JWT que SIGUE vigente ahora. Orden: `last_checked_at`
+    ascendente (la más desactualizada primero).
 
-    Excepción: las RESERVADA_SA (`published_to_pool=0 + locked_by` del SA)
-    SÍ son candidatas — el SA las usa y necesita su balance al día.
-    `sa_tokens` lista los valores que identifican al SA en `locked_by`
-    (cubre formatos username y telegram_id, ver `_sa_lock_tokens`).
+    Excepción RESERVADA_SA: pool=0 + locked_by del SA sí es candidata.
+
+    Regla "hot" (Robert, 2026-08-04): una fila con `row["hot"]=True` (ver
+    `is_hot_account`) SIEMPRE es candidata — bypassea lock/grade/pool y NO
+    cuenta contra `batch_max` — solo requiere estar LIVE y tener JWT vigente
+    (sin eso no hay forma de refrescarla). Van primero en el resultado.
     """
     sa_tokens = set(sa_tokens or [])
-    out: List[Dict[str, Any]] = []
+    hot: List[Dict[str, Any]] = []
+    normal: List[Dict[str, Any]] = []
     for r in rows:
         if (r.get("status") or "") != "LIVE":
             continue
+        exp = _exp_int(r.get("jwt_expires_at"))
+        if exp <= now:
+            continue  # sin JWT vigente → no es candidata (la toca jwt_keeper)
+
+        if r.get("hot"):
+            hot.append(r)
+            continue
+
         grade = r.get("grade") or ""
         if grade not in grades:
             continue
         locked_by = r.get("locked_by")
-        # RESERVADA_SA: pool=0 + locked_by del SA → candidata.
         is_sa_reserved = (
             not r.get("published_to_pool")
             and str(locked_by).lower() in sa_tokens
         )
         if not is_sa_reserved:
-            # cuenta pública y libre: ok
             if not r.get("published_to_pool"):
                 continue
             if locked_by is not None:
                 continue
-        exp = _exp_int(r.get("jwt_expires_at"))
-        if exp <= now:
-            continue  # sin JWT vigente → no es candidata (la toca jwt_keeper)
-        out.append(r)
+        normal.append(r)
 
-    out.sort(key=lambda r: (r.get("last_checked_at") or ""))
-    return out[:batch_max]
-
-    out.sort(key=lambda r: (r.get("last_checked_at") or ""))
-    return out[:batch_max]
+    hot.sort(key=lambda r: (r.get("last_checked_at") or ""))
+    normal.sort(key=lambda r: (r.get("last_checked_at") or ""))
+    return hot + normal[:batch_max]
 
 
 def _exp_int(v: Any) -> int:
