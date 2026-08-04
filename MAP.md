@@ -246,6 +246,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `232eac7` | fix(portal): flujo /bet operativo — cache-bust/auto-reload + fecha corrupta en grid de cuentas |
 | `a62629d` | fix: reparación integral de los 31 fallos de test arrastrados (362/362 verdes) |
 | `26f7938` | docs: NEXT-SESSION pruned — bugs resueltos, estado actual para Claude Code |
 | `e3ee73a` | fix: httpx import, test contamination, auth hardening + auditoria Impeccable portal/login |
@@ -257,7 +258,6 @@ prewarm.py (router)
 | `6f2332e` | fix(prewarm): persistir balance real $0 en fetch_mode=balance_only |
 | `69887c2` | test(deposits): agregar regresion del log de aborto 3DS en scheduled_create + doc de handoff |
 | `e5c5056` | style(telegram-mock): pulir tiradera aczino en segunda persona directa con estructuras rítmicas complejas |
-| `51439c7` | style(telegram-mock): pulir tiradera freestyle estilo Aczino con remates exactos de rima consonante |
 <!-- GEN:end:recientes -->
 
 ---
