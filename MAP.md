@@ -246,6 +246,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `e3ee73a` | fix: httpx import, test contamination, auth hardening + auditoria Impeccable portal/login |
 | `ef482be` | docs: cierre de sesión — auditoría Impeccable de /portal + /login, NEXT-SESSION actualizado |
 | `7db7ec2` | feat(routing): separar /dashboard (SA) de /user/{id} (bet) + vista "como usuario" para SA |
 | `dff8150` | feat(brand): integrar logo real botmexico.net (mascota robot + wordmark) en portal/login |
@@ -257,7 +258,6 @@ prewarm.py (router)
 | `51439c7` | style(telegram-mock): pulir tiradera freestyle estilo Aczino con remates exactos de rima consonante |
 | `e70a23a` | style(telegram-mock): rimas cuadradas de tiradera rapera mexa en disclaimers de start |
 | `e485193` | style(telegram-mock): pulir metrica y ritmo organico de los raps de bienvenida |
-| `2e31fba` | feat(telegram-mock): tiradera rap de bineros rediseñada y boton cancelar eliminado del menu start |
 <!-- GEN:end:recientes -->
 
 ---
