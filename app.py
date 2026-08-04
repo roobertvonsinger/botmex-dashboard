@@ -704,7 +704,7 @@ FRONTEND_ASSETS = [
     "style.css", "depos.css", "pantalla.css", "soporte.css",
     "activity_logic.js", "pantalla_logic.js", "strip_logic.js",
     "app.js", "depos_logic.js", "depos_window.js", "depos.js", "pantalla.js",
-    "soporte.js",
+    "soporte.js", "portal.js", "horizon.js",
 ]
 
 
@@ -729,6 +729,33 @@ def _own_portal_path(session: dict) -> str:
     return f"/user/{session.get('telegram_id')}"
 
 
+def _render_frontend_html(path: Path) -> Response:
+    """Sirve un HTML de frontend con cache-bust por mtime + `window.BMX_VERSION`
+    inyectado, para que el auto-reload por versión (`/api/version`, ver
+    FRONTEND_ASSETS) funcione. Compartido por `/dashboard` y `/user/{id}` —
+    antes solo el dashboard SA lo tenía, dejando el portal del operador
+    (flujo /bet) sirviendo JS/CSS potencialmente viejo tras un deploy sin
+    que la pestaña abierta se enterara."""
+    try:
+        html = path.read_text(encoding="utf-8")
+        mtimes = _asset_mtimes()
+        for name, mt in mtimes.items():
+            html = re.sub(
+                rf'(src|href)="/static/{re.escape(name)}(\?[^"]*)?"',
+                rf'\1="/static/{name}?v={mt}"',
+                html,
+            )
+        html = html.replace(
+            "<head>",
+            f'<head>\n  <script>window.BMX_VERSION="{_frontend_version(mtimes)}";</script>',
+            1,
+        )
+        return Response(content=html, media_type="text/html",
+                        headers={"Cache-Control": "no-cache, must-revalidate"})
+    except Exception:
+        return FileResponse(path)
+
+
 @app.get("/user/{user_id}")
 def user_portal_page(user_id: int, request: Request, bmx_session: str = Cookie(default=None)):
     """Render del flujo /bet (portal.html) — scope por telegram_id.
@@ -746,7 +773,7 @@ def user_portal_page(user_id: int, request: Request, bmx_session: str = Cookie(d
         q = request.url.query
         own = _own_portal_path(session)
         return RedirectResponse(f"{own}?{q}" if q else own, status_code=302)
-    return FileResponse(STATIC / "portal.html")
+    return _render_frontend_html(STATIC / "portal.html")
 
 
 @app.get("/portal")
@@ -775,23 +802,7 @@ def dashboard_page(request: Request, bmx_session: str = Cookie(default=None)):
     # `?v=YYYYMMDDx` hardcodeado a mano, así que un replace de string exacto
     # nunca hacía match — quedaba muerto en silencio. El regex pisa CUALQUIER
     # query string existente, por archivo, usando FRONTEND_ASSETS (arriba).
-    try:
-        html = (STATIC / "index.html").read_text(encoding="utf-8")
-        mtimes = _asset_mtimes()
-        for name, mt in mtimes.items():
-            html = re.sub(
-                rf'(src|href)="/static/{re.escape(name)}(\?[^"]*)?"',
-                rf'\1="/static/{name}?v={mt}"',
-                html,
-            )
-        html = html.replace(
-            '<script src="/static/app.js',
-            f'<script>window.BMX_VERSION="{_frontend_version(mtimes)}";</script>\n<script src="/static/app.js',
-        )
-        return Response(content=html, media_type="text/html",
-                        headers={"Cache-Control": "no-cache, must-revalidate"})
-    except Exception:
-        return FileResponse(STATIC / "index.html")
+    return _render_frontend_html(STATIC / "index.html")
 
 
 @app.get("/")

@@ -3,6 +3,31 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-08-04 (flujo `/bet` operativo — smoke real en navegador + 2 bugs nuevos corregidos)
+
+**Motivo**: Robert pidió cerrar todos los pendientes que bloquean que el flujo `/bet` (portal del
+operador en `/user/{id}`) quede completo y bien hecho. Se corrió un server local contra una
+**copia** de la DB real de producción (nunca se tocó el original) y se navegó el flujo real:
+login (primera vez + ya-registrado), portal, vista de misión con datos reales, grid de cuentas,
+modal de retiro. Esto convierte varios 🔵 de capturas previas (sesión 2026-08-03) a ✅ y descubrió
+2 bugs nuevos no documentados antes.
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Cache-bust + auto-reload en `/user/{id}`** | `portal.js`/`horizon.js` sumados a `FRONTEND_ASSETS`; `_render_frontend_html()` (helper compartido con `/dashboard`) inyecta `window.BMX_VERSION` + cache-bust por mtime; `portal.js` suma el polling `_checkVersion()`. Detalle en `docs/ERRORS.md`. | ✅ fix aplicado | ✅ verificado en navegador: bump de mtime → `/api/version` cambia → toast + reload solo, sirviendo el asset con `?v=` nuevo |
+| **`last_deposit_date` en grid de cuentas del portal** | `portal.js` parsea `"DD/MM/YYYY HH:MM"` (formato MX) con el mismo `parseTs` que ya usa `app.js`, en vez de `new Date()` ambiguo. Detalle en `docs/ERRORS.md`. | ✅ fix aplicado | ✅ verificado con 34 cuentas reales: 0 "Invalid Date", fechas correctas |
+| **Vista de misión viva (`?match=ID`) con datos reales** | Auto-detecta `mission_id`, carga `/api/deposits/auto/{mid}/status`, renderiza progress/matches/resumen. | ✅ implementado | ✅ verificado con misión real completada (`796aa289`): status COMPLETADO, $1210.00 depositado, 9 aprobados/2 fallidos renderizados correctamente. **Antes 🔵 "sin smoke real con misión viva"** |
+| **Modal de retiro: Escape + retorno de foco** | `Escape` cierra el modal, el foco vuelve al botón que lo abrió. | ✅ implementado | ✅ verificado con teclado real (Escape) en navegador: modal se cierra, `document.activeElement` vuelve a ser el botón "💸 Retirar" original. **Antes 🔵 "sin verificar con teclado real"** |
+| **Touch targets 44px en `.acc-actions`** | `min-height: 44px` en botones de acciones de cuenta. | ✅ implementado | ✅ verificado: `getComputedStyle().minHeight === '44px'` y `offsetHeight === 44` en botón real del grid. **Antes 🔵 "sin verificar en dispositivo móvil real"** |
+
+**Suite de tests**: 362/362 siguen pasando tras ambos fixes (`python -m pytest -q`).
+
+**Metodología del smoke**: server local (`app-bet-smoke` en `.claude/launch.json`, gitignored) con
+`JWT_KEEPER_ENABLED=0` + `ACCOUNT_REFRESH_ENABLED=0` (sin llamadas salientes a BetMexico) apuntando
+a una **copia** de `Boveda/BetMexico/betmexico_accounts.db` — nunca se ejecutó un depósito real ni
+se tocó la BD de producción. Login real (no `BMX_WEB_AUTH_MODE=open`) vía master password, como
+Lau (operador) y como RobertVS (SA con `view_as`) para probar ambos roles.
+
 ## Captura: 2026-08-04 (resolución integral de los 31 fallos de tests)
 
 **Motivo**: Limpieza y reparación integral de todos los fallos de test arrastrados. 362 tests ejecutados, 362 pasaron (0 fallos).

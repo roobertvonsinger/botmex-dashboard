@@ -2,6 +2,20 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## Portal del operador (`/user/{id}`) sin cache-bust ni auto-reload — flujo `/bet` servía JS/CSS viejo tras deploy (detectado 2026-08-04)
+
+- **Síntoma**: `static/portal.html` cargaba `portal.js` y `horizon.js` con un `?v=` **hardcodeado a mano** (nunca cambiaba). `/user/{id}` se servía con `FileResponse` directo, sin pasar por el rewrite de cache-busting que sí tiene `/dashboard`. `portal.js` tampoco tenía el polling de `/api/version` que dispara el auto-reload en `app.js`. Resultado: un operador con el portal abierto de antes de un deploy nunca veía el fix nuevo salvo Ctrl+Shift+R manual — el mismo bug de campo que ya se había resuelto para el dashboard SA (ver `MAP.md` comentario sobre `FRONTEND_ASSETS`), pero nunca se replicó al portal del flujo `/bet`.
+- **Causa raíz**: `FRONTEND_ASSETS` (`app.py`) no incluía `portal.js`/`horizon.js`, y `user_portal_page()` no reusaba el rewrite de `dashboard_page()`.
+- **Fix**: agregados `portal.js`/`horizon.js` a `FRONTEND_ASSETS`; extraído el rewrite a `_render_frontend_html()` (helper compartido por `/dashboard` y `/user/{id}`, inyecta `window.BMX_VERSION` tras `<head>`); agregado el mismo polling `_checkVersion()` (visibilitychange + `setInterval` 5min) a `portal.js`.
+- **Verificado en navegador real** (server local con copia de la DB real, `data-testid` no aplica — se usó `read_network_requests`/`javascript_tool`): tras bumpear el mtime de `portal.js`, `/api/version` reportó versión nueva, la pestaña disparó el toast y recargó sola sirviendo `portal.js?v=<mtime nuevo>`.
+
+## `last_deposit_date` corrompida en el portal: swap día/mes o "Invalid Date" (detectado 2026-08-04)
+
+- **Síntoma**: en `/user/{id}` (grid "Mis Cuentas"), la fecha de "Último" depósito aparecía como `Invalid Date` en varias cuentas, y en otras mostraba una fecha **distinta a la real** (día y mes intercambiados) sin ningún error visible.
+- **Causa raíz**: `static/portal.js` formateaba `acc.last_deposit_date` con `new Date(acc.last_deposit_date)` directo. El backend guarda esa columna como `"DD/MM/YYYY HH:MM"` (formato MX de BetMexico — ver `app.py:2523` `strptime(..., "%d/%m/%Y %H:%M")`) o el sentinel `'N/A'` cuando no hay dato. El constructor `Date()` de JS interpreta strings ambiguos como `MM/DD/YYYY`: con día ≤12 swapea día/mes en silencio (ej. `12/07/2026` real = 12-jul se mostraba como 07-dic), con día >12 tira `Invalid Date` directo. El sentinel `'N/A'` también pasaba el check truthy y llegaba a `Date('N/A')` → `Invalid Date` (mismo patrón de [[feedback_sentinel_strings_truthy]]).
+- **Fix**: portado a `portal.js` el mismo parser `parseTs` que ya usa `app.js` (dashboard SA) para este exacto formato — regex explícito `DD/MM/YYYY HH:MM[:SS]` + fallback ISO + guard de `'N/A'`/vacío. El dashboard SA nunca tuvo este bug porque ya usaba `parseTs`; el portal se escribió aparte y no lo heredó.
+- **Verificado en navegador real**: grid de 34 cuentas reales, 0 "Invalid Date" tras el fix, fechas en orden cronológico descendente coherente.
+
 ## `canonical_card_pipe` NameError en `list_all_cards` (`app.py:3864`) (detectado 2026-08-04)
 
 - **Síntoma**: `test_a21_visibilidad.py` fallaba con `NameError: name 'canonical_card_pipe' is not defined` al invocar `GET /api/cards`.

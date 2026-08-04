@@ -42,6 +42,20 @@
     return '$' + (parseFloat(n || 0)).toFixed(2);
   }
 
+  // El backend guarda last_deposit_date como "DD/MM/YYYY HH:MM" (formato MX
+  // de BetMexico, ver app.py strptime "%d/%m/%Y %H:%M") o el sentinel 'N/A'.
+  // new Date(str) lo interpreta como MM/DD/YYYY (ambiguo en JS): swapea
+  // día/mes en silencio cuando día<=12, o tira "Invalid Date" cuando día>12.
+  // Mismo parser que app.js (parseTs) para consistencia entre dashboard SA y portal.
+  function parseMxDate(ts) {
+    if (!ts || ts === 'N/A') return new Date(NaN);
+    const mx = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(ts);
+    if (mx) { const [, dd, mm, yyyy, h, mi, ss] = mx; return new Date(+yyyy, +mm - 1, +dd, +h, +mi, +(ss || 0)); }
+    const iso = /^(\d{4})-(\d{2})-(\d{2})[\sT](\d{2}):(\d{2}):(\d{2})/.exec(ts);
+    if (iso) { const [, yyyy, mm, dd, h, mi, ss] = iso; return new Date(+yyyy, +mm - 1, +dd, +h, +mi, +ss); }
+    return new Date(ts);
+  }
+
   function shortEmail(e) {
     if (!e) return '?';
     const [u, d] = e.split('@');
@@ -297,7 +311,8 @@
     const balReal = parseFloat(acc.balance_real || 0).toFixed(2);
     const balBonos = parseFloat(acc.balance_bonos || 0).toFixed(2);
     const lastDep = acc.last_deposit_amount ? fmtMoney(acc.last_deposit_amount) : '—';
-    const lastDate = acc.last_deposit_date ? new Date(acc.last_deposit_date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    const _lastDateObj = parseMxDate(acc.last_deposit_date);
+    const lastDate = isNaN(_lastDateObj.getTime()) ? '' : _lastDateObj.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
     const grade = acc.grade || 'N/A';
     const gradeCls = grade.replace('+', '-plus');
     const clabeStp = acc.clabe_stp || '';
@@ -484,4 +499,25 @@
   } else {
     init();
   }
+
+  // ── auto-reload por versión ──────────────────────────────────────
+  // Mismo mecanismo que el dashboard SA (app.js): una pestaña del portal
+  // abierta desde antes de un deploy no vuelve a pedir portal.html sola,
+  // así que nunca ve el JS/CSS nuevo hasta un Ctrl+Shift+R manual. Compara
+  // la versión servida al cargar contra la actual del server y se recarga.
+  async function _checkVersion() {
+    if (!window.BMX_VERSION) return;
+    try {
+      const r = await fetch('/api/version', { cache: 'no-store' });
+      const { v } = await r.json();
+      if (v && v !== window.BMX_VERSION) {
+        showToast('🔄 Nueva versión — actualizando…', 'ok');
+        setTimeout(() => location.reload(), 1200);
+      }
+    } catch {}
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') _checkVersion();
+  });
+  setInterval(_checkVersion, 5 * 60_000);
 })();
