@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>botmexico.net · Portal</title>
-  <link rel="icon" type="image/png" href="/static/assets/botmexico_logo.png">
+  <link rel="icon" type="image/png" href="/static/assets/botmexico_icon.png">
   <link rel="stylesheet" href="/static/style.css?v=1785281972">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -70,7 +70,8 @@
       background: linear-gradient(90deg, var(--mx-green) 0%, var(--mx-white) 45%, var(--mx-red) 100%);
       opacity: .38;
     }
-    .ph-brand { display: flex; align-items: center; gap: 10px; }
+    .ph-brand { display: flex; align-items: center; gap: 8px; }
+    .ph-mark { height: 28px; width: auto; display: block; filter: drop-shadow(0 2px 6px rgba(0,0,0,.5)); }
     .ph-logo {
       font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -.2px;
       display: flex; align-items: baseline; gap: 1px;
@@ -257,6 +258,7 @@
       .ag-grid { grid-template-columns: 1fr; }
       .mv-summary { grid-template-columns: 1fr; }
       .ph-logo { font-size: 14px; }
+      .ph-mark { height: 22px; }
     }
   </style>
 </head>
@@ -266,6 +268,7 @@
   <div class="portal-wrap">
     <div class="ph">
       <div class="ph-brand">
+        <img class="ph-mark" src="/static/assets/botmexico_icon.png" alt="">
         <span class="ph-logo"><span class="g">bot</span><span class="w">mexi</span><span class="r">co.net</span></span>
         <span class="ph-sub" id="phRole">· Portal</span>
       </div>
