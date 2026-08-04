@@ -92,7 +92,7 @@ def test_account_details_dispatches_touch_off_request_path():
     `with db(write=True)` inline en su cuerpo (el único write del touch vive en
     _record_account_touch, despachado off-request).
     """
-    import inspect, app
+    import inspect, app, ast
 
     src = inspect.getsource(app.account_details)
     # (a) el touch se despacha a un thread daemon, no se ejecuta inline.
@@ -103,17 +103,36 @@ def test_account_details_dispatches_touch_off_request_path():
     assert "_record_account_touch" in src, (
         "account_details debe llamar a _record_account_touch (no inline el INSERT)"
     )
-    # (b) no debe haber un `with db(write=True)` inline en el cuerpo de account_details
-    #     (el write del touch vive dentro de _record_account_touch, en el thread).
-    #     Cuenta `db(write=True)` en líneas de CÓDIGO (no en comentarios — el docstring
-    #     explica el fix previo y menciona `db(write=True)` literalmente).
-    code_lines = [
-        ln for ln in src.splitlines()
-        if "db(write=True)" in ln and not ln.strip().startswith("#")
-    ]
-    assert code_lines == [], (
-        f"account_details tiene {len(code_lines)} `db(write=True)` en código (no "
-        "comentario) — el único write del touch debe vivir en _record_account_touch "
-        "(thread daemon), no en el path síncrono del request. Líneas: "
-        + " | ".join(ln.strip() for ln in code_lines)
+    # (b) no debe haber un `with db(write=True)` inline en el cuerpo TOP-LEVEL de
+    #     account_details (el write del touch vive dentro de _record_account_touch,
+    #     en el thread). Las funciones anidadas que corren en daemon thread (como
+    #     _async_val_renapo) SÍ pueden tener db(write=True) — no están en el path
+    #     síncrono del request. Usamos AST para examinar solo el cuerpo directo.
+    tree = ast.parse(inspect.getsource(app.account_details))
+    # La función wrapper es el primer FunctionDef del módulo parseado
+    func_def = next(
+        (n for n in tree.body if isinstance(n, ast.FunctionDef)), None
+    )
+    assert func_def is not None, "no se encontró FunctionDef en el source"
+    violating = []
+    for stmt in func_def.body:
+        # Buscar `with db(write=True)` — ast.withitem → ast.Call con keyword write=True
+        if isinstance(stmt, ast.With):
+            for item in stmt.items:
+                call = item.context_expr
+                if (
+                    isinstance(call, ast.Call)
+                    and isinstance(call.func, ast.Name)
+                    and call.func.id == "db"
+                    and any(
+                        kw.arg == "write" and isinstance(kw.value, ast.Constant) and kw.value.value is True
+                        for kw in call.keywords
+                    )
+                ):
+                    violating.append(ast.get_source_segment(src, stmt))
+    assert not violating, (
+        f"account_details tiene {len(violating)} `db(write=True)` en el cuerpo "
+        "top-level (no en función anidada) — el único write del touch debe vivir "
+        "en _record_account_touch (thread daemon), no en el path síncrono. "
+        "Líneas: " + " | ".join(v.strip() for v in violating)
     )

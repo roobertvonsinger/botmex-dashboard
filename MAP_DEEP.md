@@ -142,32 +142,32 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `CombosRequest` | class | L3808–L3809 |
 | `accounts_combos` | def | L3813–L3826 |
 | `accounts_pass_map` | def | L3830–L3835 |
-| `list_all_cards` | def | L3839–L3914 |
-| `activity_feed` | def | L3918–L4015 |
-| `list_deposits` | def | L4019–L4048 |
-| `deposits_stats` | def | L4052–L4077 |
-| `_persist_auto_mission` | def | L4085–L4115 |
-| `admin_maintenance_state` | def | L4119–L4122 |
-| `MaintenanceToggleRequest` | class | L4125–L4126 |
-| `admin_maintenance_toggle` | def | L4130–L4151 |
-| `auto_deposit_create` | def | L4155–L4191 |
-| `auto_deposit_cancel` | def | L4195–L4221 |
-| `operator_my_accounts` | def | L4225–L4258 |
-| `operator_release_account` | def | L4262–L4279 |
-| `operator_withdraw` | def | L4283–L4334 |
-| `operator_missions` | def | L4338–L4356 |
-| `auto_deposit_status` | def | L4360–L4371 |
-| `register_operator_strike` | def | L4374–L4407 |
-| `bot_start_info` | def | L4411–L4447 |
-| `bot_operator_info` | def | L4451–L4490 |
-| `bot_help_info` | def | L4494–L4508 |
-| `bot_pause_mission` | def | L4512–L4541 |
-| `bot_resume_mission` | def | L4545–L4563 |
-| `bot_cancel_mission` | def | L4568–L4603 |
-| `bot_bet_create` | def | L4607–L4776 |
-| `filter_and_sanitize_check_combos` | def | L4779–L4864 |
-| `BotCheckRequest` | class | L4867–L4871 |
-| `bot_check` | def | L4874–L4955 |
+| `list_all_cards` | def | L3839–L3915 |
+| `activity_feed` | def | L3919–L4016 |
+| `list_deposits` | def | L4020–L4049 |
+| `deposits_stats` | def | L4053–L4078 |
+| `_persist_auto_mission` | def | L4086–L4116 |
+| `admin_maintenance_state` | def | L4120–L4123 |
+| `MaintenanceToggleRequest` | class | L4126–L4127 |
+| `admin_maintenance_toggle` | def | L4131–L4152 |
+| `auto_deposit_create` | def | L4156–L4192 |
+| `auto_deposit_cancel` | def | L4196–L4222 |
+| `operator_my_accounts` | def | L4226–L4259 |
+| `operator_release_account` | def | L4263–L4280 |
+| `operator_withdraw` | def | L4284–L4335 |
+| `operator_missions` | def | L4339–L4357 |
+| `auto_deposit_status` | def | L4361–L4372 |
+| `register_operator_strike` | def | L4375–L4408 |
+| `bot_start_info` | def | L4412–L4448 |
+| `bot_operator_info` | def | L4452–L4491 |
+| `bot_help_info` | def | L4495–L4509 |
+| `bot_pause_mission` | def | L4513–L4542 |
+| `bot_resume_mission` | def | L4546–L4564 |
+| `bot_cancel_mission` | def | L4569–L4604 |
+| `bot_bet_create` | def | L4608–L4777 |
+| `filter_and_sanitize_check_combos` | def | L4780–L4865 |
+| `BotCheckRequest` | class | L4868–L4872 |
+| `bot_check` | def | L4875–L4956 |
 
 ### `auth.py`
 
@@ -203,19 +203,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_pipe_str` | def | L108–L113 |
 | `_parse_card_pipe` | def | L116–L137 |
 | `_normalize_pipe_to_3part` | def | L140–L142 |
-| `select_accounts_for_auto` | def | L149–L281 |
-| `select_card_for_account` | def | L285–L307 |
-| `_max_accounts_for_cards` | def | L311–L315 |
-| `plan_auto_mission` | def | L318–L536 |
-| `_iso` | def | L577–L578 |
-| `_m_load` | def | L581–L588 |
-| `_m_status` | def | L591–L593 |
-| `_m_update` | def | L596–L605 |
-| `_fetch_account` | def | L608–L614 |
-| `_unlock` | def | L617–L625 |
-| `_broadcast_mission` | def | L628–L642 |
-| `_stop_pool` | def | L645–L652 |
-| `run_auto_mission` | def | L656–L1022 |
+| `select_accounts_for_auto` | def | L149–L300 |
+| `select_card_for_account` | def | L304–L326 |
+| `_max_accounts_for_cards` | def | L330–L334 |
+| `plan_auto_mission` | def | L337–L555 |
+| `_iso` | def | L596–L597 |
+| `_m_load` | def | L600–L607 |
+| `_m_status` | def | L610–L612 |
+| `_m_update` | def | L615–L624 |
+| `_fetch_account` | def | L627–L633 |
+| `_unlock` | def | L636–L644 |
+| `_broadcast_mission` | def | L647–L661 |
+| `_stop_pool` | def | L664–L671 |
+| `run_auto_mission` | def | L675–L1041 |
 
 ### `autoexclusion.py`
 
@@ -452,10 +452,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_group_into_sessions` | def | L159–L206 |
 | `_pure_fail_penalty` | def | L214–L224 |
 | `_last_success_bonus` | def | L227–L233 |
-| `score_payment_readiness` | def | L247–L430 |
-| `analyze_gateway_ban_pattern` | def | L437–L507 |
-| `generate_payment_analysis_summary` | def | L514–L562 |
-| `generate_payment_ready_txt` | def | L565–L593 |
+| `score_payment_readiness` | def | L247–L429 |
+| `analyze_gateway_ban_pattern` | def | L436–L506 |
+| `generate_payment_analysis_summary` | def | L513–L561 |
+| `generate_payment_ready_txt` | def | L564–L592 |
 
 ### `test_a1_estados.py`
 
@@ -530,7 +530,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_record_touch_dedup_same_day_returns_false` | def | L32–L41 |
 | `test_record_touch_different_actors_both_persist` | def | L44–L53 |
 | `test_record_touch_traps_locked_silently` | def | L56–L78 |
-| `test_account_details_dispatches_touch_off_request_path` | def | L81–L119 |
+| `test_account_details_dispatches_touch_off_request_path` | def | L81–L138 |
 
 ### `test_activity_scoped.py`
 
@@ -588,12 +588,12 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `_make_db` | def | L19–L75 |
-| `test_gate_duro_published_to_pool` | def | L78–L91 |
-| `test_cooldown_48h_dashboard_approved` | def | L97–L117 |
-| `test_spei_external_deposit_relegates_to_low` | def | L120–L136 |
-| `test_boost_3ds_recent_to_top` | def | L139–L153 |
-| `test_bin_cooldown_30d_on_approval` | def | L156–L187 |
+| `_make_db` | def | L19–L76 |
+| `test_gate_duro_published_to_pool` | def | L79–L92 |
+| `test_cooldown_48h_dashboard_approved` | def | L98–L118 |
+| `test_spei_external_deposit_relegates_to_low` | def | L121–L137 |
+| `test_boost_3ds_recent_to_top` | def | L140–L154 |
+| `test_bin_cooldown_30d_on_approval` | def | L157–L188 |
 
 ### `test_auto_missions_migrate.py`
 
@@ -879,29 +879,29 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `_acc_id` | def | L9–L11 |
-| `_set_jwt` | def | L14–L24 |
-| `_clear_jwt` | def | L27–L34 |
-| `test_withdraw_403_for_non_sa` | def | L39–L43 |
-| `test_withdraw_404_unknown_account` | def | L46–L49 |
-| `test_withdraw_409_jwt_expired` | def | L52–L69 |
-| `test_withdraw_409_no_jwt` | def | L72–L84 |
-| `test_withdraw_409_no_approved_account` | def | L87–L99 |
-| `test_withdraw_409_multiple_approved_bug1` | def | L102–L114 |
-| `test_withdraw_409_insufficient_balance` | def | L117–L129 |
-| `test_withdraw_409_concurrent_pending` | def | L132–L144 |
-| `test_withdraw_happy_persists_and_broadcasts` | def | L147–L177 |
-| `test_withdraw_amount_validation` | def | L180–L196 |
-| `test_withdraw_broadcast_visible_to_sa_only` | def | L199–L205 |
-| `test_withdraw_persist_idempotent_unique_transaction_id` | def | L208–L221 |
-| `test_status_403_non_sa` | def | L226–L230 |
-| `test_status_404_unknown_tx` | def | L233–L237 |
-| `test_status_happy_pending` | def | L240–L261 |
-| `test_status_happy_successful_two_phase_bug2` | def | L264–L296 |
-| `test_status_gateway_mismatch_alert_bug3` | def | L299–L325 |
-| `test_status_digits_mismatch_alert_bug1` | def | L328–L354 |
-| `test_status_no_pending_returns_idle` | def | L357–L376 |
-| `test_status_updates_db_row` | def | L379–L412 |
+| `_acc_id` | def | L9–L16 |
+| `_set_jwt` | def | L19–L29 |
+| `_clear_jwt` | def | L32–L39 |
+| `test_withdraw_403_for_non_sa` | def | L44–L48 |
+| `test_withdraw_404_unknown_account` | def | L51–L54 |
+| `test_withdraw_409_jwt_expired` | def | L57–L74 |
+| `test_withdraw_409_no_jwt` | def | L77–L89 |
+| `test_withdraw_409_no_approved_account` | def | L92–L104 |
+| `test_withdraw_409_multiple_approved_bug1` | def | L107–L119 |
+| `test_withdraw_409_insufficient_balance` | def | L122–L134 |
+| `test_withdraw_409_concurrent_pending` | def | L137–L149 |
+| `test_withdraw_happy_persists_and_broadcasts` | def | L152–L182 |
+| `test_withdraw_amount_validation` | def | L185–L201 |
+| `test_withdraw_broadcast_visible_to_sa_only` | def | L204–L210 |
+| `test_withdraw_persist_idempotent_unique_transaction_id` | def | L213–L226 |
+| `test_status_403_non_sa` | def | L231–L235 |
+| `test_status_404_unknown_tx` | def | L238–L242 |
+| `test_status_happy_pending` | def | L245–L266 |
+| `test_status_happy_successful_two_phase_bug2` | def | L269–L301 |
+| `test_status_gateway_mismatch_alert_bug3` | def | L304–L330 |
+| `test_status_digits_mismatch_alert_bug1` | def | L333–L359 |
+| `test_status_no_pending_returns_idle` | def | L362–L381 |
+| `test_status_updates_db_row` | def | L384–L417 |
 
 ### `test_withdrawals_migrate.py`
 

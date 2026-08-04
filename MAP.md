@@ -98,9 +98,9 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 300 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 4962 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 4963 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 191 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1022 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1041 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `card_checker.py` | 234 | `—` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
@@ -116,16 +116,16 @@ prewarm.py (router)
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/migrate_status_no_banco.py` | 80 | `—` | _[completar]_ |
 | `scripts/recalc_grades.py` | 136 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
-| `shared/betmexico_payment_analyzer.py` | 593 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
+| `shared/betmexico_payment_analyzer.py` | 592 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
 | `test_account_refresh.py` | 122 | `—` | _[completar]_ |
 | `test_account_touch.py` | 51 | `—` | _[completar]_ |
-| `test_account_touch_isolated.py` | 119 | `—` | _[completar]_ |
+| `test_account_touch_isolated.py` | 138 | `—` | _[completar]_ |
 | `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
 | `test_anti_rate_limit.py` | 271 | `—` | _[completar]_ |
 | `test_at_hand.py` | 73 | `—` | _[completar]_ |
-| `test_auto_deposit_selection.py` | 187 | `—` | _[completar]_ |
+| `test_auto_deposit_selection.py` | 188 | `—` | _[completar]_ |
 | `test_auto_missions_migrate.py` | 120 | `—` | _[completar]_ |
 | `test_balance_only_real_zero_preserved.py` | 89 | `—` | _[completar]_ |
 | `test_bet_live_plan.py` | 108 | `—` | _[completar]_ |
@@ -148,7 +148,7 @@ prewarm.py (router)
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 71 | `—` | _[completar]_ |
 | `test_withdrawals.py` | 361 | `—` | _[completar]_ |
-| `test_withdrawals_endpoints.py` | 412 | `—` | _[completar]_ |
+| `test_withdrawals_endpoints.py` | 417 | `—` | _[completar]_ |
 | `test_withdrawals_migrate.py` | 46 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
 | `web_grading.py` | 197 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
@@ -168,7 +168,7 @@ prewarm.py (router)
 | `PERSISTENT_USERS` | `{"robertvs"}` | `auth.py` |
 | `PERSISTENT_TTL` | `60 * 60 * 24 * 365 * 10` | `auth.py` |
 | `THREEDS_RECENT_H` | `24` | `auto_deposit.py` |
-| `MM_ACCOUNT_RECENT_DECLINE_LIMIT` | `3` | `auto_deposit.py` |
+| `MM_ACCOUNT_RECENT_DECLINE_LIMIT` | `2` | `auto_deposit.py` |
 | `PROBE_AMOUNT` | `10.0` | `auto_deposit.py` |
 | `MATCH_TRANSIENT_RETRIES` | `4` | `auto_deposit.py` |
 | `MM_CROSS_ACCOUNT_GAP` | `5` | `auto_deposit.py` |
@@ -210,12 +210,12 @@ prewarm.py (router)
 | `TXN_STATUS_FAILED` | `-4` | `shared/betmexico_payment_analyzer.py` |
 | `TXN_TYPE_DEPOSIT` | `1` | `shared/betmexico_payment_analyzer.py` |
 | `GATEWAY_CARD` | `1` | `shared/betmexico_payment_analyzer.py` |
-| `A_NO_FAIL_DAYS_MIN` | `30` | `shared/betmexico_payment_analyzer.py` |
-| `A_MAX_TOTAL_FAILS` | `2` | `shared/betmexico_payment_analyzer.py` |
+| `A_NO_FAIL_DAYS_MIN` | `60` | `shared/betmexico_payment_analyzer.py` |
+| `A_MAX_TOTAL_FAILS` | `3` | `shared/betmexico_payment_analyzer.py` |
 | `A_MAX_BIGFAIL_SESS` | `0` | `shared/betmexico_payment_analyzer.py` |
 | `D_RECENT_FAIL_DAYS` | `14` | `shared/betmexico_payment_analyzer.py` |
 | `D_MASSACRE_COUNT` | `3` | `shared/betmexico_payment_analyzer.py` |
-| `C_DEEP_REST_DAYS` | `30` | `shared/betmexico_payment_analyzer.py` |
+| `C_DEEP_REST_DAYS` | `90` | `shared/betmexico_payment_analyzer.py` |
 | `SCORE_FLOOR` | `{"A": 80, "B": 60, "C": 40, "D": 0}` | `shared/betmexico_payment_analyzer.py` |
 | `SCORE_CEIL` | `{"A": 100, "B": 79, "C": 59, "D": 39}` | `shared/betmexico_payment_analyzer.py` |
 | `SCHEMA` | `"""` | `test_a1_estados.py` |
@@ -246,6 +246,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `26f7938` | docs: NEXT-SESSION pruned — bugs resueltos, estado actual para Claude Code |
 | `e3ee73a` | fix: httpx import, test contamination, auth hardening + auditoria Impeccable portal/login |
 | `ef482be` | docs: cierre de sesión — auditoría Impeccable de /portal + /login, NEXT-SESSION actualizado |
 | `7db7ec2` | feat(routing): separar /dashboard (SA) de /user/{id} (bet) + vista "como usuario" para SA |
@@ -257,7 +258,6 @@ prewarm.py (router)
 | `e5c5056` | style(telegram-mock): pulir tiradera aczino en segunda persona directa con estructuras rítmicas complejas |
 | `51439c7` | style(telegram-mock): pulir tiradera freestyle estilo Aczino con remates exactos de rima consonante |
 | `e70a23a` | style(telegram-mock): rimas cuadradas de tiradera rapera mexa en disclaimers de start |
-| `e485193` | style(telegram-mock): pulir metrica y ritmo organico de los raps de bienvenida |
 <!-- GEN:end:recientes -->
 
 ---

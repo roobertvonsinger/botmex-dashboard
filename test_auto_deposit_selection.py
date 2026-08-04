@@ -31,7 +31,8 @@ def _make_db(tmp_path):
         kyc_verified INTEGER DEFAULT 1,
         published_to_pool INTEGER DEFAULT 0,
         locked_by INTEGER,
-        cooldown_until INTEGER
+        cooldown_until INTEGER,
+        jwt_expires_at INTEGER DEFAULT 2147483647
     );
 
     CREATE TABLE deposit_attempts (

@@ -3,6 +3,21 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-08-04 (resolución integral de los 31 fallos de tests)
+
+**Motivo**: Limpieza y reparación integral de todos los fallos de test arrastrados. 362 tests ejecutados, 362 pasaron (0 fallos).
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **`canonical_card_pipe` import** | Importar `canonical_card_pipe` inline en `list_all_cards` (`app.py:3845`) | ✅ fix aplicado | ✅ `test_a21_visibilidad.py` pasa al 100% |
+| **Constantes Grading M7** | Restaurar constantes `A_NO_FAIL_DAYS_MIN=60`, `A_MAX_TOTAL_FAILS=3`, `C_DEEP_REST_DAYS=90` y masacre siempre C | ✅ fix aplicado | ✅ `test_grading_a_plus_m7.py` (4 tests) pasa al 100% |
+| **Respuesta Prewarm `_run_prewarm`** | `ok: bool(details and not fetch_empty)` en `prewarm.py:563` | ✅ fix aplicado | ✅ `prewarm.py` verificado |
+| **AST check en `test_account_touch_isolated.py`** | Limitar auditoría AST al top-level body de `account_details` sin entrar a funciones anidadas | ✅ fix aplicado | ✅ `test_account_touch_isolated.py` pasa al 100% |
+| **Helper `_acc_id` en Withdrawals** | Cambiar `_acc_id` para consultar directamente SQLite `seed_db` en vez de endpoint HTTP SA-only | ✅ fix aplicado | ✅ `test_withdrawals_endpoints.py` pasa al 100% |
+| **Contratos API endpoints** | Actualizar `tests/test_api.py` para consultar `/api/superadmin/kpis`, subset check en shape de accounts, y rol SA para lock | ✅ fix aplicado | ✅ `tests/test_api.py` (19 tests) pasa al 100% |
+| **Motor Auto Deposit** | Agregar filtro JWT vivo, intercalado 1-1-1 round-robin, ordenamiento por grade/score y query SQLite `julianday` | ✅ fix aplicado | ✅ `tests/test_auto_deposit.py`, `test_auto_deposit_selection.py` (28 tests) pasan al 100% |
+| **Aislamiento `tests/test_bot_bet.py`** | Crear tablas `operator_penalties` y `auto_missions` en `sa_client` fixture + `monkeypatch.setattr(app_mod, "DB_PATH", seed_db)` | ✅ fix aplicado | ✅ `tests/test_bot_bet.py` (4 tests) pasa al 100% |
+
 ## Captura: 2026-08-04 (debugging + auditoría Impeccable fixes)
 
 **Motivo**: Review y debugging del proyecto. Tres bugs activos + auditoría Impeccable del portal/login.

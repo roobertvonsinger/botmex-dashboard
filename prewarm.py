@@ -560,8 +560,8 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
              "jwt_from_cache": jwt_from_cache},
             int((time.time() - t0) * 1000),
         )
-        return {"ok": bool(details), "status": phase,
-                "error": None if details else "fetch sin datos"}
+        return {"ok": bool(details and not fetch_empty), "status": phase,
+                "error": None if (details and not fetch_empty) else "fetch sin datos"}
     except asyncio.CancelledError:
         _db_log_phase(
             process_id, "cancelled",

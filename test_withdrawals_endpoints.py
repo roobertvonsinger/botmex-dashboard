@@ -6,9 +6,14 @@ import pytest
 import withdrawals as wd
 
 
-def _acc_id(client, email="a@test.com"):
-    rows = client.get("/api/accounts?status=all").json()
-    return next(r["id"] for r in rows if r["email"] == email)
+def _acc_id(seed_db, email="a@test.com"):
+    import sqlite3
+    con = sqlite3.connect(seed_db)
+    try:
+        row = con.execute("SELECT id FROM accounts WHERE email=?", (email,)).fetchone()
+        return row[0] if row else None
+    finally:
+        con.close()
 
 
 def _set_jwt(seed_db, email, *, expires_delta=3600, token="JWT-VIGENTE"):
@@ -38,7 +43,7 @@ def _clear_jwt(seed_db, email):
 
 def test_withdraw_403_for_non_sa(make_client, seed_db):
     client = make_client(role="user", telegram_id=555)
-    acc_id = _acc_id(client)
+    acc_id = _acc_id(seed_db)
     r = client.post(f"/api/accounts/{acc_id}/withdraw", json={"amount": 100})
     assert r.status_code == 403
 
@@ -51,7 +56,7 @@ def test_withdraw_404_unknown_account(make_client, seed_db):
 
 def test_withdraw_409_jwt_expired(make_client, seed_db, monkeypatch):
     client = make_client(role="superadmin")
-    acc_id = _acc_id(client)
+    acc_id = _acc_id(seed_db)
     _set_jwt(seed_db, "a@test.com", expires_delta=-3600)
 
     called = {"n": 0}
@@ -71,7 +76,7 @@ def test_withdraw_409_jwt_expired(make_client, seed_db, monkeypatch):
 
 def test_withdraw_409_no_jwt(make_client, seed_db, monkeypatch):
     client = make_client(role="superadmin")
-    acc_id = _acc_id(client)
+    acc_id = _acc_id(seed_db)
     _clear_jwt(seed_db, "a@test.com")
 
     async def fake_execute(db_path, account_id, amount):
@@ -86,7 +91,7 @@ def test_withdraw_409_no_jwt(make_client, seed_db, monkeypatch):
 
 def test_withdraw_409_no_approved_account(make_client, seed_db, monkeypatch):
     client = make_client(role="superadmin")
-    acc_id = _acc_id(client)
+    acc_id = _acc_id(seed_db)
 
     async def fake_execute(db_path, account_id, amount):
         raise wd.NoApprovedWithdrawalAccount("sin cuenta")
@@ -101,7 +106,7 @@ def test_withdraw_409_no_approved_account(make_client, seed_db, monkeypatch):
 
 def test_withdraw_409_multiple_approved_bug1(make_client, seed_db, monkeypatch):
     client = make_client(role="superadmin")
-    acc_id = _acc_id(client)
+    acc_id = _acc_id(seed_db)
 
     async def fake_execute(db_path, account_id, amount):
         raise wd.MultipleApprovedAccounts("Hay 2 cuentas de retiro aprobadas (HEY BANCO ···1215, BBVA ···0139)")
@@ -116,7 +121,7 @@ def test_withdraw_409_multiple_approved_bug1(make_client, seed_db, monkeypatch):
 
 def test_withdraw_409_insufficient_balance(make_client, seed_db, monkeypatch):
     client = make_client(role="superadmin")
-    acc_id = _acc_id(client)
+    acc_id = _acc_id(seed_db)
 
     async def fake_execute(db_path, account_id, amount):
         raise wd.InsufficientBalance("Saldo insuficiente: Real=$50.00, solicitado=$100.00")
@@ -131,7 +136,7 @@ def test_withdraw_409_insufficient_balance(make_client, seed_db, monkeypatch):
 
 def test_withdraw_409_concurrent_pending(make_client, seed_db, monkeypatch):
     client = make_client(role="superadmin")
-    acc_id = _acc_id(client)
+    acc_id = _acc_id(seed_db)
 
     async def fake_execute(db_path, account_id, amount):
         raise wd.ConcurrentWithdrawalPending("ya hay uno")
@@ -146,7 +151,7 @@ def test_withdraw_409_concurrent_pending(make_client, seed_db, monkeypatch):
 
 def test_withdraw_happy_persists_and_broadcasts(make_client, seed_db, monkeypatch):
     client = make_client(role="superadmin", telegram_id=1341812706)
-    acc_id = _acc_id(client)
+    acc_id = _acc_id(seed_db)
 
     async def fake_execute(db_path, account_id, amount):
         return {
@@ -179,7 +184,7 @@ def test_withdraw_happy_persists_and_broadcasts(make_client, seed_db, monkeypatc
 
 def test_withdraw_amount_validation(make_client, seed_db, monkeypatch):
     client = make_client(role="superadmin")
-    acc_id = _acc_id(client)
+    acc_id = _acc_id(seed_db)
 
     r = client.post(f"/api/accounts/{acc_id}/withdraw", json={"amount": 0})
     assert r.status_code == 400
@@ -225,21 +230,21 @@ def test_withdraw_persist_idempotent_unique_transaction_id(seed_db):
 
 def test_status_403_non_sa(make_client, seed_db):
     client = make_client(role="user", telegram_id=555)
-    acc_id = _acc_id(client)
+    acc_id = _acc_id(seed_db)
     r = client.get(f"/api/accounts/{acc_id}/withdraw/status/tx1")
     assert r.status_code == 403
 
 
 def test_status_404_unknown_tx(make_client, seed_db):
     client = make_client(role="superadmin")
-    acc_id = _acc_id(client)
+    acc_id = _acc_id(seed_db)
     r = client.get(f"/api/accounts/{acc_id}/withdraw/status/nope")
     assert r.status_code == 404
 
 
 def test_status_happy_pending(make_client, seed_db, monkeypatch):
     client = make_client(role="superadmin")
-    acc_id = _acc_id(client)
+    acc_id = _acc_id(seed_db)
     _set_jwt(seed_db, "a@test.com")
 
     import app
@@ -263,7 +268,7 @@ def test_status_happy_pending(make_client, seed_db, monkeypatch):
 
 def test_status_happy_successful_two_phase_bug2(make_client, seed_db, monkeypatch):
     client = make_client(role="superadmin")
-    acc_id = _acc_id(client)
+    acc_id = _acc_id(seed_db)
     _set_jwt(seed_db, "a@test.com")
 
     import app
@@ -298,7 +303,7 @@ def test_status_happy_successful_two_phase_bug2(make_client, seed_db, monkeypatc
 
 def test_status_gateway_mismatch_alert_bug3(make_client, seed_db, monkeypatch):
     client = make_client(role="superadmin")
-    acc_id = _acc_id(client)
+    acc_id = _acc_id(seed_db)
     _set_jwt(seed_db, "a@test.com")
 
     import app
@@ -327,7 +332,7 @@ def test_status_gateway_mismatch_alert_bug3(make_client, seed_db, monkeypatch):
 
 def test_status_digits_mismatch_alert_bug1(make_client, seed_db, monkeypatch):
     client = make_client(role="superadmin")
-    acc_id = _acc_id(client)
+    acc_id = _acc_id(seed_db)
     _set_jwt(seed_db, "a@test.com")
 
     import app
@@ -356,7 +361,7 @@ def test_status_digits_mismatch_alert_bug1(make_client, seed_db, monkeypatch):
 
 def test_status_no_pending_returns_idle(make_client, seed_db, monkeypatch):
     client = make_client(role="superadmin")
-    acc_id = _acc_id(client)
+    acc_id = _acc_id(seed_db)
     _set_jwt(seed_db, "a@test.com")
 
     import app
@@ -378,7 +383,7 @@ def test_status_no_pending_returns_idle(make_client, seed_db, monkeypatch):
 
 def test_status_updates_db_row(make_client, seed_db, monkeypatch):
     client = make_client(role="superadmin")
-    acc_id = _acc_id(client)
+    acc_id = _acc_id(seed_db)
     _set_jwt(seed_db, "a@test.com")
 
     import app

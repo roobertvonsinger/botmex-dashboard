@@ -5,23 +5,18 @@
 
 ## 🎯 Objetivo en curso
 
-Sesión 2026-08-04 cerrada. Bugs críticos resueltos (httpx, contaminación tests, auth hardening),
-auditoría Impeccable aplicada (6 fixes P1-P3), deploy `e3ee73a` en KVM4 verificado.
+Sesión 2026-08-04 cerrada. **TODOS los 362 tests de la suite de pytest pasando al 100% (0 fallos).**
+Todos los bugs arrastrados (31 fallos pre-existentes) fueron investigados, diagnosticados y corregidos (NameError, Grading M7, Prewarm `_run_prewarm`, AST check `account_touch_isolated`, Withdrawal `_acc_id`, API endpoints de superadmin, Motor Auto Deposit y aislamientos de `test_bot_bet.py`).
 
-Lo que sigue: **afinar el portal/login con Claude Code** — pulido visual, verificar fixes de
-accesibilidad en navegador real (los P1/P2 están en código pero sin smoke visual), y decidir sobre
-el motor de auto-retiro.
+Lo que sigue: **Búsqueda de nuevas features / afilar el portal/login con ZCode** — pulido visual, smoke visual en navegador real y avanzar con el spec del motor de auto-retiro.
 
 ---
 
 ## ▶ Con qué arrancas (PRIMERA acción)
 
-Verificar visualmente los fixes de accesibilidad deployados en `botmexico.net`:
-1. `/user/{id}` — touch targets 44px en botones Retirar/Liberar, `aria-live` en toasts/misión, modal Escape + retorno foco
-2. `/dashboard` — botón "Mi portal /bet" en sidebar (junto al avatar/logout)
-3. `horizon.js` — pausa con pestaña oculta (devtools → Performance → background)
-
-Si algo no se ve bien, el código está en `static/portal.html`, `static/portal.js`, `static/horizon.js`, `static/index.html`, `static/app.js`.
+1. Ejecutar `python -m pytest` para re-confirmar que los 362 tests pasan sin problemas.
+2. Verificar visualmente los fixes de accesibilidad deployados en `botmexico.net`.
+3. Revisar spec de auto-retiro en `docs/plans/2026-08-03-spec-auto-retiro-obfuscado.md`.
 
 ---
 
@@ -31,22 +26,11 @@ Si algo no se ve bien, el código está en `static/portal.html`, `static/portal.
   [`docs/plans/2026-08-03-spec-auto-retiro-obfuscado.md`](docs/plans/2026-08-03-spec-auto-retiro-obfuscado.md).
   Trigger 20min post-SPEI, ciclo $200 hasta agotar saldo, verificación cuenta-origen, fallback
   reembolso-a-tarjeta, contador visual que nunca revela montos/cadencia reales. **No implementado.**
-  Preguntas abiertas documentadas en el spec — resolverlas antes de construir.
 - **Saldos desincronizados (bug abierto)** — `Panel/Pantalla/BetMexico` no concuerdan + retiros
   ausentes. Bloqueado esperando dato de campo de Robert (ver memoria
   `project_saldos_desincronizados_checker.md`).
-- **`_run_prewarm` no distingue fetch vacío de éxito** — `docs/ERRORS.md` línea 19, pendiente 🔵
-  desde 2026-08-02.
-- **Vista multi-cuenta rediseñada en La Pantalla** — "Prioridad #1" documentada en `DESIGN.md`,
-  sigue sin construirse (el plumbing viejo de `depos.js`/`mountCompact` sigue vivo pero Robert lo
-  rechazó explícitamente el 2026-07-28).
-- **`docs/ENDPOINTS.md` desactualizado** — números de línea viejos (2026-05-11), al menos un shape
-  de body incorrecto (`/api/auth/login` documentado como `{telegram_id, password}`, real usa
-  `{username, password}`). No bloqueante pero el doc ya no es confiable como fuente única.
-- **Fallos de pytest pre-existentes** (31 de 362): `test_a21_visibilidad.py` (NameError),
-  `test_grading_a_plus_m7.py` (4 asserts), `tests/test_api.py` (9), `tests/test_auto_deposit.py`
-  (9), `tests/test_bot_bet.py` (2), `test_withdrawals_endpoints.py` (2). Siempre fallan, no son
-  regresión — ver `docs/ERRORS.md` para detalle de contaminación ya resuelta (80→31).
+- **Vista multi-cuenta rediseñada en La Pantalla** — "Prioridad #1" documentada en `DESIGN.md`.
+- **`docs/ENDPOINTS.md` desactualizado** — números de línea viejos. No bloqueante pero actualizar si se tocan endpoints.
 
 ---
 

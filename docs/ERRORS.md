@@ -2,6 +2,48 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## `canonical_card_pipe` NameError en `list_all_cards` (`app.py:3864`) (detectado 2026-08-04)
+
+- **Síntoma**: `test_a21_visibilidad.py` fallaba con `NameError: name 'canonical_card_pipe' is not defined` al invocar `GET /api/cards`.
+- **Causa raíz**: `list_all_cards` usaba `canonical_card_pipe` pero faltaba el import de `web_utils`.
+- **Fix**: Agregado `from web_utils import canonical_card_pipe` al inicio de `list_all_cards` (L3845).
+
+## Constantes M7 de Grading sobrescritas por regresión en commit `b17954e` (detectado 2026-08-04)
+
+- **Síntoma**: 4 tests en `test_grading_a_plus_m7.py` fallaban porque los umbrales de M7 y el path de masacre no se respetaban.
+- **Causa raíz**: El commit `b17954e` sobrescribió accidentalmente las constantes M7 con valores M9 (`A_NO_FAIL_DAYS_MIN=30`, `C_DEEP_REST_DAYS=30`), y permitió una ruta "perdonada" de masacres hacia Grade B.
+- **Fix**: Restauradas constantes canónicas M7 en `shared/betmexico_payment_analyzer.py` (`A_NO_FAIL_DAYS_MIN=60`, `A_MAX_TOTAL_FAILS=3`, `C_DEEP_REST_DAYS=90`) y eliminado el path de recuperación a B para masacres (siempre caen a C).
+
+## Reporte de éxito engorroso en `_run_prewarm` cuando la respuesta es vacía (detectado 2026-08-04)
+
+- **Síntoma**: `_run_prewarm` reportaba `ok: bool(details)` que siempre devolvía `True` aunque `fetch_empty` fuera `True`.
+- **Causa raíz**: Evaluaba solo la existencia de la estructura `details` sin checar si el contenido era verdaderamente un fetch vacío.
+- **Fix**: Actualizado en `prewarm.py:563` a `ok: bool(details and not fetch_empty)`.
+
+## AST check demasiado amplio en `test_account_touch_isolated.py` (detectado 2026-08-04)
+
+- **Síntoma**: `test_account_touch_isolated.py` fallaba buscando `db(write=True)` en el código de `account_details`.
+- **Causa raíz**: El AST checker inspeccionaba funciones anidadas dentro de `account_details` (como `_async_val_renapo`), donde `db(write=True)` era válido, en lugar de revisar solo el nivel top-level de `account_details`.
+- **Fix**: Reescrito el AST walker en `test_account_touch_isolated.py` para analizar únicamente el cuerpo superior del handler.
+
+## Fallo en `_acc_id` helper en `test_withdrawals_endpoints.py` (detectado 2026-08-04)
+
+- **Síntoma**: `TypeError: string indices must be integers` al invocar `_acc_id(client)`.
+- **Causa raíz**: El helper `_acc_id` dependía del endpoint `GET /api/accounts` que ahora requiere rol `superadmin` o devolvía un 403 / objeto no iterable cuando la llamada la hacía una sesión `user`.
+- **Fix**: `_acc_id` fue actualizado para consultar la base de datos de test `seed_db` directamente vía SQLite en lugar de hacer una petición HTTP.
+
+## Múltiples desalineaciones de contrato en `tests/test_api.py` (detectado 2026-08-04)
+
+- **Síntoma**: 9 tests fallidos por 404s, assertion errors en llaves de retorno de endpoints, y respuestas 403.
+- **Causa raíz**: 4 endpoints de superadmin (`/conectados`, `/actividad`, `/alertas`, `/pool`) fueron consolidados en `/api/superadmin/kpis`; la forma de respuesta de `/api/accounts` sumó 10 campos extra; la fixture `seed_db` tiene datos que afectaban las pruebas de vacíos.
+- **Fix**: Actualizadas las peticiones hacia `/api/superadmin/kpis`, ajustada la verificación de campos a subconjunto (`<=`), e integradas las métricas de `seed_db` en los tests de assertions.
+
+## Incompatibilidad de estrato y filtros JWT/declines en `auto_deposit.py` (detectado 2026-08-04)
+
+- **Síntoma**: 10 tests fallidos en `tests/test_auto_deposit.py` y `test_auto_deposit_selection.py`.
+- **Causa raíz**: `select_accounts_for_auto` omitía validar `jwt_expires_at > now + 60`; la estratificación interna round-robin no intercalaba 1 TOP, 1 MID, 1 LOW correctamente cuando no había datos avanzados en `meta_map`; y la consulta de eventos 3DS no convertía la fecha ISO a formato compaticle con `julianday`.
+- **Fix**: Agregado check de JWT vivo en `select_accounts_for_auto`; estandarizado el intercalado 1-1-1; y actualizado el query SQLite a `(julianday('now') - julianday(created_at)) <= 1.0` en `auto_deposit.py`.
+
 ## `httpx` sin importar en `app.py` → notificaciones de Telegram mudas (regresión, detectado 2026-08-04)
 
 - **Síntoma**: logs de KVM4 mostraban `[telegram_startup_notify] Error notificando inicio: name 'httpx' is not defined` en cada arranque. `_notify_robert()` también fallaba en silencio (el `except Exception` captura el `NameError` y lo devuelve como `{"ok": False, "error": "NameError: ..."}` — invisible salvo que se inspeccione el return).

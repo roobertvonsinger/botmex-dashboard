@@ -3842,6 +3842,7 @@ def list_all_cards(user: dict = Depends(require_session)):
     Devuelve pipe completo sin enmascarar. Dedupe por (card_number, account_email).
     `source` indica origen ('card' = formalmente registrada, 'note' = solo en nota).
     """
+    from web_utils import canonical_card_pipe
     out = []
     seen = set()
     with db() as c:

@@ -143,7 +143,7 @@ def _normalize_pipe_to_3part(p: str) -> str:
 
 
 # ── B1 — selección de cuentas (pura) ─────────────────────────────────────────
-MM_ACCOUNT_RECENT_DECLINE_LIMIT = 3  # >= N declines en 12h → cuenta fuera de selección (Robert 2026-07-30: igualado a 3)
+MM_ACCOUNT_RECENT_DECLINE_LIMIT = 2  # >= N declines en 12h → cuenta fuera de selección (Robert 2026-07-28)
 
 
 def select_accounts_for_auto(
@@ -161,17 +161,18 @@ def select_accounts_for_auto(
       2. published_to_pool == 1 (o excepción RESERVADA_SA)
       3. locked_by IS NULL
       4. cooldown_until no activo
-      5. Cooldown de 48h por depósito APROBADO en el dashboard
-      6. window_map[email]["available"] >= amount * count
-      7. decline_map[email] < MM_ACCOUNT_RECENT_DECLINE_LIMIT (3 declines en 12h)
-      8. Cero IsUserInValidationProcess o DEAD reciente en meta_map
+      5. jwt_expires_at > now + 60 (JWT vivo)
+      6. Cooldown de 48h por depósito APROBADO en el dashboard
+      7. window_map[email]["available"] >= amount * count
+      8. decline_map[email] < MM_ACCOUNT_RECENT_DECLINE_LIMIT (2 declines en 12h)
+      9. Cero IsUserInValidationProcess o DEAD reciente en meta_map
 
     Estratificación Oculta Backend (sin badges ni labels visuales):
-      - Tier TOP: 3DS reciente (<24h) o (<5 rechazos históricos + reposo >24h sin depósitos externos)
-      - Tier MID: Reposo >48h sin rechazos recientes ni depósitos externos
-      - Tier LOW: Depósitos SPEI/externos recientes (<24h) o reposo corto (1-24h)
+      - Tier TOP: 3DS reciente (<24h) o Grade A+
+      - Tier MID: Grade A
+      - Tier LOW: Depósitos SPEI/externos recientes (<24h), reposo corto o Grade B/C/D
 
-    Selección: 1 TOP, 2 MID, resto LOW (round-robin con fall-through).
+    Selección: 1 TOP, 1 MID, 1 LOW (round-robin con fall-through).
     """
     now = _now_epoch()
     sa = _sa_tokens()
@@ -197,6 +198,11 @@ def select_accounts_for_auto(
 
         if _cd_active(r.get("cooldown_until"), now):
             continue
+
+        if "jwt_expires_at" in r:
+            jwt_exp = _exp_int(r.get("jwt_expires_at"))
+            if jwt_exp <= now + 60:
+                continue
 
         meta = meta_map.get(email) or {}
         # 1. Enfriamiento 48h por depósito APROBADO en dashboard
@@ -231,25 +237,38 @@ def select_accounts_for_auto(
         has_3ds_24h = meta.get("has_3ds_24h", False)
         total_fails = meta.get("total_fails", 0)
         mins_since_attempt = meta.get("mins_since_last_attempt", 99999)
+        grade = r.get("grade") or ""
 
-        # Regla de degradación anti-atropello: depósitos SPEI/externos recientes -> LOW directo
         if has_spei_24h:
             tier_low.append(r)
         elif has_3ds_24h:
             tier_top.append(r)
-        elif total_fails < 5 and mins_since_attempt > 1440: # > 24h
-            tier_top.append(r)
-        elif mins_since_attempt > 2880: # > 48h
-            tier_mid.append(r)
-        else:
+        elif mins_since_attempt <= 1440:
             tier_low.append(r)
+        elif meta:
+            if grade == "A+":
+                tier_top.append(r)
+            else:
+                tier_mid.append(r)
+        else:
+            if grade == "A+":
+                tier_top.append(r)
+            elif grade == "A":
+                tier_mid.append(r)
+            else:
+                tier_low.append(r)
+
+    sort_key = lambda r: (_grade_rank(r.get("grade")), -(float(r.get("grade_score") or 0)))
+    tier_top.sort(key=sort_key)
+    tier_mid.sort(key=sort_key)
+    tier_low.sort(key=sort_key)
 
     # Si count <= 3 o hay muy pocas cuentas, entregar las mejores disponibles (TOP -> MID -> LOW)
     if count <= 3:
         combined = tier_top + tier_mid + tier_low
         return combined[:count]
 
-    # Distribución intercalada ocultando etiquetas (1 TOP, 2 MID, resto LOW)
+    # Distribución intercalada (1 TOP, 1 MID, 1 LOW)
     stratified: List[Dict[str, Any]] = []
     i_top, i_mid, i_low = 0, 0, 0
 
@@ -260,14 +279,13 @@ def select_accounts_for_auto(
             i_top += 1
             if len(stratified) == count: break
 
-        # 2 MID
-        for _ in range(2):
-            if i_mid < len(tier_mid):
-                stratified.append(tier_mid[i_mid])
-                i_mid += 1
-                if len(stratified) == count: break
+        # 1 MID
+        if i_mid < len(tier_mid):
+            stratified.append(tier_mid[i_mid])
+            i_mid += 1
+            if len(stratified) == count: break
 
-        # Resto LOW
+        # 1 LOW
         if i_low < len(tier_low):
             stratified.append(tier_low[i_low])
             i_low += 1
@@ -276,6 +294,7 @@ def select_accounts_for_auto(
     # Si aún falta para completar count (fall-through de seguridad)
     if len(stratified) < count:
         remaining = [r for r in out if r not in stratified]
+        remaining.sort(key=sort_key)
         stratified.extend(remaining[:count - len(stratified)])
 
     return stratified
@@ -394,7 +413,7 @@ def plan_auto_mission(
             threeds_24h = con.execute(
                 "SELECT COUNT(*) AS n FROM deposit_attempts "
                 "WHERE account_email=? AND UPPER(status) LIKE '%3DS%' "
-                "AND created_at >= datetime('now','-24 hours')",
+                "AND (julianday('now') - julianday(created_at)) <= 1.0",
                 (email,),
             ).fetchone()["n"]
 

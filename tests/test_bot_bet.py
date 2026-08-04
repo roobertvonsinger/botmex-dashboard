@@ -7,12 +7,47 @@ import card_checker
 
 
 @pytest.fixture
-def sa_client(seed_db):
+def sa_client(seed_db, monkeypatch):
+    monkeypatch.setattr(app_mod, "DB_PATH", seed_db)
+    import sqlite3
+    con = sqlite3.connect(seed_db)
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS operator_penalties (
+            telegram_id INTEGER PRIMARY KEY,
+            strikes_count INTEGER DEFAULT 0,
+            penalty_until TEXT,
+            last_attempts INTEGER DEFAULT 0,
+            updated_at TEXT
+        )
+    """)
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS auto_missions (
+            mission_id TEXT PRIMARY KEY,
+            created_at TEXT,
+            updated_at TEXT,
+            completed_at TEXT,
+            operator_id INTEGER,
+            amount REAL,
+            target_count INTEGER,
+            card_pipes TEXT,
+            accounts_selected TEXT,
+            status TEXT,
+            phase_detail TEXT,
+            matches TEXT,
+            total_deposited REAL DEFAULT 0,
+            total_approved INTEGER DEFAULT 0,
+            total_failed INTEGER DEFAULT 0
+        )
+    """)
+    con.execute("DELETE FROM account_cards")
+    con.commit()
+    con.close()
     app_mod.app.dependency_overrides[app_mod.require_session] = lambda: {
         "role": "superadmin", "telegram_id": 1341812706,
         "username": "robertvs", "display": "Robert",
     }
-    return TestClient(app_mod.app)
+    yield TestClient(app_mod.app)
+    app_mod.app.dependency_overrides.clear()
 
 
 def test_bot_bet_max_4_cards(sa_client):
