@@ -3,6 +3,42 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-08-03 (rebrand visual portal + login, ventana AFK 30min)
+
+**Motivo**: Robert pidió terminar la implementación visual de `/portal` y `/login` con la marca
+real de botmexico.net (verde/blanco/rojo MX), inspirado en 2 prototipos de Open Design:
+el concepto de tarjetas "materializándose" y un fondo de agujero negro/horizonte de sucesos —
+pero sin el "look espacial" (sin campo estelar) y coherente con la marca real (no la mascota
+robot AI del prototipo, que no es el asset de producción).
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Fondo de marca `static/horizon.js`** | Canvas Three.js compartido (portal+login): agujero negro + disco de acreción recoloreado verde/blanco/rojo MX, SIN campo estelar. Fail-safe: si WebGL falla, el canvas se oculta y queda el fondo CSS de respaldo — cero riesgo al resto de la página. | ✅ implementado | ✅ `node --check` sintaxis OK, ✅ verificado visualmente en preview (screenshot), 🔵 sin verificar contra el server real (solo file:// local, `/static/` no resuelve fuera del server) |
+| **`static/portal.html` rebrand** | Header con wordmark tricolor, línea divisoria tricolor, cards con glass (`backdrop-filter`) sobre el horizonte, animación `materialize` en match-rows y account-cards (reemplaza `slideIn` plano), footer con dominio. | ✅ implementado | 🔵 sin smoke real contra `/portal` con sesión + datos reales |
+| **`static/login.html` rebrand** | Mismo fondo compartido, línea superior tricolor, copy actualizado a botmexico.net (title/tagline/footer). Glow pre-existente del `.login-card` (L58 original) se dejó intacto — no es parte de este cambio. | ✅ implementado | 🔵 sin smoke real contra `/login` |
+| **Motor de auto-retiro + UI ofuscada** | Spec completa recibida de Robert a medio turno (trigger 20min post-SPEI, ciclo $200 hasta agotar saldo, verificación cuenta-origen, fallback reembolso-a-tarjeta, contador visual que NUNCA revela montos/cadencia reales). | 🔵 **PARQUEADO — no implementado**, spec completa en `docs/plans/2026-08-03-spec-auto-retiro-obfuscado.md` | — requiere sesión dedicada, toca movimiento de dinero real |
+
+**Nota de alcance**: ventana AFK de 30 min. Prioridad fue el rebrand visual (lo que Robert pidió
+completar primero); el motor de auto-retiro es una feature nueva de varias horas que no es segura
+de construir + probar sin supervisión — se dejó como spec exacta en vez de código a medias.
+
+## Captura: 2026-08-02 (Portal Mission Control + transición Telegram → Web)
+
+**Motivo**: Robert exigió que el bot `/bet` quede 100% operativo con feedback visual de Telegram al dashboard web. El portal de operadores era estático (sólo grid de cuentas). Faltaba: SSE en vivo, vista de misión, gestión de combos sin password, transición visual Telegram → Web.
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Portal SPA con SSE** (`static/portal.js`) | Reescrito como SPA: suscribe `/api/events` (SSE), handler `auto_mission` filtrado por `mission_id`, reusa patrón `_autoOnBus` simplificado (progress bar + matches en vivo + countdown 60s). Sin `?match` → grid de "Mis Cuentas". Auto-refresh en eventos terminales. | ✅ implementado | ✅ deployado KVM4, health 200 OK, 23 tests bot+bet verdes |
+| **Vista de misión viva** (`?match=ID`) | Auto-detecta `mission_id` en URL → carga `/api/deposits/auto/{mid}/status` → muestra progress bar (matching→scheduling→done), matches apareciendo con animación slideIn, countdown 60s entre depósitos, resumen final con deposited/approved/failed. | ✅ implementado | 🔵 sin smoke real con misión viva (requiere /bet real) |
+| **Retiro sin password** (`POST /api/operator/accounts/{id}/withdraw`) | Valida ownership vía `_visible_emails` (operador solo retira de cuentas propias matcheadas), usa JWT en BD (no pide password). Reusa `execute_withdrawal` + `_persist_withdrawal`. | ✅ implementado | ✅ py_compile OK, tests existentes pasan |
+| **Liberar cuenta sin password** (`POST /api/operator/accounts/{id}/release`) | Valida ownership, usa `_release_account` canónico (republica al pool + broadcast). | ✅ implementado | ✅ py_compile OK |
+| **`/api/operator/my-accounts` mejorado** | Ahora incluye `is_locked`, `status`, y SA ve todas las cuentas (no solo las propias). | ✅ implementado | ✅ test_bet_live_plan.py pasa |
+| **`/api/operator/missions`** (nuevo) | Lista misiones del operador (últimas 20) o todas (SA, últimas 50). | ✅ implementado | ✅ py_compile OK |
+| **Feedback Telegram → Web** (`telegram_bot_mock/bot.py`) | Mensaje de inicio de misión con botón URL al portal `?match=ID`. `on_progress` ahora muestra link "Ver en vivo →" en cada update. Mensaje terminal cambia botón a "Gestionar cuentas →". `confirm_gate` incluye link al portal. | ✅ implementado | ✅ deployado KVM4, mock-bot arrancó OK |
+| **Portal HTML rediseñado** (`static/portal.html`) | Dark/graphite consistente con dashboard SA. Mobile-first. CSS inline (sin dependencias). Contenedores `#missionView` + `#accountsSection`. Modal de retiro. Toasts. | ✅ implementado | 🔵 sin verificación visual en navegador |
+
+**Deploy KVM4 (2026-08-02 23:27)**: SCP atómico de 4 archivos (app.py, portal.html, portal.js, bot.py), restart `betmexico-web` + `betmexico-mock-bot`, health `{"ok":true,"accounts":941}`, logs limpios (sin Traceback/ImportError). Bot mock envió notificación de arranque a SuperAdmin.
+
 ## Captura: 2026-08-01 (agente de soporte b.soporte + 3 bugs pre-existentes reparados)
 
 **Motivo**: Robert pidió un agente de soporte para los 3 bots, embebido en el dashboard como chat,

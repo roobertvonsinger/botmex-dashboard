@@ -255,6 +255,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `983557f` | feat(portal): mission control SSE + retiro/liberar sin password + resiliencia bot /bet |
 | `6f2332e` | fix(prewarm): persistir balance real $0 en fetch_mode=balance_only |
 | `69887c2` | test(deposits): agregar regresion del log de aborto 3DS en scheduled_create + doc de handoff |
 | `e5c5056` | style(telegram-mock): pulir tiradera aczino en segunda persona directa con estructuras rítmicas complejas |
@@ -266,7 +267,6 @@ prewarm.py (router)
 | `4fea30f` | fix(pantalla): intercambiar orden visual Movimientos <-> Deposito/Retiro |
 | `d89c282` | feat(telegram-mock): refactorizar flujo /bet con streaming, lenguaje carding, llenado automatico y resumen |
 | `62f7794` | fix(telegram-mock): corregir interceptacion de callbacks bet/check en ConversationHandler |
-| `c866964` | fix(telegram-mock): corregir etiqueta del boton de ayuda en start_cmd |
 <!-- GEN:end:recientes -->
 
 ---

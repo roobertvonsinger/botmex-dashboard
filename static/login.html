@@ -3,17 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Botmexico v2 — Acceso</title>
+<title>botmexico.net — Acceso</title>
 <link rel="icon" type="image/png" href="/static/assets/botmexico_logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
 <style>
 :root {
   --hue: 169; --chr: 0.20;
   --bg: #08090c;
-  --bg-accent: radial-gradient(ellipse 1100px 700px at 50% 30%, oklch(0.40 0.20 169 / 0.12), transparent 60%), #08090c;
+  --bg-accent:
+    radial-gradient(ellipse 900px 560px at 12% 8%, rgba(63,185,80,.10), transparent 58%),
+    radial-gradient(ellipse 900px 560px at 92% 92%, rgba(239,74,69,.08), transparent 55%),
+    radial-gradient(ellipse 1100px 700px at 50% 30%, oklch(0.40 0.20 169 / 0.10), transparent 60%), #08090c;
   --surface: rgba(18, 20, 24, 0.70);
+  --mx-green: #2ea043; --mx-green-bright: #3fb950; --mx-white: #eef0f3; --mx-red: #ef4a45;
   --hairline: rgba(255,255,255,0.07);
   --hairline-h: rgba(255,255,255,0.12);
   --text: #eef0f3;
@@ -64,8 +69,8 @@ body {
 .login-card::before {
   content: "";
   position: absolute; top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent 5%, var(--accent) 40%, rgba(255,255,255,0.6) 55%, var(--accent) 70%, transparent 95%);
-  opacity: 0.55;
+  background: linear-gradient(90deg, transparent 4%, var(--mx-green) 30%, var(--mx-white) 50%, var(--mx-red) 70%, transparent 96%);
+  opacity: 0.6;
 }
 
 /* Subtle inner glow */
@@ -174,6 +179,12 @@ body {
   letter-spacing: 0.4px;
 }
 
+#horizon { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; display: block; pointer-events: none; opacity: .38; }
+.hz-vignette {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(ellipse 60% 55% at 50% 45%, rgba(8,9,12,.35) 0%, rgba(8,9,12,.78) 62%, rgba(8,9,12,.97) 100%);
+}
+
 /* ── Subtle grid noise ── */
 body::before {
   content: "";
@@ -185,11 +196,13 @@ body::before {
 </style>
 </head>
 <body>
+<canvas id="horizon"></canvas>
+<div class="hz-vignette"></div>
 <div class="login-wrap">
   <div class="login-card">
     <div class="login-brand">
-      <img src="/static/assets/botmexico_logo.png" alt="Botmexico">
-      <span class="login-tagline">Panel de control</span>
+      <img src="/static/assets/botmexico_logo.png" alt="botmexico.net">
+      <span class="login-tagline">botmexico.net · acceso directo</span>
     </div>
 
     <!-- Step 1: Login normal -->
@@ -226,7 +239,7 @@ body::before {
       <div id="msgFt" class="msg"></div>
     </div>
   </div>
-  <div class="login-footer">Botmexico v2 · Acceso restringido</div>
+  <div class="login-footer">botmexico.net · acceso restringido</div>
 </div>
 
 <script>
@@ -338,5 +351,6 @@ fetch('/api/auth/me').then(r => {
   if (r.ok) window.location.href = '/';
 }).catch(() => {});
 </script>
+<script src="/static/horizon.js?v=1"></script>
 </body>
 </html>

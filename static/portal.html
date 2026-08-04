@@ -3,138 +3,291 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Portal Operador — BotMexico</title>
+  <title>botmexico.net · Portal</title>
+  <link rel="icon" type="image/png" href="/static/assets/botmexico_logo.png">
   <link rel="stylesheet" href="/static/style.css?v=1785281972">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
   <style>
+    :root {
+      --bg: #0b0e12;
+      --bg-card: rgba(22,27,34,.72);
+      --bg-elev: #1c2129;
+      --border: #30363d;
+      --border-light: #363b42;
+      --text: #c9d1d9;
+      --text-dim: #8b949e;
+      --text-bright: #f0f6fc;
+      --accent: #58a6ff;
+      /* Marca botmexico.net — tricolor MX */
+      --mx-green: #2ea043;
+      --mx-green-bright: #3fb950;
+      --mx-white: #f0f6fc;
+      --mx-red: #ef4a45;
+      --green: #2ea043;
+      --green-bright: #3fb950;
+      --gold: #d4a843;
+      --red: #f85149;
+      --orange: #e0974b;
+      --radius: 8px;
+      --radius-sm: 6px;
+      --font-display: 'Space Grotesk', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { background: var(--bg); }
     body {
-      background-color: var(--bg-dark, #0d1117);
-      color: var(--text-main, #c9d1d9);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      margin: 0;
-      padding: 20px;
-    }
-    .portal-container {
-      max-width: 900px;
-      margin: 0 auto;
-    }
-    .portal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--border-color, #30363d);
-      margin-bottom: 24px;
-    }
-    .portal-title {
-      font-size: 24px;
-      font-weight: 600;
-      color: #58a6ff;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .logout-btn {
-      background: #21262d;
-      border: 1px solid #363b42;
-      color: #c9d1d9;
-      padding: 6px 12px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 13px;
-    }
-    .logout-btn:hover {
-      background: #30363d;
-    }
-    .accounts-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 16px;
-    }
-    .account-card {
-      background: #161b22;
-      border: 1px solid #30363d;
-      border-radius: 8px;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .acc-email {
-      font-weight: 600;
+      background:
+        radial-gradient(ellipse 900px 500px at 15% -8%, rgba(63,185,80,.10), transparent 60%),
+        radial-gradient(ellipse 900px 500px at 105% 12%, rgba(239,74,69,.08), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       font-size: 14px;
-      word-break: break-all;
-      color: #f0f6fc;
+      line-height: 1.5;
+      min-height: 100vh;
+      position: relative;
     }
-    .acc-balance {
-      font-size: 22px;
-      font-weight: 700;
-      color: #2ea043;
+    /* Horizonte de marca: agujero negro + disco, sin campo estelar (no "look espacial") */
+    #horizon { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; display: block; pointer-events: none; opacity: .5; }
+    .hz-vignette {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background: radial-gradient(ellipse 60% 50% at 50% 40%, rgba(11,14,18,.35) 0%, rgba(11,14,18,.72) 62%, rgba(11,14,18,.96) 100%);
     }
-    .acc-meta {
-      font-size: 12px;
-      color: #8b949e;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
+    .portal-wrap { max-width: 960px; margin: 0 auto; padding: 16px; position: relative; z-index: 1; }
+
+    /* Header */
+    .ph {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px 14px; margin: 0 -16px 20px; position: relative;
+      background: rgba(11,14,18,.55);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
     }
+    .ph::after {
+      content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+      background: linear-gradient(90deg, var(--mx-green) 0%, var(--mx-white) 45%, var(--mx-red) 100%);
+      opacity: .38;
+    }
+    .ph-brand { display: flex; align-items: center; gap: 10px; }
+    .ph-logo {
+      font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -.2px;
+      display: flex; align-items: baseline; gap: 1px;
+    }
+    .ph-logo .g { color: var(--mx-green-bright); }
+    .ph-logo .w { color: var(--mx-white); }
+    .ph-logo .r { color: var(--mx-red); }
+    .ph-sub { font-size: 11px; color: var(--text-dim); font-family: var(--font-mono); letter-spacing: .3px; }
+    .ph-actions { display: flex; gap: 8px; align-items: center; }
+    .btn {
+      background: var(--bg-elev); border: 1px solid var(--border-light);
+      color: var(--text); padding: 6px 14px; border-radius: var(--radius-sm);
+      cursor: pointer; font-size: 13px; font-weight: 500; transition: all .15s;
+    }
+    .btn:hover { background: var(--border); border-color: var(--accent); }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+    .btn-primary { background: rgba(46,160,67,.15); border-color: var(--green); color: var(--green-bright); }
+    .btn-primary:hover { background: rgba(46,160,67,.25); }
+    .btn-danger { background: rgba(248,81,73,.1); border-color: var(--red); color: var(--red); }
+    .btn-danger:hover { background: rgba(248,81,73,.2); }
+    .btn:disabled { opacity: .4; cursor: default; }
+
+    /* Mission View */
+    #missionView { display: none; }
+    .mv-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+    }
+    .mv-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .mv-id {
+      font-family: monospace; font-size: 16px; font-weight: 700;
+      color: var(--gold); background: rgba(212,168,67,.08);
+      padding: 2px 10px; border-radius: 4px; border: 1px solid rgba(212,168,67,.2);
+    }
+    .mv-status {
+      font-size: 12px; font-weight: 600; padding: 4px 10px;
+      border-radius: 12px; text-transform: uppercase; letter-spacing: .5px;
+    }
+    .st-matching { background: rgba(88,166,255,.12); color: var(--accent); border: 1px solid rgba(88,166,255,.3); }
+    .st-scheduling { background: rgba(212,168,67,.12); color: var(--gold); border: 1px solid rgba(212,168,67,.3); }
+    .st-completed { background: rgba(46,160,67,.12); color: var(--green-bright); border: 1px solid rgba(46,160,67,.3); }
+    .st-failed, .st-cancelled { background: rgba(248,81,73,.1); color: var(--red); border: 1px solid rgba(248,81,73,.25); }
+    .st-pending, .st-awaiting_confirmation { background: rgba(139,148,158,.1); color: var(--text-dim); border: 1px solid var(--border); }
+
+    .mv-progress-wrap { margin-bottom: 16px; }
+    .mv-progress-bar {
+      height: 8px; background: var(--bg-elev); border-radius: 4px;
+      overflow: hidden; position: relative;
+    }
+    .mv-progress-fill {
+      height: 100%; background: linear-gradient(90deg, var(--green), var(--green-bright));
+      border-radius: 4px; transition: width .4s ease; width: 0%;
+    }
+    .mv-progress-fill.sched { background: linear-gradient(90deg, var(--gold), #e0c060); }
+    .mv-progress-fill.err { background: var(--red); }
+    .mv-sub { font-size: 13px; color: var(--text-dim); margin-top: 6px; min-height: 20px; }
+    .mv-sub .email { color: var(--accent); font-family: monospace; }
+
+    /* Match cards */
+    .mv-matches { display: flex; flex-direction: column; gap: 8px; }
+    .match-row {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--bg-elev); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 10px 14px;
+      animation: materialize .5s cubic-bezier(.22,1,.36,1) both;
+    }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
+    /* Materialización: la cuenta "aparece" confirmada — sin tema espacial, solo el brillo de marca */
+    @keyframes materialize {
+      0%   { opacity: 0; transform: translateY(-8px) scale(.94); filter: blur(4px); box-shadow: 0 0 0 0 rgba(63,185,80,0); }
+      55%  { opacity: 1; transform: translateY(0) scale(1.015); filter: blur(0); box-shadow: 0 0 22px -4px rgba(63,185,80,.45); }
+      100% { transform: translateY(0) scale(1); box-shadow: 0 0 0 0 rgba(63,185,80,0); }
+    }
+    .match-icon { font-size: 18px; }
+    .match-email { font-family: monospace; font-size: 13px; color: var(--text-bright); flex: 1; }
+    .match-clabe { font-family: monospace; font-size: 12px; color: var(--green-bright); }
+
+    /* Countdown */
+    .mv-countdown {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 12px; color: var(--gold); font-weight: 600;
+    }
+    .mv-countdown .cd-dot {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--gold);
+      animation: pulse 1s ease infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity: .4; } 50% { opacity: 1; } }
+
+    /* Summary */
+    .mv-summary {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px;
+    }
+    .mv-stat {
+      background: var(--bg-elev); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px; text-align: center;
+    }
+    .mv-stat-val { font-size: 22px; font-weight: 700; color: var(--text-bright); }
+    .mv-stat-lbl { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .5px; margin-top: 2px; }
+
+    /* Accounts Grid */
+    #accountsSection { }
+    .ag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+    .acc-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 8px;
+      transition: border-color .15s, transform .15s;
+      animation: materialize .45s cubic-bezier(.22,1,.36,1) both;
+    }
+    .acc-card:hover { border-color: var(--border-light); transform: translateY(-2px); }
+    .acc-card.locked { border-color: rgba(212,168,67,.3); }
+    .acc-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .acc-email { font-weight: 600; font-size: 13px; word-break: break-all; color: var(--text-bright); }
+    .acc-grade {
+      font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+      background: var(--bg-elev); border: 1px solid var(--border); color: var(--text-dim);
+      white-space: nowrap;
+    }
+    .acc-grade.A1 { color: var(--green-bright); border-color: rgba(46,160,67,.3); }
+    .acc-grade.A, .acc-grade.A-plus { color: var(--green-bright); border-color: rgba(46,160,67,.3); }
+    .acc-grade.B { color: var(--gold); border-color: rgba(212,168,67,.3); }
+    .acc-grade.C { color: var(--orange); border-color: rgba(224,151,75,.3); }
+    .acc-grade.D { color: var(--red); border-color: rgba(248,81,73,.3); }
+    .acc-balance { font-size: 24px; font-weight: 700; color: var(--green-bright); }
+    .acc-balance .cur { font-size: 12px; font-weight: 400; color: var(--text-dim); }
+    .acc-meta { font-size: 12px; color: var(--text-dim); display: flex; flex-direction: column; gap: 3px; }
     .clabe-box {
-      background: #0d1117;
-      border: 1px dashed #30363d;
-      border-radius: 6px;
-      padding: 8px 10px;
-      margin-top: 4px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
+      background: var(--bg); border: 1px dashed var(--border);
+      border-radius: var(--radius-sm); padding: 8px 10px;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
     }
-    .clabe-code {
-      font-family: monospace;
-      font-size: 13px;
-      color: #3fb950;
-      letter-spacing: 0.5px;
+    .clabe-code { font-family: monospace; font-size: 13px; color: var(--green-bright); letter-spacing: .5px; }
+    .acc-actions { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 4px; }
+    .acc-locked-badge {
+      font-size: 10px; color: var(--gold); display: flex; align-items: center; gap: 3px;
     }
-    .copy-clabe-btn {
-      background: #21262d;
-      border: 1px solid #30363d;
-      color: #58a6ff;
-      border-radius: 4px;
-      padding: 3px 8px;
-      font-size: 11px;
-      cursor: pointer;
+
+    /* Empty / loading */
+    .empty-msg { text-align: center; padding: 40px; color: var(--text-dim); font-size: 14px; }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.6);
+      display: flex; align-items: center; justify-content: center; z-index: 1000;
+      animation: fadeIn .15s ease;
     }
-    .copy-clabe-btn:hover {
-      background: #30363d;
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .modal-box {
+      background: var(--bg-card); border: 1px solid var(--border);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border-radius: var(--radius); padding: 24px; max-width: 360px; width: 90%;
     }
-    .mission-banner {
-      background: rgba(56, 139, 253, 0.1);
-      border: 1px solid rgba(56, 139, 253, 0.4);
-      color: #58a6ff;
-      border-radius: 6px;
-      padding: 10px 16px;
-      margin-bottom: 20px;
-      font-size: 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    .modal-title { font-size: 16px; font-weight: 600; color: var(--text-bright); margin-bottom: 12px; }
+    .modal-input {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 10px 12px; color: var(--text);
+      font-size: 16px; font-weight: 600; margin-bottom: 16px;
+    }
+    .modal-input:focus { outline: none; border-color: var(--accent); }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .modal-info { font-size: 13px; color: var(--text-dim); margin-bottom: 12px; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: var(--bg-elev); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 10px 20px; color: var(--text-bright);
+      font-size: 14px; font-weight: 500; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,.4);
+      animation: toastIn .2s ease;
+    }
+    @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+    .toast.ok { border-color: var(--green); color: var(--green-bright); }
+    .toast.err { border-color: var(--red); color: var(--red); }
+
+    .pf {
+      margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--border);
+      text-align: center; font-family: var(--font-mono); font-size: 10px;
+      color: var(--text-dim); letter-spacing: .4px;
+    }
+
+    @media (max-width: 600px) {
+      .portal-wrap { padding: 12px; }
+      .ag-grid { grid-template-columns: 1fr; }
+      .mv-summary { grid-template-columns: 1fr; }
+      .ph-logo { font-size: 14px; }
     }
   </style>
 </head>
 <body>
-  <div class="portal-container">
-    <div class="portal-header">
-      <div class="portal-title">
-        <span>🤖</span>
-        <span>Portal de Operador — Mis Cuentas</span>
+  <canvas id="horizon"></canvas>
+  <div class="hz-vignette"></div>
+  <div class="portal-wrap">
+    <div class="ph">
+      <div class="ph-brand">
+        <span class="ph-logo"><span class="g">bot</span><span class="w">mexi</span><span class="r">co.net</span></span>
+        <span class="ph-sub" id="phRole">· Portal</span>
       </div>
-      <button class="logout-btn" id="logoutBtn">Cerrar Sesión</button>
+      <div class="ph-actions">
+        <button class="btn btn-sm" id="btnMissions" style="display:none;">Misiones</button>
+        <button class="btn btn-sm" id="btnAccounts">Mis Cuentas</button>
+        <button class="btn btn-sm" id="logoutBtn">Salir</button>
+      </div>
     </div>
 
-    <div id="accountsGrid" class="accounts-grid">
-      <div class="empty-msg">Cargando tus cuentas...</div>
+    <div id="missionView"></div>
+
+    <div id="accountsSection">
+      <div id="accountsGrid" class="ag-grid">
+        <div class="empty-msg">Cargando…</div>
+      </div>
     </div>
+
+    <div class="pf">botmexico.net · gestión directa, sin fricción, sin contraseñas de cuenta</div>
   </div>
 
   <script src="/static/portal.js?v=1785281972"></script>
+  <script src="/static/horizon.js?v=1"></script>
 </body>
 </html>
