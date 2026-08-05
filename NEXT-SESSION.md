@@ -5,60 +5,28 @@
 
 ## 🎯 Objetivo en curso
 
-Sesión 2026-08-05 (OpenCode autónomo → review Claude Code → consolidación + deploy). Rama
-`feature/jwt-refresh-hardening-2026-08-05` mergeada a `main` y **deployada a KVM4**, verificada en vivo
-contra el dominio correcto (`botmexico.net`). El caveat de `balance_real` post-retiro que quedó abierto
-la sesión anterior **ya está resuelto y deployado** (ver abajo).
+Sesión larga 2026-08-05 (OpenCode autónomo → review Claude Code → consolidación → deploy → análisis del
+matchmaker → segundo fix + segundo deploy). Todo en `main`, todo deployado a KVM4, todo verificado en vivo
+contra el dominio correcto (`botmexico.net`, no `betmexico.mx`). Sin trabajo pendiente de deploy.
 
-### Qué se cerró esta sesión (deployado a KVM4, verificado)
+## ▶ Con qué arrancas (PRIMERA acción)
 
-1. **`jwt_keeper` prioriza cuentas hot** (balance>$50 / autolock activo / retiro pendiente) sin esperar el
-   ciclo horario completo — bypassea grade/published/locked_by, cooldown sigue aplicando siempre.
-2. **Refresco de balance post-retiro** (`withdrawals._refresh_account_after_withdrawal`, espejo de
-   `deposits._refresh_account_after_deposit`) — **cierra el caveat de `balance_real` desincronizado** que
-   quedó pendiente la sesión pasada. Reusa el JWT del login de `execute_withdrawal`, no gasta captcha extra.
-   Cubierto en ambos endpoints (`withdraw` SA y `operator_withdraw`) — este último NO tenía test hasta que
-   se agregó en esta sesión (gap de la sesión de OpenCode, cerrado).
-3. **Batch de `jwt_keeper` 8→50 + cooldown rate-limit 360→1440min (24h)** (Robert) — el 429 medido en
-   julio era ráfaga propia de logins concurrentes, no bloqueo de BetMexico. Con cooldown de 24h tras UN
-   rate-limit, el batch alto ya no recrea el bucle de quema del incidente de julio.
-4. **FUGA #1 cerrada**: JWT muerto server-side (401 silencioso detectado por `account_refresh`) ya no
-   espera hasta 1h al próximo ciclo de `jwt_keeper` — lo despierta (`_wake_jwt_keeper`, debounce 5min).
-5. **Matchmaker de `auto_deposit`**: JWT vivo ya NO excluye cuentas del pool, solo prioriza tier. Sin JWT
-   vivo → tier más bajo (Login Full), nunca fuera del pool. Cambio de contrato — revisar si Modo Auto en
-   vivo empieza a generar más Login Full de lo esperado (medible en logs `refresh.log`).
-6. **Frontend: tabs superiores reemplazan la cenefa de marca** — Cuentas | Portal | Monitoreo | Pool |
-   Sistema | Estadisticas. El sidebar sigue vivo en paralelo (transición, no roto). **Portal /bet ahora
-   embebido como tab** (`iframe` lazy-load a `/user/{tid}?bare=1`) — bare mode oculta header/footer/horizon
-   del portal standalone. `showSection()` acepta ambos vocabularios (tabs nuevos + nombres viejos sidebar).
-7. **Logs de refresco separados**: `account_refresh`/`jwt_keeper` ya no spamean `dashboard.log` — van a
-   `refresh.log` propio (`RotatingFileHandler`, `propagate=False`).
-8. **`accounts.last_updated_at`** (migración aditiva) — cuándo se persistió balance REAL de verdad, distinto
-   de `last_checked_at` (que también se toca en fetch fallidos). Expuesto en `/api/accounts`, tabla lo usa.
-9. **Rate-limit invisible al operador** — copy neutro en `deposits.py`, detalle solo en log debug + SA.
+1. Ejecutar `python -m pytest -q` — debe dar **401 passed**.
+2. Pedirle a Robert feedback visual del nav nuevo (tabs) y del Portal embebido, y del comportamiento del
+   modo Auto — son los primeros ciclos reales en producción, smoke real pendiente de su parte en los tres.
+3. Si el operador reporta más "Login Full" de lo esperado en Modo Auto, es el cambio de contrato de JWT
+   del matchmaker (ya no excluye, prioriza) — no es regresión, es el comportamiento nuevo documentado abajo.
 
-**Tests**: 395/395 verdes (7 tests nuevos de priorización hot + 2 de refresh post-retiro + 3 actualizados
-al contrato nuevo del matchmaker — ver `docs/AUDIT.md` §"Captura 2026-08-05" para el detalle completo).
+## 🧭 Recomendación de approach
 
-### Deploy — verificado, no asumido
+- **`bin_stats` recién empezó a llenarse** (antes de este fix, 3 filas en toda la BD, todas en 0). Dale unos
+  días de tráfico real antes de tocar de nuevo `_rank_key`/`_approval_rate` — con pocos datos el ranking por
+  BIN todavía no tiene señal suficiente para confiar en él a ciegas.
+- Antes de cualquier cambio futuro al matchmaker de `auto_deposit`, releer el análisis completo en
+  `docs/ERRORS.md` §"bin_stats.total_approved/total_rejected nunca se actualizaban" — ahí está el mapeo
+  completo de qué información ya se recicla (grade vía analyzer V10, bin_stats vía BIN) y qué no.
 
-- 16 archivos (10 backend + 6 estáticos) SCP a `/docker/betmexico/code/web/`, MD5 local==remoto confirmado
-  archivo por archivo. Sintaxis validada (`ast.parse`) **dentro del contenedor** antes del restart.
-  `docker restart betmexico-web` → arranque limpio, sin tracebacks en logs, 0 errores en 30min post-restart.
-- Verificado contra el dominio real del dashboard (`https://botmexico.net`, **no** `betmexico.mx` — ese es
-  el sitio de apuestas real, cuidado con el typo en el nombre). `/static/index.html` sirve `class="toptabs"`
-  en vivo, `/static/app.js` sirve `_ensurePortalLoaded`, `/static/portal.html` sirve `body.bare` — el
-  frontend nuevo SÍ está siendo servido por el proceso corriendo, no solo en disco.
-- `/login` → 200, `/dashboard` sin sesión → 302 (redirect correcto). `betmexico-mock-bot`/`betmexico-bot`
-  sin tocar (solo se tocó `betmexico-web`).
-
-### Riesgo de diseño documentado, NO bug hoy (heredado de la sesión de OpenCode)
-
-- El bypass de `batch_max` para cuentas hot en `jwt_keeper` no tiene tope superior. Medido contra backup de
-  prod (2026-08-01, 816 cuentas LIVE): 3-4 hot en un momento dado, sin riesgo de starvation hoy. Vigilar si
-  la base de cuentas crece mucho — revisar `docs/AUDIT.md` para las queries de medición.
-
-### Candidatos a próxima sesión (no implementados, no urgentes)
+## ⏳ Pendientes próximos
 
 - **Intervalo adaptativo de `jwt_keeper`** cuando hay hot pendientes (hoy fijo 1h) — requiere medir en prod
   primero (queries en `docs/plans/2026-08-05-HANDOFF-claudecode-deploy.md`).
@@ -68,23 +36,47 @@ al contrato nuevo del matchmaker — ver `docs/AUDIT.md` §"Captura 2026-08-05" 
   explícitamente NO mergeada. Retomar solo si Robert lo pide.
 - **Reintento automático de `auto_deposit` 24h** tras depósito fallido — explícitamente fuera de alcance,
   solo si Robert lo retoma.
+- El bypass de `batch_max` para cuentas hot en `jwt_keeper` sigue sin tope superior (riesgo de diseño
+  documentado, no bug — medido en 816 cuentas LIVE de prod, 3-4 hot a la vez). Vigilar si la base crece.
 
----
+## ✅ Hecho esta sesión
 
-## ▶ Con qué arrancas (PRIMERA acción)
+**Bloque 1 — consolidación + deploy #1** (`3e564d6`):
+- `jwt_keeper` prioriza cuentas hot sin esperar el ciclo horario; batch 8→50 + cooldown rate-limit 24h
+  (Robert: el 429 de julio era ráfaga propia, no bloqueo de BetMexico); FUGA #1 cerrada (`_wake_jwt_keeper`,
+  JWT muerto server-side ya no espera 1h); matchmaker ya no excluye por JWT, prioriza; refresco de balance
+  post-retiro (cierra el caveat de `balance_real` desincronizado de la sesión anterior); frontend: tabs
+  superiores reemplazan la cenefa + Portal `/bet` embebido como iframe (`?bare=1`); logs de refresco
+  separados a `refresh.log`; `accounts.last_updated_at`.
+- Gap cerrado: `operator_withdraw` no tenía test del refresh post-retiro (lo tenía `withdraw` SA nomás).
+- 16 archivos deployados a KVM4, MD5 verificado, sintaxis pre-restart, contenido nuevo confirmado servido
+  en vivo (no solo en disco) contra `botmexico.net`.
 
-1. Ejecutar `python -m pytest -q` — debe dar **395 passed**.
-2. Pedirle a Robert feedback visual del nav nuevo (tabs) y del Portal embebido — es la primera vez que
-   corre en producción, smoke real pendiente de su parte.
-3. Si reporta que Modo Auto está tomando más cuentas sin JWT de lo esperado (Login Full en vez de sesión
-   directa), es el cambio de contrato del punto 5 arriba — no es regresión, es el comportamiento nuevo.
-
----
+**Bloque 2 — análisis del matchmaker + deploy #2** (`7145c2e`):
+- Robert pidió evaluar si el picker de cuentas del modo Auto sirve a su objetivo real (encontrar al menos
+  una cuenta que logre depositar) y si se está desperdiciando información entre intentos.
+- **Hallazgo real**: `bin_stats.total_approved`/`total_rejected` nunca se actualizaban — verificado contra
+  prod (3 filas, las 3 en `total_attempts=0`). `_record_attempt` llama `log_attempt(card_id=None)`, y el
+  bloque de `betmexico_db.py` que toca `bin_stats` requiere `card_id` resuelto. `update_bin_stats(bin,
+  approved)` existe para exactamente este caso pero nunca se llamaba — código muerto. El approval_rate por
+  BIN que usa `auto_deposit._rank_key` para priorizar tarjetas era 0.0 para todo, siempre.
+- **Fix**: `deposits.py::_record_attempt` ahora escribe `bin_stats` directo vía `app.db()` (mismo patrón
+  que `_record_bin_3ds`, no depende de `betmexico_db` — testable). Gateado a approved/rejected únicamente.
+- **JWT del matchmaker**: se descartó la cuota dura de 50% que Robert pidió originalmente (análisis:
+  `jwt_keeper` ya mantiene sesiones calientes más barato, `MATCH_TRANSIENT_RETRIES=4` ya da a las cuentas
+  sin JWT un intento justo — una cuota dura habría gastado cupos de probe escasos en mantenimiento de
+  sesión). Se implementó una preferencia leve (tie-break, no exclusión) dentro del tier LOW.
+- Gap de arnés encontrado y cerrado de paso: `import app` sin `importlib.reload` en tests nuevos hereda el
+  `DB_PATH` de un test anterior en el mismo proceso pytest — nadie lo había pisado porque ningún test previo
+  de `_record_attempt` hacía una escritura real vía `app.db(write=True)`.
+- 2 archivos deployados (`deposits.py`, `auto_deposit.py`), MD5 verificado, sintaxis pre-restart, 0 errores
+  30min post-restart.
 
 ## 🖥️ Estado del sistema al cerrar (2026-08-05, sesión Claude Code)
 
-- **Repo**: `main` en `3e564d6`, pusheado a Forgejo. Working tree limpio.
-- **Tests**: 395/395 verdes.
-- **Prod (KVM4)**: `betmexico-web` reiniciado 1×, MD5 local==remoto verificado en los 16 archivos
-  deployados, sintaxis validada pre-restart, contenido nuevo confirmado servido en vivo (no solo en disco).
-  `betmexico-mock-bot`/`betmexico-bot` sin tocar.
+- **Repo**: `main` en `7145c2e`, pusheado a Forgejo. Working tree limpio.
+- **Tests**: 401/401 verdes.
+- **Prod (KVM4)**: `betmexico-web` reiniciado 2× en esta sesión (deploy #1 y #2), MD5 local==remoto
+  verificado en ambos, sintaxis validada pre-restart en ambos, 0 errores post-restart. Verificado contra
+  `botmexico.net` (dominio real del dashboard — `betmexico.mx` es el sitio de apuestas, cuidado con el
+  typo). `betmexico-mock-bot`/`betmexico-bot` sin tocar en toda la sesión.

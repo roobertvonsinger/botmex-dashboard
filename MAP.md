@@ -248,6 +248,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `7145c2e` | fix(deposits): cerrar hueco de bin_stats — approved/rejected nunca se contaban |
 | `f347775` | docs: cierre de sesión — deploy verificado a KVM4 + estado para /cerrar-bmx |
 | `3e564d6` | feat(frontend): tabs superiores reemplazan cenefa + portal /bet embebido (SA) |
 | `18e74d8` | feat(jwt): refresco super smooth — 3 universos, cooldown 24h, FUGA #1 cerrada |
@@ -259,7 +260,6 @@ prewarm.py (router)
 | `dcce536` | feat(jwt_keeper): priorizar cuentas hot en lote de re-login |
 | `fd0b633` | docs: handoff para OpenCode — refresco JWT en tiempo real + gate de retiro + gaps abiertos |
 | `c5f28d4` | docs: guardar avances de sesión — 2 bugs de visibilidad del portal fixeados y deployados |
-| `ea5ad9a` | fix(portal): operator_my_accounts oculta cuentas ya retiradas por completo |
 <!-- GEN:end:recientes -->
 
 ---
