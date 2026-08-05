@@ -156,22 +156,22 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `admin_maintenance_toggle` | def | L4164–L4185 |
 | `auto_deposit_create` | def | L4189–L4225 |
 | `auto_deposit_cancel` | def | L4229–L4255 |
-| `operator_my_accounts` | def | L4259–L4300 |
-| `operator_release_account` | def | L4304–L4321 |
-| `operator_withdraw` | def | L4325–L4376 |
-| `operator_missions` | def | L4380–L4398 |
-| `auto_deposit_status` | def | L4402–L4413 |
-| `register_operator_strike` | def | L4416–L4449 |
-| `bot_start_info` | def | L4453–L4489 |
-| `bot_operator_info` | def | L4493–L4532 |
-| `bot_help_info` | def | L4536–L4550 |
-| `bot_pause_mission` | def | L4554–L4583 |
-| `bot_resume_mission` | def | L4587–L4605 |
-| `bot_cancel_mission` | def | L4610–L4645 |
-| `bot_bet_create` | def | L4649–L4818 |
-| `filter_and_sanitize_check_combos` | def | L4821–L4906 |
-| `BotCheckRequest` | class | L4909–L4913 |
-| `bot_check` | def | L4916–L4997 |
+| `operator_my_accounts` | def | L4259–L4306 |
+| `operator_release_account` | def | L4310–L4327 |
+| `operator_withdraw` | def | L4331–L4382 |
+| `operator_missions` | def | L4386–L4404 |
+| `auto_deposit_status` | def | L4408–L4419 |
+| `register_operator_strike` | def | L4422–L4455 |
+| `bot_start_info` | def | L4459–L4495 |
+| `bot_operator_info` | def | L4499–L4538 |
+| `bot_help_info` | def | L4542–L4556 |
+| `bot_pause_mission` | def | L4560–L4589 |
+| `bot_resume_mission` | def | L4593–L4611 |
+| `bot_cancel_mission` | def | L4616–L4651 |
+| `bot_bet_create` | def | L4655–L4824 |
+| `filter_and_sanitize_check_combos` | def | L4827–L4912 |
+| `BotCheckRequest` | class | L4915–L4919 |
+| `bot_check` | def | L4922–L5003 |
 
 ### `auth.py`
 
@@ -641,8 +641,9 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
 | `test_operator_my_accounts_endpoint` | def | L5–L70 |
-| `test_operator_my_accounts_visibility_in_process_lock` | def | L73–L128 |
-| `test_confirm_gate_in_auto_deposit` | def | L132–L172 |
+| `test_operator_my_accounts_hides_fully_withdrawn_account` | def | L73–L122 |
+| `test_operator_my_accounts_visibility_in_process_lock` | def | L125–L180 |
+| `test_confirm_gate_in_auto_deposit` | def | L184–L224 |
 
 ### `test_card_touch_log.py`
 

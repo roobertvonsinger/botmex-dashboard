@@ -70,6 +70,58 @@ def test_operator_my_accounts_endpoint(client, monkeypatch):
     assert "jwt" not in accs[0]
 
 
+def test_operator_my_accounts_hides_fully_withdrawn_account(client, monkeypatch):
+    """Regla de producto (Robert, 2026-08-05): una cuenta con depósito aprobado
+    debe desaparecer de la vista del operador una vez que ya no queda saldo real
+    que retirar (balance_real llegó a 0), NO debe seguir apareciendo para siempre
+    solo por tener un deposit_attempt approved histórico. Cubre `app.py` L4288
+    (AND COALESCE(a.balance_real,0) > 0 agregado sobre la pierna de aprobados)."""
+    monkeypatch.delenv("BMX_WEB_AUTH_MODE", raising=False)
+    from auth import USERS, create_session, sha256
+    operator_id = 998833
+    USERS["testop_withdrawn"] = {
+        "password_hash": sha256("pass123"),
+        "role": "operator",
+        "telegram_id": operator_id,
+        "display": "Test Op Withdrawn"
+    }
+    token = create_session("testop_withdrawn")
+    client.cookies.set("bmx_session", token)
+
+    from app import db
+    with db(write=True) as c:
+        # Depósito aprobado, pero saldo real ya en 0 (todo retirado) → NO debe salir.
+        c.execute(
+            "INSERT OR REPLACE INTO accounts (id, email, password, status, balance_real, balance_bonos, "
+            "last_deposit_amount, last_deposit_date, grade, first_checked_at, last_checked_at) "
+            "VALUES (996, 'ya_retirada@test.com', 'p6', 'LIVE', 0.0, 0.0, 150.0, '2026-08-01T12:00:00Z', 'A', "
+            "'2026-08-01T10:00:00Z', '2026-08-01T10:00:00Z')"
+        )
+        c.execute(
+            "INSERT INTO deposit_attempts (attempt_id, account_email, amount, status, duration_ms, operator_id) "
+            "VALUES ('att_withdrawn', 'ya_retirada@test.com', 150.0, 'approved', 1200, ?)",
+            (operator_id,)
+        )
+        # Depósito aprobado con saldo real > 0 todavía → SÍ debe salir (control).
+        c.execute(
+            "INSERT OR REPLACE INTO accounts (id, email, password, status, balance_real, balance_bonos, "
+            "last_deposit_amount, last_deposit_date, grade, first_checked_at, last_checked_at) "
+            "VALUES (997, 'con_saldo@test.com', 'p7', 'LIVE', 150.0, 0.0, 150.0, '2026-08-01T12:00:00Z', 'A', "
+            "'2026-08-01T10:00:00Z', '2026-08-01T10:00:00Z')"
+        )
+        c.execute(
+            "INSERT INTO deposit_attempts (attempt_id, account_email, amount, status, duration_ms, operator_id) "
+            "VALUES ('att_con_saldo', 'con_saldo@test.com', 150.0, 'approved', 1200, ?)",
+            (operator_id,)
+        )
+
+    res = client.get("/api/operator/my-accounts")
+    assert res.status_code == 200
+    emails = {a["email"] for a in res.json()["accounts"]}
+    assert "ya_retirada@test.com" not in emails
+    assert "con_saldo@test.com" in emails
+
+
 def test_operator_my_accounts_visibility_in_process_lock(client, monkeypatch):
     """Regla de vista única (2026-08-04): una cuenta SIN depósito aprobado aún
     debe aparecer si está lockeada por el operador (misión en curso), pero NO

@@ -4257,7 +4257,12 @@ def auto_deposit_cancel(mission_id: str,
 
 @app.get("/api/operator/my-accounts")
 def operator_my_accounts(user: dict = Depends(require_operator_view)):
-    """Cuentas con depósitos aprobados o en proceso del operador + CLABE STP + estado de lock."""
+    """Cuentas del operador: en proceso (lockeadas por él) o con depósito aprobado
+    Y saldo real > 0 todavía retirable. Depósito fallido o cuenta ya retirada por
+    completo desaparecen de su vista/control (regla de producto, Robert 2026-08-05).
+    Nota: balance_real se actualiza síncrono en el depósito pero NO en el retiro
+    (ver withdrawals.py) — hay lag hasta el próximo ciclo de account_refresh.py
+    entre "se retiró todo" y que la cuenta desaparezca de este endpoint."""
     operator_id = user.get("telegram_id") or 0
     is_sa = user.get("role") == "superadmin"
     with db() as c:
@@ -4285,7 +4290,8 @@ def operator_my_accounts(user: dict = Depends(require_operator_view)):
                 "FROM accounts a "
                 "LEFT JOIN deposit_attempts d ON d.account_email = a.email "
                 "LEFT JOIN account_deposit_clabes c ON (a.id = c.account_id AND (c.integration = 'STP' OR c.integration = '2')) "
-                "WHERE ( (d.operator_id=? AND d.status='approved') OR (a.locked_by=? OR a.locked_by=?) ) "
+                "WHERE ( (d.operator_id=? AND d.status='approved' AND COALESCE(a.balance_real,0) > 0) "
+                "OR (a.locked_by=? OR a.locked_by=?) ) "
                 "ORDER BY a.last_deposit_date DESC",
                 (operator_id, op_str, user.get("username") or "")
             ).fetchall()
