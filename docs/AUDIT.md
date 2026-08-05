@@ -753,3 +753,25 @@ Ejecución completa con tests 395/395 verdes.
 | **`rl_streak` SA-only en `/api/accounts`** | El crudo `rl_streak` se hace `pop` SIEMPRE (no filtrar internals al operador — ley de capas); solo el SA lo recibe como flag de gestión (marca de cuentas en rate-limit sin que operadores sepan que existe). | ✅ implementado | ✅ `app.py` `_accounts_api` |
 
 **Universos finales** (Robert 2026-08-05): 🟢 JWT vivo → `account_refresh` autofetch (balance + datos variables, sin captcha); 🔑 sin JWT → `jwt_keeper` Login Full (captcha+proxy, batch 50/ciclo, cooldown 24h tras rate-limit); Login D/R → reusa sesión viva (cache-hit sin captcha), Login Full solo si murió. Regla dura: nunca rafagear a BetMexico.
+
+## Captura: 2026-08-05 (noche — review Claude Code, consolidación a `main` y deploy a KVM4)
+
+**Motivo**: Robert pidió revisar el trabajo de OpenCode ("¿se rompió algo?"), consolidar toda la rama
+`feature/jwt-refresh-hardening-2026-08-05` (incluyendo su propio commit `18e74d8` de refresco JWT y cambios
+de frontend sin commitear) en una sola rama, mergear a `main` y deployar sin omitir errores.
+
+| Verificación | Resultado |
+|---|---|
+| Gap de tests que dejó OpenCode | `operator_withdraw` (el endpoint de retiro más usado) no tenía cobertura del refresh post-retiro — solo `withdraw` (SA) la tenía. Cerrado con 2 tests nuevos. Encontrado de paso: bug del arnés — `make_client` solo hace `dependency_overrides` sobre `require_session`, pero `operator_withdraw` usa `require_operator_view`, que llama a `require_session` como función plana (no `Depends`) — el override nunca lo interceptaba. Workaround en el test (override directo de `require_operator_view`); no se tocó `auth.py`/`conftest.py` (gap de arnés, no de producto). |
+| Ramas locales | `feat/fix-modo-auto` y `feat/modo-auto-deposito`: ya ancestros de `main` (obsoletas, nada que consolidar). `feat/support-agent`: **excluida a propósito** — su propio commit dice "bloqueado en 9-router, sin merge a main". |
+| Consolidación | Frontend sin commitear (tabs superiores + portal embebido) + rama JWT → 1 sola rama, mergeada a `main` FF-only (`main` era ancestro directo, sin conflictos). Push a Forgejo. |
+| Suite completa | 395/395 sobre la rama consolidada, sin regresiones. |
+| Sintaxis frontend | `node --check` sobre `app.js`/`portal.js` — OK. Sin referencias huérfanas a `.cenefa` tras el rename a `.toptabs`. `/user/{id}?bare=1` no requiere cambios de backend (ruta ya soporta query string; SA tiene `telegram_id` fijo en `auth.py`). |
+| Estado de prod ANTES del deploy | `betmexico-web` sano (sin errores en logs) pero corriendo código **anterior a toda esta sesión** — 0 de 6 archivos backend clave coincidía por hash. Además había drift previo sin relación (archivos `static/depos.js`, `static/depos_logic.js`, `static/pantalla.css`, `static/pantalla.js`, `clabe_fetch.py` — último commit relevante `e674d395`, 2026-08-01 — nunca deployados). |
+| Deploy ejecutado | 16 archivos (10 backend + 6 estáticos) vía `scp` a `/docker/betmexico/code/web/`. MD5 local==remoto verificado archivo por archivo post-copia. Sintaxis (`ast.parse`) validada **dentro del contenedor** antes de reiniciar. `docker restart betmexico-web` → arranque limpio, 0 tracebacks en 30min post-restart. |
+| Verificación post-deploy | ⚠️ Trampa propia detectada y corregida: el primer `curl` de salud usó `betmexico.mx` (el sitio REAL de apuestas, con CloudFront delante) en vez de `botmexico.net` (nuestro dashboard) — typo de un carácter, dio 200 por pura coincidencia (era la home del sitio de apuestas, no nuestro health). Repetido contra el dominio correcto: `/api/health` 401 sin sesión (correcto, requiere `Depends(require_session)`), `/login` 200, `/dashboard` sin sesión → 302. `/static/index.html` sirve `class="toptabs"`, `/static/app.js` sirve `_ensurePortalLoaded`, `/static/portal.html` sirve `body.bare` — confirmado que el proceso vivo sirve el contenido nuevo, no solo el disco. |
+
+**Nota para próximas sesiones**: el dominio del dashboard es `botmexico.net` (o `.com.mx` si el alias se
+restauró — ver `project_dominio_botmexico_net_alias` en memoria). `betmexico.mx` (con "e") es el sitio de
+apuestas real que el bot automatiza — dominios de 1 carácter de diferencia, fácil de confundir en un `curl`
+rápido. Verificar siempre el `Server:` header (`uvicorn` = nuestro dashboard; `CloudFront` = sitio real).

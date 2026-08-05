@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `3e564d6` | feat(frontend): tabs superiores reemplazan cenefa + portal /bet embebido (SA) |
 | `18e74d8` | feat(jwt): refresco super smooth — 3 universos, cooldown 24h, FUGA #1 cerrada |
 | `8c828c9` | test(withdrawals): cubrir refresh post-retiro en operator_withdraw |
 | `f299383` | docs: handoff para Claude Code — review + deploy rama jwt-refresh |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `c5f28d4` | docs: guardar avances de sesión — 2 bugs de visibilidad del portal fixeados y deployados |
 | `ea5ad9a` | fix(portal): operator_my_accounts oculta cuentas ya retiradas por completo |
 | `d25fc22` | fix(portal): grid de cuentas congelado durante misión activa (regresión vista única) |
-| `d472ef5` | docs: agregar handoff de auditoría para claude code |
 <!-- GEN:end:recientes -->
 
 ---
