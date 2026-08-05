@@ -3,6 +3,15 @@
 > Documento máster para trabajo en Open Design / Figma / Frontend Refactoring.
 > Define la arquitectura visual, tokens, affordances, microinteracciones y flujo sin fricción desde Telegram hasta el Landing Page `/portal`.
 
+> **⚠️ Corrección 2026-08-04 (Robert, campo real):** la frase de abajo "NO requiere ingresar
+> contraseñas" se leyó mal en al menos una implementación como "sin login al dashboard" —
+> **falso**. Se refiere ÚNICA y EXCLUSIVAMENTE a la contraseña de la cuenta de BetMexico
+> (el operador nunca la ve/usa). El login al dashboard con usuario/contraseña PROPIOS del
+> sistema es y debe ser siempre obligatorio para cualquier no-SA. Ver desambiguación completa
+> en `PRODUCT.md`. Este documento también describe un flujo de dos vistas (misión + grid) con
+> `mission_id` visible que Robert marcó como ruido innecesario el mismo día — ver corrección
+> en `PRODUCT.md` sección "Portal del operador" antes de usar este doc como referencia de diseño.
+
 ---
 
 ## 1. Visión y Filosofía de Marca (BoTMexico UX)

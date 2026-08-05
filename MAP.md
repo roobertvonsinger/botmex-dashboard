@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `8aced33` | fix(portal): Retirar habilitado sin saldo real + modal exponía instrucción interna |
 | `b858f34` | docs: NEXT-SESSION — cierre de auditoría E2E /bet + impeccable (5ta parte) |
 | `b4f90a5` | fix(portal): 4 bugs reales de lógica de usuario en poll de retiro + CURP sentinel |
 | `1050bc6` | docs: NEXT-SESSION — Track B cerrado (12 commits, 383/383, IDOR encontrado y corregido) |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `98613fb` | feat(api): permitir a operadores dueños consultar withdraw/status |
 | `1eceac6` | feat(account_refresh): bypass de filtros para cuentas hot en select_refresh_candidates_healthy |
 | `88b3c47` | feat(portal): interpolación visual del progreso de misión (anti-detección) |
-| `7e68635` | feat(api): exponer withdrawal_ready/withdrawal_institution/curp en /api/operator/my-accounts |
 <!-- GEN:end:recientes -->
 
 ---
