@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `6f67527` | feat(withdrawals): refresco de balance post-retiro reusando JWT |
 | `dcce536` | feat(jwt_keeper): priorizar cuentas hot en lote de re-login |
 | `fd0b633` | docs: handoff para OpenCode — refresco JWT en tiempo real + gate de retiro + gaps abiertos |
 | `c5f28d4` | docs: guardar avances de sesión — 2 bugs de visibilidad del portal fixeados y deployados |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `484b002` | docs: desambiguar "sin password" (BetMexico != login dashboard) + regla real de visibilidad del portal |
 | `8aced33` | fix(portal): Retirar habilitado sin saldo real + modal exponía instrucción interna |
 | `b858f34` | docs: NEXT-SESSION — cierre de auditoría E2E /bet + impeccable (5ta parte) |
-| `b4f90a5` | fix(portal): 4 bugs reales de lógica de usuario en poll de retiro + CURP sentinel |
 <!-- GEN:end:recientes -->
 
 ---

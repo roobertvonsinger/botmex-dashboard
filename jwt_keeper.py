@@ -165,10 +165,10 @@ _SELECT_COLS = ("email", "password", "status", "grade", "jwt_expires_at",
                 "cooldown_until", "locked_by", "published_to_pool", "rl_streak",
                 "balance_real", "locked_until")
 
-_PENDING_WD_EXISTS_SQL = (
-    "EXISTS(SELECT 1 FROM account_withdrawals w WHERE w.account_id = accounts.id "
-    "AND (w.status_api IS NULL OR (w.status_api >= 0 AND w.status_api != 6)))"
-)
+# Reusa la subquery de account_refresh (DRY: una sola fuente de verdad para
+# "¿tiene retiro pendiente?"). ponytail: si account_refresh la cambia, jwt_keeper
+# la hereda automáticamente sin tocar este archivo.
+from account_refresh import _PENDING_WD_EXISTS_SQL
 
 
 def _load_candidate_rows() -> List[Dict[str, Any]]:
