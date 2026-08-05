@@ -2,6 +2,12 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## JWT muerto server-side quedaba sin re-login hasta 1h (FUGA #1 — corregido 2026-08-05 tarde)
+
+- **Síntoma**: cuando BetMexico mataba un JWT server-side (401 silencioso, fetch vacío), `account_refresh` invalidaba la cache pero el re-login solo ocurría en el tick horario de `jwt_keeper` → gap de hasta 1h con la cuenta sin sesión, aunque `jwt_keeper` estuviera configurado para re-login urgente. Muy relevante para cuentas hot (retiro pendiente, autolock, ventana activa).
+- **Fix**: `_wake_jwt_keeper()` en `app.py` — un `asyncio.Event` global con debounce de 5 min. `account_refresh` lo dispara al invalidar un JWT muerto; `_jwt_keepalive_loop` duerme en `await asyncio.wait_for(_jwt_wakeup.wait(), timeout=interval_sec)` en vez de sleep ciego, así el ciclo corre YA (si no hay otro corriendo) y no al próximo tick. Ver AUDIT.md entry "Detector de sesiones muertas cada 20 min".
+- **Verificación**: suite 395/395 green, syntax OK en los módulos tocados.
+
 ## `operator_my_accounts` no ocultaba cuentas ya retiradas por completo — violaba la regla real de control del operador (detectado y corregido 2026-08-05)
 
 - **Regla de producto (Robert, 2026-08-05, textual)**: la única forma en que una cuenta le aparece a un operador en su portal es (a) haber depositado con `/bet` exitosamente, o (b) temporalmente mientras el proceso está en curso. Si el depósito falla, la cuenta sale de su vista/control. Si el depósito se logra, se queda **únicamente mientras tenga dinero real que retirar** — una vez retirado todo, también debe desaparecer.

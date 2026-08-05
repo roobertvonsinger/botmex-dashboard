@@ -254,19 +254,22 @@ def _db_upsert_balance(email: str, details: dict) -> None:
                     bal_real = float(row["balance_real"] or 0.0)
                     bal_bonos = float(row["balance_bonos"] or 0.0)
                     bal_total = float(row["balance_total"] or (bal_real + bal_bonos))
+            # last_updated_at solo se toca aquí (persistencia de balance REAL),
+            # no en fetch fallidos — es el "Últ. update" honesto de la tabla.
             if has_dep:
                 c.execute(
                     "UPDATE accounts SET balance_real=?, balance_bonos=?, "
                     "balance_total=?, last_deposit_amount=?, last_deposit_date=?, "
-                    "last_checked_at=? WHERE email=?",
+                    "last_checked_at=?, last_updated_at=? WHERE email=?",
                     (bal_real, bal_bonos, bal_total,
-                     float(new_amt), str(new_date), now_utc, email),
+                     float(new_amt), str(new_date), now_utc, now_utc, email),
                 )
             else:
                 c.execute(
                     "UPDATE accounts SET balance_real=?, balance_bonos=?, "
-                    "balance_total=?, last_checked_at=? WHERE email=?",
-                    (bal_real, bal_bonos, bal_total, now_utc, email),
+                    "balance_total=?, last_checked_at=?, last_updated_at=? "
+                    "WHERE email=?",
+                    (bal_real, bal_bonos, bal_total, now_utc, now_utc, email),
                 )
     except sqlite3.OperationalError:
         pass

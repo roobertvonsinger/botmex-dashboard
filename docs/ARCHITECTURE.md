@@ -176,11 +176,12 @@ Columnas clave de estado y operativo:
 | `locked_until` | TEXT | NULL | ISO timestamp de liberación automática (reloj); NULL = perpetuo (solo SA) |
 | `published_to_pool` | INTEGER | 1 | 1 = disponible en pool; 0 = trastienda (oculta) |
 | `status` | TEXT | — | Estado BetMexico (`LIVE`, `INACTIVE`, `BANNED`, etc.) |
-| `balance` | REAL | — | Saldo (caché, actualizado por `account_refresh.py` cada 5 min) |
+| `balance` | REAL | — | Saldo (caché, actualizado por `account_refresh.py` cada 20 min) |
 | `jwt_token` | TEXT | NULL | JWT vigente (login exitoso); cacheado, válido ~7 días |
 | `jwt_expires_at` | INTEGER | NULL | Unix timestamp de expiración del JWT actual |
 | `withdrawal_ready` | INTEGER | 0 | Flag: 1 = BetMexico tiene cuenta de retiro aprobada (SPEI aterrizó). Cacheado, poblado por `account_refresh.py`. Gatea el botón de retiro del portal. |
 | `withdrawal_institution` | TEXT | NULL | Nombre de la institución de retiro aprobada (ej. "BBVA México"). Poblado junto con `withdrawal_ready` por `account_refresh.py`. |
+| `last_updated_at` | TEXT | NULL | Cuándo se persistió balance REAL por última vez (escrito solo por `prewarm._db_upsert_balance`). Difiere de `last_checked_at` (que también se toca en fetchs fallidos) — es el "Últ. update" honesto de la tabla. Agregado 2026-08-05. |
 | `grade` | TEXT | — | Calificación de riesgo (`A+`, `A`, `B`, `C`, `D`; ver `web_grading.py`) |
 | `locked_by` + `locked_until` + `published_to_pool` | — | — | **Fuente única de estado** (ver §Modelo de estados de cuenta) |
 

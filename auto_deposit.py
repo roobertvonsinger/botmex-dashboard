@@ -161,16 +161,20 @@ def select_accounts_for_auto(
       2. published_to_pool == 1 (o excepción RESERVADA_SA)
       3. locked_by IS NULL
       4. cooldown_until no activo
-      5. jwt_expires_at > now + 60 (JWT vivo)
-      6. Cooldown de 48h por depósito APROBADO en el dashboard
-      7. window_map[email]["available"] >= amount * count
-      8. decline_map[email] < MM_ACCOUNT_RECENT_DECLINE_LIMIT (2 declines en 12h)
-      9. Cero IsUserInValidationProcess o DEAD reciente en meta_map
+      5. Cooldown de 48h por depósito APROBADO en el dashboard
+      6. window_map[email]["available"] >= amount * count
+      7. decline_map[email] < MM_ACCOUNT_RECENT_DECLINE_LIMIT (2 declines en 12h)
+      8. Cero IsUserInValidationProcess o DEAD reciente en meta_map
 
     Estratificación Oculta Backend (sin badges ni labels visuales):
       - Tier TOP: 3DS reciente (<24h) o Grade A+
       - Tier MID: Grade A
       - Tier LOW: Depósitos SPEI/externos recientes (<24h), reposo corto o Grade B/C/D
+
+    JWT vivo NO es exclusión dura (Robert 2026-08-05): el matchmaker PRIORIZA
+    cuentas con sesión 🟢 por rapidez, pero si no hay suficientes, toma 🔑 sin
+    JWT y el flujo hace Login Full — última prioridad, no bloquea. Las cuentas
+    sin JWT vivo caen siempre al tier más bajo.
 
     Selección: 1 TOP, 1 MID, 1 LOW (round-robin con fall-through).
     """
@@ -199,11 +203,6 @@ def select_accounts_for_auto(
         if _cd_active(r.get("cooldown_until"), now):
             continue
 
-        if "jwt_expires_at" in r:
-            jwt_exp = _exp_int(r.get("jwt_expires_at"))
-            if jwt_exp <= now + 60:
-                continue
-
         meta = meta_map.get(email) or {}
         # 1. Enfriamiento 48h por depósito APROBADO en dashboard
         if meta.get("has_dashboard_approved_48h"):
@@ -222,6 +221,13 @@ def select_accounts_for_auto(
             if (decline_map.get(email) or 0) >= MM_ACCOUNT_RECENT_DECLINE_LIMIT:
                 continue
 
+        # JWT vivo (🟢) = sesión reutilizable sin captcha. NO excluye (Robert
+        # 2026-08-05): baja a la cuenta de tier, no la saca. Flag para el tiering.
+        if "jwt_expires_at" in r:
+            r["_jwt_alive"] = _exp_int(r.get("jwt_expires_at")) > now + 60
+        else:
+            r["_jwt_alive"] = False
+
         out.append(r)
 
     # Clasificar internamente en 3 Tiers (Top, Mid, Low)
@@ -232,6 +238,13 @@ def select_accounts_for_auto(
     for r in out:
         email = r.get("email")
         meta = meta_map.get(email) or {}
+
+        # Sin JWT vivo (🔑) → SIEMPRE último tier (Robert 2026-08-05): el
+        # matchmaker prioriza 🟢 por rapidez; 🔑 solo se usa si no alcanza y
+        # el flujo hace Login Full. No se excluye (última prioridad, no bloquea).
+        if not r.get("_jwt_alive"):
+            tier_low.append(r)
+            continue
 
         has_spei_24h = meta.get("has_spei_24h", False)
         has_3ds_24h = meta.get("has_3ds_24h", False)
@@ -296,6 +309,10 @@ def select_accounts_for_auto(
         remaining = [r for r in out if r not in stratified]
         remaining.sort(key=sort_key)
         stratified.extend(remaining[:count - len(stratified)])
+
+    # _jwt_alive era flag interno de tiering — limpiarlo del dict entregado
+    for r in stratified:
+        r.pop("_jwt_alive", None)
 
     return stratified
 
@@ -747,7 +764,10 @@ async def run_auto_mission(
                 logger.info(f"💳 SUBMIT SUCCESS | {email} | Pipe: {pipe} | Code: {code} | Duration: {duration}ms")
             else:
                 if code == "RATE_LIMITED":
-                    logger.warning(f"⏱️ RATE-LIMIT | {email} | Pipe: {pipe} | Reason: {reason}")
+                    # Robert 2026-08-05: el rate-limit es pedo interno del backend,
+                    # se resuelve en silencio (cooldown en deposits). El operador
+                    # no debe verlo en el log de misión.
+                    logger.debug(f"🛡️ cuenta en pausa (retry automático) | {email}")
                 elif code in _d.MM_DEAD_RC:
                     logger.error(f"💀 DEAD ACCOUNT | {email} | Pipe: {pipe} | Code: {code}")
                 else:

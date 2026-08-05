@@ -46,14 +46,18 @@ def test_select_filters_cooldown():
     assert [r["email"] for r in sel] == ["ok@t.com"]
 
 
-def test_select_filters_no_jwt():
+def test_select_prioritizes_jwt_not_excludes():
+    # Robert 2026-08-05: JWT vivo NO excluye — prioriza. Sin JWT va al último
+    # tier (Login Full), nunca se bloquea el matchmaker por falta de sesión.
     rows = [
         _row("ok@t.com"),
         _row("nojwt@t.com", jwt_expires_at=None),
         _row("exp@t.com", jwt_expires_at=int(time.time()) - 10),
     ]
     sel = select_accounts_for_auto(rows, 150, 9, _win("ok@t.com", "nojwt@t.com", "exp@t.com"))
-    assert [r["email"] for r in sel] == ["ok@t.com"]
+    assert sel and sel[0]["email"] == "ok@t.com"  # 🟢 primero
+    got = [r["email"] for r in sel]
+    assert "nojwt@t.com" in got and "exp@t.com" in got  # 🔑 incluida, no excluida
 
 
 def test_select_filters_insufficient_cap():
@@ -218,11 +222,12 @@ def test_plan_normalizes_4part_pool_cards(seed_db):
 
 
 def test_plan_feasibility_check(seed_db):
-    # seed base: a@ lockeada, b@ sin JWT vivo, c@ DEAD → ninguna elegible
+    # seed base: a@ lockeada, c@ DEAD → solo b@ (LIVE, sin JWT) es candidata.
+    # Robert 2026-08-05: JWT vivo NO es exclusión — b@ sin JWT entra (última
+    # prioridad, Login Full), así que el plan es factible con ella.
     plan = plan_auto_mission(seed_db, ["4111111111111111|1230|123"], amount=150, target_count=9)
-    assert plan["feasible"] is False
-    assert plan["accounts"] == []
-    assert plan["reason"]
+    assert plan["feasible"] is True
+    assert any(r["email"] == "b@test.com" for r in plan["accounts"])
 
 
 def test_plan_estimates_total(seed_db):
@@ -231,8 +236,10 @@ def test_plan_estimates_total(seed_db):
     _add_card(seed_db, "4111111111111111", "t1@t.com")
     _add_card(seed_db, "4222222222222222", "t2@t.com")
     plan = plan_auto_mission(seed_db, [], amount=150, target_count=9)
-    assert len(plan["accounts"]) == 2
-    assert plan["total_estimated"] == 150 * 9 * 2
+    # t1 + t2 (JWT vivo, tarjeta casada) + b@ del seed (LIVE sin JWT, tarjeta
+    # 4222 casada en conftest) — el JWT ya no excluye (Robert 2026-08-05).
+    assert len(plan["accounts"]) == 3
+    assert plan["total_estimated"] == 150 * 9 * 3
 
 
 def _add_rejected_attempt(db_path, email, hours_ago=1):
@@ -251,14 +258,15 @@ def _add_rejected_attempt(db_path, email, hours_ago=1):
 
 def test_plan_excludes_accounts_with_recent_declines(seed_db):
     """Regla Robert: cuenta con 2 declines en las últimas 12h NO entra al plan
-    aunque cumpla el resto de filtros (no taladrar cuentas ya quemadas)."""
+    aunque cumpla el resto de filtros (no taladrar cuentas ya quemadas).
+    burned@ queda fuera; b@ del seed (sin declines) sí entra."""
     _add_account(seed_db, "burned@t.com")
     _add_card(seed_db, "4111111111111111", "burned@t.com")
     _add_rejected_attempt(seed_db, "burned@t.com", hours_ago=1)
     _add_rejected_attempt(seed_db, "burned@t.com", hours_ago=2)
     plan = plan_auto_mission(seed_db, [], amount=150, target_count=9)
-    assert plan["feasible"] is False
-    assert plan["accounts"] == []
+    assert "burned@t.com" not in [r["email"] for r in plan["accounts"]]
+    assert plan["accounts"]  # b@ del seed sigue entrando (sin declines)
 
 
 def test_plan_max_accounts_scales_with_card_count(seed_db):

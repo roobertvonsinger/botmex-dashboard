@@ -967,10 +967,12 @@ async def _acquire_session_and_begin(
                 })
                 # RATE_LIMITED (429/BAN, Capa 3): enfriar la cuenta y NO reintentar
                 # la caliente — el caller la salta hasta que pase el cooldown.
+                # Robert 2026-08-05: el operador NO debe ver "rate-limit" — es
+                # pedo interno del backend. Copy neutro, cooldown real.
                 if login_res.code == "RATE_LIMITED":
                     until = _set_account_cooldown(email)
-                    msg = (f"BetMexico rate-limit (429) — cuenta enfriando "
-                           f"{RATE_LIMIT_COOLDOWN_MIN} min. No reintentar hasta entonces.")
+                    msg = (f"Cuenta temporalmente no disponible — se reintenta "
+                           f"automáticamente más tarde.")
                     await _safe_phase(phase_cb, "done", {
                         "success": False, "result_code": "RATE_LIMITED", "error": msg,
                     })

@@ -62,6 +62,26 @@ try:
         _root_logger.addHandler(_fh)
         if _root_logger.level == _logging.NOTSET or _root_logger.level > _logging.INFO:
             _root_logger.setLevel(_logging.INFO)
+
+    # Refrescos masivos (account_refresh + jwt_keeper) a SU PROPIO archivo,
+    # NO al dashboard.log — Robert 2026-08-05: los refrescos masivos no deben
+    # spamear el log operativo. propagate=False evita que además caigan al root.
+    _refresh_loggers = [_logging.getLogger("betmexico.dashboard.account_refresh"),
+                        _logging.getLogger("betmexico.dashboard.jwt_keeper")]
+    for _rl in _refresh_loggers:
+        _rl.propagate = False
+        if not any(isinstance(h, _logging_handlers.RotatingFileHandler)
+                   and getattr(h, "_refresh_handler", False)
+                   for h in _rl.handlers):
+            _rfh = _logging_handlers.RotatingFileHandler(
+                str(_LOGS_DIR / "refresh.log"), maxBytes=10 * 1024 * 1024,
+                backupCount=3, encoding="utf-8",
+            )
+            _rfh._refresh_handler = True  # marker
+            _rfh.setFormatter(_logging.Formatter(
+                "%(asctime)s [%(levelname)s] [%(name)s] %(message)s"
+            ))
+            _rl.addHandler(_rfh)
 except Exception as _e:
     print(f"[boot] file logger init failed: {_e}")
 
@@ -275,6 +295,11 @@ def _migrate():
         # gatear el botón del portal sin round-trip. Poblado por account_refresh.py.
         ("withdrawal_ready", "ALTER TABLE accounts ADD COLUMN withdrawal_ready INTEGER DEFAULT 0"),
         ("withdrawal_institution", "ALTER TABLE accounts ADD COLUMN withdrawal_institution TEXT"),
+        # last_updated_at: cuándo se persistió balance REAL por última vez. Difiere
+        # de last_checked_at (que también se toca en fetchs fallidos, prewarm
+        # _db_touch_last_checked) — para que la tabla muestre "Últ. update" real.
+        # Lo escribe prewarm._db_upsert_balance. Aditiva.
+        ("last_updated_at", "ALTER TABLE accounts ADD COLUMN last_updated_at TEXT"),
     ]:
         try:
             with db(write=True) as c:
@@ -1046,7 +1071,8 @@ def list_accounts(
         "a.balance_total, a.balance_real, "
         "a.last_deposit_amount, a.last_deposit_date, a.status, a.grade, "
         "a.locked_by, a.locked_at, a.locked_until, a.last_checked_at, a.check_count, "
-        "a.jwt_expires_at, a.dead_reason, a.cooldown_until, "
+        "a.jwt_expires_at, a.dead_reason, a.cooldown_until, a.rl_streak, "
+        "a.last_updated_at, "
         "COALESCE(a.published_to_pool, 1) AS published_to_pool, "
         "(SELECT COUNT(*) FROM account_cards ac WHERE ac.account_email=a.email) AS cards_count, "
         "(SELECT COUNT(*) FROM account_notes an WHERE an.account_email=a.email "
@@ -1096,6 +1122,13 @@ def list_accounts(
                 # TODOS: son guardarriles visuales, no internals.
                 _dr = r.pop("dead_reason", None)
                 _cd = r.pop("cooldown_until", None)
+                # rl_streak es internal operativo → SOLO-SA. Non-SA nunca debe
+                # saber que existe rate-limit (Robert 2026-08-05: pedo interno
+                # del backend, se resuelve en silencio). Pop siempre, expongo
+                # solo al SA como flag de gestión.
+                _rl = r.pop("rl_streak", None)
+                if role == "superadmin":
+                    r["rl_streak"] = int(_rl or 0)
                 r["jwt_alive"] = bool(
                     _exp not in (None, "")
                     and int(_exp) > datetime.now(timezone.utc).timestamp() + 60)
@@ -2620,7 +2653,11 @@ async def _jwt_keepalive_loop():
     """Mantiene vivos los JWT de sesión (7 días fijos) re-logueando de forma
     proactiva y ESPACIADA solo las cuentas por expirar/expiradas de mejor grado.
     Baja el 429: menos JWT muertos = menos logins forzados = menos rate-limit.
-    Config por env JWT_KEEPER_* (ver jwt_keeper.cfg). Tick cada JWT_KEEPER_INTERVAL_SEC."""
+    Config por env JWT_KEEPER_* (ver jwt_keeper.cfg). Tick cada JWT_KEEPER_INTERVAL_SEC.
+
+    Sleep = `_jwt_wakeup.wait()` con timeout: si account_refresh detecta un JWT
+    muerto server-side (401 silencioso) invalida la cache y hace `_wake_jwt_keeper()`
+    → este loop despierta y re-loguea YA, sin esperar el tick horario (FUGA #1)."""
     import jwt_keeper
     c = jwt_keeper.cfg()
     if not c["enabled"]:
@@ -2633,7 +2670,32 @@ async def _jwt_keepalive_loop():
             print(f"[jwt_keeper] ciclo: {stats}")
         except Exception as e:
             print(f"[jwt_keeper] error de ciclo: {e}")
-        await asyncio.sleep(jwt_keeper.cfg()["interval_sec"])
+        # Dormir hasta el próximo tick horario, o despertar antes si el refresh
+        # invalidó JWT muertos (wake). Debounce de la señal está en _wake_jwt_keeper.
+        try:
+            await asyncio.wait_for(_jwt_wakeup.wait(), timeout=jwt_keeper.cfg()["interval_sec"])
+        except asyncio.TimeoutError:
+            pass
+        finally:
+            _jwt_wakeup.clear()
+
+
+_jwt_wakeup = asyncio.Event()
+_jwt_wakeup_last = 0.0
+
+
+def _wake_jwt_keeper() -> None:
+    """Despierta a `_jwt_keepalive_loop` para que re-loguee YA las cuentas cuyo
+    JWT murió server-side (las invalidó account_refresh). Debounce de 5 min:
+    si ya se despertó hace poco, el event ya está seteado y el keeper corre al
+    terminar su ciclo — no hay que repetir. No rafagea: el ciclo del keeper
+    siempre espacia los logins (gap configurable) y el event solo adelanta tick."""
+    global _jwt_wakeup_last
+    now = time.time()
+    if now - _jwt_wakeup_last < 300:
+        return
+    _jwt_wakeup_last = now
+    _jwt_wakeup.set()
 
 
 async def _account_refresh_loop():

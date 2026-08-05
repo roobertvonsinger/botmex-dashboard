@@ -48,25 +48,30 @@ def cfg() -> Dict[str, Any]:
     return {
         "enabled": os.environ.get("JWT_KEEPER_ENABLED", "1") == "1",
         "interval_sec": _env_int("JWT_KEEPER_INTERVAL_SEC", 3600),      # 1h
-        "batch_max": _env_int("JWT_KEEPER_BATCH", 8),                   # cuentas/ciclo. 12→20→8 (2026-07-11): subirlo a 20 para "drenar backlog" fue error — el backlog resultó ~90% QUEMADO (medido: selected:20/rate_limited:18), así que batch alto solo gasta más captcha en cuentas que dan rate_limited. Con el cooldown de 6h apartando las quemadas, un batch chico toca suave, aparta las quemadas y refresca las pocas sanas sin desperdicio. Sube de nuevo cuando el universo enfríe.
+        # 8 → 50 (Robert 2026-08-05): el batch alto era un problema cuando el
+        # cooldown era corto (6h) — la cuenta quemada volvía a ser elegible al
+        # siguiente ciclo y el batch drenaba captcha en puro rate_limited. Con
+        # cooldown de 24h tras UN rate-limit (no taladrar) + cuarentena de 24h
+        # tras racha, el batch de 50 es seguro: las quemadas se apartan por un
+        # día completo tras su primer 429 y el universo sano avanza de verdad.
+        "batch_max": _env_int("JWT_KEEPER_BATCH", 50),
         "refresh_ahead_sec": _env_int("JWT_KEEPER_REFRESH_AHEAD_H", 24) * 3600,
         "gap_min": _env_int("JWT_KEEPER_GAP_MIN_SEC", 20),
         "gap_max": _env_int("JWT_KEEPER_GAP_MAX_SEC", 45),
-        # Cooldown que el keeper aplica a una cuenta que le da RATE_LIMITED. DEBE
-        # ser >> interval (1h): si fuera 45min (< 1h) la cuenta quemada volvería a
-        # ser elegible justo cuando el keeper corre de nuevo → BUCLE DE QUEMA
-        # (medido 2026-07-11: 12 selected / 12 rate_limited cada ciclo). El keeper
-        # NO tiene urgencia (el JWT ya expiró, no hay sesión que salvar), así que
-        # una cuenta quemada descansa VARIOS ciclos. Efecto: el keeper se auto-regula
-        # — aparta las quemadas y deja de tocarlas hasta que enfríen de verdad. 6h = 6 ciclos.
-        "rl_cooldown_min": _env_int("JWT_KEEPER_RL_COOLDOWN_MIN", 360),
-        # Racha de RATE_LIMITED consecutivos (forense 2026-07-11 tarde, ver rl_streak
-        # en app._migrate): a partir de este umbral, la cuenta deja de ser "enfriando"
-        # (transitorio) y pasa a "quemada permanente" (cuarentena larga). Medido en
-        # prod: cuentas con 429 en TODOS sus intentos durante 22h+ pese al cooldown de
-        # 6h — no es cuestión de esperar más, es que BetMexico las tiene bloqueadas.
+        # Cooldown tras UN rate-limit = 24h (Robert 2026-08-05): "solo intentar
+        # 1 vez al día traerlas a la vida, no más, para no espamearla". Con un
+        # solo 429 de BetMexico la cuenta descansa 24h COMPLETAS — rompe el
+        # bucle de quema sin importar el tamaño del batch: la quemada entra al
+        # lote, da 429 una vez, y no vuelve a ser elegible hasta mañana.
+        "rl_cooldown_min": _env_int("JWT_KEEPER_RL_COOLDOWN_MIN", 1440),  # 24h
+        # Racha de RATE_LIMITED consecutivos (forense 2026-07-11, ver rl_streak
+        # en app._migrate): a partir de este umbral la cuenta pasa a cuarentena
+        # larga. 2026-08-05: 48h → 24h. El 429 NO era un bloqueo puntual de
+        # BetMexico — fue una ráfaga de logins que los quemó (forense Robert);
+        # con el refresco bien hecho no hay por qué mandar a nadie a rate-limit.
+        # 24h las deja descansar un día y reintentar suave al siguiente.
         "rl_streak_quarantine_at": _env_int("JWT_KEEPER_RL_STREAK_QUARANTINE_AT", 3),
-        "rl_quarantine_min": _env_int("JWT_KEEPER_RL_QUARANTINE_MIN", 2880),  # 48h
+        "rl_quarantine_min": _env_int("JWT_KEEPER_RL_QUARANTINE_MIN", 1440),  # 24h
         "grades": grades or DEFAULT_GRADES,
     }
 
@@ -320,7 +325,7 @@ async def run_keepalive_cycle(
                 stats["live"] += 1
                 if (r.get("rl_streak") or 0) > 0:
                     await asyncio.to_thread(_reset_rl_streak, email)
-                logger.info(f"[jwt_keeper] {email} JWT fresco ✓ (grade {r.get('grade')})")
+                logger.debug(f"[jwt_keeper] {email} JWT fresco ✓ (grade {r.get('grade')})")
             elif res.code == "RATE_LIMITED":
                 stats["rate_limited"] += 1
                 streak = await asyncio.to_thread(_bump_rl_streak, email)
@@ -329,10 +334,10 @@ async def run_keepalive_cycle(
                     await asyncio.to_thread(_set_cooldown, email, rl_quarantine_min)
                     logger.warning(
                         f"[jwt_keeper] {email} racha={streak} rate-limited SIN éxito → "
-                        f"CUARENTENA {rl_quarantine_min}min (quemada permanente, no transitoria)")
+                        f"descanso {rl_quarantine_min}min (1 día, Robert 2026-08-05)")
                 else:
                     await asyncio.to_thread(_set_cooldown, email, rl_cooldown_min)
-                    logger.info(f"[jwt_keeper] {email} rate-limited (racha={streak}) → cooldown {rl_cooldown_min}min")
+                    logger.debug(f"[jwt_keeper] {email} rate-limited (racha={streak}) → cooldown {rl_cooldown_min}min")
             elif res.account_dead:
                 stats["dead"] += 1
                 # Cuarentena (forense 2026-07-11): persistir DEAD, no solo contar.
@@ -343,7 +348,7 @@ async def run_keepalive_cycle(
                     await asyncio.to_thread(_db_mark_dead, email, res.code or "LOGIN_DENIED")
                 except Exception as e:  # pragma: no cover
                     logger.warning(f"[jwt_keeper] no pude marcar DEAD {email}: {e}")
-                logger.info(f"[jwt_keeper] {email} muerta ({res.code}) → cuarentena DEAD")
+                logger.warning(f"[jwt_keeper] {email} muerta ({res.code}) → cuarentena DEAD")
             else:
                 stats["retry"] += 1  # LOGIN_RETRY_LATER → próximo ciclo
     finally:

@@ -70,8 +70,13 @@ def cfg() -> Dict[str, Any]:
     grades = {g.strip() for g in grades_raw.split(",") if g.strip()}
     return {
         "enabled": os.environ.get("ACCOUNT_REFRESH_ENABLED", "1") == "1",
-        "interval_sec": _env_int("ACCOUNT_REFRESH_INTERVAL_SEC", 300),  # 5 min
-        "batch_max": _env_int("ACCOUNT_REFRESH_BATCH", 40),  # headroom sobre las ~18 medidas
+        # 300 → 1200 (Robert 2026-08-05): el autofetch ahora es el DETECTOR de
+        # sesiones muertas server-side + refresco de balance. Corre cada 20 min
+        # (no cada 5): el fetch no renueva el JWT (7 días fijos, solo login emite
+        # uno fresco), así que refrescar balance cada 5 min no mantiene nada vivo
+        # — solo actualiza datos. 20 min es suficiente para datos variables.
+        "interval_sec": _env_int("ACCOUNT_REFRESH_INTERVAL_SEC", 1200),  # 20 min
+        "batch_max": _env_int("ACCOUNT_REFRESH_BATCH", 60),
         "gap_min": _env_int("ACCOUNT_REFRESH_GAP_MIN_SEC", 2),
         "gap_max": _env_int("ACCOUNT_REFRESH_GAP_MAX_SEC", 5),
         "grades": grades or DEFAULT_GRADES,
@@ -289,19 +294,25 @@ async def run_refresh_cycle(
             # NO marcar dead, NO tocar jwt_expires_at — lo captura jwt_keeper
             # cuando expire localmente. Solo se cuenta como fallo del ciclo.
             stats["failed"] += 1
-            logger.info(f"[account_refresh] {email} fetch vacío (posible JWT muerto server-side)")
+            logger.debug(f"[account_refresh] {email} fetch vacío (posible JWT muerto server-side)")
             continue
 
         # `fetch_account_details_parallel` SIEMPRE devuelve un dict truthy
         # (defaults N/A/0.00). Si TODO quedó en default, el JWT está muerto
         # server-side (401 redirectLogin) — invalidar cache para que el
-        # próximo ciclo haga login REAL en vez de reusar el JWT muerto.
+        # próximo ciclo haga login REAL en vez de reusar el JWT muerto, y
+        # despertar al jwt_keeper YA (no esperar su tick horario — FUGA #1).
         from prewarm import _fetch_looks_empty, _db_invalidate_jwt
         if _fetch_looks_empty(details):
             stats["failed"] += 1
-            logger.info(f"[account_refresh] {email} fetch vacío (JWT muerto server-side) — invalidando cache")
+            logger.debug(f"[account_refresh] {email} fetch vacío (JWT muerto server-side) — invalidando cache")
             try:
                 await asyncio.to_thread(_db_invalidate_jwt, email)
+            except Exception:
+                pass
+            try:
+                from app import _wake_jwt_keeper
+                _wake_jwt_keeper()
             except Exception:
                 pass
             continue
@@ -310,8 +321,8 @@ async def run_refresh_cycle(
             await asyncio.to_thread(_db_upsert_balance, email, details)
             await asyncio.to_thread(_db_save_txns_and_recalc, email, details, None)
             stats["refreshed"] += 1
-            logger.info(f"[account_refresh] {email} balance fresco "
-                        f"(balance_real={details.get('balance_real')})")
+            logger.debug(f"[account_refresh] {email} balance fresco "
+                         f"(balance_real={details.get('balance_real')})")
             try:
                 from app import _broadcast, _resolve_who
                 _broadcast({
@@ -348,7 +359,7 @@ async def run_refresh_cycle(
                     # en el momento del click. No se puede elegir "la" institución.
                     ready, institution = True, "Múltiples cuentas — revisar"
                 except Exception as e:
-                    logger.info(f"[account_refresh] {email} check withdrawal_ready falló: {str(e)[:120]}")
+                    logger.debug(f"[account_refresh] {email} check withdrawal_ready falló: {str(e)[:120]}")
 
                 if ready is not None:
                     prev = _db_get_withdrawal_ready(email)
