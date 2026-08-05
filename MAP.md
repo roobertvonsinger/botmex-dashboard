@@ -100,13 +100,13 @@ prewarm.py (router)
 | `account_refresh.py` | 392 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5086 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 191 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1061 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1070 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `card_checker.py` | 234 | `—` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 152 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
-| `deposits.py` | 2814 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2854 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 371 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 416 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 904 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -129,6 +129,7 @@ prewarm.py (router)
 | `test_auto_missions_migrate.py` | 120 | `—` | _[completar]_ |
 | `test_balance_only_real_zero_preserved.py` | 89 | `—` | _[completar]_ |
 | `test_bet_live_plan.py` | 224 | `—` | _[completar]_ |
+| `test_bin_stats_feedback.py` | 118 | `—` | _[completar]_ |
 | `test_card_touch_log.py` | 61 | `—` | _[completar]_ |
 | `test_curp_utils.py` | 28 | `—` | _[completar]_ |
 | `test_deposit_status_classify.py` | 95 | `—` | _[completar]_ |
@@ -247,6 +248,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `f347775` | docs: cierre de sesión — deploy verificado a KVM4 + estado para /cerrar-bmx |
 | `3e564d6` | feat(frontend): tabs superiores reemplazan cenefa + portal /bet embebido (SA) |
 | `18e74d8` | feat(jwt): refresco super smooth — 3 universos, cooldown 24h, FUGA #1 cerrada |
 | `8c828c9` | test(withdrawals): cubrir refresh post-retiro en operator_withdraw |
@@ -258,7 +260,6 @@ prewarm.py (router)
 | `fd0b633` | docs: handoff para OpenCode — refresco JWT en tiempo real + gate de retiro + gaps abiertos |
 | `c5f28d4` | docs: guardar avances de sesión — 2 bugs de visibilidad del portal fixeados y deployados |
 | `ea5ad9a` | fix(portal): operator_my_accounts oculta cuentas ya retiradas por completo |
-| `d25fc22` | fix(portal): grid de cuentas congelado durante misión activa (regresión vista única) |
 <!-- GEN:end:recientes -->
 
 ---

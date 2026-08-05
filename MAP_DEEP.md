@@ -208,19 +208,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_pipe_str` | def | L108–L113 |
 | `_parse_card_pipe` | def | L116–L137 |
 | `_normalize_pipe_to_3part` | def | L140–L142 |
-| `select_accounts_for_auto` | def | L149–L317 |
-| `select_card_for_account` | def | L321–L343 |
-| `_max_accounts_for_cards` | def | L347–L351 |
-| `plan_auto_mission` | def | L354–L572 |
-| `_iso` | def | L613–L614 |
-| `_m_load` | def | L617–L624 |
-| `_m_status` | def | L627–L629 |
-| `_m_update` | def | L632–L641 |
-| `_fetch_account` | def | L644–L650 |
-| `_unlock` | def | L653–L661 |
-| `_broadcast_mission` | def | L664–L678 |
-| `_stop_pool` | def | L681–L688 |
-| `run_auto_mission` | def | L692–L1061 |
+| `select_accounts_for_auto` | def | L149–L326 |
+| `select_card_for_account` | def | L330–L352 |
+| `_max_accounts_for_cards` | def | L356–L360 |
+| `plan_auto_mission` | def | L363–L581 |
+| `_iso` | def | L622–L623 |
+| `_m_load` | def | L626–L633 |
+| `_m_status` | def | L636–L638 |
+| `_m_update` | def | L641–L650 |
+| `_fetch_account` | def | L653–L659 |
+| `_unlock` | def | L662–L670 |
+| `_broadcast_mission` | def | L673–L687 |
+| `_stop_pool` | def | L690–L697 |
+| `run_auto_mission` | def | L701–L1070 |
 
 ### `autoexclusion.py`
 
@@ -299,28 +299,28 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_parse_pipe` | def | L496–L517 |
 | `_check_card_velocity` | def | L537–L584 |
 | `_has_recent_approved_deposit` | def | L587–L603 |
-| `_record_attempt` | def | L606–L748 |
-| `_safe_phase` | def | L758–L765 |
-| `_now_mx_str` | def | L773–L782 |
-| `_deposit_step_payload` | def | L791–L799 |
-| `_wrap_deposit_step` | def | L802–L821 |
-| `_build_admin_proxy_url` | def | L824–L828 |
-| `_refresh_account_after_deposit` | def | L831–L890 |
-| `_should_relogin_after_401` | def | L893–L897 |
-| `_acquire_session_and_begin` | def | L900–L1151 |
-| `_run_deposit_with_phases` | def | L1154–L1498 |
-| `deposit_execute_stream` | def | L1502–L1701 |
-| `cap_status` | def | L1705–L1717 |
-| `_mm_is_real_decline` | def | L1754–L1760 |
-| `_mm_is_ambiguous_charge` | def | L1763–L1773 |
-| `classify_deposit_status` | def | L1776–L1807 |
-| `_mm_session_get` | def | L1853–L1857 |
-| `_mm_session_update` | def | L1860–L1869 |
-| `multi_stream` | def | L1873–L2388 |
-| `multi_cancel` | def | L2392–L2397 |
-| `scheduled_create` | def | L2410–L2776 |
-| `scheduled_list` | def | L2780–L2802 |
-| `scheduled_cancel` | def | L2806–L2814 |
+| `_record_attempt` | def | L606–L788 |
+| `_safe_phase` | def | L798–L805 |
+| `_now_mx_str` | def | L813–L822 |
+| `_deposit_step_payload` | def | L831–L839 |
+| `_wrap_deposit_step` | def | L842–L861 |
+| `_build_admin_proxy_url` | def | L864–L868 |
+| `_refresh_account_after_deposit` | def | L871–L930 |
+| `_should_relogin_after_401` | def | L933–L937 |
+| `_acquire_session_and_begin` | def | L940–L1191 |
+| `_run_deposit_with_phases` | def | L1194–L1538 |
+| `deposit_execute_stream` | def | L1542–L1741 |
+| `cap_status` | def | L1745–L1757 |
+| `_mm_is_real_decline` | def | L1794–L1800 |
+| `_mm_is_ambiguous_charge` | def | L1803–L1813 |
+| `classify_deposit_status` | def | L1816–L1847 |
+| `_mm_session_get` | def | L1893–L1897 |
+| `_mm_session_update` | def | L1900–L1909 |
+| `multi_stream` | def | L1913–L2428 |
+| `multi_cancel` | def | L2432–L2437 |
+| `scheduled_create` | def | L2450–L2816 |
+| `scheduled_list` | def | L2820–L2842 |
+| `scheduled_cancel` | def | L2846–L2854 |
 
 ### `jwt_keeper.py`
 
@@ -645,6 +645,18 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_operator_my_accounts_hides_fully_withdrawn_account` | def | L73–L122 |
 | `test_operator_my_accounts_visibility_in_process_lock` | def | L125–L180 |
 | `test_confirm_gate_in_auto_deposit` | def | L184–L224 |
+
+### `test_bin_stats_feedback.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `_reload_app` | def | L16–L22 |
+| `_bin_row` | def | L25–L30 |
+| `test_record_attempt_approved_increments_bin_stats` | def | L33–L48 |
+| `test_record_attempt_rejected_increments_bin_stats` | def | L51–L66 |
+| `test_record_attempt_accumulates_across_attempts` | def | L69–L84 |
+| `test_record_attempt_ignores_non_bank_status` | def | L87–L102 |
+| `test_record_attempt_skips_bin_stats_without_pipe` | def | L105–L118 |
 
 ### `test_card_touch_log.py`
 

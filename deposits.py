@@ -729,6 +729,46 @@ def _record_attempt(
     except Exception as e:
         logger.debug(f"[Deposits] _record_attempt note_a_plus_outcome: {e}")
 
+    # ── 3c. bin_stats: approved/rejected (Robert 2026-08-05 — hueco cerrado) ──
+    # Hallazgo: `_bot_db.log_attempt` (paso 1) solo toca bin_stats si recibe un
+    # `card_id` resuelto — este flujo SIEMPRE llama con card_id=None ("no es
+    # crítico"), así que el approval_rate por BIN que `auto_deposit._rank_key`
+    # usa para priorizar tarjetas quedaba SIEMPRE en 0/0 (verificado contra
+    # prod: 3 filas en bin_stats, las 3 con total_attempts=0). `update_bin_stats`
+    # existe en betmexico_db.py exactamente para este caso pero nunca se llama
+    # desde ningún lado — código muerto. Fix: mismo patrón UPDATE-o-INSERT que
+    # `_record_bin_3ds` ya usa unas líneas arriba — mismas columnas (bin,
+    # total_attempts/approved/rejected, updated_at, SIN gateway_name: no existe
+    # en el schema de test de `conftest.py`, y en prod tiene DEFAULT 'default'
+    # así que omitirla en el INSERT es válido en los dos). Solo approved/rejected
+    # cuentan (misma ley que classify_deposit_status: rate-limit/login/gateway/
+    # timeout/ambiguo NUNCA se atribuyen a la tarjeta).
+    if status in ("approved", "rejected") and card_pipe:
+        try:
+            ccnum, _exp, _cvv = _parse_pipe(card_pipe)
+            bin6 = (ccnum or "").strip()[:6]
+            if len(bin6) == 6:
+                from app import db as _adb
+                approved = status == "approved"
+                col = "total_approved" if approved else "total_rejected"
+                with _adb(write=True) as c:
+                    cur = c.execute(
+                        "UPDATE bin_stats SET "
+                        "total_attempts = COALESCE(total_attempts,0) + 1, "
+                        f"{col} = COALESCE({col},0) + 1, "
+                        "updated_at = ? WHERE bin = ?",
+                        (now_str, bin6),
+                    )
+                    if cur.rowcount == 0:
+                        c.execute(
+                            "INSERT INTO bin_stats (bin, total_attempts, "
+                            f"total_approved, total_rejected, updated_at) "
+                            f"VALUES (?, 1, ?, ?, ?)",
+                            (bin6, 1 if approved else 0, 0 if approved else 1, now_str),
+                        )
+        except Exception as e:
+            logger.debug(f"[Deposits] _record_attempt bin_stats: {e}")
+
     # ── 4. Broadcast SSE para feed de actividad ────────────────
     try:
         from app import _resolve_who

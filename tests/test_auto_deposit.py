@@ -60,6 +60,22 @@ def test_select_prioritizes_jwt_not_excludes():
     assert "nojwt@t.com" in got and "exp@t.com" in got  # 🔑 incluida, no excluida
 
 
+def test_select_low_tier_prefers_jwt_alive_over_needs_login():
+    # Robert 2026-08-05: dentro de LOW (mezcla de JWT-vivo degradado + 🔑 sin
+    # JWT), preferencia leve por 🟢 — más barato de probar (sin captcha/login),
+    # mismo riesgo de tarjeta. NO excluye: 🔑 sigue entrando, solo después.
+    # grade C (JWT vivo) cae a LOW por grade; grade A+ SIN jwt cae a LOW pese
+    # a ser mejor grade — el JWT manda sobre el grade dentro del tier.
+    rows = [
+        _row("alive_low@t.com", grade="C", grade_score=10),
+        _row("needs_login@t.com", grade="A+", grade_score=99, jwt_expires_at=None),
+    ]
+    sel = select_accounts_for_auto(
+        rows, 150, 2, _win("alive_low@t.com", "needs_login@t.com")
+    )
+    assert [r["email"] for r in sel] == ["alive_low@t.com", "needs_login@t.com"]
+
+
 def test_select_filters_insufficient_cap():
     # 9 * $150 = $1350 → la cuenta con available $500 no alcanza el cap 24h
     rows = [_row("rich@t.com"), _row("poor@t.com")]

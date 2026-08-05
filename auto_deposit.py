@@ -274,7 +274,16 @@ def select_accounts_for_auto(
     sort_key = lambda r: (_grade_rank(r.get("grade")), -(float(r.get("grade_score") or 0)))
     tier_top.sort(key=sort_key)
     tier_mid.sort(key=sort_key)
-    tier_low.sort(key=sort_key)
+    # LOW mezcla dos perfiles de riesgo distinto: cuentas JWT-vivo degradadas
+    # (SPEI reciente / intento <24h / grade B-D — buena cuenta, solo con mala
+    # suerte temporal) y cuentas 🔑 sin JWT (necesitan Login Full: captcha +
+    # proxy + una superficie de fallo extra ANTES de llegar siquiera al probe).
+    # Robert 2026-08-05: preferencia leve, no exclusión — dentro de LOW, probar
+    # primero las 🟢 (más baratas, mismo riesgo de tarjeta) y dejar las 🔑 para
+    # cuando ya no queden alternativas vivas en este tier. No cambia CUÁLES
+    # cuentas entran (siguen todas, round-robin intacto), solo el ORDEN dentro
+    # del tier — no le quita presupuesto de captcha a la búsqueda del match.
+    tier_low.sort(key=lambda r: (0 if r.get("_jwt_alive") else 1, *sort_key(r)))
 
     # Si count <= 3 o hay muy pocas cuentas, entregar las mejores disponibles (TOP -> MID -> LOW)
     if count <= 3:
