@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `484b002` | docs: desambiguar "sin password" (BetMexico != login dashboard) + regla real de visibilidad del portal |
 | `8aced33` | fix(portal): Retirar habilitado sin saldo real + modal exponía instrucción interna |
 | `b858f34` | docs: NEXT-SESSION — cierre de auditoría E2E /bet + impeccable (5ta parte) |
 | `b4f90a5` | fix(portal): 4 bugs reales de lógica de usuario en poll de retiro + CURP sentinel |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `b3c9eb1` | feat(portal): gatear botón Retirar por withdrawal_ready + mostrar CURP/institución |
 | `98613fb` | feat(api): permitir a operadores dueños consultar withdraw/status |
 | `1eceac6` | feat(account_refresh): bypass de filtros para cuentas hot en select_refresh_candidates_healthy |
-| `88b3c47` | feat(portal): interpolación visual del progreso de misión (anti-detección) |
 <!-- GEN:end:recientes -->
 
 ---
