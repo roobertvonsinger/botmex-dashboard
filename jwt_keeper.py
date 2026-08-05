@@ -92,13 +92,34 @@ def select_refresh_candidates(
     datos reales y no default. `sa_tokens` lista los valores que identifican al
     SA en `locked_by` (ver `account_refresh._sa_lock_tokens`).
 
-    Orden: mejor grado primero; dentro del grado, la más urgente (menor `exp`, con
-    expiradas/nulas —exp=0— al frente). Corta en `batch_max` para no hacer ráfaga.
+    Orden: HOT PRIMERO (cuenta con depósito/retiro en curso = `row["hot"]=True`,
+    handoff 2026-08-05 §2.2) — sin importar grade, van al frente del lote para
+    que el keeper las re-loguee ANTES que las cuentas frías. Dentro de cada
+    grupo (hot / normal), mejor grade primero; dentro del grade, la más urgente
+    (menor `exp`, con expiradas/nulas —exp=0— al frente). Corta en `batch_max`
+    contando las normales; las hot NO cuentan contra ese cupo (espejo de
+    `account_refresh.select_refresh_candidates_healthy`).
     """
     sa_tokens = set(sa_tokens or [])
-    out: List[Dict[str, Any]] = []
+    hot: List[Dict[str, Any]] = []
+    normal: List[Dict[str, Any]] = []
     for r in rows:
         if (r.get("status") or "") != "LIVE":
+            continue
+        # Cooldown aplica SIEMPRE, incluso a hot — evita el bucle de quema
+        # (medido 2026-07-11: una hot quemada debe descansar como cualquier otra).
+        cd = r.get("cooldown_until")
+        if cd not in (None, "") and int(cd) > now:
+            continue
+        exp = _exp_int(r.get("jwt_expires_at"))
+        if exp > now + refresh_ahead_sec:
+            continue  # todavía tiene margen → no re-loguear
+        # HOT bypassa grade/published/locked_by (espejo de
+        # account_refresh.select_refresh_candidates_healthy): una cuenta con
+        # depósito/retiro en curso necesita JWT vivo sí o sí, sin importar su
+        # grade o si está lockeada por un operador.
+        if r.get("hot"):
+            hot.append(r)
             continue
         grade = r.get("grade") or ""
         if grade not in grades:
@@ -114,19 +135,16 @@ def select_refresh_candidates(
                 continue
             if locked_by is not None:
                 continue
-        cd = r.get("cooldown_until")
-        if cd not in (None, "") and int(cd) > now:
-            continue
-        exp = _exp_int(r.get("jwt_expires_at"))
-        if exp > now + refresh_ahead_sec:
-            continue  # todavía tiene margen → no re-loguear
-        out.append(r)
+        normal.append(r)
 
-    out.sort(key=lambda r: (
-        _GRADE_RANK.get(r.get("grade") or "", 9),
-        _exp_int(r.get("jwt_expires_at")),
-    ))
-    return out[:batch_max]
+    def _key(r: Dict[str, Any]) -> tuple:
+        return (
+            _GRADE_RANK.get(r.get("grade") or "", 9),
+            _exp_int(r.get("jwt_expires_at")),
+        )
+    hot.sort(key=_key)
+    normal.sort(key=_key)
+    return hot + normal[:batch_max]
 
 
 def _exp_int(v: Any) -> int:
@@ -139,8 +157,18 @@ def _exp_int(v: Any) -> int:
 
 
 # ── I/O de BD (aislado; usa el context manager de app) ────────────────────────
+# `balance_real`, `locked_until` y `has_pending_withdrawal` se traen para que
+# `is_hot_account` (importada de account_refresh) pueda marcar las hot aquí
+# mismo — una cuenta hot con JWT expirado debe ir PRIMERO en el lote de
+# re-login, no detrás de 8 cuentas frías de mejor grade (handoff 2026-08-05 §2.2).
 _SELECT_COLS = ("email", "password", "status", "grade", "jwt_expires_at",
-                "cooldown_until", "locked_by", "published_to_pool", "rl_streak")
+                "cooldown_until", "locked_by", "published_to_pool", "rl_streak",
+                "balance_real", "locked_until")
+
+_PENDING_WD_EXISTS_SQL = (
+    "EXISTS(SELECT 1 FROM account_withdrawals w WHERE w.account_id = accounts.id "
+    "AND (w.status_api IS NULL OR (w.status_api >= 0 AND w.status_api != 6)))"
+)
 
 
 def _load_candidate_rows() -> List[Dict[str, Any]]:
@@ -151,26 +179,41 @@ def _load_candidate_rows() -> List[Dict[str, Any]]:
     RESERVADA_SA (published_to_pool=0 + locked_by del SA) — sin esto, el JWT
     muerto server-side de una cuenta en uso nunca se renueva y el refresh
     siempre recibe default del server.
+
+    Computa `hot` vía `account_refresh.is_hot_account` (DRY: una sola fuente de
+    verdad para qué es "hot"). Las hot con JWT por expirar se priorizan en el
+    sort para que el keeper las re-loguee ANTES que las cuentas frías del mismo
+    grade — sin esto, una cuenta con depósito/retiro en curso y JWT por morir
+    puede quedarse fuera del batch de 8 por grade y no ser re-logueada hasta
+    el próximo ciclo (1h de lag en vez de "ya").
     """
     import app  # lazy: evita ciclo de import
-    from account_refresh import _sa_lock_tokens
+    from datetime import datetime, timezone
+    from account_refresh import _sa_lock_tokens, is_hot_account
     sa_tokens = _sa_lock_tokens()
+    now_iso = datetime.now(timezone.utc).isoformat()
     with app.db() as conn:
         if sa_tokens:
             placeholders = ",".join("?" for _ in sa_tokens)
             cur = conn.execute(
-                f"SELECT {', '.join(_SELECT_COLS)} FROM accounts "
-                "WHERE status='LIVE' "
+                f"SELECT {', '.join(_SELECT_COLS)}, "
+                f"{_PENDING_WD_EXISTS_SQL} AS has_pending_withdrawal "
+                "FROM accounts WHERE status='LIVE' "
                 f"AND (published_to_pool=1 "
                 f"OR (published_to_pool=0 AND lower(locked_by) IN ({placeholders})))",
                 [t.lower() for t in sa_tokens],
             )
         else:
             cur = conn.execute(
-                f"SELECT {', '.join(_SELECT_COLS)} FROM accounts "
-                "WHERE status='LIVE' AND published_to_pool=1"
+                f"SELECT {', '.join(_SELECT_COLS)}, "
+                f"{_PENDING_WD_EXISTS_SQL} AS has_pending_withdrawal "
+                "FROM accounts WHERE status='LIVE' AND published_to_pool=1"
             )
-        return [dict(row) for row in cur.fetchall()]
+        rows = [dict(row) for row in cur.fetchall()]
+    for r in rows:
+        r["has_pending_withdrawal"] = bool(r.get("has_pending_withdrawal"))
+        r["hot"] = is_hot_account(r, now_iso)
+    return rows
 
 
 def _set_cooldown(email: str, minutes: int) -> None:

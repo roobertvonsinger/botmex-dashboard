@@ -14,11 +14,12 @@ AHEAD = 24 * H  # refresh si expira en <=24h
 
 
 def _acc(email, *, status="LIVE", grade="B", jwt_exp=None, cooldown=None,
-         locked_by=None, published=1, password="pw"):
+         locked_by=None, published=1, password="pw", hot=False):
     return {
         "email": email, "password": password, "status": status, "grade": grade,
         "jwt_expires_at": jwt_exp, "cooldown_until": cooldown,
         "locked_by": locked_by, "published_to_pool": published,
+        "hot": hot,
     }
 
 
@@ -134,3 +135,67 @@ def test_reservada_no_sa_no_es_candidata():
     got = _run([_acc("op@x.com", grade="A", jwt_exp=NOW - H,
                      published=0, locked_by="555")])
     assert got == []
+
+
+# ── Priorización de cuentas HOT (handoff 2026-08-05 §2.2) ──────────────────
+# Una cuenta "hot" (depósito/retiro en curso, balance_real>$50, o retiro
+# pendiente) con JWT expirado debe ir PRIMERO en el lote de re-login — ANTES
+# que una cuenta fría de mejor grade. Sin esto, una cuenta en proceso activo
+# puede quedarse fuera del batch de 8 y no ser re-logueada hasta el próximo
+# ciclo (1h de lag). Las hot no cuentan contra batch_max (espejo de
+# account_refresh.select_refresh_candidates_healthy).
+
+def test_hot_va_antes_que_normal_aun_con_grade_menor():
+    """Hot con grade B debe ir ANTES que normal con grade A+ (que hoy iría
+    primero por orden de grade). Sin el fix, A+ iría primero y hot podría
+    no entrar al batch de 8."""
+    rows = [
+        _acc("normal_aplus@x.com", grade="A+", jwt_exp=NOW - H),
+        _acc("hot_b@x.com", grade="B", jwt_exp=NOW - H, hot=True),
+    ]
+    got = [r["email"] for r in _run(rows)]
+    assert got == ["hot_b@x.com", "normal_aplus@x.com"]
+
+
+def test_hot_no_cuenta_contra_batch_max():
+    """Las hot van SIEMPRE, no ocupan cupo del batch de normales."""
+    normales = [_acc(f"n{i}@x.com", grade="B", jwt_exp=NOW - H) for i in range(8)]
+    hots = [_acc(f"h{i}@x.com", grade="B", jwt_exp=NOW - H, hot=True) for i in range(3)]
+    got = _run(normales + hots, batch_max=8)
+    assert len(got) == 11
+    assert {r["email"] for r in got if r["email"].startswith("h")} == {f"h{i}@x.com" for i in range(3)}
+
+
+def test_hot_dentro_de_grupo_se_ordena_por_grade():
+    """Entre hot, mejor grade primero (mismo criterio que normales)."""
+    rows = [
+        _acc("hot_b@x.com", grade="B", jwt_exp=NOW - H, hot=True),
+        _acc("hot_aplus@x.com", grade="A+", jwt_exp=NOW - H, hot=True),
+        _acc("hot_a@x.com", grade="A", jwt_exp=NOW - H, hot=True),
+    ]
+    got = [r["email"] for r in _run(rows)]
+    assert got == ["hot_aplus@x.com", "hot_a@x.com", "hot_b@x.com"]
+
+
+def test_hot_excluye_si_no_es_candidata_normal():
+    """Hot respeta los filtros duros: cooldown activo la excluye igual que
+    a una normal. Hot no es pase-libre para re-loguear cuentas quemadas."""
+    got = _run([_acc("hot@x.com", grade="B", jwt_exp=NOW - H,
+                     cooldown=NOW + 10 * 60, hot=True)])
+    assert got == []
+
+
+def test_hot_grade_no_util_sigue_siendo_candidata_si_hot_y_publicada():
+    """Hot bypassea el filtro de grade (igual que en account_refresh) — una
+    cuenta con retiro en curso y grade D sigue siendo hot y necesita JWT
+    vivo para que el ciclo de refresh reciba datos reales."""
+    got = _run([_acc("hot_d@x.com", grade="D", jwt_exp=NOW - H, hot=True)],
+               grades={"A+", "A", "B"})
+    assert [r["email"] for r in got] == ["hot_d@x.com"]
+
+
+def test_hot_no_publicada_es_candidata():
+    """Hot bypassea published_to_pool (igual que account_refresh)."""
+    got = _run([_acc("hot@x.com", grade="B", jwt_exp=NOW - H,
+                     published=0, hot=True)])
+    assert [r["email"] for r in got] == ["hot@x.com"]
