@@ -108,16 +108,24 @@
   }
 
   function onBusEvent(ev) {
-    if (ev.type === 'activity' && ev.kind === 'auto_mission') {
+    if (ev.type !== 'activity') return;
+    // Vista única (2026-08-05): #accountsSection ya NO se oculta mientras hay
+    // misión activa (queda visible siempre, ver loadMission), así que el grid
+    // debe seguir refrescándose en vivo aunque activeMissionId esté seteado.
+    // El guard `!activeMissionId` de antes venía del modelo de dos pestañas
+    // (983557f) donde el grid estaba oculto durante la misión — dejarlo aquí
+    // congelaba saldo/lock/retiro del operador hasta que cerrara el resumen a mano.
+    if (ev.kind === 'account_refreshed' || ev.kind === 'withdrawal' || ev.kind === 'withdrawal_status' || ev.kind === 'withdrawal_ready_changed') {
+      loadAccounts();
+      return;
+    }
+    if (ev.kind === 'auto_mission') {
       if (activeMissionId && ev.mission_id === activeMissionId) {
         onMissionEvent(ev);
-      }
-    }
-    if (ev.type === 'activity' && (ev.kind === 'account_refreshed' || ev.kind === 'withdrawal' || ev.kind === 'withdrawal_status' || ev.kind === 'withdrawal_ready_changed')) {
-      if (!activeMissionId) loadAccounts();
-    }
-    if (ev.type === 'activity' && ev.kind === 'auto_mission' && ev.status === 'completed') {
-      if (!activeMissionId || ev.mission_id !== activeMissionId) {
+        if (ev.status === 'completed' || ev.status === 'failed' || ev.status === 'cancelled') {
+          loadAccounts();
+        }
+      } else if (ev.status === 'completed') {
         loadAccounts();
       }
     }

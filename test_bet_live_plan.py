@@ -70,6 +70,64 @@ def test_operator_my_accounts_endpoint(client, monkeypatch):
     assert "jwt" not in accs[0]
 
 
+def test_operator_my_accounts_visibility_in_process_lock(client, monkeypatch):
+    """Regla de vista única (2026-08-04): una cuenta SIN depósito aprobado aún
+    debe aparecer si está lockeada por el operador (misión en curso), pero NO
+    si está lockeada por otro operador. Cubre el cambio de JOIN de app.py:
+    operator_my_accounts pasó de INNER JOIN deposit_attempts a LEFT JOIN +
+    `OR a.locked_by IS NOT NULL` — comportamiento nunca antes cubierto por test."""
+    monkeypatch.delenv("BMX_WEB_AUTH_MODE", raising=False)
+    from auth import USERS, create_session, sha256
+    operator_id = 998811
+    other_operator_id = 998822
+    USERS["testop_lock"] = {
+        "password_hash": sha256("pass123"),
+        "role": "operator",
+        "telegram_id": operator_id,
+        "display": "Test Op Lock"
+    }
+    token = create_session("testop_lock")
+    client.cookies.set("bmx_session", token)
+
+    from app import db
+    with db(write=True) as c:
+        # Lockeada por el propio operador, SIN deposit_attempts todavía
+        # (misión recién arrancó, aún no hay intento registrado) → debe salir.
+        c.execute(
+            "INSERT OR REPLACE INTO accounts (id, email, password, status, balance_real, balance_bonos, "
+            "last_deposit_amount, last_deposit_date, grade, first_checked_at, last_checked_at, locked_by) "
+            "VALUES (993, 'inproc_own@test.com', 'p3', 'LIVE', 0.0, 0.0, NULL, 'N/A', 'B', "
+            "'2026-08-04T10:00:00Z', '2026-08-04T10:00:00Z', ?)",
+            (str(operator_id),)
+        )
+        # Lockeada por OTRO operador, sin deposit_attempts → NO debe salir.
+        c.execute(
+            "INSERT OR REPLACE INTO accounts (id, email, password, status, balance_real, balance_bonos, "
+            "last_deposit_amount, last_deposit_date, grade, first_checked_at, last_checked_at, locked_by) "
+            "VALUES (994, 'inproc_other@test.com', 'p4', 'LIVE', 0.0, 0.0, NULL, 'N/A', 'B', "
+            "'2026-08-04T10:00:00Z', '2026-08-04T10:00:00Z', ?)",
+            (str(other_operator_id),)
+        )
+        # Libre (locked_by NULL), sin deposit_attempts → NO debe salir.
+        c.execute(
+            "INSERT OR REPLACE INTO accounts (id, email, password, status, balance_real, balance_bonos, "
+            "last_deposit_amount, last_deposit_date, grade, first_checked_at, last_checked_at) "
+            "VALUES (995, 'free_unlocked@test.com', 'p5', 'LIVE', 0.0, 0.0, NULL, 'N/A', 'B', "
+            "'2026-08-04T10:00:00Z', '2026-08-04T10:00:00Z')"
+        )
+
+    res = client.get("/api/operator/my-accounts")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["ok"] is True
+    emails = {a["email"] for a in data["accounts"]}
+    assert "inproc_own@test.com" in emails
+    assert "inproc_other@test.com" not in emails
+    assert "free_unlocked@test.com" not in emails
+    own = next(a for a in data["accounts"] if a["email"] == "inproc_own@test.com")
+    assert own["is_locked"] is True
+
+
 @pytest.mark.asyncio
 async def test_confirm_gate_in_auto_deposit(seed_db):
     """Verifica que confirm_gate se invoque y que si retorna False no se ejecute la Fase 2."""

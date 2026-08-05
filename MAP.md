@@ -128,7 +128,7 @@ prewarm.py (router)
 | `test_auto_deposit_selection.py` | 188 | `—` | _[completar]_ |
 | `test_auto_missions_migrate.py` | 120 | `—` | _[completar]_ |
 | `test_balance_only_real_zero_preserved.py` | 89 | `—` | _[completar]_ |
-| `test_bet_live_plan.py` | 114 | `—` | _[completar]_ |
+| `test_bet_live_plan.py` | 172 | `—` | _[completar]_ |
 | `test_card_touch_log.py` | 61 | `—` | _[completar]_ |
 | `test_curp_utils.py` | 28 | `—` | _[completar]_ |
 | `test_deposit_status_classify.py` | 95 | `—` | _[completar]_ |
@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d472ef5` | docs: agregar handoff de auditoría para claude code |
 | `1e95694` | feat(portal): rediseño a vista única y filtro estricto de visibilidad sin ruidos |
 | `8ccfc8b` | docs: handoff de orquestacion para rediseno completo del portal /bet |
 | `484b002` | docs: desambiguar "sin password" (BetMexico != login dashboard) + regla real de visibilidad del portal |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `a49cc10` | feat(account_refresh): persistir withdrawal_ready/institution + SSE en cambio |
 | `cd1dde2` | feat(portal): poll de estado tras disparar retiro (15s hasta terminal) |
 | `0a6aff3` | feat(account_refresh): _load_candidate_rows trae balance/lock/retiro-pendiente y computa hot |
-| `b3c9eb1` | feat(portal): gatear botón Retirar por withdrawal_ready + mostrar CURP/institución |
 <!-- GEN:end:recientes -->
 
 ---

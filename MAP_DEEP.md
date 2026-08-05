@@ -641,7 +641,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
 | `test_operator_my_accounts_endpoint` | def | L5–L70 |
-| `test_confirm_gate_in_auto_deposit` | def | L74–L114 |
+| `test_operator_my_accounts_visibility_in_process_lock` | def | L73–L128 |
+| `test_confirm_gate_in_auto_deposit` | def | L132–L172 |
 
 ### `test_card_touch_log.py`
 
