@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `e994e7c` | refactor(jwt_keeper): importar _PENDING_WD_EXISTS_SQL de account_refresh (DRY) |
 | `6f67527` | feat(withdrawals): refresco de balance post-retiro reusando JWT |
 | `dcce536` | feat(jwt_keeper): priorizar cuentas hot en lote de re-login |
 | `fd0b633` | docs: handoff para OpenCode — refresco JWT en tiempo real + gate de retiro + gaps abiertos |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `8ccfc8b` | docs: handoff de orquestacion para rediseno completo del portal /bet |
 | `484b002` | docs: desambiguar "sin password" (BetMexico != login dashboard) + regla real de visibilidad del portal |
 | `8aced33` | fix(portal): Retirar habilitado sin saldo real + modal exponía instrucción interna |
-| `b858f34` | docs: NEXT-SESSION — cierre de auditoría E2E /bet + impeccable (5ta parte) |
 <!-- GEN:end:recientes -->
 
 ---
