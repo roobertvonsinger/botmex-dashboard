@@ -928,17 +928,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_withdraw_persist_idempotent_unique_transaction_id` | def | L213–L226 |
 | `test_withdraw_triggers_refresh_after_success` | def | L231–L265 |
 | `test_withdraw_skips_refresh_when_jwt_missing` | def | L268–L296 |
-| `test_status_403_non_sa` | def | L301–L307 |
-| `test_withdraw_status_operador_dueno_puede_consultar` | def | L310–L331 |
-| `test_withdraw_status_operador_ajeno_403` | def | L334–L340 |
-| `test_withdraw_status_operador_no_puede_leer_tx_de_otra_cuenta_via_account_id_propio` | def | L343–L364 |
-| `test_status_404_unknown_tx` | def | L367–L371 |
-| `test_status_happy_pending` | def | L374–L395 |
-| `test_status_happy_successful_two_phase_bug2` | def | L398–L430 |
-| `test_status_gateway_mismatch_alert_bug3` | def | L433–L459 |
-| `test_status_digits_mismatch_alert_bug1` | def | L462–L488 |
-| `test_status_no_pending_returns_idle` | def | L491–L510 |
-| `test_status_updates_db_row` | def | L513–L546 |
+| `test_operator_withdraw_triggers_refresh_after_success` | def | L313–L347 |
+| `test_operator_withdraw_skips_refresh_when_jwt_missing` | def | L350–L378 |
+| `test_status_403_non_sa` | def | L382–L388 |
+| `test_withdraw_status_operador_dueno_puede_consultar` | def | L391–L412 |
+| `test_withdraw_status_operador_ajeno_403` | def | L415–L421 |
+| `test_withdraw_status_operador_no_puede_leer_tx_de_otra_cuenta_via_account_id_propio` | def | L424–L445 |
+| `test_status_404_unknown_tx` | def | L448–L452 |
+| `test_status_happy_pending` | def | L455–L476 |
+| `test_status_happy_successful_two_phase_bug2` | def | L479–L511 |
+| `test_status_gateway_mismatch_alert_bug3` | def | L514–L540 |
+| `test_status_digits_mismatch_alert_bug1` | def | L543–L569 |
+| `test_status_no_pending_returns_idle` | def | L572–L591 |
+| `test_status_updates_db_row` | def | L594–L627 |
 
 ### `test_withdrawals_migrate.py`
 

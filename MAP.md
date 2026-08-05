@@ -148,7 +148,7 @@ prewarm.py (router)
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 71 | `—` | _[completar]_ |
 | `test_withdrawals.py` | 361 | `—` | _[completar]_ |
-| `test_withdrawals_endpoints.py` | 546 | `—` | _[completar]_ |
+| `test_withdrawals_endpoints.py` | 627 | `—` | _[completar]_ |
 | `test_withdrawals_migrate.py` | 46 | `—` | _[completar]_ |
 | `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
 | `web_grading.py` | 197 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `f299383` | docs: handoff para Claude Code — review + deploy rama jwt-refresh |
 | `02a08b1` | docs: reporte final de sesión — refresco JWT + gate retiro + gaps |
 | `e994e7c` | refactor(jwt_keeper): importar _PENDING_WD_EXISTS_SQL de account_refresh (DRY) |
 | `6f67527` | feat(withdrawals): refresco de balance post-retiro reusando JWT |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `d472ef5` | docs: agregar handoff de auditoría para claude code |
 | `1e95694` | feat(portal): rediseño a vista única y filtro estricto de visibilidad sin ruidos |
 | `8ccfc8b` | docs: handoff de orquestacion para rediseno completo del portal /bet |
-| `484b002` | docs: desambiguar "sin password" (BetMexico != login dashboard) + regla real de visibilidad del portal |
 <!-- GEN:end:recientes -->
 
 ---

@@ -296,6 +296,87 @@ def test_withdraw_skips_refresh_when_jwt_missing(make_client, seed_db, monkeypat
     assert refresh_calls[0][1] is None
 
 
+# ── C1c — Refresh post-retiro vía POST /api/operator/accounts/{id}/withdraw ──
+# operator_withdraw() (app.py) importa execute_withdrawal/_refresh_account_after_withdrawal
+# LOCAL dentro de la función (from withdrawals import ...), a diferencia del endpoint
+# SA que los tiene en el namespace de app.py — el patch tiene que ir sobre el módulo
+# `withdrawals`, no sobre `app`, para que el import local en tiempo de llamada lo recoja.
+#
+# `make_client` solo hace dependency_overrides sobre `require_session` — pero
+# `operator_withdraw` usa `Depends(require_operator_view)`, y `require_operator_view`
+# LLAMA a `require_session(bmx_session)` como función plana (no vía Depends), así que
+# el override de make_client NUNCA lo intercepta (queda pisado por el "open mode" de
+# require_session en test: role=superadmin, sin telegram_id). Gap de arnés de tests
+# pre-existente (no introducido por este handoff) — el fix acá es override-ar
+# `require_operator_view` directo, no `require_session`.
+
+def test_operator_withdraw_triggers_refresh_after_success(make_client, seed_db, monkeypatch):
+    """Mismo contrato que el endpoint SA, pero vía operator_withdraw (a@test.com
+    está asignada a 555 en el seed de conftest.py — ownership vía account_assignments)."""
+    client = make_client(role="user", telegram_id=555)
+    import app as app_mod
+    app_mod.app.dependency_overrides[app_mod.require_operator_view] = lambda: {
+        "role": "user", "telegram_id": 555, "username": "op555", "display": "op555",
+    }
+    acc_id = _acc_id(seed_db, "a@test.com")
+
+    async def fake_execute(db_path, account_id, amount):
+        return {
+            "transactionId": "t1", "reference": "r1", "accountId": "a1",
+            "accountDigits": "1215", "institutionName": "HEY BANCO",
+            "amount": amount, "account_email": "a@test.com", "warnings": [],
+            "_jwt": "JWT-VIGENTE", "_proxy_url": "http://proxy:8080",
+        }
+
+    import withdrawals
+    monkeypatch.setattr(withdrawals, "execute_withdrawal", fake_execute)
+    monkeypatch.setattr(app_mod, "_broadcast", lambda e: None)
+
+    refresh_calls = []
+    async def fake_refresh(email, jwt, proxy, op_id):
+        refresh_calls.append((email, jwt, proxy, op_id))
+    monkeypatch.setattr(withdrawals, "_refresh_account_after_withdrawal", fake_refresh)
+
+    r = client.post(f"/api/operator/accounts/{acc_id}/withdraw", json={"amount": 100})
+    assert r.status_code == 200
+    assert len(refresh_calls) == 1
+    email, jwt, proxy, op_id = refresh_calls[0]
+    assert email == "a@test.com"
+    assert jwt == "JWT-VIGENTE"
+    assert proxy == "http://proxy:8080"
+    assert op_id == 555
+
+
+def test_operator_withdraw_skips_refresh_when_jwt_missing(make_client, seed_db, monkeypatch):
+    """Mismo guard `if not jwt: return` que el endpoint SA, vía operator_withdraw."""
+    client = make_client(role="user", telegram_id=555)
+    import app as app_mod
+    app_mod.app.dependency_overrides[app_mod.require_operator_view] = lambda: {
+        "role": "user", "telegram_id": 555, "username": "op555", "display": "op555",
+    }
+    acc_id = _acc_id(seed_db, "a@test.com")
+
+    async def fake_execute(db_path, account_id, amount):
+        return {
+            "transactionId": "t1", "reference": "r1", "accountId": "a1",
+            "accountDigits": "1215", "institutionName": "HEY BANCO",
+            "amount": amount, "account_email": "a@test.com", "warnings": [],
+        }
+
+    import withdrawals
+    monkeypatch.setattr(withdrawals, "execute_withdrawal", fake_execute)
+    monkeypatch.setattr(app_mod, "_broadcast", lambda e: None)
+
+    refresh_calls = []
+    async def fake_refresh(email, jwt, proxy, op_id):
+        refresh_calls.append((email, jwt, proxy, op_id))
+    monkeypatch.setattr(withdrawals, "_refresh_account_after_withdrawal", fake_refresh)
+
+    r = client.post(f"/api/operator/accounts/{acc_id}/withdraw", json={"amount": 100})
+    assert r.status_code == 200
+    assert len(refresh_calls) == 1
+    assert refresh_calls[0][1] is None
+
 
 
 def test_status_403_non_sa(make_client, seed_db):
