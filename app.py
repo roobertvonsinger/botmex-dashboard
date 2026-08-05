@@ -4257,7 +4257,7 @@ def auto_deposit_cancel(mission_id: str,
 
 @app.get("/api/operator/my-accounts")
 def operator_my_accounts(user: dict = Depends(require_operator_view)):
-    """Cuentas con depósitos aprobados del operador + CLABE STP + estado de lock."""
+    """Cuentas con depósitos aprobados o en proceso del operador + CLABE STP + estado de lock."""
     operator_id = user.get("telegram_id") or 0
     is_sa = user.get("role") == "superadmin"
     with db() as c:
@@ -4268,21 +4268,26 @@ def operator_my_accounts(user: dict = Depends(require_operator_view)):
                 "a.locked_by, a.locked_until, a.status, "
                 "a.withdrawal_ready, a.withdrawal_institution, a.curp, "
                 "c.clabe AS clabe_stp "
-                "FROM deposit_attempts d JOIN accounts a ON d.account_email = a.email "
+                "FROM accounts a "
+                "LEFT JOIN deposit_attempts d ON d.account_email = a.email "
                 "LEFT JOIN account_deposit_clabes c ON (a.id = c.account_id AND (c.integration = 'STP' OR c.integration = '2')) "
-                "WHERE d.status='approved' ORDER BY a.last_deposit_date DESC"
+                "WHERE (d.status='approved' OR a.locked_by IS NOT NULL) "
+                "ORDER BY a.last_deposit_date DESC"
             ).fetchall()
         else:
+            op_str = str(operator_id)
             rows = c.execute(
                 "SELECT DISTINCT a.id, a.email, a.balance_real, a.balance_bonos, "
                 "a.last_deposit_amount, a.last_deposit_date, a.grade, "
                 "a.locked_by, a.locked_until, a.status, "
                 "a.withdrawal_ready, a.withdrawal_institution, a.curp, "
                 "c.clabe AS clabe_stp "
-                "FROM deposit_attempts d JOIN accounts a ON d.account_email = a.email "
+                "FROM accounts a "
+                "LEFT JOIN deposit_attempts d ON d.account_email = a.email "
                 "LEFT JOIN account_deposit_clabes c ON (a.id = c.account_id AND (c.integration = 'STP' OR c.integration = '2')) "
-                "WHERE d.operator_id=? AND d.status='approved' ORDER BY a.last_deposit_date DESC",
-                (operator_id,)
+                "WHERE ( (d.operator_id=? AND d.status='approved') OR (a.locked_by=? OR a.locked_by=?) ) "
+                "ORDER BY a.last_deposit_date DESC",
+                (operator_id, op_str, user.get("username") or "")
             ).fetchall()
         result = []
         for r in rows:

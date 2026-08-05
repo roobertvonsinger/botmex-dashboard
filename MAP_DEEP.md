@@ -156,22 +156,22 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `admin_maintenance_toggle` | def | L4164–L4185 |
 | `auto_deposit_create` | def | L4189–L4225 |
 | `auto_deposit_cancel` | def | L4229–L4255 |
-| `operator_my_accounts` | def | L4259–L4295 |
-| `operator_release_account` | def | L4299–L4316 |
-| `operator_withdraw` | def | L4320–L4371 |
-| `operator_missions` | def | L4375–L4393 |
-| `auto_deposit_status` | def | L4397–L4408 |
-| `register_operator_strike` | def | L4411–L4444 |
-| `bot_start_info` | def | L4448–L4484 |
-| `bot_operator_info` | def | L4488–L4527 |
-| `bot_help_info` | def | L4531–L4545 |
-| `bot_pause_mission` | def | L4549–L4578 |
-| `bot_resume_mission` | def | L4582–L4600 |
-| `bot_cancel_mission` | def | L4605–L4640 |
-| `bot_bet_create` | def | L4644–L4813 |
-| `filter_and_sanitize_check_combos` | def | L4816–L4901 |
-| `BotCheckRequest` | class | L4904–L4908 |
-| `bot_check` | def | L4911–L4992 |
+| `operator_my_accounts` | def | L4259–L4300 |
+| `operator_release_account` | def | L4304–L4321 |
+| `operator_withdraw` | def | L4325–L4376 |
+| `operator_missions` | def | L4380–L4398 |
+| `auto_deposit_status` | def | L4402–L4413 |
+| `register_operator_strike` | def | L4416–L4449 |
+| `bot_start_info` | def | L4453–L4489 |
+| `bot_operator_info` | def | L4493–L4532 |
+| `bot_help_info` | def | L4536–L4550 |
+| `bot_pause_mission` | def | L4554–L4583 |
+| `bot_resume_mission` | def | L4587–L4605 |
+| `bot_cancel_mission` | def | L4610–L4645 |
+| `bot_bet_create` | def | L4649–L4818 |
+| `filter_and_sanitize_check_combos` | def | L4821–L4906 |
+| `BotCheckRequest` | class | L4909–L4913 |
+| `bot_check` | def | L4916–L4997 |
 
 ### `auth.py`
 

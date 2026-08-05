@@ -756,21 +756,16 @@ real desde el panel compacto.
 ## Portal de operadores (`/portal`)
 
 > `static/portal.html` + `static/portal.js` — SPA independiente para operadores (no-SA).
-> Acceso: operadores aterrizan aquí tras login; SA es redirigido al dashboard principal (`/`).
+> Acceso: operadores aterrizan aquí tras login (`/user/{id}`); SA puede supervisar con `?view_as=`.
 
-### Arquitectura
+### Arquitectura & Rediseño a Vista Única (2026-08-04)
 
-- **Sin framework** — vanilla JS, mismo patrón que `app.js` pero simplificado
-- **SSE en vivo**: subscribe `/api/events`, maneja eventos `auto_mission` filtrados por `mission_id`
-- **Reusa patrón `_autoOnBus`** de `depos.js` pero simplificado: progress bar + lista de matches + pulso "en curso" (SIN cadencia/countdown real — ver nota de seguridad abajo), sin SVG de líneas ni mascota
-- **Mobile-first** — operadores abren desde Telegram en el celular
-
-### Vistas
-
-| Vista | Trigger | Qué muestra |
-|---|---|---|
-| **Misión viva** | `?match=ID` en URL | Progress bar (matching→scheduling→done), matches apareciendo con `slideIn` animation, pulso "en curso…" SIN número/segundos (2026-08-04: antes mostraba countdown real de 60s + texto "cada 60s" — filtraba la cadencia real del motor al operador, ver `docs/ERRORS.md`), resumen final (deposited/approved/failed) solo al terminar. Botón "Ver mis cuentas" al terminar. |
-| **Mis Cuentas** | Sin `?match` (default) | Grid de cards con email, balance, grade badge, CURP, estado de retiro (institución en verde/azul-acento si `withdrawal_ready`, o "esperando SPEI…" gris si no), CLABE STP (botón copiar), botones Retirar/Liberar. Auto-refresh cuando llega evento SSE terminal. |
+- **Vista Única Integrada**: Eliminada la navegación por pestañas ("Misión Activa" vs "Mis Cuentas"). `#missionView` (progreso vivo si viene `?match=ID`) y `#accountsSection` (cuentas del operador) conviven en la misma pantalla.
+- **Cero Ruido Técnico**: Sin IDs de misión (`mission_id`), sin tags ni conteos de intentos fallidos (`mv-stat` de fallidos removido).
+- **Regla de Visibilidad Backend/Frontend**: Solo se muestran cuentas con un depósito **ya aprobado** o **actualmente en proceso** (misión en curso / `locked_by` activo). Cuentas fallidas o sin depósito desaparecen automáticamente.
+- **Sin framework** — vanilla JS, mismo patrón que `app.js` pero simplificado.
+- **SSE en vivo**: suscribe `/api/events`, maneja eventos `auto_mission` y refresh de cuentas.
+- **Mobile-first** — operadores abren desde Telegram en el celular.
 
 **Retirar gateado por `withdrawal_ready` (2026-08-04, Task 7 de `docs/superpowers/plans/2026-08-04-retiro-manual-gateado-spei-y-tiempo-real.md`):** antes el botón `.btn-withdraw` siempre estaba clickeable y podía fallar server-side con `NoApprovedWithdrawalAccount` si BetMexico aún no tenía la cuenta de retiro aprobada (requiere un SPEI ya acreditado). Ahora `renderAccountCard` (`static/portal.js`) lee `acc.withdrawal_ready`/`acc.withdrawal_institution`/`acc.curp` (poblados por `GET /api/operator/my-accounts`, cacheados por `account_refresh.py`) y:
 - Si `withdrawal_ready` es `true`: botón habilitado, meta muestra la institución (o "Aprobado" si no hay institución) en `var(--accent)` (azul en el portal, `#58a6ff` — scope propio de `portal.html`, distinto del verde del dashboard SA).

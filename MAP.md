@@ -98,7 +98,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 381 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 1h |
-| `app.py` | 4999 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 5004 | `betmexico.dashboard.db` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 191 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1041 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `8ccfc8b` | docs: handoff de orquestacion para rediseno completo del portal /bet |
 | `484b002` | docs: desambiguar "sin password" (BetMexico != login dashboard) + regla real de visibilidad del portal |
 | `8aced33` | fix(portal): Retirar habilitado sin saldo real + modal exponía instrucción interna |
 | `b858f34` | docs: NEXT-SESSION — cierre de auditoría E2E /bet + impeccable (5ta parte) |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `0a6aff3` | feat(account_refresh): _load_candidate_rows trae balance/lock/retiro-pendiente y computa hot |
 | `b3c9eb1` | feat(portal): gatear botón Retirar por withdrawal_ready + mostrar CURP/institución |
 | `98613fb` | feat(api): permitir a operadores dueños consultar withdraw/status |
-| `1eceac6` | feat(account_refresh): bypass de filtros para cuentas hot en select_refresh_candidates_healthy |
 <!-- GEN:end:recientes -->
 
 ---

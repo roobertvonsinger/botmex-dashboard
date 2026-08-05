@@ -5,8 +5,6 @@
   const mv = $('#missionView');
   const grid = $('#accountsGrid');
   const accountsSection = $('#accountsSection');
-  const btnAccounts = $('#btnAccounts');
-  const btnMissions = $('#btnMissions');
   const phRole = $('#phRole');
 
   let sse = null;
@@ -128,10 +126,11 @@
   // ── Mission View ───────────────────────────────────────────────
   async function loadMission(mid) {
     activeMissionId = mid;
-    accountsSection.style.display = 'none';
+    accountsSection.style.display = 'block';
     mv.style.display = 'block';
     missionState = { matches: [], deposited: 0, approved: 0, failed: 0, status: 'pending' };
     renderMission();
+    loadAccounts();
 
     try {
       const res = await fetch('/api/deposits/auto/' + mid + '/status');
@@ -307,8 +306,7 @@
     const summaryHtml = (s.status === 'completed' || s.status === 'failed' || s.status === 'cancelled')
       ? '<div class="mv-summary">' +
         '<div class="mv-stat"><div class="mv-stat-val">' + fmtMoney(s.deposited) + '</div><div class="mv-stat-lbl">Depositado</div></div>' +
-        '<div class="mv-stat"><div class="mv-stat-val" style="color:var(--green-bright)">' + (s.approved || 0) + '</div><div class="mv-stat-lbl">Aprobados</div></div>' +
-        '<div class="mv-stat"><div class="mv-stat-val" style="color:var(--red)">' + (s.failed || 0) + '</div><div class="mv-stat-lbl">Fallidos</div></div>' +
+        '<div class="mv-stat"><div class="mv-stat-val" style="color:var(--green-bright)">' + (s.approved || 0) + '</div><div class="mv-stat-lbl">Cuentas Listas</div></div>' +
         '</div>'
       : '';
 
@@ -317,7 +315,6 @@
     mv.innerHTML =
       '<div class="mv-card">' +
         '<div class="mv-header">' +
-          '<span class="mv-id">' + (activeMissionId || '?') + '</span>' +
           '<span class="mv-status ' + statusClass(s.status) + '">' + statusLabel(s.status) + '</span>' +
           cdHtml +
         '</div>' +
@@ -329,7 +326,7 @@
         summaryHtml +
         (s.status === 'completed' || s.status === 'failed' || s.status === 'cancelled'
           ? '<div style="margin-top:16px;display:flex;gap:8px">' +
-            '<button class="btn btn-sm" id="btnGoAccounts">Ver mis cuentas →</button>' +
+            '<button class="btn btn-sm" id="btnGoAccounts">Ocultar resumen ✕</button>' +
             '</div>'
           : '') +
       '</div>';
@@ -584,8 +581,6 @@
       try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (_) {}
       window.location.href = '/login';
     });
-
-    btnAccounts.addEventListener('click', exitMission);
 
     // SA viendo /user/{id} (posiblemente el suyo propio, vía view_as): nunca
     // debe quedar atrapado sin volver a su dashboard — link directo siempre visible.
