@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `1050bc6` | docs: NEXT-SESSION — Track B cerrado (12 commits, 383/383, IDOR encontrado y corregido) |
 | `79c6f3a` | fix(security): cerrar IDOR en GET /api/accounts/{id}/withdraw/status/{tx_id} |
 | `a49cc10` | feat(account_refresh): persistir withdrawal_ready/institution + SSE en cambio |
 | `cd1dde2` | feat(portal): poll de estado tras disparar retiro (15s hasta terminal) |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `7e68635` | feat(api): exponer withdrawal_ready/withdrawal_institution/curp en /api/operator/my-accounts |
 | `5a39b4a` | docs(audit): confirmar que fetch mínimo contra BetMexico ya está satisfecho |
 | `b8c36d5` | feat(account_refresh): agregar is_hot_account (lógica pura, TDD) |
-| `d798ab3` | feat(db): agregar withdrawal_ready/withdrawal_institution + índice account_withdrawals |
 <!-- GEN:end:recientes -->
 
 ---

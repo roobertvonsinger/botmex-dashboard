@@ -19,7 +19,12 @@
   // _startWithdrawPoll/_fetchWithdrawStatus): portal.js no necesita degradar a
   // "slow" ni panel de detalle, solo avisar cuando el retiro llega a terminal.
   const WD_POLL_FAST_MS = 15000;
-  let wdPollTimer = null;
+  // Map, no variable única: un operador puede disparar retiros en más de una
+  // cuenta antes de que el primero llegue a terminal (grid multi-cuenta). Con
+  // un solo timer global, el segundo retiro mataba el poll del primero sin
+  // avisar — el operador perdía la confirmación de aterrizaje justo en el
+  // punto que la memoria del proyecto marca crítico (status:6 ≠ aterrizó).
+  const wdPolls = new Map(); // accountId -> intervalId
 
   // ── View-as scope ──────────────────────────────────────────────
   // /user/{id}: {id} identifica de quién es este portal. Si el que mira es
@@ -381,7 +386,10 @@
         '<button class="btn btn-sm copy-clabe">Copiar</button></div>'
       : '<div class="clabe-box" style="opacity:.6"><span class="clabe-code" style="color:var(--text-dim)">CLABE pendiente</span></div>';
 
-    const curpHtml = acc.curp ? '<div>• CURP: ' + acc.curp + '</div>' : '';
+    // acc.curp llega como sentinel string 'N/A' cuando BetMexico no lo tiene
+    // (no null/undefined) — 'N/A' es truthy en JS, así que un check ingenuo
+    // imprime literalmente "CURP: N/A" al operador en vez de ocultar la línea.
+    const curpHtml = (acc.curp && acc.curp !== 'N/A') ? '<div>• CURP: ' + acc.curp + '</div>' : '';
     const wdInstHtml = acc.withdrawal_ready
       ? '<div>• Retiro: <span style="color:var(--accent)">' + (acc.withdrawal_institution || 'Aprobado') + '</span></div>'
       : '<div style="color:var(--text-dim)">• Retiro: esperando SPEI…</div>';
@@ -456,8 +464,9 @@
     });
   }
 
-  function stopWithdrawPoll() {
-    if (wdPollTimer) { clearInterval(wdPollTimer); wdPollTimer = null; }
+  function stopWithdrawPoll(accountId) {
+    const t = wdPolls.get(accountId);
+    if (t) { clearInterval(t); wdPolls.delete(accountId); }
   }
 
   async function fetchWithdrawStatus(accountId, txId) {
@@ -467,18 +476,31 @@
       const st = await res.json();
       const terminal = st.status === 'successful' || st.status === 'completed' || st.status === 'failed';
       if (terminal) {
-        stopWithdrawPoll();
-        const ok = st.status !== 'failed';
-        showToast(ok ? '✅ Retiro liberado' : '❌ Retiro falló', ok ? 'ok' : 'err');
+        stopWithdrawPoll(accountId);
+        // bug#2 (memoria del proyecto): status:6 de BetMexico != aterrizó en el
+        // banco. Mismo copy que pantalla.js (SA) — nunca "liberado"/"entregado".
+        if (st.status === 'failed') {
+          showToast('❌ Retiro falló', 'err');
+        } else {
+          showToast('✅ Retiro procesado — confirma en tu banco', 'ok');
+        }
+        const alerts = st.alerts || {};
+        if (alerts.gatewayMismatch) {
+          showToast('⚠️ BetMexico mandó el retiro a TARJETA, no a SPEI', 'err');
+        }
+        if (alerts.digitsMismatch) {
+          showToast('⚠️ El retiro fue a dígitos distintos a la cuenta esperada', 'err');
+        }
         loadAccounts();
       }
     } catch (_) { /* best-effort, el próximo tick reintenta */ }
   }
 
   function startWithdrawPoll(accountId, txId) {
-    stopWithdrawPoll();
+    stopWithdrawPoll(accountId);
     fetchWithdrawStatus(accountId, txId);
-    wdPollTimer = setInterval(() => fetchWithdrawStatus(accountId, txId), WD_POLL_FAST_MS);
+    const t = setInterval(() => fetchWithdrawStatus(accountId, txId), WD_POLL_FAST_MS);
+    wdPolls.set(accountId, t);
   }
 
   // ── Withdraw Modal ─────────────────────────────────────────────

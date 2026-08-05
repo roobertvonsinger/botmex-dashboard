@@ -73,6 +73,27 @@ modal de retiro. Esto convierte varios 🔵 de capturas previas (sesión 2026-08
 
 **Suite de tests**: 362/362 siguen pasando tras ambos fixes (`python -m pytest -q`).
 
+## Auditoría E2E post-merge `/bet` + revisión impeccable (2026-08-04, segunda pasada)
+
+Tras mergear `feature/retiro-manual-gateado-spei` a `main`, se orquestó una revisión enfocada en lógica de
+usuario final (no seguridad — esa ya se cerró con el fix de IDOR). Dos agentes independientes (Explore para
+trazar el flujo `/bet` completo bot→portal, review adversarial para el poll/hot-refresh/animación) más
+verificación manual en navegador contra copia de la DB real de producción (34 cuentas, `repos/Boveda/BetMexico/betmexico_accounts.db`).
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| **Flujo `/bet` completo, bot→portal** | `telegram_bot_mock/bot.py` (el bot real deployado en KVM4 como contenedor `betmexico-mock-bot`, pese al nombre "mock" — NO es el bot legacy de `Proyectos/BetMexico/Telegram/`, que no implementa `/bet`) → `auto_deposit.plan_auto_mission`/`run_auto_mission` → link `?match=ID` → `/` redirige preservando query a `/user/{telegram_id}` → `operator_my_accounts` expone `withdrawal_ready` (poblado por `account_refresh.py`). | ✅ trazado y verificado | ✅ sin inconsistencias en las costuras bot↔dashboard (mismo nombre de campo, mismo scoping por sesión/telegram_id, sin condición de carrera — un solo escritor) |
+| **Poll de retiro: timer global, copy overclaim, alertas ausentes, CSS vs rAF** | Ver entry completa en `docs/ERRORS.md` ("Poll de retiro del portal..."). 4 bugs reales en la lógica agregada por Task 9/10 de Track B. | ✅ fix aplicado | ✅ código revisado + verificado en navegador real con datos de producción; suite 383/383 |
+| **CURP sentinel `'N/A'` impreso literal en grid de cuentas** | `renderAccountCard` mostraba "• CURP: N/A" por check truthy ingenuo sobre el sentinel string. | ✅ fix aplicado | ✅ verificado en vivo: antes/después contra las mismas 34 cuentas reales |
+| **Gate `withdrawal_ready` sin ETA ni refresh manual** | Hasta 2× el intervalo del ciclo de `account_refresh.py` (~10 min peor caso) entre que se deposita y el botón Retirar se habilita, sin feedback más allá de un tooltip estático. | 🔵 documentado, NO implementado | Confirmado por agente adversarial vía lectura de `app.py`/`account_refresh.py` (nada dispara un refresh inmediato tras el depósito). Recomendación en la sección impeccable de abajo — no es bug de esta sesión (comportamiento ya conocido de Track B), es candidato a feature aparte. |
+| **Hot bypass sin cap vs `batch_max`** | `select_refresh_candidates_healthy` no limita cuentas "hot" — hoy sin starvation real (~18 candidatas/ciclo vs `batch_max=40`), pero balance>$50 casi siempre coincide con "tiene JWT vigente" — a escala, casi todo el universo podría entrar por la puerta "hot" saltándose el filtro de grade/pool. | 🔵 riesgo de diseño documentado, no bug hoy | Confirmado por agente adversarial + `test_hot_ignora_batch_max` existente (comportamiento intencional, cubierto). Vigilar si el volumen de cuentas con JWT vigente crece. |
+
+**Suite de tests**: 383/383 (`python -m pytest -q`), sin regresión.
+
+### Auditoría técnica impeccable — `static/portal.js`/`portal.html`/`login.html`
+
+Ver reporte completo en [`docs/audits/2026-08-04-impeccable-portal.md`](audits/2026-08-04-impeccable-portal.md).
+
 **Metodología del smoke**: server local (`app-bet-smoke` en `.claude/launch.json`, gitignored) con
 `JWT_KEEPER_ENABLED=0` + `ACCOUNT_REFRESH_ENABLED=0` (sin llamadas salientes a BetMexico) apuntando
 a una **copia** de `Boveda/BetMexico/betmexico_accounts.db` — nunca se ejecutó un depósito real ni
