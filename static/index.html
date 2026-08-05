@@ -20,23 +20,26 @@
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/duotone/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
-<link rel="stylesheet" href="/static/style.css?v=20260718b">
+<link rel="stylesheet" href="/static/style.css?v=20260805a">
 <link rel="stylesheet" href="/static/depos.css?v=20260718a">
 <link rel="stylesheet" href="/static/pantalla.css?v=20260718a">
 <link rel="stylesheet" href="/static/soporte.css?v=20260801a">
 </head>
 <body>
-<!-- Cenefa superior: banda delgada full-width (top del top) con el wordmark
-     botmexico.com.mx en colores de la bandera (verde/blanco/rojo) + glow verde.
-     Recreado en texto (no raster) para quedar nítido a cualquier ancho y
-     respetar el tema obsidian. -->
-<div class="cenefa">
-  <a href="/" title="botmexico.com.mx — inicio" aria-label="botmexico.com.mx">
-    <span class="cenefa-dot"></span>
-    <span class="cenefa-wm"><span class="g">botm</span><span class="w">exico</span><span class="r">.com.mx</span></span>
-    <span class="cenefa-dot"></span>
-  </a>
-</div>
+<!-- Barra de tabs superior — reemplaza la cenefa de marca (2026-08-05).
+     Migración de los controles del sidebar izquierdo a tabs horizontales
+     principales. El wordmark queda en el sidebar (.sb-brand); acá van las
+     ventanas: Cuentas | Portal | Monitoreo | Pool | Sistema | Estadisticas.
+     Monitoreo agrupa Actividad/Notificaciones/Logs/Salud vía sub-tabs
+     (#monitoreoSubBar, visible solo cuando Monitoreo está activo). -->
+<nav class="toptabs" role="tablist" aria-label="Vistas principales">
+  <button class="tab on" data-tab="accounts" role="tab" title="Tu chamba diaria — todas las cuentas vivas"><span class="ti">▦</span>Cuentas</button>
+  <button class="tab" data-tab="portal" role="tab" title="Tu portal /bet — tus cuentas como operador"><span class="ti">◈</span>Portal</button>
+  <button class="tab" data-tab="monitoreo" role="tab" title="Actividad, notificaciones, logs y salud"><span class="ti">⚡</span>Monitoreo</button>
+  <button class="tab" data-tab="pool" id="tabPool" role="tab" title="Las que ven los operadores ahorita"><span class="ti">◈</span>Pool</button>
+  <button class="tab" data-tab="sistema" id="tabSistema" role="tab" title="Botones rojos peligrosos — usa con criterio"><span class="ti">⚙</span>Sistema</button>
+  <button class="tab" data-tab="estadisticas" id="tabEstadisticas" role="tab" title="Inteligencia de BINes — tasa de aprobación por tarjeta"><span class="ti">▣</span>Estadisticas</button>
+</nav>
 <div class="shell">
   <aside class="sidebar">
     <button class="sb-collapse" id="sidebarToggle" title="Colapsar el menú (rail)" aria-label="Colapsar o expandir el menú lateral">
@@ -119,6 +122,16 @@
       </button>
       <div class="grow"></div>
     </header>
+
+    <!-- Sub-tabs de Monitoreo: barra secundaria que aparece solo cuando el
+         tab "Monitoreo" está activo. Reemplaza el grupo "Monitoreo" del sidebar
+         (Actividad/Notificaciones/Logs/Salud) migrándolo a tabs horizontales. -->
+    <div class="subtabs" id="monitoreoSubBar" hidden role="tablist" aria-label="Vistas de Monitoreo">
+      <button class="subtab on" data-sub="activity" role="tab" title="Quién hizo qué y cuándo"><span class="si">⚡</span>Actividad</button>
+      <button class="subtab" data-sub="notifications" role="tab" title="Lo que pasó mientras no veías"><span class="si">◔</span>Notificaciones<span class="sb hidden warn" id="subNotifBadge">·</span></button>
+      <button class="subtab" data-sub="logs" role="tab" title="Tripas en vivo del servidor"><span class="si">▤</span>Logs</button>
+      <button class="subtab" data-sub="health" role="tab" title="¿Está vivo todo? Aquí lo dice"><span class="si">◉</span>Salud</button>
+    </div>
 
     <!-- Vista: Cuentas -->
     <div id="accountsMain" style="display:flex;flex-direction:column;flex:1;min-height:0">
@@ -583,6 +596,18 @@
           <span class="dim mono" id="poolHint">Solo Superadmin · vista de las cuentas que los operadores pueden ver y bloquear.</span>
         </div>
       </div>
+    </div>
+
+    <!-- Vista: Portal (el portal /bet personal embebido como tab — SA only).
+         iframe lazy-load: el src se setea solo la primera vez que se muestra el
+         tab (_ensurePortalLoaded en app.js) con /user/{telegram_id}?bare=1 —
+         NO existe ruta /bet; el portal se sirve en /user/{id}. Así no carga
+         Three.js + SSE del portal hasta que Robert lo pida. Persiste entre tab
+         switches (no recarga) → misión SSE y estado sobreviven. -->
+    <div id="portalMain" style="display:none;flex-direction:column;flex:1;min-height:0">
+      <iframe id="portalFrame" class="portal-frame"
+              title="Mi portal /bet" loading="lazy"
+              style="flex:1;min-height:0;border:0;background:transparent"></iframe>
     </div>
 
     <!-- Vista: Actividad (event log en vivo) -->
@@ -1144,7 +1169,7 @@
 <script src="/static/activity_logic.js?v=20260629b"></script>
 <script src="/static/pantalla_logic.js?v=20260702a"></script>
 <script src="/static/strip_logic.js?v=20260630a"></script>
-<script src="/static/app.js?v=20260722b"></script>
+<script src="/static/app.js?v=20260805a"></script>
 <script src="/static/depos_logic.js?v=20260628e"></script>
 <script src="/static/depos_window.js?v=20260630a"></script>
 <script src="/static/depos.js?v=20260628e"></script>

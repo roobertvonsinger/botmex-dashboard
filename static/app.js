@@ -533,6 +533,16 @@ async function loadMe() {
   if (!isSuper) {
     const ga = document.getElementById('sbGroupAdminWrap'); if (ga) ga.hidden = true;
   }
+  // Tabs superiores SA-only (2026-08-05): Pool / Sistema / Estadisticas no
+  // aplican a operadores. Mismo gateo que el sidebar (#navPool/#navAdmin/...
+  // arriba) — la barra de tabs y el sidebar se mantienen consistentes durante
+  // la transición. Sub-tabs Logs/Salud de Monitoreo también SA-only.
+  if (!isSuper) {
+    ['#tabPool', '#tabSistema', '#tabEstadisticas'].forEach(sel => {
+      const t = $(sel); if (t) t.style.display = 'none';
+    });
+    $$('.subtab[data-sub="logs"], .subtab[data-sub="health"]').forEach(t => t.style.display = 'none');
+  }
   // Liberar (asignar a otros) solo superadmin — el "admin" NO debe verlo (vista secreta)
   if (!isSuper) {
     $('#cmdRelease').closest('.cmd-release-wrap').style.display = 'none';
@@ -645,7 +655,7 @@ function renderTable() {
         <th class="sel-cell"></th>
         ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
         ${_th('last_deposit_date','Últ. depósito')}
-        ${_th('last_checked_at','Últ. check')}
+        ${_th('last_updated_at','Últ. update')}
         <th class="ic-col-th" aria-label="Acciones"></th>
       </tr>`;
   const thead = t.querySelector('thead');
@@ -749,7 +759,7 @@ function renderTable() {
       <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
       <td class="combo" title="Click: ver detalle · Ctrl/Shift+Click: seleccionar">${jwtBadge}<b class="combo-txt d-copy" data-copy="${esc(combo)}" title="Click: copiar combo">${esc(combo)}</b></td>
       <td class="dep" title="Último depósito hecho">${dep}</td>
-      <td class="dep dim check-cell" title="Última actualización · total de checks">${fmtAgo(r.last_checked_at)}<span class="check-cnt">· ${r.check_count || 0}</span></td>
+      <td class="dep dim check-cell" title="Última actualización real · total de checks">${fmtAgo(r.last_updated_at || r.last_checked_at)}<span class="check-cnt">· ${r.check_count || 0}</span></td>
       ${cellAcciones}
     </tr>`;
   }).join('');
@@ -1607,38 +1617,111 @@ document.body.addEventListener('click', async e => {
 
 // ─── navigation ───
 let _lastNonNotifSection = 'accounts';
+
+// Tabs superiores (2026-08-05): migración de los controles del sidebar a tabs
+// horizontales. 6 tabs principales: Cuentas | Portal | Monitoreo | Pool |
+// Sistema | Estadisticas. Monitoreo agrupa los 4 sub-views (Actividad /
+// Notificaciones / Logs / Salud) vía #monitoreoSubBar.
+// showSection acepta AMBOS vocabularios: los 6 top-tabs nuevos Y los nombres
+// viejos del sidebar (activity/notifications/logs/health/admin/bin-stats) —
+// el sidebar sigue vivo durante la transición, así que ambos deben funcionar.
+const _MON_SUBS = ['activity', 'notifications', 'logs', 'health'];
+function _resolveSection(name) {
+  // top = tab superior a activar · sub = sub-view de monitoreo · view = contenedor
+  if (name === 'monitoreo') return { top: 'monitoreo', sub: state.monSub || 'activity', view: state.monSub || 'activity' };
+  if (_MON_SUBS.includes(name)) return { top: 'monitoreo', sub: name, view: name };
+  if (name === 'sistema' || name === 'admin') return { top: 'sistema', sub: null, view: 'admin' };
+  if (name === 'estadisticas' || name === 'bin-stats') return { top: 'estadisticas', sub: null, view: 'bin-stats' };
+  return { top: name, sub: null, view: name };
+}
+
+// Portal /bet embebido como tab: lazy-load del iframe (Three.js + SSE del portal
+// no cargan hasta que Robert abra el tab). El src se arma con el telegram_id
+// del usuario logueado → /user/{tid}?bare=1 (NO existe ruta /bet; el portal se
+// sirve en /user/{id}). Persiste entre tab switches (no recarga) → misión SSE
+// y estado del portal sobreviven.
+let _portalLoaded = false;
+function _ensurePortalLoaded() {
+  if (_portalLoaded) return;
+  const f = $('#portalFrame');
+  if (!f) return;
+  const tid = state.user && state.user.telegram_id;
+  if (!tid) return; // sin telegram_id no hay portal propio
+  f.src = '/user/' + tid + '?bare=1';
+  _portalLoaded = true;
+}
+
+// Sub-view de Monitoreo: alterna los 4 contenedores + sub-tab activa + inits.
+function _showMonitoreoSub(sub) {
+  state.monSub = sub;
+  const show = (id, on) => { const el = $('#' + id); if (el) el.style.display = on ? 'flex' : 'none'; };
+  _MON_SUBS.forEach(s => show(s + 'Main', s === sub));
+  $$('.subtab[data-sub]').forEach(b => b.classList.toggle('on', b.dataset.sub === sub));
+  if (sub !== 'logs') stopLogsPolling();
+  if (sub === 'activity') reloadActivity();
+  else if (sub === 'notifications') renderNotifs();
+  else if (sub === 'logs') {
+    _navLogsAlertCount = 0;
+    const b = $('#navLogsBadge'); if (b) { b.textContent = ''; b.classList.remove('warn'); }
+    startLogsPolling();
+  }
+  else if (sub === 'health') loadHealth(false);
+}
+
 function showSection(name) {
-  if (state.section !== 'notifications' && name !== state.section) {
+  if (state.section !== 'notifications' && name !== state.section && name !== 'notifications') {
     _lastNonNotifSection = state.section;
   }
-  state.section = name;
-  $('#accountsMain').style.display = name === 'accounts' ? 'flex' : 'none';
-  const poolM = $('#poolMain'); if (poolM) poolM.style.display = name === 'pool' ? 'flex' : 'none';
-  $('#activityMain').style.display = name === 'activity' ? 'flex' : 'none';
-  $('#notificationsMain').style.display = name === 'notifications' ? 'flex' : 'none';
-  const logsM = $('#logsMain'); if (logsM) logsM.style.display = name === 'logs' ? 'flex' : 'none';
-  const healthM = $('#healthMain'); if (healthM) healthM.style.display = name === 'health' ? 'flex' : 'none';
-  const adminM = $('#adminMain'); if (adminM) adminM.style.display = name === 'admin' ? 'flex' : 'none';
-  const binM = $('#binStatsMain'); if (binM) binM.style.display = name === 'bin-stats' ? 'flex' : 'none';
-  $$('.nav[data-section]').forEach(btn => btn.classList.toggle('on', btn.dataset.section === name));
-  if (name === 'pool') reloadPool();
-  if (name === 'activity') reloadActivity();
-  if (name === 'notifications') renderNotifs();
-  if (name === 'logs') {
-    _navLogsAlertCount = 0;
-    const b = $('#navLogsBadge');
-    if (b) { b.textContent = ''; b.classList.remove('warn'); }
-    startLogsPolling();
-  } else stopLogsPolling();
-  if (name === 'health') loadHealth(false);
-  if (name === 'admin') loadAdminState();
-  if (name === 'bin-stats') reloadBinStats();
+  const r = _resolveSection(name);
+  // state.section refleja el VIEW real (activity/admin/bin-stats…), no el tab
+  // superior (monitoreo/sistema/estadisticas) — los guards SSE y los checks
+  // state.section==='activity'/'logs'/etc. esperan el view, no el agrupador.
+  state.section = r.view;
+
+  // Contenedores top-level
+  const show = (id, on) => { const el = $('#' + id); if (el) el.style.display = on ? 'flex' : 'none'; };
+  show('accountsMain', r.view === 'accounts');
+  show('poolMain', r.view === 'pool');
+  show('adminMain', r.view === 'admin');
+  show('binStatsMain', r.view === 'bin-stats');
+  show('portalMain', r.view === 'portal');
+
+  // Monitoreo: sub-views + sub-bar
+  const isMon = r.top === 'monitoreo';
+  const subBar = $('#monitoreoSubBar');
+  if (subBar) subBar.hidden = !isMon;
+  if (isMon) {
+    _showMonitoreoSub(r.sub);
+  } else {
+    _MON_SUBS.forEach(s => show(s + 'Main', false));
+    stopLogsPolling();
+  }
+
+  // Tab bar superior (activa)
+  $$('.tab[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === r.top));
+  // Sidebar nav (legacy — sigue vivo durante la transición)
+  $$('.nav[data-section]').forEach(btn => btn.classList.toggle('on', btn.dataset.section === r.view));
+
+  // Inits por vista
+  if (r.view === 'pool') reloadPool();
+  if (r.view === 'admin') loadAdminState();
+  if (r.view === 'bin-stats') reloadBinStats();
+  if (r.view === 'portal') _ensurePortalLoaded();
+
   try {
     var dw = window.DeposWindow && window.DeposWindow._instance;
     var _isSA = !!(state.user && state.user.role === 'superadmin');
-    if (dw && typeof dw.reanchorForSection === 'function') dw.reanchorForSection(name, _isSA);
+    if (dw && typeof dw.reanchorForSection === 'function') dw.reanchorForSection(r.view, _isSA);
   } catch (e) {}
 }
+
+// Click en tabs superiores y sub-tabs de Monitoreo
+$$('.tab[data-tab]').forEach(btn => {
+  btn.addEventListener('click', () => showSection(btn.dataset.tab));
+});
+$$('.subtab[data-sub]').forEach(btn => {
+  btn.addEventListener('click', () => showSection(btn.dataset.sub));
+});
 
 // ─── BIN intelligence (SA only) ───
 async function reloadBinStats() {

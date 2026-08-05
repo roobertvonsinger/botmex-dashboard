@@ -279,6 +279,15 @@
       .ph-logo { font-size: 14px; }
       .ph-mark { height: 22px; }
     }
+
+    /* ── Bare mode (?bare=1): portal embebido como tab del dashboard SA ──
+       Se ocultan header (.ph), footer (.pf) y el canvas horizonte (#horizon +
+       .hz-vignette) — su estética (agujero negro + campo estelar) es distinta
+       del dashboard obsidiano. El portal queda solo con el grid de cuentas +
+       misión, fondo radial sutil que ya cuadra con el tema del dashboard. */
+    body.bare .ph, body.bare .pf, body.bare .hz-vignette, body.bare #horizon { display: none !important; }
+    body.bare .portal-wrap { padding: 10px 14px; max-width: 100%; }
+    body.bare { overflow: auto; }
   </style>
 </head>
 <body>
@@ -309,7 +318,7 @@
 
     <div id="toastRegion" aria-live="polite" role="status"></div>
 
-    <script src="/static/portal.js?v=1785281972"></script>
+    <script src="/static/portal.js?v=20260805a"></script>
   <script src="/static/horizon.js?v=1"></script>
 </body>
 </html>

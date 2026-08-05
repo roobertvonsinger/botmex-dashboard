@@ -7,15 +7,15 @@
 
 ```
 +------------------------------------------------------------+
-| topbar: COLAPSADA en desktop (2026-06-29) · hamburger en mobile |
+| toptabs: Cuentas | Portal | Monitoreo | Pool | Sistema | Estadisticas |
 +----+--------------------------------------------------------+
-| s  |  main section (cambia según nav):                      |
-| i  |   - accounts                                           |
-| d  |   - activity                                           |
-| e  |   - pool                                               |
-| b  |   - notifications                                      |
-| a  |   - logs (SA)                                          |
-| r  |   - admin panel (SA)                                   |
+| s  | [subtabs Monitoreo: Actividad|Notificaciones|Logs|Salud] |
+| i  |  main section (cambia según nav):                      |
+| d  |   - accounts                                           |
+| e  |   - portal (iframe /bet?bare=1)                        |
+| b  |   - activity / notifications / logs / health (Monitoreo)|
+| a  |   - pool (SA)                                          |
+| r  |   - admin / Controles (SA)                             |
 +----+--------------------------------------------------------+
 | cmdBar (visible cuando hay selección): Depositar · Lock ... |
 +------------------------------------------------------------+
@@ -29,16 +29,92 @@
   - Tamaño en sidebar: `.sb-brand img { width: 158px }` (`static/style.css`; reducido de 190px el 2026-06-29 al compactar el sidebar para que entre sin scroll). El glow verde lo da un `drop-shadow` CSS.
   - **Distinto** del avatar del panel de depósitos (`depos_avatar.png` / osito busto del modal) — ese es branding "Depos", no el logo global.
 
-- **Cenefa superior** (`.cenefa`, `index.html` primer hijo de `<body>`) — 2026-06-29. Banda delgada full-width (`--cenefa-h: 30px`) en el "top del top" con el wordmark `botmexico.com.mx` en colores de la bandera (`.g` verde / `.w` blanco / `.r` rojo) + glow verde, flanqueado por 2 puntos rojos (`.cenefa-dot`). **Recreado en texto/CSS, NO raster** — nítido a cualquier ancho, sin distorsión, theme-aware (Robert pidió "con la segunda imagen": ese PNG no estaba como asset; el wordmark CSS es fiel a la marca y mejor para una banda delgada). `.shell` pasó a `height: calc(100vh - var(--cenefa-h))`; el `.dep-drawer` y el sidebar-drawer mobile arrancan en `top: var(--cenefa-h)`. Si Robert quiere el raster exacto: dejar el PNG en `static/assets/` y cambiar `.cenefa` por un `<img>`.
+- **Cenefa superior → REPLAZADA por barra de tabs** (`.toptabs`, 2026-08-05). La
+  banda de marca delgada (`.cenefa`, wordmark `botmexico.com.mx` tricolor) se
+  reemplazó por una barra de tabs horizontales principales que migran los
+  controles del sidebar izquierdo a la parte superior. El wordmark quedó en el
+  sidebar (`.sb-brand`); la cenefa como tal NO existe más en el DOM. Mismo
+  anclaje de altura: `--cenefa-h` (bump 30→38px) sigue fijando `.shell` height
+  y el `top` del `.dep-drawer` + drawer mobile. Ver §"Barra de tabs superior".
 
-## Secciones (vías `showSection(name)` — app.js:926)
+## Barra de tabs superior (`.toptabs`) — 2026-08-05
 
-| Sección | Container HTML | Render | Endpoint inicial |
+Reemplaza la cenefa de marca. Migración de los controles del sidebar izquierdo
+a tabs horizontales principales. **El sidebar sigue vivo durante la transición**
+— ambos (tabs + sidebar) cablean a la misma `showSection(name)`, así que son
+redundantes a propósito. Quitar el sidebar es paso futuro (decidir qué va ahí).
+
+**6 tabs principales** (`data-tab`):
+
+| Tab | `data-tab` | View/contenedor | Notas |
 |---|---|---|---|
-| `accounts` | `#accountsMain` | `renderTable()` (app.js:450) | `GET /api/accounts` |
-| `activity` | `#activityMain` | `renderActivity()` (app.js:809) | `GET /api/activity` |
-| `pool` | `#poolMain` | `reloadPool()` (app.js:948) | `GET /api/pool/accounts` |
-| `notifications` | `#notificationsMain` | `renderNotifs()` (app.js:906) | (estado in-memory `notifications[]`) |
+| Cuentas | `accounts` | `#accountsMain` | default |
+| Portal | `portal` | `#portalMain` (iframe `/bet?bare=1`) | SA (su portal personal); lazy-load |
+| Monitoreo | `monitoreo` | grupo: Actividad/Notificaciones/Logs/Salud | sub-tabs `#monitoreoSubBar` |
+| Pool | `pool` | `#poolMain` | SA-only |
+| Sistema | `sistema` | `#adminMain` (Controles) | SA-only |
+| Estadisticas | `estadisticas` | `#binStatsMain` (BINes) | SA-only |
+
+**Monitoreo** agrupa los 4 sub-views antes sueltos en el sidebar (grupo
+"Monitoreo"): Actividad / Notificaciones / Logs / Salud. La barra secundaria
+`#monitoreoSubBar` (`.subtabs`/`.subtab`) aparece SOLO cuando el tab Monitoreo
+está activo. Sub-tabs SA-only: Logs + Salud (mismo gateo que el sidebar viejo).
+
+**`showSection(name)`** (app.js) acepta AMBOS vocabularios — los 6 top-tabs
+nuevos (`monitoreo`/`sistema`/`estadisticas`/`portal`) Y los nombres viejos del
+sidebar (`activity`/`notifications`/`logs`/`health`/`admin`/`bin-stats`).
+`_resolveSection(name)` mapea a `{top, sub, view}`:
+- `top` = tab superior a activar (`.tab.on`)
+- `sub` = sub-view de Monitoreo (para `#monitoreoSubBar`)
+- `view` = contenedor real a mostrar + valor guardado en `state.section`
+
+**`state.section` guarda el VIEW real** (ej. `activity`), NO el tab agrupador
+(`monitoreo`) — los guards SSE (`state.section === 'activity'`/`'logs'`) y los
+inits dependen del view, no del agrupador. Por eso `admin`/`bin-stats`
+(pero el tab dice Sistema/Estadisticas) y `activity` (pero el tab dice Monitoreo).
+
+**`_showMonitoreoSub(sub)`** alterna los 4 contenedores + sub-tab activa + inits
+(reloadActivity / renderNotifs / startLogsPolling / loadHealth). stopLogsPolling()
+al salir de Logs o de Monitoreo entero.
+
+**Role-gating** (loadMe): `#tabPool`/`#tabSistema`/`#tabEstadisticas` y los
+sub-tabs Logs/Salud se ocultan para no-SA (mismo gateo que `#navPool`/etc.).
+
+### Portal embebido (`#portalMain` → iframe `/bet?bare=1`)
+
+El portal `/bet` (portal.html + portal.js) se embebe como tab vía iframe.
+`_ensurePortalLoaded()` hace **lazy-load** del `src` la primera vez que se abre
+el tab (Three.js + SSE del portal no cargan hasta entonces). El iframe
+**persiste** entre tab switches (no recarga) → misión SSE y estado del portal
+sobreviven. Ver §"Branding / logo" para el modo bare.
+
+- **`?bare=1`** (portal.js `BARE`): añade `body.bare` → oculta `.ph` (header con
+  brand + Salir), `.pf` (footer) y `#horizon`/`.hz-vignette` (canvas agujero
+  negro — estética distinta al dashboard). Queda solo el grid de cuentas +
+  misión. El back-link "← Dashboard" y el logout se skipan (el dashboard los
+  provee). Funciona standalone (`/bet`) Y embebido (`/bet?bare=1`).
+- **Limitación v1**: el tab Portal NO recibe `?match=ID` — si Robert arranca una
+  misión /bet desde Telegram (link con `?match=`), la verá abriendo ese link en
+  pestaña nueva, no en el tab. Pipear la misión activa al tab = paso futuro.
+
+## Secciones (vías `showSection(name)` — app.js, ver §"Barra de tabs superior")
+
+> `showSection` acepta ambos vocabularios: top-tabs (`monitoreo`/`sistema`/...)
+> y nombres viejos del sidebar (`activity`/`admin`/...). `_resolveSection`
+> mapea a `{top, sub, view}` — `state.section` guarda el `view` real.
+
+| Tab / Sección | Container HTML | Render | Endpoint inicial |
+|---|---|---|---|
+| Cuentas (`accounts`) | `#accountsMain` | `renderTable()` | `GET /api/accounts` |
+| Portal (`portal`) | `#portalMain` (iframe) | `_ensurePortalLoaded()` → `/bet?bare=1` | `/api/operator/my-accounts` (dentro del iframe) |
+| Monitoreo (`monitoreo`) | `#monitoreoSubBar` + sub-views | `_showMonitoreoSub(sub)` | (ver sub-views) |
+| ↳ Actividad (`activity`) | `#activityMain` | `renderActivity()` | `GET /api/activity` |
+| ↳ Notificaciones (`notifications`) | `#notificationsMain` | `renderNotifs()` | (in-memory `notifications[]`) |
+| ↳ Logs (`logs`) | `#logsMain` | `startLogsPolling()` | `GET /api/logs/stream` (SSE) |
+| ↳ Salud (`health`) | `#healthMain` | `loadHealth(false)` | `GET /api/health/full` |
+| Pool (`pool`) | `#poolMain` | `reloadPool()` | `GET /api/pool/accounts` |
+| Sistema (`sistema`/`admin`) | `#adminMain` | `loadAdminState()` | `GET /api/superadmin/*` |
+| Estadisticas (`estadisticas`/`bin-stats`) | `#binStatsMain` | `reloadBinStats()` | `GET /api/deposits/bin-stats` |
 
 ## Sidebar — status pills (`.sb-status`)
 
@@ -290,7 +366,7 @@ localStorage: `bmx.lpCols.v1` → `v2` y `bmx.lpOrder.v1` → `v2` (invalidan ra
 ### Ajustes 2026-06-29 (2) — feedback Robert sesión limpia
 
 - **Buscador → filterbar de Cuentas.** Salió del sidebar y se incrustó en `.filterbar` junto al `<h2>Cuentas</h2>`, antes de los filtros (`.filterbar .search.filterbar-search`). Conserva `id="searchInput"` + cableado `q=`. **Ctrl+K** ahora salta a la vista Cuentas antes de enfocar (app.js).
-- **Vista única.** El toggle Simple/Detallada (`.seg[data-seg="view"]`) se **eliminó** del DOM. `state.view` queda fijo en `'detail'` para todos (antes operadores forzados a `'simple'`). La tabla siempre muestra 9 columnas (incluye `Últ. check` + `Checks`). `_detailColspan()` fallback → 9.
+- **Vista única.** El toggle Simple/Detallada (`.seg[data-seg="view"]`) se **eliminó** del DOM. `state.view` queda fijo en `'detail'` para todos (antes operadores forzados a `'simple'`). La tabla siempre muestra 9 columnas (incluye `Últ. update` + `Checks`). `_detailColspan()` fallback → 9. `Últ. update` = `last_updated_at` (persistencia real de balance, agregado 2026-08-05) con fallback a `last_checked_at`.
 - **Sidebar — cajas de fondo encajadas.** Online + status se agruparon en `.sb-bottom` (margin único, gap 6px) y el `.grow` se movió ARRIBA del grupo → Online baja y queda pegado al status como un par cohesivo (antes el `.grow` los separaba con un hueco grande).
 - **Divisores arrastrables del strip** (`.lp-gutter` ×2, patrón Claude Desktop). Entre Actividad↔Recientes y Recientes↔Pool. Arrastra para repartir el ancho de los cards adyacentes (min 150px c/u); **doble-click restaura**. `initLpResize()` (app.js) persiste proporciones en `localStorage['bmx.lpCols.v1']` (resiliente a resize de ventana). Grid del `.lpanel` = 5 tracks (`var(--lpc0/1/2)` con fallback fr + `--lp-gw`).
 - **~~Divisor horizontal del strip (`.lp-vgutter`, ↕ row-resize, doble-click restaura)~~ — ELIMINADO 2026-07-09** (Robert: "ya no debería haber drag/collapse ni de los KPI ni de la pantalla, se quedan fijos"). En su lugar `<div class="lp-vspacer">` (10px fijo, sin interactividad) entre `.lpanel` y `#accDockZone`. El alto del panel ya no se arrastra ni persiste en `localStorage` — lo fija `initLpVResize()` UNA vez al cargar vía `ANCHOR_H` (ver sección "La Pantalla" más abajo: alineado con `#sbSectionSistema`). Detalle completo + `window.KpiPanel` reducido en la sección de La Pantalla.

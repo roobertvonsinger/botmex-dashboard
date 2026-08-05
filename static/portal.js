@@ -24,6 +24,14 @@
   // punto que la memoria del proyecto marca crítico (status:6 ≠ aterrizó).
   const wdPolls = new Map(); // accountId -> intervalId
 
+  // ── Bare mode ─────────────────────────────────────────────────
+  // ?bare=1: el portal va embebido como tab del dashboard SA. Se ocultan
+  // header (.ph), footer (.pf) y el canvas horizonte (estética distinta al
+  // dashboard) vía body.bare (CSS en portal.html). El logout y el back-link
+  // "← Dashboard" se skipan — el dashboard ya provee ambos.
+  const BARE = new URLSearchParams(window.location.search).has('bare');
+  if (BARE) document.body.classList.add('bare');
+
   // ── View-as scope ──────────────────────────────────────────────
   // /user/{id}: {id} identifica de quién es este portal. Si el que mira es
   // SA, el backend narrowea su sesión (rol/telegram_id) a ese {id} vía
@@ -584,25 +592,28 @@
 
   // ── Init ───────────────────────────────────────────────────────
   async function init() {
-    // Logout
-    $('#logoutBtn').addEventListener('click', async () => {
-      try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (_) {}
-      window.location.href = '/login';
-    });
+    // Logout + back-link SA: solo en página standalone. En bare (tab embebido)
+    // el dashboard ya provee logout y navegación — el header (.ph) está oculto.
+    if (!BARE) {
+      $('#logoutBtn').addEventListener('click', async () => {
+        try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (_) {}
+        window.location.href = '/login';
+      });
 
-    // SA viendo /user/{id} (posiblemente el suyo propio, vía view_as): nunca
-    // debe quedar atrapado sin volver a su dashboard — link directo siempre visible.
-    try {
-      const me = await (await fetch('/api/auth/me')).json();
-      if (me.role === 'superadmin') {
-        const back = document.createElement('a');
-        back.className = 'btn btn-sm';
-        back.href = '/dashboard';
-        back.textContent = '← Dashboard';
-        $('#logoutBtn').insertAdjacentElement('beforebegin', back);
-        if (phRole) phRole.textContent = '· viendo como usuario';
-      }
-    } catch (_) {}
+      // SA viendo /user/{id} (posiblemente el suyo propio, vía view_as): nunca
+      // debe quedar atrapado sin volver a su dashboard — link directo siempre visible.
+      try {
+        const me = await (await fetch('/api/auth/me')).json();
+        if (me.role === 'superadmin') {
+          const back = document.createElement('a');
+          back.className = 'btn btn-sm';
+          back.href = '/dashboard';
+          back.textContent = '← Dashboard';
+          $('#logoutBtn').insertAdjacentElement('beforebegin', back);
+          if (phRole) phRole.textContent = '· viendo como usuario';
+        }
+      } catch (_) {}
+    }
 
     // Check for ?match=ID in URL
     const params = new URLSearchParams(window.location.search);

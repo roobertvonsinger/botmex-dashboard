@@ -77,7 +77,7 @@
   --z-modal: 400; --z-toast: 500; --z-coachmark: 10000;
 
   /* ── Layout base ── */
-  --sidebar-w: 216px; --topbar-h: 56px; --cenefa-h: 30px; --blur: 7px;
+  --sidebar-w: 216px; --topbar-h: 56px; --cenefa-h: 38px; --blur: 7px;
 
   /* Easing compartido — mismo curvado que el panel de depósitos v8 (depos.css
      §--t-fast/--t). Estándar mínimo de fluidez para TODOS los controles UI. */
@@ -132,42 +132,87 @@ body.dep-drawer-pushing { padding-right: 420px; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); }
 
-/* ─── Cenefa superior (banda de marca, top del top) ───────────────────────────
-   Banda delgada full-width con el wordmark botmexico.com.mx en colores de la
-   bandera (verde/blanco/rojo) + glow verde. Texto (no raster) → nítido a
-   cualquier ancho, sin distorsión, coherente con el tema obsidian. */
-.cenefa {
+/* ─── Barra de tabs superior (reemplaza la cenefa de marca, 2026-08-05) ──────
+   Migración de los controles del sidebar a tabs horizontales principales:
+   Cuentas | Portal | Monitoreo | Pool | Sistema | Estadisticas.
+   El wordmark quedó en el sidebar (.sb-brand); acá van las ventanas.
+   Mismo lenguaje visual que .nav (acento verde, hairline, ease-fast). */
+.toptabs {
   height: var(--cenefa-h); flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  position: relative; overflow: hidden; user-select: none;
+  display: flex; align-items: stretch; justify-content: center; gap: 0;
+  padding: 0 6px;
+  position: relative; overflow-x: auto; overflow-y: hidden;
+  user-select: none;
   background:
     radial-gradient(ellipse 55% 150% at 50% 0%, oklch(0.50 0.11 160 / 0.12), transparent 70%),
     linear-gradient(180deg, #0a0c10, #06070a);
   border-bottom: 1px solid var(--hairline);
+  scrollbar-width: none;
 }
-/* hairline verde inferior — mismo lenguaje que .sidebar::before */
-.cenefa::after {
+.toptabs::-webkit-scrollbar { display: none; }
+/* hairline verde inferior — mismo lenguaje que .sidebar::before y la ex-cenefa */
+.toptabs::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
   background: linear-gradient(90deg, transparent, var(--accent-glow), transparent);
-  opacity: 0.55;
+  opacity: 0.55; pointer-events: none;
 }
-.cenefa a {
-  display: inline-flex; align-items: center; gap: 13px;
-  text-decoration: none; line-height: 1; outline: 0;
+.tab {
+  appearance: none; border: none; background: transparent;
+  color: var(--text-dim); font: inherit; font-size: 12.5px; font-weight: 500;
+  padding: 0 14px; margin: 0; border-radius: 0;
+  display: inline-flex; align-items: center; gap: 7px;
+  white-space: nowrap; cursor: pointer; position: relative;
+  transition: color var(--ease-fast), background var(--ease-fast);
 }
-.cenefa-wm {
-  font-family: var(--font-display); font-weight: 700;
-  font-size: 14px; letter-spacing: 0.3px; white-space: nowrap;
+.tab .ti { font-size: 13px; width: 14px; text-align: center; color: var(--text-dim); transition: color var(--ease-fast); }
+.tab:hover { color: var(--text); background: rgba(255,255,255,0.025); }
+.tab:hover .ti { color: var(--text); }
+.tab:active { transform: scale(0.98); }
+.tab.on { color: var(--text); }
+.tab.on .ti { color: var(--accent); text-shadow: 0 0 8px var(--accent-glow); }
+/* subrayado acento inferior — reemplaza la barra lateral izq de .nav.on */
+.tab.on::after {
+  content: ""; position: absolute; left: 10px; right: 10px; bottom: 0; height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--accent); box-shadow: 0 0 8px var(--accent-glow), 0 -1px 6px var(--accent-soft);
 }
-.cenefa-wm .g { color: oklch(0.64 0.13 160); text-shadow: 0 0 6px var(--accent-glow), 0 0 14px oklch(0.50 0.11 160 / 0.30); }
-.cenefa-wm .w { color: #eef0f3; }
-.cenefa-wm .r { color: oklch(0.62 0.20 24); text-shadow: 0 0 7px oklch(0.62 0.20 24 / 0.42); }
-.cenefa-dot {
-  width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
-  background: oklch(0.62 0.20 24);
-  box-shadow: 0 0 6px oklch(0.62 0.20 24 / 0.55), 0 0 0 2px oklch(0.62 0.20 24 / 0.12);
+
+.subtabs[hidden] { display: none !important; }
+
+/* ─── Sub-tabs de Monitoreo (barra secundaria, solo cuando Monitoreo activo) ─ */
+.subtabs {
+  flex-shrink: 0; display: flex; align-items: stretch; gap: 2px;
+  padding: 0 12px; height: 36px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+  position: relative; z-index: 4;
 }
-.cenefa a:hover .cenefa-wm .g { text-shadow: 0 0 9px var(--accent), 0 0 18px var(--accent-glow); }
+.subtab {
+  appearance: none; border: none; background: transparent;
+  color: var(--text-dim); font: inherit; font-size: 12px; font-weight: 500;
+  padding: 0 12px; border-radius: 6px 6px 0 0;
+  display: inline-flex; align-items: center; gap: 6px;
+  white-space: nowrap; cursor: pointer; position: relative;
+  transition: color var(--ease-fast), background var(--ease-fast);
+}
+.subtab .si { font-size: 12px; color: var(--text-dim); transition: color var(--ease-fast); }
+.subtab .sb {
+  font-size: 9px; font-weight: 600; padding: 1px 6px; border-radius: 99px;
+  background: rgba(255,255,255,0.04); color: var(--text-dim); border: 1px solid var(--hairline);
+  font-family: var(--font-mono);
+}
+.subtab .sb.warn { background: var(--danger-soft); color: var(--danger); border-color: oklch(0.66 0.21 24 / 0.22); }
+.subtab:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+.subtab:hover .si { color: var(--text); }
+.subtab.on { color: var(--text); }
+.subtab.on .si { color: var(--accent); }
+.subtab.on::after {
+  content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 2px;
+  border-radius: 2px 2px 0 0; background: var(--accent); box-shadow: 0 0 6px var(--accent-glow);
+}
+
+/* ─── Portal embebido (iframe) ─── */
+.portal-frame { width: 100%; display: block; }
 
 /* ─── Shell ─── */
 .shell { display: flex; height: calc(100vh - var(--cenefa-h)); }
@@ -4446,9 +4491,10 @@ button:focus-visible, [role="button"]:focus-visible {
 /* Overrides puntuales: estos selectores tienen "outline:0" incondicional (no
    ligado a :focus) con especificidad mayor a *:focus-visible — sin este empate
    explícito el link quedaba SIN indicador de foco (detectado con Tab real). */
-.cenefa a:focus-visible, .sb-brand a:focus-visible {
+.toptabs .tab:focus-visible, .sb-brand a:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline-offset: -4px;
+  border-radius: 4px;
 }
 .sb-user { box-shadow: inset 0 1px 0 var(--hairline), 0 2px 9px rgba(0,0,0,0.26); }
 
@@ -4460,12 +4506,13 @@ button:focus-visible, [role="button"]:focus-visible {
 /* Botón de colapso del sidebar + grip de reorden: brillo de acento al interactuar. */
 .nav.on { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.015); }
 
-/* Cenefa superior: respiración de glow muy lenta (vida), apagada si reduce-motion. */
+/* Tab activo: respiración de glow muy lenta (vida), apagada si reduce-motion.
+   Antes era la cenefa-wm; migrado al subrayado del tab activo. */
 @media (prefers-reduced-motion: no-preference) {
-  .cenefa-wm { animation: cenefaBreath 7s ease-in-out infinite; }
-  @keyframes cenefaBreath {
-    0%, 100% { filter: drop-shadow(0 0 5px var(--accent-glow)); }
-    50%      { filter: drop-shadow(0 0 11px var(--accent-glow)); }
+  .tab.on::after { animation: tabBreath 7s ease-in-out infinite; }
+  @keyframes tabBreath {
+    0%, 100% { box-shadow: 0 0 6px var(--accent-glow); }
+    50%      { box-shadow: 0 0 12px var(--accent-glow), 0 -1px 8px var(--accent-soft); }
   }
 }
 

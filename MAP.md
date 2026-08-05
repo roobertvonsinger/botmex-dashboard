@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `18e74d8` | feat(jwt): refresco super smooth — 3 universos, cooldown 24h, FUGA #1 cerrada |
 | `8c828c9` | test(withdrawals): cubrir refresh post-retiro en operator_withdraw |
 | `f299383` | docs: handoff para Claude Code — review + deploy rama jwt-refresh |
 | `02a08b1` | docs: reporte final de sesión — refresco JWT + gate retiro + gaps |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `ea5ad9a` | fix(portal): operator_my_accounts oculta cuentas ya retiradas por completo |
 | `d25fc22` | fix(portal): grid de cuentas congelado durante misión activa (regresión vista única) |
 | `d472ef5` | docs: agregar handoff de auditoría para claude code |
-| `1e95694` | feat(portal): rediseño a vista única y filtro estricto de visibilidad sin ruidos |
 <!-- GEN:end:recientes -->
 
 ---
