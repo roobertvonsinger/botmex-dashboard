@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `02a08b1` | docs: reporte final de sesión — refresco JWT + gate retiro + gaps |
 | `e994e7c` | refactor(jwt_keeper): importar _PENDING_WD_EXISTS_SQL de account_refresh (DRY) |
 | `6f67527` | feat(withdrawals): refresco de balance post-retiro reusando JWT |
 | `dcce536` | feat(jwt_keeper): priorizar cuentas hot en lote de re-login |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `1e95694` | feat(portal): rediseño a vista única y filtro estricto de visibilidad sin ruidos |
 | `8ccfc8b` | docs: handoff de orquestacion para rediseno completo del portal /bet |
 | `484b002` | docs: desambiguar "sin password" (BetMexico != login dashboard) + regla real de visibilidad del portal |
-| `8aced33` | fix(portal): Retirar habilitado sin saldo real + modal exponía instrucción interna |
 <!-- GEN:end:recientes -->
 
 ---
