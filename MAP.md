@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c5f28d4` | docs: guardar avances de sesión — 2 bugs de visibilidad del portal fixeados y deployados |
 | `ea5ad9a` | fix(portal): operator_my_accounts oculta cuentas ya retiradas por completo |
 | `d25fc22` | fix(portal): grid de cuentas congelado durante misión activa (regresión vista única) |
 | `d472ef5` | docs: agregar handoff de auditoría para claude code |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `b4f90a5` | fix(portal): 4 bugs reales de lógica de usuario en poll de retiro + CURP sentinel |
 | `1050bc6` | docs: NEXT-SESSION — Track B cerrado (12 commits, 383/383, IDOR encontrado y corregido) |
 | `79c6f3a` | fix(security): cerrar IDOR en GET /api/accounts/{id}/withdraw/status/{tx_id} |
-| `a49cc10` | feat(account_refresh): persistir withdrawal_ready/institution + SSE en cambio |
 <!-- GEN:end:recientes -->
 
 ---
