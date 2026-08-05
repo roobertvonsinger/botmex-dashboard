@@ -140,38 +140,38 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `get_clabes` | def | L3531–L3540 |
 | `refresh_clabes` | def | L3544–L3554 |
 | `_persist_withdrawal` | def | L3563–L3609 |
-| `withdraw` | def | L3613–L3658 |
-| `withdraw_status` | def | L3662–L3822 |
-| `delete_note` | def | L3826–L3838 |
-| `CombosRequest` | class | L3841–L3842 |
-| `accounts_combos` | def | L3846–L3859 |
-| `accounts_pass_map` | def | L3863–L3868 |
-| `list_all_cards` | def | L3872–L3948 |
-| `activity_feed` | def | L3952–L4049 |
-| `list_deposits` | def | L4053–L4082 |
-| `deposits_stats` | def | L4086–L4111 |
-| `_persist_auto_mission` | def | L4119–L4149 |
-| `admin_maintenance_state` | def | L4153–L4156 |
-| `MaintenanceToggleRequest` | class | L4159–L4160 |
-| `admin_maintenance_toggle` | def | L4164–L4185 |
-| `auto_deposit_create` | def | L4189–L4225 |
-| `auto_deposit_cancel` | def | L4229–L4255 |
-| `operator_my_accounts` | def | L4259–L4306 |
-| `operator_release_account` | def | L4310–L4327 |
-| `operator_withdraw` | def | L4331–L4382 |
-| `operator_missions` | def | L4386–L4404 |
-| `auto_deposit_status` | def | L4408–L4419 |
-| `register_operator_strike` | def | L4422–L4455 |
-| `bot_start_info` | def | L4459–L4495 |
-| `bot_operator_info` | def | L4499–L4538 |
-| `bot_help_info` | def | L4542–L4556 |
-| `bot_pause_mission` | def | L4560–L4589 |
-| `bot_resume_mission` | def | L4593–L4611 |
-| `bot_cancel_mission` | def | L4616–L4651 |
-| `bot_bet_create` | def | L4655–L4824 |
-| `filter_and_sanitize_check_combos` | def | L4827–L4912 |
-| `BotCheckRequest` | class | L4915–L4919 |
-| `bot_check` | def | L4922–L5003 |
+| `withdraw` | def | L3613–L3665 |
+| `withdraw_status` | def | L3669–L3829 |
+| `delete_note` | def | L3833–L3845 |
+| `CombosRequest` | class | L3848–L3849 |
+| `accounts_combos` | def | L3853–L3866 |
+| `accounts_pass_map` | def | L3870–L3875 |
+| `list_all_cards` | def | L3879–L3955 |
+| `activity_feed` | def | L3959–L4056 |
+| `list_deposits` | def | L4060–L4089 |
+| `deposits_stats` | def | L4093–L4118 |
+| `_persist_auto_mission` | def | L4126–L4156 |
+| `admin_maintenance_state` | def | L4160–L4163 |
+| `MaintenanceToggleRequest` | class | L4166–L4167 |
+| `admin_maintenance_toggle` | def | L4171–L4192 |
+| `auto_deposit_create` | def | L4196–L4232 |
+| `auto_deposit_cancel` | def | L4236–L4262 |
+| `operator_my_accounts` | def | L4266–L4313 |
+| `operator_release_account` | def | L4317–L4334 |
+| `operator_withdraw` | def | L4338–L4396 |
+| `operator_missions` | def | L4400–L4418 |
+| `auto_deposit_status` | def | L4422–L4433 |
+| `register_operator_strike` | def | L4436–L4469 |
+| `bot_start_info` | def | L4473–L4509 |
+| `bot_operator_info` | def | L4513–L4552 |
+| `bot_help_info` | def | L4556–L4570 |
+| `bot_pause_mission` | def | L4574–L4603 |
+| `bot_resume_mission` | def | L4607–L4625 |
+| `bot_cancel_mission` | def | L4630–L4665 |
+| `bot_bet_create` | def | L4669–L4838 |
+| `filter_and_sanitize_check_combos` | def | L4841–L4926 |
+| `BotCheckRequest` | class | L4929–L4933 |
+| `bot_check` | def | L4936–L5017 |
 
 ### `auth.py`
 
@@ -926,17 +926,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_withdraw_amount_validation` | def | L185–L201 |
 | `test_withdraw_broadcast_visible_to_sa_only` | def | L204–L210 |
 | `test_withdraw_persist_idempotent_unique_transaction_id` | def | L213–L226 |
-| `test_status_403_non_sa` | def | L231–L237 |
-| `test_withdraw_status_operador_dueno_puede_consultar` | def | L240–L261 |
-| `test_withdraw_status_operador_ajeno_403` | def | L264–L270 |
-| `test_withdraw_status_operador_no_puede_leer_tx_de_otra_cuenta_via_account_id_propio` | def | L273–L294 |
-| `test_status_404_unknown_tx` | def | L297–L301 |
-| `test_status_happy_pending` | def | L304–L325 |
-| `test_status_happy_successful_two_phase_bug2` | def | L328–L360 |
-| `test_status_gateway_mismatch_alert_bug3` | def | L363–L389 |
-| `test_status_digits_mismatch_alert_bug1` | def | L392–L418 |
-| `test_status_no_pending_returns_idle` | def | L421–L440 |
-| `test_status_updates_db_row` | def | L443–L476 |
+| `test_withdraw_triggers_refresh_after_success` | def | L231–L265 |
+| `test_withdraw_skips_refresh_when_jwt_missing` | def | L268–L296 |
+| `test_status_403_non_sa` | def | L301–L307 |
+| `test_withdraw_status_operador_dueno_puede_consultar` | def | L310–L331 |
+| `test_withdraw_status_operador_ajeno_403` | def | L334–L340 |
+| `test_withdraw_status_operador_no_puede_leer_tx_de_otra_cuenta_via_account_id_propio` | def | L343–L364 |
+| `test_status_404_unknown_tx` | def | L367–L371 |
+| `test_status_happy_pending` | def | L374–L395 |
+| `test_status_happy_successful_two_phase_bug2` | def | L398–L430 |
+| `test_status_gateway_mismatch_alert_bug3` | def | L433–L459 |
+| `test_status_digits_mismatch_alert_bug1` | def | L462–L488 |
+| `test_status_no_pending_returns_idle` | def | L491–L510 |
+| `test_status_updates_db_row` | def | L513–L546 |
 
 ### `test_withdrawals_migrate.py`
 
@@ -985,20 +987,21 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `WithdrawalError` | class | L44–L45 |
-| `JwtExpired` | class | L48–L49 |
-| `NoApprovedWithdrawalAccount` | class | L52–L53 |
-| `MultipleApprovedAccounts` | class | L56–L57 |
-| `InsufficientBalance` | class | L60–L61 |
-| `ConcurrentWithdrawalPending` | class | L64–L65 |
-| `_auth_headers` | def | L70–L71 |
-| `_client_kwargs` | def | L74–L78 |
-| `get_bank_accounts` | def | L83–L126 |
-| `get_real_balance` | def | L131–L158 |
-| `begin_withdrawal` | def | L163–L221 |
-| `get_pending_withdrawal` | def | L226–L255 |
-| `get_bank_transaction` | def | L260–L312 |
-| `execute_withdrawal` | def | L317–L388 |
+| `WithdrawalError` | class | L46–L47 |
+| `JwtExpired` | class | L50–L51 |
+| `NoApprovedWithdrawalAccount` | class | L54–L55 |
+| `MultipleApprovedAccounts` | class | L58–L59 |
+| `InsufficientBalance` | class | L62–L63 |
+| `ConcurrentWithdrawalPending` | class | L66–L67 |
+| `_auth_headers` | def | L72–L73 |
+| `_client_kwargs` | def | L76–L80 |
+| `get_bank_accounts` | def | L85–L128 |
+| `get_real_balance` | def | L133–L160 |
+| `begin_withdrawal` | def | L165–L223 |
+| `get_pending_withdrawal` | def | L228–L257 |
+| `get_bank_transaction` | def | L262–L314 |
+| `execute_withdrawal` | def | L319–L395 |
+| `_refresh_account_after_withdrawal` | def | L398–L466 |
 <!-- GEN:end:simbolos -->
 
 ---

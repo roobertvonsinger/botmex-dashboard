@@ -3613,6 +3613,7 @@ def _persist_withdrawal(account_id: int, disparado_por, result: dict) -> None:
 async def withdraw(account_id: int, payload: dict, user: dict = Depends(require_session)):
     if user.get("role") != "superadmin":
         raise HTTPException(403, "Solo superadmin")
+    from withdrawals import _refresh_account_after_withdrawal
     with db() as c:
         acc = c.execute("SELECT id FROM accounts WHERE id=?", (account_id,)).fetchone()
     if not acc:
@@ -3647,6 +3648,12 @@ async def withdraw(account_id: int, payload: dict, user: dict = Depends(require_
         _persist_withdrawal(account_id, user.get("telegram_id"), result)
     except sqlite3.OperationalError:
         persisted = False
+    # Refresh post-retiro (handoff 2026-08-05 §2.3): el retiro ya se ejecutó en
+    # BetMexico — traemos el saldo post-retiro a BD de inmediato reusando el JWT
+    # que ya tiene execute_withdrawal (sin gastar captcha). No-throws.
+    await _refresh_account_after_withdrawal(
+        result.get("account_email"), result.get("_jwt"),
+        result.get("_proxy_url"), user.get("telegram_id") or 0)
     if persisted:
         _broadcast({
             "type": "activity", "kind": "withdrawal",
@@ -4335,7 +4342,7 @@ async def operator_withdraw(account_id: int,
     from withdrawals import (
         execute_withdrawal, JwtExpired, InsufficientBalance,
         NoApprovedWithdrawalAccount, MultipleApprovedAccounts,
-        ConcurrentWithdrawalPending,
+        ConcurrentWithdrawalPending, _refresh_account_after_withdrawal,
     )
     with db() as c:
         acc = c.execute(
@@ -4371,6 +4378,13 @@ async def operator_withdraw(account_id: int,
         _persist_withdrawal(account_id, user.get("telegram_id"), result)
     except sqlite3.OperationalError:
         persisted = False
+    # Refresh post-retiro (handoff 2026-08-05 §2.3): el retiro ya se ejecutó en
+    # BetMexico — traemos el saldo post-retiro a BD de inmediato reusando el JWT
+    # que ya tiene execute_withdrawal (sin gastar captcha). No-throws: un fallo
+    # acá no debe afectar el resultado del retiro ya emitido.
+    await _refresh_account_after_withdrawal(
+        result.get("account_email"), result.get("_jwt"),
+        result.get("_proxy_url"), user.get("telegram_id") or 0)
     if persisted:
         _broadcast({
             "type": "activity", "kind": "withdrawal",

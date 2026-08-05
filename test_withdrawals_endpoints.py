@@ -226,7 +226,77 @@ def test_withdraw_persist_idempotent_unique_transaction_id(seed_db):
     assert len(rows) == 1
 
 
-# ── C2 — GET /api/accounts/{id}/withdraw/status/{tx_id} ──────────────────
+# ── C1b — Refresh post-retiro (handoff 2026-08-05 §2.3) ──────────────────
+
+def test_withdraw_triggers_refresh_after_success(make_client, seed_db, monkeypatch):
+    """Tras un retiro exitoso, se invoca `_refresh_account_after_withdrawal`
+    con el email/JWT/proxy que ya tiene execute_withdrawal (sin recargarlos
+    de BD ni gastar captcha nuevo)."""
+    client = make_client(role="superadmin", telegram_id=1341812706)
+    acc_id = _acc_id(seed_db)
+
+    async def fake_execute(db_path, account_id, amount):
+        return {
+            "transactionId": "t1", "reference": "r1", "accountId": "a1",
+            "accountDigits": "1215", "institutionName": "HEY BANCO",
+            "amount": amount, "account_email": "a@test.com", "warnings": [],
+            "_jwt": "JWT-VIGENTE", "_proxy_url": "http://proxy:8080",
+        }
+
+    import app
+    monkeypatch.setattr(app, "execute_withdrawal", fake_execute)
+    monkeypatch.setattr(app, "_broadcast", lambda e: None)
+
+    refresh_calls = []
+    async def fake_refresh(email, jwt, proxy, op_id):
+        refresh_calls.append((email, jwt, proxy, op_id))
+    import withdrawals
+    monkeypatch.setattr(withdrawals, "_refresh_account_after_withdrawal", fake_refresh)
+    # El import en app.py es local (from withdrawals import ...), así que el
+    # patch sobre withdrawals._refresh_account_after_withdrawal SÍ se respeta.
+
+    r = client.post(f"/api/accounts/{acc_id}/withdraw", json={"amount": 100})
+    assert r.status_code == 200
+    assert len(refresh_calls) == 1
+    email, jwt, proxy, op_id = refresh_calls[0]
+    assert email == "a@test.com"
+    assert jwt == "JWT-VIGENTE"
+    assert proxy == "http://proxy:8080"
+    assert op_id == 1341812706
+
+
+def test_withdraw_skips_refresh_when_jwt_missing(make_client, seed_db, monkeypatch):
+    """Si execute_withdrawal no trae `_jwt` (caso de test viejos o JWT ausente),
+    el refresh se invoca pero sale temprano por el guard `if not jwt: return`.
+    El retiro sigue retornando 200 — el refresh es no-throw."""
+    client = make_client(role="superadmin", telegram_id=1341812706)
+    acc_id = _acc_id(seed_db)
+
+    async def fake_execute(db_path, account_id, amount):
+        return {
+            "transactionId": "t1", "reference": "r1", "accountId": "a1",
+            "accountDigits": "1215", "institutionName": "HEY BANCO",
+            "amount": amount, "account_email": "a@test.com", "warnings": [],
+        }
+
+    import app
+    monkeypatch.setattr(app, "execute_withdrawal", fake_execute)
+    monkeypatch.setattr(app, "_broadcast", lambda e: None)
+
+    refresh_calls = []
+    async def fake_refresh(email, jwt, proxy, op_id):
+        refresh_calls.append((email, jwt, proxy, op_id))
+    import withdrawals
+    monkeypatch.setattr(withdrawals, "_refresh_account_after_withdrawal", fake_refresh)
+
+    r = client.post(f"/api/accounts/{acc_id}/withdraw", json={"amount": 100})
+    assert r.status_code == 200
+    # El refresh se invoca (con jwt=None), el guard interno sale temprano.
+    assert len(refresh_calls) == 1
+    assert refresh_calls[0][1] is None
+
+
+
 
 def test_status_403_non_sa(make_client, seed_db):
     """Operador SIN relación con la cuenta (ni account_assignments ni locked_by) -> 403.

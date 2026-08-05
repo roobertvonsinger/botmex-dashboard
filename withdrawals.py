@@ -13,9 +13,11 @@ PASO5: GET /api/wallet/bankTransaction/{tx_id} → auditoría/rail externo
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
+from datetime import datetime, timezone
 from typing import Optional, Any
 
 import httpx
@@ -385,4 +387,80 @@ async def execute_withdrawal(
         "amount": float(amount),
         "account_email": email or "",
         "warnings": warnings,
+        # Internos (underscore) para que app.py pueda pasarlos al refresh
+        # post-retiro sin recargarlos de BD (el JWT y proxy que YA tenemos en
+        # mano, sin gastar captcha de nuevo). No son parte del contrato público.
+        "_jwt": jwt,
+        "_proxy_url": proxy_url,
     }
+
+
+async def _refresh_account_after_withdrawal(
+    email: str,
+    jwt: Optional[str],
+    used_proxy: Optional[str],
+    operator_id: int,
+) -> None:
+    """Tras un retiro, refresca balance + movimientos de la cuenta REUSANDO el
+    JWT del login que ya se hizo (sin gastar captcha) y los persiste en BD.
+    Espejo de `deposits._refresh_account_after_deposit` (Robert 2026-08-05,
+    handoff §2.3): antes el dashboard solo actualizaba balance en el próximo
+    ciclo de `account_refresh.py` (5 min de lag), o cuando el operador picaba
+    "Actualizar" manual. Tras un retiro, el saldo DEBE verse reflejado de
+    inmediato — el retiro ya se ejecutó en BetMexico, este refresh solo trae
+    el estado post-retiro a BD.
+
+    No-throws: un fallo aquí NO debe afectar el resultado del retiro ya emitido
+    (igual que el patrón de deposits). Emite `account_refreshed` por SSE para
+    que el frontend repinte la fila.
+
+    ponytail: es 95% idéntico a deposits._refresh_account_after_deposit. El
+    upgrade path es extraer un `refresh_account_after_action(email, jwt, proxy,
+    operator_id, log_tag)` en prewarm.py y hacer ambos wrappers thin — fuera
+    de scope de este handoff que pide explícitamente el espejo.
+    """
+    if not jwt:
+        return
+    try:
+        from betmexico_login_api import BetmexicoApiChecker
+        async with BetmexicoApiChecker(proxy=used_proxy) as checker:
+            details = await asyncio.wait_for(
+                checker.fetch_account_details_parallel(jwt, fetch_mode="full"),
+                timeout=15.0,
+            )
+        if not details:
+            return
+        from prewarm import (
+            _db_upsert_balance, _db_save_txns_and_recalc,
+            _fetch_looks_empty, _db_invalidate_jwt,
+        )
+        # `fetch_account_details_parallel` siempre devuelve dict truthy con
+        # defaults; si quedó todo vacío el JWT murió server-side (401). No
+        # persistir (pisaría saldo) — invalidar JWT y salir. El próximo
+        # depósito/refresh/jwt_keeper hará login real.
+        if _fetch_looks_empty(details):
+            logger.info(f"[withdrawals] refresh post-retiro {email} vacío (JWT muerto) — cache invalidado")
+            try:
+                await asyncio.to_thread(_db_invalidate_jwt, email)
+            except Exception:
+                pass
+            return
+        await asyncio.to_thread(_db_upsert_balance, email, details)
+        await asyncio.to_thread(_db_save_txns_and_recalc, email, details, operator_id)
+        logger.info(f"[withdrawals] refresh post-retiro OK {email} "
+                    f"(balance_real={details.get('balance_real')})")
+        try:
+            from app import _broadcast, _resolve_who
+            _broadcast({
+                "type": "activity", "kind": "account_refreshed",
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "email": email, "target": email,
+                "balance_real": details.get("balance_real"),
+                "balance_total": (float(details.get("balance_real", 0) or 0)
+                                  + float(details.get("balance_bonos", 0) or 0)),
+                **_resolve_who(operator_id),
+            })
+        except Exception:
+            pass
+    except Exception as e:
+        logger.warning(f"[withdrawals] refresh post-retiro {email}: {str(e)[:160]}")
