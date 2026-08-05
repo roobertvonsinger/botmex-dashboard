@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `ea5ad9a` | fix(portal): operator_my_accounts oculta cuentas ya retiradas por completo |
 | `d25fc22` | fix(portal): grid de cuentas congelado durante misión activa (regresión vista única) |
 | `d472ef5` | docs: agregar handoff de auditoría para claude code |
 | `1e95694` | feat(portal): rediseño a vista única y filtro estricto de visibilidad sin ruidos |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `1050bc6` | docs: NEXT-SESSION — Track B cerrado (12 commits, 383/383, IDOR encontrado y corregido) |
 | `79c6f3a` | fix(security): cerrar IDOR en GET /api/accounts/{id}/withdraw/status/{tx_id} |
 | `a49cc10` | feat(account_refresh): persistir withdrawal_ready/institution + SSE en cambio |
-| `cd1dde2` | feat(portal): poll de estado tras disparar retiro (15s hasta terminal) |
 <!-- GEN:end:recientes -->
 
 ---
