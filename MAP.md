@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b858f34` | docs: NEXT-SESSION — cierre de auditoría E2E /bet + impeccable (5ta parte) |
 | `b4f90a5` | fix(portal): 4 bugs reales de lógica de usuario en poll de retiro + CURP sentinel |
 | `1050bc6` | docs: NEXT-SESSION — Track B cerrado (12 commits, 383/383, IDOR encontrado y corregido) |
 | `79c6f3a` | fix(security): cerrar IDOR en GET /api/accounts/{id}/withdraw/status/{tx_id} |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `1eceac6` | feat(account_refresh): bypass de filtros para cuentas hot en select_refresh_candidates_healthy |
 | `88b3c47` | feat(portal): interpolación visual del progreso de misión (anti-detección) |
 | `7e68635` | feat(api): exponer withdrawal_ready/withdrawal_institution/curp en /api/operator/my-accounts |
-| `5a39b4a` | docs(audit): confirmar que fetch mínimo contra BetMexico ya está satisfecho |
 <!-- GEN:end:recientes -->
 
 ---

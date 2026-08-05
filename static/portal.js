@@ -394,6 +394,13 @@
       ? '<div>• Retiro: <span style="color:var(--accent)">' + (acc.withdrawal_institution || 'Aprobado') + '</span></div>'
       : '<div style="color:var(--text-dim)">• Retiro: esperando SPEI…</div>';
 
+    // Retirar exigía SOLO withdrawal_ready — quedaba clickeable con saldo $0.00/
+    // negativo (no hay nada que retirar). Robert, 2026-08-04, campo real: "retirar
+    // esta disponible aun sin saldo". Gate real = SPEI aprobado Y saldo > 0.
+    const wdDisabledReason = !acc.withdrawal_ready
+      ? 'Esperando confirmación de SPEI en BetMexico'
+      : (parseFloat(balReal) <= 0 ? 'Sin saldo disponible para retirar' : '');
+
     return '<div class="acc-card' + (isLocked ? ' locked' : '') + '" data-id="' + acc.id + '" data-email="' + (acc.email || '') + '">' +
       '<div class="acc-top">' +
         '<span class="acc-email">' + (acc.email || '') + '</span>' +
@@ -401,7 +408,7 @@
       '</div>' +
       '<div class="acc-balance">' + fmtMoney(balReal) + ' <span class="cur">MXN</span></div>' +
       '<div class="acc-meta">' +
-        '<div>• Bonos: ' + fmtMoney(balBonos) + '</div>' +
+        (parseFloat(balBonos) > 0 ? '<div>• Bonos: ' + fmtMoney(balBonos) + '</div>' : '') +
         '<div>• Último: ' + lastDep + (lastDate ? ' (' + lastDate + ')' : '') + '</div>' +
         curpHtml +
         wdInstHtml +
@@ -410,7 +417,7 @@
       clabeHtml +
       '<div class="acc-actions">' +
         '<button class="btn btn-sm btn-primary btn-withdraw"' +
-          (acc.withdrawal_ready ? '' : ' disabled title="Esperando confirmación de SPEI en BetMexico"') +
+          (wdDisabledReason ? ' disabled title="' + wdDisabledReason + '"' : '') +
           ' data-bal="' + balReal + '">💸 Retirar</button>' +
         (isLocked ? '<button class="btn btn-sm btn-danger btn-release">🔓 Liberar</button>' : '') +
       '</div>' +
@@ -510,10 +517,10 @@
     overlay.className = 'modal-overlay';
     overlay.innerHTML =
       '<div class="modal-box">' +
-      '<div class="modal-title">💸 Retiro sin password</div>' +
+      '<div class="modal-title">💸 Retirar</div>' +
       '<div class="modal-info">Cuenta: <span style="color:var(--accent);font-family:monospace">' + shortEmail(email) + '</span><br>' +
       'Saldo disponible: <b style="color:var(--green-bright)">' + fmtMoney(balance) + '</b></div>' +
-      '<input type="number" class="modal-input" id="wdAmount" placeholder="Monto MXN" step="0.01" min="1" max="' + balance + '" autofocus>' +
+      '<input type="number" class="modal-input" id="wdAmount" placeholder="Monto MXN" step="0.01" min="0.01" max="' + balance + '" autofocus>' +
       '<div class="modal-actions">' +
       '<button class="btn" id="wdCancel">Cancelar</button>' +
       '<button class="btn btn-primary" id="wdConfirm">Retirar</button>' +
