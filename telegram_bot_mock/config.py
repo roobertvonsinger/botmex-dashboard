@@ -5,6 +5,7 @@ import os
 import sys
 import logging
 import logging.handlers
+import warnings
 from pathlib import Path
 
 # Configurar logging — StreamHandler (stdout → `docker logs`) + FileHandler
@@ -32,6 +33,15 @@ logging.getLogger("telegram.ext._utils.networkloop").setLevel(logging.ERROR)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
+# Silenciar el warning informativo de PTB sobre ConversationHandler con
+# per_message=False (default) — los CallbackQueryHandler no se trackean por
+# mensaje, comportamiento intencional en este bot.
+warnings.filterwarnings(
+    "ignore",
+    message="If 'per_message=False', 'CallbackQueryHandler' will not be tracked",
+    category=UserWarning,
+)
+
 # Rutas principales
 MOCK_DIR = Path(__file__).parent.resolve()
 DASHBOARD_DIR = MOCK_DIR.parent.resolve()
@@ -48,19 +58,13 @@ if MONOREPO_BOT_DIR.exists() and str(MONOREPO_BOT_DIR) not in sys.path:
 DEFAULT_DB = DASHBOARD_DIR.parent / "betmexico_accounts.db"
 DB_PATH = Path(os.environ.get("BETMEX_DB", str(DEFAULT_DB)))
 
-# Reconciliar DB_FILE de betmexico_db antes de instanciar singleton si existe
-try:
-    import betmexico_db
-    betmexico_db.DB_FILE = DB_PATH
-    if hasattr(betmexico_db, "db") and betmexico_db.db is not None:
-        betmexico_db.db.db_path = DB_PATH
-    if not DB_PATH.exists() and not any(mod for mod in sys.modules if "pytest" in mod):
-        logger.error(f"CRÍTICO: La BD especificada no existe en la ruta {DB_PATH}")
-        raise SystemExit(1)
-except ImportError:
-    logger.warning("betmexico_db no disponible en este entorno.")
-except Exception as e:
-    logger.error(f"Error inicializando la base de datos: {e}")
+# La BD del mock la maneja app.db()/DB_PATH (app.py). NO se reconcilia
+# betmexico_db aquí: ese módulo vive en la copia legacy (fuera de este repo) y
+# su import desde este punto dispara un circular import (betmexico_db ↔
+# betmexico_config) → warning falso "no disponible en este entorno".
+if not DB_PATH.exists() and not any(mod for mod in sys.modules if "pytest" in mod):
+    logger.error(f"CRÍTICO: La BD especificada no existe en la ruta {DB_PATH}")
+    raise SystemExit(1)
 
 # Lockup de marca oficial BotMexico (estilo Ruthopia lockup)
 HEADER_LOCKUP = (

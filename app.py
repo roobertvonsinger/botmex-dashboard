@@ -12,7 +12,7 @@ import queue as _stdlib_queue
 import threading
 import urllib.request
 import httpx
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
@@ -1810,6 +1810,13 @@ _LOG_NOISE_PATTERNS: list[re.Pattern] = [
     re.compile(r'^\S+ \d+:\d+:\d+,\d+ - import\b', re.IGNORECASE),
     # Spam de KYC de BetMexico
     re.compile(r'\[KYC.*?\]', re.IGNORECASE),
+    # Tracebacks de RED de Telegram (Bad Gateway / NetworkError / timeout en
+    # get_updates). El bot legacy los imprime sin timestamp y no son errores de
+    # la app — solo ruido de red. Filtrar las líneas de la librería y el error.
+    re.compile(r'telegram\.error\.(NetworkError|TimedOut).*'),
+    re.compile(r'Traceback \(most recent call last\):'),
+    re.compile(r'File ".*(?:python\d+\.\d+)?/?dist-packages/telegram/'),
+    re.compile(r'raise exception$'),
 ]
 
 
@@ -2819,8 +2826,9 @@ async def _startup_telegram_notify():
         print(f"[telegram_startup_notify] Error notificando inicio: {e}")
 
 
-@app.on_event("startup")
-async def _start_bg_tasks():
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    """Startup de background tasks — reemplaza el deprecado @app.on_event."""
     asyncio.create_task(_health_loop())
     asyncio.create_task(_janitor_loop())
     asyncio.create_task(_window_watcher_loop())
@@ -2828,6 +2836,10 @@ async def _start_bg_tasks():
     asyncio.create_task(_jwt_keepalive_loop())
     asyncio.create_task(_account_refresh_loop())
     asyncio.create_task(_startup_telegram_notify())
+    yield
+
+
+app.router.lifespan_context = _lifespan
 
 
 class LockRequest(BaseModel):

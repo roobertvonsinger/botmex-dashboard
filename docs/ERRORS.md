@@ -2,6 +2,18 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## Ruido de red de Telegram en vista de logs + startup deprecado + circular import en config.py (corregido 2026-08-06)
+
+- **Contexto**: limpieza de 3 issues menores detectados de pasada en la sesión de reglas de containers.
+- **Síntoma 1 — ruido en vista de logs**: los `NetworkError: Bad Gateway` / `TimedOut` del bot legacy (`telegram_bot.log`) aparecían como tracebacks completos sin timestamp en la vista `bot=main` del dashboard. El fix anterior (commit `d0e2814`) ya prevenía que corrompieran el `since` del poll, pero las líneas seguían mostrándose como ruido visual.
+- **Fix 1**: 4 patrones regex agregados a `_LOG_NOISE_PATTERNS` (`app.py`): `telegram.error.(NetworkError|TimedOut)`, `Traceback (most recent call last):`, `File ".*dist-packages/telegram/"`, `raise exception$`. Filtran el bloque completo del traceback de red del legacy. Complementa el fix de `d0e2814` (que prevenía corrupción) ocultando el ruido mismo.
+- **Síntoma 2 — startup deprecado**: `@app.on_event("startup")` está deprecado en FastAPI/Starlette desde la introducción del lifespan context manager. Genera `DeprecationWarning` en cada arranque.
+- **Fix 2**: reemplazado por `@asynccontextmanager` + `app.router.lifespan_context = _lifespan` (`app.py:2829-2842`). Mantiene las mismas 7 tasks de background (`_health_loop`, `_janitor_loop`, `_window_watcher_loop`, `_release_watchdog_loop`, `_jwt_keepalive_loop`, `_account_refresh_loop`, `_startup_telegram_notify`).
+- **Síntoma 3 — circular import**: `telegram_bot_mock/config.py` importaba `betmexico_db` para reconciliar `DB_FILE`/`db.db_path`, pero ese módulo vive en la copia legacy (fuera de este repo) y su import desde config.py dispara un circular import (`betmexico_db ↔ betmexico_config`), produciendo un warning falso "betmexico_db no disponible en este entorno" en cada arranque del mock.
+- **Fix 3**: removida la reconciliación de `betmexico_db` de `config.py`. La BD del mock la maneja `app.db()`/`DB_PATH` (app.py) — no necesita `betmexico_db`. Solo se conserva el guard `DB_PATH.exists()`.
+- **Fix 4 (relacionado)**: silenciado `UserWarning` de PTB sobre `per_message=False` con `CallbackQueryHandler` (`warnings.filterwarnings` en `config.py:39-43`). El comportamiento es intencional en este bot — los `CallbackQueryHandler` no se trackean por mensaje.
+- **Verificación**: `python -m pytest -q` → 421 passed.
+
 ## Vista de logs de bots "congelada" — errores históricos parecían seguir saliendo (corregido 2026-08-06)
 
 - **Contexto**: Robert reportó "por qué siguen saliendo los putos errores" en el dashboard — la vista dual de logs de Telegram (bot main + mock) mostraba una y otra vez los mismos errores, incluidos los que el código ya tenía resueltos desde el deploy de las 03:54 (no-text, LOCK, DB_PATH).
