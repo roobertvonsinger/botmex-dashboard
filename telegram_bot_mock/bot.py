@@ -1084,8 +1084,27 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             async def _edit():
                 try:
                     await status_msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
-                except Exception:
-                    pass
+                except Exception as ex:
+                    logger.warning(
+                        f"[Bot] [Auto {mission_id}] edit_text falló (status={status}): {ex}"
+                    )
+                    # Robert 2026-08-06: el edit silencioso dejaba misiones muertas
+                    # mostrando el mensaje inicial ("Rastreando cuentas...") con el
+                    # botón Detener Misión vivo para siempre — sin feedback ni error
+                    # visible. En terminal (completed/cancelled/failed) mandamos un
+                    # mensaje NUEVO como fallback en vez de morir en silencio.
+                    if is_terminal:
+                        try:
+                            await context.bot.send_message(
+                                chat_id=operator_id,
+                                text=text,
+                                parse_mode="HTML",
+                                reply_markup=kb,
+                            )
+                        except Exception as ex2:
+                            logger.warning(
+                                f"[Bot] [Auto {mission_id}] fallback send_message también falló: {ex2}"
+                            )
 
             asyncio.run_coroutine_threadsafe(_edit(), loop)
 

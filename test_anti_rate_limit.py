@@ -181,7 +181,7 @@ async def _noop_phase(name, payload):
 
 
 def _run_acquire(monkeypatch, *, gentle, begin, proxies=("http://pool:1",),
-                 invalidated=None, session_jwt=None):
+                 invalidated=None, session_jwt=None, marked_dead=None):
     import login_orchestrator as _lo
     monkeypatch.setattr(_lo, "gentle_login", gentle)
     monkeypatch.setattr("proxy_pool.shuffled_proxy_urls", lambda: list(proxies))
@@ -194,6 +194,10 @@ def _run_acquire(monkeypatch, *, gentle, begin, proxies=("http://pool:1",),
     import prewarm as _pw
     inv = invalidated if invalidated is not None else []
     monkeypatch.setattr(_pw, "_db_invalidate_jwt", lambda e: inv.append(e))
+    if marked_dead is not None:
+        monkeypatch.setattr(
+            _pw, "_db_mark_dead",
+            lambda e, reason: marked_dead.append((e, reason)))
 
     return asyncio.run(deposits._acquire_session_and_begin(
         "e@x.com", "pw", 50.0, pool=object(), proxy=None,
@@ -245,14 +249,16 @@ def test_acquire_cache_401_invalidates_and_relogins(monkeypatch):
     asyncio.run(res["client"].aclose())
 
 
-def test_acquire_rate_limited_sets_cooldown_and_fails(monkeypatch):
+def test_acquire_rate_limited_marks_dead_and_fails(monkeypatch):
+    # Robert 2026-08-06: ya no enfriar-y-reintentar — a la primera, DEAD.
+    dead = []
     gentle = _fake_gentle([_LR(False, jwt=None, code="RATE_LIMITED",
                                error="rate-limit")])
     begin = _fake_begin([])
-    res, inv = _run_acquire(monkeypatch, gentle=gentle, begin=begin)
+    res, inv = _run_acquire(monkeypatch, gentle=gentle, begin=begin, marked_dead=dead)
     assert "fail" in res
     assert res["fail"]["result_code"] == "RATE_LIMITED"
-    assert res["fail"].get("cooldown_until")    # marcó cooldown
+    assert dead == [("e@x.com", "RATE_LIMITED_INSTANT (429 — fuera al primer golpe, Robert 2026-08-06)")]
 
 
 def test_set_account_cooldown_persists(seed_db):

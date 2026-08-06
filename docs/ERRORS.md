@@ -2,6 +2,30 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## 429/RATE_LIMITED — de "enfriar y reintentar para siempre" a "DEAD a la primera" (decisión Robert 2026-08-06)
+
+- **Contexto**: censo del pool completo (941 cuentas) tras auditar por qué una misión `/bet` parecía "atorada". Encontrado: **145 cuentas grado A/B con `rl_streak` 3-12**, algunas reintentadas a diario, gentil y espaciado (tal como se diseñó el 2026-08-05: cooldown 45min → cuarentena 24h tras racha≥3), durante **semanas** (la más vieja, `scrappyjyl@gmail.com`, llevaba desde 2026-07-08 sin un solo login exitoso) — la cuarentena NUNCA las rehabilitaba.
+- **Esto invalida el diagnóstico del 2026-08-05** (código/comentarios en `jwt_keeper.py`): la hipótesis era que el 429 era solo ráfaga de concurrencia nuestra y que "con el refresco bien hecho no hay por qué mandar a nadie a rate-limit". Si eso fuera cierto, el reintento diario gentil ya las habría sanado. No sanó ninguna → el 429 en estas cuentas es **bloqueo real de BetMexico por cuenta**, no artefacto de concurrencia.
+- **Decisión de Robert (explícita, 2026-08-06)**: cero tolerancia. Al primer 429/RATE_LIMITED, la cuenta se declara `DEAD` de inmediato — sin cooldown, sin cuarentena, sin segunda oportunidad. Se van al "cementerio" (`status='DEAD'`, fuera del pool); revisión manual solo si Robert decide reactivarlas después.
+- **Fix — 4 puntos de mutación unificados**, todos ahora llaman `deposits._mark_rate_limited_dead(email)` (nueva función, reusa `prewarm._db_mark_dead`) en vez de `_set_account_cooldown`:
+  - `deposits.py::_acquire_session_and_begin` (motor core — cubre single-deposit, `multi_stream` y `scheduled`, que solo leen el resultado del motor).
+  - `auto_deposit.py::run_auto_mission` — Fase 1 (matchmaking probe) y Fase 2 (scheduled), 2 call sites.
+  - `jwt_keeper.py::run_keepalive_cycle` — nuevo umbral `JWT_KEEPER_RL_STREAK_DEAD_AT` (default **1**, antes no existía / cuarentena infinita a partir de racha 3).
+  - Copy de SSE actualizado (`account_cooling`→`account_dead` en `multi_stream`; mensaje de `scheduled_aborted` ya no dice "enfriando N min").
+  - **NO tocado**: el cooldown por decline REAL de tarjeta (`deposits.py` rama `_mm_is_real_decline`, línea ~2358) — es un mecanismo distinto (anti-abuso de tarjeta, no rate-limit de login) y sigue enfriando 45min como antes.
+- **Tests**: `test_anti_rate_limit.py`, `tests/test_auto_mission.py` actualizados (afirmaban `cooldown_until`/`_set_account_cooldown`, ahora afirman `_mark_rate_limited_dead`). 119 tests verdes en los módulos tocados.
+- **Deploy**: sin misiones activas al momento del restart. `betmexico-web` + `betmexico-mock-bot` reiniciados, 0 tracebacks, tráfico real sirviendo 200 OK post-restart.
+- **Pendiente 🔵**: el recuento de "cuántas más caen DEAD" se poblará orgánicamente conforme `jwt_keeper` (ciclo horario) y las misiones `/bet` toquen cuentas con JWT muerto — no se forzó un sweep masivo manual (regla dura: nunca rafagear a BetMexico). Las 145 ya identificadas seguirán cayendo a DEAD la próxima vez que les toque ciclo (algunas ya tienen cooldown vencido).
+
+## Misión `/bet` terminaba en backend pero el mensaje de Telegram se quedaba pegado para siempre (corregido 2026-08-06)
+
+- **Síntoma**: Robert lanzó una misión `/bet` y, minutos después, seguía pensando que estaba corriendo — el mensaje en Telegram nunca pasó de "Rastreando cuentas aptas…", el botón "🛑 Detener Misión" seguía activo, y no había NINGÚN error en ningún log. Dos misiones consecutivas (`def98b71`, `a6c0ef21`) ya habían terminado (`status='failed'`, `phase_detail='sin matches'`) en 2-3 minutos cada una, verificado contra BD y `dashboard.log`/`docker logs betmexico-mock-bot`.
+- **Causa raíz**: `telegram_bot_mock/bot.py::handle_bet_callback` → closure `on_progress` → `_edit()` (línea ~1084) agendaba el edit del mensaje vía `asyncio.run_coroutine_threadsafe(_edit(), loop)` (fire-and-forget) y el propio `_edit()` envolvía `status_msg.edit_text(...)` en `except Exception: pass` — cualquier falla del edit real (terminal o intermedio) se tragaba sin loguear NADA. `auto_deposit.py::_broadcast_mission` sí invoca `on_progress` sin excepción (por eso tampoco aparecía `on_progress falló` en logs), pero eso no prueba que el edit de Telegram haya llegado — solo prueba que la función no lanzó. Prueba directa del bug: el botón "Detener Misión" de `def98b71` seguía vivo y funcional 22 min después de que la misión ya había fallado (el código en terminal reemplaza ese botón por "Ver cuentas y gestionar" — si el edit hubiera llegado, el botón ya no existiría).
+- **No es** un loop de reintentos: cada cuenta intenta login UNA vez; si rebota 429 (`RATE_LIMITED`) se salta con "enfriar y saltar", sin retry. La sensación de "excesivo" viene de la combinación (a) 0 feedback visible en Telegram + (b) `MM_COOLDOWN=45s` entre reintentos de tarjeta en la misma cuenta (anti-detección, intencional — ver constantes en `MAP.md`).
+- **Fix**: `bot.py::_edit()` ahora loguea la excepción (`logger.warning`) en vez de tragarla, y si el fallo ocurre en un estado terminal (`completed`/`cancelled`/`failed`) manda un mensaje NUEVO (`context.bot.send_message`) como fallback en vez de morir en silencio.
+- **Deploy**: sin misiones activas al momento del restart (verificado contra `auto_missions` antes de tocar el contenedor). `betmexico-mock-bot` reiniciado limpio (`Application started`, notificación de arranque a SuperAdmin). Se mandó mensaje manual de cierre a Robert para `a6c0ef21` (la última misión zombie, ya terminal en BD).
+- **Pendiente 🔵**: verificar en vivo que el fallback `send_message` dispare correctamente la próxima vez que un edit falle (no se pudo forzar el fallo para probarlo, solo se corrigió el swallow silencioso).
+
 ## Ruido de red de Telegram en vista de logs + startup deprecado + circular import en config.py (corregido 2026-08-06)
 
 - **Contexto**: limpieza de 3 issues menores detectados de pasada en la sesión de reglas de containers.

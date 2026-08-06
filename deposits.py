@@ -113,6 +113,21 @@ def _set_account_cooldown(email: str, minutes: int = RATE_LIMIT_COOLDOWN_MIN) ->
     return until
 
 
+def _mark_rate_limited_dead(email: str) -> None:
+    """Robert 2026-08-06: el 429/BAN ya no enfría-y-reintenta — a la primera
+    la cuenta se declara DEAD. Censo mostró 145 cuentas grado A/B reintentadas
+    a diario, gentil y espaciado (tal como se diseñó el 2026-08-05), que JAMÁS
+    sanaron — el 429 es bloqueo real de BetMexico por cuenta, no ráfaga de
+    concurrencia nuestra. Reintentar solo gasta captcha/proxy y ensucia el
+    pool con cuentas zombie. Se van al cementerio; revisión manual si acaso.
+    No-throws (best-effort), mismo patrón que jwt_keeper._db_mark_dead."""
+    try:
+        from prewarm import _db_mark_dead
+        _db_mark_dead(email, "RATE_LIMITED_INSTANT (429 — fuera al primer golpe, Robert 2026-08-06)")
+    except Exception as e:
+        logger.warning(f"[cooldown] no pude marcar DEAD por rate-limit {email}: {e}")
+
+
 def _cooldown_remaining_min(cooldown_until, now=None) -> int:
     """Minutos restantes de enfriamiento (0 si no aplica)."""
     if not _cooldown_active(cooldown_until, now):
@@ -1005,20 +1020,22 @@ async def _acquire_session_and_begin(
                 await _safe_phase(phase_cb, "login_done", {
                     "ok": False, "duration_ms": login_ms, "from_cache": False,
                 })
-                # RATE_LIMITED (429/BAN, Capa 3): enfriar la cuenta y NO reintentar
-                # la caliente — el caller la salta hasta que pase el cooldown.
+                # RATE_LIMITED (429/BAN, Capa 3): a la primera, DEAD — NO más
+                # enfriar-y-reintentar (Robert 2026-08-06: 145 cuentas A/B
+                # reintentadas a diario, gentil y espaciado, JAMÁS sanaron —
+                # es bloqueo real de BetMexico por cuenta). El caller la salta
+                # y no vuelve a ser candidata (status != LIVE).
                 # Robert 2026-08-05: el operador NO debe ver "rate-limit" — es
-                # pedo interno del backend. Copy neutro, cooldown real.
+                # pedo interno del backend. Copy neutro.
                 if login_res.code == "RATE_LIMITED":
-                    until = _set_account_cooldown(email)
-                    msg = (f"Cuenta temporalmente no disponible — se reintenta "
-                           f"automáticamente más tarde.")
+                    _mark_rate_limited_dead(email)
+                    msg = (f"Cuenta dada de baja automáticamente — no vuelve "
+                           f"a intentarse.")
                     await _safe_phase(phase_cb, "done", {
                         "success": False, "result_code": "RATE_LIMITED", "error": msg,
                     })
                     return {"fail": {
                         "success": False, "result_code": "RATE_LIMITED", "error": msg,
-                        "cooldown_until": until,
                         "duration_ms": int((time.time() - t_total) * 1000),
                     }}
                 # LOGIN_RETRY_LATER (agotó reintentos, nuestro lado) → LOGIN_FAILED:
@@ -2261,17 +2278,16 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                         vel = r.get("velocity", {})
                         yield f"data: {json.dumps({'type':'velocity_skip','email':acc['email'],'tail':card['tail'],'wait_sec':vel.get('wait_sec'),'distinct_count':vel.get('distinct_count'),'message':vel.get('message','')})}\n\n"
                         continue
-                    # RATE_LIMITED (429/BAN): la cuenta entró en enfriamiento persistente
-                    # (cooldown_until ya seteado por el motor). Sale del run — NO se
-                    # reintenta la cuenta caliente (spec Capa 3, decisión Robert). La
-                    # tarjeta NO se "consumió" (login falló antes del gateway): no marca
-                    # tried ni strike, y se libera del cupo de la tarjeta.
+                    # RATE_LIMITED (429/BAN): la cuenta se marca DEAD de inmediato
+                    # (motor ya la dio de baja — Robert 2026-08-06, ver
+                    # _mark_rate_limited_dead). Sale del run — NO se reintenta ni
+                    # ahora ni en misiones futuras. La tarjeta NO se "consumió"
+                    # (login falló antes del gateway): no marca tried ni strike,
+                    # y se libera del cupo de la tarjeta.
                     if code == "RATE_LIMITED":
                         acc["done"] = True
                         card["assigned"].discard(acc["id"])
-                        cu = r.get("cooldown_until")
-                        rem = _cooldown_remaining_min(cu) if cu else RATE_LIMIT_COOLDOWN_MIN
-                        yield f"data: {json.dumps({'type':'account_cooling','email':acc['email'],'tail':card['tail'],'attempt':n,'cooldown_min':rem})}\n\n"
+                        yield f"data: {json.dumps({'type':'account_dead','email':acc['email'],'tail':card['tail'],'code':code,'attempt':n,'persisted':True})}\n\n"
                         continue
                     now2 = asyncio.get_event_loop().time()
                     card["last_used"] = now2
@@ -2640,15 +2656,12 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                 # timeout, pool de captcha seco=DEPS_MISSING) = nuestro lado → reintento.
                 # Antes SCHED_TERMINAL_RC metía DEPS_MISSING en PARO → el scheduled se
                 # detenía "de volada" cuando el captcha no resolvía. Ya no.
-                # RATE_LIMITED (429/BAN): la cuenta enfría (cooldown_until seteado por
-                # el motor). El programado opera UNA cuenta → no puede continuar:
-                # aborta con mensaje claro. NO es la tarjeta; no reintentar la cuenta
-                # caliente (spec Capa 3, decisión Robert).
+                # RATE_LIMITED (429/BAN): la cuenta ya quedó DEAD (motor la dio de
+                # baja — Robert 2026-08-06). El programado opera UNA cuenta → no
+                # puede continuar: aborta con mensaje claro. NO es la tarjeta; no
+                # reintentar la cuenta (spec Capa 3, decisión Robert).
                 if code == "RATE_LIMITED":
-                    cu = r.get("cooldown_until")
-                    rem = _cooldown_remaining_min(cu) if cu else RATE_LIMIT_COOLDOWN_MIN
-                    cool_reason = (f"Cuenta enfriando {rem} min por rate-limit (429) — "
-                                   f"misión detenida.")
+                    cool_reason = "Cuenta dada de baja por rate-limit (429) — misión detenida."
                     _broadcast({
                         "type": "activity", "kind": "scheduled",
                         "sched_id": sched_id, "iter": iter_num, "total": repetitions,

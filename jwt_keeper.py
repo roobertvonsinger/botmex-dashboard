@@ -72,6 +72,17 @@ def cfg() -> Dict[str, Any]:
         # 24h las deja descansar un día y reintentar suave al siguiente.
         "rl_streak_quarantine_at": _env_int("JWT_KEEPER_RL_STREAK_QUARANTINE_AT", 3),
         "rl_quarantine_min": _env_int("JWT_KEEPER_RL_QUARANTINE_MIN", 1440),  # 24h
+        # Robert 2026-08-06: cuentas A/B con racha alta seguían en cuarentena
+        # infinita — reintentadas TODOS los días, gentil y espaciado tal como
+        # se diseñó el 2026-08-05, y AUN ASÍ nunca sanaban (censo: 145 cuentas
+        # grado A/B con racha 3-12, algunas llevaban semanas fallando a diario
+        # sin un solo éxito). Eso invalida la hipótesis de que el 429 era solo
+        # ráfaga de concurrencia nuestra — a esta racha ya es bloqueo real de
+        # BetMexico por cuenta. Decisión explícita de Robert (2026-08-06): CERO
+        # tolerancia — al primer 429 la cuenta se declara DEAD, sin cuarentena
+        # ni segunda oportunidad. Deja de ser candidata, para de gastar
+        # captcha/proxy. Revisión manual si acaso, cuando Robert quiera.
+        "rl_streak_dead_at": _env_int("JWT_KEEPER_RL_STREAK_DEAD_AT", 1),
         "grades": grades or DEFAULT_GRADES,
     }
 
@@ -269,6 +280,7 @@ async def run_keepalive_cycle(
     rl_cooldown_min: int = 360,
     rl_streak_quarantine_at: int = 3,
     rl_quarantine_min: int = 2880,
+    rl_streak_dead_at: int = 6,
 ) -> Dict[str, Any]:
     """Un ciclo: selecciona el lote y re-loguea cada cuenta espaciada (JWT fresco).
 
@@ -329,7 +341,20 @@ async def run_keepalive_cycle(
             elif res.code == "RATE_LIMITED":
                 stats["rate_limited"] += 1
                 streak = await asyncio.to_thread(_bump_rl_streak, email)
-                if streak >= rl_streak_quarantine_at:
+                if streak >= rl_streak_dead_at:
+                    stats["dead"] += 1
+                    try:
+                        from prewarm import _db_mark_dead
+                        await asyncio.to_thread(
+                            _db_mark_dead, email,
+                            f"RATE_LIMITED_PERSISTENTE (racha={streak}, {rl_streak_dead_at}+ "
+                            "ciclos de cuarentena sin un solo éxito)")
+                    except Exception as e:  # pragma: no cover
+                        logger.warning(f"[jwt_keeper] no pude marcar DEAD {email}: {e}")
+                    logger.warning(
+                        f"[jwt_keeper] {email} racha={streak} ≥ {rl_streak_dead_at} → "
+                        "DEAD (bloqueo real de BetMexico, deja de reintentarse)")
+                elif streak >= rl_streak_quarantine_at:
                     stats["quarantined"] += 1
                     await asyncio.to_thread(_set_cooldown, email, rl_quarantine_min)
                     logger.warning(

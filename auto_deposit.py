@@ -1051,8 +1051,9 @@ async def run_auto_mission(
                                 )
                             break  # siguiente tarjeta
                         if code == "RATE_LIMITED":
-                            # Cuarentena instantánea + aviso SSE
-                            dep._set_account_cooldown(email)
+                            # DEAD instantáneo + aviso SSE (Robert 2026-08-06: ya
+                            # no enfriar-y-reintentar, ver dep._mark_rate_limited_dead)
+                            dep._mark_rate_limited_dead(email)
                             _broadcast_mission(
                                 mission_id,
                                 "cooldown",
@@ -1274,7 +1275,7 @@ async def run_auto_mission(
                         or dep._mm_is_ambiguous_charge(code)
                     ):
                         if code == "RATE_LIMITED":
-                            dep._set_account_cooldown(email)
+                            dep._mark_rate_limited_dead(email)
                         failed += 1
                         _m_update(
                             mission_id,

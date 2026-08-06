@@ -100,14 +100,14 @@ prewarm.py (router)
 | `account_refresh.py` | 392 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5160 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1347 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1348 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `card_checker.py` | 234 | `—` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 152 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
-| `deposits.py` | 2854 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
-| `jwt_keeper.py` | 371 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
+| `deposits.py` | 2867 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `jwt_keeper.py` | 396 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 416 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 904 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 364 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
@@ -123,7 +123,7 @@ prewarm.py (router)
 | `test_account_touch.py` | 51 | `—` | _[completar]_ |
 | `test_account_touch_isolated.py` | 138 | `—` | _[completar]_ |
 | `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
-| `test_anti_rate_limit.py` | 271 | `—` | _[completar]_ |
+| `test_anti_rate_limit.py` | 277 | `—` | _[completar]_ |
 | `test_at_hand.py` | 73 | `—` | _[completar]_ |
 | `test_auto_deposit_selection.py` | 188 | `—` | _[completar]_ |
 | `test_auto_missions_migrate.py` | 120 | `—` | _[completar]_ |
@@ -246,6 +246,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `95b2ff0` | fix(logs+lifespan+config): filtros de ruido de red Telegram en _LOG_NOISE_PATTERNS + lifespan reemplaza @on_event deprecado + config.py sin betmexico_db (circular import) + silenciar warning PTB per_message=False |
 | `9d0c90d` | docs(AGENTS.md): reglas duras de containers KVM4 — el bot legacy (@betmx_bot) es EXCLUSIVO de Robert, NO se apaga/alinea/migra; el mock suple al legacy; auto-deposito corre en /app/web; warning support_routes intencional |
 | `d0e2814` | fix(logs+auto_deposit): la vista de logs se congelaba con since corrupto (lastTs sin validar) + DB_PATH NameError en CLABE STP + LOCK de arranque baja a warning |
 | `db3a81b` | fix(bot): scope del SA debe llevar TODOS los comandos (BotCommandScopeChat reemplaza, no fusiona) |
@@ -257,7 +258,6 @@ prewarm.py (router)
 | `35dd0d8` | feat(bot): /start con logo nuevo botmexico.net (reply_photo con fallback) |
 | `a0b44ea` | feat(auth): registro dinamico de usuarios + /adduser del bot (Luisito operador normal) |
 | `b613ef5` | fix(antifuga): auditoría Claude Code — 4 bugs reales en el trabajo de OpenCode |
-| `af94b59` | docs(antifuga): reporte final de implementacion - 4 areas A-D |
 <!-- GEN:end:recientes -->
 
 ---

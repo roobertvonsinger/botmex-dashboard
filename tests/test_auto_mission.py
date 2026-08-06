@@ -38,6 +38,7 @@ def H(monkeypatch):
     h = type("H", (), {})()
     h.updates, h.unlocked, h.locked, h.attempts = [], [], [], []
     h.cooldowns, h.run_calls, h.sleeps, h.pools = [], [], [], []
+    h.dead = []
     h.status = "matching"
     h.target_count = 1
     h.card_pipes = [P1]
@@ -65,6 +66,8 @@ def H(monkeypatch):
                         lambda *a, **k: h.attempts.append(k.get("card_pipe")))
     monkeypatch.setattr(dep, "_set_account_cooldown",
                         lambda email, minutes=45: h.cooldowns.append(email))
+    monkeypatch.setattr(dep, "_mark_rate_limited_dead",
+                        lambda email: h.dead.append(email))
     monkeypatch.setattr(dep, "_mission_sem", asyncio.Semaphore(2))
 
     async def _run(email, password, cc_num, cc_exp, cc_cvv, amount, user, pool,
@@ -129,14 +132,15 @@ def test_mission_matchmaking_skips_on_3ds(H):
     assert matches[0]["card_pipe"] == P2  # 3DS no es decline: probó la siguiente
 
 
-def test_mission_matchmaking_rate_limit_cooldown(H):
+def test_mission_matchmaking_rate_limit_marks_dead(H):
+    # Robert 2026-08-06: ya no enfriar-y-reintentar — a la primera 429, DEAD.
     def script(email, amount, kw):
         if email == "acc1@x.com":
             return {"success": False, "result_code": "RATE_LIMITED", "error": "429"}
         return {"success": True, "result_code": "BANK_APPROVED", "jwt": "J", "used_proxy": "P"}
     H.script = script
     run(H, plan(1, 2))
-    assert "acc1@x.com" in H.cooldowns
+    assert "acc1@x.com" in H.dead
     assert all(c["email"] != "acc1@x.com" or c is H.run_calls[0] for c in H.run_calls)
     matches = json.loads(next(u["matches"] for u in H.updates if "matches" in u))
     assert [m["account_id"] for m in matches] == [2]
