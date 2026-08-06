@@ -246,6 +246,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `41c89fe` | fix(bot): botones del /start fallaban con foto (edit_message_caption en vez de edit_message_text) |
 | `2a83a80` | chore: .gitattributes normalizacion line-endings (text=auto eol=lf + binarios) |
 | `44984f5` | feat(portal): ronda 3 (URL /{username}, view_as str) + empty state accionable (liga al bot + /bet) |
 | `dc1899b` | feat(bot): /adduser oculto al publico (solo Superadmin) + raps de /start con flow + help con 'Volver al inicio' |
@@ -257,7 +258,6 @@ prewarm.py (router)
 | `1e115af` | docs(antifuga): Area D - SSE_EVENTS, ERRORS, AUDIT actualizados |
 | `abc0e38` | feat(antifuga): Area C - portal consume fake_pct del SSE + fix resumen terminal |
 | `2f336f3` | feat(antifuga): Area B - piso 45-60s antes de Fase 2 con status 'preparing' |
-| `516fcc9` | feat(antifuga): Area A - bloque terminal del bot sin cadencia ni conteo |
 <!-- GEN:end:recientes -->
 
 ---

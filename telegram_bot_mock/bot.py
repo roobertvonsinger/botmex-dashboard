@@ -1261,6 +1261,9 @@ async def setup_bot_commands(application):
     /adduser es operativo exclusivo del Superadmin: no se publica en el menú
     general (ni en /help) y solo se expone vía BotCommandScopeChat en el chat
     del Superadmin — nadie más lo ve ni sabe que existe.
+
+    OJO: BotCommandScopeChat REEMPLAZA el scope default para ese chat (no se
+    fusiona), así que el scope del SA debe llevar TODOS los comandos.
     """
     commands = [
         BotCommand("start", "🚀 Menú principal"),
@@ -1270,7 +1273,7 @@ async def setup_bot_commands(application):
     try:
         await application.bot.set_my_commands(commands)
         await application.bot.set_my_commands(
-            [BotCommand("adduser", "👤 Agregar usuario")],
+            commands + [BotCommand("adduser", "👤 Agregar usuario")],
             scope=BotCommandScopeChat(chat_id=SUPERADMIN_ID),
         )
         logger.info(

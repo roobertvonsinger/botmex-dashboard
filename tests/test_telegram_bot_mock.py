@@ -182,9 +182,12 @@ async def test_setup_bot_commands_scopes_adduser_to_superadmin():
     default_cmds, default_kwargs = bot.set_my_commands.call_args_list[0]
     assert all(cmd.command != "adduser" for cmd in default_cmds[0])
     assert "scope" not in default_kwargs or default_kwargs["scope"] is None
-    # Scope del Superadmin: adduser presente
+    # Scope del Superadmin: REEMPLAZA el default, así que debe llevar TODOS los
+    # comandos (start/help/cancel) + adduser — sino se borran del menú del SA.
     scoped_cmds, scoped_kwargs = bot.set_my_commands.call_args_list[1]
-    assert any(cmd.command == "adduser" for cmd in scoped_cmds[0])
+    scoped_names = {cmd.command for cmd in scoped_cmds[0]}
+    assert "adduser" in scoped_names
+    assert {"start", "help", "cancel"}.issubset(scoped_names)
     scope = scoped_kwargs["scope"]
     assert isinstance(scope, BotCommandScopeChat)
     assert scope.chat_id == SUPERADMIN_ID
