@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `1e115af` | docs(antifuga): Area D - SSE_EVENTS, ERRORS, AUDIT actualizados |
 | `abc0e38` | feat(antifuga): Area C - portal consume fake_pct del SSE + fix resumen terminal |
 | `2f336f3` | feat(antifuga): Area B - piso 45-60s antes de Fase 2 con status 'preparing' |
 | `516fcc9` | feat(antifuga): Area A - bloque terminal del bot sin cadencia ni conteo |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `3e564d6` | feat(frontend): tabs superiores reemplazan cenefa + portal /bet embebido (SA) |
 | `18e74d8` | feat(jwt): refresco super smooth — 3 universos, cooldown 24h, FUGA #1 cerrada |
 | `8c828c9` | test(withdrawals): cubrir refresh post-retiro en operator_withdraw |
-| `f299383` | docs: handoff para Claude Code — review + deploy rama jwt-refresh |
 <!-- GEN:end:recientes -->
 
 ---
