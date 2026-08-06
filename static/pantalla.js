@@ -777,9 +777,17 @@
 
   function renderPantallaTxns(d) {
     const movs = Array.isArray(d.movimientos) ? d.movimientos : [];
-    // Ya viene ordenado desc por el backend (_mv_sort_key); sort defensivo por si
-    // el string "when" (YYYY-MM-DD HH:MM:SS) llega desordenado de algún caller viejo.
-    const sorted = movs.slice().sort((a, b) => String((b || {}).when || '').localeCompare(String((a || {}).when || '')));
+    // Ya viene ordenado desc por el backend (_mv_sort_key), pero ese sort normaliza
+    // "T"→espacio antes de comparar (BetMexico manda "...T07:43:59", dashboard manda
+    // "...  09:00:09"). Este sort "defensivo" comparaba el `when` CRUDO — 'T' (0x54)
+    // > ' ' (0x20) en ASCII/localeCompare, así que CUALQUIER movimiento de BetMexico
+    // salía "más reciente" que uno del dashboard del mismo día sin importar la hora
+    // real, reventando el orden que el backend ya entregaba bien (bug de campo
+    // 2026-08-06, confirmado con cuenta luisoz6666@gmail.com: 3 rechazos a las
+    // 09:00/08:08/08:07 aparecían DESPUÉS de depósitos SPEI de 07:43/06:45).
+    // Fix: normalizar igual que el backend antes de comparar.
+    const _mvSortWhen = m => String((m || {}).when || '').replace('T', ' ');
+    const sorted = movs.slice().sort((a, b) => _mvSortWhen(b).localeCompare(_mvSortWhen(a)));
     const rows = sorted.map((m, i) => ({ m, i }));
 
     // El header (.pat-txn-h) YA NO vive dentro del área scrolleable — antes se iba

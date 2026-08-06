@@ -2,6 +2,16 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## Historial de "Movimientos" en La Pantalla salía con fechas revueltas (corregido 2026-08-06)
+
+- **Síntoma**: Robert reportó (con captura) el historial de una cuenta mostrando 06-ago 07:43 y 06:45 arriba, y DEBAJO 06-ago 09:00/08:08/08:07 (rechazos), rompiendo el orden cronológico descendente esperado.
+- **Diagnóstico con datos reales** (no se asumió nada — se consultó `account_transactions`/`deposit_attempts` de la cuenta real `luisoz6666@gmail.com` en la BD de KVM4): el backend (`app.py::_mv_sort_key`) ya arma `movimientos` bien ordenado — normaliza `"T"`→espacio antes de comparar, porque BetMexico manda `txn_date` como `"2026-08-06T07:43:59.343753"` (con `T` y microsegundos) mientras el dashboard manda `created_at` convertido a MX como `"2026-08-06 09:00:09"` (con espacio, sin fracción).
+- **Causa raíz**: `static/pantalla.js::renderPantallaTxns` traía un sort "defensivo" (línea ~782) que volvía a ordenar usando el campo `when` **crudo**, sin esa normalización. En ASCII/`localeCompare`, `'T'` (0x54) > `' '` (0x20) — así que CUALQUIER movimiento fuente BetMexico se comparaba como "más reciente" que uno del dashboard del mismo día, sin importar la hora real, deshaciendo el orden correcto que el backend ya entregaba. El comentario original decía que era "por si un caller viejo entrega desordenado" — en realidad era el propio sort defensivo el que rompía el orden.
+- **Fix**: `_mvSortWhen(m)` normaliza `"T"`→espacio antes de comparar (mismo criterio que `_mv_sort_key` del backend), en vez de comparar el campo crudo.
+- **Verificación**: simulado en Node con los 9 valores reales de `luisoz6666@gmail.com` (ver commit) → orden queda 09:00 rechazo → 08:08 rechazo → 08:07 rechazo → 07:43 depósito → 06:45 depósito → 23:25 retiro (05-ago) → 22:28 → 20:43 → 19:38, que es el orden cronológico real. Deploy: `static/pantalla.js` + bump de cache-bust en `index.html` (`?v=20260718a`→`?v=20260806a`, sin el bump el navegador cacheado no jala el fix). Verificado archivo servido en disco de KVM4 con el fix presente.
+- **Nota**: `static/app.js` (vista de acordeón del dashboard principal, no La Pantalla) NO tiene este sort defensivo — usa `d.movimientos` directo del backend sin reordenar, así que esa vista nunca tuvo el bug.
+- 🔵 Pendiente: no se verificó visualmente en navegador (sin sesión de operador disponible en este entorno) — Robert debe confirmar en campo que el orden ya se ve bien tras el hard-refresh (cache-bust nuevo debería forzarlo solo).
+
 ## 429/RATE_LIMITED — de "enfriar y reintentar para siempre" a "DEAD a la primera" (decisión Robert 2026-08-06)
 
 - **Contexto**: censo del pool completo (941 cuentas) tras auditar por qué una misión `/bet` parecía "atorada". Encontrado: **145 cuentas grado A/B con `rl_streak` 3-12**, algunas reintentadas a diario, gentil y espaciado (tal como se diseñó el 2026-08-05: cooldown 45min → cuarentena 24h tras racha≥3), durante **semanas** (la más vieja, `scrappyjyl@gmail.com`, llevaba desde 2026-07-08 sin un solo login exitoso) — la cuarentena NUNCA las rehabilitaba.
