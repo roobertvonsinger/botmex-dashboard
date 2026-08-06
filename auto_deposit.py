@@ -597,6 +597,40 @@ MM_CROSS_ACCOUNT_GAP = 5
 MM_MAX_ACCOUNT_DECLINES_PER_RUN = 2
 
 
+def _fake_progress_pct(status: str, extra: dict) -> int:
+    """Única fuente de verdad para el % de progreso fake de la misión.
+
+    Consumida por bot (telegram_bot_mock/bot.py::on_progress) y portal
+    (static/portal.js via SSE fake_pct). Replica EXACTAMENTE los breakpoints
+    que portal.js calculaba en JS (líneas 226-264 pre-refactor):
+    - matching: 15%
+    - logging_in: 15 + (current/total)*30, cap 70
+    - match: 25 + matches_count*15, cap 85
+    - preparing: 30% (piso de Fase 2 antes del primer depósito)
+    - scheduling: 30 + (completed/total)*70, cap 95
+    - completed: 100
+    """
+    if status == "matching":
+        return 15
+    if status == "logging_in":
+        cur = extra.get('current', 1)
+        tot = extra.get('total', 1)
+        return min(70, 15 + int((cur / max(tot, 1)) * 30))
+    if status == "match":
+        count = extra.get('matches_count', 0)
+        return min(85, 25 + count * 15)
+    if status == "preparing":
+        return 30
+    if status == "scheduling":
+        comp = extra.get('completed', 0)
+        tot = extra.get('total', 9)
+        pct = 30 + int((comp / max(tot, 1)) * 70)
+        return min(100, pct)
+    if status == "completed":
+        return 100
+    return 0
+
+
 # ── seams de BD/app (los tests los monkeypatchean; producción usa app.db) ─────
 def _iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -655,12 +689,14 @@ def _broadcast_mission(mission_id: str, status: str, user: dict, on_progress: Op
         _broadcast({
             "type": "activity", "kind": "auto_mission",
             "mission_id": mission_id, "status": status, "ts": _iso(),
+            "fake_pct": _fake_progress_pct(status, extra),
             **_resolve_who(user.get("telegram_id")), **extra,
         })
     except Exception as e:
         logger.warning(f"[Auto {mission_id}] broadcast falló ({status}): {e}")
     if on_progress:
         try:
+            extra['fake_pct'] = _fake_progress_pct(status, extra)
             on_progress(status, extra)
         except Exception as e:
             logger.warning(f"[Auto {mission_id}] on_progress falló ({status}): {e}")

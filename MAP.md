@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 392 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5086 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 191 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1051 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1087 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `card_checker.py` | 234 | `—` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
@@ -249,6 +249,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `0a4d71f` | docs: spec anti-fuga bot+portal + handoff OpenCode con decisiones resueltas |
 | `8b46a8b` | fix(auto_deposit): modo auto ya no usa tarjetas married + tope duro de 10 cuentas |
 | `6a1edf2` | docs: cierre de sesión — bin_stats fix deployado y verificado |
 | `7145c2e` | fix(deposits): cerrar hueco de bin_stats — approved/rejected nunca se contaban |
@@ -260,7 +261,6 @@ prewarm.py (router)
 | `02a08b1` | docs: reporte final de sesión — refresco JWT + gate retiro + gaps |
 | `e994e7c` | refactor(jwt_keeper): importar _PENDING_WD_EXISTS_SQL de account_refresh (DRY) |
 | `6f67527` | feat(withdrawals): refresco de balance post-retiro reusando JWT |
-| `dcce536` | feat(jwt_keeper): priorizar cuentas hot en lote de re-login |
 <!-- GEN:end:recientes -->
 
 ---
