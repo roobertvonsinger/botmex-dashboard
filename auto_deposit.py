@@ -11,6 +11,7 @@ La lógica de filtros de `select_accounts_for_auto` replica
 para depósito: exige JWT VIVO (> now + 60, no por expirar) y cap 24h
 suficiente para amount × count.
 """
+
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Dict, List, Optional
@@ -25,6 +26,7 @@ def _now_epoch() -> int:
 
 def _grade_rank(grade: Any) -> int:
     from jwt_keeper import _GRADE_RANK
+
     return _GRADE_RANK.get(grade or "", 9)
 
 
@@ -36,6 +38,7 @@ def _sa_tokens() -> set:
     """
     try:
         from account_refresh import _sa_lock_tokens
+
         return {str(t).lower() for t in (_sa_lock_tokens() or [])}
     except Exception:
         return set()
@@ -51,6 +54,7 @@ def _cd_active(cd: Any, now: int) -> bool:
         return False
     try:
         import deposits as dep
+
         return bool(dep._cooldown_active(cd))
     except (TypeError, AttributeError):
         try:
@@ -143,7 +147,9 @@ def _normalize_pipe_to_3part(p: str) -> str:
 
 
 # ── B1 — selección de cuentas (pura) ─────────────────────────────────────────
-MM_ACCOUNT_RECENT_DECLINE_LIMIT = 2  # >= N declines en 12h → cuenta fuera de selección (Robert 2026-07-28)
+MM_ACCOUNT_RECENT_DECLINE_LIMIT = (
+    2  # >= N declines en 12h → cuenta fuera de selección (Robert 2026-07-28)
+)
 
 
 def select_accounts_for_auto(
@@ -190,10 +196,7 @@ def select_accounts_for_auto(
 
         locked_by = r.get("locked_by")
         # RESERVADA_SA (pool=0 + locked_by del SA) → candidata.
-        is_sa_reserved = (
-            not r.get("published_to_pool")
-            and str(locked_by).lower() in sa
-        )
+        is_sa_reserved = not r.get("published_to_pool") and str(locked_by).lower() in sa
         if not is_sa_reserved:
             if not r.get("published_to_pool"):
                 continue
@@ -271,7 +274,10 @@ def select_accounts_for_auto(
             else:
                 tier_low.append(r)
 
-    sort_key = lambda r: (_grade_rank(r.get("grade")), -(float(r.get("grade_score") or 0)))
+    sort_key = lambda r: (
+        _grade_rank(r.get("grade")),
+        -(float(r.get("grade_score") or 0)),
+    )
     tier_top.sort(key=sort_key)
     tier_mid.sort(key=sort_key)
     # LOW mezcla dos perfiles de riesgo distinto: cuentas JWT-vivo degradadas
@@ -294,30 +300,35 @@ def select_accounts_for_auto(
     stratified: List[Dict[str, Any]] = []
     i_top, i_mid, i_low = 0, 0, 0
 
-    while len(stratified) < count and (i_top < len(tier_top) or i_mid < len(tier_mid) or i_low < len(tier_low)):
+    while len(stratified) < count and (
+        i_top < len(tier_top) or i_mid < len(tier_mid) or i_low < len(tier_low)
+    ):
         # 1 TOP
         if i_top < len(tier_top):
             stratified.append(tier_top[i_top])
             i_top += 1
-            if len(stratified) == count: break
+            if len(stratified) == count:
+                break
 
         # 1 MID
         if i_mid < len(tier_mid):
             stratified.append(tier_mid[i_mid])
             i_mid += 1
-            if len(stratified) == count: break
+            if len(stratified) == count:
+                break
 
         # 1 LOW
         if i_low < len(tier_low):
             stratified.append(tier_low[i_low])
             i_low += 1
-            if len(stratified) == count: break
+            if len(stratified) == count:
+                break
 
     # Si aún falta para completar count (fall-through de seguridad)
     if len(stratified) < count:
         remaining = [r for r in out if r not in stratified]
         remaining.sort(key=sort_key)
-        stratified.extend(remaining[:count - len(stratified)])
+        stratified.extend(remaining[: count - len(stratified)])
 
     # _jwt_alive era flag interno de tiering — limpiarlo del dict entregado
     for r in stratified:
@@ -327,7 +338,9 @@ def select_accounts_for_auto(
 
 
 # ── B3 — planner (toca la BD) ────────────────────────────────────────────────
-MAX_ACCOUNTS_HARD_CAP = 10  # Robert 2026-08-05: tope duro por corrida, sea cual sea la razón
+MAX_ACCOUNTS_HARD_CAP = (
+    10  # Robert 2026-08-05: tope duro por corrida, sea cual sea la razón
+)
 
 
 def _max_accounts_for_cards(num_cards: int) -> int:
@@ -478,8 +491,13 @@ def plan_auto_mission(
             mins_since = 99999
             if last_att and last_att["created_at"]:
                 try:
-                    dt = datetime.fromisoformat(str(last_att["created_at"]).replace(" ", "T").replace("Z", "+00:00"))
-                    if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
+                    dt = datetime.fromisoformat(
+                        str(last_att["created_at"])
+                        .replace(" ", "T")
+                        .replace("Z", "+00:00")
+                    )
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
                     mins_since = int((now_dt - dt).total_seconds() / 60.0)
                 except Exception:
                     pass
@@ -504,11 +522,16 @@ def plan_auto_mission(
             bin_stats_map = {}
 
         selected = select_accounts_for_auto(
-            rows, amount, target_count, window_map, decline_map=decline_map, meta_map=meta_map
+            rows,
+            amount,
+            target_count,
+            window_map,
+            decline_map=decline_map,
+            meta_map=meta_map,
         )[:max_accounts]
 
         pool: List[Dict[str, Any]] = []
-        for p in (card_pipes or []):
+        for p in card_pipes or []:
             c = _parse_card_pipe(p)
             if c:
                 pool.append(c)
@@ -538,10 +561,14 @@ def plan_auto_mission(
                     break
 
             if pipe:
-                accounts_out.append({
-                    "id": r.get("id"), "email": email,
-                    "grade": r.get("grade"), "card_pipe": pipe,
-                })
+                accounts_out.append(
+                    {
+                        "id": r.get("id"),
+                        "email": email,
+                        "grade": r.get("grade"),
+                        "card_pipe": pipe,
+                    }
+                )
     finally:
         con.close()
 
@@ -581,11 +608,12 @@ import asyncio
 import json
 import logging
 import os
+import random
 import uuid
 
 logger = logging.getLogger("betmexico.dashboard.auto_deposit")
 
-PROBE_AMOUNT = 10.0          # D1: probe de matchmaking (dinero real, queda en la cuenta)
+PROBE_AMOUNT = 10.0  # D1: probe de matchmaking (dinero real, queda en la cuenta)
 MATCH_TRANSIENT_RETRIES = 4  # = MM_MAX_PAIR_TRANSIENT (nuestro lado, no quema tarjeta)
 
 # Regla Robert 2026-07-28 (anti-rafagueo):
@@ -613,17 +641,17 @@ def _fake_progress_pct(status: str, extra: dict) -> int:
     if status == "matching":
         return 15
     if status == "logging_in":
-        cur = extra.get('current', 1)
-        tot = extra.get('total', 1)
+        cur = extra.get("current", 1)
+        tot = extra.get("total", 1)
         return min(70, 15 + int((cur / max(tot, 1)) * 30))
     if status == "match":
-        count = extra.get('matches_count', 0)
+        count = extra.get("matches_count", 0)
         return min(85, 25 + count * 15)
     if status == "preparing":
         return 30
     if status == "scheduling":
-        comp = extra.get('completed', 0)
-        tot = extra.get('total', 9)
+        comp = extra.get("completed", 0)
+        tot = extra.get("total", 9)
         pct = 30 + int((comp / max(tot, 1)) * 70)
         return min(100, pct)
     if status == "completed":
@@ -639,6 +667,7 @@ def _iso() -> str:
 def _m_load(mission_id: str) -> Optional[Dict[str, Any]]:
     """Fila de la misión (amount, target_count, card_pipes, status)."""
     from app import db
+
     with db() as c:
         row = c.execute(
             "SELECT * FROM auto_missions WHERE mission_id=?", (mission_id,)
@@ -654,6 +683,7 @@ def _m_status(mission_id: str) -> Optional[str]:
 def _m_update(mission_id: str, **fields) -> None:
     """UPDATE incremental — SIEMPRE toca updated_at (regla 3, anti-zombie)."""
     from app import db
+
     fields["updated_at"] = _iso()
     cols = ", ".join(f"{k}=?" for k in fields)
     with db(write=True) as c:
@@ -665,6 +695,7 @@ def _m_update(mission_id: str, **fields) -> None:
 
 def _fetch_account(account_id: int) -> Optional[Dict[str, Any]]:
     from app import db
+
     with db() as c:
         row = c.execute(
             "SELECT id, email, password FROM accounts WHERE id=?", (account_id,)
@@ -676,6 +707,7 @@ def _unlock(account_id: int) -> None:
     """Unlock explícito (reglas 4 y 7). El lock SA es perpetuo (locked_until NULL)
     — sin esto la cuenta queda RESERVADA_SA para siempre tras la misión."""
     from app import db
+
     with db(write=True) as c:
         c.execute(
             "UPDATE accounts SET locked_by=NULL, locked_until=NULL WHERE id=?",
@@ -683,20 +715,33 @@ def _unlock(account_id: int) -> None:
         )
 
 
-def _broadcast_mission(mission_id: str, status: str, user: dict, on_progress: Optional[Callable[[str, dict], None]] = None, **extra) -> None:
+def _broadcast_mission(
+    mission_id: str,
+    status: str,
+    user: dict,
+    on_progress: Optional[Callable[[str, dict], None]] = None,
+    **extra,
+) -> None:
     from app import _broadcast, _resolve_who
+
     try:
-        _broadcast({
-            "type": "activity", "kind": "auto_mission",
-            "mission_id": mission_id, "status": status, "ts": _iso(),
-            "fake_pct": _fake_progress_pct(status, extra),
-            **_resolve_who(user.get("telegram_id")), **extra,
-        })
+        _broadcast(
+            {
+                "type": "activity",
+                "kind": "auto_mission",
+                "mission_id": mission_id,
+                "status": status,
+                "ts": _iso(),
+                "fake_pct": _fake_progress_pct(status, extra),
+                **_resolve_who(user.get("telegram_id")),
+                **extra,
+            }
+        )
     except Exception as e:
         logger.warning(f"[Auto {mission_id}] broadcast falló ({status}): {e}")
     if on_progress:
         try:
-            extra['fake_pct'] = _fake_progress_pct(status, extra)
+            extra["fake_pct"] = _fake_progress_pct(status, extra)
             on_progress(status, extra)
         except Exception as e:
             logger.warning(f"[Auto {mission_id}] on_progress falló ({status}): {e}")
@@ -730,16 +775,23 @@ async def run_auto_mission(
     # Regla 5: fail-fast si el semáforo está lleno (el endpoint ya devolvió 429,
     # pero la misión pudo encolarse antes de que se llenara).
     if dep._mission_sem.locked():
-        _m_update(mission_id, status="failed",
-                  phase_detail="misiones activas — semáforo lleno", completed_at=_iso())
+        _m_update(
+            mission_id,
+            status="failed",
+            phase_detail="misiones activas — semáforo lleno",
+            completed_at=_iso(),
+        )
         return
 
     async with dep._mission_sem:
         make_pool = dep._load_deps()
         if make_pool is None:
-            _m_update(mission_id, status="failed",
-                      phase_detail="módulo de depósitos no disponible",
-                      completed_at=_iso())
+            _m_update(
+                mission_id,
+                status="failed",
+                phase_detail="módulo de depósitos no disponible",
+                completed_at=_iso(),
+            )
             return
         mission = _m_load(mission_id) or {}
         amount = float(mission.get("amount") or 150)
@@ -749,12 +801,14 @@ async def run_auto_mission(
         except (TypeError, ValueError):
             card_pipes = []
 
-        cap_key = os.environ.get("CAPMONSTER_KEY", "") or os.environ.get("BMX_CAPMONSTER_KEY", "")
+        cap_key = os.environ.get("CAPMONSTER_KEY", "") or os.environ.get(
+            "BMX_CAPMONSTER_KEY", ""
+        )
         pool = make_pool(cap_key, size=2, workers=1)
         await pool.start_factory()
         asyncio.create_task(pool.prefetch(2))
 
-        sessions: Dict[str, Any] = {}     # email -> (jwt, proxy) — regla 11
+        sessions: Dict[str, Any] = {}  # email -> (jwt, proxy) — regla 11
         matches: List[Dict[str, Any]] = []
         locked_ids: set = set()
         deposited = 0.0
@@ -768,6 +822,7 @@ async def run_auto_mission(
         async def _attempt(email, password, pipe, amt, sj, sp):
             """Un intento de depósito + persistencia (regla 8). Retorna (r, ok, code)."""
             import deposits as _d
+
             num, exp, cvv = _d._parse_pipe(pipe)
             t0 = asyncio.get_event_loop().time()
             if sj:
@@ -775,17 +830,30 @@ async def run_auto_mission(
             else:
                 logger.info(f"🔑 LOGIN START | {email}")
             r = await _d._run_deposit_with_phases(
-                email, password, num, exp, cvv, amt, user, pool, None,
-                session_jwt=sj, session_proxy=sp,
+                email,
+                password,
+                num,
+                exp,
+                cvv,
+                amt,
+                user,
+                pool,
+                None,
+                session_jwt=sj,
+                session_proxy=sp,
                 persist_login_data=(sj is None),
             )
             ok = bool(r.get("success"))
             code = r.get("result_code", "UNKNOWN")
             reason = r.get("error") or code
-            duration = r.get("duration_ms") or int((asyncio.get_event_loop().time() - t0) * 1000)
+            duration = r.get("duration_ms") or int(
+                (asyncio.get_event_loop().time() - t0) * 1000
+            )
 
             if ok:
-                logger.info(f"💳 SUBMIT SUCCESS | {email} | Pipe: {pipe} | Code: {code} | Duration: {duration}ms")
+                logger.info(
+                    f"💳 SUBMIT SUCCESS | {email} | Pipe: {pipe} | Code: {code} | Duration: {duration}ms"
+                )
             else:
                 if code == "RATE_LIMITED":
                     # Robert 2026-08-05: el rate-limit es pedo interno del backend,
@@ -793,23 +861,40 @@ async def run_auto_mission(
                     # no debe verlo en el log de misión.
                     logger.debug(f"🛡️ cuenta en pausa (retry automático) | {email}")
                 elif code in _d.MM_DEAD_RC:
-                    logger.error(f"💀 DEAD ACCOUNT | {email} | Pipe: {pipe} | Code: {code}")
+                    logger.error(
+                        f"💀 DEAD ACCOUNT | {email} | Pipe: {pipe} | Code: {code}"
+                    )
                 else:
-                    logger.warning(f"💳 SUBMIT REJECTED | {email} | Pipe: {pipe} | Code: {code} | Reason: {reason}")
+                    logger.warning(
+                        f"💳 SUBMIT REJECTED | {email} | Pipe: {pipe} | Code: {code} | Reason: {reason}"
+                    )
 
             _d._record_attempt(
-                uuid.uuid4().hex, email, amt,
+                uuid.uuid4().hex,
+                email,
+                amt,
                 _d.classify_deposit_status(code, ok),
-                reason, duration, operator_id, card_pipe=pipe,
+                reason,
+                duration,
+                operator_id,
+                card_pipe=pipe,
             )
             return r, ok, code
 
         try:
             # ── FASE 1 — MATCHMAKING (probe $10 real, D1) ────────────────────
-            _m_update(mission_id, status="matching",
-                      phase_detail="buscando pares cuenta×tarjeta")
-            _broadcast_mission(mission_id, "matching", user, on_progress=on_progress,
-                               accounts=len(plan.get("accounts", [])))
+            _m_update(
+                mission_id,
+                status="matching",
+                phase_detail="buscando pares cuenta×tarjeta",
+            )
+            _broadcast_mission(
+                mission_id,
+                "matching",
+                user,
+                on_progress=on_progress,
+                accounts=len(plan.get("accounts", [])),
+            )
             accounts_list = plan.get("accounts", [])
             for acc_idx, acc in enumerate(accounts_list):
                 if _cancelled():
@@ -843,22 +928,29 @@ async def run_auto_mission(
                 matched = False
                 locked = False
                 code = None
-                account_declines = 0  # regla Robert 2026-07-28: tope por cuenta EN ESTA CORRIDA
+                account_declines = (
+                    0  # regla Robert 2026-07-28: tope por cuenta EN ESTA CORRIDA
+                )
                 for pipe_idx, pipe in enumerate(candidates):
                     if matched or _cancelled():
                         break
                     if account_declines >= MM_MAX_ACCOUNT_DECLINES_PER_RUN:
                         break  # ya declinó 2 veces esta corrida — no taladrar más, siguiente cuenta
                     if not locked:  # regla 7: lock justo antes del 1er intento real
-                        dep._auto_lock_for_deposit(account_id, operator_id, user, hours=4)
+                        dep._auto_lock_for_deposit(
+                            account_id, operator_id, user, hours=4
+                        )
                         locked = True
                         locked_ids.add(account_id)
                     transient = 0
                     while True:  # reintentos transitorios del PAR (nuestro lado)
                         sj, sp = dep._mm_session_get(sessions, email)
-                        logger.info(f"🏦 BEGIN_DEPOSIT | {email} | Target Pipe: {pipe} | Amt: ${PROBE_AMOUNT}")
-                        r, ok, code = await _attempt(email, acct["password"], pipe,
-                                                     PROBE_AMOUNT, sj, sp)
+                        logger.info(
+                            f"🏦 BEGIN_DEPOSIT | {email} | Target Pipe: {pipe} | Amt: ${PROBE_AMOUNT}"
+                        )
+                        r, ok, code = await _attempt(
+                            email, acct["password"], pipe, PROBE_AMOUNT, sj, sp
+                        )
                         dep._mm_session_update(sessions, email, r)  # regla 11
                         if ok:
                             matched = True
@@ -870,8 +962,18 @@ async def run_auto_mission(
                             clabe_stp = None
                             try:
                                 import clabe_fetch
-                                saved_clabes = clabe_fetch.get_saved_clabes(DB_PATH, account_id)
-                                stp_item = next((c for c in saved_clabes if c.get("integration") in ("STP", 2, "2")), None)
+
+                                saved_clabes = clabe_fetch.get_saved_clabes(
+                                    DB_PATH, account_id
+                                )
+                                stp_item = next(
+                                    (
+                                        c
+                                        for c in saved_clabes
+                                        if c.get("integration") in ("STP", 2, "2")
+                                    ),
+                                    None,
+                                )
                                 if stp_item:
                                     clabe_stp = stp_item.get("clabe")
                                 else:
@@ -879,35 +981,72 @@ async def run_auto_mission(
                                     jwt_token = r.get("jwt")
                                     used_proxy = r.get("used_proxy")
                                     if jwt_token:
-                                        fetched_data = await clabe_fetch.fetch_clabes_from_betmexico(jwt_token, used_proxy)
-                                        clabe_fetch._persist_clabes(DB_PATH, account_id, email, fetched_data)
-                                        accounts_stp = fetched_data.get("accounts") or []
-                                        stp_acc = next((a for a in accounts_stp if str(a.get("integration")) in ("STP", "2")), None)
+                                        fetched_data = await clabe_fetch.fetch_clabes_from_betmexico(
+                                            jwt_token, used_proxy
+                                        )
+                                        clabe_fetch._persist_clabes(
+                                            DB_PATH, account_id, email, fetched_data
+                                        )
+                                        accounts_stp = (
+                                            fetched_data.get("accounts") or []
+                                        )
+                                        stp_acc = next(
+                                            (
+                                                a
+                                                for a in accounts_stp
+                                                if str(a.get("integration"))
+                                                in ("STP", "2")
+                                            ),
+                                            None,
+                                        )
                                         if stp_acc:
                                             clabe_stp = str(stp_acc.get("account"))
                             except Exception as ex_clabe:
-                                logger.warning(f"[Auto {mission_id}] No se pudo obtener CLABE STP para {email}: {ex_clabe}")
+                                logger.warning(
+                                    f"[Auto {mission_id}] No se pudo obtener CLABE STP para {email}: {ex_clabe}"
+                                )
 
-                            matches.append({
-                                "account_id": account_id, "email": email,
-                                "card_pipe": pipe, "clabe_stp": clabe_stp,
-                                "jwt": r.get("jwt"), "proxy": r.get("used_proxy"),
-                            })
-                            _m_update(mission_id, matches=json.dumps(matches),
-                                      total_deposited=deposited, total_approved=approved,
-                                      phase_detail=f"match {email}")
-                            _broadcast_mission(mission_id, "match", user, on_progress=on_progress,
-                                               email=email, card_tail=f"···{pipe[:6]}")
+                            matches.append(
+                                {
+                                    "account_id": account_id,
+                                    "email": email,
+                                    "card_pipe": pipe,
+                                    "clabe_stp": clabe_stp,
+                                    "jwt": r.get("jwt"),
+                                    "proxy": r.get("used_proxy"),
+                                    "matched_at": time.time(),
+                                }
+                            )
+                            _m_update(
+                                mission_id,
+                                matches=json.dumps(matches),
+                                total_deposited=deposited,
+                                total_approved=approved,
+                                phase_detail=f"match {email}",
+                            )
+                            _broadcast_mission(
+                                mission_id,
+                                "match",
+                                user,
+                                on_progress=on_progress,
+                                email=email,
+                                card_tail=f"···{pipe[:6]}",
+                            )
                             break
                         if code in dep.MM_THREEDS_RC:
                             # 3DS → cuenta premium A+ (no es decline) — patrón :2541-2549
                             try:
                                 from app import db as _adb
+
                                 with _adb(write=True) as cdb:
-                                    cdb.execute("UPDATE accounts SET grade='A+' WHERE email=?",
-                                                (email,))
+                                    cdb.execute(
+                                        "UPDATE accounts SET grade='A+' WHERE email=?",
+                                        (email,),
+                                    )
                             except Exception as ex:
-                                logger.error(f"[Auto {mission_id}] no pude marcar A+ {email}: {ex}")
+                                logger.error(
+                                    f"[Auto {mission_id}] no pude marcar A+ {email}: {ex}"
+                                )
                             break  # siguiente tarjeta
                         if code == "RATE_LIMITED":
                             # Cuarentena instantánea + aviso SSE
@@ -921,7 +1060,9 @@ async def run_auto_mission(
                                 reason="rate_limited",
                             )
                             break  # siguiente cuenta inmediatamente (0 espera)
-                        if dep._mm_is_real_decline(code) or dep._mm_is_ambiguous_charge(code):
+                        if dep._mm_is_real_decline(code) or dep._mm_is_ambiguous_charge(
+                            code
+                        ):
                             failed += 1
                             account_declines += 1
                             break  # siguiente tarjeta (decline real o cargo ambiguo: terminal)
@@ -940,8 +1081,12 @@ async def run_auto_mission(
                     # Regla Robert 2026-07-28: 60s SOLO si vamos a reintentar OTRA
                     # tarjeta en la MISMA cuenta (no al salir hacia la siguiente cuenta).
                     has_more_candidates = pipe_idx < len(candidates) - 1
-                    if (not matched and code is not None and has_more_candidates
-                            and account_declines < MM_MAX_ACCOUNT_DECLINES_PER_RUN):
+                    if (
+                        not matched
+                        and code is not None
+                        and has_more_candidates
+                        and account_declines < MM_MAX_ACCOUNT_DECLINES_PER_RUN
+                    ):
                         await asyncio.sleep(dep.MM_COOLDOWN)
                 if locked and not matched:
                     _unlock(account_id)  # regla 7: no dejar 4h/perpetuo sin match
@@ -952,12 +1097,24 @@ async def run_auto_mission(
                     await asyncio.sleep(MM_CROSS_ACCOUNT_GAP)
 
             if not matches:
-                _m_update(mission_id, status="failed" if not cancelled else "cancelled",
-                          phase_detail="sin matches" if not cancelled else "cancelada por el operador",
-                          total_deposited=deposited, total_approved=approved,
-                          total_failed=failed, completed_at=_iso())
-                _broadcast_mission(mission_id, "failed" if not cancelled else "cancelled",
-                                   user, on_progress=on_progress, reason="sin matches")
+                _m_update(
+                    mission_id,
+                    status="failed" if not cancelled else "cancelled",
+                    phase_detail="sin matches"
+                    if not cancelled
+                    else "cancelada por el operador",
+                    total_deposited=deposited,
+                    total_approved=approved,
+                    total_failed=failed,
+                    completed_at=_iso(),
+                )
+                _broadcast_mission(
+                    mission_id,
+                    "failed" if not cancelled else "cancelled",
+                    user,
+                    on_progress=on_progress,
+                    reason="sin matches",
+                )
                 return
 
             # Si TODOS los matches capturaron sesión, el pool ya no se necesita (regla 9)
@@ -981,26 +1138,55 @@ async def run_auto_mission(
                 )
                 proceed = False
                 try:
-                    proceed = await confirm_gate({"mission_id": mission_id, "matches": matches, "amount": amount, "target_count": target_count})
+                    proceed = await confirm_gate(
+                        {
+                            "mission_id": mission_id,
+                            "matches": matches,
+                            "amount": amount,
+                            "target_count": target_count,
+                        }
+                    )
                 except Exception as ex:
                     logger.warning(f"[Auto {mission_id}] confirm_gate falló: {ex}")
                 if not proceed:
                     cancelled = True
 
             if cancelled:
-                _m_update(mission_id, status="completed",
-                          phase_detail="detenido por el operador tras matchmaking",
-                          total_deposited=deposited, total_approved=approved,
-                          total_failed=failed, completed_at=_iso())
-                _broadcast_mission(mission_id, "completed", user, on_progress=on_progress,
-                                   deposited=deposited, approved=approved, failed=failed,
-                                   accounts=len(matches), stopped_by_user=True)
+                _m_update(
+                    mission_id,
+                    status="completed",
+                    phase_detail="detenido por el operador tras matchmaking",
+                    total_deposited=deposited,
+                    total_approved=approved,
+                    total_failed=failed,
+                    completed_at=_iso(),
+                )
+                _broadcast_mission(
+                    mission_id,
+                    "completed",
+                    user,
+                    on_progress=on_progress,
+                    deposited=deposited,
+                    approved=approved,
+                    failed=failed,
+                    accounts=len(matches),
+                    stopped_by_user=True,
+                )
                 return
 
             # ── FASE 2 — SCHEDULED por match (N×amount cada 60s, SP-2) ───────
-            _m_update(mission_id, status="scheduling",
-                      phase_detail=f"{len(matches)} matches — {target_count}×${amount:.0f}/60s")
-            _broadcast_mission(mission_id, "scheduling", user, on_progress=on_progress, matches=len(matches))
+            _m_update(
+                mission_id,
+                status="scheduling",
+                phase_detail=f"{len(matches)} matches — {target_count}×${amount:.0f}/60s",
+            )
+            _broadcast_mission(
+                mission_id,
+                "scheduling",
+                user,
+                on_progress=on_progress,
+                matches=len(matches),
+            )
             for m in matches:
                 if _cancelled():
                     cancelled = True
@@ -1010,51 +1196,105 @@ async def run_auto_mission(
                 if not acct:
                     continue
                 session_jwt, session_proxy = m.get("jwt"), m.get("proxy")  # regla 2
+
+                # Piso de 45-60s antes del primer depósito de Fase 2 (anti-fuga,
+                # handoff 2026-08-05 §2 Área B): evita que el primer depósito de
+                # $150 caiga a escasos segundos del probe de $10 en la MISMA
+                # cuenta si el operador confirmó rápido el gate.
+                elapsed = time.time() - m.get("matched_at", 0)
+                floor = random.uniform(45, 60)
+                if elapsed < floor:
+                    _broadcast_mission(
+                        mission_id,
+                        "preparing",
+                        user,
+                        on_progress=on_progress,
+                        email=email,
+                    )
+                    await asyncio.sleep(floor - elapsed)
+
                 completed = 0
                 retries = 0
                 while completed < target_count:
                     if _cancelled():
                         cancelled = True
                         break
-                    r, ok, code = await _attempt(email, acct["password"], m["card_pipe"],
-                                                 amount, session_jwt, session_proxy)
+                    r, ok, code = await _attempt(
+                        email,
+                        acct["password"],
+                        m["card_pipe"],
+                        amount,
+                        session_jwt,
+                        session_proxy,
+                    )
                     if ok:
                         completed += 1
                         retries = 0
                         deposited += amount
                         approved += 1
-                        if session_jwt is None and r.get("jwt"):  # SP-2 verbatim (:2475)
+                        if session_jwt is None and r.get(
+                            "jwt"
+                        ):  # SP-2 verbatim (:2475)
                             session_jwt = r.get("jwt")
                             session_proxy = r.get("used_proxy")
                             m["jwt"], m["proxy"] = session_jwt, session_proxy
-                            if all(mm.get("jwt") for mm in matches) and pool is not None:
+                            if (
+                                all(mm.get("jwt") for mm in matches)
+                                and pool is not None
+                            ):
                                 await _stop_pool(pool, mission_id)
                                 pool = None
-                        _m_update(mission_id, total_deposited=deposited,
-                                  total_approved=approved,
-                                  phase_detail=f"{email} {completed}/{target_count}")
-                        _broadcast_mission(mission_id, "scheduling", user, on_progress=on_progress,
-                                           email=email, completed=completed,
-                                           total=target_count)
+                        _m_update(
+                            mission_id,
+                            total_deposited=deposited,
+                            total_approved=approved,
+                            phase_detail=f"{email} {completed}/{target_count}",
+                        )
+                        _broadcast_mission(
+                            mission_id,
+                            "scheduling",
+                            user,
+                            on_progress=on_progress,
+                            email=email,
+                            completed=completed,
+                            total=target_count,
+                        )
                         if completed < target_count:
                             await asyncio.sleep(60)
                         continue
                     # Terminal para ESTA cuenta (no las demás) — misma ley que scheduled
-                    if (code == "RATE_LIMITED" or code in dep.MM_THREEDS_RC
-                            or dep._mm_is_real_decline(code) or code in dep.MM_DEAD_RC
-                            or code == "PENDING_NOT_APPLIED" or dep._mm_is_ambiguous_charge(code)):
+                    if (
+                        code == "RATE_LIMITED"
+                        or code in dep.MM_THREEDS_RC
+                        or dep._mm_is_real_decline(code)
+                        or code in dep.MM_DEAD_RC
+                        or code == "PENDING_NOT_APPLIED"
+                        or dep._mm_is_ambiguous_charge(code)
+                    ):
                         if code == "RATE_LIMITED":
                             dep._set_account_cooldown(email)
                         failed += 1
-                        _m_update(mission_id, total_failed=failed,
-                                  phase_detail=f"{email} abortada ({code})")
-                        _broadcast_mission(mission_id, "scheduling", user, on_progress=on_progress,
-                                           email=email, aborted=code)
+                        _m_update(
+                            mission_id,
+                            total_failed=failed,
+                            phase_detail=f"{email} abortada ({code})",
+                        )
+                        _broadcast_mission(
+                            mission_id,
+                            "scheduling",
+                            user,
+                            on_progress=on_progress,
+                            email=email,
+                            aborted=code,
+                        )
                         break
                     # Transitorio → retry (SCHED_MAX_TRANSIENT_RETRIES=4, backoff 25s)
                     low = str(r.get("error") or "").lower()
-                    if session_jwt and ("sesión rechazada" in low or "401" in low
-                                        or "redirectlogin" in low):
+                    if session_jwt and (
+                        "sesión rechazada" in low
+                        or "401" in low
+                        or "redirectlogin" in low
+                    ):
                         session_jwt = session_proxy = None  # patrón :2594-2605
                         if pool is None:
                             pool = make_pool(cap_key, size=2, workers=1)
@@ -1063,21 +1303,39 @@ async def run_auto_mission(
                     retries += 1
                     if retries > dep.SCHED_MAX_TRANSIENT_RETRIES:
                         failed += 1
-                        _m_update(mission_id, total_failed=failed,
-                                  phase_detail=f"{email} sin éxito tras {retries - 1} reintentos")
+                        _m_update(
+                            mission_id,
+                            total_failed=failed,
+                            phase_detail=f"{email} sin éxito tras {retries - 1} reintentos",
+                        )
                         break
                     await asyncio.sleep(dep.SCHED_RETRY_BACKOFF_SEC)
 
             # ── FASE 3 — CIERRE ──────────────────────────────────────────────
             final = "cancelled" if cancelled else "completed"
-            _m_update(mission_id, status=final,
-                      phase_detail=("cancelada por el operador" if cancelled
-                                    else f"${deposited:.0f} en {len(matches)} cuentas"),
-                      total_deposited=deposited, total_approved=approved,
-                      total_failed=failed, completed_at=_iso())
-            _broadcast_mission(mission_id, final, user, on_progress=on_progress,
-                               deposited=deposited, approved=approved, failed=failed,
-                               accounts=len(matches))
+            _m_update(
+                mission_id,
+                status=final,
+                phase_detail=(
+                    "cancelada por el operador"
+                    if cancelled
+                    else f"${deposited:.0f} en {len(matches)} cuentas"
+                ),
+                total_deposited=deposited,
+                total_approved=approved,
+                total_failed=failed,
+                completed_at=_iso(),
+            )
+            _broadcast_mission(
+                mission_id,
+                final,
+                user,
+                on_progress=on_progress,
+                deposited=deposited,
+                approved=approved,
+                failed=failed,
+                accounts=len(matches),
+            )
         finally:
             await _stop_pool(pool, mission_id)
             for aid in locked_ids:  # regla 7: la misión no deja cuentas reservadas

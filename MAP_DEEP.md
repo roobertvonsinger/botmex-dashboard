@@ -196,31 +196,31 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `_now_epoch` | def | L22–L23 |
-| `_grade_rank` | def | L26–L28 |
-| `_sa_tokens` | def | L31–L41 |
-| `_cd_active` | def | L44–L59 |
-| `_exp_int` | def | L62–L68 |
-| `_bin_of` | def | L71–L73 |
-| `_approval_rate` | def | L76–L82 |
-| `_threeds_recent` | def | L85–L99 |
-| `_rank_key` | def | L102–L105 |
-| `_pipe_str` | def | L108–L113 |
-| `_parse_card_pipe` | def | L116–L137 |
-| `_normalize_pipe_to_3part` | def | L140–L142 |
-| `select_accounts_for_auto` | def | L149–L326 |
-| `_max_accounts_for_cards` | def | L333–L341 |
-| `plan_auto_mission` | def | L344–L560 |
-| `_fake_progress_pct` | def | L600–L631 |
-| `_iso` | def | L635–L636 |
-| `_m_load` | def | L639–L646 |
-| `_m_status` | def | L649–L651 |
-| `_m_update` | def | L654–L663 |
-| `_fetch_account` | def | L666–L672 |
-| `_unlock` | def | L675–L683 |
-| `_broadcast_mission` | def | L686–L702 |
-| `_stop_pool` | def | L705–L712 |
-| `run_auto_mission` | def | L716–L1087 |
+| `_now_epoch` | def | L23–L24 |
+| `_grade_rank` | def | L27–L30 |
+| `_sa_tokens` | def | L33–L44 |
+| `_cd_active` | def | L47–L63 |
+| `_exp_int` | def | L66–L72 |
+| `_bin_of` | def | L75–L77 |
+| `_approval_rate` | def | L80–L86 |
+| `_threeds_recent` | def | L89–L103 |
+| `_rank_key` | def | L106–L109 |
+| `_pipe_str` | def | L112–L117 |
+| `_parse_card_pipe` | def | L120–L141 |
+| `_normalize_pipe_to_3part` | def | L144–L146 |
+| `select_accounts_for_auto` | def | L155–L337 |
+| `_max_accounts_for_cards` | def | L346–L354 |
+| `plan_auto_mission` | def | L357–L587 |
+| `_fake_progress_pct` | def | L628–L659 |
+| `_iso` | def | L663–L664 |
+| `_m_load` | def | L667–L675 |
+| `_m_status` | def | L678–L680 |
+| `_m_update` | def | L683–L693 |
+| `_fetch_account` | def | L696–L703 |
+| `_unlock` | def | L706–L715 |
+| `_broadcast_mission` | def | L718–L747 |
+| `_stop_pool` | def | L750–L757 |
+| `run_auto_mission` | def | L761–L1345 |
 
 ### `autoexclusion.py`
 
