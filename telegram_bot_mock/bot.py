@@ -230,6 +230,22 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, parse_mode="HTML", reply_markup=kb)
 
 
+async def _edit_msg(query, text: str, reply_markup=None):
+    """Edita el mensaje del callback: usa edit_message_caption si el mensaje
+    original tiene foto (el /start envía foto+caption), sino edit_message_text.
+
+    Fixes 'There is no text in the message to edit' cuando se toca un botón
+    del /start (mensaje con media)."""
+    if query.message and query.message.photo:
+        await query.edit_message_caption(
+            caption=text, parse_mode="HTML", reply_markup=reply_markup
+        )
+    else:
+        await query.edit_message_text(
+            text=text, parse_mode="HTML", reply_markup=reply_markup
+        )
+
+
 async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Callback para botones rápidos del /start."""
     query = update.callback_query
@@ -244,7 +260,8 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
                 ]
             ]
         )
-        await query.edit_message_text(
+        await _edit_msg(
+            query,
             f"{HEADER}\n\n"
             "💳 <b>Auto Deposito [CC Auto-match] (/BET)</b>\n\n"
             "Pega tus CeCes en formato:\n"
@@ -253,7 +270,6 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
             "🇲🇽 <b>BoTMexico</b> encuentra una cuenta para tu CC 💳\n"
             "🤖 One Click & Watcha la magia...\n\n"
             f"<i>{get_random_greeting()}</i>",
-            parse_mode="HTML",
             reply_markup=kb,
         )
         return WAIT_BET_CONFIRM
@@ -267,13 +283,13 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
                 ]
             ]
         )
-        await query.edit_message_text(
+        await _edit_msg(
+            query,
             f"{HEADER}\n\n"
             "📥 <b>VERIFICACIÓN COMBOS (/check)</b>\n\n"
             "Envía combos en chat (máx 100) o archivo .txt (máx 5,000):\n"
             "<code>correo:contraseña</code>\n\n"
             f"<i>{get_random_greeting()}</i>",
-            parse_mode="HTML",
             reply_markup=kb,
         )
         return WAIT_CHECK_CONFIRM
@@ -314,7 +330,7 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
                 ],
             ]
         )
-        await query.edit_message_text(msg, parse_mode="HTML", reply_markup=kb)
+        await _edit_msg(query, msg, reply_markup=kb)
     elif query.data == "btn_start_cancel":
         user_id = update.effective_user.id
         with db(write=True) as c:
@@ -326,9 +342,7 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
         context.user_data.clear()
         nickname = get_user_nickname(user_id, update.effective_user.first_name)
         home_msg, home_kb = _start_menu_msg(user_id, nickname)
-        await query.edit_message_text(
-            home_msg, parse_mode="HTML", reply_markup=home_kb
-        )
+        await _edit_msg(query, home_msg, reply_markup=home_kb)
         return ConversationHandler.END
 
 

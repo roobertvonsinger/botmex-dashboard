@@ -128,13 +128,15 @@ async def test_help_btn_start_help_keeps_home_button():
     """El help abierto desde el botón del /start también debe tener 'Volver al inicio'."""
     query = AsyncMock()
     query.data = "btn_start_help"
+    query.message = MagicMock()
+    query.message.photo = [MagicMock()]
 
     update = MagicMock(spec=Update)
     update.callback_query = query
 
     res = await start_buttons_callback(update, None)
-    args, kwargs = query.edit_message_text.call_args
-    assert "Manual Operativo BoTMexico" in args[0]
+    args, kwargs = query.edit_message_caption.call_args
+    assert "Manual Operativo BoTMexico" in kwargs["caption"]
     kb = kwargs.get("reply_markup")
     labels = [btn.text for row in kb.inline_keyboard for btn in row]
     assert "🏠 Volver al inicio" in labels
@@ -145,6 +147,8 @@ async def test_btn_start_cancel_returns_to_start_menu(seed_db):
     """'Volver al inicio' cancela misiones activas y re-renderiza el menú principal."""
     query = AsyncMock()
     query.data = "btn_start_cancel"
+    query.message = MagicMock()
+    query.message.photo = [MagicMock()]
 
     update = MagicMock(spec=Update)
     user = MagicMock(spec=User)
@@ -157,8 +161,8 @@ async def test_btn_start_cancel_returns_to_start_menu(seed_db):
 
     res = await start_buttons_callback(update, context)
     assert res == ConversationHandler.END
-    args, kwargs = query.edit_message_text.call_args
-    assert "ʙ ᴏ ᴛ · ᴍ ᴇ x ɪ ᴄ ᴏ" in args[0]
+    args, kwargs = query.edit_message_caption.call_args
+    assert "ʙ ᴏ ᴛ · ᴍ ᴇ x ɪ ᴄ ᴏ" in kwargs["caption"]
     assert kwargs.get("parse_mode") == "HTML"
     kb = kwargs.get("reply_markup")
     labels = [btn.text for row in kb.inline_keyboard for btn in row]
