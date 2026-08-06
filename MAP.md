@@ -247,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `2f336f3` | feat(antifuga): Area B - piso 45-60s antes de Fase 2 con status 'preparing' |
 | `516fcc9` | feat(antifuga): Area A - bloque terminal del bot sin cadencia ni conteo |
 | `0a4d71f` | docs: spec anti-fuga bot+portal + handoff OpenCode con decisiones resueltas |
 | `8b46a8b` | fix(auto_deposit): modo auto ya no usa tarjetas married + tope duro de 10 cuentas |
@@ -258,7 +259,6 @@ prewarm.py (router)
 | `8c828c9` | test(withdrawals): cubrir refresh post-retiro en operator_withdraw |
 | `f299383` | docs: handoff para Claude Code — review + deploy rama jwt-refresh |
 | `02a08b1` | docs: reporte final de sesión — refresco JWT + gate retiro + gaps |
-| `e994e7c` | refactor(jwt_keeper): importar _PENDING_WD_EXISTS_SQL de account_refresh (DRY) |
 <!-- GEN:end:recientes -->
 
 ---

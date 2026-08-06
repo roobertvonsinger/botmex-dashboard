@@ -83,6 +83,7 @@
   function statusClass(st) {
     const m = {
       matching: 'st-matching', scheduling: 'st-scheduling',
+      preparing: 'st-scheduling',
       awaiting_confirmation: 'st-awaiting_confirmation',
       completed: 'st-completed', failed: 'st-failed',
       cancelled: 'st-cancelled', pending: 'st-pending',
@@ -93,6 +94,7 @@
   function statusLabel(st) {
     const m = {
       matching: 'Rastreando', scheduling: 'Llenando',
+      preparing: 'Preparando',
       awaiting_confirmation: 'Confirmar',
       completed: 'Completado', failed: 'Falló',
       cancelled: 'Cancelado', pending: 'En cola',
@@ -218,17 +220,19 @@
 
   function onMissionEvent(ev) {
     if (!missionState) missionState = { matches: [], deposited: 0, approved: 0, failed: 0, status: 'pending' };
+    // fake_pct viene del backend (_fake_progress_pct) — única fuente de verdad
+    const fp = (ev.fake_pct != null) ? ev.fake_pct : 0;
     switch (ev.status) {
       case 'started':
       case 'matching':
         missionState.status = 'matching';
         missionState.sub = 'Buscando cuentas' + (ev.accounts ? ' · ' + ev.accounts + ' candidatas' : '…');
-        animateProgressTo(15, renderMission);
+        animateProgressTo(fp || 15, renderMission);
         return;
       case 'logging_in':
         missionState.status = 'matching';
         missionState.sub = '🔑 Sesión: <span class="email">' + shortEmail(ev.email) + '</span> (' + (ev.current || 1) + '/' + (ev.total || '…') + ')';
-        animateProgressTo(Math.min(70, 15 + ((ev.current || 1) / Math.max(ev.total || 1, 1)) * 30), renderMission);
+        animateProgressTo(fp, renderMission);
         return;
       case 'cooldown':
         missionState.status = 'matching';
@@ -238,54 +242,57 @@
         missionState.status = 'matching';
         missionState.matches.push({ email: ev.email, card_tail: ev.card_tail });
         missionState.sub = '✅ <span class="email">' + shortEmail(ev.email) + '</span> ↔ ' + (ev.card_tail || '');
-        animateProgressTo(Math.min(85, 25 + missionState.matches.length * 15), renderMission);
+        animateProgressTo(fp, renderMission);
         return;
       case 'awaiting_confirmation':
         missionState.status = 'awaiting_confirmation';
         missionState.sub = '⚠️ Listo para confirmar llenado';
         break;
+      case 'preparing':
+        missionState.status = 'scheduling';
+        missionState.sub = '⏳ Preparando…';
+        startProcessingPulse();
+        animateProgressTo(fp || 30, renderMission);
+        return;
       case 'scheduling':
         missionState.status = 'scheduling';
         if (ev.completed != null) {
-          const total = ev.total || 9;
-          missionState.sub = 'Acreditado ✓ · <span class="email">' + shortEmail(ev.email) + '</span> · ' + ev.completed + '/' + total;
+          missionState.sub = 'Acreditado ✓ · <span class="email">' + shortEmail(ev.email) + '</span>';
           missionState.schedDone = ev.completed;
-          missionState.schedTotal = total;
-          if (ev.completed < total) startProcessingPulse();
+          missionState.schedTotal = ev.total || 9;
+          if (ev.completed < (ev.total || 9)) startProcessingPulse();
           else clearProcessingPulse();
-          animateProgressTo(Math.min(95, 30 + (ev.completed / Math.max(total, 1)) * 70), renderMission);
+          animateProgressTo(fp, renderMission);
           return;
         } else if (ev.aborted) {
           missionState.sub = '❌ <span class="email">' + shortEmail(ev.email) + '</span> no jaló (' + ev.aborted + ')';
         } else {
-          // No revelar cadencia real (Robert, 2026-08-04): nada de "cada Ns" ni
-          // montos por depósito — solo que el proceso está en curso.
           missionState.sub = '¡Match! Depositando' + (ev.matches ? ' · ' + ev.matches + ' cuentas' : '');
-          animateProgressTo(30, renderMission);
+          animateProgressTo(fp || 30, renderMission);
           return;
         }
         break;
       case 'completed':
         clearProcessingPulse();
         missionState.status = 'completed';
+        missionState.stopped_by_user = ev.stopped_by_user || false;
         missionState.deposited = ev.deposited || missionState.deposited;
-        missionState.approved = ev.approved || missionState.approved;
         missionState.failed = ev.failed || missionState.failed;
         missionState.sub = 'Completado';
-        animateProgressTo(100, renderMission);
+        animateProgressTo(fp || 100, renderMission);
         return;
       case 'cancelled':
         clearProcessingPulse();
         missionState.status = 'cancelled';
         missionState.sub = 'Detenido por el operador';
-        missionState.pct = missionState.pct || 50;
-        break;
+        animateProgressTo(fp || (missionState.pct || 50), renderMission);
+        return;
       case 'failed':
         clearProcessingPulse();
         missionState.status = 'failed';
         missionState.sub = 'Falló' + (ev.reason ? ' · ' + ev.reason : '');
-        missionState.pct = missionState.pct || 50;
-        break;
+        animateProgressTo(fp || (missionState.pct || 50), renderMission);
+        return;
     }
     renderMission();
   }
@@ -319,10 +326,18 @@
       ? '<span class="mv-countdown"><span class="cd-dot"></span>en curso…</span>'
       : '';
 
+    // Resumen terminal anti-fuga (handoff 2026-08-05 §2 Área C):
+    // - s.deposited se muestra SOLO si completed && !stopped_by_user
+    //   (camino 4: misión corrió Fase 2 completa — el único con monto real que
+    //   vale la pena mostrar). En cualquier otro cierre, sin cifras.
+    // - s.approved (conteo de intentos) se oculta SIEMPRE — revela la
+    //   cadencia de probes/depósitos.
+    const showDeposited = (s.status === 'completed' && !s.stopped_by_user);
     const summaryHtml = (s.status === 'completed' || s.status === 'failed' || s.status === 'cancelled')
       ? '<div class="mv-summary">' +
-        '<div class="mv-stat"><div class="mv-stat-val">' + fmtMoney(s.deposited) + '</div><div class="mv-stat-lbl">Depositado</div></div>' +
-        '<div class="mv-stat"><div class="mv-stat-val" style="color:var(--green-bright)">' + (s.approved || 0) + '</div><div class="mv-stat-lbl">Cuentas Listas</div></div>' +
+        (showDeposited
+          ? '<div class="mv-stat"><div class="mv-stat-val">' + fmtMoney(s.deposited) + '</div><div class="mv-stat-lbl">Depositado</div></div>'
+          : '<div class="mv-stat"><div class="mv-stat-val">—</div><div class="mv-stat-lbl">Sin datos</div></div>') +
         '</div>'
       : '';
 
