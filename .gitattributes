@@ -1,1 +1,24 @@
+# Normalización de line-endings: todo texto se almacena como LF en el repo.
+# En Windows (core.autocrlf=true) el checkout sigue siendo CRLF nativo.
+* text=auto eol=lf
+
+# Binarios: nunca tocar line-endings
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.pdf binary
+*.db binary
+*.sqlite binary
+*.zip binary
+*.gz binary
+
+# Merge strategy para graphify
 graphify-out/graph.json merge=graphify
