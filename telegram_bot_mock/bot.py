@@ -11,7 +11,13 @@ import time
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    BotCommand,
+    BotCommandScopeChat,
+)
 from telegram.request import HTTPXRequest
 from telegram.error import NetworkError, TimedOut, Conflict
 from telegram.ext import (
@@ -77,11 +83,12 @@ POC_GREETINGS = [
 ]
 
 # Barras en 2a Persona Directa con Variación de Métricas (Estructuras de Rap Complejas)
+# Flow escrito: 4 barras, rima al final de cada línea, métrica pareja pa' que se lea y se escuche.
 RAP_DISCLAIMERS = [
-    "Buenas compa carder, qué bueno que traes feria, ya te habías tardado.\nDijiste que ibas a sacar billete de algún lado,\npero le bajaste a tu mamá los doscientos del mandado\ny me trajiste puro carbón en lugar de un LIVE bien cargado. 🥩🔥",
-    "Llegaste muy picudo presumiendo que traías el truco aprendido,\nte gastaste la feria del mandado pa' meterte en este ruido.\nTraes tres CCs quemadas de un checker sin sentido\ny crees que con ChatGPT vas a salir del olvido. 💀⚡",
-    "Soñabas con tu Airbnb en automático y tu cashout de revista,\nandabas de mamador en Discord dándotela de artista.\nTe vendieron puro carbón esos vagos de la lista\ny en BoTMexico te dejamos sin saldo y fuera de vista. 🚀💸",
-    "Creíste que con abliteración ya eras el dueño del circuito,\nte gastaste los últimos doscientos pesitos en un mito.\nTus combos de Telegram salieron muertos de a bonito\ny te apagué el asador antes de empezar tu escrito. 🎤🥩",
+    "Buenas compa carder, qué bueno que traes feria, ya te habías tardado.\nDijiste que el billete iba a salir de cualquier lado,\npero le bajaste a tu mamá los doscientos del mandado\ny me trajiste puro carbón, ni un LIVE bien cargado. 🥩🔥",
+    "Llegaste muy picudo presumiendo que traías el truco aprendido,\nte fundiste la feria del mandado pa' meterte en este ruido.\nTraes tres CCs quemadas de un checker sin sentido\ny crees que con ChatGPT vas a salir del olvido. 💀⚡",
+    "Soñabas con tu Airbnb en automático y un cashout de revista,\nandabas de mamador en Discord dándotela de artista.\nTe vendieron puro carbón esos vagos de la lista\ny en BoTMexico te dejo sin saldo y fuera de vista. 🚀💸",
+    "Creíste que con abliteración ya te dabas de exquisito,\nte fundiste los doscientos pesitos en un mito.\nTus combos de Telegram salieron muertos de a bonito\ny te apagué el asador antes de empezar tu escrito. 🎤🥩",
     "Traes la cara de hacker y el bolsillo pelado en ceros,\nte quemaste la feria del mandado con estafadores rateros.\nAquí BoTMexico no consuela noobs ni escucha tus peros:\no tiras la CC correcta o te regresas a los primeros. 🌵⚡",
 ]
 
@@ -177,19 +184,10 @@ def _logo_path() -> Path:
     return Path(__file__).resolve().parent.parent / "static" / "assets" / "botmexico_logo_new.png"
 
 
-async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /start — Entrada con membrete oficial, logo, saludo dinámico por apodo, ID y rap sátira."""
-    user_id = update.effective_user.id
-    if not is_authorized(user_id):
-        await update.message.reply_text(
-            f"{HEADER}\n\nAcceso denegado.", parse_mode="HTML"
-        )
-        return
-
-    nickname = get_user_nickname(user_id, update.effective_user.first_name)
+def _start_menu_msg(user_id: int, nickname: str):
+    """Construye mensaje + teclado del menú principal (/start y 'Volver al inicio')."""
     poc_saludo = get_random_poc_greeting(nickname)
     rap_intro = get_random_rap_intro()
-
     msg = (
         f"{HEADER}\n\n"
         f"{poc_saludo}\n"
@@ -208,6 +206,21 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🇲🇽 botmexico.net (Dashboard)", url=DASHBOARD_URL)],
         ]
     )
+    return msg, kb
+
+
+async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Comando /start — Entrada con membrete oficial, logo, saludo dinámico por apodo, ID y rap sátira."""
+    user_id = update.effective_user.id
+    if not is_authorized(user_id):
+        await update.message.reply_text(
+            f"{HEADER}\n\nAcceso denegado.", parse_mode="HTML"
+        )
+        return
+
+    nickname = get_user_nickname(user_id, update.effective_user.first_name)
+    msg, kb = _start_menu_msg(user_id, nickname)
+
     try:
         with open(_logo_path(), "rb") as f:
             await update.message.reply_photo(
@@ -291,6 +304,11 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
                 ],
                 [
                     InlineKeyboardButton(
+                        "🏠 Volver al inicio", callback_data="btn_start_cancel"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
                         "🇲🇽 botmexico.net (Dashboard)", url=DASHBOARD_URL
                     )
                 ],
@@ -306,11 +324,10 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
                 (user_id,),
             )
         context.user_data.clear()
+        nickname = get_user_nickname(user_id, update.effective_user.first_name)
+        home_msg, home_kb = _start_menu_msg(user_id, nickname)
         await query.edit_message_text(
-            f"{HEADER}\n\n"
-            "🛑 <b>Proceso abortado.</b>\n"
-            "Operaciones detenidas limpiamente.",
-            parse_mode="HTML",
+            home_msg, parse_mode="HTML", reply_markup=home_kb
         )
         return ConversationHandler.END
 
@@ -330,8 +347,6 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "  Enlace directo al núcleo del Dashboard de Operador.\n\n"
         "• <b>/help</b> — ❔ Ayuda\n"
         "  Muestra esta guía rápida de instrucciones.\n\n"
-        "• <b>/adduser</b> — 👤 Agregar Usuario (Superadmin)\n"
-        "  Registra nuevo usuario: <code>/adduser &lt;ID&gt; &lt;Apodo&gt; [rol]</code>.\n\n"
         "• <b>/cancel</b> — 🛑 Cancelar/Detener proceso\n"
         "  Cancela cualquier misión activa y libera cuentas de inmediato.\n\n"
         f"  🌵 {get_random_greeting()}\n"
@@ -339,6 +354,11 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kb = InlineKeyboardMarkup(
         [
             [InlineKeyboardButton("💳 CC Auto-Match", callback_data="btn_start_bet")],
+            [
+                InlineKeyboardButton(
+                    "🏠 Volver al inicio", callback_data="btn_start_cancel"
+                )
+            ],
             [InlineKeyboardButton("🇲🇽 botmexico.net (Dashboard)", url=DASHBOARD_URL)],
         ]
     )
@@ -1222,15 +1242,23 @@ async def handle_stop_mission_callback(
 
 
 async def setup_bot_commands(application):
-    """Registra el menú nativo de comandos en la interfaz de Telegram."""
+    """Registra el menú nativo de comandos en la interfaz de Telegram.
+
+    /adduser es operativo exclusivo del Superadmin: no se publica en el menú
+    general (ni en /help) y solo se expone vía BotCommandScopeChat en el chat
+    del Superadmin — nadie más lo ve ni sabe que existe.
+    """
     commands = [
         BotCommand("start", "🚀 Menú principal"),
         BotCommand("help", "📖 Manual operativo"),
         BotCommand("cancel", "🛑 Cancelar proceso"),
-        BotCommand("adduser", "👤 Agregar usuario (Superadmin)"),
     ]
     try:
         await application.bot.set_my_commands(commands)
+        await application.bot.set_my_commands(
+            [BotCommand("adduser", "👤 Agregar usuario")],
+            scope=BotCommandScopeChat(chat_id=SUPERADMIN_ID),
+        )
         logger.info(
             "[Bot] Menú nativo de comandos en Telegram configurado exitosamente."
         )

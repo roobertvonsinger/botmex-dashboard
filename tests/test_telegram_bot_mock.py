@@ -5,7 +5,7 @@ import sqlite3
 import asyncio
 import importlib
 from unittest.mock import AsyncMock, MagicMock, patch
-from telegram import Update, Message, User, Chat, Document
+from telegram import Update, Message, User, Chat, Document, BotCommandScopeChat
 from telegram.ext import ConversationHandler
 
 import app as app_mod
@@ -24,6 +24,8 @@ from telegram_bot_mock.bot import (
     process_bet_input,
     handle_check_callback,
     handle_bet_callback,
+    start_buttons_callback,
+    setup_bot_commands,
     _run_check_task,
     WAIT_CHECK_CONFIRM,
     WAIT_BET_CONFIRM,
@@ -113,6 +115,75 @@ async def test_help_cmd():
     await help_cmd(update, None)
     args, kwargs = update.message.reply_text.call_args
     assert "Manual Operativo BoTMexico" in args[0]
+    # /adduser es operativo exclusivo del Superadmin: NO debe pregonarse en /help
+    assert "adduser" not in args[0]
+    # El help siempre trae salida de vuelta al inicio
+    kb = kwargs.get("reply_markup")
+    labels = [btn.text for row in kb.inline_keyboard for btn in row]
+    assert "🏠 Volver al inicio" in labels
+
+
+@pytest.mark.asyncio
+async def test_help_btn_start_help_keeps_home_button():
+    """El help abierto desde el botón del /start también debe tener 'Volver al inicio'."""
+    query = AsyncMock()
+    query.data = "btn_start_help"
+
+    update = MagicMock(spec=Update)
+    update.callback_query = query
+
+    res = await start_buttons_callback(update, None)
+    args, kwargs = query.edit_message_text.call_args
+    assert "Manual Operativo BoTMexico" in args[0]
+    kb = kwargs.get("reply_markup")
+    labels = [btn.text for row in kb.inline_keyboard for btn in row]
+    assert "🏠 Volver al inicio" in labels
+
+
+@pytest.mark.asyncio
+async def test_btn_start_cancel_returns_to_start_menu(seed_db):
+    """'Volver al inicio' cancela misiones activas y re-renderiza el menú principal."""
+    query = AsyncMock()
+    query.data = "btn_start_cancel"
+
+    update = MagicMock(spec=Update)
+    user = MagicMock(spec=User)
+    user.id = SUPERADMIN_ID
+    update.effective_user = user
+    update.callback_query = query
+
+    context = MagicMock()
+    context.user_data = {"some_key": "some_val"}
+
+    res = await start_buttons_callback(update, context)
+    assert res == ConversationHandler.END
+    args, kwargs = query.edit_message_text.call_args
+    assert "ʙ ᴏ ᴛ · ᴍ ᴇ x ɪ ᴄ ᴏ" in args[0]
+    assert kwargs.get("parse_mode") == "HTML"
+    kb = kwargs.get("reply_markup")
+    labels = [btn.text for row in kb.inline_keyboard for btn in row]
+    assert "💳 CC Auto-Match" in labels
+
+
+@pytest.mark.asyncio
+async def test_setup_bot_commands_scopes_adduser_to_superadmin():
+    """El menú nativo NO publica /adduser: va solo en el scope del chat del Superadmin."""
+    bot = AsyncMock()
+    application = MagicMock()
+    application.bot = bot
+
+    await setup_bot_commands(application)
+
+    # Default scope: sin adduser
+    default_cmds, default_kwargs = bot.set_my_commands.call_args_list[0]
+    assert all(cmd.command != "adduser" for cmd in default_cmds[0])
+    assert "scope" not in default_kwargs or default_kwargs["scope"] is None
+    # Scope del Superadmin: adduser presente
+    scoped_cmds, scoped_kwargs = bot.set_my_commands.call_args_list[1]
+    assert any(cmd.command == "adduser" for cmd in scoped_cmds[0])
+    scope = scoped_kwargs["scope"]
+    assert isinstance(scope, BotCommandScopeChat)
+    assert scope.chat_id == SUPERADMIN_ID
 
 
 @pytest.mark.asyncio
