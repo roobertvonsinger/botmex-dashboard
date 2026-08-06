@@ -246,6 +246,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `35dd0d8` | feat(bot): /start con logo nuevo botmexico.net (reply_photo con fallback) |
 | `a0b44ea` | feat(auth): registro dinamico de usuarios + /adduser del bot (Luisito operador normal) |
 | `b613ef5` | fix(antifuga): auditoría Claude Code — 4 bugs reales en el trabajo de OpenCode |
 | `af94b59` | docs(antifuga): reporte final de implementacion - 4 areas A-D |
@@ -257,7 +258,6 @@ prewarm.py (router)
 | `8b46a8b` | fix(auto_deposit): modo auto ya no usa tarjetas married + tope duro de 10 cuentas |
 | `6a1edf2` | docs: cierre de sesión — bin_stats fix deployado y verificado |
 | `7145c2e` | fix(deposits): cerrar hueco de bin_stats — approved/rejected nunca se contaban |
-| `f347775` | docs: cierre de sesión — deploy verificado a KVM4 + estado para /cerrar-bmx |
 <!-- GEN:end:recientes -->
 
 ---
