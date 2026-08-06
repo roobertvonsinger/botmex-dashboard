@@ -173,8 +173,12 @@ def _mission_status_text(status: str, extra: dict) -> str:
 # ─────────────────────────────────────────────────────────────────────
 
 
+def _logo_path() -> Path:
+    return Path(__file__).resolve().parent.parent / "static" / "assets" / "botmexico_logo_new.png"
+
+
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /start — Entrada con membrete oficial, saludo dinámico por apodo, ID y rap sátira."""
+    """Comando /start — Entrada con membrete oficial, logo, saludo dinámico por apodo, ID y rap sátira."""
     user_id = update.effective_user.id
     if not is_authorized(user_id):
         await update.message.reply_text(
@@ -204,7 +208,13 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🇲🇽 botmexico.net (Dashboard)", url=DASHBOARD_URL)],
         ]
     )
-    await update.message.reply_text(msg, parse_mode="HTML", reply_markup=kb)
+    try:
+        with open(_logo_path(), "rb") as f:
+            await update.message.reply_photo(
+                photo=f, caption=msg, parse_mode="HTML", reply_markup=kb
+            )
+    except FileNotFoundError:
+        await update.message.reply_text(msg, parse_mode="HTML", reply_markup=kb)
 
 
 async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -99,9 +99,9 @@ async def test_start_cmd_authorized():
     update.message = AsyncMock(spec=Message)
 
     await start_cmd(update, None)
-    assert update.message.reply_text.called
-    args, kwargs = update.message.reply_text.call_args
-    assert "ʙ ᴏ ᴛ · ᴍ ᴇ x ɪ ᴄ ᴏ" in args[0]
+    assert update.message.reply_photo.called
+    args, kwargs = update.message.reply_photo.call_args
+    assert "ʙ ᴏ ᴛ · ᴍ ᴇ x ɪ ᴄ ᴏ" in kwargs.get("caption", "")
     assert kwargs.get("parse_mode") == "HTML"
 
 

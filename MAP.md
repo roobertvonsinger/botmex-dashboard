@@ -246,6 +246,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a0b44ea` | feat(auth): registro dinamico de usuarios + /adduser del bot (Luisito operador normal) |
 | `b613ef5` | fix(antifuga): auditoría Claude Code — 4 bugs reales en el trabajo de OpenCode |
 | `af94b59` | docs(antifuga): reporte final de implementacion - 4 areas A-D |
 | `1e115af` | docs(antifuga): Area D - SSE_EVENTS, ERRORS, AUDIT actualizados |
@@ -257,7 +258,6 @@ prewarm.py (router)
 | `6a1edf2` | docs: cierre de sesión — bin_stats fix deployado y verificado |
 | `7145c2e` | fix(deposits): cerrar hueco de bin_stats — approved/rejected nunca se contaban |
 | `f347775` | docs: cierre de sesión — deploy verificado a KVM4 + estado para /cerrar-bmx |
-| `3e564d6` | feat(frontend): tabs superiores reemplazan cenefa + portal /bet embebido (SA) |
 <!-- GEN:end:recientes -->
 
 ---
