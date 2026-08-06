@@ -246,6 +246,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d0e2814` | fix(logs+auto_deposit): la vista de logs se congelaba con since corrupto (lastTs sin validar) + DB_PATH NameError en CLABE STP + LOCK de arranque baja a warning |
 | `db3a81b` | fix(bot): scope del SA debe llevar TODOS los comandos (BotCommandScopeChat reemplaza, no fusiona) |
 | `41c89fe` | fix(bot): botones del /start fallaban con foto (edit_message_caption en vez de edit_message_text) |
 | `2a83a80` | chore: .gitattributes normalizacion line-endings (text=auto eol=lf + binarios) |
@@ -257,7 +258,6 @@ prewarm.py (router)
 | `b613ef5` | fix(antifuga): auditoría Claude Code — 4 bugs reales en el trabajo de OpenCode |
 | `af94b59` | docs(antifuga): reporte final de implementacion - 4 areas A-D |
 | `1e115af` | docs(antifuga): Area D - SSE_EVENTS, ERRORS, AUDIT actualizados |
-| `abc0e38` | feat(antifuga): Area C - portal consume fake_pct del SSE + fix resumen terminal |
 <!-- GEN:end:recientes -->
 
 ---

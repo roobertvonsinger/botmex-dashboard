@@ -14,3 +14,19 @@ Acceso por **API + MCP** a la nube Hostinger donde viven **KVM2** (`2.24.211.166
 
 ## Slash commands
 - `/abrir-bmx` y `/cerrar-bmx` viven en `.claude/commands/` (disponibles vía junction en `.agents/commands/`).
+
+## 🤖 Containers KVM4 — topología y REGLAS DURAS (2026-08-06, decisiones dictadas por Robert — NO volver a preguntar)
+
+Tres containers `betmexico:*` en KVM4, todos montando `/docker/betmexico/code → /app`:
+
+| Container | Comando | Bot / rol | Se deploya con este repo |
+|---|---|---|---|
+| `betmexico-web` | `python web/app.py` | Dashboard (botmexico.net) | ✅ sí |
+| `betmexico-mock-bot` | `python telegram_bot_mock/bot.py` | **Bot de producción** `@betmexbot` (token `8823043859`). **Suple al legacy** — los operadores y el flujo real usan este. | ✅ sí |
+| `betmexico-bot` | `python betmexico_bot.py` (desde la RAÍZ `/app` = `/docker/betmexico/code/`, NO `/app/web`) | **Legacy** `@betmx_bot` (token `8516175452`) — bot viejo v2, **EXCLUSIVO de Robert** | ❌ NO, jamás |
+
+### REGLAS (no negociables)
+1. **El legacy se queda.** Es solo de Robert. **NO se apaga, NO se detiene, NO se borra, NO se alinea a este repo, NO se migra.** Decisión cerrada — no preguntar si se retira (Robert ya la dictó y hubo que revertir un `docker stop` el 2026-08-06 por no saberlo).
+2. **El auto-depósito NO corre en el legacy.** El legacy (`betmexico_bot.py`) no importa `auto_deposit` ni `app` — las misiones corren con la copia `/app/web`. La copia raíz `/app/auto_deposit.py` es una versión vieja (580+ diffs) que **no se toca**.
+3. **No interfiere en nada.** Su log vive en `/data/logs/telegram_bot.log` (vista "main" del dashboard). Los tracebacks sin timestamp de ese archivo ya no corrompen la vista (fix `_reloadBotLog`/`_tail_log_file`, commit `d0e2814`). Sus `NetworkError: Bad Gateway` de `get_updates` son red intermitente de Telegram — no son bugs del mock ni del dashboard.
+4. **`support_routes.py` NO existe** en el repo — el warning `[support] router no cargado` en cada arranque es INTENCIONAL (módulo opcional, ver `docs/AGENTE_SOPORTE.md`). No "arreglarlo".
