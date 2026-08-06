@@ -249,6 +249,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `8b46a8b` | fix(auto_deposit): modo auto ya no usa tarjetas married + tope duro de 10 cuentas |
 | `6a1edf2` | docs: cierre de sesión — bin_stats fix deployado y verificado |
 | `7145c2e` | fix(deposits): cerrar hueco de bin_stats — approved/rejected nunca se contaban |
 | `f347775` | docs: cierre de sesión — deploy verificado a KVM4 + estado para /cerrar-bmx |
@@ -260,7 +261,6 @@ prewarm.py (router)
 | `e994e7c` | refactor(jwt_keeper): importar _PENDING_WD_EXISTS_SQL de account_refresh (DRY) |
 | `6f67527` | feat(withdrawals): refresco de balance post-retiro reusando JWT |
 | `dcce536` | feat(jwt_keeper): priorizar cuentas hot en lote de re-login |
-| `fd0b633` | docs: handoff para OpenCode — refresco JWT en tiempo real + gate de retiro + gaps abiertos |
 <!-- GEN:end:recientes -->
 
 ---
