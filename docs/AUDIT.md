@@ -16,7 +16,16 @@
 | Badge "en proceso" con punto pulsante + borde con glow ambiental en `.acc-card.locked` | Antes: badge de texto estático "🔒 Bloqueada" + borde `--text-dim` sin animación. Ahora: "En proceso" + `box-shadow` pulsante (`processingPulse`, gateado por `prefers-reduced-motion`). | ✅ implementado | ✅ screenshot en vivo confirma borde verde visible en tarjetas "en proceso" vs. la que no lo está |
 | Copy "AI-tagline" en login/portal (taglines auto-explicativas tipo "acceso directo · sin fricción", "gestión directa, sin fricción, sin contraseñas de cuenta") | Reemplazado por footer minimal `botmexico.net · 2026`, sin la palabra "Portal" en título/header visible (era jerga interna). | ✅ implementado | ✅ screenshot en vivo, título de pestaña y header confirmados |
 
-## Captura: 2026-08-06 (bot: `/adduser` oculto al público, raps de `/start` con flow corregido, help con "Volver al inicio")
+## Captura: 2026-08-06 (portal: empty state accionable — liga al bot + /bet)
+
+**Motivo**: Robert reportó que Luisito (operador `operator`) "no le respondía el bot" — resultó ser que no veía cuentas en el dashboard (vista propia sin depósitos aprobados = lista vacía). El empty state decía "Aún no tienes cuentas con depósitos aprobados. Cuando uses /bet y se depositen, aparecerán aquí." — informativo pero inútil para un operador novato: no le dice qué hacer ni adónde ir. Robert pidió reemplazarlo por algo accionable: liga al bot de Telegram + mencionar el comando `/bet`.
+
+| Función | Spec (2026-08-06) | Estado | Verificado |
+|---|---|---|---|
+| `static/portal.js::loadAccounts` (empty state) | Cuando un operador sin cuentas aprobadas abre el portal, el grid muestra CTA accionable: texto "Sin cuentas todavía — usa <code>/bet</code> en el bot con tus tarjetas." + botón "Abrir el bot ↗" (link `https://t.me/betmexbot`, `target=_blank`). Reemplaza el mensaje pasivo anterior. | ✅ implementado | ⚠️ pendiente verificación visual en vivo post-deploy KVM4. Sin test automatizado (es HTML/CSS estático). |
+| `static/portal.html` (`.empty-msg .empty-cta`, `.empty-msg code`) | Estilo para el CTA del empty state: botón verde (`--accent`) con hover lift + glow; `<code>` en `--gold`. | ✅ implementado | ⚠️ pendiente verificación visual. |
+
+
 
 **Motivo**: Robert pidió (1) que `/adduser` deje de estar pregonado — es operativo exclusivo del Superadmin, no debe aparecer en `/help` ni en el menú nativo de comandos de otros usuarios; (2) que los raps de `/start` tengan el mismo slang pero con flow musical escrito, rimas y métrica pareja; (3) que `/help` tenga botón de vuelta al inicio — unificando la navegación: "Volver al inicio" y cancelar hacen lo mismo (regresan al menú), y cancelar aplica cuando hay proceso activo.
 

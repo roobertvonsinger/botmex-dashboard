@@ -23,6 +23,7 @@
   // avisar — el operador perdía la confirmación de aterrizaje justo en el
   // punto que la memoria del proyecto marca crítico (status:6 ≠ aterrizó).
   const wdPolls = new Map(); // accountId -> intervalId
+  const cardNodes = new Map(); // accountId -> { el: HTMLElement, data: serialized-snapshot }
 
   // ── Bare mode ─────────────────────────────────────────────────
   // ?bare=1: el portal va embebido como tab del dashboard SA. Se ocultan
@@ -33,15 +34,18 @@
   if (BARE) document.body.classList.add('bare');
 
   // ── View-as scope ──────────────────────────────────────────────
-  // /user/{id}: {id} identifica de quién es este portal. Si el que mira es
-  // SA, el backend narrowea su sesión (rol/telegram_id) a ese {id} vía
-  // ?view_as= — así SA ve exactamente lo que ese usuario vería, incl. sus
-  // propias cuentas depositadas con /bet, sin la omnisciencia de SA.
-  const VIEW_AS = (window.location.pathname.match(/^\/user\/(\d+)/) || [])[1] || null;
+  // /{username}: el username identifica de quién es este portal (antes era
+  // /user/{telegram_id} — cambiado 2026-08-06, la URL debe traer el apodo,
+  // no un ID). Si el que mira es SA, el backend narrowea su sesión (rol) a
+  // ese username vía ?view_as= — así SA ve exactamente lo que ese usuario
+  // vería, incl. sus propias cuentas depositadas con /bet, sin la
+  // omnisciencia de SA. portal.html SOLO se sirve desde /{username}, así que
+  // el primer segmento del path SIEMPRE es el username de este portal.
+  const VIEW_AS = (window.location.pathname.match(/^\/([^\/]+)/) || [])[1] || null;
 
   function apiUrl(path) {
     if (!VIEW_AS) return path;
-    return path + (path.includes('?') ? '&' : '?') + 'view_as=' + VIEW_AS;
+    return path + (path.includes('?') ? '&' : '?') + 'view_as=' + encodeURIComponent(VIEW_AS);
   }
 
   // ── Utils ──────────────────────────────────────────────────────
@@ -381,21 +385,186 @@
   }
 
   // ── Accounts Grid ──────────────────────────────────────────────
+  // Snapshot of the fields we compare for dirty-checking a card.
+  function cardSnapshot(acc) {
+    return [
+      acc.balance_real, acc.balance_bonos, acc.grade, acc.is_locked,
+      acc.clabe_stp, acc.withdrawal_ready, acc.withdrawal_institution,
+      acc.last_deposit_amount, acc.last_deposit_date, acc.curp, acc.email
+    ].join('|');
+  }
+
+  let _firstLoad = true; // show "Cargando…" only before first successful fetch
+
   async function loadAccounts() {
-    grid.innerHTML = '<div class="empty-msg">Cargando…</div>';
+    // Show loading only on very first load (no cards yet)
+    if (_firstLoad && cardNodes.size === 0) {
+      grid.innerHTML = '<div class="empty-msg">Cargando…</div>';
+    }
     try {
       const res = await fetch(apiUrl('/api/operator/my-accounts'));
       if (res.status === 401) { window.location.href = '/login'; return; }
       const data = await res.json();
       if (!data.ok || !data.accounts || data.accounts.length === 0) {
-        grid.innerHTML = '<div class="empty-msg">Aún no tienes cuentas con depósitos aprobados.<br>Cuando uses <code>/bet</code> y se depositen, aparecerán aquí.</div>';
+        grid.innerHTML = '<div class="empty-msg">Sin cuentas todavía — usa <code>/bet</code> en el bot con tus tarjetas.<br>En cuanto se apruebe un depósito, la cuenta aparece aquí.<br><a class="empty-cta" href="https://t.me/betmexbot" target="_blank" rel="noopener">Abrir el bot ↗</a></div>';
+        cardNodes.clear();
+        _firstLoad = false;
         return;
       }
-      grid.innerHTML = data.accounts.map(renderAccountCard).join('');
-      bindAccountActions();
+      _firstLoad = false;
+
+      // Remove the static "Cargando…" if still there
+      const loadingMsg = grid.querySelector('.empty-msg');
+      if (loadingMsg) loadingMsg.remove();
+
+      const incomingIds = new Set();
+
+      data.accounts.forEach((acc) => {
+        const id = acc.id;
+        incomingIds.add(id);
+        const snap = cardSnapshot(acc);
+        const existing = cardNodes.get(id);
+
+        if (!existing) {
+          // New card — create, insert, animate (materialize runs via CSS)
+          const wrapper = document.createElement('div');
+          wrapper.innerHTML = renderAccountCard(acc);
+          const el = wrapper.firstElementChild;
+          grid.appendChild(el);
+          bindCardActions(el);
+          cardNodes.set(id, { el, snap });
+        } else if (existing.snap !== snap) {
+          // Existing card changed — update fields in-place
+          const el = existing.el;
+          const oldBal = existing.snap.split('|')[0];
+          const newBal = String(acc.balance_real);
+
+          updateCardFields(el, acc);
+          // Re-bind actions on updated card (safe: uses data-bound flag)
+          bindCardActions(el);
+          existing.snap = snap;
+
+          // FIX 5a: balance tick pulse if balance changed
+          if (oldBal !== newBal) {
+            const balEl = el.querySelector('.acc-balance');
+            if (balEl) {
+              balEl.classList.remove('tick');
+              // Force reflow to allow re-triggering the animation
+              void balEl.offsetWidth;
+              balEl.classList.add('tick');
+              balEl.addEventListener('animationend', function onEnd() {
+                balEl.classList.remove('tick');
+                balEl.removeEventListener('animationend', onEnd);
+              });
+            }
+          }
+        }
+        // If snap identical, do nothing — no DOM touch
+      });
+
+      // Remove cards no longer in response
+      for (const [id, entry] of cardNodes) {
+        if (!incomingIds.has(id)) {
+          entry.el.remove();
+          cardNodes.delete(id);
+        }
+      }
+
     } catch (err) {
       grid.innerHTML = '<div class="empty-msg" style="color:var(--red)">Error: ' + err.message + '</div>';
+      cardNodes.clear();
     }
+  }
+
+  // Update individual fields inside an existing card element without replacing it
+  function updateCardFields(el, acc) {
+    const balReal = parseFloat(acc.balance_real || 0).toFixed(2);
+    const balBonos = parseFloat(acc.balance_bonos || 0).toFixed(2);
+    const lastDep = acc.last_deposit_amount ? fmtMoney(acc.last_deposit_amount) : '—';
+    const _lastDateObj = parseMxDate(acc.last_deposit_date);
+    const lastDate = isNaN(_lastDateObj.getTime()) ? '' : _lastDateObj.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    const grade = acc.grade || 'N/A';
+    const gradeCls = gradeClass(grade);
+    const clabeStp = acc.clabe_stp || '';
+    const isLocked = acc.is_locked;
+
+    // Balance
+    const balEl = el.querySelector('.acc-balance');
+    if (balEl) balEl.innerHTML = fmtMoney(balReal) + ' <span class="cur">MXN</span>';
+
+    // Grade badge
+    const gradeEl = el.querySelector('.acc-grade');
+    if (gradeEl) {
+      gradeEl.className = 'acc-grade grade ' + gradeCls;
+      gradeEl.textContent = grade;
+    }
+
+    // Email
+    const emailEl = el.querySelector('.acc-email');
+    if (emailEl) emailEl.textContent = acc.email || '';
+
+    // Locked state
+    el.classList.toggle('locked', !!isLocked);
+
+    // data attributes
+    el.dataset.id = acc.id;
+    el.dataset.email = acc.email || '';
+
+    // Meta block — rebuild (simpler than patching each line individually)
+    const metaEl = el.querySelector('.acc-meta');
+    if (metaEl) {
+      const curpHtml = (acc.curp && acc.curp !== 'N/A') ? '<div>• CURP: ' + acc.curp + '</div>' : '';
+      const wdInstHtml = acc.withdrawal_ready
+        ? '<div>• Retiro: <span style="color:var(--accent)">' + (acc.withdrawal_institution || 'Aprobado') + '</span></div>'
+        : '<div style="color:var(--text-dim)">• Retiro: esperando SPEI…</div>';
+      metaEl.innerHTML =
+        (parseFloat(balBonos) > 0 ? '<div>• Bonos: ' + fmtMoney(balBonos) + '</div>' : '') +
+        '<div>• Último: ' + lastDep + (lastDate ? ' (' + lastDate + ')' : '') + '</div>' +
+        curpHtml + wdInstHtml +
+        (isLocked ? '<div class="acc-locked-badge"><span class="live-dot"></span>En proceso</div>' : '');
+    }
+
+    // CLABE box
+    const clabeBox = el.querySelector('.clabe-box');
+    if (clabeBox) {
+      if (clabeStp) {
+        clabeBox.style.opacity = '';
+        clabeBox.innerHTML = '<span class="clabe-code">' + clabeStp + '</span>' +
+          '<button class="btn btn-sm copy-clabe">Copiar</button>';
+      } else {
+        clabeBox.style.opacity = '.6';
+        clabeBox.innerHTML = '<span class="clabe-code" style="color:var(--text-dim)">CLABE pendiente</span>';
+      }
+    }
+
+    // Withdraw button state
+    const wdDisabledReason = !acc.withdrawal_ready
+      ? 'Esperando confirmación de SPEI en BetMexico'
+      : (parseFloat(balReal) <= 0 ? 'Sin saldo disponible para retirar' : '');
+    const wdBtn = el.querySelector('.btn-withdraw');
+    if (wdBtn) {
+      wdBtn.disabled = !!wdDisabledReason;
+      wdBtn.title = wdDisabledReason || '';
+      wdBtn.dataset.bal = balReal;
+    }
+
+    // Release button: add/remove as needed
+    const actionsEl = el.querySelector('.acc-actions');
+    const existingRelease = el.querySelector('.btn-release');
+    if (isLocked && !existingRelease && actionsEl) {
+      const rb = document.createElement('button');
+      rb.className = 'btn btn-sm btn-danger btn-release';
+      rb.textContent = '🔓 Liberar';
+      actionsEl.appendChild(rb);
+    } else if (!isLocked && existingRelease) {
+      existingRelease.remove();
+    }
+  }
+
+  // Canonical grade-class mapping — matches app.js:172 exactly.
+  // D has no explicit rule in style.css, falls to base .grade (neutral).
+  function gradeClass(g) {
+    return ({ 'A+': 'Aplus', A: 'A', B: 'B', C: 'C', D: 'D' })[g] || 'U';
   }
 
   function renderAccountCard(acc) {
@@ -405,7 +574,7 @@
     const _lastDateObj = parseMxDate(acc.last_deposit_date);
     const lastDate = isNaN(_lastDateObj.getTime()) ? '' : _lastDateObj.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
     const grade = acc.grade || 'N/A';
-    const gradeCls = grade.replace('+', '-plus');
+    const gradeCls = gradeClass(grade);
     const clabeStp = acc.clabe_stp || '';
     const isLocked = acc.is_locked;
 
@@ -432,7 +601,7 @@
     return '<div class="acc-card' + (isLocked ? ' locked' : '') + '" data-id="' + acc.id + '" data-email="' + (acc.email || '') + '">' +
       '<div class="acc-top">' +
         '<span class="acc-email">' + (acc.email || '') + '</span>' +
-        '<span class="acc-grade ' + gradeCls + '">' + grade + '</span>' +
+        '<span class="acc-grade grade ' + gradeCls + '">' + grade + '</span>' +
       '</div>' +
       '<div class="acc-balance">' + fmtMoney(balReal) + ' <span class="cur">MXN</span></div>' +
       '<div class="acc-meta">' +
@@ -440,7 +609,7 @@
         '<div>• Último: ' + lastDep + (lastDate ? ' (' + lastDate + ')' : '') + '</div>' +
         curpHtml +
         wdInstHtml +
-        (isLocked ? '<div class="acc-locked-badge">🔒 Bloqueada</div>' : '') +
+        (isLocked ? '<div class="acc-locked-badge"><span class="live-dot"></span>En proceso</div>' : '') +
       '</div>' +
       clabeHtml +
       '<div class="acc-actions">' +
@@ -452,52 +621,63 @@
     '</div>';
   }
 
-  function bindAccountActions() {
-    document.querySelectorAll('.copy-clabe').forEach(btn => {
-      btn.addEventListener('click', function () {
-        const code = this.parentElement.querySelector('.clabe-code').textContent;
+  // Bind actions on a single card element. Uses data-bound flag to avoid duplicates.
+  function bindCardActions(cardEl) {
+    if (cardEl.dataset.bound) return;
+    cardEl.dataset.bound = '1';
+
+    // Use event delegation on the card itself
+    cardEl.addEventListener('click', function (e) {
+      const copyBtn = e.target.closest('.copy-clabe');
+      if (copyBtn) {
+        const code = copyBtn.parentElement.querySelector('.clabe-code').textContent;
         navigator.clipboard.writeText(code).then(() => {
-          this.textContent = '✓';
-          setTimeout(() => { this.textContent = 'Copiar'; }, 2000);
+          copyBtn.textContent = '✓';
+          setTimeout(() => { copyBtn.textContent = 'Copiar'; }, 2000);
         });
-      });
-    });
+        return;
+      }
 
-    document.querySelectorAll('.btn-withdraw').forEach(btn => {
-      btn.addEventListener('click', function () {
-        const card = this.closest('.acc-card');
-        const id = parseInt(card.dataset.id);
-        const email = card.dataset.email;
-        const bal = parseFloat(this.dataset.bal);
+      const wdBtn = e.target.closest('.btn-withdraw');
+      if (wdBtn && !wdBtn.disabled) {
+        const id = parseInt(cardEl.dataset.id);
+        const email = cardEl.dataset.email;
+        const bal = parseFloat(wdBtn.dataset.bal);
         showWithdrawModal(id, email, bal);
-      });
-    });
+        return;
+      }
 
-    document.querySelectorAll('.btn-release').forEach(btn => {
-      btn.addEventListener('click', async function () {
-        const card = this.closest('.acc-card');
-        const id = parseInt(card.dataset.id);
-        this.disabled = true;
-        this.textContent = '…';
-        try {
-          const res = await fetch(apiUrl('/api/operator/accounts/' + id + '/release'), { method: 'POST' });
-          const d = await res.json();
-          if (d.ok) {
-            showToast('Cuenta liberada', 'ok');
-            loadAccounts();
-          } else {
-            showToast('Error al liberar', 'err');
-            this.disabled = false;
-            this.textContent = '🔓 Liberar';
+      const rlBtn = e.target.closest('.btn-release');
+      if (rlBtn && !rlBtn.disabled) {
+        const id = parseInt(cardEl.dataset.id);
+        rlBtn.disabled = true;
+        rlBtn.textContent = '…';
+        (async () => {
+          try {
+            const res = await fetch(apiUrl('/api/operator/accounts/' + id + '/release'), { method: 'POST' });
+            const d = await res.json();
+            if (d.ok) {
+              showToast('Cuenta liberada', 'ok');
+              loadAccounts();
+            } else {
+              showToast('Error al liberar', 'err');
+              rlBtn.disabled = false;
+              rlBtn.textContent = '🔓 Liberar';
+            }
+          } catch (e2) {
+            showToast('Error: ' + e2.message, 'err');
+            rlBtn.disabled = false;
+            rlBtn.textContent = '🔓 Liberar';
           }
-        } catch (e) {
-          showToast('Error: ' + e.message, 'err');
-          this.disabled = false;
-          this.textContent = '🔓 Liberar';
-        }
-      });
+        })();
+        return;
+      }
     });
   }
+
+  // Legacy wrapper — no longer needed since bindCardActions handles per-card,
+  // but kept as no-op to avoid breaking any existing call sites.
+  function bindAccountActions() {}
 
   function stopWithdrawPoll(accountId) {
     const t = wdPolls.get(accountId);
@@ -615,7 +795,7 @@
         window.location.href = '/login';
       });
 
-      // SA viendo /user/{id} (posiblemente el suyo propio, vía view_as): nunca
+      // SA viendo /{username} (posiblemente el suyo propio, vía view_as): nunca
       // debe quedar atrapado sin volver a su dashboard — link directo siempre visible.
       try {
         const me = await (await fetch('/api/auth/me')).json();

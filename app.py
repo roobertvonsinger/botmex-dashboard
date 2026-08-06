@@ -681,7 +681,7 @@ async def _maintenance_gate_middleware(request: Request, call_next):
 
             if user_role != "superadmin":
                 # Exceptuar el portal y sus APIs si es operador en mantenimiento
-                if user_role == "operator" and (path == "/portal" or path.startswith("/user/") or path.startswith("/api/operator/") or path.startswith("/static/portal")):
+                if user_role == "operator" and (path == "/portal" or path.startswith("/user/") or path.startswith("/api/operator/") or path.startswith("/static/portal") or path.lstrip("/") in _auth.USERS):
                     return await call_next(request)
                 if path.startswith("/api/"):
                     return JSONResponse(
@@ -770,7 +770,7 @@ def _frontend_version(mtimes=None):
 
 
 def _own_portal_path(session: dict) -> str:
-    return f"/user/{session.get('telegram_id')}"
+    return f"/{session.get('username')}"
 
 
 def _render_frontend_html(path: Path) -> Response:
@@ -801,23 +801,22 @@ def _render_frontend_html(path: Path) -> Response:
 
 
 @app.get("/user/{user_id}")
-def user_portal_page(user_id: int, request: Request, bmx_session: str = Cookie(default=None)):
-    """Render del flujo /bet (portal.html) — scope por telegram_id.
-
-    Cualquier operador que entre con un {user_id} que no es el suyo se
-    canoniza a su propia URL (los endpoints /api/operator/* ya scopean por
-    la sesión, no por este segmento — esto es solo coherencia de URL). SA
-    puede navegar cualquier /user/{id} para supervisar en vivo.
-    """
-    session = _auth.get_session(bmx_session) if bmx_session else None
-    if not session:
-        q = request.url.query
-        return RedirectResponse(f"/login?{q}" if q else "/login", status_code=302)
-    if session.get("role") != "superadmin" and user_id != session.get("telegram_id"):
-        q = request.url.query
-        own = _own_portal_path(session)
-        return RedirectResponse(f"{own}?{q}" if q else own, status_code=302)
-    return _render_frontend_html(STATIC / "portal.html")
+def user_portal_page(user_id: int, request: Request):
+    """Alias de compatibilidad — el flujo /bet vivía aquí (por telegram_id)
+    hasta 2026-08-06; ahora vive en /{username} (Robert: la URL debe traer
+    el apodo del usuario, no un ID numérico). Se conserva por si algún link
+    viejo (bot, bookmark) todavía apunta a /user/{id} — redirige 302 al
+    username correspondiente, preservando query string. 404 si el id no
+    existe en ningún usuario registrado."""
+    target_username = next(
+        (k for k, v in _auth.USERS.items() if v.get("telegram_id") == user_id),
+        None,
+    )
+    if not target_username:
+        raise HTTPException(404, "Usuario no encontrado")
+    q = request.url.query
+    target = f"/{target_username}"
+    return RedirectResponse(f"{target}?{q}" if q else target, status_code=302)
 
 
 @app.get("/portal")
@@ -852,7 +851,7 @@ def dashboard_page(request: Request, bmx_session: str = Cookie(default=None)):
 @app.get("/")
 def index(request: Request, bmx_session: str = Cookie(default=None)):
     """Root = puro gate de auth. botmexico.net/ nunca renderiza contenido
-    directamente: exige login y reenvía a /dashboard (SA) o /user/{id} (resto),
+    directamente: exige login y reenvía a /dashboard (SA) o /{username} (resto),
     preservando query string (ej. ?match={mission_id} del handoff de /bet)."""
     session = _auth.get_session(bmx_session) if bmx_session else None
     q = request.url.query
@@ -860,6 +859,36 @@ def index(request: Request, bmx_session: str = Cookie(default=None)):
         return RedirectResponse(f"/login?{q}" if q else "/login", status_code=302)
     target = "/dashboard" if session.get("role") == "superadmin" else _own_portal_path(session)
     return RedirectResponse(f"{target}?{q}" if q else target, status_code=302)
+
+
+@app.get("/{username}")
+def username_portal_page(username: str, request: Request, bmx_session: str = Cookie(default=None)):
+    """Render del flujo /bet (portal.html) — scope por username (apodo),
+    reemplaza /user/{telegram_id} desde 2026-08-06 (Robert: la URL debe
+    mostrar quién es, no un ID). DEBE ser la ÚLTIMA ruta GET de un solo
+    segmento registrada en el archivo — cualquier ruta literal de un segmento
+    (/login, /dashboard, /portal, /favicon.ico, /maintenance) tiene que
+    quedar ANTES de esta, si no la sombrea (Starlette resuelve por orden de
+    registro, la primera que hace match gana).
+
+    Cualquier operador que entre con un username que no es el suyo se
+    canoniza a su propia URL (los endpoints /api/operator/* ya scopean por
+    la sesión, no por este segmento — esto es solo coherencia de URL). SA
+    puede navegar cualquier /{username} para supervisar en vivo. 404 si el
+    username no existe — así una ruta cualquiera con typo no se traga
+    silenciosamente como "portal de nadie"."""
+    username = username.lower()
+    if username not in _auth.USERS:
+        raise HTTPException(404, "Usuario no encontrado")
+    session = _auth.get_session(bmx_session) if bmx_session else None
+    if not session:
+        q = request.url.query
+        return RedirectResponse(f"/login?{q}" if q else "/login", status_code=302)
+    if session.get("role") != "superadmin" and username != session.get("username"):
+        q = request.url.query
+        own = _own_portal_path(session)
+        return RedirectResponse(f"{own}?{q}" if q else own, status_code=302)
+    return _render_frontend_html(STATIC / "portal.html")
 
 
 @app.get("/api/version")
@@ -956,6 +985,11 @@ def auth_logout(response: _Response, bmx_session: str = Cookie(default=None)):
 def auth_me(user: dict = Depends(require_session)):
     return {
         "username": user["display"],
+        # "login": el username crudo (apodo, ej. "lau") — usado por el
+        # frontend para armar /{username} sin exponer telegram_id en la URL
+        # (Robert, 2026-08-06). "username" de arriba ya es el display bonito
+        # y varios consumidores del frontend lo esperan así — no se toca.
+        "login": user.get("username"),
         "role": user["role"],
         "telegram_id": user.get("telegram_id"),
     }
@@ -4334,6 +4368,19 @@ def operator_my_accounts(user: dict = Depends(require_operator_view)):
     entre "se retiró todo" y que la cuenta desaparezca de este endpoint."""
     operator_id = user.get("telegram_id") or 0
     is_sa = user.get("role") == "superadmin"
+    # Ventana de "en proceso" para el lock propio (bug reportado por Robert,
+    # 2026-08-06): un lock de operador normal se autolimpia solo (locked_until
+    # 2-4h, watchdogs de app.py liberan cuando locked_until<=now). Un lock de
+    # SA (RESERVADA_SA, deposits.py:_auto_lock_for_deposit) deja locked_until
+    # NULL a propósito — ningún watchdog lo toca, así que sin este filtro se
+    # acumula para siempre y la vista propia del SA deja de reflejar "lo que
+    # estoy procesando ahorita" (112 cuentas de 5+ semanas en producción).
+    # locked_at IS NULL se trata como reciente (fail-open): ningún camino real
+    # de lock deja locked_at sin setear, solo pasa en fixtures de test.
+    # No toca locked_until/RESERVADA_SA — la cuenta sigue reservada para pool
+    # y refresh, solo deja de contar como "en proceso" en esta vista.
+    from deposits import AUTOLOCK_HOURS_SCHEDULED
+    lock_recency_window = f"-{AUTOLOCK_HOURS_SCHEDULED} hours"
     with db() as c:
         if is_sa:
             rows = c.execute(
@@ -4350,6 +4397,14 @@ def operator_my_accounts(user: dict = Depends(require_operator_view)):
             ).fetchall()
         else:
             op_str = str(operator_id)
+            # Piso de $1 en la pierna de "depósito aprobado con saldo" (bug
+            # reportado por Robert, 2026-08-06, ronda 2): sin piso, saldo
+            # polvo ($0.01-$0.94, nunca retirado por completo) se quedaba en
+            # "en proceso" para siempre — no hay minimo documentado de
+            # BetMexico (grep en bundle/docs/flags.betmexico.mx no encontró
+            # uno), así que el corte se sacó de los datos reales de prod: los
+            # 31 residuales de esta vista tenían un hueco limpio entre $0.94
+            # y $2.57, ningún caso ambiguo entre esos dos valores.
             rows = c.execute(
                 "SELECT DISTINCT a.id, a.email, a.balance_real, a.balance_bonos, "
                 "a.last_deposit_amount, a.last_deposit_date, a.grade, "
@@ -4359,10 +4414,11 @@ def operator_my_accounts(user: dict = Depends(require_operator_view)):
                 "FROM accounts a "
                 "LEFT JOIN deposit_attempts d ON d.account_email = a.email "
                 "LEFT JOIN account_deposit_clabes c ON (a.id = c.account_id AND (c.integration = 'STP' OR c.integration = '2')) "
-                "WHERE ( (d.operator_id=? AND d.status='approved' AND COALESCE(a.balance_real,0) > 0) "
-                "OR (a.locked_by=? OR a.locked_by=?) ) "
+                "WHERE ( (d.operator_id=? AND d.status='approved' AND COALESCE(a.balance_real,0) >= 1) "
+                "OR ( (a.locked_by=? OR a.locked_by=?) "
+                "     AND (a.locked_at IS NULL OR a.locked_at >= datetime('now', ?)) ) ) "
                 "ORDER BY a.last_deposit_date DESC",
-                (operator_id, op_str, user.get("username") or "")
+                (operator_id, op_str, user.get("username") or "", lock_recency_window)
             ).fetchall()
         result = []
         for r in rows:

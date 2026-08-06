@@ -843,6 +843,33 @@ real desde el panel compacto.
 - **SSE en vivo**: suscribe `/api/events`, maneja eventos `auto_mission` y refresh de cuentas.
 - **Mobile-first** — operadores abren desde Telegram en el celular.
 
+### Render diferencial del grid + animaciones premium (2026-08-06)
+
+**Fix de render diferencial (FIX 1 — `static/portal.js`):** `loadAccounts()` ya no hace `grid.innerHTML = ...` en cada tick SSE — reescribía todo el DOM y disparaba `materialize` en TODAS las tarjetas (no solo las nuevas). Ahora mantiene `cardNodes: Map<accountId, {el, snap}>` y en cada llamada:
+- **Nueva cuenta** → crea el nodo, lo inserta, deja `materialize` correr (correcto para una cuenta genuinamente nueva).
+- **Cuenta existente sin cambios** → no toca el DOM (compara snapshot de campos).
+- **Cuenta existente con cambios** → actualiza solo los campos que cambiaron (balance, grade, clabe, estado retiro, locked) mediante `updateCardFields()` sin re-crear el elemento.
+- **Cuenta desaparecida** → remueve el nodo del DOM y del Map.
+- **Balance cambió** → aplica pulso dirigido `.acc-balance.tick` (glow `text-shadow` que decae en ~600ms) en vez de re-materializar la tarjeta.
+
+**Pulso de saldo (FIX 5a):** `.acc-balance.tick` → `@keyframes balanceTick` (glow verde que nace al 30% y decae). Se dispara solo cuando `balance_real` cambia entre snapshots. Clase removida con `animationend` listener para poder re-disparar.
+
+**Movimientos reducidos (FIX 2 — `static/portal.html`):** TODAS las animaciones CSS (`materialize`, `pulse`, `fadeIn`, `toastIn`, `balanceTick`) gateadas con `@media (prefers-reduced-motion: no-preference)`. Con `reduce`, se anulan (`animation-duration: 0.01ms`) y el hover de tarjeta deja de hacer `transform`/`box-shadow`.
+
+**Agrupación visual (FIX 5b):** `.acc-meta` reduce `gap` de 3px a 2px y suma `margin-top: 4px` para separar visualmente el bloque dinero del bloque meta, respetando la regla de producto "no quitar, compactar".
+
+**CTA de dinero usa `--gold` (FIX 3):** `.btn-primary` (botón "💸 Retirar") migra de verde a `var(--gold)` (#d4a843) — el único CTA de dinero real de la página. Los usos de `--gold` que NO son dinero (`.mv-id`, `.st-scheduling`, `.mv-countdown`, `.acc-locked-badge`, `.mv-progress-fill.sched`, `.acc-card.locked`) migran a `--text-dim`/`--border-light` para que `--gold` quede reservado exclusivamente al botón Retirar.
+
+**Grade badge canónico (FIX 4):** Eliminadas las reglas `.acc-grade.A1/.A/.A-plus/.B/.C/.D` de `portal.html` (paleta hex propia). Ahora usa `class="acc-grade grade {gradeCls}"` donde `gradeCls` viene de `gradeClass()` — misma función exacta que `app.js:172` (`{ 'A+': 'Aplus', A: 'A', B: 'B', C: 'C', D: 'D' }[g] || 'U'`). Los colores/fondo/borde vienen de las clases canónicas `.grade.*` ya definidas en `style.css:718-722`.
+
+**Microinteracciones premium (FIX 6):**
+- Hover de tarjeta: lift mayor (`translateY(-4px)`) + sombra tintada verde (`box-shadow: 0 20px 42px -26px rgba(63,185,80,.35)`).
+- Sheen radial sutil (`::after` pseudo-elemento, luminancia no hue, `radial-gradient` blanco 5% que aparece en hover).
+- Easing consistente: `--ease: cubic-bezier(.22,1,.36,1)` en `:root`, aplicado a `.acc-card` y `.btn`.
+- Botón copiar CLABE sin reflow: `min-width: 58px` para que el cambio de texto ("Copiar" ↔ "✓") no salte el ancho.
+
+**Acciones por card con delegación (FIX 1):** `bindAccountActions()` reemplazado por `bindCardActions(cardEl)` — binding por card individual con flag `data-bound` para no duplicar listeners. Event delegation en el propio elemento `.acc-card`.
+
 **Retirar gateado por `withdrawal_ready` (2026-08-04, Task 7 de `docs/superpowers/plans/2026-08-04-retiro-manual-gateado-spei-y-tiempo-real.md`):** antes el botón `.btn-withdraw` siempre estaba clickeable y podía fallar server-side con `NoApprovedWithdrawalAccount` si BetMexico aún no tenía la cuenta de retiro aprobada (requiere un SPEI ya acreditado). Ahora `renderAccountCard` (`static/portal.js`) lee `acc.withdrawal_ready`/`acc.withdrawal_institution`/`acc.curp` (poblados por `GET /api/operator/my-accounts`, cacheados por `account_refresh.py`) y:
 - Si `withdrawal_ready` es `true`: botón habilitado, meta muestra la institución (o "Aprobado" si no hay institución) en `var(--accent)` (azul en el portal, `#58a6ff` — scope propio de `portal.html`, distinto del verde del dashboard SA).
 - Si es `false`: botón con `disabled` + `title="Esperando confirmación de SPEI en BetMexico"`, meta muestra "esperando SPEI…" en `var(--text-dim)`.
@@ -857,6 +884,14 @@ real desde el panel compacto.
 | **Copiar CLABE** | — (clipboard) | Botón en cada card, feedback "✓" temporal |
 
 **Poll de estado tras retiro (2026-08-04, Task 9 del plan retiro-manual-gateado-spei):** antes el portal disparaba el retiro y no volvía a preguntar — el operador nunca se enteraba si se liberó, tenía que refrescar a mano o preguntar a un SA. Ahora, si la respuesta de `POST .../withdraw` trae `transactionId`, arranca `startWithdrawPoll(accountId, transactionId)` (`static/portal.js`): GET `/api/accounts/{id}/withdraw/status/{tx_id}` (mismo endpoint que `pantalla.js`, accesible a operadores dueños desde Task 8) cada `WD_POLL_FAST_MS=15000`ms hasta que `st.status` sea `'successful'`, `'completed'` o `'failed'` — entonces detiene el interval, muestra toast (✅/❌) y recarga el grid con `loadAccounts()`. Versión simplificada del patrón de `pantalla.js` (`_startWithdrawPoll`/`_fetchWithdrawStatus`): sin degradación a poll lento (60s) ni panel de detalle, solo el aviso terminal.
+
+**Rediseño visual premium (2026-08-06, handoff `docs/plans/2026-08-06-handoff-portal-premium-visual.md`):** score impeccable 21/40 → se aplicaron 6 fixes visuales:
+1. **[P0] Render diferencial del grid** (`loadAccounts`): de `grid.innerHTML = ...map(renderAccountCard).join('')` completo en cada SSE tick a `Map<cardId, {el, snap}>` con diff por snapshot (`cardSnapshot()`). Nuevas tarjetas animan `materialize`; existentes actualizan solo campos cambiados; cuentas que desaparecen se remueven del DOM. Elimina el "flash" constante de TODAS las tarjetas en cada evento SSE.
+2. **[P0] `prefers-reduced-motion`** gatea TODAS las animaciones CSS del portal (`materialize`, `pulse`, `fadeIn`, `toastIn`, `balanceTick`) bajo `@media (prefers-reduced-motion: reduce)`.
+3. **[P1] `--gold` solo para dinero**: `.btn-primary` ("💸 Retirar") usa `var(--gold)`; badges/countdowns/labels migran a `--text-dim` o `--border-light`.
+4. **[P1] Badge de grade canónico**: eliminadas reglas `.acc-grade.A1/.A/.A-plus/.B/.C/D` duplicadas; ahora usa `.grade.*` de `style.css` con mapeo `A+→Aplus` (mismo que `app.js:gradeClass`).
+5. **[P2] Pulso de saldo** (`balanceTick` keyframe, `.acc-balance.tick`) + **agrupación visual** de `.acc-meta` (gap reducido, margin-top separa del saldo).
+6. **[P3] Hover premium** (lift + `box-shadow` verde tintado, sheen `::after`), **`--ease: cubic-bezier(.22,1,.36,1)`** consistente, **`.copy-clabe` con `min-width`** para evitar reflow.
 
 **Fix (2026-08-04, auditoría post-merge, lógica de usuario final):** el poll tenía 4 bugs reales, corregidos en el mismo pase:
 1. **Timer global → Map por cuenta.** `wdPollTimer` era una sola variable: un segundo retiro en OTRA cuenta mataba el poll de la primera sin avisar (`startWithdrawPoll` llamaba `stopWithdrawPoll()` incondicional). El operador perdía la confirmación de aterrizaje justo en el caso crítico. Ahora `wdPolls` es un `Map<accountId, intervalId>` — mismo patrón que `_wdPolls[accId]` de `pantalla.js`, cada cuenta trackea su propio timer.

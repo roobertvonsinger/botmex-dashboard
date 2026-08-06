@@ -246,6 +246,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `dc1899b` | feat(bot): /adduser oculto al publico (solo Superadmin) + raps de /start con flow + help con 'Volver al inicio' |
 | `3baf912` | docs: cierre de sesión — anti-fuga bot/portal auditado + deployado, revisión final de main verificada |
 | `35dd0d8` | feat(bot): /start con logo nuevo botmexico.net (reply_photo con fallback) |
 | `a0b44ea` | feat(auth): registro dinamico de usuarios + /adduser del bot (Luisito operador normal) |
@@ -257,7 +258,6 @@ prewarm.py (router)
 | `516fcc9` | feat(antifuga): Area A - bloque terminal del bot sin cadencia ni conteo |
 | `0a4d71f` | docs: spec anti-fuga bot+portal + handoff OpenCode con decisiones resueltas |
 | `8b46a8b` | fix(auto_deposit): modo auto ya no usa tarjetas married + tope duro de 10 cuentas |
-| `6a1edf2` | docs: cierre de sesión — bin_stats fix deployado y verificado |
 <!-- GEN:end:recientes -->
 
 ---

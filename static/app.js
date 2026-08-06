@@ -489,10 +489,10 @@ async function loadMe() {
   $('#sbUserName').textContent = me.username || '—';
   $('#sbUserRole').textContent = me.role || '—';
   $('#sbUserAv').textContent = (me.username || '··').slice(0, 2).toUpperCase();
-  // Botón "Mi portal /bet" — link a /user/{mi_telegram_id} para ver mis cuentas como operador
+  // Botón "Mi portal /bet" — link a /{mi_username} para ver mis cuentas como operador
   const btnPortal = $('#btnMyPortal');
-  if (btnPortal && me.telegram_id) {
-    btnPortal.href = '/user/' + me.telegram_id;
+  if (btnPortal && me.login) {
+    btnPortal.href = '/' + me.login;
     btnPortal.style.display = '';
   }
   // Roles
@@ -1636,18 +1636,18 @@ function _resolveSection(name) {
 }
 
 // Portal /bet embebido como tab: lazy-load del iframe (Three.js + SSE del portal
-// no cargan hasta que Robert abra el tab). El src se arma con el telegram_id
-// del usuario logueado → /user/{tid}?bare=1 (NO existe ruta /bet; el portal se
-// sirve en /user/{id}). Persiste entre tab switches (no recarga) → misión SSE
-// y estado del portal sobreviven.
+// no cargan hasta que Robert abra el tab). El src se arma con el username
+// del usuario logueado → /{username}?bare=1 (NO existe ruta /bet; el portal
+// se sirve en /{username}). Persiste entre tab switches (no recarga) → misión
+// SSE y estado del portal sobreviven.
 let _portalLoaded = false;
 function _ensurePortalLoaded() {
   if (_portalLoaded) return;
   const f = $('#portalFrame');
   if (!f) return;
-  const tid = state.user && state.user.telegram_id;
-  if (!tid) return; // sin telegram_id no hay portal propio
-  f.src = '/user/' + tid + '?bare=1';
+  const login = state.user && state.user.login;
+  if (!login) return; // sin username no hay portal propio
+  f.src = '/' + login + '?bare=1';
   _portalLoaded = true;
 }
 

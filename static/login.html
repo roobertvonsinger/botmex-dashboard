@@ -89,11 +89,6 @@ body {
   width: 128px; height: auto;
   filter: drop-shadow(0 6px 16px rgba(0,0,0,.55));
 }
-.login-tagline {
-  font-family: var(--font-mono);
-  font-size: 10px; letter-spacing: 1.8px; text-transform: uppercase;
-  color: var(--text-muted);
-}
 
 /* ── Step title ── */
 .step-title {
@@ -172,7 +167,6 @@ body {
   vertical-align: middle; margin-right: 6px;
 }
 
-/* ── Footer ── */
 .login-footer {
   margin-top: 20px; text-align: center;
   font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);
@@ -202,12 +196,11 @@ body::before {
   <div class="login-card">
     <div class="login-brand">
       <img src="/static/assets/botmexico_lockup.png" alt="botmexico.net">
-      <span class="login-tagline">acceso directo · sin fricción</span>
     </div>
 
     <!-- Step 1: Login normal -->
     <div id="stepLogin" class="step active">
-      <div class="step-title">Acceso al sistema</div>
+      <div class="step-title">Acceso</div>
       <div class="field">
         <label>Usuario</label>
         <input id="inUser" type="text" placeholder="Tu nombre de usuario" autocomplete="username" autofocus>
@@ -239,7 +232,7 @@ body::before {
       <div id="msgFt" class="msg"></div>
     </div>
   </div>
-  <div class="login-footer">botmexico.net · acceso restringido</div>
+  <div class="login-footer">botmexico.net · 2026</div>
 </div>
 
 <script>

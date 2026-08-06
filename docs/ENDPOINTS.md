@@ -19,10 +19,11 @@
 | Método | Path | Función | Auth | Body / Query | Respuesta | File:line |
 |---|---|---|---|---|---|---|
 | GET | `/login` | Página de login (preserva `?match=`/query en el redirect post-login) | público | — | HTML `login.html` | `app.py:688` |
-| GET | `/` | Root — puro gate de auth. Sin sesión → `/login`; SA → `/dashboard`; resto → `/user/{telegram_id}` (query preservada, p.ej. `?match={mission_id}` del handoff `/bet`) | require_session (vía redirect) | — | 302 redirect | `app.py:796` |
-| GET | `/dashboard` | Dashboard SA (renombrado desde `/`, 2026-08-04) | superadmin (no-SA rebota a su propio `/user/{id}`) | — | HTML `index.html` | `app.py:762` |
-| GET | `/user/{user_id}` | Portal `/bet` (`portal.html`), scoped por `telegram_id`. No-SA con `{id}` ajeno se canoniza al propio; SA puede navegar cualquier `{id}` (supervisión / `?view_as=` en las APIs para ver exactamente como ese usuario) | require_session | — | HTML `portal.html` | `app.py:731` |
-| GET | `/portal` | Alias de compatibilidad — redirige a `/dashboard` (SA) o `/user/{id}` (resto), preserva query | require_session | — | 302 redirect | `app.py:751` |
+| GET | `/` | Root — puro gate de auth. Sin sesión → `/login`; SA → `/dashboard`; resto → `/{username}` (query preservada, p.ej. `?match={mission_id}` del handoff `/bet`) | require_session (vía redirect) | — | 302 redirect | `app.py:796` |
+| GET | `/dashboard` | Dashboard SA (renombrado desde `/`, 2026-08-04) | superadmin (no-SA rebota a su propio `/{username}`) | — | HTML `index.html` | `app.py:762` |
+| GET | `/{username}` | Portal `/bet` (`portal.html`), scoped por username/apodo (reemplaza `/user/{telegram_id}` desde 2026-08-06 — Robert: la URL debe traer el apodo, no un ID; DEBE ser la última ruta GET de 1 segmento en `app.py`, cualquier ruta literal nueva de 1 segmento tiene que registrarse antes). No-SA con `{username}` ajeno se canoniza al propio; SA puede navegar cualquier `{username}` (supervisión / `?view_as=` en las APIs, ahora el username directo — antes telegram_id — para ver exactamente como ese usuario). 404 si el username no existe. | require_session | — | HTML `portal.html` | `app.py:867` |
+| GET | `/user/{user_id}` | Alias de compatibilidad (links viejos por telegram_id) — 302 a `/{username}` resuelto por telegram_id, o 404 si no existe | público (solo redirige) | — | 302 redirect / 404 | `app.py:803` |
+| GET | `/portal` | Alias de compatibilidad — redirige a `/dashboard` (SA) o `/{username}` (resto), preserva query | require_session | — | 302 redirect | `app.py:751` |
 | GET | `/favicon.ico` | Favicon | público | — | 204 No Content | `app.py:171` |
 | POST | `/api/auth/login` | Iniciar sesión | público | `{telegram_id, password}` | `{ok, user, set_cookie bmx_auth}` | `app.py:205` |
 | POST | `/api/auth/set-password` | Setear/cambiar password | require_session | `{old_password?, new_password}` | `{ok}` | `app.py:234` |

@@ -253,27 +253,32 @@ def require_session(bmx_session: str = Cookie(default=None)) -> dict:
     return s
 
 
-def require_operator_view(bmx_session: str = Cookie(default=None), view_as: Optional[int] = Query(None)) -> dict:
+def require_operator_view(bmx_session: str = Cookie(default=None), view_as: Optional[str] = Query(None)) -> dict:
     """Como require_session, pero permite a SA angostar su propio scope a un
-    telegram_id via ?view_as=, simulando exactamente la vista de ese usuario
-    (rol degradado a 'operator', username resuelto al del target). Sirve para
-    que el SA vea /user/{id} — incluida su propia cuenta bet — como lo vería
-    ese usuario, sin la omnisciencia de SA colándose en las queries scoped.
+    username via ?view_as=, simulando exactamente la vista de ese usuario
+    (rol degradado a 'operator'). Sirve para que el SA vea /{username} —
+    incluida su propia cuenta bet — como lo vería ese usuario, sin la
+    omnisciencia de SA colándose en las queries scoped.
+
+    view_as es el username (apodo) directo desde 2026-08-06 — antes era el
+    telegram_id numérico, resuelto a la inversa contra USERS; con la URL ya
+    en /{username} (no /user/{id}), el propio segmento de la URL ES el
+    username, así que resolverlo es una sola búsqueda directa.
 
     Para cualquier rol no-SA, view_as se ignora: no puede ampliar su propio
     scope (ya es su propio id), y degradar a alguien ya-degradado es un no-op.
     """
     session = require_session(bmx_session)
     if view_as and session.get("role") == "superadmin":
-        target_username = next(
-            (k for k, v in USERS.items() if v.get("telegram_id") == view_as),
-            session.get("username"),
-        )
+        target_username = view_as.lower()
+        target_user = USERS.get(target_username)
+        if target_user is None:
+            return session
         return {
             "username": target_username,
             "display": session.get("display"),
             "role": "operator",
-            "telegram_id": view_as,
+            "telegram_id": target_user.get("telegram_id"),
             "_real_username": session.get("username"),
             "_real_role": "superadmin",
         }

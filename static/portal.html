@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>botmexico.net · Portal</title>
+  <title>botmexico.net</title>
   <link rel="icon" type="image/png" href="/static/assets/botmexico_icon.png">
   <link rel="stylesheet" href="/static/style.css?v=1785281972">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -33,6 +33,7 @@
       --orange: #e0974b;
       --radius: 8px;
       --radius-sm: 6px;
+      --ease: cubic-bezier(.22,1,.36,1);
       --font-display: 'Space Grotesk', -apple-system, sans-serif;
       --font-mono: 'JetBrains Mono', ui-monospace, monospace;
     }
@@ -84,12 +85,12 @@
     .btn {
       background: var(--bg-elev); border: 1px solid var(--border-light);
       color: var(--text); padding: 6px 14px; border-radius: var(--radius-sm);
-      cursor: pointer; font-size: 13px; font-weight: 500; transition: all .15s;
+      cursor: pointer; font-size: 13px; font-weight: 500; transition: all .15s var(--ease);
     }
     .btn:hover { background: var(--border); border-color: var(--accent); }
     .btn-sm { padding: 4px 10px; font-size: 12px; }
-    .btn-primary { background: rgba(46,160,67,.15); border-color: var(--green); color: var(--green-bright); }
-    .btn-primary:hover { background: rgba(46,160,67,.25); }
+    .btn-primary { background: rgba(212,168,67,.15); border-color: var(--gold); color: var(--gold); }
+    .btn-primary:hover { background: rgba(212,168,67,.25); }
     .btn-danger { background: rgba(248,81,73,.1); border-color: var(--red); color: var(--red); }
     .btn-danger:hover { background: rgba(248,81,73,.2); }
     .btn:disabled { opacity: .4; cursor: default; }
@@ -117,15 +118,15 @@
     .mv-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
     .mv-id {
       font-family: monospace; font-size: 16px; font-weight: 700;
-      color: var(--gold); background: rgba(212,168,67,.08);
-      padding: 2px 10px; border-radius: 4px; border: 1px solid rgba(212,168,67,.2);
+      color: var(--text-dim); background: rgba(139,148,158,.08);
+      padding: 2px 10px; border-radius: 4px; border: 1px solid var(--border-light);
     }
     .mv-status {
       font-size: 12px; font-weight: 600; padding: 4px 10px;
       border-radius: 12px; text-transform: uppercase; letter-spacing: .5px;
     }
     .st-matching { background: rgba(88,166,255,.12); color: var(--accent); border: 1px solid rgba(88,166,255,.3); }
-    .st-scheduling { background: rgba(212,168,67,.12); color: var(--gold); border: 1px solid rgba(212,168,67,.3); }
+    .st-scheduling { background: rgba(139,148,158,.12); color: var(--text-dim); border: 1px solid var(--border-light); }
     .st-completed { background: rgba(46,160,67,.12); color: var(--green-bright); border: 1px solid rgba(46,160,67,.3); }
     .st-failed, .st-cancelled { background: rgba(248,81,73,.1); color: var(--red); border: 1px solid rgba(248,81,73,.25); }
     .st-pending, .st-awaiting_confirmation { background: rgba(139,148,158,.1); color: var(--text-dim); border: 1px solid var(--border); }
@@ -145,7 +146,7 @@
          curva de easing y produce micro-saltos, justo lo que la interpolación
          busca evitar. */
     }
-    .mv-progress-fill.sched { background: linear-gradient(90deg, var(--gold), #e0c060); }
+    .mv-progress-fill.sched { background: linear-gradient(90deg, var(--text-dim), #aab2bd); }
     .mv-progress-fill.err { background: var(--red); }
     .mv-sub { font-size: 13px; color: var(--text-dim); margin-top: 6px; min-height: 20px; }
     .mv-sub .email { color: var(--accent); font-family: monospace; }
@@ -156,7 +157,6 @@
       display: flex; align-items: center; gap: 10px;
       background: var(--bg-elev); border: 1px solid var(--border);
       border-radius: var(--radius-sm); padding: 10px 14px;
-      animation: materialize .5s cubic-bezier(.22,1,.36,1) both;
     }
     @keyframes slideIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
     /* Materialización: la cuenta "aparece" confirmada — sin tema espacial, solo el brillo de marca */
@@ -172,11 +172,10 @@
     /* Countdown */
     .mv-countdown {
       display: inline-flex; align-items: center; gap: 4px;
-      font-size: 12px; color: var(--gold); font-weight: 600;
+      font-size: 12px; color: var(--text-dim); font-weight: 600;
     }
     .mv-countdown .cd-dot {
-      width: 6px; height: 6px; border-radius: 50%; background: var(--gold);
-      animation: pulse 1s ease infinite;
+      width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim);
     }
     @keyframes pulse { 0%,100% { opacity: .4; } 50% { opacity: 1; } }
 
@@ -198,45 +197,102 @@
       background: var(--bg-card); border: 1px solid var(--border);
       backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
       border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 8px;
-      transition: border-color .15s, transform .15s;
-      animation: materialize .45s cubic-bezier(.22,1,.36,1) both;
+      transition: border-color .15s, transform .2s var(--ease), box-shadow .2s var(--ease);
+      position: relative;
+      /* SIN overflow:hidden aquí: recortaría el box-shadow externo del propio
+         .acc-card en :hover (verificado — es un comportamiento real de Chrome/
+         Firefox, no falso positivo). El sheen de ::after no lo necesita: su
+         propio border-radius:inherit ya recorta SU background al border-box,
+         sin depender de overflow en el padre. */
     }
-    .acc-card:hover { border-color: var(--border-light); transform: translateY(-2px); }
-    .acc-card.locked { border-color: rgba(212,168,67,.3); }
+    .acc-card::after {
+      content: ''; position: absolute; inset: 0; border-radius: inherit;
+      background: radial-gradient(120px 80px at 50% 0%, rgba(255,255,255,.05), transparent 70%);
+      opacity: 0; transition: opacity .35s ease; pointer-events: none;
+    }
+    .acc-card:hover {
+      border-color: var(--border-light);
+      transform: translateY(-4px);
+      box-shadow: 0 20px 42px -26px rgba(63,185,80,.35);
+    }
+    .acc-card:hover::after { opacity: 1; }
+    /* "En proceso" (locked_by=yo, ver operator_my_accounts): a diferencia del
+       hover (var(--border-light), momentáneo), esto debe leerse como activo EN
+       REPOSO — Robert, 2026-08-06: quiere feedback en vivo de qué cuenta está
+       trabajando ahorita, no solo un badge de texto estático. */
+    .acc-card.locked {
+      border-color: rgba(63,185,80,.45);
+      box-shadow: 0 0 0 1px rgba(63,185,80,.08);
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .acc-card.locked { animation: processingPulse 2.4s ease-in-out infinite; }
+    }
+    @keyframes processingPulse {
+      0%, 100% { box-shadow: 0 0 0 1px rgba(63,185,80,.08); }
+      50%      { box-shadow: 0 0 18px -2px rgba(63,185,80,.35); }
+    }
     .acc-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-    .acc-email { font-weight: 600; font-size: 13px; word-break: break-all; color: var(--text-bright); }
+    /* Tipografía de la tarjeta — antes: email/meta/clabe/badge todos apretados
+       entre 10-13px con el mismo font-family de cuerpo, sin family propia para
+       el balance (el número más importante de la tarjeta caía al sans default).
+       Robert, 2026-08-06: "parecen cartas de países de turismo mundial, no hay
+       criterio de diseño" — el problema real era jerarquía plana + demasiado
+       verde compitiendo por atención (balance Y clabe del mismo color). Fix:
+       escala de design-system/typography/scale.html (Display 28 · Body 13 ·
+       Caption 11 · Micro 10), font-display solo en balance+email (identidad de
+       la tarjeta), verde reservado al balance — clabe pasa a neutral. */
+    .acc-email {
+      font-family: var(--font-display); font-weight: 600; font-size: 13px;
+      word-break: break-all; color: var(--text-bright); letter-spacing: -.1px;
+    }
     .acc-grade {
       font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
-      background: var(--bg-elev); border: 1px solid var(--border); color: var(--text-dim);
       white-space: nowrap;
     }
-    .acc-grade.A1 { color: var(--green-bright); border-color: rgba(46,160,67,.3); }
-    .acc-grade.A, .acc-grade.A-plus { color: var(--green-bright); border-color: rgba(46,160,67,.3); }
-    .acc-grade.B { color: var(--gold); border-color: rgba(212,168,67,.3); }
-    .acc-grade.C { color: var(--orange); border-color: rgba(224,151,75,.3); }
-    .acc-grade.D { color: var(--red); border-color: rgba(248,81,73,.3); }
-    .acc-balance { font-size: 24px; font-weight: 700; color: var(--green-bright); }
-    .acc-balance .cur { font-size: 12px; font-weight: 400; color: var(--text-dim); }
-    .acc-meta { font-size: 12px; color: var(--text-dim); display: flex; flex-direction: column; gap: 3px; }
+    .acc-balance { font-family: var(--font-display); font-size: 28px; font-weight: 700; letter-spacing: -.3px; color: var(--green-bright); }
+    .acc-balance .cur { font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--text-dim); letter-spacing: .3px; }
+    /* FIX 5b: meta grouped visually — tighter gap internally, more space from balance above */
+    .acc-meta { font-size: 11px; color: var(--text-dim); display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
     .clabe-box {
       background: var(--bg); border: 1px dashed var(--border);
       border-radius: var(--radius-sm); padding: 8px 10px;
       display: flex; justify-content: space-between; align-items: center; gap: 8px;
     }
-    .clabe-code { font-family: monospace; font-size: 13px; color: var(--green-bright); letter-spacing: .5px; }
+    .clabe-code { font-family: var(--font-mono); font-size: 13px; color: var(--text); letter-spacing: .5px; }
+    .copy-clabe { min-width: 58px; text-align: center; }
     .acc-actions { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 4px; }
     .acc-locked-badge {
-      font-size: 10px; color: var(--gold); display: flex; align-items: center; gap: 3px;
+      font-family: var(--font-mono); font-size: 10px; color: var(--green-bright);
+      display: flex; align-items: center; gap: 5px; letter-spacing: .2px;
+      text-transform: uppercase;
+    }
+    .live-dot {
+      width: 5px; height: 5px; border-radius: 50%; flex: 0 0 auto;
+      background: var(--green-bright); box-shadow: 0 0 6px rgba(63,185,80,.8);
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .live-dot { animation: liveDotBeat 1.6s ease-in-out infinite; }
+    }
+    @keyframes liveDotBeat {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(63,185,80,.55); }
+      50%      { opacity: .5; box-shadow: 0 0 0 4px rgba(63,185,80,0); }
     }
 
     /* Empty / loading */
     .empty-msg { text-align: center; padding: 40px; color: var(--text-dim); font-size: 14px; }
+    .empty-msg .empty-cta {
+      display: inline-block; margin-top: 14px; padding: 10px 18px;
+      background: var(--accent, #3fb550); color: #0a0e0a; border-radius: 10px;
+      text-decoration: none; font-weight: 700; font-size: 14px;
+      transition: transform .12s ease, box-shadow .12s ease;
+    }
+    .empty-msg .empty-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(63,185,80,.35); }
+    .empty-msg code { color: var(--gold, #d4af37); }
 
     /* Modal */
     .modal-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,.6);
       display: flex; align-items: center; justify-content: center; z-index: 1000;
-      animation: fadeIn .15s ease;
     }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     .modal-box {
@@ -260,11 +316,36 @@
       background: var(--bg-elev); border: 1px solid var(--border);
       border-radius: var(--radius-sm); padding: 10px 20px; color: var(--text-bright);
       font-size: 14px; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,.4);
-      animation: toastIn .2s ease; pointer-events: auto;
+      pointer-events: auto;
     }
     @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .toast.ok { border-color: var(--green); color: var(--green-bright); }
     .toast.err { border-color: var(--red); color: var(--red); }
+
+    /* FIX 5a — balance tick pulse on value change */
+    @keyframes balanceTick {
+      0%   { text-shadow: 0 0 0 rgba(63,185,80,0); }
+      30%  { text-shadow: 0 0 14px rgba(63,185,80,.65); }
+      100% { text-shadow: 0 0 0 rgba(63,185,80,0); }
+    }
+    .acc-balance.tick { animation: balanceTick .6s ease; }
+
+    /* FIX 2 — prefers-reduced-motion: gate ALL animations */
+    @media (prefers-reduced-motion: no-preference) {
+      .match-row, .acc-card { animation: materialize .5s var(--ease) both; }
+      .mv-countdown .cd-dot { animation: pulse 1s ease infinite; }
+      .modal-overlay { animation: fadeIn .15s ease; }
+      .toast { animation: toastIn .2s ease; }
+      .acc-balance.tick { animation: balanceTick .6s ease; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+      .acc-card:hover { transform: none; box-shadow: none; }
+      .acc-card::after { display: none; }
+    }
 
     .pf {
       margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--border);
@@ -281,11 +362,13 @@
     }
 
     /* ── Bare mode (?bare=1): portal embebido como tab del dashboard SA ──
-       Se ocultan header (.ph), footer (.pf) y el canvas horizonte (#horizon +
-       .hz-vignette) — su estética (agujero negro + campo estelar) es distinta
-       del dashboard obsidiano. El portal queda solo con el grid de cuentas +
-       misión, fondo radial sutil que ya cuadra con el tema del dashboard. */
-    body.bare .ph, body.bare .pf, body.bare .hz-vignette, body.bare #horizon { display: none !important; }
+       Se ocultan header (.ph) y footer (.pf) — el dashboard ya provee ambos.
+       El horizonte (#horizon + .hz-vignette) SÍ se mantiene aquí (Robert,
+       2026-08-06: es donde vive de verdad "el portal" en su uso diario, vía
+       el tab embebido — apagarlo dejaba solo el gradiente radial estático de
+       abajo, que no es lo que pidió). horizon.js ya respeta
+       prefers-reduced-motion por su cuenta. */
+    body.bare .ph, body.bare .pf { display: none !important; }
     body.bare .portal-wrap { padding: 10px 14px; max-width: 100%; }
     body.bare { overflow: auto; }
   </style>
@@ -298,7 +381,7 @@
       <div class="ph-brand">
         <img class="ph-mark" src="/static/assets/botmexico_icon.png" alt="">
         <span class="ph-logo"><span class="g">bot</span><span class="w">mexi</span><span class="r">co.net</span></span>
-        <span class="ph-sub" id="phRole">· Portal</span>
+        <span class="ph-sub" id="phRole"></span>
       </div>
       <div class="ph-actions">
         <button class="btn btn-sm" id="logoutBtn">Salir</button>
@@ -313,7 +396,7 @@
       </div>
     </div>
 
-    <div class="pf">botmexico.net · gestión directa, sin fricción, sin contraseñas de cuenta</div>
+    <div class="pf">botmexico.net · 2026</div>
     </div>
 
     <div id="toastRegion" aria-live="polite" role="status"></div>
