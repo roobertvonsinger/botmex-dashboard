@@ -653,7 +653,7 @@ def _fake_progress_pct(status: str, extra: dict) -> int:
         comp = extra.get("completed", 0)
         tot = extra.get("total", 9)
         pct = 30 + int((comp / max(tot, 1)) * 70)
-        return min(100, pct)
+        return min(95, pct)
     if status == "completed":
         return 100
     return 0
@@ -1031,6 +1031,7 @@ async def run_auto_mission(
                                 on_progress=on_progress,
                                 email=email,
                                 card_tail=f"···{pipe[:6]}",
+                                matches_count=len(matches),
                             )
                             break
                         if code in dep.MM_THREEDS_RC:

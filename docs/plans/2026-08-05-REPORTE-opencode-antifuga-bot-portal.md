@@ -145,3 +145,46 @@ Baseline: 397 passed → +15 tests nuevos en `tests/test_antifuga_bot_portal.py`
 3. **`portal.js` `cancelled`/`failed` usan `fake_pct` del SSE**: antes usaban `missionState.pct || 50` como fallback. Ahora usan `ev.fake_pct || (missionState.pct || 50)` — si el backend manda `fake_pct`, se usa; si no, fallback al viejo comportamiento. Esto es defensivo: si alguien cancela antes de que el backend emita un `fake_pct`, el portal no se queda sin barra.
 
 4. **Formatter reformateó `bot.py` y `auto_deposit.py`**: un formatter (probablemente el pre-commit hook o black) expandió el código de ambos archivos más allá de los cambios funcionales. El diff es más grande de lo ideal, pero los cambios reales son solo los descritos en este reporte. No se modificó lógica existente más allá de lo especificado.
+
+---
+
+## 7. Auditoría Claude Code (2026-08-05, post-implementación)
+
+Diff completo revisado (con un subagente adversarial dedicado a buscar fallas, no a confirmar
+que estaba bien) + suite corrida independientemente (412 passed, coincide con §4). Confirmado:
+el "formatter" del punto 6.4 tocó solo estilo (verificado con `git diff -w`, 95%+ del diff
+desaparece ignorando whitespace) — no se encontró lógica preexistente alterada fuera de las 4
+áreas, ni código fuera de alcance (botones del gate intactos, retiro/monorepo sin tocar).
+
+Dentro de las ~80 líneas de lógica nueva real se encontraron y corrigieron 4 problemas antes de
+mergear a `main`:
+
+1. **BLOQUEANTE — `auto_deposit.py` (broadcast `"match"`)**: nunca pasaba `matches_count` a
+   `_broadcast_mission`, así que `_fake_progress_pct` defaulteaba a `extra.get("matches_count", 0)`
+   → cada evento `match` daba **25% fijo**, nunca rampaba a 40/55/70/85 como diseñado — bot y
+   portal se veían "pegados" en 25% durante todo el matching. Fix: agregar
+   `matches_count=len(matches)` al broadcast (el valor ya estaba disponible ahí mismo). Test de
+   regresión agregado en `TestAreaBFloorWait::test_floor_wait_occurs_before_first_phase2_attempt`
+   (verifica el broadcast real end-to-end, no solo la función pura — el bug original pasaba con
+   la cobertura existente porque solo testeaba `_fake_progress_pct` aislada).
+2. **MENOR — `auto_deposit.py::_fake_progress_pct` (status `scheduling`)**: cacheaba a `min(100,
+   pct)` en vez de `min(95, pct)`, contradiciendo su propio docstring ("cap 95") y
+   `docs/SSE_EVENTS.md`/`docs/ERRORS.md`. El 100% real queda reservado al status `completed`
+   separado. El test `test_scheduling_interpolates_30_to_95` había sido escrito para validar el
+   bug (`== 100` bajo un comentario que decía `Math.min(95, ...)`) — corregido a `== 95`.
+3. **MENOR — `telegram_bot_mock/bot.py::on_progress`**: `is_terminal` incluía `"preparing"` (el
+   piso de 45-60s antes de Fase 2), que NO es un cierre de misión — la misión sigue corriendo.
+   Efecto real: durante esos 45-60s el bot mostraba el teclado de cierre ("Gestionar cuentas en
+   el portal", sin botón de detener) en vez del teclado normal en curso ("Ver en vivo" + "🛑
+   Detener Misión"), quitándole al operador la posibilidad de abortar antes de que arranque el
+   dinero real. Fix: `is_terminal` ahora es solo `("completed", "cancelled", "failed")`;
+   `is_priority` (que sí necesita incluir `"preparing"` para saltar el throttle de 2.5s) no se
+   tocó.
+4. **MENOR — `telegram_bot_mock/bot.py::_gate_closed_missions`**: `set` global que se agrega en
+   `stop_sched_` y se lee en el guard, pero nunca se liberaba — crecimiento indefinido en un
+   proceso de bot de larga vida. Fix: `_gate_closed_missions.discard(mission_id)` al cerrar de
+   verdad la misión (cualquiera de los 3 status terminales) en `on_progress`.
+
+Suite completa re-corrida tras los 4 fixes: **412 passed** (mismo número que §4 — los fixes no
+agregaron tests nuevos salvo la aserción de regresión del punto 1, que vive dentro de un test ya
+existente). Rama lista para mergear a `main`; el deploy a KVM4 se coordina aparte con Robert.

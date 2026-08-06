@@ -892,10 +892,17 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
                 and mission_id in _gate_closed_missions
             ):
                 return
+            if status in ("completed", "cancelled", "failed"):
+                # Robert 2026-08-05 (auditoría Claude Code): liberar el guard al
+                # cerrar de verdad la misión — evita crecimiento indefinido del set
+                # en un proceso de bot de larga vida.
+                _gate_closed_missions.discard(mission_id)
 
             st_text = _mission_status_text(status, extra)
 
-            is_terminal = status in ("completed", "cancelled", "failed", "preparing")
+            # "preparing" (piso 45-60s antes de Fase 2) NO es terminal — la misión
+            # sigue corriendo, el operador debe conservar el botón de detener.
+            is_terminal = status in ("completed", "cancelled", "failed")
             is_priority = status in (
                 "awaiting_confirmation",
                 "completed",

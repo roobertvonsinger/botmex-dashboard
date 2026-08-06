@@ -128,10 +128,13 @@ class TestAreaCFakeProgressPct:
         assert ad._fake_progress_pct("match", {"matches_count": 4}) == 85  # cap
 
     def test_scheduling_interpolates_30_to_95(self):
-        # portal.js: Math.min(95, 30 + (completed/total) * 70)
+        # portal.js: Math.min(95, 30 + (completed/total) * 70) — el 100% real
+        # queda reservado al status "completed" (Robert 2026-08-05, auditoría
+        # Claude Code: el código cacheaba a 100 y contradecía este mismo
+        # comentario y el docstring de _fake_progress_pct).
         assert ad._fake_progress_pct("scheduling", {"completed": 0, "total": 9}) == 30
         assert ad._fake_progress_pct("scheduling", {"completed": 5, "total": 10}) == 65
-        assert ad._fake_progress_pct("scheduling", {"completed": 9, "total": 9}) == 100
+        assert ad._fake_progress_pct("scheduling", {"completed": 9, "total": 9}) == 95
 
     def test_completed_is_100(self):
         assert ad._fake_progress_pct("completed", {}) == 100
@@ -218,6 +221,15 @@ class TestAreaBFloorWait:
         # El broadcast 'preparing' debe haberse emitido
         preparing_broadcasts = [b for b in h.broadcasts if len(b[0]) >= 2 and b[0][1] == "preparing"]
         assert len(preparing_broadcasts) >= 1, f"esperaba broadcast 'preparing', got={h.broadcasts}"
+
+        # Regresión (Robert 2026-08-05, auditoría Claude Code): el broadcast
+        # 'match' tiene que pasar matches_count real, si no _fake_progress_pct
+        # defaultea a 0 y el % de la barra queda pegado en 25% siempre.
+        match_broadcasts = [b for b in h.broadcasts if len(b[0]) >= 2 and b[0][1] == "match"]
+        assert len(match_broadcasts) >= 1, f"esperaba broadcast 'match', got={h.broadcasts}"
+        assert match_broadcasts[0][1].get("matches_count") == 1, (
+            f"matches_count faltante o incorrecto en broadcast 'match': {match_broadcasts[0][1]}"
+        )
 
 
 # ── ÁREA B: piso de 45-60s antes de Fase 2 ───────────────────────────────────
