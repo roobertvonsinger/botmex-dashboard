@@ -3,6 +3,18 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-08-05 (selección de tarjeta del modo auto — married revocado por Robert)
+
+**Motivo**: Robert reportó en vivo (log de un depósito automático con 4 tarjetas propias) que el
+matchmaker intentó una tarjeta distinta a las 4 que dio. Root cause: `plan_auto_mission` priorizaba
+la tarjeta married (`account_cards` ACTIVE de la cuenta) sobre el pool entregado — comportamiento
+por diseño desde el plan v2 (2026-07-28), revocado explícitamente hoy. Ver entry completa en
+`docs/ERRORS.md`.
+
+| Función | Spec (nueva, 2026-08-05) | Estado | Verificado |
+|---|---|---|---|
+| `auto_deposit.plan_auto_mission` — asignación de tarjeta por cuenta | El automático (Modo Auto / misión vía bot) SIEMPRE asigna desde el pool de `card_pipes` que entregó el operador (rankeado por approval_rate/3DS). NUNCA consulta ni usa `account_cards` (tarjeta married). Si ninguna del pool sirve para una cuenta, esa cuenta queda fuera del plan — no se sustituye por una married. Si una tarjeta del pool falla en una cuenta, se prueba la siguiente del mismo pool (sin cambios, confirmado con Robert). El manual (`deposits.py::multi_stream`, dashboard) ya se comportaba así — nunca tocó `account_cards`. | ✅ fix aplicado | ✅ `tests/test_auto_deposit.py::test_plan_never_uses_married_card` + suite completa de auto_deposit (18/18) + `test_auto_deposit_selection.py` (5/5) verdes. `select_card_for_account` (única fuente de la prioridad married) eliminada del código — no queda referencia en `*.py`. |
+
 ## Captura: 2026-08-04 (Task 9 de `docs/superpowers/plans/2026-08-04-retiro-manual-gateado-spei-y-tiempo-real.md` — poll de estado tras disparar retiro en `portal.js`)
 
 **Motivo**: tras `POST .../withdraw` el portal disparaba el retiro y no volvía a preguntar — el

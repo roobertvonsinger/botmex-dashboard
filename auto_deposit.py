@@ -326,38 +326,19 @@ def select_accounts_for_auto(
     return stratified
 
 
-# ── B2 — selección de tarjeta (pura) ─────────────────────────────────────────
-def select_card_for_account(
-    account_email: str,
-    cards_married: List[Dict[str, Any]],
-    bin_stats_map: Dict[str, Dict[str, Any]],
-    amount: float,
-) -> Optional[str]:
-    """Prioridad: (1) tarjeta casada ACTIVE de la cuenta (fila account_cards
-    con account_email=? AND status='ACTIVE' — no hay columna married ni bin),
-    (2) BIN con mejor approval_rate COMPUTADO (approved/attempts) y sin 3DS
-    reciente (total_3ds > 0 y last_3ds_at reciente → penalizado),
-    (3) None si no hay viable.
-
-    Retorna pipe "number|expiry|cvv" o None.
-    """
-    cands = [
-        c for c in (cards_married or [])
-        if c.get("account_email") == account_email
-        and (c.get("status") or "ACTIVE") == "ACTIVE"
-    ]
-    if not cands:
-        return None
-    cands.sort(key=lambda c: _rank_key(c, bin_stats_map))
-    return _pipe_str(cands[0])
-
-
 # ── B3 — planner (toca la BD) ────────────────────────────────────────────────
+MAX_ACCOUNTS_HARD_CAP = 10  # Robert 2026-08-05: tope duro por corrida, sea cual sea la razón
+
+
 def _max_accounts_for_cards(num_cards: int) -> int:
     """Robert 2026-07-28: 3 cuentas para la 1a tarjeta + 1 extra por tarjeta
     adicional — evita taladrar todo el pool para lograr el match, con rango
-    suficiente cuando hay más tarjetas para probar."""
-    return 3 + max(0, num_cards - 1)
+    suficiente cuando hay más tarjetas para probar.
+
+    Robert 2026-08-05: tope duro de MAX_ACCOUNTS_HARD_CAP (10) — la fórmula
+    de 3+1×extra es el estándar, pero NUNCA debe sumar más de 10 cuentas en
+    una sola corrida, sin importar cuántas tarjetas se den."""
+    return min(MAX_ACCOUNTS_HARD_CAP, 3 + max(0, num_cards - 1))
 
 
 def plan_auto_mission(
@@ -377,8 +358,12 @@ def plan_auto_mission(
       deposits._window_status (available = max(0, DEP_MAX_24H - used 24h)).
       decline_map (Robert 2026-07-28) cuenta declines en las últimas 12h por
       cuenta — >=2 la saca de la selección (cuenta ya "quemada" reciente).
-    - Tarjeta: married ACTIVE de la cuenta si existe; si no, pool de
-      card_pipes rankeado por approval_rate computado / 3DS reciente.
+    - Tarjeta: SIEMPRE del pool de `card_pipes` que entregó el operador,
+      rankeado por approval_rate computado / 3DS reciente. NUNCA se usa una
+      tarjeta ya guardada/casada en la cuenta (`account_cards`) — Robert
+      2026-08-05: el automático solo prueba lo que el operador dio; si
+      ninguna del pool sirve para esa cuenta, la cuenta queda sin tarjeta
+      (fuera del plan), no se sustituye por una married.
     - max_accounts: si no se pasa explícito, se escala con el número de
       tarjetas pegadas (`_max_accounts_for_cards`).
     - feasible = hay cuentas Y todas tienen tarjeta viable.
@@ -535,18 +520,12 @@ def plan_auto_mission(
             meta = meta_map.get(email) or {}
             app_bin_pipes = meta.get("approved_bin_pipes") or {}
 
-            married = [
-                dict(c) for c in con.execute(
-                    "SELECT * FROM account_cards "
-                    "WHERE account_email=? AND status='ACTIVE'",
-                    (email,),
-                ).fetchall()
-            ]
-
-            pipe = select_card_for_account(email, married, bin_stats_map, amount)
-
-            # Si no hay tarjeta casada, asignar la mejor tarjeta candidata del pool que no viole el cooldown de 30d de BIN
-            if pipe is None and pool:
+            # Asignar la mejor tarjeta candidata del pool (dado por el operador)
+            # que no viole el cooldown de 30d de BIN. NUNCA se consulta
+            # account_cards aquí — Robert 2026-08-05: el automático no usa
+            # tarjetas ya guardadas en la cuenta, solo el pool entregado.
+            pipe = None
+            if pool:
                 for cand in pool:
                     cand_pipe_str = _pipe_str(cand)
                     cand_bin = cand_pipe_str[:6] if len(cand_pipe_str) >= 6 else ""
@@ -816,8 +795,10 @@ async def run_auto_mission(
                     total=len(accounts_list),
                 )
 
-                # Tarjetas candidatas: la asignada (married si había) + pool (regla 7:
-                # si no hay ninguna, siguiente cuenta SIN lockear)
+                # Tarjetas candidatas: la asignada por el plan (mejor del pool para
+                # esta cuenta) + resto del pool — SIEMPRE del lote que dio el
+                # operador, nunca de account_cards (regla 7: si no hay ninguna,
+                # siguiente cuenta SIN lockear)
                 candidates = [p for p in [acc.get("card_pipe"), *card_pipes] if p]
                 candidates = [_normalize_pipe_to_3part(p) for p in candidates]
                 candidates = list(dict.fromkeys(candidates))  # dedup, orden estable

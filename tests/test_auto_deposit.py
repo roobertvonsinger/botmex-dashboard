@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from auto_deposit import (
     plan_auto_mission,
     select_accounts_for_auto,
-    select_card_for_account,
+    _max_accounts_for_cards,
 )
 
 
@@ -142,51 +142,6 @@ def test_select_ignores_decline_map_when_absent():
     assert [r["email"] for r in sel] == ["a@t.com"]
 
 
-# ── B2 — select_card_for_account ─────────────────────────────────────────────
-def _card(number, email="a@t.com", status="ACTIVE"):
-    return {"card_number": number, "card_expiry": "1230", "card_cvv": "123",
-            "account_email": email, "status": status}
-
-
-def test_prefers_married_card():
-    cards = [_card("5555555555555555", email="otro@t.com"), _card("4111111111111111")]
-    stats = {"555555": {"total_attempts": 100, "total_approved": 99}}
-    pipe = select_card_for_account("a@t.com", cards, stats, 150)
-    assert pipe == "4111111111111111|1230|123"
-
-
-def test_avoids_3ds_bin():
-    cards = [_card("4111111111111111"), _card("4222222222222222")]
-    stats = {
-        "411111": {"total_attempts": 10, "total_approved": 9, "total_3ds": 2,
-                    "last_3ds_at": datetime.now(timezone.utc).isoformat()},
-        "422222": {"total_attempts": 10, "total_approved": 5, "total_3ds": 0,
-                    "last_3ds_at": None},
-    }
-    pipe = select_card_for_account("a@t.com", cards, stats, 150)
-    assert pipe.startswith("422222")
-
-
-def test_best_approval_rate():
-    # approval_rate se COMPUTA (total_approved/total_attempts) — no es columna
-    cards = [_card("4222222222222222"), _card("4111111111111111")]
-    stats = {
-        "411111": {"total_attempts": 10, "total_approved": 9},   # 90%
-        "422222": {"total_attempts": 10, "total_approved": 5},   # 50%
-    }
-    pipe = select_card_for_account("a@t.com", cards, stats, 150)
-    assert pipe.startswith("411111")
-
-
-def test_no_card_returns_none():
-    assert select_card_for_account("a@t.com", [], {}, 150) is None
-
-
-def test_skips_retired_card():
-    cards = [_card("4111111111111111", status="RETIRED")]
-    assert select_card_for_account("a@t.com", cards, {}, 150) is None
-
-
 # ── B3 — plan_auto_mission (BD temporal vía fixture seed_db) ─────────────────
 def _add_account(db_path, email, grade="A", grade_score=50, balance=100.0):
     con = sqlite3.connect(str(db_path))
@@ -214,13 +169,22 @@ def _add_card(db_path, number, email, status="ACTIVE"):
         con.close()
 
 
-def test_plan_assigns_married_cards(seed_db):
+def test_plan_never_uses_married_card(seed_db):
+    """Robert 2026-08-05: el automático NUNCA usa una tarjeta ya guardada en
+    la cuenta (account_cards) — solo el pool que entregó el operador. Bug
+    real: el matchmaker tomó una tarjeta married mientras Robert corría un
+    depósito automático con 4 tarjetas propias."""
     _add_account(seed_db, "m@t.com")
-    _add_card(seed_db, "4111111111111111", "m@t.com")
-    plan = plan_auto_mission(seed_db, [], amount=150, target_count=9)
-    assert plan["feasible"] is True
-    assert plan["accounts"][0]["email"] == "m@t.com"
-    assert plan["accounts"][0]["card_pipe"] == "4111111111111111|1230|123"
+    _add_card(seed_db, "4111111111111111", "m@t.com")  # married — no debe usarse
+
+    # Sin pool: aunque exista married, la cuenta queda sin tarjeta asignada
+    plan_empty_pool = plan_auto_mission(seed_db, [], amount=150, target_count=9)
+    assert "m@t.com" not in [a["email"] for a in plan_empty_pool["accounts"]]
+
+    # Con pool: se asigna la del pool, jamás la married
+    plan_with_pool = plan_auto_mission(seed_db, ["4333333333333333|0131|999"], amount=150, target_count=9)
+    m_entry = next(a for a in plan_with_pool["accounts"] if a["email"] == "m@t.com")
+    assert m_entry["card_pipe"] == "4333333333333333|0131|999"
 
 
 def test_plan_assigns_pool_cards(seed_db):
@@ -249,13 +213,12 @@ def test_plan_feasibility_check(seed_db):
 def test_plan_estimates_total(seed_db):
     _add_account(seed_db, "t1@t.com")
     _add_account(seed_db, "t2@t.com")
-    _add_card(seed_db, "4111111111111111", "t1@t.com")
-    _add_card(seed_db, "4222222222222222", "t2@t.com")
-    plan = plan_auto_mission(seed_db, [], amount=150, target_count=9)
-    # t1 + t2 (JWT vivo, tarjeta casada) + b@ del seed (LIVE sin JWT, tarjeta
-    # 4222 casada en conftest) — el JWT ya no excluye (Robert 2026-08-05).
+    plan = plan_auto_mission(seed_db, ["4999999999999999|0130|999"], amount=150, target_count=9)
+    # t1 + t2 (JWT vivo) + b@ del seed (LIVE sin JWT) — el JWT ya no excluye
+    # (Robert 2026-08-05). Las 3 se asignan desde el pool, ninguna married.
     assert len(plan["accounts"]) == 3
     assert plan["total_estimated"] == 150 * 9 * 3
+    assert all(a["card_pipe"] == "4999999999999999|0130|999" for a in plan["accounts"])
 
 
 def _add_rejected_attempt(db_path, email, hours_ago=1):
@@ -277,10 +240,9 @@ def test_plan_excludes_accounts_with_recent_declines(seed_db):
     aunque cumpla el resto de filtros (no taladrar cuentas ya quemadas).
     burned@ queda fuera; b@ del seed (sin declines) sí entra."""
     _add_account(seed_db, "burned@t.com")
-    _add_card(seed_db, "4111111111111111", "burned@t.com")
     _add_rejected_attempt(seed_db, "burned@t.com", hours_ago=1)
     _add_rejected_attempt(seed_db, "burned@t.com", hours_ago=2)
-    plan = plan_auto_mission(seed_db, [], amount=150, target_count=9)
+    plan = plan_auto_mission(seed_db, ["4999999999999999|0130|999"], amount=150, target_count=9)
     assert "burned@t.com" not in [r["email"] for r in plan["accounts"]]
     assert plan["accounts"]  # b@ del seed sigue entrando (sin declines)
 
@@ -290,7 +252,6 @@ def test_plan_max_accounts_scales_with_card_count(seed_db):
     adicional (no taladrar todo el pool para lograr el match)."""
     for i in range(6):
         _add_account(seed_db, f"u{i}@t.com")
-        _add_card(seed_db, f"411111111111{i:04d}", f"u{i}@t.com")
     plan_1card = plan_auto_mission(seed_db, ["4999999999999999|0130|999"],
                                     amount=150, target_count=9)
     plan_3cards = plan_auto_mission(
@@ -300,3 +261,16 @@ def test_plan_max_accounts_scales_with_card_count(seed_db):
         amount=150, target_count=9)
     assert len(plan_1card["accounts"]) == 3
     assert len(plan_3cards["accounts"]) == 5
+
+
+def test_plan_max_accounts_hard_cap_at_10(seed_db):
+    """Regla Robert 2026-08-05: tope duro de 10 cuentas por corrida, sea cual
+    sea la razón (aunque la fórmula 3+1×extra dé más con muchas tarjetas)."""
+    for i in range(15):
+        _add_account(seed_db, f"v{i}@t.com")
+    many_cards = [f"49{i:014d}|0130|999" for i in range(9)]  # 9 tarjetas → 3+8=11 sin cap
+    # amount chico + target_count alto: el tope real que se prueba es max_accounts
+    # (10), no el cap de 24h (amount*count) ni el count de select_accounts_for_auto.
+    plan = plan_auto_mission(seed_db, many_cards, amount=10, target_count=20)
+    assert len(plan["accounts"]) == 10
+    assert _max_accounts_for_cards(9) == 10

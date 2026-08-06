@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 392 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5086 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 191 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1070 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1051 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `card_checker.py` | 234 | `—` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
@@ -170,6 +170,7 @@ prewarm.py (router)
 | `PERSISTENT_TTL` | `60 * 60 * 24 * 365 * 10` | `auth.py` |
 | `THREEDS_RECENT_H` | `24` | `auto_deposit.py` |
 | `MM_ACCOUNT_RECENT_DECLINE_LIMIT` | `2` | `auto_deposit.py` |
+| `MAX_ACCOUNTS_HARD_CAP` | `10` | `auto_deposit.py` |
 | `PROBE_AMOUNT` | `10.0` | `auto_deposit.py` |
 | `MATCH_TRANSIENT_RETRIES` | `4` | `auto_deposit.py` |
 | `MM_CROSS_ACCOUNT_GAP` | `5` | `auto_deposit.py` |
@@ -248,6 +249,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `6a1edf2` | docs: cierre de sesión — bin_stats fix deployado y verificado |
 | `7145c2e` | fix(deposits): cerrar hueco de bin_stats — approved/rejected nunca se contaban |
 | `f347775` | docs: cierre de sesión — deploy verificado a KVM4 + estado para /cerrar-bmx |
 | `3e564d6` | feat(frontend): tabs superiores reemplazan cenefa + portal /bet embebido (SA) |
@@ -259,7 +261,6 @@ prewarm.py (router)
 | `6f67527` | feat(withdrawals): refresco de balance post-retiro reusando JWT |
 | `dcce536` | feat(jwt_keeper): priorizar cuentas hot en lote de re-login |
 | `fd0b633` | docs: handoff para OpenCode — refresco JWT en tiempo real + gate de retiro + gaps abiertos |
-| `c5f28d4` | docs: guardar avances de sesión — 2 bugs de visibilidad del portal fixeados y deployados |
 <!-- GEN:end:recientes -->
 
 ---
