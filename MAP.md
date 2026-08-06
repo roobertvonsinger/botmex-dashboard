@@ -98,9 +98,9 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 392 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5142 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 5148 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1346 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1347 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `card_checker.py` | 234 | `—` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
@@ -246,6 +246,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `db3a81b` | fix(bot): scope del SA debe llevar TODOS los comandos (BotCommandScopeChat reemplaza, no fusiona) |
 | `41c89fe` | fix(bot): botones del /start fallaban con foto (edit_message_caption en vez de edit_message_text) |
 | `2a83a80` | chore: .gitattributes normalizacion line-endings (text=auto eol=lf + binarios) |
 | `44984f5` | feat(portal): ronda 3 (URL /{username}, view_as str) + empty state accionable (liga al bot + /bet) |
@@ -257,7 +258,6 @@ prewarm.py (router)
 | `af94b59` | docs(antifuga): reporte final de implementacion - 4 areas A-D |
 | `1e115af` | docs(antifuga): Area D - SSE_EVENTS, ERRORS, AUDIT actualizados |
 | `abc0e38` | feat(antifuga): Area C - portal consume fake_pct del SSE + fix resumen terminal |
-| `2f336f3` | feat(antifuga): Area B - piso 45-60s antes de Fase 2 con status 'preparing' |
 <!-- GEN:end:recientes -->
 
 ---

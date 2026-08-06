@@ -3,6 +3,19 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-08-06 (fixes de logs — los "errores que seguían saliendo" eran la vista congelada)
+
+**Motivo**: Robert reportó que el dashboard seguía mostrando los mismos errores (Bad Gateway, no-text, DB_PATH, LOCK) pese a los deploys. Diagnóstico: la vista de logs de bots se congelaba mostrando el histórico — los errores reales ya estaban resueltos desde las 03:54.
+
+| Función | Spec (2026-08-06) | Estado | Verificado |
+|---|---|---|---|
+| `static/app.js::_reloadBotLog` | El `since` del polling solo puede ser un timestamp real (`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$`); los tracebacks sin timestamp ya no corrompen el filtro ni congelan la vista. | ✅ implementado | ✅ verificación local de `_tail_log_file` con `since` inválido regresa líneas (antes `[]`); web log post-deploy pide `since` con timestamp válido |
+| `app.py::_tail_log_file` | `since` inválido se ignora (regresa las últimas N líneas), nunca `[]`. | ✅ implementado | ✅ mismo test |
+| `app.py::db()` — caso "LOCK sin otro write en este proceso" | Baja de ERROR a WARNING: contención esperada entre `betmexico-web` y `betmexico-mock-bot` al arrancar (comparten BD SQLite en `/data` y ambos corren `_migrate()`). El caso con writes simultáneos del MISMO proceso sigue siendo ERROR. | ✅ implementado | ✅ arranque post-deploy: el mensaje sale como WARNING |
+| `auto_deposit.py` — bloque CLABE STP | `DB_PATH` importado lazy junto a `clabe_fetch` — mata el `NameError` post-depósito exitoso. | ✅ implementado | ✅ `grep` en deploy confirma la línea; solo en copia `/app/web` (la copia legacy raíz no tiene el bloque CLABE, no se tocó) |
+
+Nota: el warning `[support] router no cargado: No module named 'support_routes'` es INTENCIONAL — módulo opcional documentado en `docs/AGENTE_SOPORTE.md`, no existe en el repo. Los `Bad Gateway` del final del log eran del bot legacy (`betmexico_bot.py`, fuera de este repo): red intermitente de Telegram en `get_updates`, no un bug del mock (el mock ya tiene `global_error_handler`).
+
 ## Captura: 2026-08-06 ronda 3 (URL del portal /bet: /user/{telegram_id} → /{username}; premium visual + feedback en vivo)
 
 **Motivo**: Robert, en vivo, mismo hilo del bug de "en proceso": (1) quería la URL con el apodo del usuario, no un ID numérico; (2) el rediseño visual delegado a OpenCode se sintió incompleto/ignorado frente al prototipo de referencia (fondo animado + entrada de tarjetas); (3) copy con "aclaratorias de IA" (taglines tipo "acceso directo · sin fricción") en login/portal; (4) quería feedback animado en vivo para cuentas "en proceso".

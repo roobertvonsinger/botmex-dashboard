@@ -962,6 +962,7 @@ async def run_auto_mission(
                             clabe_stp = None
                             try:
                                 import clabe_fetch
+                                from app import DB_PATH  # lazy: auto_deposit se importa desde app (circular)
 
                                 saved_clabes = clabe_fetch.get_saved_clabes(
                                     DB_PATH, account_id

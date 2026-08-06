@@ -198,7 +198,13 @@ def db(write: bool = False):
                     )
                     _dblg.error(f"[db] LOCK — {len(others)} write(s) activos simultáneos AHORA:\n{held}")
                 else:
-                    _dblg.error(
+                    # En arquitectura multicontainer (web + mock-bot comparten la
+                    # misma BD SQLite en /data), "sin otro write en ESTE proceso"
+                    # es casi siempre el otro container migrando/arrancando a la
+                    # vez — contención esperada, no un bug. Se loguea warning con
+                    # stack para diagnóstico; el caso con writes simultáneos del
+                    # MISMO proceso (arriba) sí es error real.
+                    _dblg.warning(
                         f"[db] LOCK sin otro write registrado en este proceso — el lock viene de "
                         f"fuera del registro (conexión huérfana o proceso externo). Origen de este write:\n{stack}"
                     )
@@ -1824,7 +1830,7 @@ def _tail_log_file(log_file: Path, limit: int = 200, since: Optional[str] = None
             f.readline()  # descarta línea parcial
         data = f.read().decode("utf-8", errors="replace")
     lines = data.splitlines()[-n:]
-    if since:
+    if since and re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", since[:19]):
         lines = [ln for ln in lines if ln[:19] >= since[:19]]
     # Filtrar ruido de uvicorn/health/SSE/imports
     lines = [ln for ln in lines

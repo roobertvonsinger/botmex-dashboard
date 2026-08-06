@@ -2,6 +2,31 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## Vista de logs de bots "congelada" — errores históricos parecían seguir saliendo (corregido 2026-08-06)
+
+- **Contexto**: Robert reportó "por qué siguen saliendo los putos errores" en el dashboard — la vista dual de logs de Telegram (bot main + mock) mostraba una y otra vez los mismos errores, incluidos los que el código ya tenía resueltos desde el deploy de las 03:54 (no-text, LOCK, DB_PATH).
+- **Síntoma**: la vista `bot=main` quedaba congelada mostrando SIEMPRE los últimos 300 líneas del histórico. El log del web mostraba polls repetidos con `since=telegram.error.Netw` (200 OK pero devolviendo vacío).
+- **Causa raíz**: `static/app.js::_reloadBotLog` hacía `st.ts = lastLine.slice(0, 19)` SIN validar formato. Cuando la última línea del archivo de log es un traceback **sin timestamp** (p.ej. `telegram.error.NetworkError: Bad Gateway`), `since` se corrompía. `app.py::_tail_log_file` compara strings (`ln[:19] >= since[:19]`): `"2026-08-06 ..."` < `"telegram.error..."` → filtra TODO → backend regresa `[]` → el frontend conserva el DOM viejo → la vista se congela con el histórico. Los errores que Robert veía ya NO estaban pasando — eran el freeze del histórico.
+- **Fix**:
+  - `static/app.js`: `lastTs` solo se acepta si matchea `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$` — se busca el último ts válido hacia atrás en el batch (los tracebacks multilínea ya no corrompen el `since`).
+  - `app.py::_tail_log_file`: `since` solo filtra si es timestamp válido; si llega inválido, regresa las últimas N líneas (nunca vacío).
+  - Logs truncados en KVM4 (`/docker/betmexico/data/logs/telegram_bot.log` y `telegram_mock_bot.log`) para arrancar la vista limpia.
+- **Test**: verificación local de `_tail_log_file` con `since="telegram.error.Netw"` → regresa líneas (antes `[]`).
+- **Relacionado**: los `Bad Gateway` que aparecían al final del archivo eran del bot LEGACY (`betmexico_bot.py`, fuera de este repo) — errores de red intermitentes de Telegram en `get_updates`, no un bug del mock. El mock bot ya tiene `global_error_handler` (`bot.py:1302`, registrado en `build_app`) para NetworkError/TimedOut/Conflict.
+
+## `auto_deposit.py` usaba `DB_PATH` sin importarlo — NameError al obtener CLABE STP post-depósito (corregido 2026-08-06)
+
+- **Síntoma**: `[Auto 6a5c8c21] No se pudo obtener CLABE STP para <email>: name 'DB_PATH' is not defined` después de un `🎯 MATCH FOUND` exitoso.
+- **Causa raíz**: el bloque CLABE STP (`auto_deposit.py:962-988`) llama `clabe_fetch.get_saved_clabes(DB_PATH, ...)` y `clabe_fetch._persist_clabes(DB_PATH, ...)` pero `DB_PATH` NUNCA se importa en el módulo — los imports de `app` son lazy por diseño para evitar circular (`app → auto_deposit → deposits → app`). El bug solo se dispara en el camino de depósito EXITOSO, por eso pasaba desapercibido.
+- **Fix**: import lazy `from app import DB_PATH` dentro del `try` junto a `import clabe_fetch` (`auto_deposit.py:964`).
+- **Nota de deploy**: el bug existe en la copia `/app/web` (la que ejecuta las misiones — mock-bot y web). La copia legacy raíz `/app/auto_deposit.py` NO tiene el bloque CLABE (versión vieja, 580+ diffs) — no se tocó.
+
+## ERROR "[db] LOCK sin otro write registrado en este proceso" en cada arranque del mock-bot (bajado a WARNING, 2026-08-06)
+
+- **Síntoma**: al arrancar el mock-bot, `app.py::_migrate()` (corre al importar `app`, línea 560, importado por `bot.py`) logueaba `[db] LOCK sin otro write registrado en este proceso — el lock viene de fuera del registro (conexión huérfana o proceso externo)` como ERROR en cada restart.
+- **Causa raíz**: arquitectura multicontainer — `betmexico-web` y `betmexico-mock-bot` comparten la misma BD SQLite (`/data/betmexico_accounts.db`) y AMBOS corren `_migrate()` al arrancar (~15 writes). Cuando uno está escribiendo (WAL) mientras el otro arranca, SQLite devuelve "database is locked" → el registro de writes del proceso local no contiene ningún otro write (el que lockea es el OTRO proceso) → se logueaba ERROR. Es contención de arranque esperada, no un bug.
+- **Fix**: `app.py::db()` — el caso "sin otro write en este proceso" baja de ERROR a WARNING (conserva el stack completo para diagnóstico). El caso con writes simultáneos del MISMO proceso (contención real) sigue siendo ERROR.
+
 ## `data/users.json` en prod tenía a robertvs con `role: "operator"` — próximo login fresco lo hubiera bloqueado de su propio dashboard (encontrado y corregido 2026-08-06)
 
 - **Contexto**: descubierto de pasada, verificando en vivo el cambio de URL `/user/{id}`→`/{username}` (no relacionado al bug original de esta sesión). Robert tiene una sesión persistente vieja en el navegador (`PERSISTENT_USERS`, nunca expira) con `role: superadmin` cacheado desde que se creó — por eso nada se veía roto en el día a día. Pero cualquier login FRESCO (`POST /api/auth/login` → `_auth.create_session(username)` → `u = USERS[username_lower]`) hubiera leído `role: "operator"` del archivo persistido y lo hubiera dejado sin acceso a `/dashboard` ni a ninguna función SA-only.

@@ -2741,10 +2741,19 @@ async function _reloadBotLog(which) {
       });
     }
     if (data.lines.length) {
-      const lastLine = data.lines[data.lines.length - 1];
-      const lastTs = lastLine.slice(0, 19);
-      st.ts = lastTs;
-      st.boundary = new Set(data.lines.filter(ln => ln.slice(0, 19) === lastTs));
+      // El ts de filtro ("since") solo puede ser un timestamp real: si la última
+      // línea es un traceback sin timestamp (p.ej. "telegram.error.NetworkError"),
+      // slice(0,19) corrompe el since y el backend regresa vacío, congelando la
+      // vista. Buscar el último timestamp válido hacia atrás en el batch.
+      let lastTs = null;
+      for (let i = data.lines.length - 1; i >= 0; i--) {
+        const t = data.lines[i].slice(0, 19);
+        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(t)) { lastTs = t; break; }
+      }
+      if (lastTs) {
+        st.ts = lastTs;
+        st.boundary = new Set(data.lines.filter(ln => ln.slice(0, 19) === lastTs));
+      }
     }
   } catch (e) {
     if (!st.ts) v.textContent = humanizeApiError(e);
