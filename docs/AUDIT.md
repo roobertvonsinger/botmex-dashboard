@@ -3,6 +3,20 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-08-05 (registro dinámico de usuarios + comando `/adduser` del bot)
+
+**Motivo**: Robert pidió darle a Luisito acceso de usuario normal al bot de Telegram y al portal web
+(vista única de operador), y un comando desde Telegram para registrar nuevos usuarios — que quede
+registrado tanto en el bot como en la web, y que la primera vez que entren a la web se les pida
+definir contraseña usando el apodo registrado como usuario.
+
+| Función | Spec (nueva, 2026-08-05) | Estado | Verificado |
+|---|---|---|---|
+| `auth.USERS` (registro de usuarios) | Ya no es diccionario estático: `load_users()`/`save_users()` fusionan `DEFAULT_USERS` (robertvs/lau/luisito/magdiel) con `data/users.json` (runtime, gitignored). `USERS` es un proxy dinámico → agregar un usuario no requiere redeploy ni editar código. `auth.add_user(display, telegram_id, role)` registra en `users.json` (clave = apodo en minúsculas), asigna `USER_COLORS` si falta y garantiza entrada `null` en `web_passwords.json` (dispara flujo first-time de la web). | ✅ implementado | ✅ roundtrip con `_DATA_DIR` temporal: `add_user('PepeTest', 123456789)` → `load_users()['pepetest']`, `is_authorized`, `get_user_nickname`, `WEB_USERS` y `web_passwords['pepetest']=None` todos OK. Suite completa 412/412 verde. |
+| `web_auth.WEB_USERS_RAW` / `WEB_USERS` | Ahora son proxies que leen de `auth.load_users()` → el login web usa exactamente el mismo registro que el bot; el usuario de la web es el apodo en minúsculas. | ✅ implementado | ✅ `WEB_USERS.get('pepetest')` resuelve y `WEB_USERS_RAW.__contains__('PepeTest')` OK (roundtrip). Suite 412/412 verde. |
+| `telegram_bot_mock/config.py` — `NICKNAMES`/`get_user_nickname`/`is_authorized` | Dinámicos desde `auth.load_users()`: cualquier usuario registrado por `/adduser` queda autorizado en el bot (antes listas hardcodeadas `AUTHORIZED_USERS`/`NICKNAMES`). | ✅ implementado | ✅ `is_authorized(123456789)` y `get_user_nickname(123456789)=='PepeTest'` OK (roundtrip). Suite 412/412 verde. |
+| `telegram_bot_mock/bot.py` — comando `/adduser` (alias `/agregar_usuario`) | Exclusivo `SUPERADMIN_ID`. Formato directo `/adduser <ID> <Apodo> [rol]` o conversación guiada (pide ID, Apodo y rol/nivel). Roles: `operator` (defecto) / `admin` / `superadmin`. Registra vía `auth.add_user` → usuario activo en bot + web, sin contraseña (first-time web le pide definirla con su apodo). Añadido a `/help` y menú nativo de comandos. | ✅ implementado | ✅ suite 412/412 verde (incluye `tests/test_telegram_bot_mock.py`). Smoke en vivo pendiente de deploy KVM4. |
+
 ## Captura: 2026-08-05 (selección de tarjeta del modo auto — married revocado por Robert)
 
 **Motivo**: Robert reportó en vivo (log de un depósito automático con 4 tarjetas propias) que el

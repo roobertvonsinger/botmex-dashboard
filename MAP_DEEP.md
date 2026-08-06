@@ -178,19 +178,23 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `sha256` | def | L31–L32 |
-| `load_passwords` | def | L35–L58 |
-| `save_passwords` | def | L61–L69 |
-| `_is_persistent` | def | L79–L80 |
-| `_load_persistent_sessions` | def | L83–L89 |
-| `_save_persistent_sessions` | def | L92–L98 |
-| `_prune` | def | L104–L113 |
-| `session_max_age` | def | L116–L118 |
-| `create_session` | def | L121–L134 |
-| `get_session` | def | L137–L146 |
-| `delete_session` | def | L149–L152 |
-| `require_session` | def | L156–L164 |
-| `require_operator_view` | def | L167–L191 |
+| `load_users` | def | L29–L51 |
+| `save_users` | def | L53–L61 |
+| `_UsersDictProxy` | class | L63–L88 |
+| `add_user` | def | L92–L113 |
+| `sha256` | def | L120–L121 |
+| `load_passwords` | def | L124–L147 |
+| `save_passwords` | def | L150–L158 |
+| `_is_persistent` | def | L168–L169 |
+| `_load_persistent_sessions` | def | L172–L178 |
+| `_save_persistent_sessions` | def | L181–L187 |
+| `_prune` | def | L193–L202 |
+| `session_max_age` | def | L205–L207 |
+| `create_session` | def | L210–L223 |
+| `get_session` | def | L226–L235 |
+| `delete_session` | def | L238–L241 |
+| `require_session` | def | L245–L253 |
+| `require_operator_view` | def | L256–L280 |
 
 ### `auto_deposit.py`
 
@@ -967,12 +971,14 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `_load_passwords` | def | L38–L65 |
-| `_save_passwords` | def | L67–L75 |
-| `set_session_callback` | def | L80–L82 |
-| `authenticate` | def | L84–L128 |
-| `require_admin` | def | L130–L133 |
-| `require_superadmin` | def | L135–L138 |
+| `_WebUsersRawProxy` | class | L21–L34 |
+| `_WebUsersProxy` | class | L36–L43 |
+| `_load_passwords` | def | L59–L86 |
+| `_save_passwords` | def | L88–L96 |
+| `set_session_callback` | def | L101–L103 |
+| `authenticate` | def | L105–L149 |
+| `require_admin` | def | L151–L154 |
+| `require_superadmin` | def | L156–L159 |
 
 ### `web_grading.py`
 

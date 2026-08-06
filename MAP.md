@@ -99,7 +99,7 @@ prewarm.py (router)
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 392 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5086 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
-| `auth.py` | 191 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
+| `auth.py` | 280 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1346 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `card_checker.py` | 234 | `—` | _[completar]_ |
@@ -151,7 +151,7 @@ prewarm.py (router)
 | `test_withdrawals.py` | 361 | `—` | _[completar]_ |
 | `test_withdrawals_endpoints.py` | 627 | `—` | _[completar]_ |
 | `test_withdrawals_migrate.py` | 46 | `—` | _[completar]_ |
-| `web_auth.py` | 138 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
+| `web_auth.py` | 159 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
 | `web_grading.py` | 197 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
 | `web_utils.py` | 265 | `betmexico.web.utils` | Helpers compartidos: _friendly_error, _normalize_ccexp, _build_proxy_url |
 | `withdrawals.py` | 466 | `betmexico.dashboard.withdrawals` | Retiro automático vía API BetMexico (5 pasos). `execute_withdrawal` orquesta PASO0-3. `_refresh_account_after_withdrawal` refresca saldo post-retiro reusando JWT |
@@ -226,7 +226,6 @@ prewarm.py (router)
 | `NOW` | `1_800_000_000` | `test_jwt_keeper.py` |
 | `AHEAD` | `24 * H` | `test_jwt_keeper.py` |
 | `PIPE` | `"4111111111111111|12|30|123"` | `test_unificacion_sp1.py` |
-| `WEB_USERS` | `{k.lower(): v for k, v in WEB_USERS_RAW.items()}` | `web_auth.py` |
 | `PAYMENTS_API` | `"https://paymentsapi.betmexico.mx"` | `withdrawals.py` |
 <!-- GEN:end:constantes -->
 
@@ -247,6 +246,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b613ef5` | fix(antifuga): auditoría Claude Code — 4 bugs reales en el trabajo de OpenCode |
 | `af94b59` | docs(antifuga): reporte final de implementacion - 4 areas A-D |
 | `1e115af` | docs(antifuga): Area D - SSE_EVENTS, ERRORS, AUDIT actualizados |
 | `abc0e38` | feat(antifuga): Area C - portal consume fake_pct del SSE + fix resumen terminal |
@@ -258,7 +258,6 @@ prewarm.py (router)
 | `7145c2e` | fix(deposits): cerrar hueco de bin_stats — approved/rejected nunca se contaban |
 | `f347775` | docs: cierre de sesión — deploy verificado a KVM4 + estado para /cerrar-bmx |
 | `3e564d6` | feat(frontend): tabs superiores reemplazan cenefa + portal /bet embebido (SA) |
-| `18e74d8` | feat(jwt): refresco super smooth — 3 universos, cooldown 24h, FUGA #1 cerrada |
 <!-- GEN:end:recientes -->
 
 ---

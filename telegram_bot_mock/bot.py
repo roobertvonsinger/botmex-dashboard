@@ -109,7 +109,7 @@ HEADER_DECORATIVE = (
 HEADER = HEADER_DECORATIVE
 
 # Estados de Conversación
-(WAIT_CHECK_CONFIRM, WAIT_BET_CONFIRM) = range(2)
+(WAIT_CHECK_CONFIRM, WAIT_BET_CONFIRM, WAIT_ADDUSER_INPUT) = range(3)
 
 
 # Eventos de confirmación en espera para /bet confirm_gate
@@ -320,6 +320,8 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "  Enlace directo al núcleo del Dashboard de Operador.\n\n"
         "• <b>/help</b> — ❔ Ayuda\n"
         "  Muestra esta guía rápida de instrucciones.\n\n"
+        "• <b>/adduser</b> — 👤 Agregar Usuario (Superadmin)\n"
+        "  Registra nuevo usuario: <code>/adduser &lt;ID&gt; &lt;Apodo&gt; [rol]</code>.\n\n"
         "• <b>/cancel</b> — 🛑 Cancelar/Detener proceso\n"
         "  Cancela cualquier misión activa y libera cuentas de inmediato.\n\n"
         f"  🌵 {get_random_greeting()}\n"
@@ -367,8 +369,87 @@ async def cancel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ─────────────────────────────────────────────────────────────────────
-# FLUJO /CHECK
+# FLUJO /ADDUSER
 # ─────────────────────────────────────────────────────────────────────
+
+async def adduser_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Punto de entrada /adduser — exclusivo Superadmin."""
+    user_id = update.effective_user.id
+    if user_id != SUPERADMIN_ID:
+        await update.message.reply_text("❌ Comando exclusivo para Superadmin.")
+        return ConversationHandler.END
+
+    args = context.args or []
+    if len(args) >= 2:
+        # Formato directo: /adduser <ID> <Apodo> [rol]
+        tg_id_str, nickname = args[0], args[1]
+        role = args[2].lower() if len(args) >= 3 else "operator"
+        try:
+            tg_id = int(tg_id_str)
+            from auth import add_user
+            u = add_user(nickname, tg_id, role)
+            await update.message.reply_text(
+                f"✅ <b>Usuario registrado con éxito</b>\n\n"
+                f"• <b>Apodo:</b> {u['display']}\n"
+                f"• <b>Telegram ID:</b> <code>{u['telegram_id']}</code>\n"
+                f"• <b>Rol:</b> {u['role']}\n\n"
+                f"<i>Al ingresar a la web por primera vez con el usuario <b>{u['display']}</b>, se le pedirá definir contraseña.</i>",
+                parse_mode="HTML",
+            )
+            return ConversationHandler.END
+        except ValueError:
+            await update.message.reply_text("❌ ID inválido. Debe ser numérico.")
+            return ConversationHandler.END
+
+    await update.message.reply_text(
+        "👤 <b>REGISTRAR NUEVO USUARIO</b>\n\n"
+        "Envía los datos del usuario en el siguiente formato:\n"
+        "<code>ID Apodo [rol]</code>\n\n"
+        "<b>Ejemplo:</b>\n"
+        "<code>7847239854 Luisito operator</code>\n"
+        "<code>1234567890 Pedro admin</code>\n\n"
+        "<i>Roles válidos: operator (defecto), admin, superadmin.</i>",
+        parse_mode="HTML",
+    )
+    return WAIT_ADDUSER_INPUT
+
+
+async def process_adduser_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Procesa el texto ingresado para /adduser."""
+    user_id = update.effective_user.id
+    if user_id != SUPERADMIN_ID:
+        await update.message.reply_text("❌ No autorizado.")
+        return ConversationHandler.END
+
+    text = (update.message.text or "").strip()
+    parts = text.split()
+    if len(parts) < 2:
+        await update.message.reply_text(
+            "⚠️ Formato incorrecto. Envía: <code>ID Apodo [rol]</code> (Ej: <code>7847239854 Luisito operator</code>)",
+            parse_mode="HTML",
+        )
+        return WAIT_ADDUSER_INPUT
+
+    tg_id_str, nickname = parts[0], parts[1]
+    role = parts[2].lower() if len(parts) >= 3 else "operator"
+
+    try:
+        tg_id = int(tg_id_str)
+    except ValueError:
+        await update.message.reply_text("❌ El ID de Telegram debe ser un número.")
+        return WAIT_ADDUSER_INPUT
+
+    from auth import add_user
+    u = add_user(nickname, tg_id, role)
+    await update.message.reply_text(
+        f"✅ <b>Usuario registrado con éxito</b>\n\n"
+        f"• <b>Apodo:</b> {u['display']}\n"
+        f"• <b>Telegram ID:</b> <code>{u['telegram_id']}</code>\n"
+        f"• <b>Rol:</b> {u['role']}\n\n"
+        f"<i>Al ingresar a la web por primera vez con el usuario <b>{u['display']}</b>, se le pedirá definir contraseña.</i>",
+        parse_mode="HTML",
+    )
+    return ConversationHandler.END
 
 
 async def check_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1136,6 +1217,7 @@ async def setup_bot_commands(application):
         BotCommand("start", "🚀 Menú principal"),
         BotCommand("help", "📖 Manual operativo"),
         BotCommand("cancel", "🛑 Cancelar proceso"),
+        BotCommand("adduser", "👤 Agregar usuario (Superadmin)"),
     ]
     try:
         await application.bot.set_my_commands(commands)
@@ -1239,6 +1321,21 @@ def build_app():
         fallbacks=[CommandHandler("cancel", cancel_cmd)],
     )
     app.add_handler(check_handler)
+
+    # ConversationHandler para /adduser
+    adduser_handler = ConversationHandler(
+        entry_points=[
+            CommandHandler("adduser", adduser_cmd),
+            CommandHandler("agregar_usuario", adduser_cmd),
+        ],
+        states={
+            WAIT_ADDUSER_INPUT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, process_adduser_input),
+            ]
+        },
+        fallbacks=[CommandHandler("cancel", cancel_cmd)],
+    )
+    app.add_handler(adduser_handler)
 
     # ConversationHandler para /bet
     bet_handler = ConversationHandler(

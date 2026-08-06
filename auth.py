@@ -6,14 +6,13 @@ from typing import Optional
 from fastapi import Cookie, HTTPException, Query
 
 # ── Users ─────────────────────────────────────────────────────────────────────
-USERS: dict[str, dict] = {
+DEFAULT_USERS: dict[str, dict] = {
     "robertvs": {"display": "RobertVS", "telegram_id": 1341812706, "role": "superadmin"},
     "lau":      {"display": "Lau",      "telegram_id": 7599631505, "role": "operator"},
     "luisito":  {"display": "Luisito",  "telegram_id": 7847239854, "role": "operator"},
     "magdiel":  {"display": "Magdiel",  "telegram_id": 1059367082, "role": "operator"},
 }
 
-# Color por operador (token name del CSS). Consistente lock-chip y borde fila.
 USER_COLORS: dict[int, str] = {
     1341812706: "warn",     # RobertVS — amarillo
     7599631505: "purple",   # Lau — morado
@@ -21,9 +20,99 @@ USER_COLORS: dict[int, str] = {
     1059367082: "azure",    # Magdiel — azul
 }
 
-# ── Password storage ───────────────────────────────────────────────────────────
 _DATA_DIR = Path(__file__).parent / "data"
+_USERS_FILE = _DATA_DIR / "users.json"
 _PWD_FILE = _DATA_DIR / "web_passwords.json"
+_USERS_CACHE: dict = {}
+_USERS_CACHE_MTIME: float = 0.0
+
+def load_users() -> dict[str, dict]:
+    global _USERS_CACHE, _USERS_CACHE_MTIME
+    if _USERS_FILE.exists():
+        try:
+            mtime = _USERS_FILE.stat().st_mtime
+            if _USERS_CACHE and mtime == _USERS_CACHE_MTIME:
+                return _USERS_CACHE
+            data = json.loads(_USERS_FILE.read_text(encoding="utf-8"))
+            merged = dict(DEFAULT_USERS)
+            merged.update(data)
+            _USERS_CACHE = merged
+            _USERS_CACHE_MTIME = mtime
+            return merged
+        except Exception:
+            return _USERS_CACHE or dict(DEFAULT_USERS)
+    _DATA_DIR.mkdir(parents=True, exist_ok=True)
+    _USERS_FILE.write_text(json.dumps(DEFAULT_USERS, indent=2), encoding="utf-8")
+    _USERS_CACHE = dict(DEFAULT_USERS)
+    try:
+        _USERS_CACHE_MTIME = _USERS_FILE.stat().st_mtime
+    except Exception:
+        pass
+    return dict(DEFAULT_USERS)
+
+def save_users(users: dict) -> None:
+    global _USERS_CACHE, _USERS_CACHE_MTIME
+    _DATA_DIR.mkdir(parents=True, exist_ok=True)
+    _USERS_FILE.write_text(json.dumps(users, indent=2), encoding="utf-8")
+    _USERS_CACHE = dict(users)
+    try:
+        _USERS_CACHE_MTIME = _USERS_FILE.stat().st_mtime
+    except Exception:
+        pass
+
+class _UsersDictProxy(dict):
+    """Proxy dinámico para mantener compatibilidad con USERS[key] e iteraciones."""
+    def __getitem__(self, item):
+        return load_users()[item]
+    def __setitem__(self, key, value):
+        users = load_users()
+        users[key] = value
+        save_users(users)
+    def __delitem__(self, key):
+        users = load_users()
+        del users[key]
+        save_users(users)
+    def __contains__(self, item):
+        return item in load_users()
+    def __iter__(self):
+        return iter(load_users())
+    def __len__(self):
+        return len(load_users())
+    def keys(self):
+        return load_users().keys()
+    def values(self):
+        return load_users().values()
+    def items(self):
+        return load_users().items()
+    def get(self, key, default=None):
+        return load_users().get(key, default)
+
+USERS: dict[str, dict] = _UsersDictProxy()
+
+def add_user(display_name: str, telegram_id: int, role: str = "operator", color: str = "azure") -> dict:
+    """Registra o actualiza usuario en users.json y limpia entrada en web_passwords.json."""
+    users = load_users()
+    key = display_name.strip().lower()
+    user_entry = {
+        "display": display_name.strip(),
+        "telegram_id": int(telegram_id),
+        "role": role if role in ("superadmin", "operator", "admin") else "operator",
+    }
+    users[key] = user_entry
+    save_users(users)
+    
+    # Asignar color visual en USER_COLORS si no tiene
+    USER_COLORS.setdefault(int(telegram_id), color)
+    
+    # Garantizar que en web_passwords.json la clave exista con valor null si es nuevo
+    pwd_data = load_passwords()
+    if key not in pwd_data:
+        pwd_data[key] = None
+        save_passwords(pwd_data)
+        
+    return user_entry
+
+# ── Password storage ───────────────────────────────────────────────────────────
 _PWD_CACHE: dict = {}
 _PWD_CACHE_MTIME: float = 0.0
 

@@ -70,16 +70,13 @@ HEADER_LOCKUP = (
 )
 
 # Mapeo de Apodos por Telegram ID (coincide con USERS de auth.py)
-NICKNAMES = {
-    1341812706: "Robert",
-    7599631505: "Lau",
-    7847239854: "Luisito",
-    1059367082: "Magdiel",
-    753020051: "Operador",
-}
+import auth as _auth
 
 def get_user_nickname(user_id: int, fallback_name: str = "") -> str:
-    return NICKNAMES.get(user_id, fallback_name or f"Operador_{user_id}")
+    for u in _auth.load_users().values():
+        if u.get("telegram_id") == user_id:
+            return u.get("display", fallback_name)
+    return fallback_name or f"Operador_{user_id}"
 
 # Token para el bot mock
 MOCK_BOT_TOKEN = os.getenv("BMX_MOCK_BOT_TOKEN", "8823043859:AAEWnv2aVYopE7qsNVACA24sW_Tei7o1nnI")
@@ -87,7 +84,9 @@ DASHBOARD_URL = os.getenv("BMX_DASHBOARD_URL", "https://botmexico.net")
 
 # Usuarios autorizados (coincide con auth.py del dashboard y betmexico_config)
 SUPERADMIN_ID = 1341812706
-AUTHORIZED_USERS = {1341812706, 7599631505, 7847239854, 1059367082, 753020051}
 
 def is_authorized(user_id: int) -> bool:
-    return user_id in AUTHORIZED_USERS or user_id == SUPERADMIN_ID
+    if user_id == SUPERADMIN_ID:
+        return True
+    authorized_ids = {u.get("telegram_id") for u in _auth.load_users().values() if u.get("telegram_id")}
+    return user_id in authorized_ids

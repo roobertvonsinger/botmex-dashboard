@@ -16,13 +16,34 @@ from web_utils import _sha256
 logger = logging.getLogger("betmexico.web.auth")
 
 # --- User Registry ---
-WEB_USERS_RAW = {
-    "RobertVS": {"telegram_id": 1341812706, "role": "superadmin"},
-    "Lau":      {"telegram_id": 7599631505, "role": "admin"},
-    "Luisito":  {"telegram_id": 7847239854, "role": "admin"},
-    "Magdiel":  {"telegram_id": 1059367082, "role": "admin"},
-}
-WEB_USERS = {k.lower(): v for k, v in WEB_USERS_RAW.items()}
+import auth as _core_auth
+
+class _WebUsersRawProxy(dict):
+    def __getitem__(self, item):
+        users = _core_auth.load_users()
+        for k, v in users.items():
+            if v["display"].lower() == str(item).lower():
+                return v
+        raise KeyError(item)
+    def __contains__(self, item):
+        users = _core_auth.load_users()
+        return any(v["display"].lower() == str(item).lower() for v in users.values())
+    def __iter__(self):
+        return iter({v["display"]: v for v in _core_auth.load_users().values()})
+    def items(self):
+        return [(v["display"], v) for v in _core_auth.load_users().values()]
+
+class _WebUsersProxy(dict):
+    def get(self, key, default=None):
+        users = _core_auth.load_users()
+        return users.get(str(key).lower(), default)
+    def __getitem__(self, item):
+        return _core_auth.load_users()[str(item).lower()]
+    def __contains__(self, item):
+        return str(item).lower() in _core_auth.load_users()
+
+WEB_USERS_RAW = _WebUsersRawProxy()
+WEB_USERS = _WebUsersProxy()
 
 # --- Password Persistence ---
 _DATA_DIR = Path(__file__).resolve().parent.parent / "data"
