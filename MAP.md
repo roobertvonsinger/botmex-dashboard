@@ -97,8 +97,8 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `account_refresh.py` | 392 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5160 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `account_refresh.py` | 577 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
+| `app.py` | 5054 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1348 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -119,7 +119,7 @@ prewarm.py (router)
 | `shared/betmexico_payment_analyzer.py` | 592 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
-| `test_account_refresh.py` | 332 | `—` | _[completar]_ |
+| `test_account_refresh.py` | 470 | `—` | _[completar]_ |
 | `test_account_touch.py` | 51 | `—` | _[completar]_ |
 | `test_account_touch_isolated.py` | 138 | `—` | _[completar]_ |
 | `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
@@ -148,13 +148,13 @@ prewarm.py (router)
 | `test_sse_visibility.py` | 88 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 71 | `—` | _[completar]_ |
-| `test_withdrawals.py` | 361 | `—` | _[completar]_ |
+| `test_withdrawals.py` | 757 | `—` | _[completar]_ |
 | `test_withdrawals_endpoints.py` | 627 | `—` | _[completar]_ |
 | `test_withdrawals_migrate.py` | 46 | `—` | _[completar]_ |
 | `web_auth.py` | 159 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
 | `web_grading.py` | 197 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
 | `web_utils.py` | 265 | `betmexico.web.utils` | Helpers compartidos: _friendly_error, _normalize_ccexp, _build_proxy_url |
-| `withdrawals.py` | 466 | `betmexico.dashboard.withdrawals` | Retiro automático vía API BetMexico (5 pasos). `execute_withdrawal` orquesta PASO0-3. `_refresh_account_after_withdrawal` refresca saldo post-retiro reusando JWT |
+| `withdrawals.py` | 699 | `betmexico.dashboard.withdrawals` | Retiro automático vía API BetMexico (5 pasos). `execute_withdrawal` orquesta PASO0-3. `_refresh_account_after_withdrawal` refresca saldo post-retiro reusando JWT |
 <!-- GEN:end:modulos -->
 
 ---
@@ -164,6 +164,7 @@ prewarm.py (router)
 <!-- GEN:start:constantes -->
 | Constante | Valor | Módulo |
 |-----------|-------|--------|
+| `WITHDRAWAL_POLL_INTERVAL_SEC` | `60` | `account_refresh.py` |
 | `ROBERT_CHAT_ID` | `1341812706` | `app.py` |
 | `SESSION_TTL` | `86_400` | `auth.py` |
 | `PERSISTENT_USERS` | `{"robertvs"}` | `auth.py` |
@@ -246,6 +247,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `ae8c43e` | fix(pantalla): historial de Movimientos revuelto por sort defensivo que ignoraba 'T' vs espacio |
 | `a3f9ee9` | fix(bot+rate-limit): mensaje de /bet ya no se queda pegado en Telegram + 429 mata la cuenta a la primera |
 | `95b2ff0` | fix(logs+lifespan+config): filtros de ruido de red Telegram en _LOG_NOISE_PATTERNS + lifespan reemplaza @on_event deprecado + config.py sin betmexico_db (circular import) + silenciar warning PTB per_message=False |
 | `9d0c90d` | docs(AGENTS.md): reglas duras de containers KVM4 — el bot legacy (@betmx_bot) es EXCLUSIVO de Robert, NO se apaga/alinea/migra; el mock suple al legacy; auto-deposito corre en /app/web; warning support_routes intencional |
@@ -257,7 +259,6 @@ prewarm.py (router)
 | `dc1899b` | feat(bot): /adduser oculto al publico (solo Superadmin) + raps de /start con flow + help con 'Volver al inicio' |
 | `3baf912` | docs: cierre de sesión — anti-fuga bot/portal auditado + deployado, revisión final de main verificada |
 | `35dd0d8` | feat(bot): /start con logo nuevo botmexico.net (reply_photo con fallback) |
-| `a0b44ea` | feat(auth): registro dinamico de usuarios + /adduser del bot (Luisito operador normal) |
 <!-- GEN:end:recientes -->
 
 ---

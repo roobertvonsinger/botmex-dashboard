@@ -485,6 +485,47 @@ El fix `2026-07-28` de `_fetch_looks_empty()` (ver entry de arriba, "Regresión 
 - **Pendiente**: confirmar con Robert que el toast ✅/❌ y el refresco de tabla/detalle se ven bien en un retiro
   fresco end-to-end (no solo en el atorado histórico que este fix resolvió retroactivamente).
 
+## [CRÍTICO] Retiro pendiente no resuelve sin tab abierto + institución divergente (Bug 1 + Bug 2, 2026-08-07)
+
+- **Síntoma Bug 1**: un retiro "en proceso" no avanzaba a un estado terminal en el dashboard salvo que un
+  operador tuviera el panel de esa cuenta abierto en un tab con el navegador vivo. El poll JS
+  (`_wdPolls` en `pantalla.js`/`portal.js`) vive en memoria del tab — se detiene al cerrar la pestaña,
+  navegar a otra cuenta, o si nadie abrió esa cuenta cuando el retiro se resolvió. Medido por Robert en
+  vivo: un retiro normalmente resuelve en 1-2 min, hasta 10-15 min en casos raros.
+- **Causa raíz Bug 1**: `account_withdrawals.status_api` SOLO se escribe desde el endpoint
+  `GET /api/accounts/{id}/withdraw/status/{tx_id}` en `app.py`, que SOLO lo dispara el `setInterval`
+  del navegador. `account_refresh.py` SÍ marca la cuenta como "hot" (by passea filtros de grade/pool/lock)
+  cuando tiene un retiro pendiente, pero su ciclo (cada 1200s = 20 min) SOLO hace fetch de balance +
+  `withdrawal_ready` (PASO1) — NUNCA llama `get_pending_withdrawal`/`get_bank_transaction` para resolver
+  el retiro. El loop que "sabe" que hay un retiro pendiente no tiene ningún camino de código para
+  resolverlo.
+- **Síntoma Bug 2**: el badge del dashboard mostraba "BANAMEX" (`accounts.withdrawal_institution`) mientras
+  que el retiro realmente disparado fue a INBURSA (`account_withdrawals.institution_name`,
+  transactionId `90502403-...`). Verificado con SELECT directo en BD prod (KVM4) — ambas filas con
+  timestamp `15:28:19` del mismo día, valores distintos.
+- **Causa raíz Bug 2**: `account_refresh.py` hace su PROPIA llamada a `get_bank_accounts` (PASO1) para
+  decidir `withdrawal_institution`, totalmente independiente de la llamada que hace `execute_withdrawal`
+  en `withdrawals.py` al disparar el retiro real. Dos llamadas independientes a la misma API pueden devolver
+  resultados distintos en la misma ventana de tiempo — no hay una sola fuente de verdad para "cuál es la
+  cuenta bancaria destino ahora mismo".
+- **Fix Bug 1**: `withdrawals.py` — nueva función `resolve_withdrawal_status(jwt, proxy_url, tx_id, ...)`
+  que encapsula la MISMA lógica de decisión PASO4+PASO5 que tenía `app.py::withdraw_status` inline
+  (si `status_api==6` confirmar con PASO5; si no hay pending pero status previo no es terminal, intentar
+  PASO5; si nada resuelve, dejar idle para el próximo ciclo). `account_refresh.py` — nuevo bg-loop
+  `_withdrawal_resolution_loop` registrado en `app._lifespan`, corre cada `WITHDRAWAL_POLL_INTERVAL_SEC=60s`
+  (piso documentado en `withdrawals.py` PASO4), itera SOLO cuentas con retiro pendiente, llama
+  `resolve_withdrawal_status` y persiste el resultado + emite broadcast SSE `withdrawal_status` si pasa a
+  terminal — sin depender de ningún tab abierto. `app.py::withdraw_status` refactorizada para llamar la
+  MISMA función (no duplicar lógica).
+- **Fix Bug 2**: `withdrawals.execute_withdrawal` — tras disparar el retiro con éxito, persiste
+  `accounts.withdrawal_institution` con la institución REALMENTE usada (resultado de SU PROPIA llamada
+  `get_bank_accounts`), en vez de dejar que el próximo ciclo de `account_refresh.py` (hasta 20 min después)
+  sea el único que la actualice.
+- **Verificado**: 99/99 tests (`test_account_refresh.py` + `test_withdrawals.py` + `test_withdrawals_endpoints.py`)
+  pasan sin regresiones. Tests nuevos: resolución server-side con status_api=2→6, constante 60s≠1200s,
+  persistencia de institución Bug 2 (stale BANAMEX→INBURSA), 5 tests de `resolve_withdrawal_status` con
+  mock transport.
+
 ## `clabe_fetch.py` nunca se había deployado a KVM4 — crash-loop al deployar `withdrawals.py` (2026-07-24)
 
 **Síntoma**: al deployar el botón de retiro automático (`app.py` + `withdrawals.py` + frontend) y hacer `docker compose restart web`, el container entró en crash-loop: `ModuleNotFoundError: No module named 'clabe_fetch'` en cada intento de arranque (`withdrawals.py:23` hace `from clabe_fetch import _load_jwt_for_account, _get_admin_proxy_url`).

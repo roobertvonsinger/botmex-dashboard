@@ -130,6 +130,7 @@ from withdrawals import (
     execute_withdrawal,
     get_pending_withdrawal,
     get_bank_transaction,
+    resolve_withdrawal_status,
     NoApprovedWithdrawalAccount,
     MultipleApprovedAccounts,
     ConcurrentWithdrawalPending,
@@ -2835,6 +2836,8 @@ async def _lifespan(_app: FastAPI):
     asyncio.create_task(_release_watchdog_loop())
     asyncio.create_task(_jwt_keepalive_loop())
     asyncio.create_task(_account_refresh_loop())
+    import account_refresh
+    asyncio.create_task(account_refresh._withdrawal_resolution_loop())
     asyncio.create_task(_startup_telegram_notify())
     yield
 
@@ -3804,133 +3807,24 @@ async def withdraw_status(account_id: int, tx_id: str, user: dict = Depends(requ
     except Exception:
         pass
 
-    expected_digits = row["account_digits"]
-    prev_status = row["status_api"]
-    pending = None
-    if jwt:
-        try:
-            pending = await get_pending_withdrawal(jwt, proxy_url)
-        except Exception:
-            pending = None
-
-    out = {
-        "transactionId": tx_id,
-        "accountDigits": expected_digits,
-        "alerts": {"gatewayMismatch": False, "digitsMismatch": False},
-    }
-
-    if pending is not None:
-        status_api = pending.get("transactionStatus")
-        out["transactionStatus"] = status_api
-        if status_api == 6:
-            # bug#2: status:6 = BetMexico lo ejecutó, NO que aterrizó en el banco.
-            # Confirmar rail externo vía PASO5 antes de reportar "delivered".
-            bank_tx = None
-            if jwt:
-                try:
-                    bank_tx = await get_bank_transaction(
-                        jwt, proxy_url, tx_id, expected_digits=expected_digits
-                    )
-                except Exception:
-                    bank_tx = None
-            out["status"] = "successful"
-            out["phase"] = "executed"
-            out["description"] = "Ejecutado por BetMexico — confirma en tu banco"
-            if bank_tx is not None:
-                out["lastModifiedUtc"] = bank_tx.get("lastModifiedUtc")
-                out["gateway"] = bank_tx.get("gateway")
-                out["alerts"]["gatewayMismatch"] = bool(bank_tx.get("gateway_mismatch"))
-                out["alerts"]["digitsMismatch"] = bool(bank_tx.get("digits_mismatch"))
-                with db(write=True) as c:
-                    c.execute(
-                        "UPDATE account_withdrawals SET status_api=?, gateway=?, "
-                        "last_modified_utc=? WHERE transaction_id=?",
-                        (status_api, bank_tx.get("gateway"), bank_tx.get("lastModifiedUtc"), tx_id),
-                    )
-            else:
-                with db(write=True) as c:
-                    c.execute(
-                        "UPDATE account_withdrawals SET status_api=? WHERE transaction_id=?",
-                        (status_api, tx_id),
-                    )
-        else:
-            out["status"] = "pending"
-            out["phase"] = "pending"
-            out["description"] = pending.get("transactionStatusDescription") or "Pendiente"
-            with db(write=True) as c:
-                c.execute(
-                    "UPDATE account_withdrawals SET status_api=? WHERE transaction_id=?",
-                    (status_api, tx_id),
-                )
-    elif prev_status == 6:
-        out["status"] = "completed"
-        out["phase"] = "completed"
-        out["transactionStatus"] = prev_status
-        out["lastModifiedUtc"] = row["last_modified_utc"]
-        out["gateway"] = row["gateway"]
-    elif prev_status is not None and prev_status < 0:
-        out["status"] = "failed"
-        out["phase"] = "failed"
-        out["transactionStatus"] = prev_status
-        out["lastModifiedUtc"] = row["last_modified_utc"]
-        out["gateway"] = row["gateway"]
-    else:
-        # Root cause (2026-07-26, medido con tx real 232b8814...): BetMexico saca
-        # el retiro de PendingWithdrawal (PASO4→None) en cuanto se resuelve — MUCHO
-        # antes de que este endpoint vuelva a mirar el rail externo. status_api en
-        # BD quedaba pegado al último valor intermedio que reportó PASO4 mientras
-        # aún aparecía ahí (ej. 2), y sin este PASO5 el status caía en "idle" para
-        # siempre: el frontend nunca ve un estado terminal → "Retiro en proceso"
-        # colgado eternamente aunque BetMexico ya lo haya ejecutado. PASO5 es la
-        # única fuente que sigue teniendo el desenlace real una vez que cae de la
-        # lista de pendientes.
-        bank_tx = None
-        if jwt:
-            try:
-                bank_tx = await get_bank_transaction(
-                    jwt, proxy_url, tx_id, expected_digits=expected_digits
-                )
-            except Exception:
-                bank_tx = None
-        if bank_tx is not None and bank_tx.get("transactionStatus") == 6:
-            out["status"] = "successful"
-            out["phase"] = "executed"
-            out["description"] = "Ejecutado por BetMexico — confirma en tu banco"
-            out["transactionStatus"] = 6
-            out["lastModifiedUtc"] = bank_tx.get("lastModifiedUtc")
-            out["gateway"] = bank_tx.get("gateway")
-            out["alerts"]["gatewayMismatch"] = bool(bank_tx.get("gateway_mismatch"))
-            out["alerts"]["digitsMismatch"] = bool(bank_tx.get("digits_mismatch"))
-            with db(write=True) as c:
-                c.execute(
-                    "UPDATE account_withdrawals SET status_api=?, gateway=?, "
-                    "last_modified_utc=? WHERE transaction_id=?",
-                    (6, bank_tx.get("gateway"), bank_tx.get("lastModifiedUtc"), tx_id),
-                )
-        elif bank_tx is not None:
-            # El rail respondió pero sin status 6 — reporta lo que dice, no lo
-            # pisamos con un valor inventado.
-            out["status"] = "pending"
-            out["phase"] = "pending"
-            out["transactionStatus"] = bank_tx.get("transactionStatus")
-            out["lastModifiedUtc"] = bank_tx.get("lastModifiedUtc")
-            out["gateway"] = bank_tx.get("gateway")
-        else:
-            # Ni PASO4 ni PASO5 confirman nada ahora mismo — de verdad desconocido,
-            # NO se disfraza de completado ni de fallido sin evidencia. El próximo
-            # poll lo vuelve a intentar.
-            out["status"] = "idle"
-            out["phase"] = "idle"
-            out["transactionStatus"] = prev_status
-            out["lastModifiedUtc"] = row["last_modified_utc"]
-            out["gateway"] = row["gateway"]
+    out = await resolve_withdrawal_status(
+        jwt=jwt,
+        proxy_url=proxy_url,
+        tx_id=tx_id,
+        expected_digits=row["account_digits"],
+        prev_status_api=row["status_api"],
+        prev_gateway=row["gateway"],
+        prev_last_modified=row["last_modified_utc"],
+        _get_pending=get_pending_withdrawal,
+        _get_bank_tx=get_bank_transaction,
+    )
 
     # SSE broadcast cuando el status cambia a terminal (Task #12): permite que
     # otros clientes/tabs/feed vean el cambio sin tener que hacer poll.
     _WD_TERMINAL = {6}  # status_api 6 = ejecutado
     new_status_api = out.get("transactionStatus")
     new_terminal = new_status_api in _WD_TERMINAL or out.get("status") in ("successful", "completed", "failed")
-    was_terminal = prev_status in _WD_TERMINAL
+    was_terminal = row["status_api"] in _WD_TERMINAL
     if new_terminal and not was_terminal:
         _broadcast({
             "type": "activity", "kind": "withdrawal_status",
