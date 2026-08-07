@@ -1073,6 +1073,12 @@ async def run_auto_mission(
                             failed += 1
                             account_declines += 1
                             break  # cuenta muerta — siguiente cuenta
+                        if code == "CARD_LOCKED_OTHER_ACCOUNT":
+                            # Candado DB (deposits.py) — determinístico, jamás
+                            # cambia entre intentos. No es decline de la cuenta:
+                            # no cuenta para MM_MAX_ACCOUNT_DECLINES_PER_RUN.
+                            failed += 1
+                            break  # siguiente tarjeta
                         # TRANSITORIO (nuestro lado) → reintentar el par
                         transient += 1
                         if transient > MATCH_TRANSIENT_RETRIES:
@@ -1272,6 +1278,7 @@ async def run_auto_mission(
                         or dep._mm_is_real_decline(code)
                         or code in dep.MM_DEAD_RC
                         or code == "PENDING_NOT_APPLIED"
+                        or code == "CARD_LOCKED_OTHER_ACCOUNT"
                         or dep._mm_is_ambiguous_charge(code)
                     ):
                         if code == "RATE_LIMITED":

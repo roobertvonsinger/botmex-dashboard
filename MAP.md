@@ -100,13 +100,13 @@ prewarm.py (router)
 | `account_refresh.py` | 577 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5054 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1348 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1355 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `card_checker.py` | 234 | `—` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 152 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
-| `deposits.py` | 2867 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2868 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 396 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 416 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 904 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -144,6 +144,7 @@ prewarm.py (router)
 | `test_refresh_single_guard.py` | 77 | `—` | _[completar]_ |
 | `test_renapo_validator.py` | 50 | `—` | _[completar]_ |
 | `test_scheduled_deposit_3ds_logging.py` | 93 | `—` | _[completar]_ |
+| `test_scheduled_deposit_card_locked.py` | 80 | `—` | _[completar]_ |
 | `test_search.py` | 70 | `—` | _[completar]_ |
 | `test_sse_visibility.py` | 88 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
@@ -247,6 +248,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `7e94e1f` | fix(retiros): reconciliación server-side de status pendiente + fuente única de institución |
 | `ae8c43e` | fix(pantalla): historial de Movimientos revuelto por sort defensivo que ignoraba 'T' vs espacio |
 | `a3f9ee9` | fix(bot+rate-limit): mensaje de /bet ya no se queda pegado en Telegram + 429 mata la cuenta a la primera |
 | `95b2ff0` | fix(logs+lifespan+config): filtros de ruido de red Telegram en _LOG_NOISE_PATTERNS + lifespan reemplaza @on_event deprecado + config.py sin betmexico_db (circular import) + silenciar warning PTB per_message=False |
@@ -258,7 +260,6 @@ prewarm.py (router)
 | `44984f5` | feat(portal): ronda 3 (URL /{username}, view_as str) + empty state accionable (liga al bot + /bet) |
 | `dc1899b` | feat(bot): /adduser oculto al publico (solo Superadmin) + raps de /start con flow + help con 'Volver al inicio' |
 | `3baf912` | docs: cierre de sesión — anti-fuga bot/portal auditado + deployado, revisión final de main verificada |
-| `35dd0d8` | feat(bot): /start con logo nuevo botmexico.net (reply_photo con fallback) |
 <!-- GEN:end:recientes -->
 
 ---

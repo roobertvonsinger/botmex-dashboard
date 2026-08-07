@@ -2,6 +2,19 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## CARD_LOCKED_OTHER_ACCOUNT se reintentaba 4 veces contra un candado determinístico (corregido 2026-08-07)
+
+- **Síntoma**: Robert reportó (log real) una misión `/bet` (matchmaking de Modo Auto) reintentando la MISMA tarjeta 5 veces en ~2 minutos (14:44:30 → 14:46:10, exactamente 25s de separación), cada vez con `Code: CARD_LOCKED_OTHER_ACCOUNT | Reason: Tarjeta ya aprobada en {otro email} — bloqueada para otras cuentas`.
+- **Causa raíz**: `deposits.py` tiene un candado DB (línea ~1245-1260, antes de tocar BetMexico) que consulta `account_cards` y corta con `result_code=CARD_LOCKED_OTHER_ACCOUNT` si la tarjeta ya está ligada a otro email — funciona bien, evita el cobro en la cuenta equivocada. El bug estaba en los 3 loops de retry que consumen ese `result_code`: ninguno lo incluía en su lista de códigos terminales (`_mm_is_real_decline` / `MM_DEAD_RC` / `MM_THREEDS_RC` / `_mm_is_ambiguous_charge`), así que caía siempre al branch catch-all "TRANSITORIO (nuestro lado)" y se reintentaba con backoff de 25s hasta agotar el máximo — contra un resultado 100% determinístico (misma fila de `account_cards`, jamás cambia entre intentos).
+- **3 call sites con el mismo hueco** (mismo patrón duplicado, no había una única fuente de verdad para "qué es terminal"):
+  - `auto_deposit.py:1066` — matchmaking probe loop (Fase 1 de Modo Auto, `MATCH_TRANSIENT_RETRIES=4`) — es el que generó el log reportado.
+  - `auto_deposit.py:1275` — scheduled loop (Fase 2 de Modo Auto, `SCHED_MAX_TRANSIENT_RETRIES=4`).
+  - `deposits.py:2717` — endpoint standalone `scheduled_create` (`SCHED_MAX_TRANSIENT_RETRIES=4`).
+- **Fix**: agregado `code == "CARD_LOCKED_OTHER_ACCOUNT"` a la condición terminal en los 3 sitios. En `auto_deposit.py:1066` se le dio rama propia (no cuenta como `account_declines` — no es decline de la cuenta, es un conflicto de ruteo de tarjeta ajeno a su historial).
+- **Tests (TDD, RED confirmado antes del fix)**: `tests/test_auto_mission.py::test_mission_matchmaking_terminal_on_card_locked` (reproduce el log exacto: 5 intentos → 1), `tests/test_auto_mission.py::test_mission_scheduled_aborts_on_card_locked`, `test_scheduled_deposit_card_locked.py::test_scheduled_card_locked_aborts_without_retry`. 35/35 verdes tras el fix, sin regresiones en `test_deposit_status_classify.py` ni el resto de `test_auto_mission.py`.
+- **Nota**: `classify_deposit_status` (fuente de verdad del status persistido) ya clasificaba `CARD_LOCKED_OTHER_ACCOUNT` correctamente como `"incomplete"` vía el catch-all neutral (confirmado en el log: UI mostraba `💳 incomplete`, nunca `rejected`) — ese lado no tenía bug, solo el loop de retry.
+- 🔵 Pendiente: smoke en vivo — no se forzó el escenario contra BetMexico real, solo verificado con unit tests (mocks de `_run_deposit_with_phases`/`_attempt`).
+
 ## Historial de "Movimientos" en La Pantalla salía con fechas revueltas (corregido 2026-08-06)
 
 - **Síntoma**: Robert reportó (con captura) el historial de una cuenta mostrando 06-ago 07:43 y 06:45 arriba, y DEBAJO 06-ago 09:00/08:08/08:07 (rechazos), rompiendo el orden cronológico descendente esperado.

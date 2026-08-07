@@ -2715,7 +2715,8 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
                 # aplicarse) → detener SIN reintentar, para no re-ejecutar submit_card
                 # y provocar un doble cargo.
                 if (_mm_is_real_decline(code) or code in MM_DEAD_RC
-                        or code == "PENDING_NOT_APPLIED" or _mm_is_ambiguous_charge(code)):
+                        or code == "PENDING_NOT_APPLIED" or code == "CARD_LOCKED_OTHER_ACCOUNT"
+                        or _mm_is_ambiguous_charge(code)):
                     _broadcast({
                         "type": "activity", "kind": "scheduled",
                         "sched_id": sched_id, "iter": iter_num, "total": repetitions,

@@ -228,7 +228,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_unlock` | def | L706–L715 |
 | `_broadcast_mission` | def | L718–L747 |
 | `_stop_pool` | def | L750–L757 |
-| `run_auto_mission` | def | L761–L1348 |
+| `run_auto_mission` | def | L761–L1355 |
 
 ### `autoexclusion.py`
 
@@ -327,9 +327,9 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_mm_session_update` | def | L1917–L1926 |
 | `multi_stream` | def | L1930–L2444 |
 | `multi_cancel` | def | L2448–L2453 |
-| `scheduled_create` | def | L2466–L2829 |
-| `scheduled_list` | def | L2833–L2855 |
-| `scheduled_cancel` | def | L2859–L2867 |
+| `scheduled_create` | def | L2466–L2830 |
+| `scheduled_list` | def | L2834–L2856 |
+| `scheduled_cancel` | def | L2860–L2868 |
 
 ### `jwt_keeper.py`
 
@@ -848,6 +848,15 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_FakeRequest` | class | L25–L30 |
 | `sched_harness` | def | L34–L65 |
 | `test_scheduled_3ds_abort_logs_it` | def | L69–L93 |
+
+### `test_scheduled_deposit_card_locked.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `_FakePool` | class | L16–L24 |
+| `_FakeRequest` | class | L27–L32 |
+| `sched_harness` | def | L36–L64 |
+| `test_scheduled_card_locked_aborts_without_retry` | def | L68–L80 |
 
 ### `test_search.py`
 

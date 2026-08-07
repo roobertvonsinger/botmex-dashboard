@@ -132,6 +132,23 @@ def test_mission_matchmaking_skips_on_3ds(H):
     assert matches[0]["card_pipe"] == P2  # 3DS no es decline: probó la siguiente
 
 
+def test_mission_matchmaking_terminal_on_card_locked(H):
+    """Bug 2026-08-07: CARD_LOCKED_OTHER_ACCOUNT es el candado DB de deposits.py
+    (tarjeta ya ligada a otro email) — determinístico, jamás cambia entre
+    intentos. No estaba en ninguna lista terminal y caía al branch
+    'transitorio', quemando los 4 reintentos (25s c/u, MATCH_TRANSIENT_RETRIES)
+    contra un resultado que nunca iba a cambiar. Debe abortar la tarjeta en el
+    primer intento, igual que un decline real."""
+    H.script = lambda email, amount, kw: {
+        "success": False, "result_code": "CARD_LOCKED_OTHER_ACCOUNT",
+        "error": "Tarjeta ya aprobada en otro@x.com — bloqueada para otras cuentas",
+    }
+    run(H, plan(1))
+    probes = [c for c in H.run_calls if c["amount"] == ad.PROBE_AMOUNT]
+    assert len(probes) == 1, f"debió abortar en el primer intento, hizo {len(probes)}"
+    assert 25 not in H.sleeps, "no debió dormir el backoff de reintento transitorio"
+
+
 def test_mission_matchmaking_rate_limit_marks_dead(H):
     # Robert 2026-08-06: ya no enfriar-y-reintentar — a la primera 429, DEAD.
     def script(email, amount, kw):
@@ -282,6 +299,29 @@ def test_mission_scheduled_aborts_on_decline(H):
     run(H, plan(1))
     sched = [c for c in H.run_calls if c["amount"] == 150]
     assert len(sched) == 2  # paró en el decline, no siguió a 9
+    assert H.updates[-1]["status"] == "completed"
+    assert H.updates[-1]["total_failed"] == 1
+
+
+def test_mission_scheduled_aborts_on_card_locked(H):
+    """Mismo hueco de clasificación que la matchmaking (bug 2026-08-07), pero en
+    Fase 2 (scheduled): CARD_LOCKED_OTHER_ACCOUNT debe abortar la rep, no
+    reintentar contra un candado DB que no va a cambiar."""
+    H.target_count = 9
+    sched_n = {"n": 0}
+
+    def script(email, amount, kw):
+        if amount == ad.PROBE_AMOUNT:
+            return {"success": True, "result_code": "BANK_APPROVED", "jwt": "J", "used_proxy": "P"}
+        sched_n["n"] += 1
+        if sched_n["n"] == 2:
+            return {"success": False, "result_code": "CARD_LOCKED_OTHER_ACCOUNT",
+                    "error": "Tarjeta ya aprobada en otro@x.com"}
+        return {"success": True, "result_code": "BANK_APPROVED", "jwt": "J", "used_proxy": "P"}
+    H.script = script
+    run(H, plan(1))
+    sched = [c for c in H.run_calls if c["amount"] == 150]
+    assert len(sched) == 2, f"debió abortar en el candado, no reintentar (hizo {len(sched)})"
     assert H.updates[-1]["status"] == "completed"
     assert H.updates[-1]["total_failed"] == 1
 
