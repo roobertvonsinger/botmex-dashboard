@@ -248,6 +248,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `176a781` | fix(auto-deposit): CARD_LOCKED_OTHER_ACCOUNT ya no se reintenta contra un candado determinístico |
 | `7e94e1f` | fix(retiros): reconciliación server-side de status pendiente + fuente única de institución |
 | `ae8c43e` | fix(pantalla): historial de Movimientos revuelto por sort defensivo que ignoraba 'T' vs espacio |
 | `a3f9ee9` | fix(bot+rate-limit): mensaje de /bet ya no se queda pegado en Telegram + 429 mata la cuenta a la primera |
@@ -259,7 +260,6 @@ prewarm.py (router)
 | `2a83a80` | chore: .gitattributes normalizacion line-endings (text=auto eol=lf + binarios) |
 | `44984f5` | feat(portal): ronda 3 (URL /{username}, view_as str) + empty state accionable (liga al bot + /bet) |
 | `dc1899b` | feat(bot): /adduser oculto al publico (solo Superadmin) + raps de /start con flow + help con 'Volver al inicio' |
-| `3baf912` | docs: cierre de sesión — anti-fuga bot/portal auditado + deployado, revisión final de main verificada |
 <!-- GEN:end:recientes -->
 
 ---
