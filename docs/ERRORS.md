@@ -2,13 +2,13 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
-## AttributeError: 'LoginResult' object has no attribute 'status' (corregido 2026-08-08, pendiente deploy)
+## AttributeError: 'LoginResult' object has no attribute 'status' (corregido y deployado 2026-08-08)
 
 - **Síntoma**: En logs de `/app/web/telegram_bot_mock/bot.py`, `_run_check_task` tronaba con `AttributeError: 'LoginResult' object has no attribute 'status'` cada vez que `gentle_login` devolvía una cuenta muerta. Como la excepción no estaba dentro de un `try` por-combo sino que envuelve TODO el for-loop, un solo combo DEAD abortaba el `/check` completo (el resto de la tanda quedaba sin procesar) y el operador recibía `❌ Error durante el check: 'LoginResult' object has no attribute 'status'` en vez del resumen.
 - **Causa raíz**: `bot.py:707` comparaba `login_res.status == "DEAD"`, pero el dataclass `LoginResult` (`login_orchestrator.py:142`) nunca tuvo un campo `status` — el resultado de una cuenta muerta se señaliza con `account_dead: bool = True` + `code=<clasificación específica>` (ver `login_orchestrator.py:386-390`, `code` viene de `_classify_dead()`, nunca es literalmente `"DEAD"`). También usaba `login_res.error_message`, campo que tampoco existe (el correcto es `.error`).
-- **Fix**: `bot.py:707-708` — `elif login_res.status == "DEAD"` → `elif login_res.account_dead:`, y `login_res.error_message` → `login_res.error`.
-- **Verificación**: nuevo test `tests/test_telegram_bot_mock.py::test_run_check_task_marks_dead_account_without_crashing` (antes no existía NINGÚN test que ejercitara `_run_check_task`, por eso el bug pasó el commit anterior). `pytest tests/test_telegram_bot_mock.py` → 23/23.
-- **Pendiente**: deploy a KVM4 en espera — Robert tiene un depósito programado corriendo en el dashboard; se hace el `docker cp` + restart del contenedor del bot cuando termine, para no interrumpir la misión en vuelo.
+- **Fix**: `bot.py:707-708` — `elif login_res.status == "DEAD"` → `elif login_res.account_dead:`, y `login_res.error_message` → `login_res.error`. Commit `a9d58fb`.
+- **Verificación**: nuevo test `tests/test_telegram_bot_mock.py::test_run_check_task_marks_dead_account_without_crashing` (antes no existía NINGÚN test que ejercitara `_run_check_task`, por eso el bug pasó el commit anterior). `pytest tests/test_telegram_bot_mock.py` → 23/23. **Deploy**: `scp` + `docker restart betmexico-mock-bot` en KVM4, 2026-08-08 12:50:15 (hora local). Confirmado con `docker logs betmexico-mock-bot` completo: última línea del log ANTES del restart con este error es `10:37:57`; **cero ocurrencias nuevas después de `12:50:15`** — el fix quedó sostenido en producción.
+- **Trampa de log viejo (para no repetir el susto)**: el visor de logs del dashboard muestra las últimas ~300 líneas del log crudo de Docker. `docker restart` NO trunca ese buffer — solo agrega una línea `Application started` arriba de lo que ya había. Si el contenedor no lleva muchas horas corriendo, errores viejos de HORAS ANTES del fix siguen cayendo dentro de esa ventana y se ven pegados justo debajo del arranque nuevo, como si acabaran de pasar. Antes de asumir que un fix deployado no sirvió, comparar el **timestamp exacto de cada línea de error** contra el timestamp de `Application started` — no solo su posición visual en el log.
 
 ## AttributeError: 'CaptchaTokenPool' object has no attribute 'close' + TypeError: _db_save_txns_and_recalc() got an unexpected keyword argument 'account_id' (corregido 2026-08-08)
 

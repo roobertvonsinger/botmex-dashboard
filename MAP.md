@@ -248,6 +248,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a9d58fb` | fix(mock-bot): LoginResult no tiene .status — cuenta DEAD tumbaba el /check completo |
 | `90cec95` | fix(mock-bot): corregir AttributeError de CaptchaTokenPool.stop y kwarg invalido en _db_save_txns_and_recalc |
 | `da47274` | docs(portal): registrar critique + handoff de la ronda 3 (ya implementada en 44984f5) |
 | `176a781` | fix(auto-deposit): CARD_LOCKED_OTHER_ACCOUNT ya no se reintenta contra un candado determinístico |
@@ -259,7 +260,6 @@ prewarm.py (router)
 | `d0e2814` | fix(logs+auto_deposit): la vista de logs se congelaba con since corrupto (lastTs sin validar) + DB_PATH NameError en CLABE STP + LOCK de arranque baja a warning |
 | `db3a81b` | fix(bot): scope del SA debe llevar TODOS los comandos (BotCommandScopeChat reemplaza, no fusiona) |
 | `41c89fe` | fix(bot): botones del /start fallaban con foto (edit_message_caption en vez de edit_message_text) |
-| `2a83a80` | chore: .gitattributes normalizacion line-endings (text=auto eol=lf + binarios) |
 <!-- GEN:end:recientes -->
 
 ---
