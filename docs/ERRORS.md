@@ -2,6 +2,19 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## AttributeError: 'CaptchaTokenPool' object has no attribute 'close' + TypeError: _db_save_txns_and_recalc() got an unexpected keyword argument 'account_id' (corregido 2026-08-08)
+
+- **Síntoma**: Errores repetidos en logs de `/app/web/telegram_bot_mock/bot.py` durante ejecuciones de `_run_check_task`:
+  - `future: <Task finished name='Task-23293' coro=<_run_check_task() done... exception=AttributeError("'CaptchaTokenPool' object has no attribute 'close'")>`
+  - `TypeError: _db_save_txns_and_recalc() got an unexpected keyword argument 'account_id'`
+- **Causa raíz**:
+  1. En `bot.py:739` (bloque `finally` de `_run_check_task`), se llamaba `await pool.close()`, pero la clase `CaptchaTokenPool` solo implementa el método `stop()`.
+  2. En `bot.py:701`, se invocaba `_db_save_txns_and_recalc(email, details, account_id=details.get("account_id"))`, pero la firma oficial en `prewarm.py:278` es `def _db_save_txns_and_recalc(email: str, details: dict, operator_id: int) -> None:`. Al pasar `account_id=` como keyword argument, Python lanzaba `TypeError`.
+- **Fix**:
+  1. En `bot.py:739`, se cambió `await pool.close()` por `await pool.stop()`.
+  2. En `bot.py:701`, se cambió `account_id=details.get("account_id")` por `operator_id` (pasado a `_run_check_task`).
+- **Verificación**: `pytest tests/test_telegram_bot_mock.py` pasó 22/22 pruebas exitosamente.
+
 ## CARD_LOCKED_OTHER_ACCOUNT se reintentaba 4 veces contra un candado determinístico (corregido 2026-08-07)
 
 - **Síntoma**: Robert reportó (log real) una misión `/bet` (matchmaking de Modo Auto) reintentando la MISMA tarjeta 5 veces en ~2 minutos (14:44:30 → 14:46:10, exactamente 25s de separación), cada vez con `Code: CARD_LOCKED_OTHER_ACCOUNT | Reason: Tarjeta ya aprobada en {otro email} — bloqueada para otras cuentas`.

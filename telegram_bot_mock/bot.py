@@ -699,7 +699,7 @@ async def _run_check_task(
                 if details and not _fetch_looks_empty(details):
                     _db_upsert_balance(email, details)
                     _db_save_txns_and_recalc(
-                        email, details, account_id=details.get("account_id")
+                        email, details, operator_id
                     )
                     hits_count += 1
                 else:
@@ -736,7 +736,7 @@ async def _run_check_task(
         await bot.send_message(chat_id=chat_id, text=f"❌ Error durante el check: {ex}")
     finally:
         if pool:
-            await pool.close()
+            await pool.stop()
 
 
 # ─────────────────────────────────────────────────────────────────────
