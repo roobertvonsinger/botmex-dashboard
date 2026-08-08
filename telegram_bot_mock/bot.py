@@ -704,8 +704,8 @@ async def _run_check_task(
                     hits_count += 1
                 else:
                     hits_count += 1
-            elif login_res.status == "DEAD":
-                _db_mark_dead(email, f"Check Login Failed: {login_res.error_message}")
+            elif login_res.account_dead:
+                _db_mark_dead(email, f"Check Login Failed: {login_res.error}")
                 dead_count += 1
             else:
                 errors_count += 1

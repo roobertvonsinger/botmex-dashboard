@@ -248,6 +248,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `90cec95` | fix(mock-bot): corregir AttributeError de CaptchaTokenPool.stop y kwarg invalido en _db_save_txns_and_recalc |
 | `da47274` | docs(portal): registrar critique + handoff de la ronda 3 (ya implementada en 44984f5) |
 | `176a781` | fix(auto-deposit): CARD_LOCKED_OTHER_ACCOUNT ya no se reintenta contra un candado determinístico |
 | `7e94e1f` | fix(retiros): reconciliación server-side de status pendiente + fuente única de institución |
@@ -259,7 +260,6 @@ prewarm.py (router)
 | `db3a81b` | fix(bot): scope del SA debe llevar TODOS los comandos (BotCommandScopeChat reemplaza, no fusiona) |
 | `41c89fe` | fix(bot): botones del /start fallaban con foto (edit_message_caption en vez de edit_message_text) |
 | `2a83a80` | chore: .gitattributes normalizacion line-endings (text=auto eol=lf + binarios) |
-| `44984f5` | feat(portal): ronda 3 (URL /{username}, view_as str) + empty state accionable (liga al bot + /bet) |
 <!-- GEN:end:recientes -->
 
 ---

@@ -2,6 +2,7 @@
 
 import pytest
 import sqlite3
+import sys
 import asyncio
 import importlib
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -13,6 +14,7 @@ from app import db, filter_and_sanitize_check_combos
 import telegram_bot_mock.config as mock_config
 import telegram_bot_mock.bot as mock_bot
 from telegram_bot_mock.config import is_authorized, SUPERADMIN_ID
+from login_orchestrator import LoginResult
 from telegram_bot_mock.bot import (
     start_cmd,
     help_cmd,
@@ -543,3 +545,49 @@ def test_db_duplicates_and_deduplication(seed_db):
     assert "4532015112830366" in res["in_db_cards"]
     assert len(res["valid_combos"]) == 1
     assert res["valid_combos"][0]["email"] == "new2@test.com"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PRUEBA _run_check_task — RAMA DEAD (regresión: LoginResult no tiene .status)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_run_check_task_marks_dead_account_without_crashing(seed_db, monkeypatch):
+    """Una cuenta DEAD no debe tumbar el batch completo con AttributeError."""
+    monkeypatch.delenv("CAPMONSTER_KEY", raising=False)
+    monkeypatch.delenv("BMX_CAPMONSTER_KEY", raising=False)
+
+    # betmexico_login_service.py / betmexico_login_api.py solo existen en el VPS
+    # (sibling dir al deploy); localmente se stubbean para ejercitar _run_check_task.
+    module_type = importlib.import_module("types").ModuleType
+    fake_login_service = module_type("betmexico_login_service")
+    fake_login_service.make_pool = lambda *a, **k: None
+    monkeypatch.setitem(sys.modules, "betmexico_login_service", fake_login_service)
+
+    fake_login_api = module_type("betmexico_login_api")
+    fake_login_api.BetmexicoApiChecker = MagicMock()
+    monkeypatch.setitem(sys.modules, "betmexico_login_api", fake_login_api)
+
+    dead_login = LoginResult(
+        ok=False, code="LOGIN_DENIED", account_dead=True, error="credenciales invalidas"
+    )
+    monkeypatch.setattr(mock_bot, "gentle_login", AsyncMock(return_value=dead_login))
+
+    marked = []
+    monkeypatch.setattr(
+        mock_bot, "_db_mark_dead", lambda email, reason: marked.append((email, reason))
+    )
+
+    bot = MagicMock()
+    status_msg = MagicMock()
+    status_msg.edit_text = AsyncMock()
+    bot.send_message = AsyncMock(return_value=status_msg)
+
+    combos = [{"email": "dead@test.com", "password": "x", "card_pipe": ""}]
+
+    await mock_bot._run_check_task(111, bot, combos, 1)
+
+    assert marked == [("dead@test.com", "Check Login Failed: credenciales invalidas")]
+    final_text = bot.send_message.call_args_list[-1].kwargs["text"]
+    assert "Cuentas Muertas (DEAD):</b> 1" in final_text
+    assert "❌ Error durante el check" not in final_text
