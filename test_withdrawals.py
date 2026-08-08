@@ -346,23 +346,35 @@ def test_get_pending_withdrawal_non200_raises(mock_bmx_transport):
         asyncio.run(wd.get_pending_withdrawal("JWT", None, transport=transport))
 
 
-# ── B5 — get_bank_transaction (PASO5) ─────────────────────────────────────
+# ── B5 — get_bank_transaction (PASO5, vía Transactions/ByUser) ────────────
+# Root cause (2026-08-08, verificado en vivo con tx real bb4a346c...):
+# /api/wallet/bankTransaction/{tx_id} NUNCA trae gateway/lastAccountDigits
+# para retiros (solo transactionStatus/reference/amount). El endpoint que SÍ
+# trae esos campos es /api/Wallet/Transactions/ByUser (verificado en vivo,
+# misma tx: gateway:2, account:"5646", lastAccountDigits:"5646"). Sin esto,
+# gateway_mismatch/digits_mismatch quedaban SIEMPRE False — guardarrail ciego.
+
+
+def _txlist_response(items, page=1, page_size=50):
+    return _json_response(200, {"data": {"results": items}})
 
 
 def test_get_bank_transaction_happy(mock_bmx_transport):
     def handler(request):
-        return _json_response(
-            200,
-            {
-                "id": "273",
-                "transactionStatus": 6,
-                "lastModifiedUtc": "2026-07-24T18:18:35",
-                "reference": "3347",
-                "transactionTypeDescription": "Retiro",
-                "amount": 100.0,
-                "gateway": 2,
-                "lastAccountDigits": "1215",
-            },
+        return _txlist_response(
+            [
+                {
+                    "id": "273",
+                    "status": 6,
+                    "date": "2026-07-24T18:18:35",
+                    "reference": "3347",
+                    "type": 2,
+                    "amount": 100.0,
+                    "gateway": 2,
+                    "lastAccountDigits": "1215",
+                    "account": "1215",
+                }
+            ]
         )
 
     transport, reqs = mock_bmx_transport(handler)
@@ -371,12 +383,13 @@ def test_get_bank_transaction_happy(mock_bmx_transport):
     )
     assert result["id"] == "273"
     assert result["lastModifiedUtc"] == "2026-07-24T18:18:35"
+    assert result["transactionStatus"] == 6
 
 
 def test_get_bank_transaction_gateway2_spei_ok(mock_bmx_transport):
     def handler(request):
-        return _json_response(
-            200, {"id": "273", "gateway": 2, "lastAccountDigits": "1215"}
+        return _txlist_response(
+            [{"id": "273", "gateway": 2, "lastAccountDigits": "1215", "status": 6}]
         )
 
     transport, reqs = mock_bmx_transport(handler)
@@ -389,8 +402,8 @@ def test_get_bank_transaction_gateway2_spei_ok(mock_bmx_transport):
 
 def test_get_bank_transaction_gateway1_card_alert_bug3(mock_bmx_transport):
     def handler(request):
-        return _json_response(
-            200, {"id": "273", "gateway": 1, "lastAccountDigits": "1215"}
+        return _txlist_response(
+            [{"id": "273", "gateway": 1, "lastAccountDigits": "1215", "status": 6}]
         )
 
     transport, reqs = mock_bmx_transport(handler)
@@ -402,8 +415,8 @@ def test_get_bank_transaction_gateway1_card_alert_bug3(mock_bmx_transport):
 
 def test_get_bank_transaction_digits_mismatch_alert_bug1(mock_bmx_transport):
     def handler(request):
-        return _json_response(
-            200, {"id": "273", "gateway": 2, "lastAccountDigits": "0139"}
+        return _txlist_response(
+            [{"id": "273", "gateway": 2, "lastAccountDigits": "0139", "status": 6}]
         )
 
     transport, reqs = mock_bmx_transport(handler)
@@ -424,6 +437,37 @@ def test_get_bank_transaction_non200_raises(mock_bmx_transport):
     transport, reqs = mock_bmx_transport(handler)
     with pytest.raises(RuntimeError):
         asyncio.run(wd.get_bank_transaction("JWT", None, "273", transport=transport))
+
+
+def test_get_bank_transaction_not_found_in_history_raises(mock_bmx_transport):
+    """La tx no aparece en la primera página del historial → error explícito,
+    no un dict silencioso con flags en False (eso era exactamente el bug)."""
+
+    def handler(request):
+        return _txlist_response(
+            [{"id": "OTRA-TX", "gateway": 2, "lastAccountDigits": "1215", "status": 6}]
+        )
+
+    transport, reqs = mock_bmx_transport(handler)
+    with pytest.raises(RuntimeError, match="273"):
+        asyncio.run(wd.get_bank_transaction("JWT", None, "273", transport=transport))
+
+
+def test_get_bank_transaction_hits_transactions_by_user_endpoint(mock_bmx_transport):
+    """Fija el endpoint correcto — regresión directa del bug: antes pegaba a
+    /api/wallet/bankTransaction/{id} (siempre vacío de gateway/digits para
+    retiros)."""
+
+    def handler(request):
+        return _txlist_response(
+            [{"id": "273", "gateway": 2, "lastAccountDigits": "1215", "status": 6}]
+        )
+
+    transport, reqs = mock_bmx_transport(handler)
+    asyncio.run(wd.get_bank_transaction("JWT", None, "273", transport=transport))
+    url = reqs["calls"][0]["url"]
+    assert "/api/Wallet/Transactions/ByUser" in url
+    assert "bankTransaction" not in url
 
 
 # ── B6 — execute_withdrawal (orquestador PASO0-3) ─────────────────────────
@@ -532,14 +576,17 @@ def test_resolve_pending_to_successful_two_phase(mock_bmx_transport, monkeypatch
         url = str(request.url)
         if "PendingWithdrawal" in url:
             return _json_response(200, {"id": "273", "transactionStatus": 6})
-        if "bankTransaction" in url:
-            return _json_response(
-                200,
-                {
-                    "gateway": 2,
-                    "lastAccountDigits": "1215",
-                    "lastModifiedUtc": "2026-07-24T18:18:35",
-                },
+        if "Transactions/ByUser" in url:
+            return _txlist_response(
+                [
+                    {
+                        "id": "273",
+                        "gateway": 2,
+                        "lastAccountDigits": "1215",
+                        "date": "2026-07-24T18:18:35",
+                        "status": 6,
+                    }
+                ]
             )
         return httpx.Response(404, text="not found")
 
@@ -603,15 +650,17 @@ def test_resolve_no_pending_bank_tx_confirms_6(mock_bmx_transport, monkeypatch):
         url = str(request.url)
         if "PendingWithdrawal" in url:
             return _json_response(200, {"id": None})
-        if "bankTransaction" in url:
-            return _json_response(
-                200,
-                {
-                    "transactionStatus": 6,
-                    "gateway": 2,
-                    "lastAccountDigits": "1215",
-                    "lastModifiedUtc": "2026-07-24T18:18:35",
-                },
+        if "Transactions/ByUser" in url:
+            return _txlist_response(
+                [
+                    {
+                        "id": "273",
+                        "status": 6,
+                        "gateway": 2,
+                        "lastAccountDigits": "1215",
+                        "date": "2026-07-24T18:18:35",
+                    }
+                ]
             )
         return httpx.Response(404, text="not found")
 

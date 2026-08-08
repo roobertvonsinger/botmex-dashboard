@@ -9,7 +9,12 @@ PASO1: GET /api/User/BankAccounts        → cuenta de retiro aprobada
 PASO2: GET /api/Wallet/Total/Amount/ByAccountType → saldo Real
 PASO3: POST /api/stp/BeginWithdrawal     → dispara retiro (SINGLE-SHOT, no retry)
 PASO4: GET /api/User/PendingWithdrawal   → estado del retiro en curso
-PASO5: GET /api/wallet/bankTransaction/{tx_id} → auditoría/rail externo
+PASO5: GET /api/Wallet/Transactions/ByUser → auditoría/rail externo (gateway+dígitos)
+
+PASO5 NO usa /api/wallet/bankTransaction/{tx_id}: verificado en vivo
+(2026-08-08, tx real bb4a346c...) que ese endpoint nunca trae gateway ni
+lastAccountDigits/account para retiros — solo transactionStatus/reference/
+amount. Transactions/ByUser sí los trae (confirmado en vivo, misma tx).
 """
 
 from __future__ import annotations
@@ -33,7 +38,8 @@ BANK_ACCOUNTS_URL = f"{PAYMENTS_API}/api/User/BankAccounts"
 BALANCE_URL = f"{PAYMENTS_API}/api/Wallet/Total/Amount/ByAccountType"
 BEGIN_WITHDRAWAL_URL = f"{PAYMENTS_API}/api/stp/BeginWithdrawal"
 PENDING_WITHDRAWAL_URL = f"{PAYMENTS_API}/api/User/PendingWithdrawal"
-BANK_TRANSACTION_URL = f"{PAYMENTS_API}/api/wallet/bankTransaction"
+TRANSACTIONS_BY_USER_URL = f"{PAYMENTS_API}/api/Wallet/Transactions/ByUser"
+TRANSACTIONS_BY_USER_PAGE_SIZE = 50
 
 CANONICAL_HEADERS = {
     "Accept": "application/json",
@@ -277,35 +283,63 @@ async def get_bank_transaction(
     expected_digits: Optional[str] = None,
     transport=None,
 ) -> dict:
-    """PASO5: GET /api/wallet/bankTransaction/{tx_id}.
+    """PASO5: GET /api/Wallet/Transactions/ByUser → busca tx_id en el historial.
 
-    Devuelve dict normalizado con flags de guardarrail:
+    (2026-08-08) NO usa /api/wallet/bankTransaction/{tx_id}: ese endpoint
+    nunca trae gateway/lastAccountDigits para retiros (verificado en vivo),
+    dejando gateway_mismatch/digits_mismatch siempre en False sin importar
+    si hubo mismatch real. Transactions/ByUser sí trae esos campos por item.
+
+    Devuelve dict normalizado (item del historial + flags de guardarrail):
+      transactionStatus: int    — status del item (mismo enum que PASO4)
+      lastModifiedUtc: str      — date del item
       gateway_spei: bool        — True si gateway==2 (SPEI)
       gateway_mismatch: bool    — True si gateway==1 (tarjeta, bug#3)
       digits_mismatch: bool     — True si lastAccountDigits != expected_digits (bug#1)
       expected_digits: str|None
       actual_digits: str|None
+
+    Lanza RuntimeError si tx_id no aparece en la primera página del
+    historial — un guardarrail de seguridad no debe reportar "sin mismatch"
+    cuando en realidad no pudo confirmar nada.
     """
     kw = _client_kwargs(proxy_url, transport)
     try:
         async with httpx.AsyncClient(timeout=30.0, **kw) as client:
             r = await client.get(
-                f"{BANK_TRANSACTION_URL}/{tx_id}",
+                TRANSACTIONS_BY_USER_URL,
                 headers=_auth_headers(jwt),
+                params={
+                    "pageNumber": 1,
+                    "pageSize": TRANSACTIONS_BY_USER_PAGE_SIZE,
+                },
             )
     except Exception as e:
-        raise RuntimeError(f"BankTransaction error de red: {e}") from e
+        raise RuntimeError(f"Transactions/ByUser error de red: {e}") from e
 
     if r.status_code != 200:
-        raise RuntimeError(f"BankTransaction HTTP {r.status_code}: {r.text[:300]}")
+        raise RuntimeError(
+            f"Transactions/ByUser HTTP {r.status_code}: {r.text[:300]}"
+        )
 
     try:
-        data = r.json()
+        payload = r.json()
     except Exception as e:
-        raise RuntimeError(f"BankTransaction respuesta no-JSON: {e}") from e
+        raise RuntimeError(f"Transactions/ByUser respuesta no-JSON: {e}") from e
 
-    gateway = data.get("gateway") or data.get("gatewayType")
-    actual_digits = data.get("lastAccountDigits") or data.get("account")
+    results = (payload.get("data") or {}).get("results")
+    if results is None:
+        results = payload.get("data") if isinstance(payload.get("data"), list) else []
+
+    item = next((it for it in results if str(it.get("id")) == str(tx_id)), None)
+    if item is None:
+        raise RuntimeError(
+            f"Transactions/ByUser: tx {tx_id} no aparece en la primera página "
+            f"del historial (pageSize={TRANSACTIONS_BY_USER_PAGE_SIZE})"
+        )
+
+    gateway = item.get("gateway") or item.get("gatewayType")
+    actual_digits = item.get("lastAccountDigits") or item.get("account")
 
     gateway_spei = gateway == 2
     gateway_mismatch = gateway == 1  # bug#3: retiro a tarjeta cuando esperabas SPEI
@@ -316,7 +350,9 @@ async def get_bank_transaction(
     )
 
     return {
-        **data,
+        **item,
+        "transactionStatus": item.get("status"),
+        "lastModifiedUtc": item.get("date"),
         "gateway_spei": gateway_spei,
         "gateway_mismatch": gateway_mismatch,
         "digits_mismatch": digits_mismatch,

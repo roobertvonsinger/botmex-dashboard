@@ -149,13 +149,13 @@ prewarm.py (router)
 | `test_sse_visibility.py` | 88 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 71 | `—` | _[completar]_ |
-| `test_withdrawals.py` | 757 | `—` | _[completar]_ |
+| `test_withdrawals.py` | 806 | `—` | _[completar]_ |
 | `test_withdrawals_endpoints.py` | 627 | `—` | _[completar]_ |
 | `test_withdrawals_migrate.py` | 46 | `—` | _[completar]_ |
 | `web_auth.py` | 159 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
 | `web_grading.py` | 197 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
 | `web_utils.py` | 265 | `betmexico.web.utils` | Helpers compartidos: _friendly_error, _normalize_ccexp, _build_proxy_url |
-| `withdrawals.py` | 699 | `betmexico.dashboard.withdrawals` | Retiro automático vía API BetMexico (5 pasos). `execute_withdrawal` orquesta PASO0-3. `_refresh_account_after_withdrawal` refresca saldo post-retiro reusando JWT |
+| `withdrawals.py` | 735 | `betmexico.dashboard.withdrawals` | Retiro automático vía API BetMexico (5 pasos). `execute_withdrawal` orquesta PASO0-3. `_refresh_account_after_withdrawal` refresca saldo post-retiro reusando JWT |
 <!-- GEN:end:modulos -->
 
 ---
@@ -229,6 +229,7 @@ prewarm.py (router)
 | `AHEAD` | `24 * H` | `test_jwt_keeper.py` |
 | `PIPE` | `"4111111111111111|12|30|123"` | `test_unificacion_sp1.py` |
 | `PAYMENTS_API` | `"https://paymentsapi.betmexico.mx"` | `withdrawals.py` |
+| `TRANSACTIONS_BY_USER_PAGE_SIZE` | `50` | `withdrawals.py` |
 <!-- GEN:end:constantes -->
 
 ---
@@ -248,6 +249,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d19e53f` | fix(retiros): badge de institucion seguia mostrando el cache de readiness, no el retiro real |
 | `638f85a` | docs(errors): corregir ERRORS.md — LoginResult.status ya estaba deployado y verificado, no pendiente |
 | `a9d58fb` | fix(mock-bot): LoginResult no tiene .status — cuenta DEAD tumbaba el /check completo |
 | `90cec95` | fix(mock-bot): corregir AttributeError de CaptchaTokenPool.stop y kwarg invalido en _db_save_txns_and_recalc |
@@ -259,7 +261,6 @@ prewarm.py (router)
 | `95b2ff0` | fix(logs+lifespan+config): filtros de ruido de red Telegram en _LOG_NOISE_PATTERNS + lifespan reemplaza @on_event deprecado + config.py sin betmexico_db (circular import) + silenciar warning PTB per_message=False |
 | `9d0c90d` | docs(AGENTS.md): reglas duras de containers KVM4 — el bot legacy (@betmx_bot) es EXCLUSIVO de Robert, NO se apaga/alinea/migra; el mock suple al legacy; auto-deposito corre en /app/web; warning support_routes intencional |
 | `d0e2814` | fix(logs+auto_deposit): la vista de logs se congelaba con since corrupto (lastTs sin validar) + DB_PATH NameError en CLABE STP + LOCK de arranque baja a warning |
-| `db3a81b` | fix(bot): scope del SA debe llevar TODOS los comandos (BotCommandScopeChat reemplaza, no fusiona) |
 <!-- GEN:end:recientes -->
 
 ---

@@ -903,3 +903,15 @@ puramente del ciclo de refresh).
 |---|---|---|---|
 | `app.py::operator_my_accounts` | Ambas ramas SQL (`is_sa`/operador) agregan subquery `last_wd_institution` = `account_withdrawals.institution_name` del retiro más reciente por cuenta. En el post-procesamiento, si existe, sobreescribe `withdrawal_institution` en la respuesta — gana sobre el cache mutable de `accounts.withdrawal_institution`. Sin retiros aún, cae al cache (única señal disponible pre-primer-retiro). Cero cambios en frontend (`portal.js` sigue leyendo el mismo campo). | ✅ implementado | ✅ `test_operator_my_accounts_withdrawal_institution_prefers_transaction_history` + `test_operator_my_accounts_withdrawal_institution_falls_back_without_history`. `test_bet_live_plan.py test_withdrawals.py test_withdrawals_endpoints.py test_account_refresh.py` → 111/111 verde. |
 | Corrección retroactiva en BD prod | NO aplicada — no hace falta, el fix es en la capa de lectura del endpoint, no en el dato cacheado. `accounts.withdrawal_institution` de la cuenta 1632 sigue en "BANAMEX" y `account_refresh.py` lo seguirá reescribiendo (comportamiento esperado, es la señal de readiness) — ya no le llega al operador cuando hay historial de retiros. | 🔵 decisión consciente | — |
+
+## Captura: 2026-08-08 (guardarrail de retiro gateway/dígitos mismatch — PASO5 pegaba al endpoint equivocado)
+
+**Motivo**: investigando el bug de institución de arriba, se confirmó en vivo (cuenta 1632, tx real
+`bb4a346c-e97a-463f-8167-0649c61a6656`) que `GET /api/wallet/bankTransaction/{tx_id}` — el endpoint que
+`withdrawals.py::get_bank_transaction` (PASO5) usaba para leer `gateway`/`lastAccountDigits` — nunca trae
+esos campos para retiros. Ver entry completa en `docs/ERRORS.md`.
+
+| Función | Spec (2026-08-08) | Estado | Verificado |
+|---|---|---|---|
+| `withdrawals.get_bank_transaction` (PASO5) | Golpea `GET /api/Wallet/Transactions/ByUser?pageNumber=1&pageSize=50` (antes `GET /api/wallet/bankTransaction/{tx_id}`, confirmado vacío de gateway/dígitos para retiros) y busca el item con `id==tx_id` en `data.results`. Mismo contrato de salida (`gateway_spei`, `gateway_mismatch`, `digits_mismatch`, `expected_digits`, `actual_digits`, `transactionStatus`, `lastModifiedUtc`) — cero cambios de wiring en `app.py`/`account_refresh.py`. Lanza `RuntimeError` si `tx_id` no aparece en la primera página (antes: flags en `False` sin evidencia). | ✅ implementado | ✅ TDD con RED confirmado (6 tests fallando contra la implementación vieja antes del fix). `test_withdrawals.py test_withdrawals_endpoints.py test_withdrawals_migrate.py test_account_refresh.py` → 104/104 verde. |
+| Caso real de mismatch (gateway=tarjeta o dígitos distintos) | NO probado contra BetMexico real — el único caso en vivo disponible hoy fue un retiro SPEI correcto, sin mismatch. La lógica de detección se probó solo con mocks. | 🔵 pendiente | ❓ falta smoke con mismatch real o inyectado server-side. |

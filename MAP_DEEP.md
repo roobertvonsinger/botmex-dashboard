@@ -940,20 +940,23 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_get_pending_withdrawal_none_when_no_pending` | def | L321–L327 |
 | `test_get_pending_withdrawal_status6_returns_dict` | def | L330–L337 |
 | `test_get_pending_withdrawal_non200_raises` | def | L340–L346 |
-| `test_get_bank_transaction_happy` | def | L352–L373 |
-| `test_get_bank_transaction_gateway2_spei_ok` | def | L376–L387 |
-| `test_get_bank_transaction_gateway1_card_alert_bug3` | def | L390–L400 |
-| `test_get_bank_transaction_digits_mismatch_alert_bug1` | def | L403–L417 |
-| `test_get_bank_transaction_non200_raises` | def | L420–L426 |
-| `test_execute_withdrawal_full_flow_mocked` | def | L432–L472 |
-| `test_execute_withdrawal_insufficient_balance` | def | L475–L499 |
-| `test_execute_withdrawal_jwt_expired_no_api_call` | def | L502–L518 |
-| `test_resolve_pending_to_successful_two_phase` | def | L527–L563 |
-| `test_resolve_still_pending_status_not_6` | def | L566–L593 |
-| `test_resolve_no_pending_bank_tx_confirms_6` | def | L596–L630 |
-| `test_resolve_no_jwt_returns_idle` | def | L633–L652 |
-| `test_resolve_prev_completed_stays_completed` | def | L655–L683 |
-| `test_execute_withdrawal_persists_institution_bug2` | def | L689–L757 |
+| `_txlist_response` | def | L358–L359 |
+| `test_get_bank_transaction_happy` | def | L362–L386 |
+| `test_get_bank_transaction_gateway2_spei_ok` | def | L389–L400 |
+| `test_get_bank_transaction_gateway1_card_alert_bug3` | def | L403–L413 |
+| `test_get_bank_transaction_digits_mismatch_alert_bug1` | def | L416–L430 |
+| `test_get_bank_transaction_non200_raises` | def | L433–L439 |
+| `test_get_bank_transaction_not_found_in_history_raises` | def | L442–L453 |
+| `test_get_bank_transaction_hits_transactions_by_user_endpoint` | def | L456–L470 |
+| `test_execute_withdrawal_full_flow_mocked` | def | L476–L516 |
+| `test_execute_withdrawal_insufficient_balance` | def | L519–L543 |
+| `test_execute_withdrawal_jwt_expired_no_api_call` | def | L546–L562 |
+| `test_resolve_pending_to_successful_two_phase` | def | L571–L610 |
+| `test_resolve_still_pending_status_not_6` | def | L613–L640 |
+| `test_resolve_no_pending_bank_tx_confirms_6` | def | L643–L679 |
+| `test_resolve_no_jwt_returns_idle` | def | L682–L701 |
+| `test_resolve_prev_completed_stays_completed` | def | L704–L732 |
+| `test_execute_withdrawal_persists_institution_bug2` | def | L738–L806 |
 
 ### `test_withdrawals_endpoints.py`
 
@@ -1039,23 +1042,23 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `WithdrawalError` | class | L49–L50 |
-| `JwtExpired` | class | L53–L54 |
-| `NoApprovedWithdrawalAccount` | class | L57–L58 |
-| `MultipleApprovedAccounts` | class | L61–L62 |
-| `InsufficientBalance` | class | L65–L66 |
-| `ConcurrentWithdrawalPending` | class | L69–L70 |
-| `_auth_headers` | def | L76–L77 |
-| `_client_kwargs` | def | L80–L84 |
-| `get_bank_accounts` | def | L90–L133 |
-| `get_real_balance` | def | L139–L166 |
-| `begin_withdrawal` | def | L172–L232 |
-| `get_pending_withdrawal` | def | L238–L267 |
-| `get_bank_transaction` | def | L273–L325 |
-| `_persist_wd_status` | def | L331–L356 |
-| `resolve_withdrawal_status` | def | L359–L510 |
-| `execute_withdrawal` | def | L516–L613 |
-| `_refresh_account_after_withdrawal` | def | L616–L699 |
+| `WithdrawalError` | class | L55–L56 |
+| `JwtExpired` | class | L59–L60 |
+| `NoApprovedWithdrawalAccount` | class | L63–L64 |
+| `MultipleApprovedAccounts` | class | L67–L68 |
+| `InsufficientBalance` | class | L71–L72 |
+| `ConcurrentWithdrawalPending` | class | L75–L76 |
+| `_auth_headers` | def | L82–L83 |
+| `_client_kwargs` | def | L86–L90 |
+| `get_bank_accounts` | def | L96–L139 |
+| `get_real_balance` | def | L145–L172 |
+| `begin_withdrawal` | def | L178–L238 |
+| `get_pending_withdrawal` | def | L244–L273 |
+| `get_bank_transaction` | def | L279–L361 |
+| `_persist_wd_status` | def | L367–L392 |
+| `resolve_withdrawal_status` | def | L395–L546 |
+| `execute_withdrawal` | def | L552–L649 |
+| `_refresh_account_after_withdrawal` | def | L652–L735 |
 <!-- GEN:end:simbolos -->
 
 ---
