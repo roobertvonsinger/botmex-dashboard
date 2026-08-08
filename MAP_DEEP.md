@@ -161,22 +161,22 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `admin_maintenance_toggle` | def | L4179–L4200 |
 | `auto_deposit_create` | def | L4204–L4240 |
 | `auto_deposit_cancel` | def | L4244–L4270 |
-| `operator_my_accounts` | def | L4274–L4343 |
-| `operator_release_account` | def | L4347–L4364 |
-| `operator_withdraw` | def | L4368–L4426 |
-| `operator_missions` | def | L4430–L4448 |
-| `auto_deposit_status` | def | L4452–L4463 |
-| `register_operator_strike` | def | L4466–L4499 |
-| `bot_start_info` | def | L4503–L4539 |
-| `bot_operator_info` | def | L4543–L4582 |
-| `bot_help_info` | def | L4586–L4600 |
-| `bot_pause_mission` | def | L4604–L4633 |
-| `bot_resume_mission` | def | L4637–L4655 |
-| `bot_cancel_mission` | def | L4660–L4695 |
-| `bot_bet_create` | def | L4699–L4868 |
-| `filter_and_sanitize_check_combos` | def | L4871–L4956 |
-| `BotCheckRequest` | class | L4959–L4963 |
-| `bot_check` | def | L4966–L5047 |
+| `operator_my_accounts` | def | L4274–L4364 |
+| `operator_release_account` | def | L4368–L4385 |
+| `operator_withdraw` | def | L4389–L4447 |
+| `operator_missions` | def | L4451–L4469 |
+| `auto_deposit_status` | def | L4473–L4484 |
+| `register_operator_strike` | def | L4487–L4520 |
+| `bot_start_info` | def | L4524–L4560 |
+| `bot_operator_info` | def | L4564–L4603 |
+| `bot_help_info` | def | L4607–L4621 |
+| `bot_pause_mission` | def | L4625–L4654 |
+| `bot_resume_mission` | def | L4658–L4676 |
+| `bot_cancel_mission` | def | L4681–L4716 |
+| `bot_bet_create` | def | L4720–L4889 |
+| `filter_and_sanitize_check_combos` | def | L4892–L4977 |
+| `BotCheckRequest` | class | L4980–L4984 |
+| `bot_check` | def | L4987–L5068 |
 
 ### `auth.py`
 
@@ -654,15 +654,17 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
 | `test_operator_my_accounts_endpoint` | def | L5–L70 |
-| `test_operator_my_accounts_hides_fully_withdrawn_account` | def | L73–L122 |
-| `test_operator_my_accounts_visibility_in_process_lock` | def | L125–L180 |
-| `test_operator_my_accounts_sa_own_view_excludes_stale_reservada_sa_locks` | def | L183–L248 |
-| `test_operator_my_accounts_dust_balance_excluded_below_one_peso` | def | L251–L311 |
-| `test_username_portal_page_renders_for_own_user` | def | L314–L330 |
-| `test_username_portal_page_404_for_unknown_username` | def | L333–L347 |
-| `test_username_portal_page_canonicalizes_non_sa_to_own_username` | def | L350–L369 |
-| `test_legacy_user_id_url_redirects_to_username` | def | L372–L390 |
-| `test_confirm_gate_in_auto_deposit` | def | L394–L434 |
+| `test_operator_my_accounts_withdrawal_institution_prefers_transaction_history` | def | L73–L124 |
+| `test_operator_my_accounts_withdrawal_institution_falls_back_without_history` | def | L127–L160 |
+| `test_operator_my_accounts_hides_fully_withdrawn_account` | def | L163–L212 |
+| `test_operator_my_accounts_visibility_in_process_lock` | def | L215–L270 |
+| `test_operator_my_accounts_sa_own_view_excludes_stale_reservada_sa_locks` | def | L273–L338 |
+| `test_operator_my_accounts_dust_balance_excluded_below_one_peso` | def | L341–L401 |
+| `test_username_portal_page_renders_for_own_user` | def | L404–L420 |
+| `test_username_portal_page_404_for_unknown_username` | def | L423–L437 |
+| `test_username_portal_page_canonicalizes_non_sa_to_own_username` | def | L440–L459 |
+| `test_legacy_user_id_url_redirects_to_username` | def | L462–L480 |
+| `test_confirm_gate_in_auto_deposit` | def | L484–L524 |
 
 ### `test_bin_stats_feedback.py`
 

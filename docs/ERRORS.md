@@ -560,6 +560,48 @@ El fix `2026-07-28` de `_fetch_looks_empty()` (ver entry de arriba, "Regresión 
   persistencia de institución Bug 2 (stale BANAMEX→INBURSA), 5 tests de `resolve_withdrawal_status` con
   mock transport.
 
+## [CRÍTICO] Badge de institución seguía divergiendo tras el fix de Bug 2 — lectura, no escritura (2026-08-08)
+
+- **Síntoma**: Robert reporta EN VIVO el mismo caso que Bug 2 arriba (misma cuenta,
+  `a323440@uach.mx`, id 1632) DESPUÉS de que 7e94e1f ya estaba deployado (confirmado — md5 de
+  `withdrawals.py`/`account_refresh.py` en KVM4 idéntico al repo). Tarjeta mostraba "Retiro:
+  BANAMEX" pero el SPEI real fue a una cuenta INBURSA (Robert lo vio aterrizar en su banco).
+  Verificado con SELECT directo en BD prod (KVM4, `betmexico_accounts.db`, 2026-08-08 19:13 UTC):
+  `accounts.withdrawal_institution='BANAMEX'` mientras los **5 retiros reales más recientes**
+  (`account_withdrawals`, ids 51-55, todos 2026-08-07 09:34-09:55 hora local, `status_api=6`
+  ejecutados) tienen `institution_name='INBURSA'` sin excepción. Ningún retiro se ha disparado
+  desde entonces — el drift a "BANAMEX" ocurrió DESPUÉS de esos 5 retiros, sin que nada nuevo se
+  ejecutara.
+- **Causa raíz**: 7e94e1f cerró la RACE de escritura en el instante del disparo (`execute_withdrawal`
+  persiste su propia `institutionName`), pero **no tocó el problema de lectura**: `accounts.withdrawal_institution`
+  sigue siendo un cache mutable de "¿qué cuenta tiene BetMexico aprobada AHORA MISMO para un futuro
+  retiro?" — `account_refresh.py::run_refresh_cycle` (líneas ~396-410, vía `_db_set_withdrawal_ready`,
+  `account_refresh.py:239-248`) lo re-escribe en CADA ciclo con su propia llamada independiente a
+  `get_bank_accounts` (PASO1), para TODA cuenta candidata (las cuentas con retiro pendiente son
+  además `hot` — `is_hot_account`, refrescan más seguido). Como la cuenta aprobada de BetMexico
+  puede cambiar con el tiempo (no es estática), el valor que el fix de Bug 2 escribió correctamente
+  en el momento del disparo (INBURSA) quedó pisado por un ciclo posterior que reportó lo que
+  BetMexico tiene aprobado AHORA (BANAMEX) — dato real, pero que responde una pregunta distinta
+  a "¿a dónde fue el último retiro?". `/api/operator/my-accounts` (`app.py`, endpoint que alimenta
+  el badge de `static/portal.js:517-518,590-591`) seguía leyendo directo de `accounts.withdrawal_institution`
+  sin cruzar con `account_withdrawals.institution_name` (el registro inmutable por transacción, que
+  SÍ tenía el valor correcto todo este tiempo — nunca se reescribe una vez insertado).
+- **Fix**: `app.py::operator_my_accounts` — ambas ramas SQL (`is_sa`/operador) agregan subquery
+  `(SELECT institution_name FROM account_withdrawals WHERE account_id=a.id ORDER BY id DESC LIMIT 1)
+  AS last_wd_institution`; en el post-procesamiento, si existe, sobreescribe `withdrawal_institution`
+  en la respuesta (gana sobre el cache). Sin retiros aún, cae al cache de readiness (única señal
+  disponible pre-primer-retiro). Cero cambios en frontend — `portal.js` sigue leyendo el mismo campo
+  `withdrawal_institution`, ahora con la fuente correcta.
+- **Verificado**: `python -m pytest test_bet_live_plan.py test_withdrawals.py test_withdrawals_endpoints.py
+  test_account_refresh.py -q` → 111/111 en verde. Tests nuevos:
+  `test_operator_my_accounts_withdrawal_institution_prefers_transaction_history` (cache stale BANAMEX +
+  3 retiros reales INBURSA → responde INBURSA) y `test_operator_my_accounts_withdrawal_institution_falls_back_without_history`
+  (sin retiros → cae al cache).
+- **Pendiente**: no se corrigió retroactivamente `accounts.withdrawal_institution` en BD prod (sigue en
+  "BANAMEX" para la cuenta 1632) — no hace falta, el endpoint ya no lo expone tal cual cuando hay
+  historial. `account_refresh.py` seguirá reescribiendo ese cache en cada ciclo (comportamiento
+  esperado, es la señal de readiness) — eso ya no le llega al operador cuando hay retiros previos.
+
 ## `clabe_fetch.py` nunca se había deployado a KVM4 — crash-loop al deployar `withdrawals.py` (2026-07-24)
 
 **Síntoma**: al deployar el botón de retiro automático (`app.py` + `withdrawals.py` + frontend) y hacer `docker compose restart web`, el container entró en crash-loop: `ModuleNotFoundError: No module named 'clabe_fetch'` en cada intento de arranque (`withdrawals.py:23` hace `from clabe_fetch import _load_jwt_for_account, _get_admin_proxy_url`).

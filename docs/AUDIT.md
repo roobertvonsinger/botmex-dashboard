@@ -886,3 +886,20 @@ rápido. Verificar siempre el `Server:` header (`uvicorn` = nuestro dashboard; `
 | `account_refresh._withdrawal_resolution_loop` | Bg-loop registrado en `app._lifespan` (junto a `_account_refresh_loop`). Arranca tras 180s (después del ciclo principal). Corre cada `WITHDRAWAL_POLL_INTERVAL_SEC` (60s). Solo itera cuentas con retiro en curso (universo chico) — no taladra la API en general. | ✅ implementado | ✅ registrado en `_lifespan`; la constante y el ciclo están testeables. |
 | `app.py::withdraw_status` (refactor) | Delegada a `resolve_withdrawal_status` — la lógica de decisión (PASO4→PASO5→persistir) ya no está inline en el endpoint, se llama la MISMA función que el bg-loop. El endpoint conserva la lectura de BD + el broadcast SSE. | ✅ implementado | ✅ todos los tests existentes de `test_withdrawals_endpoints.py` pasan sin modificación (los monkeypatchs sobre `app.get_pending_withdrawal`/`app.get_bank_transaction` se respetan vía los parámetros inyectables `_get_pending`/`_get_bank_tx`). |
 | `withdrawals.execute_withdrawal` (Bug 2 fix) | Tras disparar el retiro con éxito (`begin_withdrawal`), persiste `accounts.withdrawal_institution` + `withdrawal_ready=1` con la institución REALMENTE usada (resultado de SU PROPIA llamada `get_bank_accounts` PASO1), en vez de dejar que el próximo ciclo de `account_refresh.py` (hasta 20 min después) sea el único que la actualice. No-throw: el retiro ya se disparó, un fallo de persistencia no lo afecta. | ✅ implementado | ✅ `test_execute_withdrawal_persists_institution_bug2` (stale "BANAMEX" → mock get_bank_accounts retorna "INBURSA" → BD queda con "INBURSA"). |
+
+## Captura: 2026-08-08 (badge de institución seguía divergiendo — fix de lectura, no de escritura)
+
+**Motivo**: Robert reportó EN VIVO el MISMO caso que el bug 2 de arriba (misma cuenta `a323440@uach.mx`,
+id 1632) un día después de que 7e94e1f (fix de escritura) ya estaba deployado en KVM4 (confirmado por
+md5 idéntico repo↔prod). El fix de escritura cierra la race en el instante del disparo, pero
+`account_refresh.py::run_refresh_cycle` sigue re-escribiendo `accounts.withdrawal_institution` en CADA
+ciclo con su propia llamada a `get_bank_accounts` — desacoplada de cualquier retiro ya disparado — así
+que el cache vuelve a driftear tan pronto como el ciclo corre de nuevo. Verificado en BD prod: 5 retiros
+reales consecutivos (`account_withdrawals`, 2026-08-07) con `institution_name='INBURSA'` sin excepción,
+mientras `accounts.withdrawal_institution='BANAMEX'` (sin retiros nuevos desde entonces — el drift fue
+puramente del ciclo de refresh).
+
+| Función | Spec (2026-08-08) | Estado | Verificado |
+|---|---|---|---|
+| `app.py::operator_my_accounts` | Ambas ramas SQL (`is_sa`/operador) agregan subquery `last_wd_institution` = `account_withdrawals.institution_name` del retiro más reciente por cuenta. En el post-procesamiento, si existe, sobreescribe `withdrawal_institution` en la respuesta — gana sobre el cache mutable de `accounts.withdrawal_institution`. Sin retiros aún, cae al cache (única señal disponible pre-primer-retiro). Cero cambios en frontend (`portal.js` sigue leyendo el mismo campo). | ✅ implementado | ✅ `test_operator_my_accounts_withdrawal_institution_prefers_transaction_history` + `test_operator_my_accounts_withdrawal_institution_falls_back_without_history`. `test_bet_live_plan.py test_withdrawals.py test_withdrawals_endpoints.py test_account_refresh.py` → 111/111 verde. |
+| Corrección retroactiva en BD prod | NO aplicada — no hace falta, el fix es en la capa de lectura del endpoint, no en el dato cacheado. `accounts.withdrawal_institution` de la cuenta 1632 sigue en "BANAMEX" y `account_refresh.py` lo seguirá reescribiendo (comportamiento esperado, es la señal de readiness) — ya no le llega al operador cuando hay historial de retiros. | 🔵 decisión consciente | — |

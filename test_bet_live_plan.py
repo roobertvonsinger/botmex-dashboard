@@ -70,6 +70,96 @@ def test_operator_my_accounts_endpoint(client, monkeypatch):
     assert "jwt" not in accs[0]
 
 
+def test_operator_my_accounts_withdrawal_institution_prefers_transaction_history(client, monkeypatch):
+    """Regresión bug BANAMEX-vs-INBURSA (Robert, 2026-08-08, cuenta real a323440@uach.mx).
+
+    `accounts.withdrawal_institution` es un cache de "cuenta APROBADA para un futuro
+    retiro" que account_refresh.py reescribe en cada ciclo con su propia llamada a
+    get_bank_accounts — desacoplado de cualquier retiro ya disparado. Verificado en
+    prod (KVM4): el cache quedó en "BANAMEX" mientras los últimos 5 retiros reales
+    (account_withdrawals.institution_name, columna inmutable por transacción) fueron
+    todos a "INBURSA". El endpoint debe preferir el registro histórico inmutable sobre
+    el cache de readiness cuando existe al menos un retiro."""
+    monkeypatch.delenv("BMX_WEB_AUTH_MODE", raising=False)
+    from auth import USERS, create_session, sha256
+    operator_id = 998878
+    USERS["testop_wdinst"] = {
+        "password_hash": sha256("pass123"),
+        "role": "operator",
+        "telegram_id": operator_id,
+        "display": "Test Op WdInst",
+    }
+    token = create_session("testop_wdinst")
+    client.cookies.set("bmx_session", token)
+
+    from app import db
+    with db(write=True) as c:
+        c.execute(
+            "INSERT OR REPLACE INTO accounts (id, email, password, status, balance_real, "
+            "balance_bonos, last_deposit_amount, last_deposit_date, grade, first_checked_at, "
+            "last_checked_at, withdrawal_ready, withdrawal_institution) "
+            "VALUES (993, 'wdinst@test.com', 'p1', 'LIVE', 1507.0, 0.0, 300.0, "
+            "'2026-08-07T12:00:00Z', 'A', '2026-08-07T10:00:00Z', '2026-08-07T10:00:00Z', 1, 'BANAMEX')"
+        )
+        c.execute(
+            "INSERT INTO deposit_attempts (attempt_id, account_email, amount, status, duration_ms, operator_id) "
+            "VALUES ('att_wdinst', 'wdinst@test.com', 300.0, 'approved', 1200, ?)",
+            (operator_id,),
+        )
+        # Retiros reales ya disparados (account_withdrawals): fuente inmutable,
+        # todos a INBURSA — el más reciente (id mayor) debe ganar.
+        for i, tx in enumerate(["tx-old-1", "tx-old-2", "tx-latest"]):
+            c.execute(
+                "INSERT INTO account_withdrawals (account_id, account_email, transaction_id, "
+                "amount, account_digits, institution_name, status_api, created_at) "
+                "VALUES (993, 'wdinst@test.com', ?, 200.0, '5646', 'INBURSA', 6, ?)",
+                (tx, f"2026-08-07T15:3{i}:00+00:00"),
+            )
+
+    res = client.get("/api/operator/my-accounts")
+    assert res.status_code == 200
+    accs = res.json()["accounts"]
+    assert len(accs) == 1
+    # NO debe quedarse con el cache stale "BANAMEX" — el retiro real fue a INBURSA.
+    assert accs[0]["withdrawal_institution"] == "INBURSA"
+
+
+def test_operator_my_accounts_withdrawal_institution_falls_back_without_history(client, monkeypatch):
+    """Sin retiros disparados aún, no hay fuente inmutable — usa el cache de
+    readiness (única señal disponible antes del primer retiro real)."""
+    monkeypatch.delenv("BMX_WEB_AUTH_MODE", raising=False)
+    from auth import USERS, create_session, sha256
+    operator_id = 998879
+    USERS["testop_wdinst2"] = {
+        "password_hash": sha256("pass123"),
+        "role": "operator",
+        "telegram_id": operator_id,
+        "display": "Test Op WdInst2",
+    }
+    token = create_session("testop_wdinst2")
+    client.cookies.set("bmx_session", token)
+
+    from app import db
+    with db(write=True) as c:
+        c.execute(
+            "INSERT OR REPLACE INTO accounts (id, email, password, status, balance_real, "
+            "balance_bonos, last_deposit_amount, last_deposit_date, grade, first_checked_at, "
+            "last_checked_at, withdrawal_ready, withdrawal_institution) "
+            "VALUES (994, 'wdinst2@test.com', 'p1', 'LIVE', 900.0, 0.0, 300.0, "
+            "'2026-08-07T12:00:00Z', 'A', '2026-08-07T10:00:00Z', '2026-08-07T10:00:00Z', 1, 'BBVA')"
+        )
+        c.execute(
+            "INSERT INTO deposit_attempts (attempt_id, account_email, amount, status, duration_ms, operator_id) "
+            "VALUES ('att_wdinst2', 'wdinst2@test.com', 300.0, 'approved', 1200, ?)",
+            (operator_id,),
+        )
+
+    res = client.get("/api/operator/my-accounts")
+    accs = res.json()["accounts"]
+    assert len(accs) == 1
+    assert accs[0]["withdrawal_institution"] == "BBVA"
+
+
 def test_operator_my_accounts_hides_fully_withdrawn_account(client, monkeypatch):
     """Regla de producto (Robert, 2026-08-05): una cuenta con depósito aprobado
     debe desaparecer de la vista del operador una vez que ya no queda saldo real

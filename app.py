@@ -4300,7 +4300,9 @@ def operator_my_accounts(user: dict = Depends(require_operator_view)):
                 "a.last_deposit_amount, a.last_deposit_date, a.grade, "
                 "a.locked_by, a.locked_until, a.status, "
                 "a.withdrawal_ready, a.withdrawal_institution, a.curp, "
-                "c.clabe AS clabe_stp "
+                "c.clabe AS clabe_stp, "
+                "(SELECT w.institution_name FROM account_withdrawals w "
+                " WHERE w.account_id = a.id ORDER BY w.id DESC LIMIT 1) AS last_wd_institution "
                 "FROM accounts a "
                 "LEFT JOIN deposit_attempts d ON d.account_email = a.email "
                 "LEFT JOIN account_deposit_clabes c ON (a.id = c.account_id AND (c.integration = 'STP' OR c.integration = '2')) "
@@ -4322,7 +4324,9 @@ def operator_my_accounts(user: dict = Depends(require_operator_view)):
                 "a.last_deposit_amount, a.last_deposit_date, a.grade, "
                 "a.locked_by, a.locked_until, a.status, "
                 "a.withdrawal_ready, a.withdrawal_institution, a.curp, "
-                "c.clabe AS clabe_stp "
+                "c.clabe AS clabe_stp, "
+                "(SELECT w.institution_name FROM account_withdrawals w "
+                " WHERE w.account_id = a.id ORDER BY w.id DESC LIMIT 1) AS last_wd_institution "
                 "FROM accounts a "
                 "LEFT JOIN deposit_attempts d ON d.account_email = a.email "
                 "LEFT JOIN account_deposit_clabes c ON (a.id = c.account_id AND (c.integration = 'STP' OR c.integration = '2')) "
@@ -4337,6 +4341,23 @@ def operator_my_accounts(user: dict = Depends(require_operator_view)):
             d = dict(r)
             d["is_locked"] = bool(d.get("locked_by"))
             d["withdrawal_ready"] = bool(d.get("withdrawal_ready"))
+            # bug BANAMEX-vs-INBURSA (Robert, 2026-08-08): `accounts.withdrawal_institution`
+            # es un cache de "cuenta APROBADA por BetMexico para un FUTURO retiro" —
+            # lo reescribe account_refresh.py en cada ciclo con SU PROPIA llamada
+            # independiente a get_bank_accounts (account_refresh.py:_db_set_withdrawal_ready),
+            # totalmente desacoplada de cualquier retiro ya disparado. 7e94e1f (2026-08-07)
+            # cerró la RACE en el instante de disparo (execute_withdrawal persiste su propio
+            # resultado), pero el siguiente ciclo de account_refresh.py lo vuelve a pisar con
+            # lo que BetMexico reporte como "aprobado" EN ESE MOMENTO, que puede diferir de a
+            # dónde fue el dinero realmente (medido en prod: cuenta a323440@uach.mx, badge
+            # quedó en "BANAMEX" mientras las últimas 5 retiros reales — account_withdrawals,
+            # institution_name — fueron todos a "INBURSA"). `account_withdrawals.institution_name`
+            # SÍ es un registro inmutable por transacción (nunca se reescribe) — es la fuente
+            # real de "a dónde fue el último retiro". Si existe, gana sobre el cache de
+            # readiness; si no hay retiros aún, cae al cache (única señal disponible).
+            last_wd_inst = d.pop("last_wd_institution", None)
+            if last_wd_inst:
+                d["withdrawal_institution"] = last_wd_inst
             d.pop("locked_by", None)
             d.pop("locked_until", None)
             result.append(d)
