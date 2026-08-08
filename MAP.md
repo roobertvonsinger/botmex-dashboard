@@ -249,6 +249,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `8bdb146` | fix(retiros): guardarrail gateway/dígitos mismatch ciego — PASO5 pegaba a bankTransaction (vacío) en vez de Transactions/ByUser |
 | `d19e53f` | fix(retiros): badge de institucion seguia mostrando el cache de readiness, no el retiro real |
 | `638f85a` | docs(errors): corregir ERRORS.md — LoginResult.status ya estaba deployado y verificado, no pendiente |
 | `a9d58fb` | fix(mock-bot): LoginResult no tiene .status — cuenta DEAD tumbaba el /check completo |
@@ -260,7 +261,6 @@ prewarm.py (router)
 | `a3f9ee9` | fix(bot+rate-limit): mensaje de /bet ya no se queda pegado en Telegram + 429 mata la cuenta a la primera |
 | `95b2ff0` | fix(logs+lifespan+config): filtros de ruido de red Telegram en _LOG_NOISE_PATTERNS + lifespan reemplaza @on_event deprecado + config.py sin betmexico_db (circular import) + silenciar warning PTB per_message=False |
 | `9d0c90d` | docs(AGENTS.md): reglas duras de containers KVM4 — el bot legacy (@betmx_bot) es EXCLUSIVO de Robert, NO se apaga/alinea/migra; el mock suple al legacy; auto-deposito corre en /app/web; warning support_routes intencional |
-| `d0e2814` | fix(logs+auto_deposit): la vista de logs se congelaba con since corrupto (lastTs sin validar) + DB_PATH NameError en CLABE STP + LOCK de arranque baja a warning |
 <!-- GEN:end:recientes -->
 
 ---
