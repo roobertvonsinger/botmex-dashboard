@@ -237,7 +237,7 @@ def precheck_card_liveness(card_pipe: str) -> Tuple[bool, str, Optional[Dict[str
     with db(write=False) as c:
         # 1. Check de tarjetas asociadas
         existing = c.execute(
-            "SELECT account_email FROM account_cards WHERE card_num=?",
+            "SELECT account_email FROM account_cards WHERE card_number=?",
             (card_num,)
         ).fetchone()
         if existing:

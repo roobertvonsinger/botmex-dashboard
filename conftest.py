@@ -24,6 +24,8 @@ def seed_db(tmp_path, monkeypatch):
                 checked_by INTEGER DEFAULT 0,
                 locked_by INTEGER DEFAULT NULL, locked_at TEXT DEFAULT NULL, locked_until TEXT DEFAULT NULL,
                 published_to_pool INTEGER DEFAULT 1,
+                dead_reason TEXT,
+                dead_at TEXT,
                 grade TEXT DEFAULT '?',
                 grade_score REAL DEFAULT 0,
                 cooldown_until INTEGER DEFAULT NULL,

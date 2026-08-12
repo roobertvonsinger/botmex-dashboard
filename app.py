@@ -169,7 +169,8 @@ _db_write_counter = 0
 @contextmanager
 def db(write: bool = False):
     global _db_write_counter
-    conn = sqlite3.connect(str(DB_PATH), timeout=10)
+    db_file = os.environ.get("BETMEX_DB", str(DB_PATH))
+    conn = sqlite3.connect(str(db_file), timeout=10)
     conn.row_factory = sqlite3.Row
     entry_id = None
     stack = None
@@ -4941,19 +4942,19 @@ def filter_and_sanitize_check_combos(combos: list[str]) -> dict:
     from card_checker import precheck_card_liveness
 
     for item in cleaned_combos:
-        parts = [p.strip() for p in item.split(":") if p.strip()]
-        if not parts:
+        # Parsing de combo: email:pass:card|mm|yy|cvv o email:pass:card:mm:yy:cvv
+        raw_parts = item.split(":")
+        if not raw_parts:
             continue
-        email = parts[0].lower()
-        password = parts[1] if len(parts) > 1 else ""
+        email = raw_parts[0].strip().lower()
+        password = raw_parts[1].strip() if len(raw_parts) > 1 else ""
 
-        # Si la línea tiene 4 partes separadas por ':', el card_pipe se reconstruye con ':'
         card_pipe = ""
-        if len(parts) >= 6:
+        if len(raw_parts) >= 6:
             # Format: email:password:card:MM:YY:CVV -> card_pipe = card|MM|YY|CVV
-            card_pipe = f"{parts[2]}|{parts[3]}|{parts[4]}|{parts[5]}"
-        elif len(parts) > 2:
-            card_pipe = ":".join(parts[2:])
+            card_pipe = f"{raw_parts[2].strip()}|{raw_parts[3].strip()}|{raw_parts[4].strip()}|{raw_parts[5].strip()}"
+        elif len(raw_parts) > 2:
+            card_pipe = ":".join(p.strip() for p in raw_parts[2:])
 
         card_num = ""
         if card_pipe:

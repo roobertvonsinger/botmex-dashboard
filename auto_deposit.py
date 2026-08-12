@@ -390,14 +390,7 @@ def plan_auto_mission(
     con = sqlite3.connect(str(db_path))
     con.row_factory = sqlite3.Row
     try:
-        # Filtrar cuentas ineficientes: LIVE, no locked, balance >= amount, NO RATE_LIMITED
-        rows = [dict(r) for r in con.execute("""
-            SELECT * FROM accounts
-            WHERE status = 'LIVE'
-              AND (locked_until IS NULL OR locked_until <= datetime('now'))
-              AND balance >= ?
-              AND dead_reason NOT LIKE 'RATE_LIMITED%'
-        """, (amount,)).fetchall()]
+        rows = [dict(r) for r in con.execute("SELECT * FROM accounts").fetchall()]
         window_map: Dict[str, Dict[str, Any]] = {}
         decline_map: Dict[str, int] = {}
         meta_map: Dict[str, Dict[str, Any]] = {}
@@ -807,16 +800,19 @@ async def run_auto_mission(
             card_pipes = json.loads(mission.get("card_pipes") or "[]")
             # Filtrar tarjetas ya procesadas (fallidas/declinadas en las últimas 24h)
             if card_pipes:
-                from app import DB_PATH
-                con = sqlite3.connect(str(DB_PATH))
-                failed_cards = set(r[0] for r in con.execute("""
-                    SELECT DISTINCT card_pipe FROM deposit_attempts
-                    WHERE card_pipe IN ({seq})
-                      AND status = 'rejected'
-                      AND created_at >= datetime('now', '-24 hours')
-                """.format(seq=','.join(['?']*len(card_pipes))), card_pipes).fetchall())
-                con.close()
-                card_pipes = [p for p in card_pipes if p not in failed_cards]
+                try:
+                    from app import DB_PATH
+                    con = sqlite3.connect(str(DB_PATH))
+                    failed_cards = set(r[0] for r in con.execute("""
+                        SELECT DISTINCT card_pipe FROM deposit_attempts
+                        WHERE card_pipe IN ({seq})
+                          AND status = 'rejected'
+                          AND created_at >= datetime('now', '-24 hours')
+                    """.format(seq=','.join(['?']*len(card_pipes))), card_pipes).fetchall() if r[0])
+                    con.close()
+                    card_pipes = [p for p in card_pipes if p not in failed_cards]
+                except Exception:
+                    pass
         except Exception:
             card_pipes = []
 
