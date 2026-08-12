@@ -386,23 +386,6 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `prewarm_status` | def | L703–L718 |
 | `prewarm_refresh_stream` | def | L724–L904 |
 
-### `proxy_pool.py`
-
-| Símbolo | Tipo | Líneas |
-|---------|------|--------|
-| `_load_proxy001` | def | L90–L117 |
-| `_bot_proxies` | def | L144–L150 |
-| `all_proxies` | def | L153–L176 |
-| `_to_url` | def | L179–L189 |
-| `get_admin_proxy` | def | L192–L197 |
-| `build_admin_proxy_url` | def | L200–L203 |
-| `shuffled_proxy_urls` | def | L206–L214 |
-| `_retry_exceptions` | def | L222–L248 |
-| `_proxy_host` | def | L251–L255 |
-| `call_with_proxy_failover` | def | L258–L349 |
-| `_looks_like_proxy_failure_result` | def | L358–L377 |
-| `_looks_like_captcha_failure_result` | def | L380–L395 |
-
 ### `renapo_validator.py`
 
 | Símbolo | Tipo | Líneas |
