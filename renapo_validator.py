@@ -21,7 +21,7 @@ _RENAPO_VAL_URL = "https://consultas.curp.gob.mx/CurpSP/curp2.do"
 _RENAPO_CURP_API = "https://valida-curp.com/api/curp"
 
 
-def _check_curp_with_proxy(proxy_url: str, curp: str, expected_fullname: str) -> dict | None:
+async def _check_curp_with_proxy(proxy_url: str, curp: str, expected_fullname: str) -> dict | None:
     """
     Intenta validar un CURP candidate en RENAPO a través de un proxy específico.
     Retorna {"valid": True, "curp": curp, "fullname": ...} o None si no coincide / falla.
@@ -33,9 +33,8 @@ def _check_curp_with_proxy(proxy_url: str, curp: str, expected_fullname: str) ->
 
     # 1. Intentar API pública / endpoint de validación de RENAPO
     try:
-        proxies = {"all://": proxy_url} if proxy_url else None
-        with httpx.Client(proxies=proxies, timeout=8.0, follow_redirects=True) as client:
-            resp = client.get(f"{_RENAPO_CURP_API}/{curp}", headers=headers)
+        async with httpx.AsyncClient(proxy=proxy_url, timeout=8.0, follow_redirects=True) as client:
+            resp = await client.get(f"{_RENAPO_CURP_API}/{curp}", headers=headers)
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("status") == "success" or data.get("curp") == curp:
@@ -55,7 +54,7 @@ def _check_curp_with_proxy(proxy_url: str, curp: str, expected_fullname: str) ->
     return None
 
 
-def validate_renapo_curp(fullname: str, birthdate: str, address: str = "", sex: str = None) -> str | None:
+async def validate_renapo_curp(fullname: str, birthdate: str, address: str = "", sex: str = None) -> str | None:
     """
     Valida y obtiene el CURP oficial de RENAPO para un titular.
     Itera sobre los 32 candidatos de estado usando rotación de proxies residenciales en proxy_pool.
@@ -72,11 +71,11 @@ def validate_renapo_curp(fullname: str, birthdate: str, address: str = "", sex: 
     for cand in candidates:
         curp_candidate = cand["curp"]
 
-        def _target_fn(proxy_url=None):
-            return _check_curp_with_proxy(proxy_url, curp_candidate, fullname)
+        async def _target_fn(proxy=None, curp_candidate=curp_candidate):
+            return await _check_curp_with_proxy(proxy, curp_candidate, fullname)
 
         try:
-            res, used_proxy = pp.call_with_proxy_failover(_target_fn, max_retries=3)
+            res, used_proxy = await pp.call_with_proxy_failover(_target_fn, captcha_retries=3)
             if res and res.get("valid"):
                 logger.info(f"[renapo_val] ✓ CURP RENAPO VALIDADO: {curp_candidate} para {fullname} (Estado: {cand['name']}, Proxy: {used_proxy})")
                 return curp_candidate

@@ -3232,7 +3232,7 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
             # Tarea asíncrona en segundo plano para validar con RENAPO vía proxies y guardar en BD
             def _async_val_renapo(acc_id, fn, bd, addr):
                 try:
-                    val_curp = validate_renapo_curp(fn, bd, addr)
+                    val_curp = asyncio.run(validate_renapo_curp(fn, bd, addr))
                     if val_curp:
                         with db(write=True) as c_val:
                             c_val.execute("UPDATE accounts SET curp=? WHERE id=?", (val_curp, acc_id))

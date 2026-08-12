@@ -76,11 +76,44 @@ EXTRA_ADMIN_PROXIES: List[Dict[str, str]] = [
 #     distinta. Si el 406/429 vuelve a subir pese a esto, ya no es el pool — ver
 #     docs/plans/login-orchestration-rework.md §6 (StickySessionManager).
 # El sufijo `__cr.mx` en el username fuerza país México.
+# Data Impulse — EXCLUIDO por fallo masivo de gateway (`502 NO_HOST_CONNECTION`).
+# Excluido agregando "dataimpulse" a _EXCLUDED_PROXY_HOSTS.
+
+# Proxy001 (500 proxies residenciales MX) — reemplazo de DataImpulse cargado desde C:\Users\rober\Downloads\Proxy001_anamufa96_500.txt
+# Formato: us.proxy001.com:7878:user:pass
+_PROXY001_FILE = r"C:\Users\rober\Downloads\Proxy001_anamufa96_500.txt"
+
+
+def _load_proxy001() -> List[Dict[str, str]]:
+    import os
+    if not os.path.exists(_PROXY001_FILE):
+        return []
+    proxies = []
+    try:
+        with open(_PROXY001_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split(":")
+                if len(parts) == 4:
+                    proxies.append({
+                        "server": f"{parts[0]}:{parts[1]}",
+                        "username": parts[2],
+                        "password": parts[3],
+                    })
+    except Exception as e:
+        logger.warning(f"Error cargando Proxy001: {e}")
+    return proxies
+
+
+PROXY001_PROXIES: List[Dict[str, str]] = _load_proxy001()
+
 _DATAIMPULSE_HOST = "gw.dataimpulse.com"
 _DATAIMPULSE_USER = "506e02a6444effce62de__cr.mx"
 _DATAIMPULSE_PASS = "59bd44415b7b9c7c"
 _DATAIMPULSE_STICKY_PORT_START = 10000
-_DATAIMPULSE_STICKY_PORT_END = 10999  # 1000 sesiones sticky, TTL 3min c/u (plan actual — verificado con curl directo a 10700/10850/10999, los 3 responden 200)
+_DATAIMPULSE_STICKY_PORT_END = 10999
 
 DATAIMPULSE_PROXIES: List[Dict[str, str]] = [
     {
@@ -91,23 +124,11 @@ DATAIMPULSE_PROXIES: List[Dict[str, str]] = [
     for port in range(_DATAIMPULSE_STICKY_PORT_START, _DATAIMPULSE_STICKY_PORT_END + 1)
 ]
 
-# Hosts excluidos del pool — proxies con reputación quemada para el reCAPTCHA
-# de BetMexico o sin saldo.
-# LitPort RE-EXCLUIDO 2026-05-28 (Robert): la premisa que lo devolvió ("el problema
-# era v2-vs-v3") quedó REFUTADA con datos — v3 dio 0% aun con navegador real; el 406
-# es reputación de IP/antifraude. LitPort `hub-us-7.litport.net:1337` da 0% Y es IP
-# de US (no MX) → veneno para BetMexico (MX). gentle_login hace random.choice del
-# pool; dejarlo gastaba ~1/3 de intentos en una IP muerta US. Ver
-# docs/plans/login-orchestration-rework.md.
-# IPRoyal EXCLUIDO 2026-06-23 (Robert): SIN SALDO. El CONNECT al proxy devuelve
-# `HTTP/1.1 402 Payment Required` + header `X-Response-Origin: proxy-server`
-# (verificado con curl directo). ~50% de los intentos de login morían al instante
-# en el 402 (random.choice entre IPRoyal y NodeMaven). Excluirlo deja el tráfico por
-# NodeMaven (instrucción de Robert). QUITAR "iproyal" de esta tupla cuando se recargue
-# saldo en IPRoyal — verificar con:
-#   curl -sv -x "http://USER:PASS@geo.iproyal.com:11201" https://api.ipify.org
-# (debe dar HTTP 200, no 402). Ver docs/ERRORS.md §"402 Payment Required".
-_EXCLUDED_PROXY_HOSTS: tuple = ("litport", "iproyal")
+# Hosts excluidos del pool — proxies con reputación quemada o caídos.
+# - litport: US IP / quemado.
+# - iproyal: 402 Payment Required.
+# - dataimpulse: 502 NO_HOST_CONNECTION (gateway caído). Excluido 2026-08-12.
+_EXCLUDED_PROXY_HOSTS: tuple = ("litport", "iproyal", "dataimpulse")
 
 
 def _bot_proxies() -> List[Dict[str, str]]:
@@ -130,7 +151,7 @@ def all_proxies() -> List[Dict[str, str]]:
     únicos). Sin dedup, `random.choice`/`shuffled_proxy_urls` pesan doble
     a los puertos duplicados — sesga la rotación en vez de repartir parejo
     entre las sesiones sticky reales."""
-    combined = _bot_proxies() + EXTRA_ADMIN_PROXIES + DATAIMPULSE_PROXIES
+    combined = _bot_proxies() + EXTRA_ADMIN_PROXIES + PROXY001_PROXIES + DATAIMPULSE_PROXIES
     seen: set = set()
     deduped: List[Dict[str, str]] = []
     for p in combined:

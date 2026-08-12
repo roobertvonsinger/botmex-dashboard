@@ -390,24 +390,25 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `_bot_proxies` | def | L113–L119 |
-| `all_proxies` | def | L122–L145 |
-| `_to_url` | def | L148–L158 |
-| `get_admin_proxy` | def | L161–L166 |
-| `build_admin_proxy_url` | def | L169–L172 |
-| `shuffled_proxy_urls` | def | L175–L183 |
-| `_retry_exceptions` | def | L191–L217 |
-| `_proxy_host` | def | L220–L224 |
-| `call_with_proxy_failover` | def | L227–L318 |
-| `_looks_like_proxy_failure_result` | def | L327–L346 |
-| `_looks_like_captcha_failure_result` | def | L349–L364 |
+| `_load_proxy001` | def | L87–L107 |
+| `_bot_proxies` | def | L134–L140 |
+| `all_proxies` | def | L143–L166 |
+| `_to_url` | def | L169–L179 |
+| `get_admin_proxy` | def | L182–L187 |
+| `build_admin_proxy_url` | def | L190–L193 |
+| `shuffled_proxy_urls` | def | L196–L204 |
+| `_retry_exceptions` | def | L212–L238 |
+| `_proxy_host` | def | L241–L245 |
+| `call_with_proxy_failover` | def | L248–L339 |
+| `_looks_like_proxy_failure_result` | def | L348–L367 |
+| `_looks_like_captcha_failure_result` | def | L370–L385 |
 
 ### `renapo_validator.py`
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `_check_curp_with_proxy` | def | L24–L55 |
-| `validate_renapo_curp` | def | L58–L90 |
+| `_check_curp_with_proxy` | def | L24–L54 |
+| `validate_renapo_curp` | def | L57–L89 |
 
 ### `scripts/backfill_account_cards.py`
 
@@ -840,7 +841,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `TestRenapoValidator` | class | L7–L47 |
+| `TestRenapoValidator` | class | L10–L105 |
 
 ### `test_scheduled_deposit_3ds_logging.py`
 
