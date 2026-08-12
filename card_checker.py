@@ -201,11 +201,39 @@ def perform_wabox_liveness_check(card_data: Dict[str, str]) -> Tuple[bool, str, 
 def precheck_card_liveness(card_pipe: str) -> Tuple[bool, str, Optional[Dict[str, str]]]:
     """Realiza la verificación completa de liveness pre-depósito.
 
-    Aplica sintaxis, Luhn, fecha y comprobación HTTP liveness con Ruthopia Gate.
+    Aplica sintaxis, Luhn, fecha, check de tarjetas asociadas y comprobación HTTP
+    liveness con Ruthopia Gate.
     """
     valid, parsed, reason = parse_and_validate_card_pipe(card_pipe)
     if not valid:
         return False, f"🔴 INVALID - <i>{reason}</i>", None
+
+    # Check temprano: ¿La tarjeta ya está asociada a alguna cuenta? O ¿la cuenta está RATE_LIMITED?
+    from app import db
+    card_num = parsed.get("card_number")
+    with db(write=False) as c:
+        # 1. Check de tarjetas asociadas
+        existing = c.execute(
+            "SELECT account_email FROM account_cards WHERE card_num=?",
+            (card_num,)
+        ).fetchone()
+        if existing:
+            email = existing["account_email"]
+            # Registrar en logs del dashboard (no en Telegram)
+            import logging
+            logger = logging.getLogger("betmexico.dashboard.card_checker")
+            logger.warning(f"[CARD_MARRIED] Tarjeta {card_num} ya asociada a cuenta {email}")
+            return False, f"🔴 MARRIED - <i>Asociada a {email}</i>", parsed
+
+        # 2. Check de RATE_LIMITED (excluir cuentas bloqueadas permanentemente)
+        # Nota: `email` debe pasarse como argumento a `precheck_card_liveness` desde el caller
+        if 'email' in parsed:
+            account_status = c.execute(
+                "SELECT status, dead_reason FROM accounts WHERE email=?",
+                (parsed['email'],)
+            ).fetchone()
+            if account_status and "RATE_LIMITED" in (account_status["dead_reason"] or ""):
+                return False, "🔴 RATE_LIMITED - Cuenta bloqueada permanentemente", None
 
     is_live, status_label, raw = perform_wabox_liveness_check(parsed)
     parsed["liveness_label"] = status_label

@@ -50,6 +50,22 @@ BEGIN_RETRY_BACKOFF_SEC = 6
 RATE_LIMIT_COOLDOWN_MIN = 45
 
 
+def classify_deposit_status(result_code: str, success: bool) -> str:
+    """Clasifica el resultado del depósito para persistencia en BD.
+    - `approved`: Solo si success=True y result_code es BANK_APPROVED.
+    - `rejected`: Rechazo real del banco (BANK_REJECTED, BANK_REJECTED_AFTER_APPROVE).
+    - `threeds`: 3DS_REQUIRED (no acreditado).
+    - `failed`: Errores de infraestructura (LOGIN_FAILED, BEGIN_ERROR, SUBMIT_ERROR, etc.).
+    """
+    if success and result_code == "BANK_APPROVED":
+        return "approved"
+    if result_code in ("BANK_REJECTED", "BANK_REJECTED_AFTER_APPROVE"):
+        return "rejected"
+    if result_code == "3DS_REQUIRED":
+        return "threeds"
+    return "failed"
+
+
 def _cooldown_active(cooldown_until, now=None) -> bool:
     """True si la cuenta está enfriando (cooldown_until = epoch en el futuro)."""
     if not cooldown_until:
@@ -563,7 +579,7 @@ def _check_card_velocity(card_pipe: str, account_email: str) -> Optional[dict]:
                 "(strftime('%s','now') - strftime('%s', created_at)) AS age_sec "
                 "FROM deposit_attempts "
                 "WHERE card_pipe=? AND account_email != ? "
-                "AND status='approved' "
+                "AND status IN ('approved', 'rejected') "  # Fix: incluir 'rejected'
                 "AND created_at > datetime('now', ?) "
                 "ORDER BY created_at DESC LIMIT 20",
                 (card_pipe, account_email, f"-{CARD_VELOCITY_MEMORY_MIN} minutes"),

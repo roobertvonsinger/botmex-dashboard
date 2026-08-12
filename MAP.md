@@ -98,17 +98,17 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 577 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5075 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 5091 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1355 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1371 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
-| `card_checker.py` | 234 | `—` | _[completar]_ |
+| `card_checker.py` | 262 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 152 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
-| `deposits.py` | 2868 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2884 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 396 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
-| `login_orchestrator.py` | 416 | `betmexico.dashboard.login_orch` | _[completar]_ |
+| `login_orchestrator.py` | 448 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 904 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 860 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_validator.py` | 89 | `betmexico.renapo_validator` | _[completar]_ |
@@ -249,6 +249,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `87e25d6` | fix(proxy): embeber literalmente los 500 proxies de Proxy001 en proxy_pool.py sin lectura de disco |
 | `001e85e` | fix(proxy): resolver ruta relativa de Proxy001 en Docker (KVM4) para cargar los 500 proxies |
 | `55f346e` | fix(proxy): excluir DataImpulse por 502 NO_HOST_CONNECTION y suplantar con Proxy001 (500 MX) |
 | `9ed5931` | docs(errors): corregir mecanismo real del log viejo (archivo persistente, no buffer Docker) + limpiar bloques muertos |
@@ -260,7 +261,6 @@ prewarm.py (router)
 | `da47274` | docs(portal): registrar critique + handoff de la ronda 3 (ya implementada en 44984f5) |
 | `176a781` | fix(auto-deposit): CARD_LOCKED_OTHER_ACCOUNT ya no se reintenta contra un candado determinístico |
 | `7e94e1f` | fix(retiros): reconciliación server-side de status pendiente + fuente única de institución |
-| `ae8c43e` | fix(pantalla): historial de Movimientos revuelto por sort defensivo que ignoraba 'T' vs espacio |
 <!-- GEN:end:recientes -->
 
 ---
