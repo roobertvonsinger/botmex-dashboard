@@ -87,12 +87,30 @@ def parse_and_validate_card_pipe(pipe_str: str) -> Tuple[bool, Optional[Dict[str
     return True, parsed, "OK"
 
 
+# Caché en memoria para liveness checks de Utopía (TTL 30 min = 1800s)
+_UTOPIA_LIVENESS_CACHE: Dict[str, Tuple[float, bool, str, Dict[str, Any]]] = {}
+UTOPIA_CACHE_TTL_SEC = 1800  # 30 minutos (regla Robert: no volver a checar en Utopía si fue aprobada recientemente)
+
+
 def perform_wabox_liveness_check(card_data: Dict[str, str]) -> Tuple[bool, str, Dict[str, Any]]:
     """Ejecuta la autenticación y verificación de liveness oficial importando directamente el WaboxGate de Ruthopia.
 
     Invocación directa a ruthopia.gates.wabox.WaboxGate (misma VPS, montaje /app/ruthopia).
+    Soporta caché de 30 minutos: si la tarjeta ya se checó y aprobó en <30min, se reusa el historial.
     Retorna: (is_live, status_label, raw_details)
     """
+    card_num = card_data.get("card_number", "")
+    now_ts = time.time()
+
+    # Reuso de caché (< 30 min) para tarjetas previamente aprobadas/checadas
+    if card_num in _UTOPIA_LIVENESS_CACHE:
+        cached_ts, c_is_live, c_label, c_raw = _UTOPIA_LIVENESS_CACHE[card_num]
+        age_sec = now_ts - cached_ts
+        if age_sec < UTOPIA_CACHE_TTL_SEC:
+            logger.info(f"[LivenessCache] REUSANDO check previo para tarjeta {card_num[:6]}··· (hace {int(age_sec/60)}m)")
+            c_label_cached = f"{c_label} <i>(Caché Utopía {int(age_sec/60)}m)</i>"
+            return c_is_live, c_label_cached, c_raw
+
     import sys, os, asyncio
 
     # 1. Configurar entorno de Ruthopia
@@ -145,11 +163,15 @@ def perform_wabox_liveness_check(card_data: Dict[str, str]) -> Tuple[bool, str, 
 
         if res.status == CheckStatus.APPROVED:
             label = f"🟢 LIVE (Auth OK) - <i>{brand} {level} {bank} [{country}]</i>"
-            return True, label, {"status": "APPROVED", "message": res.message, "raw": str(res)}
+            raw_res = {"status": "APPROVED", "message": res.message, "raw": str(res)}
+            _UTOPIA_LIVENESS_CACHE[card_num] = (now_ts, True, label, raw_res)
+            return True, label, raw_res
         else:
             msg = res.message or "Card Declined"
             label = f"🔴 DECLINED (Auth Failed) - <i>{msg[:50]}</i>"
-            return False, label, {"status": "DECLINED", "message": res.message, "raw": str(res)}
+            raw_res = {"status": "DECLINED", "message": res.message, "raw": str(res)}
+            # No guardamos declinadas en caché largo para dar oportunidad de reintento si fue blip
+            return False, label, raw_res
 
     except Exception as e:
         logger.warning(f"Error invocando Ruthopia WaboxGate directo: {e}, aplicando fallback tokenizado")
@@ -186,6 +208,7 @@ def perform_wabox_liveness_check(card_data: Dict[str, str]) -> Tuple[bool, str, 
                 funding = card_info.get("funding", "")
                 country = card_info.get("country", "")
                 label = f"🟢 LIVE (Tokenized) - <i>{brand} {funding} [{country}]</i>"
+                _UTOPIA_LIVENESS_CACHE[card_num] = (now_ts, True, label, res_json)
                 return True, label, res_json
             else:
                 err = res_json.get("error", {})
@@ -219,11 +242,25 @@ def precheck_card_liveness(card_pipe: str) -> Tuple[bool, str, Optional[Dict[str
         ).fetchone()
         if existing:
             email = existing["account_email"]
-            # Registrar en logs del dashboard (no en Telegram)
+            # Registrar en logs del dashboard (no en Telegram) y emitir alerta SSE al dashboard
             import logging
             logger = logging.getLogger("betmexico.dashboard.card_checker")
-            logger.warning(f"[CARD_MARRIED] Tarjeta {card_num} ya asociada a cuenta {email}")
-            return False, f"🔴 MARRIED - <i>Asociada a {email}</i>", parsed
+            logger.warning(f"[CARD_MARRIED] Tarjeta {card_num[:6]}··· ya asociada a cuenta {email}")
+            try:
+                from app import _broadcast
+                _broadcast({
+                    "type": "activity",
+                    "kind": "alert",
+                    "level": "warning",
+                    "title": "CARD_MARRIED",
+                    "message": f"⚠️ Tarjeta {card_num[:6]}··· ya está asociada a la cuenta {email}. No se puede asociar a otra cuenta.",
+                    "target": email,
+                    "card_num": card_num
+                })
+            except Exception as _b_err:
+                logger.debug(f"No se pudo emitir broadcast para CARD_MARRIED: {_b_err}")
+
+            return False, f"🔴 MARRIED - <i>Tarjeta ya asociada a {email}</i>", parsed
 
         # 2. Check de RATE_LIMITED (excluir cuentas bloqueadas permanentemente)
         # Nota: `email` debe pasarse como argumento a `precheck_card_liveness` desde el caller

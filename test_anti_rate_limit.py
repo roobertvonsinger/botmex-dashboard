@@ -93,7 +93,8 @@ def test_ban_returns_rate_limited_immediately(monkeypatch):
         "e@x.com", "pw", pool=FakePool(), max_login_retries=4,
         allow_proxyless=True, throttle=False))
     assert res.ok is False
-    assert res.code == "RATE_LIMITED"
+    assert res.code == "DEAD"
+    assert res.account_dead is True
     # No debe agotar los 4 intentos martillando: enfría y sale temprano.
     assert res.attempts <= 2
 

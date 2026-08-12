@@ -100,9 +100,9 @@ prewarm.py (router)
 | `account_refresh.py` | 577 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5091 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1371 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1374 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
-| `card_checker.py` | 262 | `betmexico.dashboard.card_checker` | _[completar]_ |
+| `card_checker.py` | 299 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 152 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
@@ -123,7 +123,7 @@ prewarm.py (router)
 | `test_account_touch.py` | 51 | `—` | _[completar]_ |
 | `test_account_touch_isolated.py` | 138 | `—` | _[completar]_ |
 | `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
-| `test_anti_rate_limit.py` | 277 | `—` | _[completar]_ |
+| `test_anti_rate_limit.py` | 278 | `—` | _[completar]_ |
 | `test_at_hand.py` | 73 | `—` | _[completar]_ |
 | `test_auto_deposit_selection.py` | 188 | `—` | _[completar]_ |
 | `test_auto_missions_migrate.py` | 120 | `—` | _[completar]_ |
@@ -176,6 +176,7 @@ prewarm.py (router)
 | `MM_CROSS_ACCOUNT_GAP` | `5` | `auto_deposit.py` |
 | `MM_MAX_ACCOUNT_DECLINES_PER_RUN` | `2` | `auto_deposit.py` |
 | `WABOX_STRIPE_PK` | `"pk_live_WQNz0qa1BmBu47grZwTpj8BR"` | `card_checker.py` |
+| `UTOPIA_CACHE_TTL_SEC` | `1800` | `card_checker.py` |
 | `BETMEXICO_PAYMENTS_API` | `"https://paymentsapi.betmexico.mx"` | `clabe_fetch.py` |
 | `BEGIN_DEPOSIT_PATH` | `"/api/stp/BeginDeposit"` | `clabe_fetch.py` |
 | `DEP_MAX_PER_TXN` | `499.0` | `deposits.py` |
@@ -249,6 +250,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `3a45562` | fix(core): rate-limit dead permanente, drenado tokens captcha, persistencia BANK_REJECTED y check tarjetas casadas |
 | `1030c10` | fix: card_num dict key, failed_cards set extraction, BANK_REJECTED persistence |
 | `87e25d6` | fix(proxy): embeber literalmente los 500 proxies de Proxy001 en proxy_pool.py sin lectura de disco |
 | `001e85e` | fix(proxy): resolver ruta relativa de Proxy001 en Docker (KVM4) para cargar los 500 proxies |
@@ -260,7 +262,6 @@ prewarm.py (router)
 | `a9d58fb` | fix(mock-bot): LoginResult no tiene .status — cuenta DEAD tumbaba el /check completo |
 | `90cec95` | fix(mock-bot): corregir AttributeError de CaptchaTokenPool.stop y kwarg invalido en _db_save_txns_and_recalc |
 | `da47274` | docs(portal): registrar critique + handoff de la ronda 3 (ya implementada en 44984f5) |
-| `176a781` | fix(auto-deposit): CARD_LOCKED_OTHER_ACCOUNT ya no se reintenta contra un candado determinístico |
 <!-- GEN:end:recientes -->
 
 ---

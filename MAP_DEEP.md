@@ -228,7 +228,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_unlock` | def | L713–L722 |
 | `_broadcast_mission` | def | L725–L754 |
 | `_stop_pool` | def | L757–L764 |
-| `run_auto_mission` | def | L768–L1371 |
+| `run_auto_mission` | def | L768–L1374 |
 
 ### `autoexclusion.py`
 
@@ -246,9 +246,9 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 |---------|------|--------|
 | `check_luhn` | def | L22–L35 |
 | `parse_and_validate_card_pipe` | def | L38–L87 |
-| `perform_wabox_liveness_check` | def | L90–L198 |
-| `precheck_card_liveness` | def | L201–L245 |
-| `format_ruthopia_liveness_summary` | def | L248–L262 |
+| `perform_wabox_liveness_check` | def | L95–L221 |
+| `precheck_card_liveness` | def | L224–L282 |
+| `format_ruthopia_liveness_summary` | def | L285–L299 |
 
 ### `clabe_fetch.py`
 
@@ -574,26 +574,26 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_loginresult_from_cache_defaults_false` | def | L62–L63 |
 | `test_cache_hit_sets_from_cache_true` | def | L66–L74 |
 | `test_fresh_login_not_from_cache` | def | L77–L85 |
-| `test_ban_returns_rate_limited_immediately` | def | L89–L98 |
-| `test_cooldown_active_future` | def | L102–L103 |
-| `test_cooldown_active_past` | def | L106–L107 |
-| `test_cooldown_active_none` | def | L110–L111 |
-| `test_cooldown_active_zero` | def | L114–L115 |
-| `test_cooldown_remaining_min_future` | def | L118–L119 |
-| `test_cooldown_remaining_min_inactive` | def | L122–L124 |
-| `test_relogin_when_cache_and_not_yet` | def | L128–L129 |
-| `test_no_relogin_when_not_from_cache` | def | L132–L133 |
-| `test_no_relogin_when_already_relogged` | def | L136–L137 |
-| `_LR` | class | L141–L154 |
-| `_fake_gentle` | def | L157–L165 |
-| `_fake_begin` | def | L168–L176 |
-| `_noop_phase` | def | L179–L180 |
-| `_run_acquire` | def | L183–L208 |
-| `test_acquire_fresh_login_then_begin_ok` | def | L211–L219 |
-| `test_acquire_cache_hit_assigns_pool_proxy_not_proxyless` | def | L222–L229 |
-| `test_acquire_cache_401_invalidates_and_relogins` | def | L232–L249 |
-| `test_acquire_rate_limited_marks_dead_and_fails` | def | L252–L261 |
-| `test_set_account_cooldown_persists` | def | L264–L277 |
+| `test_ban_returns_rate_limited_immediately` | def | L89–L99 |
+| `test_cooldown_active_future` | def | L103–L104 |
+| `test_cooldown_active_past` | def | L107–L108 |
+| `test_cooldown_active_none` | def | L111–L112 |
+| `test_cooldown_active_zero` | def | L115–L116 |
+| `test_cooldown_remaining_min_future` | def | L119–L120 |
+| `test_cooldown_remaining_min_inactive` | def | L123–L125 |
+| `test_relogin_when_cache_and_not_yet` | def | L129–L130 |
+| `test_no_relogin_when_not_from_cache` | def | L133–L134 |
+| `test_no_relogin_when_already_relogged` | def | L137–L138 |
+| `_LR` | class | L142–L155 |
+| `_fake_gentle` | def | L158–L166 |
+| `_fake_begin` | def | L169–L177 |
+| `_noop_phase` | def | L180–L181 |
+| `_run_acquire` | def | L184–L209 |
+| `test_acquire_fresh_login_then_begin_ok` | def | L212–L220 |
+| `test_acquire_cache_hit_assigns_pool_proxy_not_proxyless` | def | L223–L230 |
+| `test_acquire_cache_401_invalidates_and_relogins` | def | L233–L250 |
+| `test_acquire_rate_limited_marks_dead_and_fails` | def | L253–L262 |
+| `test_set_account_cooldown_persists` | def | L265–L278 |
 
 ### `test_at_hand.py`
 

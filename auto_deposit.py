@@ -807,14 +807,17 @@ async def run_auto_mission(
             card_pipes = json.loads(mission.get("card_pipes") or "[]")
             # Filtrar tarjetas ya procesadas (fallidas/declinadas en las últimas 24h)
             if card_pipes:
-                failed_cards = set(r["card_pipe"] for r in con.execute("""
+                from app import DB_PATH
+                con = sqlite3.connect(str(DB_PATH))
+                failed_cards = set(r[0] for r in con.execute("""
                     SELECT DISTINCT card_pipe FROM deposit_attempts
                     WHERE card_pipe IN ({seq})
                       AND status = 'rejected'
                       AND created_at >= datetime('now', '-24 hours')
                 """.format(seq=','.join(['?']*len(card_pipes))), card_pipes).fetchall())
+                con.close()
                 card_pipes = [p for p in card_pipes if p not in failed_cards]
-        except (TypeError, ValueError):
+        except Exception:
             card_pipes = []
 
         cap_key = os.environ.get("CAPMONSTER_KEY", "") or os.environ.get(
