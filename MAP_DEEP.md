@@ -390,18 +390,18 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `_load_proxy001` | def | L87–L107 |
-| `_bot_proxies` | def | L134–L140 |
-| `all_proxies` | def | L143–L166 |
-| `_to_url` | def | L169–L179 |
-| `get_admin_proxy` | def | L182–L187 |
-| `build_admin_proxy_url` | def | L190–L193 |
-| `shuffled_proxy_urls` | def | L196–L204 |
-| `_retry_exceptions` | def | L212–L238 |
-| `_proxy_host` | def | L241–L245 |
-| `call_with_proxy_failover` | def | L248–L339 |
-| `_looks_like_proxy_failure_result` | def | L348–L367 |
-| `_looks_like_captcha_failure_result` | def | L370–L385 |
+| `_load_proxy001` | def | L90–L117 |
+| `_bot_proxies` | def | L144–L150 |
+| `all_proxies` | def | L153–L176 |
+| `_to_url` | def | L179–L189 |
+| `get_admin_proxy` | def | L192–L197 |
+| `build_admin_proxy_url` | def | L200–L203 |
+| `shuffled_proxy_urls` | def | L206–L214 |
+| `_retry_exceptions` | def | L222–L248 |
+| `_proxy_host` | def | L251–L255 |
+| `call_with_proxy_failover` | def | L258–L349 |
+| `_looks_like_proxy_failure_result` | def | L358–L377 |
+| `_looks_like_captcha_failure_result` | def | L380–L395 |
 
 ### `renapo_validator.py`
 

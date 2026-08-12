@@ -103,6 +103,7 @@ prewarm.py (router)
 | `auto_deposit.py` | 1355 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `card_checker.py` | 234 | `—` | _[completar]_ |
+| `check_proxy_debug.py` | 11 | `—` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 152 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
@@ -110,7 +111,7 @@ prewarm.py (router)
 | `jwt_keeper.py` | 396 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 416 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 904 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
-| `proxy_pool.py` | 385 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `proxy_pool.py` | 395 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_validator.py` | 89 | `betmexico.renapo_validator` | _[completar]_ |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
@@ -249,6 +250,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `55f346e` | fix(proxy): excluir DataImpulse por 502 NO_HOST_CONNECTION y suplantar con Proxy001 (500 MX) |
 | `9ed5931` | docs(errors): corregir mecanismo real del log viejo (archivo persistente, no buffer Docker) + limpiar bloques muertos |
 | `8bdb146` | fix(retiros): guardarrail gateway/dígitos mismatch ciego — PASO5 pegaba a bankTransaction (vacío) en vez de Transactions/ByUser |
 | `d19e53f` | fix(retiros): badge de institucion seguia mostrando el cache de readiness, no el retiro real |
@@ -260,7 +262,6 @@ prewarm.py (router)
 | `7e94e1f` | fix(retiros): reconciliación server-side de status pendiente + fuente única de institución |
 | `ae8c43e` | fix(pantalla): historial de Movimientos revuelto por sort defensivo que ignoraba 'T' vs espacio |
 | `a3f9ee9` | fix(bot+rate-limit): mensaje de /bet ya no se queda pegado en Telegram + 429 mata la cuenta a la primera |
-| `95b2ff0` | fix(logs+lifespan+config): filtros de ruido de red Telegram en _LOG_NOISE_PATTERNS + lifespan reemplaza @on_event deprecado + config.py sin betmexico_db (circular import) + silenciar warning PTB per_message=False |
 <!-- GEN:end:recientes -->
 
 ---

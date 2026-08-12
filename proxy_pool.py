@@ -79,18 +79,28 @@ EXTRA_ADMIN_PROXIES: List[Dict[str, str]] = [
 # Data Impulse — EXCLUIDO por fallo masivo de gateway (`502 NO_HOST_CONNECTION`).
 # Excluido agregando "dataimpulse" a _EXCLUDED_PROXY_HOSTS.
 
-# Proxy001 (500 proxies residenciales MX) — reemplazo de DataImpulse cargado desde C:\Users\rober\Downloads\Proxy001_anamufa96_500.txt
-# Formato: us.proxy001.com:7878:user:pass
-_PROXY001_FILE = r"C:\Users\rober\Downloads\Proxy001_anamufa96_500.txt"
+# Proxy001 (500 proxies residenciales MX) — reemplazo de DataImpulse
+# Se busca en la misma carpeta del script (para producción Docker) o en la carpeta de descargas local.
+from pathlib import Path
 
+_BASE_DIR = Path(__file__).parent
+_PROXY001_LOCAL = _BASE_DIR / "Proxy001_anamufa96_500.txt"
+_PROXY001_DOWNLOADS = Path(r"C:\Users\rober\Downloads\Proxy001_anamufa96_500.txt")
 
 def _load_proxy001() -> List[Dict[str, str]]:
-    import os
-    if not os.path.exists(_PROXY001_FILE):
+    target_path = None
+    if _PROXY001_LOCAL.exists():
+        target_path = _PROXY001_LOCAL
+    elif _PROXY001_DOWNLOADS.exists():
+        target_path = _PROXY001_DOWNLOADS
+
+    if not target_path:
+        logger.warning("Proxy001: No se encontró el archivo de proxies en ninguna ruta.")
         return []
+
     proxies = []
     try:
-        with open(_PROXY001_FILE, "r", encoding="utf-8") as f:
+        with open(target_path, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line:
@@ -103,7 +113,7 @@ def _load_proxy001() -> List[Dict[str, str]]:
                         "password": parts[3],
                     })
     except Exception as e:
-        logger.warning(f"Error cargando Proxy001: {e}")
+        logger.warning(f"Error cargando Proxy001 desde {target_path}: {e}")
     return proxies
 
 
