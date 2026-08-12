@@ -1040,22 +1040,41 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             last_edit_ts[0] = now
 
             if is_terminal:
-                text = (
-                    f"{HEADER}\n\n"
-                    f"🎯 <b>MISIÓN {mission_id}</b>\n\n"
-                    f"• {st_text}\n\n"
-                    f'🌐 <a href="{DASHBOARD_URL}/?match={mission_id}">Gestionar cuentas en el portal →</a>'
-                )
-                kb = InlineKeyboardMarkup(
-                    [
+                if status in ("cancelled", "failed"):
+                    # Redirigir al inicio si el proceso falla o se cancela
+                    text = (
+                        f"{HEADER}\n\n"
+                        f"🎯 <b>MISIÓN {mission_id}</b>\n\n"
+                        f"• {st_text}\n\n"
+                        f"🔄 <i>Proceso terminado. Puedes iniciar una nueva misión.</i>"
+                    )
+                    kb = InlineKeyboardMarkup(
                         [
-                            InlineKeyboardButton(
-                                "🌐 Ver cuentas y gestionar →",
-                                url=f"{DASHBOARD_URL}/?match={mission_id}",
-                            )
+                            [
+                                InlineKeyboardButton(
+                                    "🏠 Volver al inicio",
+                                    callback_data="btn_start_cancel",
+                                )
+                            ]
                         ]
-                    ]
-                )
+                    )
+                else:
+                    text = (
+                        f"{HEADER}\n\n"
+                        f"🎯 <b>MISIÓN {mission_id}</b>\n\n"
+                        f"• {st_text}\n\n"
+                        f'🌐 <a href="{DASHBOARD_URL}/?match={mission_id}">Gestionar cuentas en el portal →</a>'
+                    )
+                    kb = InlineKeyboardMarkup(
+                        [
+                            [
+                                InlineKeyboardButton(
+                                    "🌐 Ver cuentas y gestionar →",
+                                    url=f"{DASHBOARD_URL}/?match={mission_id}",
+                                )
+                            ]
+                        ]
+                    )
             else:
                 text = (
                     f"{HEADER}\n\n"

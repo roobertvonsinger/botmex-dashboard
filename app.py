@@ -290,6 +290,10 @@ def _migrate():
         # cualquier login exitoso; a partir de rl_streak>=3 el keeper aplica cuarentena
         # larga en vez de seguir reintentando cada 6h para siempre. Aditiva.
         ("rl_streak", "ALTER TABLE accounts ADD COLUMN rl_streak INTEGER DEFAULT 0"),
+        # Cuarentena para rate-limit (429/BAN): cuentas en cuarentena se excluyen de
+        # vistas y procesos automáticos. Asignado en login_orchestrator.py al primer 429.
+        # Valor: epoch en segundos (ej: datetime('now', '+7 days').timestamp()).
+        ("quarantine_until", "ALTER TABLE accounts ADD COLUMN quarantine_until INTEGER"),
         # jwt_token/jwt_expires_at: en prod ya existen (BD compartida con el bot,
         # que las migra). Aditivo aquí solo para que BD de test/local las tenga
         # (withdrawals.py y clabe_fetch.py las consumen para retiro/clabes).
@@ -1855,13 +1859,25 @@ def _tail_log_file(log_file: Path, limit: int = 200, since: Optional[str] = None
 @app.get("/api/logs")
 def get_logs(limit: int = 200, since: Optional[str] = None,
              level: Optional[str] = None,
+             source: str = "dashboard",  # dashboard | telegram
+             bot: str = "main",          # main | mock (solo para source=telegram)
              user: dict = Depends(require_session)):
-    """Lee las últimas N líneas filtradas del log del dashboard.
-    Fix 2026-05-23: lee `/data/logs/dashboard.log` (RotatingFileHandler de app.py)."""
+    """Lee las últimas N líneas filtradas del log.
+    - source=dashboard: Logs del dashboard (`/data/logs/dashboard.log`).
+    - source=telegram: Logs del bot Telegram (`/data/logs/telegram_bot.log` o `telegram_mock_bot.log`).
+    """
     if user.get("role") != "superadmin":
         raise HTTPException(403, "Solo superadmin")
     try:
-        return {"lines": _tail_log_file(Path("/data/logs/dashboard.log"), limit, since, level)}
+        if source == "dashboard":
+            log_file = Path("/data/logs/dashboard.log")
+        elif source == "telegram":
+            log_file = _TELEGRAM_LOG_FILES.get(bot)
+            if not log_file:
+                return {"lines": [f"Bot no válido: {bot}"]}
+        else:
+            return {"lines": [f"Source no válido: {source}"]}
+        return {"lines": _tail_log_file(log_file, limit, since, level)}
     except Exception as e:
         return {"lines": [f"Error leyendo log: {e}"]}
 

@@ -46,6 +46,9 @@ _TOKEN_REUSE_MAX_AGE = 100.0  # seg: < 120s de vida real del v2 (margen seguro)
 # así el login se auto-cura en vez de martillar con un token muerto.
 _TOKEN_MAX_REUSES = 8
 
+# TTL real de CapMonster = 55s (NodeMaven). Margen seguro: 50s para evitar warnings.
+_TOKEN_REUSE_MAX_AGE = 50.0
+
 # ── Semáforo GLOBAL de logins reales contra BetMexico ────────────────────────
 # CAUSA RAÍZ #1 del rate-limit (forense 2026-07-11 sobre 18k eventos): la TASA
 # agregada de logins concurrentes dispara el antifraude — medido ≥100 logins/min
@@ -294,6 +297,28 @@ async def gentle_login(
                 logger.info(f"[gentle_login] {email} iniciando pool de captcha bajo demanda")
                 await pool.start_factory()
 
+            # Fix: Drenar tokens expirados del pool ANTES de pedir uno nuevo (evitar warnings)
+            if hasattr(pool, "drain_stale_tokens"):
+                await pool.drain_stale_tokens(max_age=_TOKEN_REUSE_MAX_AGE)
+            elif hasattr(pool, "pool"):
+                # Implementación manual si el pool no tiene el método
+                fresh = []
+                drained = 0
+                while True:
+                    try:
+                        item = pool.pool.get_nowait()
+                        tok, tid, ts = item
+                        if (time.time() - ts) <= _TOKEN_REUSE_MAX_AGE:
+                            fresh.append(item)
+                        else:
+                            drained += 1
+                    except Exception:
+                        break
+                for item in fresh:
+                    pool.pool.put_nowait(item)
+                if drained > 0:
+                    logger.info(f"[gentle_login] {email} drenados {drained} tokens expirados (edad >{_TOKEN_REUSE_MAX_AGE}s)")
+
             res = await pool.get_token(timeout=90)
             if not res:
                 # Pool de captcha seco → esperar y NO gastar intento (cota 5).
@@ -391,14 +416,21 @@ async def gentle_login(
 
         if status == "BAN":
             # 403/429 = rate-limit POR CUENTA (medido 2026-06-28: 16-20 logins/día
-            # → 429). Martillar la MISMA cuenta tras un BAN la hunde más. Capa 3 del
-            # spec anti-rate-limit (decisión Robert): ENFRIAR Y SALTAR — retornar
-            # RATE_LIMITED de inmediato para que el caller marque cooldown_until y
-            # pase a otra cuenta, en vez de agotar reintentos en ráfaga.
+            # → 429). 90% de estas cuentas NO vuelven (Robert 2026-08-12).
+            # Decisión: marcar como DEAD PERMANENTE para que desaparezcan de vistas
+            # y procesos automáticos.
+            # Evitar circular import: usar db directamente
+            from app import db
+            with db(write=True) as c:
+                c.execute(
+                    "UPDATE accounts SET status='DEAD', dead_reason=?, dead_at=datetime('now') WHERE email=?",
+                    ("RATE_LIMITED_PERMANENT (429 — BetMexico bloqueó la cuenta)", email)
+                )
             logger.warning(f"[gentle_login] {email} RATE_LIMITED (BAN) en intento "
-                           f"{attempts_done + 1} → enfriar y saltar")
-            return LoginResult(ok=False, code="RATE_LIMITED",
-                               error="BetMexico rate-limit (403/429) — enfriar y saltar",
+                           f"{attempts_done + 1} → DEAD PERMANENTE")
+            return LoginResult(ok=False, code="DEAD",
+                               error="RATE_LIMITED_PERMANENT (429 — BetMexico bloqueó la cuenta)",
+                               account_dead=True,
                                attempts=attempts_done + 1)
 
         # RETRY_CAPTCHA(406) / ERROR / desconocido → reintentar.

@@ -249,6 +249,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `1030c10` | fix: card_num dict key, failed_cards set extraction, BANK_REJECTED persistence |
 | `87e25d6` | fix(proxy): embeber literalmente los 500 proxies de Proxy001 en proxy_pool.py sin lectura de disco |
 | `001e85e` | fix(proxy): resolver ruta relativa de Proxy001 en Docker (KVM4) para cargar los 500 proxies |
 | `55f346e` | fix(proxy): excluir DataImpulse por 502 NO_HOST_CONNECTION y suplantar con Proxy001 (500 MX) |
@@ -260,7 +261,6 @@ prewarm.py (router)
 | `90cec95` | fix(mock-bot): corregir AttributeError de CaptchaTokenPool.stop y kwarg invalido en _db_save_txns_and_recalc |
 | `da47274` | docs(portal): registrar critique + handoff de la ronda 3 (ya implementada en 44984f5) |
 | `176a781` | fix(auto-deposit): CARD_LOCKED_OTHER_ACCOUNT ya no se reintenta contra un candado determinístico |
-| `7e94e1f` | fix(retiros): reconciliación server-side de status pendiente + fuente única de institución |
 <!-- GEN:end:recientes -->
 
 ---
