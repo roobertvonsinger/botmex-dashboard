@@ -124,7 +124,7 @@ _DATAIMPULSE_USER = "506e02a6444effce62de__cr.mx"
 _DATAIMPULSE_PASS = "59bd44415b7b9c7c"
 _DATAIMPULSE_PORT = 823
 
-# Puerto 823 rotativo directo + rango sticky 10000-10100
+# Puerto 823 rotativo directo + rango sticky 10000-10500 (500 puertos)
 DATAIMPULSE_PROXIES: List[Dict[str, str]] = [
     {
         "server": f"{_DATAIMPULSE_HOST}:{_DATAIMPULSE_PORT}",
@@ -137,16 +137,12 @@ DATAIMPULSE_PROXIES: List[Dict[str, str]] = [
         "username": _DATAIMPULSE_USER,
         "password": _DATAIMPULSE_PASS,
     }
-    for port in range(10000, 10100)
+    for port in range(10000, 10500)
 ]
 
-# Hosts excluidos del pool â€” proxies con reputaciÃ³n quemada o caÃ­dos.
+# Hosts excluidos del pool — proxies con reputación quemada o caídos.
 # - litport: US IP / quemado.
-# - iproyal: 402 Payment Required.
-# - dataimpulse: 502 NO_HOST_CONNECTION (gateway caÃ­do). Excluido 2026-08-12.
-# - iproyal: REACTIVADO 2026-08-12 (Robert confirma servicio operativo).
-# - proxy001: us.proxy001.com caído (ConnectTimeout/502 masivo). Excluido 2026-08-12.
-_EXCLUDED_PROXY_HOSTS: tuple = ("litport", "dataimpulse")
+_EXCLUDED_PROXY_HOSTS: tuple = ("litport",)
 
 
 def _bot_proxies() -> List[Dict[str, str]]:

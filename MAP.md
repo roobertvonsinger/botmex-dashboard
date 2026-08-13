@@ -110,7 +110,7 @@ prewarm.py (router)
 | `jwt_keeper.py` | 396 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 448 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 904 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
-| `proxy_pool.py` | 403 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `proxy_pool.py` | 399 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_validator.py` | 89 | `betmexico.renapo_validator` | _[completar]_ |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
@@ -252,6 +252,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `f023074` | fix(bot/proxy): corregir AttributeError de Message.text y excluir DataImpulse caido por 502 |
 | `45332e0` | fix(proxy): actualizar proxies Proxy001 de zona MX y corregir exclusiones |
 | `d059024` | fix(proxy_pool): excluir temporalmente proxy001 por caida masiva de gateway (502/ConnectTimeout) |
 | `ac107e5` | fix(script): resolver import circular de betmexico_config en verificador masivo |
@@ -263,7 +264,6 @@ prewarm.py (router)
 | `1352ef1` | test: actualizar assert de declines por cuenta tras backup dinamico |
 | `6d61e12` | fix(proxy): reactivar DataImpulse con puerto 823 rotativo + rango 10000-10100 |
 | `64ce4de` | fix(proxy): revertir exclusion de Proxy001 y mantener IPRoyal excluido |
-| `0ca4d83` | docs(next-session): actualizar estado deploy fix backup de cuentas (2026-08-13) |
 <!-- GEN:end:recientes -->
 
 ---
