@@ -3,6 +3,17 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-08-13 (puente ruthopia en /bet — gate rw real por HTTP, reemplaza el bypass)
+
+**Motivo**: el `/bet` volvía `🟢 LIVE (Auth OK)` sin llamada HTTP (bypass `668ab62`). RF1 restaura el gate real: cada tarjeta pasa por `POST /api/rw/check` del `ruthopia-bot` (:8787, auth Bearer). Espec: `docs/superpowers/specs/2026-08-13-puente-ruthopia-bet-design.md`; plan: `docs/superpowers/plans/2026-08-13-puente-ruthopia-bet.md`.
+
+| Función | Spec (2026-08-13) | Estado | Verificado |
+|---|---|---|---|
+| `card_checker.ruthopia_bridge_check(pipe_4parts)` | Cliente HTTP al bridge ruthopia. URL desde `RUTHOPIA_API_URL` (default `http://172.16.3.1:8787`); token del mount `/app/ruthopia_env` → `DASHBOARD_TOKEN`. Retorna `(status.value, message)`. Reintentos: ≥2 (`_RUTHOPIA_BRIDGE_RETRIES=2`) SOLO cuando el resultado NO es respuesta bancaria real (`Error` por red/url/token/mantenimiento/503/500/401/timeout); un `Approved`/`Declined` real NO se reintenta. | ✅ implementado | ✅ 4 tests unitarios (post/maintenance/retries-infra/no-retry-decline) verdes |
+| `card_checker.precheck_card_liveness` | Ya NO es bypass: llama `ruthopia_bridge_check(parsed["pipe_4parts"])` y clasifica `parsed["liveness_kind"]` ∈ `live` (Approved) / `tol_bin` (BIN 416916 o 557908) / `tol_reason` (msg con "does not support this type of purchase", "card_not_supported" o "transaction_not_allowed") / `dead` (resto). Conserva MARRIED + RATE_LIMITED (bloque previo). La CC de test `4000000000000002` ya NO es especial. | ✅ implementado | ✅ 4 tests (live/tol_bin/tol_reason/dead) + suite verde |
+| `card_checker` import `os` | `os` agregado a imports a nivel módulo (antes lazy dentro de `perform_wabox_liveness_check`). | ✅ implementado | ✅ py_compile + suite |
+| Tests ajustados al bridge | `test_bot_bet` y dedup (`test_bot_check`, `test_telegram_bot_mock`) mockean `ruthopia_bridge_check` en vez de `perform_wabox_liveness_check` (función que ya no se invoca en este flujo). | ✅ implementado | ✅ suite completa 445 verdes (2 fallos preexistentes `account_withdrawals` sin relación) |
+
 ## Captura: 2026-08-13 (fix de raíz — yoyo de proxies por valida-curp.com NXDOMAIN)
 
 **Motivo**: yoyo de exclusiones de proxies durante 36h. El `502 NO_HOST_CONNECTION` masivo NO era DataImpulse caído — era `renapo_validator.py` golpeando `valida-curp.com` (NXDOMAIN) con el pool completo en failover. KVM4 quedó desplegado en `f023074` (DI excluido, 3 sustitutos caídos). Ver `docs/ERRORS.md` para el post-mortem completo.

@@ -3,6 +3,7 @@
 
 Incluye validación LUHN, expiración, y comprobación de liveness HTTP directo vía Stripe/Wabox (estilo Ruthopia /Rw gate).
 """
+import os
 import time
 import logging
 from pathlib import Path
@@ -17,6 +18,68 @@ DASHBOARD_DIR = Path(__file__).parent.resolve()
 
 # Configuración del gate Wabox (extracción de Ruthopia Bóveda)
 WABOX_STRIPE_PK = "pk_live_WQNz0qa1BmBu47grZwTpj8BR"
+
+# Configuración del bridge HTTP a Ruthopia (/api/rw/check en KVM4)
+_RUTHOPIA_API_URL = "http://172.16.3.1:8787"
+_RUTHOPIA_BRIDGE_TIMEOUT = 60
+_RUTHOPIA_BRIDGE_RETRIES = 2  # Robert 2026-08-13: ≥2 reintentos solo por infra
+_RUTHOPIA_RETRYABLE_STATUS = {"Error"}  # no se reintenta un Declined/Approved real
+
+
+def _load_ruthopia_dashboard_token() -> str:
+    """Lee DASHBOARD_TOKEN del mount /app/ruthopia_env (KVM4). Devuelve '' si no existe."""
+    env_path = Path("/app/ruthopia_env")
+    try:
+        if env_path.exists():
+            for line in env_path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    if k.strip() == "DASHBOARD_TOKEN":
+                        return v.strip()
+    except Exception as exc:
+        logger.warning(f"[Bridge] No se pudo leer token de ruthopia: {exc}")
+    return ""
+
+
+def ruthopia_bridge_check(pipe_4parts: str) -> Tuple[str, str]:
+    """POST al bridge ruthopia (gate rw real). Retorna (status.value, message).
+
+    Reintenta hasta _RUTHOPIA_BRIDGE_RETRIES veces SOLO cuando el resultado
+    NO es una respuesta bancaria real (error de red/url/token/mantenimiento/
+    timeout/500) — Robert 2026-08-13. Un Declined/Approved real no se reintenta.
+    """
+    url = os.environ.get("RUTHOPIA_API_URL", _RUTHOPIA_API_URL)
+    token = _load_ruthopia_dashboard_token()
+    if not token:
+        return "Error", "bridge token missing"
+    attempts = _RUTHOPIA_BRIDGE_RETRIES + 1
+    status, msg = "Error", "bridge unknown"
+    for i in range(attempts):
+        try:
+            res = requests.post(
+                f"{url}/api/rw/check",
+                json={"cards": [pipe_4parts]},
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=_RUTHOPIA_BRIDGE_TIMEOUT,
+            )
+            if res.status_code == 401:
+                status, msg = "Error", "bridge unauthorized"
+            elif res.status_code == 503:
+                status, msg = "Error", "bridge maintenance"
+            elif res.status_code == 200:
+                data = res.json()
+                first = (data.get("results") or [{}])[0]
+                return first.get("status", "Error"), first.get("message", "")
+            else:
+                status, msg = "Error", f"bridge http {res.status_code}"
+        except Exception as exc:
+            status, msg = "Error", f"bridge unreachable: {str(exc)[:60]}"
+        if i < attempts - 1 and status in _RUTHOPIA_RETRYABLE_STATUS:
+            time.sleep(2 * (i + 1))
+            continue
+        return status, msg
+    return status, msg
 
 
 def check_luhn(card_number: str) -> bool:
@@ -272,20 +335,46 @@ def precheck_card_liveness(card_pipe: str) -> Tuple[bool, str, Optional[Dict[str
             if account_status and "RATE_LIMITED" in (account_status["dead_reason"] or ""):
                 return False, "🔴 RATE_LIMITED - Cuenta bloqueada permanentemente", None
 
-    # RUTHOPIA CHECK TEMPORALMENTE DESHABILITADO E INVISIBLE
-    # Simplemente asumimos que la tarjeta está LIVE (Auth OK)
-    # Excepción para simular fallo en tests con la CC de prueba standard
-    if card_num == "4000000000000002":
-        status_label = "🔴 DECLINED (Auth Failed) - <i>Card Declined</i>"
+    # RUTHOPIA CHECK VÍA BRIDGE (gate rw real por HTTP)
+    _TOL_BINS = ("416916", "557908")
+    _TOL_REASON_SUBSTRINGS = (
+        "does not support this type of purchase",
+        "card_not_supported",
+        "transaction_not_allowed",
+    )
+
+    # Puente auténtico: las tarjetas pasan por el gate rw de ruthopia (HTTP)
+    status, msg = ruthopia_bridge_check(parsed["pipe_4parts"])
+
+    if status == "Approved":
+        parsed["liveness_kind"] = "live"
+        status_label = f"🟢 LIVE (Auth OK) - <i>{msg[:50]}</i>"
         parsed["liveness_label"] = status_label
-        parsed["is_live"] = False
-        return False, status_label, parsed
+        parsed["is_live"] = True
+        return True, status_label, parsed
 
-    status_label = "🟢 LIVE (Auth OK)"
+    # Tolerancias (RF3): solo estas pasan sin aprobar el rw
+    bin6 = card_num[:6]
+    if bin6 in _TOL_BINS:
+        parsed["liveness_kind"] = "tol_bin"
+        status_label = "🟡 TOLERADA (BIN) - pase sin aprobar rw"
+        parsed["liveness_label"] = status_label
+        parsed["is_live"] = True
+        return True, status_label, parsed
+
+    msg_lower = (msg or "").lower()
+    if any(sub in msg_lower for sub in _TOL_REASON_SUBSTRINGS):
+        parsed["liveness_kind"] = "tol_reason"
+        status_label = "🟡 TOLERADA (reason) - pase sin aprobar rw"
+        parsed["liveness_label"] = status_label
+        parsed["is_live"] = True
+        return True, status_label, parsed
+
+    parsed["liveness_kind"] = "dead"
+    status_label = f"🔴 DECLINED (Auth Failed) - <i>{msg[:50]}</i>"
     parsed["liveness_label"] = status_label
-    parsed["is_live"] = True
-
-    return True, status_label, parsed
+    parsed["is_live"] = False
+    return False, status_label, parsed
 
 
 def format_ruthopia_liveness_summary(results: List[Dict[str, Any]]) -> str:

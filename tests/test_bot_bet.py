@@ -75,8 +75,8 @@ def test_bot_bet_luhn_failure(sa_client):
 
 
 def test_bot_bet_require_confirmation(sa_client, monkeypatch):
-    # Mockear perform_wabox_liveness_check
-    monkeypatch.setattr(card_checker, "perform_wabox_liveness_check", lambda c: (True, "🟢 LIVE (Tokenized)", {}))
+    # Mockear ruthopia_bridge_check (puente HTTP real al gate ruthopia)
+    monkeypatch.setattr(card_checker, "ruthopia_bridge_check", lambda p: ("Approved", "Card Updated (Last4: 1111)"))
 
     res = sa_client.post("/api/bot/bet", json={
         "card_pipes": ["4111111111111111|1230|123"],
@@ -90,7 +90,7 @@ def test_bot_bet_require_confirmation(sa_client, monkeypatch):
 
 
 def test_bot_bet_no_passwords_in_response(sa_client, monkeypatch):
-    monkeypatch.setattr(card_checker, "perform_wabox_liveness_check", lambda c: (True, "🟢 LIVE (Tokenized)", {}))
+    monkeypatch.setattr(card_checker, "ruthopia_bridge_check", lambda p: ("Approved", "Card Updated (Last4: 1111)"))
 
     import auto_deposit
     def mock_plan(db_path, card_pipes, amount, target_count):

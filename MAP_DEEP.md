@@ -244,11 +244,13 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `check_luhn` | def | L22–L35 |
-| `parse_and_validate_card_pipe` | def | L38–L87 |
-| `perform_wabox_liveness_check` | def | L95–L221 |
-| `precheck_card_liveness` | def | L224–L288 |
-| `format_ruthopia_liveness_summary` | def | L291–L305 |
+| `_load_ruthopia_dashboard_token` | def | L29–L42 |
+| `ruthopia_bridge_check` | def | L45–L82 |
+| `check_luhn` | def | L85–L98 |
+| `parse_and_validate_card_pipe` | def | L101–L150 |
+| `perform_wabox_liveness_check` | def | L158–L284 |
+| `precheck_card_liveness` | def | L287–L377 |
+| `format_ruthopia_liveness_summary` | def | L380–L394 |
 
 ### `clabe_fetch.py`
 

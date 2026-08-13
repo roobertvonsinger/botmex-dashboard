@@ -102,7 +102,7 @@ prewarm.py (router)
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1466 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
-| `card_checker.py` | 305 | `betmexico.dashboard.card_checker` | _[completar]_ |
+| `card_checker.py` | 394 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 154 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
@@ -252,6 +252,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `dcd023d` | feat(agents): suite superpowers adaptada a opencode + comandos Smartplan/Smartexe |
 | `bd9d2a2` | docs(superpowers): puente ruthopia en /bet — decisiones de Robert (RF5 dinamico, RF8 segundo intento, 5 tarjetas, retries infra, no-mask) |
 | `9321a0f` | fix(proxy/renapo): causa raiz del yoyo de proxies - valida-curp.com NXDOMAIN quemaba el pool |
 | `91deb84` | docs: actualizar NEXT-SESSION para handoff de resolucion de proxies |
@@ -263,7 +264,6 @@ prewarm.py (router)
 | `e5999fa` | fix: deshabilitar proxy001 (503 caído) + Optional import en bot.py |
 | `f496233` | fix: reemplazar todos los except silenciosos por logging.warning/error |
 | `29f1717` | docs: actualizar NEXT-SESSION con estado de proxies, telegram bot y verificacion masiva |
-| `bbca351` | fix(proxy): reactivar DataImpulse y expandir rango sticky a 10000-10500 |
 <!-- GEN:end:recientes -->
 
 ---

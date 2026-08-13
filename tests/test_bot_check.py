@@ -1,6 +1,9 @@
 import os, pytest
 
-def test_filter_and_sanitize_check_combos(seed_db):
+def test_filter_and_sanitize_check_combos(seed_db, monkeypatch):
+    import card_checker
+    # Dedup es el objetivo de este test — el liveness real se mockea
+    monkeypatch.setattr(card_checker, "ruthopia_bridge_check", lambda p: ("Approved", "Card Updated (Last4: 1111)"))
     from app import filter_and_sanitize_check_combos, db
     with db(write=True) as c:
         c.execute("INSERT OR IGNORE INTO accounts (email, password, status, first_checked_at, last_checked_at) VALUES ('existente@gmail.com', 'pass123', 'LIVE', '2026-01-01', '2026-01-01')")

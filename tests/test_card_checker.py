@@ -38,16 +38,29 @@ def test_parse_and_validate_card_pipe_expired():
     assert "vencida" in reason.lower()
 
 
-def test_precheck_card_liveness(monkeypatch):
-    # Mockear perform_wabox_liveness_check para pruebas unitarias sin dependencias externas
-    monkeypatch.setattr(card_checker, "perform_wabox_liveness_check", lambda c: (True, "🟢 LIVE (Tokenized)", {}))
-    ok, msg, data = precheck_card_liveness("4111111111111111|1230|123")
-    assert ok is True
-    assert data["bin"] == "411111"
+def test_precheck_card_liveness_live(monkeypatch):
+    import card_checker as cc
+    monkeypatch.setattr(cc, "ruthopia_bridge_check", lambda p: ("Approved", "Card Updated (Last4: 1111)"))
+    ok, msg, data = cc.precheck_card_liveness("4111111111111111|1230|123")
+    assert ok and data["liveness_kind"] == "live"
 
-    ok_invalid, msg_invalid, _ = precheck_card_liveness("4111111111111112|1230|123")
-    assert ok_invalid is False
-    assert "luhn" in msg_invalid.lower()
+def test_precheck_card_liveness_tol_bin(monkeypatch):
+    import card_checker as cc
+    monkeypatch.setattr(cc, "ruthopia_bridge_check", lambda p: ("Declined", "Declined: Your card was declined"))
+    ok, msg, data = cc.precheck_card_liveness("41691600000000070|1230|123")
+    assert ok and data["liveness_kind"] == "tol_bin"
+
+def test_precheck_card_liveness_tol_reason(monkeypatch):
+    import card_checker as cc
+    monkeypatch.setattr(cc, "ruthopia_bridge_check", lambda p: ("Error", "Error: Your card does not support this type of purchase."))
+    ok, msg, data = cc.precheck_card_liveness("49156600000000030|1230|123")
+    assert ok and data["liveness_kind"] == "tol_reason"
+
+def test_precheck_card_liveness_dead(monkeypatch):
+    import card_checker as cc
+    monkeypatch.setattr(cc, "ruthopia_bridge_check", lambda p: ("Declined", "Declined: Your card was declined"))
+    ok, msg, data = cc.precheck_card_liveness("45552900000000040|1230|123")
+    assert not ok and data["liveness_kind"] == "dead"
 
 
 def test_format_ruthopia_liveness_summary():
@@ -59,3 +72,70 @@ def test_format_ruthopia_liveness_summary():
     assert "ʀ.ᴜᴛʜᴏᴘɪᴀ ɢᴀᴛᴇ /ʀᴡ" in summary
     assert "Aceptadas: <b>1</b>" in summary
     assert "Descartadas: <b>1</b>" in summary
+
+
+def test_ruthopia_bridge_check_post(monkeypatch):
+    import card_checker as cc
+    captured = {}
+    class FakeResp:
+        status_code = 200
+        def json(self):
+            return {"ok": True, "results": [{"card": "4111111111111111|12|28|123", "status": "Approved", "message": "Card Updated (Last4: 1111)", "elapsed_s": 1.0}]}
+    def fake_post(url, json=None, headers=None, timeout=None):
+        captured["url"] = url
+        captured["json"] = json
+        captured["headers"] = headers
+        return FakeResp()
+    monkeypatch.setattr(cc.requests, "post", fake_post)
+    monkeypatch.setattr(cc, "_load_ruthopia_dashboard_token", lambda: "tok-test")
+    status, msg = cc.ruthopia_bridge_check("4111111111111111|12|28|123")
+    assert status == "Approved"
+    assert "Card Updated" in msg
+    assert captured["url"] == "http://172.16.3.1:8787/api/rw/check"
+    assert captured["headers"]["Authorization"] == "Bearer tok-test"
+    assert captured["json"] == {"cards": ["4111111111111111|12|28|123"]}
+
+
+def test_ruthopia_bridge_check_maintenance(monkeypatch):
+    import card_checker as cc
+    class Fake503:
+        status_code = 503
+        def json(self):
+            return {"ok": False, "error": "maintenance"}
+    monkeypatch.setattr(cc.requests, "post", lambda *a, **k: Fake503())
+    monkeypatch.setattr(cc, "_load_ruthopia_dashboard_token", lambda: "tok-test")
+    status, msg = cc.ruthopia_bridge_check("4111111111111111|12|28|123")
+    assert status == "Error" and "maintenance" in msg
+
+
+def test_ruthopia_bridge_check_retries_infra_only(monkeypatch):
+    import card_checker as cc
+    calls = []
+    class Fake503:
+        status_code = 503
+        def json(self):
+            return {"ok": False, "error": "maintenance"}
+    def fake_post(url, json=None, headers=None, timeout=None):
+        calls.append(1)
+        return Fake503()
+    monkeypatch.setattr(cc.requests, "post", fake_post)
+    monkeypatch.setattr(cc, "_load_ruthopia_dashboard_token", lambda: "tok-test")
+    monkeypatch.setattr(cc.time, "sleep", lambda s: None)
+    status, msg = cc.ruthopia_bridge_check("4111111111111111|12|28|123")
+    assert status == "Error" and len(calls) == cc._RUTHOPIA_BRIDGE_RETRIES + 1
+
+
+def test_ruthopia_bridge_check_no_retry_on_decline(monkeypatch):
+    import card_checker as cc
+    calls = []
+    class FakeDeclined:
+        status_code = 200
+        def json(self):
+            return {"ok": True, "results": [{"card": "x", "status": "Declined", "message": "Declined: Your card was declined", "elapsed_s": 1.0}]}
+    def fake_post(url, json=None, headers=None, timeout=None):
+        calls.append(1)
+        return FakeDeclined()
+    monkeypatch.setattr(cc.requests, "post", fake_post)
+    monkeypatch.setattr(cc, "_load_ruthopia_dashboard_token", lambda: "tok-test")
+    status, msg = cc.ruthopia_bridge_check("4169160000000000|12|28|123")
+    assert status == "Declined" and len(calls) == 1  # respuesta real → NO reintenta
