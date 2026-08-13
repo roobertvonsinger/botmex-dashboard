@@ -98,7 +98,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 577 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5092 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 5205 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1466 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -252,6 +252,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `29f1717` | docs: actualizar NEXT-SESSION con estado de proxies, telegram bot y verificacion masiva |
 | `bbca351` | fix(proxy): reactivar DataImpulse y expandir rango sticky a 10000-10500 |
 | `f023074` | fix(bot/proxy): corregir AttributeError de Message.text y excluir DataImpulse caido por 502 |
 | `45332e0` | fix(proxy): actualizar proxies Proxy001 de zona MX y corregir exclusiones |
@@ -263,7 +264,6 @@ prewarm.py (router)
 | `ba9e423` | fix(auto_deposit): penalizar cuentas intentadas <60m en la ordenacion para romper el ciclo deterministico |
 | `9876977` | fix(auto_deposit): eliminar bypass de 2s en cooldown y pre-excluir tarjetas casadas de BD |
 | `1352ef1` | test: actualizar assert de declines por cuenta tras backup dinamico |
-| `6d61e12` | fix(proxy): reactivar DataImpulse con puerto 823 rotativo + rango 10000-10100 |
 <!-- GEN:end:recientes -->
 
 ---
