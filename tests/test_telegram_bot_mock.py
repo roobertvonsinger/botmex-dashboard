@@ -510,8 +510,7 @@ async def test_bet_card_invalid_or_cooldown(seed_db):
 
     res = await process_bet_input(update, context)
     assert res == ConversationHandler.END
-    status_msg = update.message.reply_text.return_value
-    args, kwargs = status_msg.edit_text.call_args
+    args, kwargs = update.message.reply_text.call_args
     assert "CARDING FALLIDO" in args[0] or "NO SE DETECTARON TARJETAS LIVE" in args[0]
 
 

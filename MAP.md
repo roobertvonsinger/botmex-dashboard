@@ -102,7 +102,7 @@ prewarm.py (router)
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1370 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
-| `card_checker.py` | 299 | `betmexico.dashboard.card_checker` | _[completar]_ |
+| `card_checker.py` | 305 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 154 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
@@ -250,6 +250,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a6d8e87` | fix(deposits): desactivar restriccion de lock por operador (409) en auto_lock_for_deposit |
 | `36d9b3c` | fix(bot): resolver fallos de pytest en /bet, /check y card_checker |
 | `5108533` | fix(cards): cache 30m utopia para tarjetas aprobadas y alerta SSE para CARD_MARRIED |
 | `3a45562` | fix(core): rate-limit dead permanente, drenado tokens captcha, persistencia BANK_REJECTED y check tarjetas casadas |
@@ -261,7 +262,6 @@ prewarm.py (router)
 | `8bdb146` | fix(retiros): guardarrail gateway/dígitos mismatch ciego — PASO5 pegaba a bankTransaction (vacío) en vez de Transactions/ByUser |
 | `d19e53f` | fix(retiros): badge de institucion seguia mostrando el cache de readiness, no el retiro real |
 | `638f85a` | docs(errors): corregir ERRORS.md — LoginResult.status ya estaba deployado y verificado, no pendiente |
-| `a9d58fb` | fix(mock-bot): LoginResult no tiene .status — cuenta DEAD tumbaba el /check completo |
 <!-- GEN:end:recientes -->
 
 ---
