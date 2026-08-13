@@ -12,6 +12,10 @@ para depósito: exige JWT VIVO (> now + 60, no por expirar) y cap 24h
 suficiente para amount × count.
 """
 
+import json
+import logging
+import os
+import sqlite3
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Dict, List, Optional
@@ -274,10 +278,18 @@ def select_accounts_for_auto(
             else:
                 tier_low.append(r)
 
-    sort_key = lambda r: (
-        _grade_rank(r.get("grade")),
-        -(float(r.get("grade_score") or 0)),
-    )
+    def sort_key(r):
+        email = r.get("email")
+        meta = meta_map.get(email) or {}
+        # Penalizar si tuvo intento en los últimos 60 minutos (evita ciclo determinístico en /bet)
+        mins = meta.get("mins_since_last_attempt", 99999)
+        recently_tried = 1 if mins < 60 else 0
+        return (
+            recently_tried,
+            _grade_rank(r.get("grade")),
+            -(float(r.get("grade_score") or 0)),
+        )
+
     tier_top.sort(key=sort_key)
     tier_mid.sort(key=sort_key)
     # LOW mezcla dos perfiles de riesgo distinto: cuentas JWT-vivo degradadas

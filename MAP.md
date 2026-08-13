@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 577 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5092 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1452 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1464 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `card_checker.py` | 305 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
@@ -250,6 +250,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `9876977` | fix(auto_deposit): eliminar bypass de 2s en cooldown y pre-excluir tarjetas casadas de BD |
 | `1352ef1` | test: actualizar assert de declines por cuenta tras backup dinamico |
 | `6d61e12` | fix(proxy): reactivar DataImpulse con puerto 823 rotativo + rango 10000-10100 |
 | `64ce4de` | fix(proxy): revertir exclusion de Proxy001 y mantener IPRoyal excluido |
@@ -261,7 +262,6 @@ prewarm.py (router)
 | `78bb7fd` | docs(next-session): update NEXT-SESSION.md for bot/liveness changes |
 | `668ab62` | fix(bot/liveness): bypass Ruthopia liveness check, remove bet confirmation, hide dashboard during matchmaking |
 | `a6d8e87` | fix(deposits): desactivar restriccion de lock por operador (409) en auto_lock_for_deposit |
-| `36d9b3c` | fix(bot): resolver fallos de pytest en /bet, /check y card_checker |
 <!-- GEN:end:recientes -->
 
 ---
