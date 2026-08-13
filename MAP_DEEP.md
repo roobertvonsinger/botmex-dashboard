@@ -442,9 +442,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `get_all_target_accounts` | def | L27–L42 |
-| `mark_account_dead` | def | L45–L60 |
-| `verify_all` | def | L63–L130 |
+| `get_db_connection` | def | L31–L38 |
+| `get_target_accounts` | def | L41–L48 |
+| `mark_account_dead` | def | L51–L62 |
+| `main` | def | L65–L133 |
 
 ### `shared/betmexico_payment_analyzer.py`
 
