@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 577 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5092 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1415 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1420 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `card_checker.py` | 305 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
@@ -250,6 +250,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a897075` | chore: actualizar NEXT-SESSION para debugging urgente post-Gemini |
 | `6a04113` | fix: jubilar tarjeta tras CARD_LOCKED_OTHER_ACCOUNT en auto_mission |
 | `78bb7fd` | docs(next-session): update NEXT-SESSION.md for bot/liveness changes |
 | `668ab62` | fix(bot/liveness): bypass Ruthopia liveness check, remove bet confirmation, hide dashboard during matchmaking |
@@ -261,7 +262,6 @@ prewarm.py (router)
 | `87e25d6` | fix(proxy): embeber literalmente los 500 proxies de Proxy001 en proxy_pool.py sin lectura de disco |
 | `001e85e` | fix(proxy): resolver ruta relativa de Proxy001 en Docker (KVM4) para cargar los 500 proxies |
 | `55f346e` | fix(proxy): excluir DataImpulse por 502 NO_HOST_CONNECTION y suplantar con Proxy001 (500 MX) |
-| `9ed5931` | docs(errors): corregir mecanismo real del log viejo (archivo persistente, no buffer Docker) + limpiar bloques muertos |
 <!-- GEN:end:recientes -->
 
 ---

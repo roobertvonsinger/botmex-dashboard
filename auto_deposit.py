@@ -1140,22 +1140,27 @@ async def run_auto_mission(
                     _unlock(account_id)  # regla 7: no dejar 4h/perpetuo sin match
                     locked_ids.discard(account_id)
 
-                # Si llegamos al final del plan y NO hemos conseguido ningún match, intentamos buscar cuentas de respaldo
-                if not matches and acc_idx == len(accounts_list) - 1 and len(accounts_list) < 10:
+                # Si llegamos al final del plan y NO hemos conseguido ningún match, intentamos buscar cuentas de respaldo.
+                # La condición `not matches` ya garantiza que no hubo match; quitamos el
+                # `len(accounts_list) < 10` que impedía el backup cuando el plan original
+                # ya alcanzó el techo de 10 pero falló todas (gap 2026-08-13).
+                if not matches and acc_idx == len(accounts_list) - 1:
                     try:
                         from app import DB_PATH
                         active_cards = [p for p in card_pipes if _normalize_pipe_to_3part(p) not in retired_cards]
                         if active_cards:
-                            backup_plan = plan_auto_mission(DB_PATH, active_cards, amount, target_count, max_accounts=10)
-                            if backup_plan and backup_plan.get("feasible"):
-                                for b_acc in backup_plan.get("accounts", []):
-                                    b_email = b_acc.get("email")
-                                    if b_email not in already_checked_emails:
-                                        accounts_list.append(b_acc)
-                                        already_checked_emails.add(b_email)
-                                        logger.info(f"➕ CUENTA DE RESPALDO AÑADIDA DINÁMICAMENTE | {b_email}")
-                                        if len(accounts_list) >= 10:
-                                            break
+                            remaining = MAX_ACCOUNTS_HARD_CAP - len(accounts_list)
+                            if remaining > 0:
+                                backup_plan = plan_auto_mission(DB_PATH, active_cards, amount, target_count, max_accounts=remaining)
+                                if backup_plan and backup_plan.get("feasible"):
+                                    for b_acc in backup_plan.get("accounts", []):
+                                        b_email = b_acc.get("email")
+                                        if b_email not in already_checked_emails:
+                                            accounts_list.append(b_acc)
+                                            already_checked_emails.add(b_email)
+                                            logger.info(f"➕ CUENTA DE RESPALDO AÑADIDA DINÁMICAMENTE | {b_email}")
+                                            if len(accounts_list) >= MAX_ACCOUNTS_HARD_CAP:
+                                                break
                     except Exception as ex_backup:
                         logger.warning(f"[Auto {mission_id}] No se pudieron buscar cuentas de respaldo: {ex_backup}")
 
