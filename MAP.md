@@ -110,7 +110,7 @@ prewarm.py (router)
 | `jwt_keeper.py` | 396 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 448 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 904 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
-| `proxy_pool.py` | 399 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `proxy_pool.py` | 401 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_validator.py` | 89 | `betmexico.renapo_validator` | _[completar]_ |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
@@ -252,6 +252,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `f496233` | fix: reemplazar todos los except silenciosos por logging.warning/error |
 | `29f1717` | docs: actualizar NEXT-SESSION con estado de proxies, telegram bot y verificacion masiva |
 | `bbca351` | fix(proxy): reactivar DataImpulse y expandir rango sticky a 10000-10500 |
 | `f023074` | fix(bot/proxy): corregir AttributeError de Message.text y excluir DataImpulse caido por 502 |
@@ -263,7 +264,6 @@ prewarm.py (router)
 | `a966a46` | fix(auto_deposit): garantizar con.close en try/finally al filtrar tarjetas fallidas |
 | `ba9e423` | fix(auto_deposit): penalizar cuentas intentadas <60m en la ordenacion para romper el ciclo deterministico |
 | `9876977` | fix(auto_deposit): eliminar bypass de 2s en cooldown y pre-excluir tarjetas casadas de BD |
-| `1352ef1` | test: actualizar assert de declines por cuenta tras backup dinamico |
 <!-- GEN:end:recientes -->
 
 ---

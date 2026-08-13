@@ -142,7 +142,9 @@ DATAIMPULSE_PROXIES: List[Dict[str, str]] = [
 
 # Hosts excluidos del pool — proxies con reputación quemada o caídos.
 # - litport: US IP / quemado.
-_EXCLUDED_PROXY_HOSTS: tuple = ("litport",)
+# - proxy001: us.proxy001.com:7878 devuelve 503/502 (servidor caído 2026-08-13).
+#   Reactivar quitando "proxy001" cuando el proveedor restaure el servicio.
+_EXCLUDED_PROXY_HOSTS: tuple = ("litport", "proxy001")
 
 
 def _bot_proxies() -> List[Dict[str, str]]:

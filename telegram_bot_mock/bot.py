@@ -9,7 +9,7 @@ import random
 import sys
 import time
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 
 from telegram import (
     Update,
