@@ -1,6 +1,6 @@
-﻿#!/usr/bin/env python3
-# BetMexico Web v2 â€” minimal dashboard sobre la BD existente.
-# Lee betmexico_accounts.db (la misma que el bot TG). Sin lÃ³gica de polling.
+#!/usr/bin/env python3
+# BetMexico Web v2 — minimal dashboard sobre la BD existente.
+# Lee betmexico_accounts.db (la misma que el bot TG). Sin lógica de polling.
 
 from __future__ import annotations
 import sqlite3, os, re, sys, time, traceback
@@ -19,30 +19,30 @@ from typing import Optional
 from curp_utils import compute_curp, generate_curp_candidates
 from renapo_validator import validate_renapo_curp
 
-# â”€â”€ FIX CRÃTICO: doble-import de este archivo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# El container arranca con `python web/app.py` â†’ este script se carga como
-# `__main__`. Pero `deposits.py`, `prewarm.py` y otros hacen `from app import â€¦`
-# que carga el ARCHIVO DE NUEVO como mÃ³dulo `app` (instancia distinta en
+# ── FIX CRÍTICO: doble-import de este archivo ───────────────────────────────
+# El container arranca con `python web/app.py` → este script se carga como
+# `__main__`. Pero `deposits.py`, `prewarm.py` y otros hacen `from app import …`
+# que carga el ARCHIVO DE NUEVO como módulo `app` (instancia distinta en
 # sys.modules). Resultado: cada uno tiene su propio `_sse_queues`.
 #
-# SÃ­ntoma: clientes SSE se registran en `__main__._sse_queues`, pero las
-# misiones Programado hacÃ­an `_broadcast` desde `app._sse_queues` (otra lista,
-# siempre vacÃ­a). El frontend nunca recibÃ­a `scheduled_phase` aunque el
-# backend los emitÃ­a correctamente.
+# Síntoma: clientes SSE se registran en `__main__._sse_queues`, pero las
+# misiones Programado hacían `_broadcast` desde `app._sse_queues` (otra lista,
+# siempre vacía). El frontend nunca recibía `scheduled_phase` aunque el
+# backend los emitía correctamente.
 #
-# Fix: aliasear `sys.modules['app']` a este mismo mÃ³dulo apenas arrancamos.
+# Fix: aliasear `sys.modules['app']` a este mismo módulo apenas arrancamos.
 # Cuando `deposits.py` haga `from app import _broadcast`, Python encuentra
 # 'app' ya en sys.modules y reutiliza esta instancia. Una sola lista
 # `_sse_queues`, un solo `_broadcast`.
 if __name__ == "__main__":
     sys.modules.setdefault("app", sys.modules[__name__])
 
-# â”€â”€ File logging para que /api/logs pueda servir desde Docker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── File logging para que /api/logs pueda servir desde Docker ─────────────────
 # Antes el endpoint usaba `journalctl -u betmexico-web.service` pero en KVM4
 # corremos en Docker (no hay systemd). Resultado: logs no se cargaban en el
-# dashboard desde la migraciÃ³n 2026-05-11. Fix: agregar FileHandler que escriba
+# dashboard desde la migración 2026-05-11. Fix: agregar FileHandler que escriba
 # a /data/logs/dashboard.log (volumen montado, persiste entre restarts) y leer
-# de ahÃ­ en el endpoint.
+# de ahí en el endpoint.
 _LOGS_DIR = Path("/data/logs")
 try:
     _LOGS_DIR.mkdir(parents=True, exist_ok=True)
@@ -64,8 +64,8 @@ try:
             _root_logger.setLevel(_logging.INFO)
 
     # Refrescos masivos (account_refresh + jwt_keeper) a SU PROPIO archivo,
-    # NO al dashboard.log â€” Robert 2026-08-05: los refrescos masivos no deben
-    # spamear el log operativo. propagate=False evita que ademÃ¡s caigan al root.
+    # NO al dashboard.log — Robert 2026-08-05: los refrescos masivos no deben
+    # spamear el log operativo. propagate=False evita que además caigan al root.
     _refresh_loggers = [_logging.getLogger("betmexico.dashboard.account_refresh"),
                         _logging.getLogger("betmexico.dashboard.jwt_keeper")]
     for _rl in _refresh_loggers:
@@ -85,36 +85,32 @@ try:
 except Exception as _e:
     print(f"[boot] file logger init failed: {_e}")
 
-# Permitir importar mÃ³dulos del bot (betmexico_db, betmexico_login_service, etc.)
+# Permitir importar módulos del bot (betmexico_db, betmexico_login_service, etc.)
 # que viven en el directorio padre cuando el VPS los tiene desplegados.
 _HERE = Path(__file__).parent
 _BOT_DIR = _HERE.parent
 if (_BOT_DIR / "betmexico_db.py").exists() and str(_BOT_DIR) not in sys.path:
     sys.path.insert(0, str(_BOT_DIR))
 
-# Carga EAGER de deps del bot â€” antes que prewarm/deposits los importen lazy.
-# Evita circular imports en betmexico_db (carga partial â†’ crash).
+# Carga EAGER de deps del bot — antes que prewarm/deposits los importen lazy.
+# Evita circular imports en betmexico_db (carga partial → crash).
 BOT_DEPS_OK = False
 BOT_MAKE_POOL = None
 BOT_SCORE_PAYMENT = None
 try:
     if (_BOT_DIR / "betmexico_db.py").exists():
-        # Romper ciclo betmexico_db â†” betmexico_config: cargar config primero
+        # Romper ciclo betmexico_db ↔ betmexico_config: cargar config primero
         # para que cuando betmexico_db haga `from betmexico_config import ...`
-        # ya estÃ© completo, y betmexico_config no necesite re-import betmexico_db.
+        # ya esté completo, y betmexico_config no necesite re-import betmexico_db.
         import betmexico_config as _bot_cfg_mod  # noqa
         import betmexico_db as _bot_db_mod  # noqa
         from betmexico_login_service import make_pool as BOT_MAKE_POOL  # noqa
         try:
             from betmexico_payment_analyzer import score_payment_readiness as BOT_SCORE_PAYMENT  # noqa
-        except Exception as e:
-            import logging as _lg
-            _lg.getLogger("betmexico.dashboard.deps").warning(
-                f"[deps] betmexico_payment_analyzer no cargado: {e}"
-            )
-            BOT_SCORE_PAYMENT = None
-        BOT_DEPS_OK = BOT_SCORE_PAYMENT is not None
-        print(f"[deps] bot modules loaded OK (analyzer={'OK' if BOT_DEPS_OK else 'skip'})")
+        except Exception:
+            pass
+        BOT_DEPS_OK = True
+        print("[deps] bot modules loaded OK")
 except Exception as _e:
     import traceback as _tb
     print(f"[deps] bot init failed: {_e}")
@@ -159,11 +155,11 @@ if _env_file.exists():
 DB_PATH = Path(os.environ.get("BETMEX_DB", str(ROOT.parent / "betmexico_accounts.db")))
 
 
-# InstrumentaciÃ³n temporal (Robert, campo 2026-07-25: 2 retiros reales chocaron con
-# "database is locked" sostenido en <20min, "no debe pasar" â€” necesitamos la causa
-# raÃ­z, no otro parche). Registro de writes activos + stack de apertura: si un write
-# tarda de mÃ¡s o choca con lock, logueamos QUIÃ‰N mÃ¡s estaba escribiendo al mismo
-# tiempo y desde dÃ³nde. Costo Ã­nfimo (dict + lock), quitar cuando se identifique
+# Instrumentación temporal (Robert, campo 2026-07-25: 2 retiros reales chocaron con
+# "database is locked" sostenido en <20min, "no debe pasar" — necesitamos la causa
+# raíz, no otro parche). Registro de writes activos + stack de apertura: si un write
+# tarda de más o choca con lock, logueamos QUIÉN más estaba escribiendo al mismo
+# tiempo y desde dónde. Costo ínfimo (dict + lock), quitar cuando se identifique
 # y arregle el culpable real.
 _db_write_registry: dict = {}
 _db_write_registry_lock = threading.Lock()
@@ -202,17 +198,17 @@ def db(write: bool = False):
                         f"[write#{k} abierto hace {time.time() - t:.1f}s, origen:]\n{s}"
                         for k, (t, s) in others.items()
                     )
-                    _dblg.error(f"[db] LOCK â€” {len(others)} write(s) activos simultÃ¡neos AHORA:\n{held}")
+                    _dblg.error(f"[db] LOCK — {len(others)} write(s) activos simultáneos AHORA:\n{held}")
                 else:
                     # En arquitectura multicontainer (web + mock-bot comparten la
                     # misma BD SQLite en /data), "sin otro write en ESTE proceso"
                     # es casi siempre el otro container migrando/arrancando a la
-                    # vez â€” contenciÃ³n esperada, no un bug. Se loguea warning con
-                    # stack para diagnÃ³stico; el caso con writes simultÃ¡neos del
-                    # MISMO proceso (arriba) sÃ­ es error real.
+                    # vez — contención esperada, no un bug. Se loguea warning con
+                    # stack para diagnóstico; el caso con writes simultáneos del
+                    # MISMO proceso (arriba) sí es error real.
                     _dblg.warning(
-                        f"[db] LOCK sin otro write registrado en este proceso â€” el lock viene de "
-                        f"fuera del registro (conexiÃ³n huÃ©rfana o proceso externo). Origen de este write:\n{stack}"
+                        f"[db] LOCK sin otro write registrado en este proceso — el lock viene de "
+                        f"fuera del registro (conexión huérfana o proceso externo). Origen de este write:\n{stack}"
                     )
         raise
     finally:
@@ -222,7 +218,7 @@ def db(write: bool = False):
                 _db_write_registry.pop(entry_id, None)
             if dt > 2.0:
                 _logging.getLogger("betmexico.dashboard.db").warning(
-                    f"[db] write#{entry_id} tardÃ³ {dt:.1f}s sosteniendo el writer global de SQLite â€” origen:\n{stack}"
+                    f"[db] write#{entry_id} tardó {dt:.1f}s sosteniendo el writer global de SQLite — origen:\n{stack}"
                 )
         conn.close()
 
@@ -231,17 +227,17 @@ def _db_write_with_retry(fn, *, attempts: int = 3, base_delay: float = 0.2):
     """Ejecuta `fn(conn)` dentro de `db(write=True)` con retry ante `database is locked`.
 
     Robert, campo 2026-07-25: los writes triviales (UPDATE de cooldown / rl_streak /
-    locked_by) mueren al primer lock sostenido y, por contenciÃ³n botâ†”web + jwt_keeper
-    corriendo su ciclo horario, tumbaban el depÃ³sito del operador. En vez de N copias
+    locked_by) mueren al primer lock sostenido y, por contención bot↔web + jwt_keeper
+    corriendo su ciclo horario, tumbaban el depósito del operador. En vez de N copias
     del loop (revolvedero), UN helper.
 
-    Backoff corto (no el de 5Ã—10s del retiro â€” ese es para dinero real). AquÃ­ 3 intentos
-    con delays 0.2/0.5/1.0s: cada `db(write=True)` ya tiene su `timeout=10` interno, asÃ­
-    que el primer intento espera hasta 10s; si aÃºn asÃ­ choca, un segundo intento rÃ¡pido
-    suele entrar en el gap que dejÃ³ el writer anterior. Si los 3 fallan, relanza â€” el
-    caller decide (best-effort lo traga, crÃ­tico lo propaga).
+    Backoff corto (no el de 5×10s del retiro — ese es para dinero real). Aquí 3 intentos
+    con delays 0.2/0.5/1.0s: cada `db(write=True)` ya tiene su `timeout=10` interno, así
+    que el primer intento espera hasta 10s; si aún así choca, un segundo intento rápido
+    suele entrar en el gap que dejó el writer anterior. Si los 3 fallan, relanza — el
+    caller decide (best-effort lo traga, crítico lo propaga).
 
-    `fn` recibe la conexiÃ³n y devuelve lo que quiera (rowcount, fila, None).
+    `fn` recibe la conexión y devuelve lo que quiera (rowcount, fila, None).
     """
     _lg = _logging.getLogger("betmexico.dashboard.db")
     last = None
@@ -253,13 +249,13 @@ def _db_write_with_retry(fn, *, attempts: int = 3, base_delay: float = 0.2):
             last = e
             if "locked" not in str(e) or attempt == attempts:
                 raise
-            delay = base_delay * attempt  # 0.2, 0.4, 0.6â€¦
+            delay = base_delay * attempt  # 0.2, 0.4, 0.6…
             _lg.warning(
-                f"[db] write retry {attempt}/{attempts} chocÃ³ con lock, "
+                f"[db] write retry {attempt}/{attempts} chocó con lock, "
                 f"reintentando en {delay:.1f}s"
             )
             time.sleep(delay)
-    raise last  # inalcanzable (attempt==attempts ya relanzÃ³ arriba)
+    raise last  # inalcanzable (attempt==attempts ya relanzó arriba)
 
 
 def _migrate():
@@ -275,45 +271,45 @@ def _migrate():
         ("notif_pre24h_sent_at", "ALTER TABLE accounts ADD COLUMN notif_pre24h_sent_at TEXT"),
         ("notif_at24h_sent_at", "ALTER TABLE accounts ADD COLUMN notif_at24h_sent_at TEXT"),
         ("notif_at24h10_sent_at", "ALTER TABLE accounts ADD COLUMN notif_at24h10_sent_at TEXT"),
-        # Tracking 3DS por BIN: cada vez que se detecta 3DS (explÃ­cito o implÃ­cito
+        # Tracking 3DS por BIN: cada vez que se detecta 3DS (explícito o implícito
         # por JWT cardinal + status Created), se incrementa total_3ds y se actualiza
         # last_3ds_at. Frontend consulta `/api/deposits/bin-check` antes del intento.
         ("total_3ds", "ALTER TABLE bin_stats ADD COLUMN total_3ds INTEGER DEFAULT 0"),
         ("last_3ds_at", "ALTER TABLE bin_stats ADD COLUMN last_3ds_at TEXT"),
         # Anti-rate-limit Capa 3 (spec 2026-06-28): tras un 429/BAN la cuenta
         # entra en "enfriamiento" hasta este epoch (segundos). Los flujos de
-        # depÃ³sito la saltan mientras `cooldown_until > now`. MigraciÃ³n aditiva.
+        # depósito la saltan mientras `cooldown_until > now`. Migración aditiva.
         ("cooldown_until", "ALTER TABLE accounts ADD COLUMN cooldown_until INTEGER"),
         # Ciclo de vida A+ (3DS): contador de rechazos REALES de banco CONSECUTIVOS
-        # desde el A+ (Robert 2026-07-09: 3DSâ†’A+; 2 declines de banco seguidasâ†’B; un
+        # desde el A+ (Robert 2026-07-09: 3DS→A+; 2 declines de banco seguidas→B; un
         # aprobado resetea). Lo mantiene `web_grading.note_a_plus_outcome`. Aditiva.
         ("a_plus_decline_streak", "ALTER TABLE accounts ADD COLUMN a_plus_decline_streak INTEGER DEFAULT 0"),
-        # jwt_keeper: racha de RATE_LIMITED consecutivos SIN Ã©xito (forense 2026-07-11
+        # jwt_keeper: racha de RATE_LIMITED consecutivos SIN éxito (forense 2026-07-11
         # tarde: cuentas como retrateriamty@gmail.com dieron 429 en 11/11 intentos a lo
-        # largo de 22h â€” el cooldown de 6h NUNCA fue el problema, la cuenta estÃ¡ quemada
+        # largo de 22h — el cooldown de 6h NUNCA fue el problema, la cuenta está quemada
         # de forma permanente del lado de BetMexico, no transitoria). Se resetea a 0 en
         # cualquier login exitoso; a partir de rl_streak>=3 el keeper aplica cuarentena
         # larga en vez de seguir reintentando cada 6h para siempre. Aditiva.
         ("rl_streak", "ALTER TABLE accounts ADD COLUMN rl_streak INTEGER DEFAULT 0"),
         # Cuarentena para rate-limit (429/BAN): cuentas en cuarentena se excluyen de
-        # vistas y procesos automÃ¡ticos. Asignado en login_orchestrator.py al primer 429.
+        # vistas y procesos automáticos. Asignado en login_orchestrator.py al primer 429.
         # Valor: epoch en segundos (ej: datetime('now', '+7 days').timestamp()).
         ("quarantine_until", "ALTER TABLE accounts ADD COLUMN quarantine_until INTEGER"),
         # jwt_token/jwt_expires_at: en prod ya existen (BD compartida con el bot,
-        # que las migra). Aditivo aquÃ­ solo para que BD de test/local las tenga
+        # que las migra). Aditivo aquí solo para que BD de test/local las tenga
         # (withdrawals.py y clabe_fetch.py las consumen para retiro/clabes).
         ("jwt_token", "ALTER TABLE accounts ADD COLUMN jwt_token TEXT"),
         ("jwt_expires_at", "ALTER TABLE accounts ADD COLUMN jwt_expires_at INTEGER"),
         # withdrawal_ready/withdrawal_institution: cachea si BetMexico tiene
         # cuenta de retiro aprobada (accountStatus==2, aparece tras un SPEI
-        # acreditado) â€” antes esto SOLO existÃ­a como llamada viva en
+        # acreditado) — antes esto SOLO existía como llamada viva en
         # withdrawals.get_bank_accounts (PASO1), sin nada persistido para
-        # gatear el botÃ³n del portal sin round-trip. Poblado por account_refresh.py.
+        # gatear el botón del portal sin round-trip. Poblado por account_refresh.py.
         ("withdrawal_ready", "ALTER TABLE accounts ADD COLUMN withdrawal_ready INTEGER DEFAULT 0"),
         ("withdrawal_institution", "ALTER TABLE accounts ADD COLUMN withdrawal_institution TEXT"),
-        # last_updated_at: cuÃ¡ndo se persistiÃ³ balance REAL por Ãºltima vez. Difiere
-        # de last_checked_at (que tambiÃ©n se toca en fetchs fallidos, prewarm
-        # _db_touch_last_checked) â€” para que la tabla muestre "Ãšlt. update" real.
+        # last_updated_at: cuándo se persistió balance REAL por última vez. Difiere
+        # de last_checked_at (que también se toca en fetchs fallidos, prewarm
+        # _db_touch_last_checked) — para que la tabla muestre "Últ. update" real.
         # Lo escribe prewarm._db_upsert_balance. Aditiva.
         ("last_updated_at", "ALTER TABLE accounts ADD COLUMN last_updated_at TEXT"),
     ]:
@@ -333,11 +329,8 @@ def _migrate():
                 "user_key TEXT NOT NULL, account_email TEXT NOT NULL, "
                 "created_at TEXT, UNIQUE(user_key, account_email))"
             )
-    except sqlite3.OperationalError as e:
-        import logging as _lg
-        _lg.getLogger("betmexico.dashboard.migration").warning(
-            f"[migration] sqlite3.OperationalError creating account_marks: {e}"
-        )
+    except sqlite3.OperationalError:
+        pass
     # Backfill A1 (defensivo, idempotente): locks legacy sin locked_until quedan
     # eternos porque el janitor exige locked_until IS NOT NULL. Re-temporiza a
     # locked_at+24h. NO toca al SA (locked_until NULL = RESERVADA_SA perpetua).
@@ -351,10 +344,10 @@ def _migrate():
     except sqlite3.OperationalError as e:
         if "no such" not in str(e):
             raise
-    # M8 (fix 2026-07-02): Ã­ndice funcional para recalc_grade_from_db, que filtra
+    # M8 (fix 2026-07-02): índice funcional para recalc_grade_from_db, que filtra
     # WHERE LOWER(account_email)=LOWER(?) sobre account_transactions en cada login/
-    # check/depÃ³sito/watchdog. Sin Ã­ndice = full-scan O(N) que crece con el historial.
-    # El Ã­ndice sobre LOWER(account_email) es sargable para ese WHERE (aditivo).
+    # check/depósito/watchdog. Sin índice = full-scan O(N) que crece con el historial.
+    # El índice sobre LOWER(account_email) es sargable para ese WHERE (aditivo).
     try:
         with db(write=True) as c:
             c.execute(
@@ -364,8 +357,8 @@ def _migrate():
     except sqlite3.OperationalError as e:
         if "no such table" not in str(e):
             raise
-    # Toque de cuenta (spec KPIs Fase 1): registra quiÃ©n metiÃ³ mano al abrir el
-    # detalle de una cuenta. Dedup 1/dÃ­a por usuario+cuenta vÃ­a UNIQUE. Aditiva.
+    # Toque de cuenta (spec KPIs Fase 1): registra quién metió mano al abrir el
+    # detalle de una cuenta. Dedup 1/día por usuario+cuenta vía UNIQUE. Aditiva.
     try:
         with db(write=True) as c:
             c.execute(
@@ -376,15 +369,12 @@ def _migrate():
                 "touched_date TEXT NOT NULL, "
                 "UNIQUE(account_id, actor_id, touched_date))"
             )
-    except sqlite3.OperationalError as e:
-        import logging as _lg
-        _lg.getLogger("betmexico.dashboard.migration").warning(
-            f"[migration] sqlite3.OperationalError creating account_touches: {e}"
-        )
-    # Clabes de depÃ³sito SPEI (NVIO + STP) por cuenta. Se obtienen vÃ­a
-    # POST /api/stp/BeginDeposit con JWT+proxy y son FIJAS por usuario â†’ se
+    except sqlite3.OperationalError:
+        pass
+    # Clabes de depósito SPEI (NVIO + STP) por cuenta. Se obtienen vía
+    # POST /api/stp/BeginDeposit con JWT+proxy y son FIJAS por usuario → se
     # persisten UNA vez y se muestran desde BD (no se taladra la cuenta en cada
-    # refresh â€” alimentarÃ­a el rate-limit de BetMexico). UNIQUE(account_id, clabe)
+    # refresh — alimentaría el rate-limit de BetMexico). UNIQUE(account_id, clabe)
     # para idempotencia. Aditiva. Ver clabe_fetch.py + docs/RECON_BETMEX_API.md.
     try:
         with db(write=True) as c:
@@ -398,13 +388,10 @@ def _migrate():
                 "fetched_at TEXT, "
                 "UNIQUE(account_id, clabe))"
             )
-    except sqlite3.OperationalError as e:
-        import logging as _lg
-        _lg.getLogger("betmexico.dashboard.migration").warning(
-            f"[migration] create account_withdrawals: {e}"
-        )
+    except sqlite3.OperationalError:
+        pass
 
-    # Tabla de bitÃ¡cora de retiros automÃ¡ticos (botÃ³n SA en La Pantalla).
+    # Tabla de bitácora de retiros automáticos (botón SA en La Pantalla).
     # UNIQUE(transaction_id) garantiza idempotencia. Aditiva.
     # Ver withdrawals.py + docs/superpowers/specs/2026-07-24-boton-retiro-automatico-design.md.
     try:
@@ -426,14 +413,11 @@ def _migrate():
                 "disparado_por INTEGER, "
                 "created_at TEXT NOT NULL)"
             )
-    except sqlite3.OperationalError as e:
-        import logging as _lg
-        _lg.getLogger("betmexico.dashboard.migration").warning(
-            f"[migration] create idx_account_withdrawals: {e}"
-        )
+    except sqlite3.OperationalError:
+        pass
 
-    # Ãndice para el EXISTS() de has_pending_withdrawal en account_refresh.py
-    # (Task 4 del plan de retiro gateado) â€” sin esto, cada ciclo de 5min hace
+    # Índice para el EXISTS() de has_pending_withdrawal en account_refresh.py
+    # (Task 4 del plan de retiro gateado) — sin esto, cada ciclo de 5min hace
     # un table scan de account_withdrawals por cada una de ~800 cuentas LIVE.
     try:
         with db(write=True) as c:
@@ -441,13 +425,10 @@ def _migrate():
                 "CREATE INDEX IF NOT EXISTS idx_account_withdrawals_account_id "
                 "ON account_withdrawals(account_id)"
             )
-    except sqlite3.OperationalError as e:
-        import logging as _lg
-        _lg.getLogger("betmexico.dashboard.migration").warning(
-            f"[migration] create auto_missions: {e}"
-        )
+    except sqlite3.OperationalError:
+        pass
 
-    # Modo auto-depÃ³sito V2: bitÃ¡cora de corridas auto (misiones). UNIQUE(mission_id)
+    # Modo auto-depósito V2: bitácora de corridas auto (misiones). UNIQUE(mission_id)
     # garantiza idempotencia. updated_at permite detectar misiones congeladas
     # (anti-zombie). Aditiva. Ver docs/superpowers/plans/2026-07-28-modo-auto-deposito-v2.md.
     try:
@@ -471,9 +452,9 @@ def _migrate():
                 "updated_at TEXT NOT NULL, "
                 "completed_at TEXT)"
             )
-            # Reaper de misiones zombie: las que quedaron vivas cuando muriÃ³ el
+            # Reaper de misiones zombie: las que quedaron vivas cuando murió el
             # proceso pasan a 'failed' (dinero real no espera). Fix auditor B2:
-            # tambiÃ©n libera los locks de cuentas de esas misiones (si no, quedan
+            # también libera los locks de cuentas de esas misiones (si no, quedan
             # lockeadas hasta que expire locked_until aunque nadie las use).
             zombies = c.execute(
                 "SELECT mission_id, matches, accounts_selected FROM auto_missions "
@@ -481,7 +462,7 @@ def _migrate():
             ).fetchall()
             c.execute(
                 "UPDATE auto_missions SET status='failed', "
-                "phase_detail='proceso reiniciado a mitad de misiÃ³n', "
+                "phase_detail='proceso reiniciado a mitad de misión', "
                 "completed_at=? "
                 "WHERE status IN ('pending','matching','scheduling')",
                 (datetime.now(timezone.utc).isoformat(),),
@@ -494,11 +475,8 @@ def _migrate():
                         "UPDATE accounts SET locked_by=NULL, locked_until=NULL WHERE id=?",
                         (aid,),
                     )
-    except sqlite3.OperationalError as e:
-        import logging as _lg
-        _lg.getLogger("betmexico.dashboard.migration").warning(
-            f"[migration] create operator_penalties: {e}"
-        )
+    except sqlite3.OperationalError:
+        pass
 
     # Tabla de tracking de penalizaciones y strikes por operador para el Bot de Telegram
     try:
@@ -511,11 +489,8 @@ def _migrate():
                 "last_attempts TEXT, "
                 "updated_at TEXT NOT NULL)"
             )
-    except sqlite3.OperationalError as e:
-        import logging as _lg
-        _lg.getLogger("betmexico.dashboard.migration").warning(
-            f"[migration] create operator_penalties: {e}"
-        )
+    except sqlite3.OperationalError:
+        pass
 
     _backfill_grades_v10_m7()
 
@@ -525,14 +500,14 @@ def _backfill_grades_v10_m7():
     One-shot backfill (gateado por marker, NO corre en cada restart): aplica
     a las cuentas YA existentes el rebalanceo M7 del grading (2026-07-09, ver
     docs/ERRORS.md "Grade A+ se borraba solo"). Sin esto, una cuenta solo se
-    recalcula en su PRÃ“XIMO login/check/depÃ³sito/prewarm â€” el fix quedarÃ­a
+    recalcula en su PRÓXIMO login/check/depósito/prewarm — el fix quedaría
     invisible para cuentas inactivas hasta que alguien las toque, que en la
-    prÃ¡ctica es "nunca" para el grueso de la BD (Â¡esto es justo lo que reportÃ³
-    Robert como "los colores no son fiables"!). Corre una sola vez por versiÃ³n.
+    práctica es "nunca" para el grueso de la BD (¡esto es justo lo que reportó
+    Robert como "los colores no son fiables"!). Corre una sola vez por versión.
     """
     _lg = _logging.getLogger("betmexico.dashboard.grading")
     # Bump del marker = re-backfill una vez con las reglas nuevas. m8 agrega
-    # "aprobaciÃ³n reciente sana â†’ A" (Robert 2026-07-09) sobre el m7 (masacreâ†’C).
+    # "aprobación reciente sana → A" (Robert 2026-07-09) sobre el m7 (masacre→C).
     VERSION = "v10_m8_2026-07-09_recent_success"
     try:
         with db(write=True) as c:
@@ -551,7 +526,7 @@ def _backfill_grades_v10_m7():
     try:
         from web_grading import _ANALYZER
         if not _ANALYZER:
-            _lg.warning("[grading backfill] analyzer V10 no cargÃ³, salto backfill")
+            _lg.warning("[grading backfill] analyzer V10 no cargó, salto backfill")
             return
         score_fn = _ANALYZER.score_payment_readiness
     except Exception as e:
@@ -564,7 +539,7 @@ def _backfill_grades_v10_m7():
             accts = c.execute("SELECT id, email, grade FROM accounts").fetchall()
             for a in accts:
                 if a["grade"] == "A+":
-                    continue  # override manual (3DS) â€” nunca se pisa, ni en backfill
+                    continue  # override manual (3DS) — nunca se pisa, ni en backfill
                 txns = c.execute(
                     "SELECT txn_date, status, txn_type, gateway, amount "
                     "FROM account_transactions WHERE LOWER(account_email)=LOWER(?) "
@@ -591,7 +566,7 @@ def _backfill_grades_v10_m7():
             )
         _lg.info(f"[grading backfill] {VERSION}: {changed} cuentas cambiaron de grade")
     except Exception as e:
-        _lg.error(f"[grading backfill] fallÃ³: {e}")
+        _lg.error(f"[grading backfill] falló: {e}")
 
 
 _migrate()
@@ -625,16 +600,16 @@ def _resolve_operator(val):
 
 
 def _is_sa(user: dict) -> bool:
-    """True si el caller es superadmin (Robert). Ãšnico rol que ve TODO."""
+    """True si el caller es superadmin (Robert). Único rol que ve TODO."""
     return user.get("role") == "superadmin"
 
 
 def _visible_emails(user: dict, c) -> "set[str] | None":
-    """Universo de cuentas que el caller puede ver. None = SA (sin restricciÃ³n).
+    """Universo de cuentas que el caller puede ver. None = SA (sin restricción).
 
-    Operador (admin/user): cuentas asignadas (account_assignments) âˆª las que
+    Operador (admin/user): cuentas asignadas (account_assignments) ∪ las que
     tiene lockeadas (locked_by = su telegram_id o username). El acto de ganchar
-    una cuenta del pool es lo que le da acceso a sus credenciales â€” frictionless
+    una cuenta del pool es lo que le da acceso a sus credenciales — frictionless
     a prueba de desmadre: no se exhibe lo ajeno, no se rafaguea.
     """
     if _is_sa(user):
@@ -645,11 +620,8 @@ def _visible_emails(user: dict, c) -> "set[str] | None":
     try:
         for r in c.execute("SELECT email FROM account_assignments WHERE user_id=?", (tg,)):
             out.add(r["email"])
-    except sqlite3.OperationalError as e:
-        import logging as _lg
-        _lg.getLogger("betmexico.dashboard.migration").warning(
-            f"[migration] query account_assignments: {e}"
-        )
+    except sqlite3.OperationalError:
+        pass
     for r in c.execute(
         "SELECT email FROM accounts WHERE locked_by IN (?, ?)", (str(tg), uname)
     ):
@@ -707,7 +679,7 @@ async def _maintenance_gate_middleware(request: Request, call_next):
 
     Si BMX_MAINTENANCE=1 o /data/maintenance.flag existe:
     - SA (Robert / robertvs) mantiene acceso total e ininterrumpido.
-    - DemÃ¡s usuarios/sesiones son bloqueados antes de login o dashboard.
+    - Demás usuarios/sesiones son bloqueados antes de login o dashboard.
     - Se permite servir asset de mantenimiento, logo y favicon.
     """
     if _is_maintenance_active():
@@ -758,7 +730,7 @@ except Exception as _e:  # nunca tumbar el dashboard por el agente
     _logging.getLogger("betmexico.dashboard").warning(f"[support] router no cargado: {_e}")
 
 
-# â”€â”€ PÃ¡ginas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Páginas ────────────────────────────────────────────────────────────────────
 
 @app.get("/favicon.ico")
 def favicon():
@@ -779,11 +751,11 @@ def login_page(request: Request, bmx_session: str = Cookie(default=None)):
 
 
 # Todo asset propio referenciado por index.html con cache-bust (?v=...). 2026-07-06:
-# antes solo se trackeaban app.js+style.css â€” un deploy de pantalla.css/pantalla.js
+# antes solo se trackeaban app.js+style.css — un deploy de pantalla.css/pantalla.js
 # (u otro asset fuera de esta lista) NO cambiaba window.BMX_VERSION/`/api/version`,
-# asÃ­ que el auto-reload NUNCA disparaba para los operadores ya conectados (bug de
+# así que el auto-reload NUNCA disparaba para los operadores ya conectados (bug de
 # campo: deploy hecho, md5 correcto en prod, pero nadie refrescaba solo). Agregar
-# aquÃ­ CUALQUIER .css/.js nuevo que index.html cargue desde /static/.
+# aquí CUALQUIER .css/.js nuevo que index.html cargue desde /static/.
 FRONTEND_ASSETS = [
     "style.css", "depos.css", "pantalla.css", "soporte.css",
     "activity_logic.js", "pantalla_logic.js", "strip_logic.js",
@@ -797,17 +769,14 @@ def _asset_mtimes():
     for name in FRONTEND_ASSETS:
         try:
             mtimes[name] = int((STATIC / name).stat().st_mtime)
-        except Exception as e:
-            _logging.getLogger("betmexico.dashboard.assets").warning(
-                f"[assets] {name} no encontrado en STATIC, mtime=0: {e}"
-            )
+        except Exception:
             mtimes[name] = 0
     return mtimes
 
 
 def _frontend_version(mtimes=None):
-    """VersiÃ³n Ãºnica = mtime MÃS RECIENTE entre todos los FRONTEND_ASSETS.
-    Cambia si se toca CUALQUIERA de ellos â†’ dispara el auto-reload global."""
+    """Versión única = mtime MÁS RECIENTE entre todos los FRONTEND_ASSETS.
+    Cambia si se toca CUALQUIERA de ellos → dispara el auto-reload global."""
     mtimes = mtimes if mtimes is not None else _asset_mtimes()
     return str(max(mtimes.values(), default=0))
 
@@ -818,11 +787,11 @@ def _own_portal_path(session: dict) -> str:
 
 def _render_frontend_html(path: Path) -> Response:
     """Sirve un HTML de frontend con cache-bust por mtime + `window.BMX_VERSION`
-    inyectado, para que el auto-reload por versiÃ³n (`/api/version`, ver
-    FRONTEND_ASSETS) funcione. Compartido por `/dashboard` y `/user/{id}` â€”
-    antes solo el dashboard SA lo tenÃ­a, dejando el portal del operador
+    inyectado, para que el auto-reload por versión (`/api/version`, ver
+    FRONTEND_ASSETS) funcione. Compartido por `/dashboard` y `/user/{id}` —
+    antes solo el dashboard SA lo tenía, dejando el portal del operador
     (flujo /bet) sirviendo JS/CSS potencialmente viejo tras un deploy sin
-    que la pestaÃ±a abierta se enterara."""
+    que la pestaña abierta se enterara."""
     try:
         html = path.read_text(encoding="utf-8")
         mtimes = _asset_mtimes()
@@ -845,12 +814,12 @@ def _render_frontend_html(path: Path) -> Response:
 
 @app.get("/user/{user_id}")
 def user_portal_page(user_id: int, request: Request):
-    """Alias de compatibilidad â€” el flujo /bet vivÃ­a aquÃ­ (por telegram_id)
+    """Alias de compatibilidad — el flujo /bet vivía aquí (por telegram_id)
     hasta 2026-08-06; ahora vive en /{username} (Robert: la URL debe traer
-    el apodo del usuario, no un ID numÃ©rico). Se conserva por si algÃºn link
-    viejo (bot, bookmark) todavÃ­a apunta a /user/{id} â€” redirige 302 al
+    el apodo del usuario, no un ID numérico). Se conserva por si algún link
+    viejo (bot, bookmark) todavía apunta a /user/{id} — redirige 302 al
     username correspondiente, preservando query string. 404 si el id no
-    existe en ningÃºn usuario registrado."""
+    existe en ningún usuario registrado."""
     target_username = next(
         (k for k, v in _auth.USERS.items() if v.get("telegram_id") == user_id),
         None,
@@ -864,7 +833,7 @@ def user_portal_page(user_id: int, request: Request):
 
 @app.get("/portal")
 def portal_page(request: Request, bmx_session: str = Cookie(default=None)):
-    """Alias de compatibilidad â€” links viejos (bot, bookmarks) siguen sirviendo."""
+    """Alias de compatibilidad — links viejos (bot, bookmarks) siguen sirviendo."""
     session = _auth.get_session(bmx_session) if bmx_session else None
     q = request.url.query
     if not session:
@@ -883,10 +852,10 @@ def dashboard_page(request: Request, bmx_session: str = Cookie(default=None)):
         q = request.url.query
         own = _own_portal_path(session)
         return RedirectResponse(f"{own}?{q}" if q else own, status_code=302)
-    # Cache-bust: aÃ±adir mtime de cada asset a su propio src/href para forzar
+    # Cache-bust: añadir mtime de cada asset a su propio src/href para forzar
     # re-fetch tras deploy. Regex (no string fijo): index.html ya trae un
-    # `?v=YYYYMMDDx` hardcodeado a mano, asÃ­ que un replace de string exacto
-    # nunca hacÃ­a match â€” quedaba muerto en silencio. El regex pisa CUALQUIER
+    # `?v=YYYYMMDDx` hardcodeado a mano, así que un replace de string exacto
+    # nunca hacía match — quedaba muerto en silencio. El regex pisa CUALQUIER
     # query string existente, por archivo, usando FRONTEND_ASSETS (arriba).
     return _render_frontend_html(STATIC / "index.html")
 
@@ -894,7 +863,7 @@ def dashboard_page(request: Request, bmx_session: str = Cookie(default=None)):
 @app.get("/")
 def index(request: Request, bmx_session: str = Cookie(default=None)):
     """Root = puro gate de auth. botmexico.net/ nunca renderiza contenido
-    directamente: exige login y reenvÃ­a a /dashboard (SA) o /{username} (resto),
+    directamente: exige login y reenvía a /dashboard (SA) o /{username} (resto),
     preservando query string (ej. ?match={mission_id} del handoff de /bet)."""
     session = _auth.get_session(bmx_session) if bmx_session else None
     q = request.url.query
@@ -906,19 +875,19 @@ def index(request: Request, bmx_session: str = Cookie(default=None)):
 
 @app.get("/{username}")
 def username_portal_page(username: str, request: Request, bmx_session: str = Cookie(default=None)):
-    """Render del flujo /bet (portal.html) â€” scope por username (apodo),
+    """Render del flujo /bet (portal.html) — scope por username (apodo),
     reemplaza /user/{telegram_id} desde 2026-08-06 (Robert: la URL debe
-    mostrar quiÃ©n es, no un ID). DEBE ser la ÃšLTIMA ruta GET de un solo
-    segmento registrada en el archivo â€” cualquier ruta literal de un segmento
+    mostrar quién es, no un ID). DEBE ser la ÚLTIMA ruta GET de un solo
+    segmento registrada en el archivo — cualquier ruta literal de un segmento
     (/login, /dashboard, /portal, /favicon.ico, /maintenance) tiene que
     quedar ANTES de esta, si no la sombrea (Starlette resuelve por orden de
     registro, la primera que hace match gana).
 
     Cualquier operador que entre con un username que no es el suyo se
     canoniza a su propia URL (los endpoints /api/operator/* ya scopean por
-    la sesiÃ³n, no por este segmento â€” esto es solo coherencia de URL). SA
+    la sesión, no por este segmento — esto es solo coherencia de URL). SA
     puede navegar cualquier /{username} para supervisar en vivo. 404 si el
-    username no existe â€” asÃ­ una ruta cualquiera con typo no se traga
+    username no existe — así una ruta cualquiera con typo no se traga
     silenciosamente como "portal de nadie"."""
     username = username.lower()
     if username not in _auth.USERS:
@@ -936,22 +905,19 @@ def username_portal_page(username: str, request: Request, bmx_session: str = Coo
 
 @app.get("/api/version")
 def api_version(user: dict = Depends(require_session)):
-    """VersiÃ³n actual de TODOS los FRONTEND_ASSETS (mtime mÃ¡s reciente entre
+    """Versión actual de TODOS los FRONTEND_ASSETS (mtime más reciente entre
     ellos). El frontend la compara contra `window.BMX_VERSION` (fijada al
-    cargar la pÃ¡gina) para auto-recargar pestaÃ±as viejas tras un deploy â€”
+    cargar la página) para auto-recargar pestañas viejas tras un deploy —
     sin que el operador dependa de Ctrl+Shift+R."""
     try:
         v = _frontend_version()
-    except Exception as e:
-        _logging.getLogger("betmexico.dashboard.assets").error(
-            f"[api_version] _frontend_version falló: {e}", exc_info=True
-        )
+    except Exception:
         v = ""
     return Response(content=f'{{"v":"{v}"}}', media_type="application/json",
                      headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
 
 
-# â”€â”€ Auth endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Auth endpoints ─────────────────────────────────────────────────────────────
 
 from fastapi.responses import Response as _Response
 
@@ -971,15 +937,15 @@ async def auth_login(request: Request, response: _Response):
     if stored is None:
         return JSONResponse({"first_time": True, "display": _auth.USERS[username]["display"]})
 
-    # M6 (fix 2026-07-02): rechazar password vacÃ­o SIEMPRE y aceptar el master solo
-    # si estÃ¡ configurado. Antes, con BMX_MASTER sin definir (default ""), un
-    # password vacÃ­o pasaba ("" == master == "") = login como cualquiera, incl. el
+    # M6 (fix 2026-07-02): rechazar password vacío SIEMPRE y aceptar el master solo
+    # si está configurado. Antes, con BMX_MASTER sin definir (default ""), un
+    # password vacío pasaba ("" == master == "") = login como cualquiera, incl. el
     # superadmin. Hoy prod tiene BMX_MASTER seteado (no explotable), pero el default
-    # era fail-open: un redeploy sin la env var reabrÃ­a el agujero.
+    # era fail-open: un redeploy sin la env var reabría el agujero.
     master = os.environ.get("BMX_MASTER", "")
     pwd_ok = _auth.sha256(password) == stored or (bool(master) and password == master)
     if not password or not pwd_ok:
-        raise HTTPException(status_code=401, detail="ContraseÃ±a incorrecta")
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta")
 
     token = _auth.create_session(username)
     response.set_cookie(
@@ -998,13 +964,13 @@ async def auth_set_password(request: Request, response: _Response):
     new_pwd = body.get("password") or ""
 
     if username not in _auth.USERS:
-        raise HTTPException(status_code=401, detail="Usuario no vÃ¡lido")
+        raise HTTPException(status_code=401, detail="Usuario no válido")
     if len(new_pwd) < 4:
-        raise HTTPException(status_code=400, detail="ContraseÃ±a muy corta (mÃ­nimo 4 caracteres)")
+        raise HTTPException(status_code=400, detail="Contraseña muy corta (mínimo 4 caracteres)")
 
     passwords = _auth.load_passwords()
     if passwords.get(username) is not None:
-        raise HTTPException(status_code=400, detail="Ya tienes contraseÃ±a")
+        raise HTTPException(status_code=400, detail="Ya tienes contraseña")
 
     passwords[username] = _auth.sha256(new_pwd)
     _auth.save_passwords(passwords)
@@ -1031,17 +997,17 @@ def auth_logout(response: _Response, bmx_session: str = Cookie(default=None)):
 def auth_me(user: dict = Depends(require_session)):
     return {
         "username": user["display"],
-        # "login": el username crudo (apodo, ej. "lau") â€” usado por el
+        # "login": el username crudo (apodo, ej. "lau") — usado por el
         # frontend para armar /{username} sin exponer telegram_id en la URL
         # (Robert, 2026-08-06). "username" de arriba ya es el display bonito
-        # y varios consumidores del frontend lo esperan asÃ­ â€” no se toca.
+        # y varios consumidores del frontend lo esperan así — no se toca.
         "login": user.get("username"),
         "role": user["role"],
         "telegram_id": user.get("telegram_id"),
     }
 
 
-# â”€â”€ API â€” protegida con sesiÃ³n â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── API — protegida con sesión ─────────────────────────────────────────────────
 
 @app.get("/api/health")
 def health(user: dict = Depends(require_session)):
@@ -1054,14 +1020,14 @@ def health(user: dict = Depends(require_session)):
 
 
 def _build_search_clause(q):
-    """WHERE multi-campo + multi-tÃ©rmino para el buscador de cuentas (criterio de
-    dominio). Cada palabra de `q` debe matchear en ALGÃšN campo (OR) y TODAS las
-    palabras deben matchear (AND) â€” asÃ­ "Andrea GarcÃ­a" cae en el nombre completo,
-    y "418928 A" filtra por BIN + algo mÃ¡s. Los tÃ©rminos numÃ©ricos se normalizan
+    """WHERE multi-campo + multi-término para el buscador de cuentas (criterio de
+    dominio). Cada palabra de `q` debe matchear en ALGÚN campo (OR) y TODAS las
+    palabras deben matchear (AND) — así "Andrea García" cae en el nombre completo,
+    y "418928 A" filtra por BIN + algo más. Los términos numéricos se normalizan
     (se les quitan espacios/-/ / /) para matchear `card_number` (guardado sin
-    separadores) por nÃºmero completo, BIN (primeros dÃ­gitos) o terminaciÃ³n
-    (Ãºltimos). Busca en: email, nombre del titular, CURP, telÃ©fono, password
-    (combo), direcciÃ³n, tarjetas guardadas (account_cards) + tarjetas/texto de
+    separadores) por número completo, BIN (primeros dígitos) o terminación
+    (últimos). Busca en: email, nombre del titular, CURP, teléfono, password
+    (combo), dirección, tarjetas guardadas (account_cards) + tarjetas/texto de
     notas (account_notes). Devuelve (sql_fragment, params); ("", []) si no hay nada.
     """
     import re
@@ -1070,18 +1036,18 @@ def _build_search_clause(q):
         return "", []
     clauses, params = [], []
     for t in terms:
-        # "a partir de un separador, ignorar lo demÃ¡s" (Robert): si el tÃ©rmino es
-        # un dato pegado con separadores de estructura â€” pipe NUM|EXP|CVV o combo
-        # email:password â€” usar SOLO el 1er segmento identificante (nÃºmero/email),
-        # ignorando expiry/cvv/password. AsÃ­ un copy-paste de pipe o combo completo
+        # "a partir de un separador, ignorar lo demás" (Robert): si el término es
+        # un dato pegado con separadores de estructura — pipe NUM|EXP|CVV o combo
+        # email:password — usar SOLO el 1er segmento identificante (número/email),
+        # ignorando expiry/cvv/password. Así un copy-paste de pipe o combo completo
         # cae en la cuenta correcta. El resultado SIEMPRE es la cuenta completa.
         t = re.split(r"[|:]", t, 1)[0].strip() or t
         if not t:
             continue
         like = f"%{t}%"
         digits = re.sub(r"[^0-9]", "", t)
-        # Para card_number usamos la versiÃ³n sin separadores si el tÃ©rmino trae
-        # dÃ­gitos (â‰¥3 para no matchear ruido); si no, el texto tal cual.
+        # Para card_number usamos la versión sin separadores si el término trae
+        # dígitos (≥3 para no matchear ruido); si no, el texto tal cual.
         card_like = f"%{digits}%" if len(digits) >= 3 else like
         ors = [
             "a.email LIKE ?",
@@ -1124,9 +1090,9 @@ def list_accounts(
             "            AND an.card_number IS NOT NULL AND TRIM(an.card_number) != ''))"
         )
 
-    # BÃºsqueda inteligente multi-campo + multi-tÃ©rmino (criterio de dominio):
-    # email Â· nombre Â· CURP Â· telÃ©fono Â· combo (password) Â· direcciÃ³n Â· tarjeta
-    # (nÃºmero/BIN/terminaciÃ³n, con o sin separadores) Â· notas. Ver _build_search_clause.
+    # Búsqueda inteligente multi-campo + multi-término (criterio de dominio):
+    # email · nombre · CURP · teléfono · combo (password) · dirección · tarjeta
+    # (número/BIN/terminación, con o sin separadores) · notas. Ver _build_search_clause.
     if q:
         clause, sparams = _build_search_clause(q)
         if clause:
@@ -1192,20 +1158,20 @@ def list_accounts(
                 r["locked_by"] = _resolve_operator(op)
                 r["locked_color"] = _auth.USER_COLORS.get(tg_id) if tg_id else None
                 # JWT vivo = reutilizable sin captcha (gentle_login cache-hit exige
-                # exp > now+60s). Alimenta el badge ðŸŸ¢/ðŸ”‘ de la lista. Ver jwt_keeper.
-                # SOLO-SA: es un internal operativo â†’ NO se filtra al operador (ley de
+                # exp > now+60s). Alimenta el badge 🟢/🔑 de la lista. Ver jwt_keeper.
+                # SOLO-SA: es un internal operativo → NO se filtra al operador (ley de
                 # capas operador/SA). Se quita SIEMPRE el epoch crudo del payload.
                 _exp = r.pop("jwt_expires_at", None)
                 # Cuarentena: se quitan SIEMPRE los crudos del payload (no
-                # filtrar internals al operador â€” ley capas). Los flags
-                # computados (jwt_alive, needs_reset, cooldown_min) SÃ van a
+                # filtrar internals al operador — ley capas). Los flags
+                # computados (jwt_alive, needs_reset, cooldown_min) SÍ van a
                 # TODOS: son guardarriles visuales, no internals.
                 _dr = r.pop("dead_reason", None)
                 _cd = r.pop("cooldown_until", None)
-                # rl_streak es internal operativo â†’ SOLO-SA. Non-SA nunca debe
+                # rl_streak es internal operativo → SOLO-SA. Non-SA nunca debe
                 # saber que existe rate-limit (Robert 2026-08-05: pedo interno
                 # del backend, se resuelve en silencio). Pop siempre, expongo
-                # solo al SA como flag de gestiÃ³n.
+                # solo al SA como flag de gestión.
                 _rl = r.pop("rl_streak", None)
                 if role == "superadmin":
                     r["rl_streak"] = int(_rl or 0)
@@ -1213,7 +1179,7 @@ def list_accounts(
                     _exp not in (None, "")
                     and int(_exp) > datetime.now(timezone.utc).timestamp() + 60)
                 # needs_reset: cuenta DEAD por login terminal recuperable con
-                # reset de contraseÃ±a (attempt-limit / credenciales) â€” la
+                # reset de contraseña (attempt-limit / credenciales) — la
                 # distingue de una muerte real (AUTOEXCLUSION / KYC).
                 r["needs_reset"] = bool(
                     r.get("status") == "DEAD"
@@ -1227,14 +1193,14 @@ def list_accounts(
             return rows
     except sqlite3.OperationalError as e:
         if "account_assignments" in str(e):
-            # Si no hay tabla account_assignments todavÃ­a (setup nuevo, sin asignaciones)
+            # Si no hay tabla account_assignments todavía (setup nuevo, sin asignaciones)
             return []
         # Cualquier otro OperationalError (p.ej. "no such table: accounts") es una
-        # BD rota, no "cero cuentas" â€” no tragar en silencio (vacÃ­o != roto).
+        # BD rota, no "cero cuentas" — no tragar en silencio (vacío != roto).
         raise HTTPException(500, f"DB: {e}")
 
 
-# â”€â”€â”€ Asignaciones / Liberador â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── Asignaciones / Liberador ──────────────────────────────────────────────────
 
 @app.get("/api/users")
 def list_users(user: dict = Depends(require_session)):
@@ -1269,11 +1235,7 @@ def list_assignments(
                     "FROM account_assignments ORDER BY assigned_at DESC"
                 ).fetchall()
             return [dict(r) for r in rows]
-    except sqlite3.OperationalError as e:
-        import logging as _lg
-        _lg.getLogger("betmexico.dashboard.migration").warning(
-            f"[migration] query accounts: {e}"
-        )
+    except sqlite3.OperationalError:
         return []
 
 
@@ -1331,16 +1293,16 @@ def stats(_user: dict = Depends(require_session)):
     return {"live": live, "total": total, "totalBalance": balance, "withBalance": with_balance, "inUse": in_use}
 
 
-# â”€â”€ Proxy pool health (cache 30s) â€” pool activo IPRoyal/NodeMaven â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Proxy pool health (cache 30s) — pool activo IPRoyal/NodeMaven ───────────────
 _proxy_cache: dict = {"ts": 0.0, "data": None}
 _PROXY_TTL = 1800.0     # cache si OK (30 min). NO bajar: el health NO debe quemar
-                        # el plan de proxy. A 30s barrÃ­a los 52 contra ipinfo cada
+                        # el plan de proxy. A 30s barría los 52 contra ipinfo cada
                         # 30s = ~1 GB/semana del plan residencial (Claude 2026-06-28,
-                        # responsabilidad: lo metÃ­ yo, lo reparo).
-_PROXY_TTL_FAIL = 120.0 # cache si fallÃ³ (2 min â€” antes 5s = rÃ¡faga que quemaba mÃ¡s)
+                        # responsabilidad: lo metí yo, lo reparo).
+_PROXY_TTL_FAIL = 120.0 # cache si falló (2 min — antes 5s = ráfaga que quemaba más)
 
 _wsai_cache: dict = {"ts": 0.0, "data": None}
-_WSAI_TTL = 120.0       # 2 min â€” el balance no cambia tan seguido
+_WSAI_TTL = 120.0       # 2 min — el balance no cambia tan seguido
 
 
 def _wsai_status() -> dict:
@@ -1370,13 +1332,13 @@ def _wsai_status() -> dict:
     _wsai_cache.update({"ts": now, "data": out})
     return out
 
-# Dedup de alertas push: kind â†’ Ãºltimo timestamp broadcast (anti-spam)
+# Dedup de alertas push: kind → último timestamp broadcast (anti-spam)
 _alert_last_sent: dict = {}
 _ALERT_DEDUP_SEC = 5 * 60  # no repetir la misma alerta < 5 min
 
 
 def _maybe_alert_broadcast(alert: dict) -> None:
-    """Broadcast una alerta crÃ­tica como notif push, deduplicando por kind."""
+    """Broadcast una alerta crítica como notif push, deduplicando por kind."""
     import time as _t
     kind = alert.get("kind", "alert")
     now = _t.time()
@@ -1384,7 +1346,7 @@ def _maybe_alert_broadcast(alert: dict) -> None:
     if now - last < _ALERT_DEDUP_SEC:
         return
     _alert_last_sent[kind] = now
-    icon = {"capmonster_low": "ðŸ’¸", "proxy_down": "ðŸ”Œ", "prewarm_errors": "ðŸ”¥"}.get(kind, "âš ï¸")
+    icon = {"capmonster_low": "💸", "proxy_down": "🔌", "prewarm_errors": "🔥"}.get(kind, "⚠️")
     _broadcast({
         "type": "alert",
         "kind": kind,
@@ -1403,8 +1365,8 @@ def _check_one_proxy(proxy_url: str, timeout: float = 6.0) -> dict:
     handler = urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
     opener = urllib.request.build_opener(handler)
     last_err = "sin respuesta"
-    # SOLO api.ipify (â‰ˆ50 bytes). ipinfo.io/json pesa ~6.6 KB y quemaba el plan
-    # residencial (1 GB/sem en health checks). El paÃ­s se asume MX (el pool es MX).
+    # SOLO api.ipify (≈50 bytes). ipinfo.io/json pesa ~6.6 KB y quemaba el plan
+    # residencial (1 GB/sem en health checks). El país se asume MX (el pool es MX).
     for endpoint, parse in [
         ("https://api.ipify.org?format=json", lambda b: (b.get("ip"), "MX")),
     ]:
@@ -1425,13 +1387,13 @@ def _check_one_proxy(proxy_url: str, timeout: float = 6.0) -> dict:
 
 
 def _proxy_health() -> dict:
-    """Salud del pool de proxies EN USO (IPRoyal/NodeMaven â€” los mismos que usan
-    login y depÃ³sito). Chequea TODOS y reporta `alive/total`.
+    """Salud del pool de proxies EN USO (IPRoyal/NodeMaven — los mismos que usan
+    login y depósito). Chequea TODOS y reporta `alive/total`.
 
-    Antes chequeaba LitPort hardcodeado, EXCLUIDO del pool por estar quemado â†’ el
-    indicador decÃ­a "caÃ­do" siempre aunque el sistema operara bien (Robert
-    2026-05-29: "para quÃ© me sirve saber de un proxy que no se estÃ¡ usando").
-    Mide CONECTIVIDAD (no reputaciÃ³n ante BetMexico). Cache 30s."""
+    Antes chequeaba LitPort hardcodeado, EXCLUIDO del pool por estar quemado → el
+    indicador decía "caído" siempre aunque el sistema operara bien (Robert
+    2026-05-29: "para qué me sirve saber de un proxy que no se está usando").
+    Mide CONECTIVIDAD (no reputación ante BetMexico). Cache 30s."""
     import time as _time
     now = _time.time()
     if _proxy_cache["data"]:
@@ -1446,12 +1408,12 @@ def _proxy_health() -> dict:
         urls = []
         print(f"[proxy_health] shuffled_proxy_urls err: {e}")
     if not urls:
-        out = {"ok": False, "error": "pool de proxies vacÃ­o", "host": "pool",
+        out = {"ok": False, "error": "pool de proxies vacío", "host": "pool",
                "alive": 0, "total": 0}
         _proxy_cache.update({"ts": now, "data": out})
         return out
 
-    # Muestra de mÃ¡x 3 (no los 52). Barrer todo el pool cada ciclo quemaba el plan.
+    # Muestra de máx 3 (no los 52). Barrer todo el pool cada ciclo quemaba el plan.
     import random as _rnd
     sample = urls if len(urls) <= 3 else _rnd.sample(urls, 3)
     results = [_check_one_proxy(u) for u in sample]
@@ -1461,7 +1423,7 @@ def _proxy_health() -> dict:
         "ok": len(alive) > 0,
         "alive": len(alive),
         "total": len(results),
-        "pool_size": len(urls),   # tamaÃ±o real del pool (la muestra es de 3)
+        "pool_size": len(urls),   # tamaño real del pool (la muestra es de 3)
         "country": (best or {}).get("country"),
         "latency_ms": (best or {}).get("latency_ms"),
         "ip": (best or {}).get("ip"),
@@ -1499,14 +1461,14 @@ def _capmonster_balance() -> dict:
         return {"balance": None, "error": str(e)}
 
 
-# â”€â”€â”€ KPIs L invertida (spec chat2) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── KPIs L invertida (spec chat2) ─────────────────────────────────────────────
 
 def _operator_color(tg_id):
     """Color del operador para acentos de UI (borde lateral, badges).
-    Acepta int/str numÃ©rico (telegram_id) o string username (locked_by /
-    operator_id legacy o manual, ej. 'op') â€” NUNCA truena el request; sin
+    Acepta int/str numérico (telegram_id) o string username (locked_by /
+    operator_id legacy o manual, ej. 'op') — NUNCA truena el request; sin
     match conocido devuelve None (2026-07-07: `int(tg_id)` a secas crasheaba
-    activity_feed con `ValueError` en cuanto locked_by traÃ­a un username)."""
+    activity_feed con `ValueError` en cuanto locked_by traía un username)."""
     if not tg_id:
         return None
     if isinstance(tg_id, str):
@@ -1537,7 +1499,7 @@ def _resolve_who(val):
 
 def _event_visible_to(event: dict, ctx: dict) -> bool:
     """Whitelisting de visibilidad para SSE/feeds. SA ve todo; admin/user ven
-    SOLO lo suyo. Las acciones del SA no aparecen para nadie mÃ¡s (fix bug
+    SOLO lo suyo. Las acciones del SA no aparecen para nadie más (fix bug
     'admin ve actividad de Robert')."""
     if event.get("kind") == "account_touch":
         who_id = event.get("who_id")
@@ -1560,7 +1522,7 @@ def _event_visible_to(event: dict, ctx: dict) -> bool:
         v = event.get(k)
         if v is not None and my is not None and str(v) == str(my):
             return True
-    # 4) Eventos sin actor ni destinatario (alertas globales) -> solo SA (ya retornÃ³ arriba).
+    # 4) Eventos sin actor ni destinatario (alertas globales) -> solo SA (ya retornó arriba).
     return False
 
 
@@ -1568,7 +1530,7 @@ def _event_visible_to(event: dict, ctx: dict) -> bool:
 def superadmin_kpis(user: dict = Depends(require_session)):
     """L invertida del SuperAdmin (spec chat2):
       1. Online: operadores con actividad < 5 min, lista con dot status
-      2. Activity feed (Ãºltimos 30 eventos: deposit/lock/prewarm)
+      2. Activity feed (últimos 30 eventos: deposit/lock/prewarm)
       3. Alertas: bulk masivo, prewarm errors, login fallidos, capmonster bajo
       4. Pool stats: pool / en_uso / trastienda / rebotadas
 
@@ -1580,7 +1542,7 @@ def superadmin_kpis(user: dict = Depends(require_session)):
     role = user.get("role")
     if role == "user":
         raise HTTPException(403, "Solo superadmin/admin")
-    # Admin: respuesta mÃ­nima (solo lo que pinta el sidebar premium)
+    # Admin: respuesta mínima (solo lo que pinta el sidebar premium)
     if role == "admin":
         cm = _capmonster_balance()
         return {
@@ -1591,7 +1553,7 @@ def superadmin_kpis(user: dict = Depends(require_session)):
     now = datetime.now(timezone.utc)
     out: dict = {}
     with db() as c:
-        # â”€â”€ 1. ONLINE NOW â”€â”€
+        # ── 1. ONLINE NOW ──
         # Operador "online" = tiene lock activo o evento < 5 min
         online_ids: set = set()
         try:
@@ -1605,17 +1567,14 @@ def superadmin_kpis(user: dict = Depends(require_session)):
             ).fetchall():
                 if r["operator_id"]:
                     online_ids.add(str(r["operator_id"]))
-        except sqlite3.OperationalError as e:
-            import logging as _lg
-            _lg.getLogger("betmexico.dashboard.migration").warning(
-                f"[migration] query online operators deposit_attempts: {e}"
-            )
+        except sqlite3.OperationalError:
+            pass
 
         operators = []
         for username, u in _auth.USERS.items():
             tg = u["telegram_id"]
             is_online = str(tg) in online_ids or username in online_ids
-            # idle si activo en Ãºltimos 30 min pero no ahora
+            # idle si activo en últimos 30 min pero no ahora
             try:
                 idle = c.execute(
                     "SELECT 1 FROM deposit_attempts WHERE operator_id=? "
@@ -1624,7 +1583,7 @@ def superadmin_kpis(user: dict = Depends(require_session)):
                 ).fetchone() is not None
             except sqlite3.OperationalError:
                 idle = False
-            # cuÃ¡ntas cuentas tiene en uso ahora
+            # cuántas cuentas tiene en uso ahora
             try:
                 in_use = c.execute(
                     "SELECT COUNT(*) FROM accounts WHERE locked_by IN (?, ?)",
@@ -1647,7 +1606,7 @@ def superadmin_kpis(user: dict = Depends(require_session)):
             "total": len(operators),
         }
 
-        # â”€â”€ 2. ACTIVITY FEED (Ãºltimos 20 eventos mezclados) â”€â”€
+        # ── 2. ACTIVITY FEED (últimos 20 eventos mezclados) ──
         feed = []
         kpi_pw_cache: dict[str, str] = {}
         def _kpi_combo(email: str) -> str:
@@ -1672,11 +1631,8 @@ def superadmin_kpis(user: dict = Depends(require_session)):
                     "amount": r["amount"],
                     "status": r["status"],
                 })
-        except sqlite3.OperationalError as e:
-            import logging as _lg
-            _lg.getLogger("betmexico.dashboard.migration").warning(
-                f"[migration] query recent activity deposit_attempts: {e}"
-            )
+        except sqlite3.OperationalError:
+            pass
 
         for r in c.execute(
             "SELECT email, locked_by, locked_at FROM accounts "
@@ -1698,9 +1654,9 @@ def superadmin_kpis(user: dict = Depends(require_session)):
         feed.sort(key=lambda e: str(e.get("ts", "")), reverse=True)
         out["feed"] = feed[:20]
 
-        # â”€â”€ 3. ALERTAS REALES â”€â”€
+        # ── 3. ALERTAS REALES ──
         alerts = []
-        # bulk: alguien tocÃ³ >20 cuentas en <1 min (locks)
+        # bulk: alguien tocó >20 cuentas en <1 min (locks)
         try:
             bulk = c.execute(
                 "SELECT locked_by, COUNT(*) as n, MIN(locked_at) as t0, MAX(locked_at) as t1 "
@@ -1711,14 +1667,11 @@ def superadmin_kpis(user: dict = Depends(require_session)):
             for r in bulk:
                 alerts.append({
                     "kind": "bulk", "severity": "warn",
-                    "msg": f"{_resolve_operator(r['locked_by'])} lockeÃ³ {r['n']} cuentas en <5 min",
+                    "msg": f"{_resolve_operator(r['locked_by'])} lockeó {r['n']} cuentas en <5 min",
                     "ts": r["t1"],
                 })
-        except sqlite3.OperationalError as e:
-            import logging as _lg
-            _lg.getLogger("betmexico.dashboard.migration").warning(
-                f"[migration] query bulk lock alerts: {e}"
-            )
+        except sqlite3.OperationalError:
+            pass
         # prewarm errors recientes
         try:
             err = c.execute(
@@ -1732,11 +1685,8 @@ def superadmin_kpis(user: dict = Depends(require_session)):
                     "msg": f"{err} prewarms fallidos en 30 min",
                     "ts": now.isoformat(),
                 })
-        except sqlite3.OperationalError as e:
-            import logging as _lg
-            _lg.getLogger("betmexico.dashboard.migration").warning(
-                f"[migration] query prewarm errors: {e}"
-            )
+        except sqlite3.OperationalError:
+            pass
         # capmonster bajo
         cm = _capmonster_balance()
         if cm.get("balance") is not None and cm["balance"] < 5:
@@ -1745,27 +1695,27 @@ def superadmin_kpis(user: dict = Depends(require_session)):
                 "msg": f"CapMonster bajo: ${cm['balance']:.2f}",
                 "ts": now.isoformat(),
             })
-        # proxy caÃ­do
+        # proxy caído
         ph = _proxy_health()
         if ph and not ph.get("ok"):
             alerts.append({
                 "kind": "proxy_down", "severity": "danger",
-                "msg": f"Proxy pool caÃ­do: {ph.get('error') or 'sin respuesta'}",
+                "msg": f"Proxy pool caído: {ph.get('error') or 'sin respuesta'}",
                 "ts": now.isoformat(),
             })
         out["alerts"] = alerts
 
-        # Broadcast alertas crÃ­ticas como notif push (deduplicado por kind+severity en 5min)
+        # Broadcast alertas críticas como notif push (deduplicado por kind+severity en 5min)
         for a in alerts:
             if a.get("severity") == "danger":
                 _maybe_alert_broadcast(a)
 
-        # â”€â”€ 4. POOL STATS (Pool Â· En uso Â· Trastienda Â· Rebotadas) â”€â”€
+        # ── 4. POOL STATS (Pool · En uso · Trastienda · Rebotadas) ──
         live = c.execute("SELECT COUNT(*) FROM accounts WHERE status='LIVE'").fetchone()[0]
         in_use = c.execute(
             "SELECT COUNT(*) FROM accounts WHERE locked_by IS NOT NULL"
         ).fetchone()[0]
-        # Trastienda = LIVE con published_to_pool=0 (las que tÃº aÃºn no soltaste a la pool)
+        # Trastienda = LIVE con published_to_pool=0 (las que tú aún no soltaste a la pool)
         trastienda = c.execute(
             "SELECT COUNT(*) FROM accounts "
             "WHERE status='LIVE' AND COALESCE(published_to_pool, 1) = 0"
@@ -1777,7 +1727,7 @@ def superadmin_kpis(user: dict = Depends(require_session)):
             "AND locked_by IS NULL"
         ).fetchone()[0]
         try:
-            # Rebotadas hoy: lock vencido sin depÃ³sito aprobado en Ãºltimas 24h
+            # Rebotadas hoy: lock vencido sin depósito aprobado en últimas 24h
             rebotadas = c.execute(
                 "SELECT COUNT(DISTINCT a.email) FROM accounts a "
                 "WHERE a.locked_until IS NOT NULL "
@@ -1795,7 +1745,7 @@ def superadmin_kpis(user: dict = Depends(require_session)):
             "rebotadas": rebotadas,
         }
 
-        # â”€â”€ Sistema (resumen rÃ¡pido) â”€â”€
+        # ── Sistema (resumen rápido) ──
         try:
             dep24 = c.execute(
                 "SELECT COUNT(*) AS total, "
@@ -1814,16 +1764,16 @@ def superadmin_kpis(user: dict = Depends(require_session)):
         out["capmonster_balance"] = cm.get("balance")
         out["capmonster_error"] = cm.get("error")
 
-        # â”€â”€ Proxies (pool activo health check) â”€â”€
+        # ── Proxies (pool activo health check) ──
         out["proxy"] = _proxy_health()
 
-        # â”€â”€ WebScraping.ai (saldo de API calls) â”€â”€
+        # ── WebScraping.ai (saldo de API calls) ──
         out["wsai"] = _wsai_status()
 
     return out
 
 
-# â”€â”€â”€ Refresh visible (re-lectura de DB) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── Refresh visible (re-lectura de DB) ────────────────────────────────────────
 
 class RefreshRequest(BaseModel):
     ids: list[int]
@@ -1832,7 +1782,7 @@ class RefreshRequest(BaseModel):
 @app.post("/api/accounts/refresh")
 def accounts_refresh(req: RefreshRequest, _user: dict = Depends(require_session)):
     """Re-lee del DB las cuentas indicadas. NOTA: el re-check live (login + balance)
-    contra BetMexico requiere las deps del bot â€” se hace via /api/prewarm/select.
+    contra BetMexico requiere las deps del bot — se hace via /api/prewarm/select.
     Este endpoint solo refresca lo que el bot ya puso en BD."""
     if not req.ids:
         return {"rows": []}
@@ -1852,7 +1802,7 @@ def accounts_refresh(req: RefreshRequest, _user: dict = Depends(require_session)
     return {"rows": out}
 
 
-# â”€â”€â”€ Logs en tiempo real â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── Logs en tiempo real ───────────────────────────────────────────────────────
 
 _LOG_NOISE_PATTERNS: list[re.Pattern] = [
     # uvicorn request lines: "GET /api/x 200" / "POST /api/x 304"
@@ -1868,7 +1818,7 @@ _LOG_NOISE_PATTERNS: list[re.Pattern] = [
     re.compile(r'\[KYC.*?\]', re.IGNORECASE),
     # Tracebacks de RED de Telegram (Bad Gateway / NetworkError / timeout en
     # get_updates). El bot legacy los imprime sin timestamp y no son errores de
-    # la app â€” solo ruido de red. Filtrar las lÃ­neas de la librerÃ­a y el error.
+    # la app — solo ruido de red. Filtrar las líneas de la librería y el error.
     re.compile(r'telegram\.error\.(NetworkError|TimedOut).*'),
     re.compile(r'Traceback \(most recent call last\):'),
     re.compile(r'File ".*(?:python\d+\.\d+)?/?dist-packages/telegram/'),
@@ -1878,19 +1828,19 @@ _LOG_NOISE_PATTERNS: list[re.Pattern] = [
 
 def _tail_log_file(log_file: Path, limit: int = 200, since: Optional[str] = None,
                     level: Optional[str] = None) -> list[str]:
-    """Lee las Ãºltimas N lÃ­neas filtradas de un archivo de log rotado.
+    """Lee las últimas N líneas filtradas de un archivo de log rotado.
     Filtra ruido (uvicorn requests, health checks, SSE heartbeats, imports).
     Param `level`: ERROR | WARNING | WARN | CRITICAL | INFO | ALL (default ALL).
     Reusado por /api/logs (dashboard) y /api/logs/telegram (bots)."""
     if not log_file.exists():
-        return ["(log file no creado todavÃ­a â€” esperar primer flush)"]
+        return ["(log file no creado todavía — esperar primer flush)"]
     n = max(1, min(int(limit or 200), 2000))
-    # Lee tail eficiente: lee Ãºltimos ~512KB y toma Ãºltimas N lÃ­neas
+    # Lee tail eficiente: lee últimos ~512KB y toma últimas N líneas
     size = log_file.stat().st_size
     with log_file.open("rb") as f:
         if size > 524288:
             f.seek(-524288, 2)
-            f.readline()  # descarta lÃ­nea parcial
+            f.readline()  # descarta línea parcial
         data = f.read().decode("utf-8", errors="replace")
     lines = data.splitlines()[-n:]
     if since and re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", since[:19]):
@@ -1913,7 +1863,7 @@ def get_logs(limit: int = 200, since: Optional[str] = None,
              source: str = "dashboard",  # dashboard | telegram
              bot: str = "main",          # main | mock (solo para source=telegram)
              user: dict = Depends(require_session)):
-    """Lee las Ãºltimas N lÃ­neas filtradas del log.
+    """Lee las últimas N líneas filtradas del log.
     - source=dashboard: Logs del dashboard (`/data/logs/dashboard.log`).
     - source=telegram: Logs del bot Telegram (`/data/logs/telegram_bot.log` o `telegram_mock_bot.log`).
     """
@@ -1925,9 +1875,9 @@ def get_logs(limit: int = 200, since: Optional[str] = None,
         elif source == "telegram":
             log_file = _TELEGRAM_LOG_FILES.get(bot)
             if not log_file:
-                return {"lines": [f"Bot no vÃ¡lido: {bot}"]}
+                return {"lines": [f"Bot no válido: {bot}"]}
         else:
-            return {"lines": [f"Source no vÃ¡lido: {source}"]}
+            return {"lines": [f"Source no válido: {source}"]}
         return {"lines": _tail_log_file(log_file, limit, since, level)}
     except Exception as e:
         return {"lines": [f"Error leyendo log: {e}"]}
@@ -1943,22 +1893,22 @@ _TELEGRAM_LOG_FILES = {
 def get_logs_telegram(bot: str = "main", limit: int = 300, since: Optional[str] = None,
                        level: Optional[str] = None,
                        user: dict = Depends(require_session)):
-    """Lee las Ãºltimas N lÃ­neas del log de uno de los 2 bots de Telegram de
+    """Lee las últimas N líneas del log de uno de los 2 bots de Telegram de
     BetMexico (main=bot real, mock=bot de pruebas). Ambos containers montan
-    el mismo volumen /data que betmexico-web â€” lectura directa a archivo,
+    el mismo volumen /data que betmexico-web — lectura directa a archivo,
     sin red ni docker exec (2026-07-31, vista dual de Logs)."""
     if user.get("role") != "superadmin":
         raise HTTPException(403, "Solo superadmin")
     log_file = _TELEGRAM_LOG_FILES.get(bot)
     if log_file is None:
-        raise HTTPException(400, f"bot invÃ¡lido: {bot!r} (usar 'main' o 'mock')")
+        raise HTTPException(400, f"bot inválido: {bot!r} (usar 'main' o 'mock')")
     try:
         return {"lines": _tail_log_file(log_file, limit, since, level)}
     except Exception as e:
         return {"lines": [f"Error leyendo log: {e}"]}
 
 
-# â”€â”€â”€ Health check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── Health check ──────────────────────────────────────────────────────────────
 
 _health_state: dict = {"last_run": None, "ok": True, "issues": []}
 
@@ -1985,16 +1935,13 @@ def _run_health_checks() -> dict:
                 "AND last_checked_at >= datetime('now','-1 hours')"
             ).fetchone()[0]
         if recent_dead >= 10:
-            issues.append(f"{recent_dead} cuentas DEAD en Ãºltima hora")
-    except Exception as e:
-        import logging as _lg
-        _lg.getLogger("betmexico.dashboard.health").warning(
-            f"[health] error counting DEAD accounts: {e}"
-        )
-    # 4. Bot deps â€” solo informativo, NO genera issue (en dev local los deps
-    #    no estÃ¡n y eso es esperado; el VPS los tiene siempre).
+            issues.append(f"{recent_dead} cuentas DEAD en última hora")
+    except Exception:
+        pass
+    # 4. Bot deps — solo informativo, NO genera issue (en dev local los deps
+    #    no están y eso es esperado; el VPS los tiene siempre).
     # try: import betmexico_db
-    # â†’ eliminado del check; la ausencia no rompe el dashboard, solo /api/deposits/execute.
+    # → eliminado del check; la ausencia no rompe el dashboard, solo /api/deposits/execute.
 
     state = {
         "last_run": datetime.now(timezone.utc).isoformat(),
@@ -2010,7 +1957,7 @@ def health_full(_user: dict = Depends(require_session)):
     return _run_health_checks()
 
 
-# â”€â”€ Panel de controles backend (SA only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Panel de controles backend (SA only) ─────────────────────────────────────
 
 import subprocess as _sp
 
@@ -2022,7 +1969,7 @@ def _require_sa(user: dict):
 
 @app.get("/api/admin/diag")
 def admin_diag(user: dict = Depends(require_session)):
-    """DiagnÃ³stico completo del sistema."""
+    """Diagnóstico completo del sistema."""
     _require_sa(user)
     out = {"ts": datetime.now(timezone.utc).isoformat(), "checks": []}
     # DB
@@ -2042,7 +1989,7 @@ def admin_diag(user: dict = Depends(require_session)):
     # Proxy
     p = _proxy_health()
     out["checks"].append({"name": "Proxy pool", "ok": p.get("ok", False),
-                          "info": f"{p.get('country','?')} Â· {p.get('latency_ms','?')}ms" if p.get("ok") else None,
+                          "info": f"{p.get('country','?')} · {p.get('latency_ms','?')}ms" if p.get("ok") else None,
                           "error": p.get("error") if not p.get("ok") else None})
     # Bot deps
     try:
@@ -2050,17 +1997,14 @@ def admin_diag(user: dict = Depends(require_session)):
         out["checks"].append({"name": "Bot deps", "ok": bool(BOT_DEPS_OK),
                               "info": "loaded" if BOT_DEPS_OK else None,
                               "error": "no cargan" if not BOT_DEPS_OK else None})
-    except Exception as e:
-        import logging as _lg
-        _lg.getLogger("betmexico.dashboard.health").warning(
-            f"[health] BOT_DEPS_OK import failed: {e}"
-        )
+    except Exception:
+        pass
     return out
 
 
 @app.post("/api/admin/ping")
 def admin_ping(user: dict = Depends(require_session)):
-    """Ping a hosts crÃ­ticos."""
+    """Ping a hosts críticos."""
     _require_sa(user)
     targets = ["betmexico.mx", "api.capmonster.cloud", "hub-us-7.litport.net"]
     results = []
@@ -2099,10 +2043,10 @@ def admin_services_restart(target: str, user: dict = Depends(require_session)):
     """Reinicia bot, web, mock o todos.
 
     Antes usaba `systemctl restart`, que en KVM4 no existe: corremos en Docker
-    sin systemd, asÃ­ que este endpoint devolvÃ­a ok=False en silencio desde la
-    migraciÃ³n. Misma causa raÃ­z que el bug de los logs (ver arriba, L40).
+    sin systemd, así que este endpoint devolvía ok=False en silencio desde la
+    migración. Misma causa raíz que el bug de los logs (ver arriba, L40).
     Ahora va por el docker-socket-proxy, que solo permite listar y reiniciar
-    contenedores â€” el socket nunca se monta en este contenedor.
+    contenedores — el socket nunca se monta en este contenedor.
     """
     _require_sa(user)
     grupos = {"bot": ["betmexico-bot"], "web": ["betmexico-web"],
@@ -2124,15 +2068,15 @@ def admin_export_logs(lines: int = Query(500, le=5000),
                       user: dict = Depends(require_session)):
     """Descarga logs recientes (text/plain)."""
     _require_sa(user)
-    # Antes: journalctl. KVM4 es Docker sin systemd â†’ siempre devolvÃ­a vacÃ­o.
+    # Antes: journalctl. KVM4 es Docker sin systemd → siempre devolvía vacío.
     # Ahora se sirve el mismo archivo que alimenta /api/logs.
     try:
         with open(str(_LOG_FILE), "r", encoding="utf-8", errors="replace") as f:
             body = "".join(f.readlines()[-lines:])
         if not body:
-            body = "(el log estÃ¡ vacÃ­o)"
+            body = "(el log está vacío)"
     except FileNotFoundError:
-        body = f"No existe {_LOG_FILE} todavÃ­a."
+        body = f"No existe {_LOG_FILE} todavía."
     except Exception as e:
         body = f"Error: {e}"
     return Response(content=body, media_type="text/plain",
@@ -2151,7 +2095,7 @@ def admin_pause_state(user: dict = Depends(require_session)):
 
 @app.post("/api/admin/pause")
 def admin_pause(user: dict = Depends(require_session), reason: str = ""):
-    """Pausa global: bloquea nuevos prewarms y depÃ³sitos para TODOS los users."""
+    """Pausa global: bloquea nuevos prewarms y depósitos para TODOS los users."""
     _require_sa(user)
     _GLOBAL_PAUSE.update({
         "paused": True,
@@ -2160,7 +2104,7 @@ def admin_pause(user: dict = Depends(require_session), reason: str = ""):
         "reason": reason or "manual",
     })
     _broadcast({"type": "alert", "kind": "global_pause", "severity": "warn",
-                "icon": "â¸", "msg": f"Sistema pausado por {user.get('display')}",
+                "icon": "⏸", "msg": f"Sistema pausado por {user.get('display')}",
                 "ts": datetime.now(timezone.utc).isoformat()})
     return _GLOBAL_PAUSE
 
@@ -2170,7 +2114,7 @@ def admin_resume(user: dict = Depends(require_session)):
     _require_sa(user)
     _GLOBAL_PAUSE.update({"paused": False, "since": None, "by": None, "reason": None})
     _broadcast({"type": "alert", "kind": "global_resume", "severity": "info",
-                "icon": "â–¶", "msg": f"Sistema reanudado por {user.get('display')}",
+                "icon": "▶", "msg": f"Sistema reanudado por {user.get('display')}",
                 "ts": datetime.now(timezone.utc).isoformat()})
     return _GLOBAL_PAUSE
 
@@ -2193,31 +2137,22 @@ def admin_emergency_stop(user: dict = Depends(require_session)):
             if not t.done():
                 t.cancel()
                 cancelled_pw += 1
-    except Exception as e:
-        import logging as _lg
-        _lg.getLogger("betmexico.dashboard.emergency").warning(
-            f"[emergency_stop] cancel prewarm tasks failed: {e}"
-        )
+    except Exception:
+        pass
     try:
         from deposits import _active_schedules, _active_mm_runs
         for sid, info in list(_active_schedules.items()):
             try:
                 info["task"].cancel()
                 cancelled_sched += 1
-            except Exception as e:
-                import logging as _lg
-                _lg.getLogger("betmexico.dashboard.emergency").warning(
-                    f"[emergency_stop] cancel schedule {sid} failed: {e}"
-                )
+            except Exception:
+                pass
         for run_id, ev in list(_active_mm_runs.items()):
             ev.set()
-    except Exception as e:
-        import logging as _lg
-        _lg.getLogger("betmexico.dashboard.emergency").warning(
-            f"[emergency_stop] cancel deposits tasks failed: {e}"
-        )
+    except Exception:
+        pass
     _broadcast({"type": "alert", "kind": "emergency_stop", "severity": "danger",
-                "icon": "ðŸ›‘", "msg": f"PARO DE EMERGENCIA por {user.get('display')}",
+                "icon": "🛑", "msg": f"PARO DE EMERGENCIA por {user.get('display')}",
                 "ts": datetime.now(timezone.utc).isoformat()})
     return {"paused": True, "cancelled_prewarms": cancelled_pw,
             "cancelled_schedules": cancelled_sched}
@@ -2225,14 +2160,14 @@ def admin_emergency_stop(user: dict = Depends(require_session)):
 
 @app.post("/api/admin/vps-reboot")
 def admin_vps_reboot(user: dict = Depends(require_session), confirm: str = ""):
-    """Reboot del VPS â€” requiere confirmaciÃ³n."""
+    """Reboot del VPS — requiere confirmación."""
     _require_sa(user)
     if confirm != "REBOOT":
         raise HTTPException(400, "Pasa confirm=REBOOT para confirmar")
     try:
         _sp.Popen(["shutdown", "-r", "+1", "Reboot solicitado por SA"])
         _broadcast({"type": "alert", "kind": "vps_reboot", "severity": "danger",
-                    "icon": "ðŸ”„", "msg": "VPS reboot programado en 1 min",
+                    "icon": "🔄", "msg": "VPS reboot programado en 1 min",
                     "ts": datetime.now(timezone.utc).isoformat()})
         return {"scheduled": True, "in": "1 minute"}
     except Exception as e:
@@ -2246,7 +2181,7 @@ def health_last(_user: dict = Depends(require_session)):
 
 @app.post("/api/health/dismiss")
 def health_dismiss(_user: dict = Depends(require_session)):
-    """Limpia el estado de salud â€” re-corre el check ahora.
+    """Limpia el estado de salud — re-corre el check ahora.
     Si los issues siguen presentes, vuelven a aparecer; si se resolvieron, quedan limpios."""
     return _run_health_checks()
 
@@ -2304,7 +2239,7 @@ def api_recent(user: dict = Depends(require_session)):
                 recent[email] = {"email": email, "combo": _combo(email),
                                  "last_ts": ts, "reason": reason}
 
-        # depÃ³sitos propios (o los de SA = tambiÃ©n los suyos; vista global = /api/activity)
+        # depósitos propios (o los de SA = también los suyos; vista global = /api/activity)
         dsql = "SELECT account_email, created_at FROM deposit_attempts "
         dargs: tuple = ()
         if not is_sa:
@@ -2317,11 +2252,8 @@ def api_recent(user: dict = Depends(require_session)):
         try:
             for r in c.execute(dsql, dargs).fetchall():
                 _add(r["account_email"], r["created_at"], "deposit")
-        except sqlite3.OperationalError as e:
-            import logging as _lg
-            _lg.getLogger("betmexico.dashboard.migration").warning(
-                f"[migration] query deposit_attempts for recent accounts (SA): {e}"
-            )
+        except sqlite3.OperationalError:
+            pass
 
         # locks propios (en uso)
         for r in c.execute(
@@ -2338,12 +2270,12 @@ def api_recent(user: dict = Depends(require_session)):
             _add(r["account_email"], r["created_at"], "mark")
 
         # Ley del pool: el operador NO ve combos de cuentas fuera de su universo.
-        # (marcar una cuenta no la expone; SA sin restricciÃ³n.)
+        # (marcar una cuenta no la expone; SA sin restricción.)
         vis = _visible_emails(user, c)
         if vis is not None:
             recent = {e: v for e, v in recent.items() if e in vis}
 
-        # stats del dÃ­a (por operador)
+        # stats del día (por operador)
         try:
             st = c.execute(
                 "SELECT COUNT(*) n, "
@@ -2389,7 +2321,7 @@ def api_accounts_at_hand(user: dict = Depends(require_session)):
                 pw = (row["password"] if row else "") or ""
             return f"{email}:{pw}" if pw else email
 
-        # â”€â”€ pineadas: marks del usuario, orden id DESC (igual que /api/marks) â”€â”€
+        # ── pineadas: marks del usuario, orden id DESC (igual que /api/marks) ──
         pinned_emails = [
             r["account_email"] for r in c.execute(
                 "SELECT account_email FROM account_marks WHERE user_key=? ORDER BY id DESC",
@@ -2397,8 +2329,8 @@ def api_accounts_at_hand(user: dict = Depends(require_session)):
             ).fetchall()
         ]
 
-        # â”€â”€ recientes: misma recoleccion que /api/recent (deposits propios,
-        # locks propios, marcadas), dedup por email, last_ts DESC â”€â”€
+        # ── recientes: misma recoleccion que /api/recent (deposits propios,
+        # locks propios, marcadas), dedup por email, last_ts DESC ──
         recent: dict = {}
 
         def _add(email, ts, reason):
@@ -2412,11 +2344,8 @@ def api_accounts_at_hand(user: dict = Depends(require_session)):
         try:
             for r in c.execute(dsql, (my,)).fetchall():
                 _add(r["account_email"], r["created_at"], "deposit")
-        except sqlite3.OperationalError as e:
-            import logging as _lg
-            _lg.getLogger("betmexico.dashboard.migration").warning(
-                f"[migration] query deposit_attempts for recent accounts (operator): {e}"
-            )
+        except sqlite3.OperationalError:
+            pass
 
         for r in c.execute(
             "SELECT email, locked_at FROM accounts WHERE locked_by=? ORDER BY locked_at DESC LIMIT 50",
@@ -2443,7 +2372,7 @@ def api_accounts_at_hand(user: dict = Depends(require_session)):
         recent_rows.sort(key=lambda x: str(x["last_ts"] or ""), reverse=True)
         recent_rows = recent_rows[:20]
 
-        # â”€â”€ enrich con UNA query: email -> fila de accounts â”€â”€
+        # ── enrich con UNA query: email -> fila de accounts ──
         all_emails = list(pinned_set | {r["email"] for r in recent_rows})
         by_email: dict = {}
         if all_emails:
@@ -2493,13 +2422,13 @@ async def _health_loop():
 
 def _release_account(c, account_id, email, reason, prev_locked_by,
                      kind="unlock_auto", who="janitor"):
-    """Liberador canÃ³nico ÃšNICO (A1). AtÃ³mico y uniforme: limpia lock + notif_*,
+    """Liberador canónico ÚNICO (A1). Atómico y uniforme: limpia lock + notif_*,
     SIEMPRE republica al pool (published_to_pool=1) y emite 1 solo broadcast.
     Reemplaza las 3 variantes inconsistentes (janitor / window_watcher / release_watchdog)
-    que liberaban la misma cuenta desde 3 orÃ­genes de tiempo distintos.
-    `c` = conexiÃ³n abierta en modo write (el caller maneja el `with db(write=True)`).
+    que liberaban la misma cuenta desde 3 orígenes de tiempo distintos.
+    `c` = conexión abierta en modo write (el caller maneja el `with db(write=True)`).
     NO toca cuentas con locked_until NULL salvo que el caller lo decida: el guard
-    `locked_until IS NOT NULL` vive en quien selecciona (janitor), no aquÃ­."""
+    `locked_until IS NOT NULL` vive en quien selecciona (janitor), no aquí."""
     c.execute(
         "UPDATE accounts SET locked_by=NULL, locked_at=NULL, locked_until=NULL, "
         "notif_pre24h_sent_at=NULL, notif_at24h_sent_at=NULL, notif_at24h10_sent_at=NULL, "
@@ -2517,9 +2446,9 @@ def _release_account(c, account_id, email, reason, prev_locked_by,
 
 def _run_lock_janitor() -> int:
     """Auto-unlock (spec chat2):
-      - Lock vencido (locked_until < now) Y sin depÃ³sito aprobado en Ãºltimas 24h â†’ liberar
-      - Si hay depÃ³sito/tarjeta nueva en Ãºltimas 24h â†’ mantener 24h desde ese evento
-    Retorna cuÃ¡ntas se liberaron.
+      - Lock vencido (locked_until < now) Y sin depósito aprobado en últimas 24h → liberar
+      - Si hay depósito/tarjeta nueva en últimas 24h → mantener 24h desde ese evento
+    Retorna cuántas se liberaron.
     """
     freed = 0
     try:
@@ -2532,7 +2461,7 @@ def _run_lock_janitor() -> int:
                 "AND locked_until <= datetime('now')"
             ).fetchall()
             for r in rows:
-                # Â¿Hubo depÃ³sito aprobado o tarjeta nueva en Ãºltimas 24h?
+                # ¿Hubo depósito aprobado o tarjeta nueva en últimas 24h?
                 try:
                     sticky = c.execute(
                         "SELECT 1 FROM deposit_attempts "
@@ -2557,7 +2486,7 @@ def _run_lock_janitor() -> int:
                         (new_until, r["id"])
                     )
                 else:
-                    # A1: liberador canÃ³nico ÃšNICO. Republica + limpia notif_* + 1 broadcast.
+                    # A1: liberador canónico ÚNICO. Republica + limpia notif_* + 1 broadcast.
                     _release_account(c, r["id"], r["email"],
                                      "lock vencido sin trabajo 24h", r["locked_by"])
                     freed += 1
@@ -2573,28 +2502,24 @@ async def _janitor_loop():
         try:
             n = await asyncio.to_thread(_run_lock_janitor)
             if n:
-                _logging.getLogger("betmexico.dashboard.janitor").info(
-                    f"[janitor] auto-unlock {n} cuentas"
-                )
+                print(f"[janitor] auto-unlock {n} cuentas")
         except Exception as e:
-            _logging.getLogger("betmexico.dashboard.janitor").error(
-                f"[janitor] error de ciclo: {e}", exc_info=True
-            )
+            print(f"[janitor] error: {e}")
         await asyncio.sleep(5 * 60)
 
 
-# â”€â”€ Watcher de ventanas de depÃ³sito 24h (A1: notificador puro) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# Emite notif al operador cuando su window 24h estÃ¡ por cerrar (~30 min antes)
-# Emite notif "ya cerrÃ³, vuelve" cuando expira.
-# NO libera (A1): el Ãºnico liberador automÃ¡tico es el janitor (_release_account).
-_window_notified: dict = {}  # email â†’ set de fases ya notificadas
+# ── Watcher de ventanas de depósito 24h (A1: notificador puro) ────────────
+# Emite notif al operador cuando su window 24h está por cerrar (~30 min antes)
+# Emite notif "ya cerró, vuelve" cuando expira.
+# NO libera (A1): el único liberador automático es el janitor (_release_account).
+_window_notified: dict = {}  # email → set de fases ya notificadas
 
 def _run_window_watcher() -> dict:
-    """Revisa cuentas con depÃ³sitos aprobados Ãºltimas 25h y emite alertas."""
+    """Revisa cuentas con depósitos aprobados últimas 25h y emite alertas."""
     out = {"warned": 0, "expired": 0, "released": 0}
     try:
         with db() as c:
-            # Para cada cuenta con dep aprobado en Ãºltimas 25h, calcula window
+            # Para cada cuenta con dep aprobado en últimas 25h, calcula window
             rows = c.execute(
                 "SELECT account_email, MIN(created_at) AS first_at, "
                 "  MAX(operator_id) AS operator_id, COUNT(*) AS n, "
@@ -2616,11 +2541,8 @@ def _run_window_watcher() -> dict:
                     ).fetchone()
                 if lk and lk["locked_by"] is not None and lk["locked_until"] is None:
                     continue
-            except Exception as e:
-                import logging as _lg
-                _lg.getLogger("betmexico.dashboard.migration").warning(
-                    f"[migration] query locked_by for window_watcher: {e}"
-                )
+            except Exception:
+                pass
             try:
                 first_at = datetime.fromisoformat(r["first_at"].replace(" ", "T"))
                 if first_at.tzinfo is None:
@@ -2643,7 +2565,7 @@ def _run_window_watcher() -> dict:
                 })
                 out["warned"] += 1
 
-            # Fase 2: window cerrÃ³ (acaba de pasar)
+            # Fase 2: window cerró (acaba de pasar)
             if -60 < mins_left <= 0 and "expired" not in phases:
                 phases.add("expired")
                 _broadcast({
@@ -2655,17 +2577,15 @@ def _run_window_watcher() -> dict:
                 })
                 out["expired"] += 1
 
-            # A1: fase 3 (auto-release a 25h) ELIMINADA. El janitor es el Ãºnico
-            # liberador (vÃ­a _release_account). window_watcher = notificador puro.
+            # A1: fase 3 (auto-release a 25h) ELIMINADA. El janitor es el único
+            # liberador (vía _release_account). window_watcher = notificador puro.
 
         # Limpia tracking de cuentas viejas (> 26h sin actividad)
         for email in list(_window_notified.keys()):
             if email not in [r["account_email"] for r in rows]:
                 _window_notified.pop(email, None)
     except Exception as e:
-        _logging.getLogger("betmexico.dashboard.window_watcher").error(
-            f"[window_watcher] error de ciclo: {e}", exc_info=True
-        )
+        print(f"[window_watcher] error: {e}")
     return out
 
 
@@ -2682,21 +2602,21 @@ async def _window_watcher_loop():
 
 
 def _release_watchdog_tick():
-    """Watchdog post-depÃ³sito: SOLO notifs progresivas (A1: ya no auto-libera).
+    """Watchdog post-depósito: SOLO notifs progresivas (A1: ya no auto-libera).
 
     Timeline desde `last_deposit_date`:
-    - T+23h55m â†’ notif "disponible en 5 min" (info)
-    - T+24h    â†’ notif "ya puedes volver a depositar" (warn) + acciones [deposit, release]
-    - T+24h10m â†’ notif "segundo aviso" (warn) + acciones [deposit, release]
-    (El auto-release a 27h se ELIMINÃ“ en A1: el janitor es el Ãºnico liberador,
+    - T+23h55m → notif "disponible en 5 min" (info)
+    - T+24h    → notif "ya puedes volver a depositar" (warn) + acciones [deposit, release]
+    - T+24h10m → notif "segundo aviso" (warn) + acciones [deposit, release]
+    (El auto-release a 27h se ELIMINÓ en A1: el janitor es el único liberador,
      con origen de tiempo = locked_until. Guard locked_until IS NOT NULL = no toca RESERVADA_SA.)
 
     Las notifs son por-usuario (target_user = locked_by). El frontend filtra para
-    mostrar solo al operador dueÃ±o del lock. SA siempre las ve.
+    mostrar solo al operador dueño del lock. SA siempre las ve.
     """
     from datetime import datetime, timedelta, timezone
     now = datetime.now(timezone.utc)
-    # last_deposit_date estÃ¡ en hora MX (UTC-6) sin tzinfo. Asumir MX.
+    # last_deposit_date está en hora MX (UTC-6) sin tzinfo. Asumir MX.
     mx_tz = timezone(timedelta(hours=-6))
 
     try:
@@ -2725,17 +2645,17 @@ def _release_watchdog_tick():
         delta = now - dt_mx
         hours = delta.total_seconds() / 3600.0
         if hours < 0:
-            continue  # depÃ³sito en futuro? skip
+            continue  # depósito en futuro? skip
 
         acc_id = r["id"]
         email = r["email"]
         owner = r["locked_by"]
         now_iso = now.isoformat()
 
-        # A1: caso 1 (auto-release a 27h) ELIMINADO. El janitor es el Ãºnico liberador
-        # (origen de tiempo = locked_until, vÃ­a _release_account). AquÃ­ solo notifs.
+        # A1: caso 1 (auto-release a 27h) ELIMINADO. El janitor es el único liberador
+        # (origen de tiempo = locked_until, vía _release_account). Aquí solo notifs.
 
-        # Caso 2: 24h+10m â†’ segundo aviso con acciones
+        # Caso 2: 24h+10m → segundo aviso con acciones
         if hours >= 24.166 and not r["notif_at24h10_sent_at"]:
             with db(write=True) as c:
                 c.execute(
@@ -2744,14 +2664,14 @@ def _release_watchdog_tick():
                 )
             _broadcast({
                 "type": "notification", "kind": "release_available_again",
-                "severity": "warn", "icon": "â°",
-                "msg": f"{email}: 2do aviso â€” deposita o libera. Auto-release a las 27h.",
+                "severity": "warn", "icon": "⏰",
+                "msg": f"{email}: 2do aviso — deposita o libera. Auto-release a las 27h.",
                 "target_user": owner, "account_id": acc_id,
                 "actions": ["deposit", "release"],
             })
             continue
 
-        # Caso 3: 24h cumplidas â†’ primer aviso con acciones
+        # Caso 3: 24h cumplidas → primer aviso con acciones
         if hours >= 24 and not r["notif_at24h_sent_at"]:
             with db(write=True) as c:
                 c.execute(
@@ -2760,14 +2680,14 @@ def _release_watchdog_tick():
                 )
             _broadcast({
                 "type": "notification", "kind": "release_available",
-                "severity": "warn", "icon": "ðŸŸ¢",
+                "severity": "warn", "icon": "🟢",
                 "msg": f"{email}: ya puedes depositar de nuevo (24h cumplidas)",
                 "target_user": owner, "account_id": acc_id,
                 "actions": ["deposit", "release"],
             })
             continue
 
-        # Caso 4: 5 min antes de 24h â†’ pre-aviso (info)
+        # Caso 4: 5 min antes de 24h → pre-aviso (info)
         if 23.917 <= hours < 24 and not r["notif_pre24h_sent_at"]:
             with db(write=True) as c:
                 c.execute(
@@ -2777,7 +2697,7 @@ def _release_watchdog_tick():
             mins_left = max(0, int((24 - hours) * 60))
             _broadcast({
                 "type": "notification", "kind": "release_warning_5min",
-                "severity": "info", "icon": "â³",
+                "severity": "info", "icon": "⏳",
                 "msg": f"{email}: disponible en ~{mins_left} min para volver a depositar",
                 "target_user": owner, "account_id": acc_id,
             })
@@ -2795,14 +2715,14 @@ async def _release_watchdog_loop():
 
 
 async def _jwt_keepalive_loop():
-    """Mantiene vivos los JWT de sesiÃ³n (7 dÃ­as fijos) re-logueando de forma
+    """Mantiene vivos los JWT de sesión (7 días fijos) re-logueando de forma
     proactiva y ESPACIADA solo las cuentas por expirar/expiradas de mejor grado.
     Baja el 429: menos JWT muertos = menos logins forzados = menos rate-limit.
     Config por env JWT_KEEPER_* (ver jwt_keeper.cfg). Tick cada JWT_KEEPER_INTERVAL_SEC.
 
     Sleep = `_jwt_wakeup.wait()` con timeout: si account_refresh detecta un JWT
     muerto server-side (401 silencioso) invalida la cache y hace `_wake_jwt_keeper()`
-    â†’ este loop despierta y re-loguea YA, sin esperar el tick horario (FUGA #1)."""
+    → este loop despierta y re-loguea YA, sin esperar el tick horario (FUGA #1)."""
     import jwt_keeper
     c = jwt_keeper.cfg()
     if not c["enabled"]:
@@ -2812,15 +2732,11 @@ async def _jwt_keepalive_loop():
     while True:
         try:
             stats = await jwt_keeper.run_keepalive_cycle_from_env()
-            _logging.getLogger("betmexico.dashboard.jwt_keeper").info(
-                f"[jwt_keeper] ciclo: {stats}"
-            )
+            print(f"[jwt_keeper] ciclo: {stats}")
         except Exception as e:
-            _logging.getLogger("betmexico.dashboard.jwt_keeper").error(
-                f"[jwt_keeper] error de ciclo: {e}", exc_info=True
-            )
-        # Dormir hasta el prÃ³ximo tick horario, o despertar antes si el refresh
-        # invalidÃ³ JWT muertos (wake). Debounce de la seÃ±al estÃ¡ en _wake_jwt_keeper.
+            print(f"[jwt_keeper] error de ciclo: {e}")
+        # Dormir hasta el próximo tick horario, o despertar antes si el refresh
+        # invalidó JWT muertos (wake). Debounce de la señal está en _wake_jwt_keeper.
         try:
             await asyncio.wait_for(_jwt_wakeup.wait(), timeout=jwt_keeper.cfg()["interval_sec"])
         except asyncio.TimeoutError:
@@ -2835,9 +2751,9 @@ _jwt_wakeup_last = 0.0
 
 def _wake_jwt_keeper() -> None:
     """Despierta a `_jwt_keepalive_loop` para que re-loguee YA las cuentas cuyo
-    JWT muriÃ³ server-side (las invalidÃ³ account_refresh). Debounce de 5 min:
-    si ya se despertÃ³ hace poco, el event ya estÃ¡ seteado y el keeper corre al
-    terminar su ciclo â€” no hay que repetir. No rafagea: el ciclo del keeper
+    JWT murió server-side (las invalidó account_refresh). Debounce de 5 min:
+    si ya se despertó hace poco, el event ya está seteado y el keeper corre al
+    terminar su ciclo — no hay que repetir. No rafagea: el ciclo del keeper
     siempre espacia los logins (gap configurable) y el event solo adelanta tick."""
     global _jwt_wakeup_last
     now = time.time()
@@ -2850,25 +2766,21 @@ def _wake_jwt_keeper() -> None:
 async def _account_refresh_loop():
     """Refresca balance/movimientos de cuentas con JWT VIGENTE (opuesto a
     jwt_keeper: esas cuentas no necesitan login, solo un fetch reusando el
-    JWT â€” sin captcha, sin rate-limit). Mantiene el dashboard actualizado
-    sin intervenciÃ³n del operador. Config por env ACCOUNT_REFRESH_*
+    JWT — sin captcha, sin rate-limit). Mantiene el dashboard actualizado
+    sin intervención del operador. Config por env ACCOUNT_REFRESH_*
     (ver account_refresh.cfg). Tick cada ACCOUNT_REFRESH_INTERVAL_SEC."""
     import account_refresh
     c = account_refresh.cfg()
     if not c["enabled"]:
         print("[account_refresh] deshabilitado (ACCOUNT_REFRESH_ENABLED!=1)")
         return
-    await asyncio.sleep(120)  # arrancar despuÃ©s del jwt_keeper (90s)
+    await asyncio.sleep(120)  # arrancar después del jwt_keeper (90s)
     while True:
         try:
             stats = await account_refresh.run_refresh_cycle_from_env()
-            _logging.getLogger("betmexico.dashboard.account_refresh").info(
-                f"[account_refresh] ciclo: {stats}"
-            )
+            print(f"[account_refresh] ciclo: {stats}")
         except Exception as e:
-            _logging.getLogger("betmexico.dashboard.account_refresh").error(
-                f"[account_refresh] error de ciclo: {e}", exc_info=True
-            )
+            print(f"[account_refresh] error de ciclo: {e}")
         await asyncio.sleep(account_refresh.cfg()["interval_sec"])
 
 
@@ -2876,19 +2788,19 @@ ROBERT_CHAT_ID = 1341812706  # ID exclusivo de Robert (SuperAdmin)
 
 
 def _bot_token() -> str | None:
-    """Token del bot Telegram LEGACY (`betmexico-bot`) â€” el canal de avisos.
+    """Token del bot Telegram LEGACY (`betmexico-bot`) — el canal de avisos.
 
-    Ojo: hasta 2026-08-01 esto leÃ­a `TELEGRAM_BOT_TOKEN`, variable que NUNCA ha
-    existido en el .env de KVM4 (ahÃ­ estÃ¡n `BMX_BOT_TOKEN` y `BMX_MOCK_BOT_TOKEN`).
-    El `if not token: return` silencioso hacÃ­a que la notificaciÃ³n de arranque
-    jamÃ¡s se enviara desde la migraciÃ³n a Docker. Se acepta el nombre viejo como
-    alias por si algÃºn entorno lo define.
+    Ojo: hasta 2026-08-01 esto leía `TELEGRAM_BOT_TOKEN`, variable que NUNCA ha
+    existido en el .env de KVM4 (ahí están `BMX_BOT_TOKEN` y `BMX_MOCK_BOT_TOKEN`).
+    El `if not token: return` silencioso hacía que la notificación de arranque
+    jamás se enviara desde la migración a Docker. Se acepta el nombre viejo como
+    alias por si algún entorno lo define.
     """
     return os.environ.get("BMX_BOT_TOKEN") or os.environ.get("TELEGRAM_BOT_TOKEN")
 
 
 def _notify_robert(msg: str, parse_mode: str | None = "HTML") -> dict:
-    """Manda un mensaje al Telegram de Robert por el bot legacy. Punto Ãºnico."""
+    """Manda un mensaje al Telegram de Robert por el bot legacy. Punto único."""
     token = _bot_token()
     if not token:
         return {"ok": False, "error": "BMX_BOT_TOKEN no configurado"}
@@ -2906,7 +2818,7 @@ def _notify_robert(msg: str, parse_mode: str | None = "HTML") -> dict:
 
 
 async def _startup_telegram_notify():
-    """NotificaciÃ³n de inicio al Telegram personal de Robert (SuperAdmin)."""
+    """Notificación de inicio al Telegram personal de Robert (SuperAdmin)."""
     bot_token = _bot_token()
     target_chat_id = ROBERT_CHAT_ID
     if not bot_token:
@@ -2914,13 +2826,13 @@ async def _startup_telegram_notify():
             "[telegram_startup_notify] sin BMX_BOT_TOKEN: no se notifica el arranque")
         return
     msg = (
-        "â—¢ â”â”â”â”â”â”â” â—£\n"
-        "  âˆ· Ê™.á´á´›á´á´‡xÉªá´„á´ âˆ·  â—Ž\n"
-        "â—¥ â”â”â”â”â”â”â” â—¤\n\n"
-        "âœ“ runtime online\n\n"
+        "◢ ━━━━━━━ ◣\n"
+        "  ∷ ʙ.ᴏᴛᴍᴇxɪᴄᴏ ∷  ◎\n"
+        "◥ ━━━━━━━ ◤\n\n"
+        "✓ runtime online\n\n"
         "Online. Gates listos.\n"
-        "Otra sesiÃ³n sin aviso previo. Muy tÃº.\n\n"
-        "âŠ¢ Ê™.á´á´›á´á´‡x"
+        "Otra sesión sin aviso previo. Muy tú.\n\n"
+        "⊢ ʙ.ᴏᴛᴍᴇx"
     )
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
@@ -2934,7 +2846,7 @@ async def _startup_telegram_notify():
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
-    """Startup de background tasks â€” reemplaza el deprecado @app.on_event."""
+    """Startup de background tasks — reemplaza el deprecado @app.on_event."""
     asyncio.create_task(_health_loop())
     asyncio.create_task(_janitor_loop())
     asyncio.create_task(_window_watcher_loop())
@@ -2960,8 +2872,8 @@ def lock_account(account_id: int, req: LockRequest, _user: dict = Depends(requir
     now = datetime.now(timezone.utc)
     locked_at = now.isoformat()
     is_sa = _user.get("role") == "superadmin"
-    # A1: SA â†’ lock perpetuo (RESERVADA_SA, locked_until NULL) + override de cualquier lock,
-    # igual que _auto_lock_for_deposit. Operador â†’ temporal (Nh) y SIN override (409 si ocupada).
+    # A1: SA → lock perpetuo (RESERVADA_SA, locked_until NULL) + override de cualquier lock,
+    # igual que _auto_lock_for_deposit. Operador → temporal (Nh) y SIN override (409 si ocupada).
     locked_until = None if is_sa else (now + timedelta(hours=req.hours)).isoformat()
     with db(write=True) as c:
         if is_sa:
@@ -3020,10 +2932,10 @@ def publish_accounts(req: PublishRequest, user: dict = Depends(require_session))
             )
         else:
             # Sacar a trastienda (SA) LIBERA de paso la RESERVADA_SA perpetua
-            # (locked_until IS NULL) â€” el auto-lock del propio SA al depositar dejaba la
+            # (locked_until IS NULL) — el auto-lock del propio SA al depositar dejaba la
             # cuenta pegada al pool y este guardrail la saltaba en silencio (Robert
             # 2026-07-17: "no puedo sacar las cuentas del pool hacia trastienda"). Los
-            # locks TEMPORALES de operador (locked_until NOT NULL = trabajo activo) SÃ se
+            # locks TEMPORALES de operador (locked_until NOT NULL = trabajo activo) SÍ se
             # respetan: esas NO se ocultan (evita el fantasma published=0 + lock ajeno).
             cur = c.execute(
                 f"UPDATE accounts SET published_to_pool=0, "
@@ -3048,7 +2960,7 @@ def hide_all_accounts(user: dict = Depends(require_session)):
             "locked_by=NULL, locked_at=NULL, locked_until=NULL "
             "WHERE status='LIVE' AND COALESCE(published_to_pool,1)=1 "
             # libera la RESERVADA_SA perpetua al ocultar (Robert 2026-07-17); respeta el
-            # lock temporal de operador activo (locked_until NOT NULL â†’ no se oculta).
+            # lock temporal de operador activo (locked_until NOT NULL → no se oculta).
             "AND (locked_by IS NULL OR locked_until IS NULL)"
         )
         changed = cur.rowcount
@@ -3058,7 +2970,7 @@ def hide_all_accounts(user: dict = Depends(require_session)):
 @app.get("/api/pool/accounts")
 def pool_accounts(user: dict = Depends(require_session)):
     """Cuentas actualmente publicadas a la pool (visibles para los operadores).
-    Solo SA â€” vista de control."""
+    Solo SA — vista de control."""
     if user.get("role") != "superadmin":
         raise HTTPException(403, "Solo superadmin")
     with db() as c:
@@ -3097,7 +3009,7 @@ def api_pool_split(user: dict = Depends(require_session)):
 
 @app.post("/api/pool/publish")
 def api_pool_publish(payload: dict, user: dict = Depends(require_session)):
-    """SA: bulk set published_to_pool by email list. publish=True â†’ 1, False â†’ 0."""
+    """SA: bulk set published_to_pool by email list. publish=True → 1, False → 0."""
     if not _is_sa(user):
         raise HTTPException(status_code=403, detail="solo superadmin")
     emails = (payload or {}).get("emails") or []
@@ -3142,14 +3054,14 @@ def unlock_account(account_id: int, user: dict = Depends(require_session)):
         if not row:
             raise HTTPException(status_code=404, detail="Account not found")
         prev_locked_by = row["locked_by"]
-        # AutorizaciÃ³n: SA puede unlock cualquier cuenta; otros solo si son quien la bloqueÃ³
+        # Autorización: SA puede unlock cualquier cuenta; otros solo si son quien la bloqueó
         if user.get("role") != "superadmin":
             tg = str(user.get("telegram_id") or "")
             uname = str(user.get("username") or "").lower()
             owner = str(prev_locked_by or "").lower()
             if not prev_locked_by or (owner != tg and owner != uname):
-                raise HTTPException(403, "Solo puedes desbloquear cuentas que tÃº bloqueaste")
-        # A1: liberar SIEMPRE vÃ­a el liberador canÃ³nico (republica + limpia notif + broadcast).
+                raise HTTPException(403, "Solo puedes desbloquear cuentas que tú bloqueaste")
+        # A1: liberar SIEMPRE vía el liberador canónico (republica + limpia notif + broadcast).
         _release_account(c, account_id, row["email"], "unlock manual", prev_locked_by,
                          kind="unlock", who=user.get("username"))
     return {"id": account_id, "locked_by": None, "locked_until": None}
@@ -3173,7 +3085,7 @@ async def _sse_generator(ctx: dict):
             )
             yield msg
     except Exception as e:
-        _sse_log.warning(f"[SSE] q_id={q_id} excepciÃ³n no-Cancelled: {type(e).__name__}: {e}")
+        _sse_log.warning(f"[SSE] q_id={q_id} excepción no-Cancelled: {type(e).__name__}: {e}")
         raise
     finally:
         with _sse_lock:
@@ -3200,7 +3112,7 @@ async def events(user: dict = Depends(require_operator_view)):
 
 @app.get("/api/accounts/{account_id}/cards-pipe")
 def account_cards_pipe(account_id: int, _user: dict = Depends(require_session)):
-    """Devuelve solo las tarjetas en formato pipe (para tooltip rÃ¡pido)."""
+    """Devuelve solo las tarjetas en formato pipe (para tooltip rápido)."""
     with db() as c:
         acc = c.execute("SELECT email FROM accounts WHERE id=?", (account_id,)).fetchone()
         if not acc:
@@ -3220,7 +3132,7 @@ def account_cards_pipe(account_id: int, _user: dict = Depends(require_session)):
         if not (r["card_number"] and r["card_expiry"] and r["card_cvv"]):
             continue
         out.append({
-            # pipe CANÃ“NICO Ãºnico: NNNN|MM|YY|CVV (web_utils.canonical_card_pipe)
+            # pipe CANÓNICO único: NNNN|MM|YY|CVV (web_utils.canonical_card_pipe)
             "pipe": canonical_card_pipe(r["card_number"], r["card_expiry"], r["card_cvv"]),
             "approved": r["total_approved"] or 0,
             "deposits": r["total_deposits"] or 0,
@@ -3230,7 +3142,7 @@ def account_cards_pipe(account_id: int, _user: dict = Depends(require_session)):
 
 @app.get("/api/accounts/{account_id}/notes-summary")
 def account_notes_summary(account_id: int, user: dict = Depends(require_session)):
-    """Notas resumidas para tooltip â€” filtradas por user/SA."""
+    """Notas resumidas para tooltip — filtradas por user/SA."""
     role = user.get("role", "user")
     my_tg = int(user.get("telegram_id") or 0)
     with db() as c:
@@ -3258,19 +3170,19 @@ def account_notes_summary(account_id: int, user: dict = Depends(require_session)
 
 
 def _record_account_touch(account_id: int, account_email: str, actor_id) -> bool:
-    """Persiste el toque de auditorÃ­a (quiÃ©n abriÃ³ La Pantalla de quÃ© cuenta).
+    """Persiste el toque de auditoría (quién abrió La Pantalla de qué cuenta).
 
-    Dedup 1/dÃ­a por (account_id, actor_id, touched_date) â€” la constraint UNIQUE
+    Dedup 1/día por (account_id, actor_id, touched_date) — la constraint UNIQUE
     de `account_touches` lo garantiza a nivel BD; el INSERT OR IGNORE es idempotente.
 
-    Es una operaciÃ³n de escritura trivial pero, al correr en el path sÃ­ncrono de
+    Es una operación de escritura trivial pero, al correr en el path síncrono de
     `account_details` (read de alta concurrencia), choca con writes sostenidos por
-    el bot TG sobre la BD compartida â†’ `database is locked` sostenido (caza 2026-07-25,
-    instrumentaciÃ³n commit 3b59fe7). Por eso el caller la despacha fire-and-forget en
+    el bot TG sobre la BD compartida → `database is locked` sostenido (caza 2026-07-25,
+    instrumentación commit 3b59fe7). Por eso el caller la despacha fire-and-forget en
     un thread daemon: el request de account_details NO espera al touch.
 
     Devuelve True si el toque fue NUEVO (para que el caller decida broadcast SSE).
-    Traga OperationalError (lock) en silencio: perder un toque de bitÃ¡cora es
+    Traga OperationalError (lock) en silencio: perder un toque de bitácora es
     aceptable; bloquear la lectura de La Pantalla no.
     """
     try:
@@ -3295,8 +3207,8 @@ def _record_account_touch(account_id: int, account_email: str, actor_id) -> bool
 
 @app.get("/api/accounts/find-id")
 def account_find_id(email: str, _user: dict = Depends(require_session)):
-    """Resuelve el id numÃ©rico de una cuenta por email â€” usado por la consola
-    de Logs para redirigir al detalle de cuenta al hacer click en una lÃ­nea
+    """Resuelve el id numérico de una cuenta por email — usado por la consola
+    de Logs para redirigir al detalle de cuenta al hacer click en una línea
     (2026-07-31, click-through intuitivo desde logs)."""
     with db() as c:
         row = c.execute("SELECT id FROM accounts WHERE email=? LIMIT 1", (email,)).fetchone()
@@ -3319,7 +3231,7 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
             raise HTTPException(404, "Cuenta no encontrada")
         result = dict(acc)
 
-        # Si no hay CURP guardado o es 'N/A', calcular e iniciar autovalidaciÃ³n RENAPO en backend
+        # Si no hay CURP guardado o es 'N/A', calcular e iniciar autovalidación RENAPO en backend
         curp_stored = result.get("curp")
         if not curp_stored or curp_stored == "N/A":
             calc_curp = compute_curp(
@@ -3334,7 +3246,7 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                 address=result.get("address", "")
             )
 
-            # Tarea asÃ­ncrona en segundo plano para validar con RENAPO vÃ­a proxies y guardar en BD
+            # Tarea asíncrona en segundo plano para validar con RENAPO vía proxies y guardar en BD
             def _async_val_renapo(acc_id, fn, bd, addr):
                 try:
                     val_curp = asyncio.run(validate_renapo_curp(fn, bd, addr))
@@ -3384,7 +3296,7 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
         except sqlite3.OperationalError:
             result["transactions"] = []
 
-        # Intentos de depÃ³sito hechos desde el dashboard (con tarjeta usada)
+        # Intentos de depósito hechos desde el dashboard (con tarjeta usada)
         try:
             rows = c.execute(
                 "SELECT attempt_id, amount, status, rejection_reason, card_pipe, "
@@ -3397,7 +3309,7 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
         except sqlite3.OperationalError:
             result["deposit_attempts"] = []
 
-        # Notas â€” non-SA solo ve las propias; SA ve todas
+        # Notas — non-SA solo ve las propias; SA ve todas
         role = _user.get("role", "user")
         my_tg = int(_user.get("telegram_id") or 0)
         try:
@@ -3422,10 +3334,10 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
         except sqlite3.OperationalError:
             result["notes"] = []
 
-        # â”€â”€ Movimientos UNIFICADOS (dashboard + betmex) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # ── Movimientos UNIFICADOS (dashboard + betmex) ─────────────────────
         # Mezcla deposit_attempts (nuestros, source="dashboard") con
-        # account_transactions (de la pÃ¡gina, source="betmex"). Normaliza a un
-        # shape comÃºn y ordena por fecha DESC. NO sustituye a transactions/
+        # account_transactions (de la página, source="betmex"). Normaliza a un
+        # shape común y ordena por fecha DESC. NO sustituye a transactions/
         # deposit_attempts (se conservan arriba para compat); esto es additivo.
         #
         # Shape de cada item:
@@ -3460,11 +3372,11 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
 
             movimientos = []
 
-            # created_at de deposit_attempts se guarda en UTC naÃ¯ve (datetime.now(utc)/
-            # datetime('now') de SQLite). El frontend trata los timestamps naÃ¯ve como
-            # hora local MX â†’ mostraba las nuestras +6h. txn_date de BetMexico YA viene
+            # created_at de deposit_attempts se guarda en UTC naïve (datetime.now(utc)/
+            # datetime('now') de SQLite). El frontend trata los timestamps naïve como
+            # hora local MX → mostraba las nuestras +6h. txn_date de BetMexico YA viene
             # en hora MX (verificado: SPEI en BD coinciden con la franja horaria de la
-            # pÃ¡gina). Por eso convertimos SOLO created_at: UTC â†’ MX. Bonus: el sort por
+            # página). Por eso convertimos SOLO created_at: UTC → MX. Bonus: el sort por
             # `when` deja de mezclar UTC y MX (antes desordenaba entre fuentes).
             def _utc_to_mx(ts):
                 if not ts:
@@ -3482,7 +3394,7 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                 except Exception:
                     return ts
 
-            # Parseo laxo de timestamp â†’ datetime (para deduplicar por monto+tiempo).
+            # Parseo laxo de timestamp → datetime (para deduplicar por monto+tiempo).
             def _parse_when(ts):
                 if not ts:
                     return None
@@ -3497,21 +3409,21 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
             import re as _mv_re0_mod
             _mv_re0 = _mv_re0_mod.compile(r"\.\d+")
 
-            # DEDUP: un depÃ³sito con tarjeta hecho DESDE el dashboard (deposit_attempt)
-            # tambiÃ©n aparece luego en el historial de BetMexico como txn de tarjeta â†’
+            # DEDUP: un depósito con tarjeta hecho DESDE el dashboard (deposit_attempt)
+            # también aparece luego en el historial de BetMexico como txn de tarjeta →
             # doble registro del mismo evento. Aplica a APROBADOS (status 6) y RECHAZADOS
             # (status -4) por igual. Guardamos la firma de cada intento nuestro (monto +
-            # hora MX) para omitir su eco de BetMexico mÃ¡s abajo, emparejando por cercanÃ­a
-            # y CONSUMIENDO cada firma (montos repetidos no se dedup de mÃ¡s).
+            # hora MX) para omitir su eco de BetMexico más abajo, emparejando por cercanía
+            # y CONSUMIENDO cada firma (montos repetidos no se dedup de más).
             # "Es uno u otro": conservamos el NUESTRO (tiene operador + tarjeta usada).
             _dash_sigs = []   # [(amount_float, datetime_mx)]
 
-            # deposit_attempts â†’ siempre deposit, source dashboard
+            # deposit_attempts → siempre deposit, source dashboard
             for a in result.get("deposit_attempts", []):
                 st = (a.get("status") or "").lower()
                 reason_txt = a.get("rejection_reason") or ""
-                # 3DS = estado propio (Ã¡mbar): NO se acreditÃ³ pero NO es rechazo del
-                # banco â€” el procesador pidiÃ³ autenticaciÃ³n (Robert 2026-05-29).
+                # 3DS = estado propio (ámbar): NO se acreditó pero NO es rechazo del
+                # banco — el procesador pidió autenticación (Robert 2026-05-29).
                 # Guardamos/mostramos aunque BetMexico no liste la txn en su historial.
                 is_3ds = "3ds" in reason_txt.lower() or st == "threeds"
                 if st == "approved":
@@ -3524,7 +3436,7 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                             "gateway_error", "timeout", "ambiguous",
                             "incomplete", "error"):
                     # No-banco (rate-limit/infra/cuenta/nuestro lado): NO se atribuye
-                    # al banco ni se firma como txn (no llegÃ³ al gateway). El `reason`
+                    # al banco ni se firma como txn (no llegó al gateway). El `reason`
                     # da el detalle operativo (bug 2026-07-06).
                     state = "incomplete"
                 else:
@@ -3542,29 +3454,29 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                     "reason": reason_txt if state in ("fail", "threeds", "incomplete") else None,
                 })
                 # Firma para dedup: aprobados y rechazados se reflejan en BetMexico
-                # (status 6 y -4). Los 3DS/pending no generan txn â†’ no se firman.
-                # Guardamos tambiÃ©n el ESTADO (ok/fail): el eco debe COINCIDIR en estado.
-                # Sin esto, una firma 'fail' podÃ­a consumir un depÃ³sito APROBADO real y
-                # ocultarlo de la vista (fix 2026-07-03, auditorÃ­a hallazgo #2).
+                # (status 6 y -4). Los 3DS/pending no generan txn → no se firman.
+                # Guardamos también el ESTADO (ok/fail): el eco debe COINCIDIR en estado.
+                # Sin esto, una firma 'fail' podía consumir un depósito APROBADO real y
+                # ocultarlo de la vista (fix 2026-07-03, auditoría hallazgo #2).
                 if state in ("ok", "fail"):
                     try:
                         _dash_sigs.append((float(a.get("amount") or 0), _parse_when(when_mx), state))
                     except (TypeError, ValueError):
                         pass
 
-            # account_transactions â†’ betmex. txn_type 1=dep, 2=retiro.
+            # account_transactions → betmex. txn_type 1=dep, 2=retiro.
             # gateway 1=tarjeta, 2=SPEI, 3=OXXO. status 6=ok,0=pending,-4/5=fail.
             _gw_method = {1: "Pago con tarjeta", 2: "SPEI", 3: "OXXO"}
-            # Resolver etiquetas de integraciÃ³n para SPEI si existen en clabes
+            # Resolver etiquetas de integración para SPEI si existen en clabes
             spei_integrations = []
             for c_item in (result.get("clabes") or []):
                 integ = str(c_item.get("integration") or "").upper() if isinstance(c_item, dict) else ""
                 ord_v = c_item.get("clabe_order") if isinstance(c_item, dict) else None
                 if integ:
-                    label = f"SPEI Â· {integ}" + (f" Â· {ord_v}" if ord_v else "")
+                    label = f"SPEI · {integ}" + (f" · {ord_v}" if ord_v else "")
                     if label not in spei_integrations:
                         spei_integrations.append(label)
-            spei_default_label = spei_integrations[0] if spei_integrations else "SPEI Â· STP"
+            spei_default_label = spei_integrations[0] if spei_integrations else "SPEI · STP"
 
             for t in result.get("transactions", []):
                 is_wd = t.get("txn_type") == 2
@@ -3585,12 +3497,12 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                         state = "pending"
                     method_label = _gw_method.get(gw)
 
-                # DEDUP: si este depÃ³sito con tarjeta coincide (mismo monto + hora Â±3min
+                # DEDUP: si este depósito con tarjeta coincide (mismo monto + hora ±3min
                 # + MISMO ESTADO) con un intento hecho desde el dashboard, es el MISMO
-                # evento â†’ omitir el eco de BetMexico (ya estÃ¡ como movimiento nuestro).
-                # La coincidencia de ESTADO es clave: sin ella una firma 'fail' podÃ­a
-                # consumir un depÃ³sito APROBADO real y ocultarlo (fix 2026-07-03, hallazgo
-                # #2). Empareja con la firma MÃS CERCANA en tiempo del MISMO estado y la consume.
+                # evento → omitir el eco de BetMexico (ya está como movimiento nuestro).
+                # La coincidencia de ESTADO es clave: sin ella una firma 'fail' podía
+                # consumir un depósito APROBADO real y ocultarlo (fix 2026-07-03, hallazgo
+                # #2). Empareja con la firma MÁS CERCANA en tiempo del MISMO estado y la consume.
                 if (not is_wd and gw == 1 and state in ("ok", "fail") and _dash_sigs):
                     _tw = _parse_when(t.get("txn_date"))
                     try:
@@ -3621,9 +3533,9 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                     "reason": None,
                 })
 
-            # Orden DESC por fecha. Normaliza antes del sort: 'T'â†’espacio y
-            # microsegundos a 6 dÃ­gitos (la BD tiene casos con 5 dÃ­gitos como
-            # '.94907' que rompen el orden lexicogrÃ¡fico crudo entre fuentes).
+            # Orden DESC por fecha. Normaliza antes del sort: 'T'→espacio y
+            # microsegundos a 6 dígitos (la BD tiene casos con 5 dígitos como
+            # '.94907' que rompen el orden lexicográfico crudo entre fuentes).
             import re as _mv_re
             def _mv_sort_key(m):
                 w = (m.get("when") or "").replace("T", " ")
@@ -3636,14 +3548,14 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
             )
             result["movimientos"] = []
 
-        # Toque de cuenta (vigilancia: quiÃ©n metiÃ³ mano) â€” dedup 1/dÃ­a por usuario+cuenta.
-        # Fire-and-forget: el touch es un write de auditorÃ­a que NO debe bloquear la
-        # lectura de La Pantalla. Antes vivÃ­a sÃ­ncrono en `db(write=True)` y, bajo
-        # contenciÃ³n con el bot TG sobre la BD compartida, lanzaba `database is locked`
+        # Toque de cuenta (vigilancia: quién metió mano) — dedup 1/día por usuario+cuenta.
+        # Fire-and-forget: el touch es un write de auditoría que NO debe bloquear la
+        # lectura de La Pantalla. Antes vivía síncrono en `db(write=True)` y, bajo
+        # contención con el bot TG sobre la BD compartida, lanzaba `database is locked`
         # sostenido (caza 2026-07-25, commit 3b59fe7). Ahora corre en un thread daemon:
-        # el request sigue de inmediato; el touch persiste (o se pierde si hay lock â€”
-        # aceptable, es bitÃ¡cora, no transacciÃ³n). El broadcast SSE va dentro del thread
-        # para que solo dispare si el toque realmente entrÃ³.
+        # el request sigue de inmediato; el touch persiste (o se pierde si hay lock —
+        # aceptable, es bitácora, no transacción). El broadcast SSE va dentro del thread
+        # para que solo dispare si el toque realmente entró.
         actor_id = _user.get("telegram_id")
         if actor_id is not None:
             _acc_email = acc["email"]
@@ -3655,9 +3567,9 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                                 **_resolve_who(actor_id)})
             threading.Thread(target=_touch_task, daemon=True).start()
 
-        # Clabes de depÃ³sito SPEI (NVIO + STP) persistidas en BD. Se muestran en
+        # Clabes de depósito SPEI (NVIO + STP) persistidas en BD. Se muestran en
         # La Pantalla sin enmascarar (feedback_no_masking). NO se taladra la cuenta
-        # aquÃ­: solo se lee lo guardado; el fetch manual vive en POST .../clabes/refresh.
+        # aquí: solo se lee lo guardado; el fetch manual vive en POST .../clabes/refresh.
         try:
             rows = c.execute(
                 "SELECT clabe, integration, clabe_order, blocked, fetched_at, "
@@ -3670,7 +3582,7 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
         except sqlite3.OperationalError:
             result["clabes"] = []
 
-        # Retiro mÃ¡s reciente (SA-only en frontend; el dato en sÃ­ no es sensible).
+        # Retiro más reciente (SA-only en frontend; el dato en sí no es sensible).
         # Permite reabrir La Pantalla y ver/retomar el estado sin re-disparar.
         try:
             wd = c.execute(
@@ -3695,9 +3607,9 @@ class NoteCreate(BaseModel):
 def create_note(account_id: int, req: NoteCreate, user: dict = Depends(require_session)):
     text = (req.text or "").strip()
     if not text:
-        raise HTTPException(400, "Texto vacÃ­o")
+        raise HTTPException(400, "Texto vacío")
     if len(text) > 2000:
-        raise HTTPException(400, "Nota muy larga (mÃ¡x 2000)")
+        raise HTTPException(400, "Nota muy larga (máx 2000)")
     tg = int(user.get("telegram_id") or 0)
     name = user.get("display") or user.get("username") or "?"
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -3732,10 +3644,10 @@ class CurpUpdate(BaseModel):
 def update_curp(account_id: int, req: CurpUpdate, _user: dict = Depends(require_session)):
     """Guarda CURP validado manualmente por el operador."""
     curp = (req.curp or "").strip().upper()
-    # ValidaciÃ³n bÃ¡sica: 18 chars, formato general
+    # Validación básica: 18 chars, formato general
     import re
     if not re.match(r"^[A-Z]{4}\d{6}[HM][A-Z]{5}[0-9A-Z]\d$", curp):
-        raise HTTPException(400, "CURP invÃ¡lido (formato 18 chars)")
+        raise HTTPException(400, "CURP inválido (formato 18 chars)")
     with db(write=True) as c:
         cur = c.execute("UPDATE accounts SET curp=? WHERE id=?", (curp, account_id))
         if cur.rowcount == 0:
@@ -3743,11 +3655,11 @@ def update_curp(account_id: int, req: CurpUpdate, _user: dict = Depends(require_
     return {"id": account_id, "curp": curp}
 
 
-# â”€â”€ Clabes de depÃ³sito SPEI (NVIO + STP) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Clabes de depósito SPEI (NVIO + STP) ──────────────────────────────────────
 # Lectura desde BD (lo guardado por BeginDeposit). Accionable: el operador ve
 # las clabes en La Pantalla sin enmascarar, copiables con un click. El fetch
-# manual (POST .../clabes/refresh) lo dispara a propÃ³sito el operador â€” NUNCA se
-# llama BeginDeposit en cada refresh (alimentarÃ­a el rate-limit de BetMexico;
+# manual (POST .../clabes/refresh) lo dispara a propósito el operador — NUNCA se
+# llama BeginDeposit en cada refresh (alimentaría el rate-limit de BetMexico;
 # las clabes son FIJAS por usuario). Ver clabe_fetch.py + docs/RECON_BETMEX_API.md.
 @app.get("/api/accounts/{account_id}/clabes")
 def get_clabes(account_id: int, _user: dict = Depends(require_session)):
@@ -3765,7 +3677,7 @@ def get_clabes(account_id: int, _user: dict = Depends(require_session)):
 @app.post("/api/accounts/{account_id}/clabes/refresh")
 async def refresh_clabes(account_id: int, _user: dict = Depends(require_session)):
     """Dispara BeginDeposit con JWT+proxy y persiste las clabes en BD.
-    AcciÃ³n manual del operador (no automÃ¡tica en cada refresh)."""
+    Acción manual del operador (no automática en cada refresh)."""
     try:
         import clabe_fetch as _cf
         result = await _cf.refresh_clabes_for_account(str(DB_PATH), account_id)
@@ -3776,22 +3688,22 @@ async def refresh_clabes(account_id: int, _user: dict = Depends(require_session)
     return result
 
 
-# â”€â”€ Retiro automÃ¡tico (botÃ³n SA en La Pantalla) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# 5 pasos vÃ­a withdrawals.py. bug#1: cuenta de retiro puede cambiar por depÃ³sito
-# SPEI reciente (NUNCA cachear). bug#2: status:6 de BetMexico != aterrizÃ³ en el
+# ── Retiro automático (botón SA en La Pantalla) ───────────────────────────────
+# 5 pasos vía withdrawals.py. bug#1: cuenta de retiro puede cambiar por depósito
+# SPEI reciente (NUNCA cachear). bug#2: status:6 de BetMexico != aterrizó en el
 # banco (reportar 2 fases). bug#3: puede aterrizar en tarjeta en vez de SPEI.
 # Ver docs/superpowers/specs/2026-07-24-boton-retiro-automatico-design.md.
 
 def _persist_withdrawal(account_id: int, disparado_por, result: dict) -> None:
-    # Robert, campo 2026-07-25: BetMexico YA ejecutÃ³ el retiro real (execute_withdrawal,
-    # arriba en withdraw()) antes de que esta funciÃ³n corra â€” este INSERT es el ÃšNICO
+    # Robert, campo 2026-07-25: BetMexico YA ejecutó el retiro real (execute_withdrawal,
+    # arriba en withdraw()) antes de que esta función corra — este INSERT es el ÚNICO
     # rastro local de un movimiento de dinero real. Un "database is locked" transitorio
-    # aquÃ­ (el connect-level timeout=10s de db() ya expirÃ³ una vez en prod, ver
-    # docs/ERRORS.md) NO puede tirar el registro silenciosamente: perderÃ­amos la
-    # trazabilidad de un retiro que sÃ­ saliÃ³, dejando al operador viendo un 500 sin
-    # saber si el dinero se moviÃ³. Retry con backoff â€” cada intento abre su propia
-    # conexiÃ³n (su propio timeout=10s), dÃ¡ndole varios intentos de 10s a un writer
-    # que sostiene el lock mÃ¡s tiempo del normal, en vez de rendirse a la primera.
+    # aquí (el connect-level timeout=10s de db() ya expiró una vez en prod, ver
+    # docs/ERRORS.md) NO puede tirar el registro silenciosamente: perderíamos la
+    # trazabilidad de un retiro que sí salió, dejando al operador viendo un 500 sin
+    # saber si el dinero se movió. Retry con backoff — cada intento abre su propia
+    # conexión (su propio timeout=10s), dándole varios intentos de 10s a un writer
+    # que sostiene el lock más tiempo del normal, en vez de rendirse a la primera.
     now = datetime.now(timezone.utc).isoformat()
     _lg = _logging.getLogger("betmexico.dashboard.withdrawals")
     attempts = 5
@@ -3819,14 +3731,14 @@ def _persist_withdrawal(account_id: int, disparado_por, result: dict) -> None:
         except sqlite3.OperationalError as e:
             if "database is locked" not in str(e) or attempt == attempts:
                 _lg.error(
-                    f"[withdraw] PERSIST FAILED tras {attempt} intento(s) â€” retiro real "
+                    f"[withdraw] PERSIST FAILED tras {attempt} intento(s) — retiro real "
                     f"transactionId={result.get('transactionId')} amount={result.get('amount')} "
                     f"account_id={account_id} SIN registrar en account_withdrawals: {e}"
                 )
                 raise
             _lg.warning(
-                f"[withdraw] persist intento {attempt}/{attempts} chocÃ³ con lock, "
-                f"reintentando en {attempt}s â€” transactionId={result.get('transactionId')}"
+                f"[withdraw] persist intento {attempt}/{attempts} chocó con lock, "
+                f"reintentando en {attempt}s — transactionId={result.get('transactionId')}"
             )
             time.sleep(attempt)
 
@@ -3843,7 +3755,7 @@ async def withdraw(account_id: int, payload: dict, user: dict = Depends(require_
     try:
         amount = float(payload.get("amount"))
     except (TypeError, ValueError):
-        raise HTTPException(400, "amount invÃ¡lido")
+        raise HTTPException(400, "amount inválido")
     if amount <= 0:
         raise HTTPException(400, "amount debe ser > 0")
     try:
@@ -3853,16 +3765,16 @@ async def withdraw(account_id: int, payload: dict, user: dict = Depends(require_
     except InsufficientBalance as e:
         raise HTTPException(409, str(e))
     except NoApprovedWithdrawalAccount:
-        raise HTTPException(409, "Sin cuenta de retiro aprobada: requiere SPEI de depÃ³sito primero")
+        raise HTTPException(409, "Sin cuenta de retiro aprobada: requiere SPEI de depósito primero")
     except MultipleApprovedAccounts as e:
         raise HTTPException(409, str(e))
     except ConcurrentWithdrawalPending:
         raise HTTPException(409, "Ya hay un retiro pendiente en esta cuenta")
-    # A partir de aquÃ­ el retiro YA SE EJECUTÃ“ de verdad en BetMexico (execute_withdrawal
-    # ya corriÃ³) â€” lo que sigue es solo nuestro registro local. Si _persist_withdrawal
-    # agota sus reintentos (bug de campo 2026-07-25: "database is locked" tumbÃ³ el INSERT
-    # y el operador vio un 500 sin saber si el dinero se moviÃ³), NO devolvemos un 500
-    # genÃ©rico que lee como "el retiro fallÃ³" â€” el retiro SÃ saliÃ³. Devolvemos 200 con
+    # A partir de aquí el retiro YA SE EJECUTÓ de verdad en BetMexico (execute_withdrawal
+    # ya corrió) — lo que sigue es solo nuestro registro local. Si _persist_withdrawal
+    # agota sus reintentos (bug de campo 2026-07-25: "database is locked" tumbó el INSERT
+    # y el operador vio un 500 sin saber si el dinero se movió), NO devolvemos un 500
+    # genérico que lee como "el retiro falló" — el retiro SÍ salió. Devolvemos 200 con
     # persisted:false + el transactionId real para que el operador pueda reconciliar a
     # mano, en vez de dejarlo a ciegas.
     persisted = True
@@ -3870,8 +3782,8 @@ async def withdraw(account_id: int, payload: dict, user: dict = Depends(require_
         _persist_withdrawal(account_id, user.get("telegram_id"), result)
     except sqlite3.OperationalError:
         persisted = False
-    # Refresh post-retiro (handoff 2026-08-05 Â§2.3): el retiro ya se ejecutÃ³ en
-    # BetMexico â€” traemos el saldo post-retiro a BD de inmediato reusando el JWT
+    # Refresh post-retiro (handoff 2026-08-05 §2.3): el retiro ya se ejecutó en
+    # BetMexico — traemos el saldo post-retiro a BD de inmediato reusando el JWT
     # que ya tiene execute_withdrawal (sin gastar captcha). No-throws.
     await _refresh_account_after_withdrawal(
         result.get("account_email"), result.get("_jwt"),
@@ -3909,11 +3821,8 @@ async def withdraw_status(account_id: int, tx_id: str, user: dict = Depends(requ
     try:
         import proxy_pool as _pp
         proxy_url = _pp.build_admin_proxy_url()
-    except Exception as e:
-        import logging as _lg
-        _lg.getLogger("betmexico.dashboard.withdrawals").warning(
-            f"[withdrawal] proxy_pool.build_admin_proxy_url failed, proceeding without proxy: {e}"
-        )
+    except Exception:
+        pass
 
     out = await resolve_withdrawal_status(
         jwt=jwt,
@@ -3984,7 +3893,7 @@ def accounts_combos(req: CombosRequest, user: dict = Depends(require_session)):
 
 @app.get("/api/accounts/pass-map")
 def accounts_pass_map(user: dict = Depends(require_session)):
-    """Mapa emailâ†’password acotado al universo del caller (SA = todos)."""
+    """Mapa email→password acotado al universo del caller (SA = todos)."""
     with db() as c:
         vis = _visible_emails(user, c)
         rows = c.execute("SELECT email, password FROM accounts WHERE password IS NOT NULL").fetchall()
@@ -4032,11 +3941,8 @@ def list_all_cards(user: dict = Depends(require_session)):
                     "total_rejected": r["total_rejected"] or 0,
                     "status": r["status"] or "ACTIVE",
                 })
-        except sqlite3.OperationalError as e:
-            import logging as _lg
-            _lg.getLogger("betmexico.dashboard.migration").warning(
-                f"[migration] query account_cards: {e}"
-            )
+        except sqlite3.OperationalError:
+            pass
         # 2) account_notes con card (no duplicados ya en account_cards)
         try:
             rows = c.execute(
@@ -4069,11 +3975,8 @@ def list_all_cards(user: dict = Depends(require_session)):
                     "total_rejected": 0,
                     "status": r["note_type"] or "note",
                 })
-        except sqlite3.OperationalError as e:
-            import logging as _lg
-            _lg.getLogger("betmexico.dashboard.migration").warning(
-                f"[migration] query account_notes cards: {e}"
-            )
+        except sqlite3.OperationalError:
+            pass
     return {"rows": out, "total": len(out)}
 
 
@@ -4083,8 +3986,8 @@ def activity_feed(
     operator_id: Optional[int] = None,
     user: dict = Depends(require_session),
 ):
-    """Feed unificado: depÃ³sitos + locks activos + prewarms.
-    SA ve todo por defecto; user/admin ve solo lo suyo (su bitÃ¡cora personal).
+    """Feed unificado: depósitos + locks activos + prewarms.
+    SA ve todo por defecto; user/admin ve solo lo suyo (su bitácora personal).
     SA puede pasar operator_id para filtrar."""
     events: list[dict] = []
     role = user.get("role", "user")
@@ -4095,7 +3998,7 @@ def activity_feed(
         op_filter = int(user.get("telegram_id") or 0)
 
     with db() as c:
-        # Cache email â†’ password para target=combo
+        # Cache email → password para target=combo
         pw_cache: dict[str, str] = {}
         def _combo(email: str) -> str:
             if not email: return ""
@@ -4107,7 +4010,7 @@ def activity_feed(
             pw = pw_cache.get(email) or ""
             return f"{email}:{pw}" if pw else email
 
-        # DepÃ³sitos
+        # Depósitos
         try:
             sql = (
                 "SELECT account_email, amount, status, rejection_reason, "
@@ -4128,13 +4031,10 @@ def activity_feed(
                     "amount": r["amount"], "status": r["status"],
                     "reason": r["rejection_reason"], "duration_ms": r["duration_ms"],
                 })
-        except sqlite3.OperationalError as e:
-            import logging as _lg
-            _lg.getLogger("betmexico.dashboard.migration").warning(
-                f"[migration] query deposit_attempts activity feed: {e}"
-            )
+        except sqlite3.OperationalError:
+            pass
 
-        # Locks activos (ACCOUNTS â€” solo los actualmente bloqueados)
+        # Locks activos (ACCOUNTS — solo los actualmente bloqueados)
         sql = "SELECT email, locked_by, locked_at FROM accounts WHERE locked_by IS NOT NULL "
         params = []
         if op_filter is not None:
@@ -4150,7 +4050,7 @@ def activity_feed(
                 "target": _combo(r["email"]),
             })
 
-        # Notas (de los usuarios â€” bitÃ¡cora visible para uno mismo, SA ve todas)
+        # Notas (de los usuarios — bitácora visible para uno mismo, SA ve todas)
         try:
             sql = (
                 "SELECT id, account_email, note_text, created_by, created_by_name, created_at "
@@ -4171,14 +4071,11 @@ def activity_feed(
                     "text": (r["note_text"] or "")[:160],
                     "id": r["id"],
                 })
-        except sqlite3.OperationalError as e:
-            import logging as _lg
-            _lg.getLogger("betmexico.dashboard.migration").warning(
-                f"[migration] query account_notes activity feed: {e}"
-            )
+        except sqlite3.OperationalError:
+            pass
 
         # Prewarms eliminados del feed (2026-07-26): ruido operacional interno.
-        # Quedan en process_log para auditorÃ­a; no se sirven en el feed.
+        # Quedan en process_log para auditoría; no se sirven en el feed.
 
     events.sort(key=lambda e: str(e.get("ts", "")), reverse=True)
     return {"feed": events[:limit]}
@@ -4246,15 +4143,15 @@ def deposits_stats(_user: dict = Depends(require_session)):
         }
 
 
-# â”€â”€â”€ Modo auto-depÃ³sito V2 (Task C) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── Modo auto-depósito V2 (Task C) ─────────────────────────────────────────
 # Plan: docs/superpowers/plans/2026-07-28-modo-auto-deposito-v2.md.
 # Imports de auto_deposit/deposits SIEMPRE lazy dentro del body (regla 10 del
-# plan â€” evita el ciclo app â†’ auto_deposit â†’ deposits â†’ app).
+# plan — evita el ciclo app → auto_deposit → deposits → app).
 
 def _persist_auto_mission(mission_id, operator_id, card_pipes, amount,
                           target_count, plan):
-    """INSERT de la misiÃ³n auto en `auto_missions` (tabla creada en `_migrate()`,
-    Task A). status='pending' â€” el orquestador la mueve a matching/scheduling/
+    """INSERT de la misión auto en `auto_missions` (tabla creada en `_migrate()`,
+    Task A). status='pending' — el orquestador la mueve a matching/scheduling/
     completed. Las listas van serializadas a JSON (card_pipes pegados,
     accounts_selected = ids, matches = {account_id, card_pipe, email})."""
     now = datetime.now(timezone.utc).isoformat()
@@ -4325,7 +4222,7 @@ async def auto_deposit_create(request: Request,
                               user: dict = Depends(require_session)):
     if user.get("role") != "superadmin":
         raise HTTPException(403, "Solo superadmin")
-    # Lazy: caps + semÃ¡foro de misiones (necesarios para validaciÃ³n)
+    # Lazy: caps + semáforo de misiones (necesarios para validación)
     from deposits import DEP_MAX_PER_TXN, DEP_MAX_24H, _mission_sem, _parse_pipe  # noqa: F401
     body = await request.json()
     card_pipes = body.get("card_pipes", [])
@@ -4340,7 +4237,7 @@ async def auto_deposit_create(request: Request,
     if amount * target_count > DEP_MAX_24H:
         raise HTTPException(400, f"Total ${amount * target_count} excede cap 24h ${DEP_MAX_24H}")
     if _mission_sem.locked():                               # fail-fast, no encolar
-        raise HTTPException(429, "Misiones activas â€” intenta cuando terminen")
+        raise HTTPException(429, "Misiones activas — intenta cuando terminen")
     # Lazy: planner + orquestador (run_auto_mission la implementa Task D)
     from auto_deposit import plan_auto_mission, run_auto_mission
     plan = plan_auto_mission(DB_PATH, card_pipes, amount, target_count)
@@ -4370,9 +4267,9 @@ def auto_deposit_cancel(mission_id: str,
             "SELECT status FROM auto_missions WHERE mission_id=?", (mission_id,)
         ).fetchone()
         if not row:
-            raise HTTPException(404, "MisiÃ³n no encontrada")
+            raise HTTPException(404, "Misión no encontrada")
         if row["status"] in ("completed", "cancelled", "failed"):
-            # Ya terminal â€” no-op idempotente (el orquestador ya cerrÃ³)
+            # Ya terminal — no-op idempotente (el orquestador ya cerró)
             return {"mission_id": mission_id, "status": row["status"],
                     "changed": False}
         # Cancel cooperativo: el orquestador lee este status entre iteraciones
@@ -4392,24 +4289,24 @@ def auto_deposit_cancel(mission_id: str,
 
 @app.get("/api/operator/my-accounts")
 def operator_my_accounts(user: dict = Depends(require_operator_view)):
-    """Cuentas del operador: en proceso (lockeadas por Ã©l) o con depÃ³sito aprobado
-    Y saldo real > 0 todavÃ­a retirable. DepÃ³sito fallido o cuenta ya retirada por
+    """Cuentas del operador: en proceso (lockeadas por él) o con depósito aprobado
+    Y saldo real > 0 todavía retirable. Depósito fallido o cuenta ya retirada por
     completo desaparecen de su vista/control (regla de producto, Robert 2026-08-05).
-    Nota: balance_real se actualiza sÃ­ncrono en el depÃ³sito pero NO en el retiro
-    (ver withdrawals.py) â€” hay lag hasta el prÃ³ximo ciclo de account_refresh.py
-    entre "se retirÃ³ todo" y que la cuenta desaparezca de este endpoint."""
+    Nota: balance_real se actualiza síncrono en el depósito pero NO en el retiro
+    (ver withdrawals.py) — hay lag hasta el próximo ciclo de account_refresh.py
+    entre "se retiró todo" y que la cuenta desaparezca de este endpoint."""
     operator_id = user.get("telegram_id") or 0
     is_sa = user.get("role") == "superadmin"
     # Ventana de "en proceso" para el lock propio (bug reportado por Robert,
     # 2026-08-06): un lock de operador normal se autolimpia solo (locked_until
     # 2-4h, watchdogs de app.py liberan cuando locked_until<=now). Un lock de
     # SA (RESERVADA_SA, deposits.py:_auto_lock_for_deposit) deja locked_until
-    # NULL a propÃ³sito â€” ningÃºn watchdog lo toca, asÃ­ que sin este filtro se
+    # NULL a propósito — ningún watchdog lo toca, así que sin este filtro se
     # acumula para siempre y la vista propia del SA deja de reflejar "lo que
-    # estoy procesando ahorita" (112 cuentas de 5+ semanas en producciÃ³n).
-    # locked_at IS NULL se trata como reciente (fail-open): ningÃºn camino real
+    # estoy procesando ahorita" (112 cuentas de 5+ semanas en producción).
+    # locked_at IS NULL se trata como reciente (fail-open): ningún camino real
     # de lock deja locked_at sin setear, solo pasa en fixtures de test.
-    # No toca locked_until/RESERVADA_SA â€” la cuenta sigue reservada para pool
+    # No toca locked_until/RESERVADA_SA — la cuenta sigue reservada para pool
     # y refresh, solo deja de contar como "en proceso" en esta vista.
     from deposits import AUTOLOCK_HOURS_SCHEDULED
     lock_recency_window = f"-{AUTOLOCK_HOURS_SCHEDULED} hours"
@@ -4431,14 +4328,14 @@ def operator_my_accounts(user: dict = Depends(require_operator_view)):
             ).fetchall()
         else:
             op_str = str(operator_id)
-            # Piso de $1 en la pierna de "depÃ³sito aprobado con saldo" (bug
+            # Piso de $1 en la pierna de "depósito aprobado con saldo" (bug
             # reportado por Robert, 2026-08-06, ronda 2): sin piso, saldo
             # polvo ($0.01-$0.94, nunca retirado por completo) se quedaba en
-            # "en proceso" para siempre â€” no hay minimo documentado de
-            # BetMexico (grep en bundle/docs/flags.betmexico.mx no encontrÃ³
-            # uno), asÃ­ que el corte se sacÃ³ de los datos reales de prod: los
-            # 31 residuales de esta vista tenÃ­an un hueco limpio entre $0.94
-            # y $2.57, ningÃºn caso ambiguo entre esos dos valores.
+            # "en proceso" para siempre — no hay minimo documentado de
+            # BetMexico (grep en bundle/docs/flags.betmexico.mx no encontró
+            # uno), así que el corte se sacó de los datos reales de prod: los
+            # 31 residuales de esta vista tenían un hueco limpio entre $0.94
+            # y $2.57, ningún caso ambiguo entre esos dos valores.
             rows = c.execute(
                 "SELECT DISTINCT a.id, a.email, a.balance_real, a.balance_bonos, "
                 "a.last_deposit_amount, a.last_deposit_date, a.grade, "
@@ -4462,19 +4359,19 @@ def operator_my_accounts(user: dict = Depends(require_operator_view)):
             d["is_locked"] = bool(d.get("locked_by"))
             d["withdrawal_ready"] = bool(d.get("withdrawal_ready"))
             # bug BANAMEX-vs-INBURSA (Robert, 2026-08-08): `accounts.withdrawal_institution`
-            # es un cache de "cuenta APROBADA por BetMexico para un FUTURO retiro" â€”
+            # es un cache de "cuenta APROBADA por BetMexico para un FUTURO retiro" —
             # lo reescribe account_refresh.py en cada ciclo con SU PROPIA llamada
             # independiente a get_bank_accounts (account_refresh.py:_db_set_withdrawal_ready),
             # totalmente desacoplada de cualquier retiro ya disparado. 7e94e1f (2026-08-07)
-            # cerrÃ³ la RACE en el instante de disparo (execute_withdrawal persiste su propio
+            # cerró la RACE en el instante de disparo (execute_withdrawal persiste su propio
             # resultado), pero el siguiente ciclo de account_refresh.py lo vuelve a pisar con
             # lo que BetMexico reporte como "aprobado" EN ESE MOMENTO, que puede diferir de a
-            # dÃ³nde fue el dinero realmente (medido en prod: cuenta a323440@uach.mx, badge
-            # quedÃ³ en "BANAMEX" mientras las Ãºltimas 5 retiros reales â€” account_withdrawals,
-            # institution_name â€” fueron todos a "INBURSA"). `account_withdrawals.institution_name`
-            # SÃ es un registro inmutable por transacciÃ³n (nunca se reescribe) â€” es la fuente
-            # real de "a dÃ³nde fue el Ãºltimo retiro". Si existe, gana sobre el cache de
-            # readiness; si no hay retiros aÃºn, cae al cache (Ãºnica seÃ±al disponible).
+            # dónde fue el dinero realmente (medido en prod: cuenta a323440@uach.mx, badge
+            # quedó en "BANAMEX" mientras las últimas 5 retiros reales — account_withdrawals,
+            # institution_name — fueron todos a "INBURSA"). `account_withdrawals.institution_name`
+            # SÍ es un registro inmutable por transacción (nunca se reescribe) — es la fuente
+            # real de "a dónde fue el último retiro". Si existe, gana sobre el cache de
+            # readiness; si no hay retiros aún, cae al cache (única señal disponible).
             last_wd_inst = d.pop("last_wd_institution", None)
             if last_wd_inst:
                 d["withdrawal_institution"] = last_wd_inst
@@ -4509,7 +4406,7 @@ def operator_release_account(account_id: int,
 async def operator_withdraw(account_id: int,
                            payload: dict,
                            user: dict = Depends(require_operator_view)):
-    """Retiro sin password â€” valida ownership, usa JWT en BD."""
+    """Retiro sin password — valida ownership, usa JWT en BD."""
     from withdrawals import (
         execute_withdrawal, JwtExpired, InsufficientBalance,
         NoApprovedWithdrawalAccount, MultipleApprovedAccounts,
@@ -4529,7 +4426,7 @@ async def operator_withdraw(account_id: int,
     try:
         amount = float(payload.get("amount"))
     except (TypeError, ValueError):
-        raise HTTPException(400, "amount invÃ¡lido")
+        raise HTTPException(400, "amount inválido")
     if amount <= 0:
         raise HTTPException(400, "amount debe ser > 0")
     try:
@@ -4539,7 +4436,7 @@ async def operator_withdraw(account_id: int,
     except InsufficientBalance as e:
         raise HTTPException(409, str(e))
     except NoApprovedWithdrawalAccount:
-        raise HTTPException(409, "Sin cuenta de retiro aprobada: requiere SPEI de depÃ³sito primero")
+        raise HTTPException(409, "Sin cuenta de retiro aprobada: requiere SPEI de depósito primero")
     except MultipleApprovedAccounts as e:
         raise HTTPException(409, str(e))
     except ConcurrentWithdrawalPending:
@@ -4549,10 +4446,10 @@ async def operator_withdraw(account_id: int,
         _persist_withdrawal(account_id, user.get("telegram_id"), result)
     except sqlite3.OperationalError:
         persisted = False
-    # Refresh post-retiro (handoff 2026-08-05 Â§2.3): el retiro ya se ejecutÃ³ en
-    # BetMexico â€” traemos el saldo post-retiro a BD de inmediato reusando el JWT
+    # Refresh post-retiro (handoff 2026-08-05 §2.3): el retiro ya se ejecutó en
+    # BetMexico — traemos el saldo post-retiro a BD de inmediato reusando el JWT
     # que ya tiene execute_withdrawal (sin gastar captcha). No-throws: un fallo
-    # acÃ¡ no debe afectar el resultado del retiro ya emitido.
+    # acá no debe afectar el resultado del retiro ya emitido.
     await _refresh_account_after_withdrawal(
         result.get("account_email"), result.get("_jwt"),
         result.get("_proxy_url"), user.get("telegram_id") or 0)
@@ -4597,7 +4494,7 @@ def auto_deposit_status(mission_id: str,
             "SELECT * FROM auto_missions WHERE mission_id=?", (mission_id,)
         ).fetchone()
     if not row:
-        raise HTTPException(404, "MisiÃ³n no encontrada")
+        raise HTTPException(404, "Misión no encontrada")
     d = dict(row)
     for k in ("card_pipes", "accounts_selected", "matches"):
         d[k] = _json.loads(d.get(k) or "[]")
@@ -4642,50 +4539,50 @@ def register_operator_strike(operator_id: int, reason: str = "bank_rejected"):
 
 @app.get("/api/bot/start")
 def bot_start_info(user: dict = Depends(require_session)):
-    """MenÃº principal /start adaptado con saludos dinÃ¡micos y comandos limitados."""
+    """Menú principal /start adaptado con saludos dinámicos y comandos limitados."""
     import random
     greetings = [
-        "Un dÃ­a mÃ¡s en la trinchera. A darle con fe.",
+        "Un día más en la trinchera. A darle con fe.",
         "Listos para mover cuentas y mantener la pasarela limpia.",
         "Monitoreo activo. La disciplina le gana al desmadre.",
-        "Otra sesiÃ³n sin aviso previo. Muy tÃº.",
-        "Todo listo para la acciÃ³n. Vamos por esos matches."
+        "Otra sesión sin aviso previo. Muy tú.",
+        "Todo listo para la acción. Vamos por esos matches."
     ]
     greeting = random.choice(greetings)
     tg_id = user.get("telegram_id") or 0
     display_name = user.get("display") or user.get("username") or "Operador"
 
     msg = (
-        f"â” ðŸŒµðŸ‡²ðŸ‡½ <b>Botmexico.net</b> ðŸ‡²ðŸ‡½ðŸŒµâ”â”“\n\n"
-        f"Hola, {display_name} ðŸŒ®\n"
+        f"┏ 🌵🇲🇽 <b>Botmexico.net</b> 🇲🇽🌵━┓\n\n"
+        f"Hola, {display_name} 🌮\n"
         f"Telegram ID: <code>{tg_id}</code>\n\n"
         f"<i>\"{greeting}\"</i>\n\n"
-        f"ðŸ“Ž <b>Comandos Habilitados:</b>\n"
-        f"â€¢ <b>/start</b>: Inicia el panel principal.\n"
-        f"â€¢ <b>/check</b>: Ingresar y alimentar cuentas con chequeo (MÃ­n: 10, MÃ¡x texto: 100, MÃ¡x archivo: 1000).\n"
-        f"â€¢ <b>/bet</b>: Iniciar el proceso de matchmaking y depÃ³sitos automÃ¡ticos (1 a 4 tarjetas por intento).\n"
-        f"â€¢ <b>/info</b>: Ver tus estadÃ­sticas personales de depÃ³sitos exitosos, BINes efectivos y cuentas alimentadas.\n"
-        f"â€¢ <b>/help</b>: GuÃ­a informativa y consejos operativos sobre el uso responsable de captchas y proxies.\n"
-        f"â€¢ <b>/cancel</b>: Aborta el proceso o misiÃ³n activa actual.\n\n"
-        f"âš ï¸ <b>LÃ­mites de Carga:</b>\n"
-        f"â€¢ MÃ­nimo 10 combos por check.\n"
-        f"â€¢ MÃ¡ximo 100 combos pegados en texto.\n"
-        f"â€¢ MÃ¡ximo 1,000 combos en archivos (.txt/.csv).\n\n"
-        f"ðŸ“Š <b>Estados de Cuentas:</b>\n"
-        f"â€¢ <b>LIVE âœ…</b>: Cuenta activa y verificada, lista para trabajar.\n"
-        f"â€¢ <b>DEAD âŒ</b>: No sirve (login fallÃ³ o bloqueada por pasarela).\n\n"
-        f"ðŸŒ <b>Web Dashboard:</b>\n"
-        f"BÃºsqueda, historial, depÃ³sitos y gestiÃ³n completa desde https://botmexico.net"
+        f"📎 <b>Comandos Habilitados:</b>\n"
+        f"• <b>/start</b>: Inicia el panel principal.\n"
+        f"• <b>/check</b>: Ingresar y alimentar cuentas con chequeo (Mín: 10, Máx texto: 100, Máx archivo: 1000).\n"
+        f"• <b>/bet</b>: Iniciar el proceso de matchmaking y depósitos automáticos (1 a 4 tarjetas por intento).\n"
+        f"• <b>/info</b>: Ver tus estadísticas personales de depósitos exitosos, BINes efectivos y cuentas alimentadas.\n"
+        f"• <b>/help</b>: Guía informativa y consejos operativos sobre el uso responsable de captchas y proxies.\n"
+        f"• <b>/cancel</b>: Aborta el proceso o misión activa actual.\n\n"
+        f"⚠️ <b>Límites de Carga:</b>\n"
+        f"• Mínimo 10 combos por check.\n"
+        f"• Máximo 100 combos pegados en texto.\n"
+        f"• Máximo 1,000 combos en archivos (.txt/.csv).\n\n"
+        f"📊 <b>Estados de Cuentas:</b>\n"
+        f"• <b>LIVE ✅</b>: Cuenta activa y verificada, lista para trabajar.\n"
+        f"• <b>DEAD ❌</b>: No sirve (login falló o bloqueada por pasarela).\n\n"
+        f"🌐 <b>Web Dashboard:</b>\n"
+        f"Búsqueda, historial, depósitos y gestión completa desde https://botmexico.net"
     )
     return {"ok": True, "message": msg}
 
 
 @app.get("/api/bot/info")
 def bot_operator_info(user: dict = Depends(require_session)):
-    """EstadÃ­sticas operativas personalizadas para /info (resumen compacto sin internals)."""
+    """Estadísticas operativas personalizadas para /info (resumen compacto sin internals)."""
     operator_id = user.get("telegram_id") or 0
     with db() as c:
-        # Cuentas con depÃ³sitos exitosos del operador
+        # Cuentas con depósitos exitosos del operador
         dep_rows = c.execute(
             "SELECT COUNT(DISTINCT account_email) as count, COALESCE(SUM(amount), 0) as total "
             "FROM deposit_attempts WHERE operator_id=? AND status='approved'",
@@ -4701,7 +4598,7 @@ def bot_operator_info(user: dict = Depends(require_session)):
         ).fetchone()
         strikes_used = pen_row["strikes_count"] if pen_row else 0
 
-        # Top 3 BINes con mejor tasa de aprobaciÃ³n histÃ³rica
+        # Top 3 BINes con mejor tasa de aprobación histórica
         top_bines = c.execute(
             "SELECT bin, approved_count, total_attempts, "
             "(CAST(approved_count AS FLOAT) / MAX(total_attempts, 1)) * 100 as rate "
@@ -4711,13 +4608,13 @@ def bot_operator_info(user: dict = Depends(require_session)):
     bines_text = ", ".join([f"<code>{b['bin']}</code> ({int(b['rate'])}%)" for b in top_bines]) if top_bines else "Sin data suficiente"
 
     msg = (
-        f"ðŸ“Š <b>ESTADÃSTICAS DEL OPERADOR</b>\n"
+        f"📊 <b>ESTADÍSTICAS DEL OPERADOR</b>\n"
         f"----------------------------------------\n"
-        f"ðŸ‘¤ <b>Telegram ID:</b> <code>{operator_id}</code>\n"
-        f"âœ… <b>Cuentas depositadas exitosamente:</b> <b>{dep_rows['count']}</b> (${dep_rows['total']:,.2f} MXN)\n"
-        f"âš¡ <b>BINes mÃ¡s efectivos:</b> {bines_text}\n"
-        f"ðŸŒ <b>Cuentas LIVE disponibles en Pool:</b> <b>{live_count}</b>\n"
-        f"ðŸŽ¯ <b>Strikes usados hoy:</b> <b>{strikes_used}/5</b>\n"
+        f"👤 <b>Telegram ID:</b> <code>{operator_id}</code>\n"
+        f"✅ <b>Cuentas depositadas exitosamente:</b> <b>{dep_rows['count']}</b> (${dep_rows['total']:,.2f} MXN)\n"
+        f"⚡ <b>BINes más efectivos:</b> {bines_text}\n"
+        f"🌐 <b>Cuentas LIVE disponibles en Pool:</b> <b>{live_count}</b>\n"
+        f"🎯 <b>Strikes usados hoy:</b> <b>{strikes_used}/5</b>\n"
         f"----------------------------------------"
     )
     return {"ok": True, "message": msg}
@@ -4725,25 +4622,25 @@ def bot_operator_info(user: dict = Depends(require_session)):
 
 @app.get("/api/bot/help")
 def bot_help_info(user: dict = Depends(require_session)):
-    """GuÃ­a informativa /help orientada al uso operativo responsable."""
+    """Guía informativa /help orientada al uso operativo responsable."""
     msg = (
-        f"ðŸ’¡ <b>GUÃA INFORMATIVA OPERATIVA (/help)</b>\n"
+        f"💡 <b>GUÍA INFORMATIVA OPERATIVA (/help)</b>\n"
         f"----------------------------------------\n"
-        f"<b>1. Â¿QuÃ© hace el /check?</b>\n"
-        f"Verifica las credenciales de las cuentas contra BetMexico. Cada check consume recursos (resoluciÃ³n de captchas y rotaciÃ³n de proxies de alta calidad).\n\n"
-        f"<b>2. Buenas prÃ¡cticas para cuidar el sistema:</b>\n"
-        f"â€¢ <b>No espamear:</b> Hacer mÃ¡s de 3 intentos invÃ¡lidos o en rÃ¡faga rÃ¡pida provocarÃ¡ una penalizaciÃ³n automÃ¡tica de 5 minutos.\n"
-        f"â€¢ <b>Formatos aceptados:</b> EnvÃ­a mÃ­nimo 10 combos en texto (mÃ¡x 100) o adjunta un archivo .txt/.csv (mÃ¡x 1,000).\n"
-        f"â€¢ <b>Limpieza de Tarjetas:</b> Antes de depositar con /bet, las tarjetas pasan por un liveness check. Si una tarjeta ya estÃ¡ en la BD, se descartarÃ¡ automÃ¡ticamente para no duplicar intentos.\n\n"
-        f"<b>3. Transparencia y SincronizaciÃ³n Web:</b>\n"
-        f"Cualquier cuenta verificable (LIVE) cargada mediante el bot se reflejarÃ¡ en tiempo real en el Dashboard Web (https://botmexico.net)."
+        f"<b>1. ¿Qué hace el /check?</b>\n"
+        f"Verifica las credenciales de las cuentas contra BetMexico. Cada check consume recursos (resolución de captchas y rotación de proxies de alta calidad).\n\n"
+        f"<b>2. Buenas prácticas para cuidar el sistema:</b>\n"
+        f"• <b>No espamear:</b> Hacer más de 3 intentos inválidos o en ráfaga rápida provocará una penalización automática de 5 minutos.\n"
+        f"• <b>Formatos aceptados:</b> Envía mínimo 10 combos en texto (máx 100) o adjunta un archivo .txt/.csv (máx 1,000).\n"
+        f"• <b>Limpieza de Tarjetas:</b> Antes de depositar con /bet, las tarjetas pasan por un liveness check. Si una tarjeta ya está en la BD, se descartará automáticamente para no duplicar intentos.\n\n"
+        f"<b>3. Transparencia y Sincronización Web:</b>\n"
+        f"Cualquier cuenta verificable (LIVE) cargada mediante el bot se reflejará en tiempo real en el Dashboard Web (https://botmexico.net)."
     )
     return {"ok": True, "message": msg}
 
 
 @app.post("/api/bot/pause")
 def bot_pause_mission(user: dict = Depends(require_session)):
-    """Pausa la misiÃ³n activa del operador y devuelve resumen corto de avance."""
+    """Pausa la misión activa del operador y devuelve resumen corto de avance."""
     operator_id = user.get("telegram_id") or 0
     now = datetime.now(timezone.utc).isoformat()
     with db(write=True) as c:
@@ -4761,22 +4658,22 @@ def bot_pause_mission(user: dict = Depends(require_session)):
     stats_msg = ""
     if row:
         stats_msg = (
-            f"\n\nðŸ“Š <b>Resumen de Avance:</b>\n"
-            f"â€¢ MisiÃ³n: <code>{row['mission_id']}</code>\n"
-            f"â€¢ Aprobados: {row['approved_count'] or 0} / {row['target_count']}\n"
-            f"â€¢ Rechazos: {row['failed_count'] or 0}"
+            f"\n\n📊 <b>Resumen de Avance:</b>\n"
+            f"• Misión: <code>{row['mission_id']}</code>\n"
+            f"• Aprobados: {row['approved_count'] or 0} / {row['target_count']}\n"
+            f"• Rechazos: {row['failed_count'] or 0}"
         )
 
     _broadcast({
         "type": "activity", "kind": "telegram_bot_pause",
         "ts": now, **_resolve_who(operator_id)
     })
-    return {"ok": True, "paused": True, "message": f"â¸ <b>PROCESO PAUSADO</b>{stats_msg}\n\n<i>Usa /resume o presiona Reanudar para continuar.</i>"}
+    return {"ok": True, "paused": True, "message": f"⏸ <b>PROCESO PAUSADO</b>{stats_msg}\n\n<i>Usa /resume o presiona Reanudar para continuar.</i>"}
 
 
 @app.post("/api/bot/resume")
 def bot_resume_mission(user: dict = Depends(require_session)):
-    """Reanuda la misiÃ³n pausada del operador."""
+    """Reanuda la misión pausada del operador."""
     operator_id = user.get("telegram_id") or 0
     now = datetime.now(timezone.utc).isoformat()
     with db(write=True) as c:
@@ -4792,14 +4689,14 @@ def bot_resume_mission(user: dict = Depends(require_session)):
         "ts": now, **_resolve_who(operator_id)
     })
     if resumed:
-        return {"ok": True, "resumed": True, "message": "â–¶ <b>PROCESO REANUDADO</b>. El matchmaking continuarÃ¡ con los depÃ³sitos."}
-    return {"ok": True, "resumed": False, "message": "â„¹ï¸ No tienes misiones pausadas por reanudar."}
+        return {"ok": True, "resumed": True, "message": "▶ <b>PROCESO REANUDADO</b>. El matchmaking continuará con los depósitos."}
+    return {"ok": True, "resumed": False, "message": "ℹ️ No tienes misiones pausadas por reanudar."}
 
 
 @app.post("/api/bot/stop")
 @app.post("/api/bot/cancel")
 def bot_cancel_mission(user: dict = Depends(require_session)):
-    """Aborta cualquier proceso o misiÃ³n activa de inmediato y devuelve resumen de avance."""
+    """Aborta cualquier proceso o misión activa de inmediato y devuelve resumen de avance."""
     operator_id = user.get("telegram_id") or 0
     now = datetime.now(timezone.utc).isoformat()
     cancelled_count = 0
@@ -4820,10 +4717,10 @@ def bot_cancel_mission(user: dict = Depends(require_session)):
     stats_msg = ""
     if row:
         stats_msg = (
-            f"\n\nðŸ“Š <b>Resumen Final de Avance:</b>\n"
-            f"â€¢ MisiÃ³n: <code>{row['mission_id']}</code>\n"
-            f"â€¢ Aprobados: {row['approved_count'] or 0} / {row['target_count']}\n"
-            f"â€¢ Rechazos: {row['failed_count'] or 0}"
+            f"\n\n📊 <b>Resumen Final de Avance:</b>\n"
+            f"• Misión: <code>{row['mission_id']}</code>\n"
+            f"• Aprobados: {row['approved_count'] or 0} / {row['target_count']}\n"
+            f"• Rechazos: {row['failed_count'] or 0}"
         )
 
     if cancelled_count > 0:
@@ -4831,9 +4728,9 @@ def bot_cancel_mission(user: dict = Depends(require_session)):
             "type": "activity", "kind": "telegram_bot_cancel",
             "ts": now, **_resolve_who(operator_id)
         })
-        return {"ok": True, "message": f"ðŸ›‘ <b>PROCESO DETENIDO DE INMEDIATO</b>{stats_msg}\n\n<i>Gestiona tus cuentas en https://botmexico.net</i>"}
+        return {"ok": True, "message": f"🛑 <b>PROCESO DETENIDO DE INMEDIATO</b>{stats_msg}\n\n<i>Gestiona tus cuentas en https://botmexico.net</i>"}
     else:
-        return {"ok": True, "message": "â„¹ï¸ No tienes ninguna misiÃ³n ni proceso de matchmaking activo por detener."}
+        return {"ok": True, "message": "ℹ️ No tienes ninguna misión ni proceso de matchmaking activo por detener."}
 
 
 @app.post("/api/bot/bet")
@@ -4841,10 +4738,10 @@ async def bot_bet_create(request: Request, user: dict = Depends(require_session)
     """Endpoint para el comando /bet del bot de Telegram.
 
     Reglas operativas actualizadas:
-    - 1 INTENTO = 1 iniciaciÃ³n completa del flujo en automÃ¡tico (no por tarjeta individual).
-    - LÃ­mite de STRIKES = 5 por dÃ­a por operador (1 strike = 3 tarjetas con 3 rechazos fallidos acumulados, O 3 intentos de spam/rÃ¡faga).
+    - 1 INTENTO = 1 iniciación completa del flujo en automático (no por tarjeta individual).
+    - Límite de STRIKES = 5 por día por operador (1 strike = 3 tarjetas con 3 rechazos fallidos acumulados, O 3 intentos de spam/ráfaga).
     - Descarte de Tarjetas Repetidas: Si la tarjeta ya existe en BD (account_cards), se descarta antes de iniciar.
-    - ConfirmaciÃ³n previa con resumen e informaciÃ³n de strikes restantes.
+    - Confirmación previa con resumen e información de strikes restantes.
     """
     from card_checker import precheck_card_liveness, format_ruthopia_liveness_summary
     from auto_deposit import plan_auto_mission, run_auto_mission
@@ -4863,7 +4760,7 @@ async def bot_bet_create(request: Request, user: dict = Depends(require_session)
     now_dt = datetime.now(timezone.utc)
     now_iso = now_dt.isoformat()
 
-    # GuardarraÃ­l 1: VerificaciÃ³n de Strikes (MÃ¡ximo 5 strikes por dÃ­a por operador)
+    # Guardarraíl 1: Verificación de Strikes (Máximo 5 strikes por día por operador)
     MAX_DAILY_STRIKES = 5
     with db(write=True) as c:
         row = c.execute(
@@ -4879,17 +4776,17 @@ async def bot_bet_create(request: Request, user: dict = Depends(require_session)
                     secs_left = int((p_dt - now_dt).total_seconds())
                     mins_left = max(1, secs_left // 60)
                     raise HTTPException(
-                        429, f"Operador en penalizaciÃ³n por spam (1 strike acumulado). Intenta en {mins_left} min."
+                        429, f"Operador en penalización por spam (1 strike acumulado). Intenta en {mins_left} min."
                     )
             except ValueError:
                 pass
 
         if strikes_count >= MAX_DAILY_STRIKES:
             raise HTTPException(
-                403, f"LÃ­mite de {MAX_DAILY_STRIKES} strikes diarios alcanzado (3 rechazos fallidos o spam = 1 strike). Solicita reset al SuperAdmin."
+                403, f"Límite de {MAX_DAILY_STRIKES} strikes diarios alcanzado (3 rechazos fallidos o spam = 1 strike). Solicita reset al SuperAdmin."
             )
 
-    # GuardarraÃ­l 2: Comprobar si las tarjetas YA existen asociadas en BD (account_cards)
+    # Guardarraíl 2: Comprobar si las tarjetas YA existen asociadas en BD (account_cards)
     existing_cards = set()
     try:
         with db() as c:
@@ -4897,13 +4794,10 @@ async def bot_bet_create(request: Request, user: dict = Depends(require_session)
             for r in rows:
                 if r["card_number"]:
                     existing_cards.add(str(r["card_number"]).strip())
-    except Exception as e:
-        import logging as _lg
-        _lg.getLogger("betmexico.dashboard.bet").warning(
-            f"[bet] load existing_cards from account_cards failed: {e}"
-        )
+    except Exception:
+        pass
 
-    # GuardarraÃ­l 3: Pre-check de Liveness con descartes por duplicidad + liveness
+    # Guardarraíl 3: Pre-check de Liveness con descartes por duplicidad + liveness
     valid_pipes = []
     liveness_records = []
     for pipe in card_pipes:
@@ -4913,7 +4807,7 @@ async def bot_bet_create(request: Request, user: dict = Depends(require_session)
             liveness_records.append({
                 "pipe": pipe,
                 "ok": False,
-                "status_label": "ðŸ”´ DESCARTADA - Tarjeta ya existe asociada a otra cuenta en la BD"
+                "status_label": "🔴 DESCARTADA - Tarjeta ya existe asociada a otra cuenta en la BD"
             })
             continue
 
@@ -4933,27 +4827,24 @@ async def bot_bet_create(request: Request, user: dict = Depends(require_session)
                         "ON CONFLICT(bin) DO UPDATE SET total_attempts = total_attempts + 1, updated_at = ?",
                         (bin_code, now_iso, now_iso)
                     )
-            except Exception as e:
-                import logging as _lg
-                _lg.getLogger("betmexico.dashboard.bet").debug(
-                    f"[bet] bin_stats upsert failed (non-critical): {e}"
-                )
+            except Exception:
+                pass
 
     summary_text = format_ruthopia_liveness_summary(liveness_records)
     strikes_left = MAX_DAILY_STRIKES - strikes_count
 
     if not valid_pipes:
-        raise HTTPException(400, f"Ninguna tarjeta superÃ³ las validaciones iniciales:\n\n{summary_text}")
+        raise HTTPException(400, f"Ninguna tarjeta superó las validaciones iniciales:\n\n{summary_text}")
 
-    # Si NO ha confirmado, solicita la Ãºltima confirmaciÃ³n amigable
+    # Si NO ha confirmado, solicita la última confirmación amigable
     if not confirmed:
         confirm_msg = (
-            f"<b>âš ï¸ ÃšLTIMA CONFIRMACIÃ“N REQUERIDA ANTES DE INICIAR</b>\n\n"
-            f"â€¢ <b>Flujo:</b> 1 intento automÃ¡tico de matchmaking con {len(valid_pipes)} tarjeta(s) vÃ¡lida(s).\n"
-            f"â€¢ <b>Strikes del Operador:</b> Tienes derecho a {MAX_DAILY_STRIKES} strikes/dÃ­a. Te quedan <b>{strikes_left}</b> strike(s).\n"
-            f"â€¢ <b>Regla:</b> Cada 3 rechazos con 3 fallos acumulados = 1 strike. Cada 3 rÃ¡fagas de spam = 1 strike.\n\n"
+            f"<b>⚠️ ÚLTIMA CONFIRMACIÓN REQUERIDA ANTES DE INICIAR</b>\n\n"
+            f"• <b>Flujo:</b> 1 intento automático de matchmaking con {len(valid_pipes)} tarjeta(s) válida(s).\n"
+            f"• <b>Strikes del Operador:</b> Tienes derecho a {MAX_DAILY_STRIKES} strikes/día. Te quedan <b>{strikes_left}</b> strike(s).\n"
+            f"• <b>Regla:</b> Cada 3 rechazos con 3 fallos acumulados = 1 strike. Cada 3 ráfagas de spam = 1 strike.\n\n"
             f"{summary_text}\n\n"
-            f"<i>Responde o envÃ­a la confirmaciÃ³n con `confirmed: true` para iniciar los depÃ³sitos.</i>"
+            f"<i>Responde o envía la confirmación con `confirmed: true` para iniciar los depósitos.</i>"
         )
         return {
             "require_confirmation": True,
@@ -4963,7 +4854,7 @@ async def bot_bet_create(request: Request, user: dict = Depends(require_session)
             "message": confirm_msg
         }
 
-    # GuardarraÃ­l 4: Concurrencia (mÃ¡ximo 1 intento a la vez)
+    # Guardarraíl 4: Concurrencia (máximo 1 intento a la vez)
     if _mission_sem.locked():
         raise HTTPException(429, "Ya hay un intento de matchmaking activo en el sistema.")
 
@@ -4976,7 +4867,7 @@ async def bot_bet_create(request: Request, user: dict = Depends(require_session)
     _persist_auto_mission(mission_id, operator_id, valid_pipes, amount, target_count, plan)
     asyncio.create_task(run_auto_mission(mission_id, plan, user))
 
-    # Log para la pestaÃ±a de logs de Telegram Bot
+    # Log para la pestaña de logs de Telegram Bot
     _broadcast({
         "type": "activity",
         "kind": "telegram_bot_bet",
@@ -4997,11 +4888,8 @@ async def bot_bet_create(request: Request, user: dict = Depends(require_session)
                 "WHERE total_attempts >= 2 ORDER BY (total_approved * 1.0 / total_attempts) DESC LIMIT 3"
             ).fetchall()
             top_bines = [r["bin"] for r in rows if r["bin"]]
-    except Exception as e:
-        import logging as _lg
-        _lg.getLogger("betmexico.dashboard.bet").warning(
-            f"[bet] query bin_stats top_bines failed: {e}"
-        )
+    except Exception:
+        pass
 
     matched_emails = [a.get("email") for a in plan.get("accounts", [])]
     return {
@@ -5014,7 +4902,7 @@ async def bot_bet_create(request: Request, user: dict = Depends(require_session)
         "strikes_left": strikes_left,
         "liveness_summary": summary_text,
         "dashboard_link": f"https://botmexico.net/?match={mission_id}",
-        "message": f"ðŸš€ Intento automÃ¡tico /bet INICIADO con {len(valid_pipes)} tarjeta(s).\n\n{summary_text}"
+        "message": f"🚀 Intento automático /bet INICIADO con {len(valid_pipes)} tarjeta(s).\n\n{summary_text}"
     }
 
 
@@ -5133,24 +5021,24 @@ async def bot_check(req: BotCheckRequest, user: dict = Depends(require_session))
                         secs_left = int((p_dt - now_dt).total_seconds())
                         mins_left = max(1, secs_left // 60)
                         raise HTTPException(
-                            429, f"Operador en penalizaciÃ³n por spam. Intenta en {mins_left} min."
+                            429, f"Operador en penalización por spam. Intenta en {mins_left} min."
                         )
                 except ValueError:
                     pass
 
             if strikes_count >= MAX_DAILY_STRIKES:
                 raise HTTPException(
-                    403, f"LÃ­mite de {MAX_DAILY_STRIKES} strikes diarios alcanzado. Solicita reset al SuperAdmin."
+                    403, f"Límite de {MAX_DAILY_STRIKES} strikes diarios alcanzado. Solicita reset al SuperAdmin."
                 )
 
     combos = req.combos or []
     stype = (req.source_type or "text").lower()
 
     if stype == "text" and len(combos) > 100:
-        raise HTTPException(400, "El mensaje supera el lÃ­mite de 100 combos en chat plano. Por favor adjunta un archivo .txt con hasta 5,000 lÃ­neas.")
+        raise HTTPException(400, "El mensaje supera el límite de 100 combos en chat plano. Por favor adjunta un archivo .txt con hasta 5,000 líneas.")
 
     if len(combos) > 5000:
-        raise HTTPException(400, "El archivo excede el lÃ­mite mÃ¡ximo de 5,000 combos.")
+        raise HTTPException(400, "El archivo excede el límite máximo de 5,000 combos.")
 
     if not combos:
         raise HTTPException(400, "No se recibieron combos para procesar.")
@@ -5160,26 +5048,26 @@ async def bot_check(req: BotCheckRequest, user: dict = Depends(require_session))
 
     if not valid_list:
         summary_msg = (
-            f"<b>âŒ NINGÃšN COMBO SUPERÃ“ LAS VALIDACIONES</b>\n\n"
-            f"â€¢ <b>Recibidos:</b> {filtered['total_received']}\n"
-            f"â€¢ <b>Duplicados:</b> {filtered['dupes_count']}\n"
-            f"â€¢ <b>Pre-existentes en BD (Correo):</b> {len(filtered['in_db_emails'])}\n"
-            f"â€¢ <b>Pre-existentes en BD (Tarjeta):</b> {len(filtered['in_db_cards'])}\n"
-            f"â€¢ <b>Tarjetas InvÃ¡lidas:</b> {len(filtered['invalid_cards'])}\n\n"
-            f"ðŸ’¡ <i>Las cuentas ya registradas se pueden consultar y gestionar en https://botmexico.net</i>"
+            f"<b>❌ NINGÚN COMBO SUPERÓ LAS VALIDACIONES</b>\n\n"
+            f"• <b>Recibidos:</b> {filtered['total_received']}\n"
+            f"• <b>Duplicados:</b> {filtered['dupes_count']}\n"
+            f"• <b>Pre-existentes en BD (Correo):</b> {len(filtered['in_db_emails'])}\n"
+            f"• <b>Pre-existentes en BD (Tarjeta):</b> {len(filtered['in_db_cards'])}\n"
+            f"• <b>Tarjetas Inválidas:</b> {len(filtered['invalid_cards'])}\n\n"
+            f"💡 <i>Las cuentas ya registradas se pueden consultar y gestionar en https://botmexico.net</i>"
         )
         raise HTTPException(400, summary_msg)
 
     if not req.confirmed:
         confirm_msg = (
-            f"<b>âš ï¸ CONFIRMACIÃ“N DE CHECK SOLICITADA</b>\n\n"
-            f"â€¢ <b>Combos Recibidos:</b> {filtered['total_received']}\n"
-            f"â€¢ <b>Descartados (Duplicados):</b> {filtered['dupes_count']}\n"
-            f"â€¢ <b>Descartados (Ya existen en BD):</b> {len(filtered['in_db_emails']) + len(filtered['in_db_cards'])}\n"
-            f"â€¢ <b>Tarjetas InvÃ¡lidas / Luhn:</b> {len(filtered['invalid_cards'])}\n"
-            f"â€¢ <b>Combos VÃ¡lidos a Verificar:</b> {len(valid_list)}\n\n"
-            f"ðŸ’¡ <i>Las cuentas omitidas por ya existir en BD se gestionan directamente en https://botmexico.net</i>\n\n"
-            f"<i>Responde o envÃ­a la confirmaciÃ³n con `confirmed: true` para iniciar la verificaciÃ³n.</i>"
+            f"<b>⚠️ CONFIRMACIÓN DE CHECK SOLICITADA</b>\n\n"
+            f"• <b>Combos Recibidos:</b> {filtered['total_received']}\n"
+            f"• <b>Descartados (Duplicados):</b> {filtered['dupes_count']}\n"
+            f"• <b>Descartados (Ya existen en BD):</b> {len(filtered['in_db_emails']) + len(filtered['in_db_cards'])}\n"
+            f"• <b>Tarjetas Inválidas / Luhn:</b> {len(filtered['invalid_cards'])}\n"
+            f"• <b>Combos Válidos a Verificar:</b> {len(valid_list)}\n\n"
+            f"💡 <i>Las cuentas omitidas por ya existir en BD se gestionan directamente en https://botmexico.net</i>\n\n"
+            f"<i>Responde o envía la confirmación con `confirmed: true` para iniciar la verificación.</i>"
         )
         return {
             "require_confirmation": True,
@@ -5192,7 +5080,7 @@ async def bot_check(req: BotCheckRequest, user: dict = Depends(require_session))
     return {
         "ok": True,
         "valid_count": len(valid_list),
-        "message": f"ðŸš€ VerificaciÃ³n /check INICIADA para {len(valid_list)} combo(s) nuevos.\n\nDashboard: https://botmexico.net",
+        "message": f"🚀 Verificación /check INICIADA para {len(valid_list)} combo(s) nuevos.\n\nDashboard: https://botmexico.net",
         "dashboard_link": "https://botmexico.net"
     }
 
@@ -5202,4 +5090,3 @@ if __name__ == "__main__":
     port = int(os.environ.get("BMX_WEB_PORT", "5001"))
     print(f"BD: {DB_PATH} (existe: {DB_PATH.exists()})")
     uvicorn.run(app, host="0.0.0.0", port=port)
-
