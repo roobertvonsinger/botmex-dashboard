@@ -252,6 +252,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `45332e0` | fix(proxy): actualizar proxies Proxy001 de zona MX y corregir exclusiones |
 | `d059024` | fix(proxy_pool): excluir temporalmente proxy001 por caida masiva de gateway (502/ConnectTimeout) |
 | `ac107e5` | fix(script): resolver import circular de betmexico_config en verificador masivo |
 | `51f9160` | feat: agregar script de verificacion masiva activa de cuentas con proxy rotativo |
@@ -263,7 +264,6 @@ prewarm.py (router)
 | `6d61e12` | fix(proxy): reactivar DataImpulse con puerto 823 rotativo + rango 10000-10100 |
 | `64ce4de` | fix(proxy): revertir exclusion de Proxy001 y mantener IPRoyal excluido |
 | `0ca4d83` | docs(next-session): actualizar estado deploy fix backup de cuentas (2026-08-13) |
-| `7a17cb2` | fix: reactivar IPRoyal + excluir Proxy001 muerto + atrapar 409 en auto_mission |
 <!-- GEN:end:recientes -->
 
 ---

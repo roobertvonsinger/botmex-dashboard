@@ -772,9 +772,7 @@ async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     if args:
         raw_text = " ".join(args)
-        # Inyectar texto simulado para procesar directo
-        update.message.text = raw_text
-        return await process_bet_input(update, context)
+        return await process_bet_input(update, context, override_text=raw_text)
 
     msg = (
         f"{HEADER}\n\n"
@@ -796,9 +794,9 @@ async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return WAIT_BET_CONFIRM
 
 
-async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE, override_text: Optional[str] = None):
     """Procesa las tarjetas ingresadas para /bet con feedback animado y liveness premium."""
-    text = update.message.text.strip() if update.message.text else ""
+    text = (override_text or (update.message.text if update.message else "") or "").strip()
     if text.startswith("/") and not any(char.isdigit() for char in text):
         await update.message.reply_text("❌ Envía las tarjetas, no un comando.")
         return WAIT_BET_CONFIRM
