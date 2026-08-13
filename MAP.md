@@ -250,6 +250,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `7a17cb2` | fix: reactivar IPRoyal + excluir Proxy001 muerto + atrapar 409 en auto_mission |
 | `b155a05` | fix(auto_deposit): backup de cuentas de respaldo dispara sin límite de 10 en plan original |
 | `a897075` | chore: actualizar NEXT-SESSION para debugging urgente post-Gemini |
 | `6a04113` | fix: jubilar tarjeta tras CARD_LOCKED_OTHER_ACCOUNT en auto_mission |
@@ -261,7 +262,6 @@ prewarm.py (router)
 | `3a45562` | fix(core): rate-limit dead permanente, drenado tokens captcha, persistencia BANK_REJECTED y check tarjetas casadas |
 | `1030c10` | fix: card_num dict key, failed_cards set extraction, BANK_REJECTED persistence |
 | `87e25d6` | fix(proxy): embeber literalmente los 500 proxies de Proxy001 en proxy_pool.py sin lectura de disco |
-| `001e85e` | fix(proxy): resolver ruta relativa de Proxy001 en Docker (KVM4) para cargar los 500 proxies |
 <!-- GEN:end:recientes -->
 
 ---

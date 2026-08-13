@@ -32,3 +32,5 @@
 ## ✅ Hecho esta sesión (2026-08-13)
 
 - **Fix CARD_LOCKED_OTHER_ACCOUNT** en `auto_deposit.py` — tarjeta casada se jubila de inmediato en `retired_cards` para que no se intente en cuentas siguientes del plan. Commit `6a04113`, deployado a KVM4 (web + raíz), contenedor reiniciado 03:59 UTC.
+- **Fix gap backup de cuentas** — el disparador de expansión dinámica exigía `len(accounts_list) < 10`, cortando el backup cuando el plan original ya alcanzó el techo (10) pero falló todas. Relajado a `MAX_ACCOUNTS_HARD_CAP`, con `remaining = HARD_CAP - len(actuales)`. Commit `b155a05`.
+- **Deploy verificado** — `auto_deposit.py` md5 `81807e48` en container betmexico-web (`/app/auto_deposit.py`). Syntax + import OK. `/` → 302, `/api/version` responde. StartedAt `2026-08-13T04:26:59Z`. Tests: `test_auto_deposit.py` + `test_auto_mission.py` → 39/39 verdes.
