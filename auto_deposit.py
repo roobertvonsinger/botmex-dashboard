@@ -910,14 +910,20 @@ async def run_auto_mission(
                 on_progress=on_progress,
                 accounts=len(plan.get("accounts", [])),
             )
-            accounts_list = plan.get("accounts", [])
-            for acc_idx, acc in enumerate(accounts_list):
+            accounts_list = list(plan.get("accounts", []))
+            already_checked_emails = set(a["email"] for a in accounts_list)
+            retired_cards = set()
+
+            acc_idx = 0
+            while acc_idx < len(accounts_list):
                 if _cancelled():
                     cancelled = True
                     break
+                acc = accounts_list[acc_idx]
                 account_id, email = acc.get("id"), acc.get("email")
                 acct = _fetch_account(account_id)
                 if not acct:
+                    acc_idx += 1
                     continue
 
                 # Emitir evento SSE de feedback: obteniendo datos/sesión de la cuenta
@@ -938,7 +944,10 @@ async def run_auto_mission(
                 candidates = [p for p in [acc.get("card_pipe"), *card_pipes] if p]
                 candidates = [_normalize_pipe_to_3part(p) for p in candidates]
                 candidates = list(dict.fromkeys(candidates))  # dedup, orden estable
+                candidates = [p for p in candidates if p not in retired_cards]
                 if not candidates:
+                    logger.info(f"⚠️ Sin tarjetas candidatas activas para {email} (todas jubiladas)")
+                    acc_idx += 1
                     continue
                 matched = False
                 locked = False
@@ -1082,7 +1091,13 @@ async def run_auto_mission(
                             code
                         ):
                             failed += 1
-                            account_declines += 1
+                            is_clean_account = acct.get("grade") in ("A+", "A")
+                            if is_clean_account and code == "BANK_REJECTED":
+                                retired_cards.add(_normalize_pipe_to_3part(pipe))
+                                logger.info(f"🚫 TARJETA JUBILADA EN MISIÓN (BANK_REJECTED en cuenta {email} con grado {acct.get('grade')}) | {pipe}")
+                                logger.info(f"ℹ️ Matriz Diagnóstico: Declinación atribuida a tarjeta, no a pasarela de {email}")
+                            else:
+                                account_declines += 1
                             break  # siguiente tarjeta (decline real o cargo ambiguo: terminal)
                         if code in dep.MM_DEAD_RC:
                             failed += 1
@@ -1092,6 +1107,10 @@ async def run_auto_mission(
                             # Candado DB (deposits.py) — determinístico, jamás
                             # cambia entre intentos. No es decline de la cuenta:
                             # no cuenta para MM_MAX_ACCOUNT_DECLINES_PER_RUN.
+                            # JUBILAR la tarjeta: ya está casada con otra cuenta,
+                            # no tiene sentido seguirla probando en las demás.
+                            retired_cards.add(_normalize_pipe_to_3part(pipe))
+                            logger.info(f"🚫 TARJETA JUBILADA (CARD_LOCKED_OTHER_ACCOUNT) | {pipe}")
                             failed += 1
                             break  # siguiente tarjeta
                         # TRANSITORIO (nuestro lado) → reintentar el par
@@ -1111,14 +1130,40 @@ async def run_auto_mission(
                         and has_more_candidates
                         and account_declines < MM_MAX_ACCOUNT_DECLINES_PER_RUN
                     ):
-                        await asyncio.sleep(dep.MM_COOLDOWN)
+                        sj, sp = dep._mm_session_get(sessions, email)
+                        if sj and code not in ("BANK_REJECTED", "3DS_REQUIRED"):
+                            logger.info(f"⚡ Bypass de cooldown (2s) para {email} debido a sesión JWT activa y error transitorio ({code})")
+                            await asyncio.sleep(2)
+                        else:
+                            await asyncio.sleep(dep.MM_COOLDOWN)
                 if locked and not matched:
                     _unlock(account_id)  # regla 7: no dejar 4h/perpetuo sin match
                     locked_ids.discard(account_id)
+
+                # Si llegamos al final del plan y NO hemos conseguido ningún match, intentamos buscar cuentas de respaldo
+                if not matches and acc_idx == len(accounts_list) - 1 and len(accounts_list) < 10:
+                    try:
+                        from app import DB_PATH
+                        active_cards = [p for p in card_pipes if _normalize_pipe_to_3part(p) not in retired_cards]
+                        if active_cards:
+                            backup_plan = plan_auto_mission(DB_PATH, active_cards, amount, target_count, max_accounts=10)
+                            if backup_plan and backup_plan.get("feasible"):
+                                for b_acc in backup_plan.get("accounts", []):
+                                    b_email = b_acc.get("email")
+                                    if b_email not in already_checked_emails:
+                                        accounts_list.append(b_acc)
+                                        already_checked_emails.add(b_email)
+                                        logger.info(f"➕ CUENTA DE RESPALDO AÑADIDA DINÁMICAMENTE | {b_email}")
+                                        if len(accounts_list) >= 10:
+                                            break
+                    except Exception as ex_backup:
+                        logger.warning(f"[Auto {mission_id}] No se pudieron buscar cuentas de respaldo: {ex_backup}")
+
                 # Regla Robert 2026-07-28: 5s de respiro entre CUENTAS distintas
                 # (no 60s — ese piso es solo para reintentar en la misma cuenta).
                 if not _cancelled() and acc_idx < len(accounts_list) - 1:
                     await asyncio.sleep(MM_CROSS_ACCOUNT_GAP)
+                acc_idx += 1
 
             if not matches:
                 _m_update(
