@@ -815,14 +815,16 @@ async def run_auto_mission(
                 try:
                     from app import DB_PATH
                     con = sqlite3.connect(str(DB_PATH))
-                    failed_cards = set(r[0] for r in con.execute("""
-                        SELECT DISTINCT card_pipe FROM deposit_attempts
-                        WHERE card_pipe IN ({seq})
-                          AND status = 'rejected'
-                          AND created_at >= datetime('now', '-24 hours')
-                    """.format(seq=','.join(['?']*len(card_pipes))), card_pipes).fetchall() if r[0])
-                    con.close()
-                    card_pipes = [p for p in card_pipes if p not in failed_cards]
+                    try:
+                        failed_cards = set(r[0] for r in con.execute("""
+                            SELECT DISTINCT card_pipe FROM deposit_attempts
+                            WHERE card_pipe IN ({seq})
+                              AND status = 'rejected'
+                              AND created_at >= datetime('now', '-24 hours')
+                        """.format(seq=','.join(['?']*len(card_pipes))), card_pipes).fetchall() if r[0])
+                        card_pipes = [p for p in card_pipes if p not in failed_cards]
+                    finally:
+                        con.close()
                 except Exception:
                     pass
         except Exception:
