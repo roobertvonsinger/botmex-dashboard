@@ -250,6 +250,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `0ca4d83` | docs(next-session): actualizar estado deploy fix backup de cuentas (2026-08-13) |
 | `7a17cb2` | fix: reactivar IPRoyal + excluir Proxy001 muerto + atrapar 409 en auto_mission |
 | `b155a05` | fix(auto_deposit): backup de cuentas de respaldo dispara sin límite de 10 en plan original |
 | `a897075` | chore: actualizar NEXT-SESSION para debugging urgente post-Gemini |
@@ -261,7 +262,6 @@ prewarm.py (router)
 | `5108533` | fix(cards): cache 30m utopia para tarjetas aprobadas y alerta SSE para CARD_MARRIED |
 | `3a45562` | fix(core): rate-limit dead permanente, drenado tokens captcha, persistencia BANK_REJECTED y check tarjetas casadas |
 | `1030c10` | fix: card_num dict key, failed_cards set extraction, BANK_REJECTED persistence |
-| `87e25d6` | fix(proxy): embeber literalmente los 500 proxies de Proxy001 en proxy_pool.py sin lectura de disco |
 <!-- GEN:end:recientes -->
 
 ---
