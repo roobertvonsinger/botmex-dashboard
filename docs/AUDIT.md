@@ -3,6 +3,17 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-08-13 (fix de raíz — yoyo de proxies por valida-curp.com NXDOMAIN)
+
+**Motivo**: yoyo de exclusiones de proxies durante 36h. El `502 NO_HOST_CONNECTION` masivo NO era DataImpulse caído — era `renapo_validator.py` golpeando `valida-curp.com` (NXDOMAIN) con el pool completo en failover. KVM4 quedó desplegado en `f023074` (DI excluido, 3 sustitutos caídos). Ver `docs/ERRORS.md` para el post-mortem completo.
+
+| Función | Spec (2026-08-13) | Estado | Verificado |
+|---|---|---|---|
+| `renapo_validator.validate_renapo_curp` | Gate de DNS previo al gasto de pool (`socket.getaddrinfo`, cacheado 10min): si el endpoint no resuelve → fallback local inmediato, CERO intentos de proxy. Endpoint = `consultas.curp.gob.mx/CurpSP/curp2.do` (host vivo), `max_attempts=2` + `captcha_retries=1`, solo `candidates[:3]`, cache por (fullname, birthdate, address). | ✅ implementado | ✅ suite `test_renapo_validator.py` 4/4 (mock del gate DNS); pool ya no se quema con NXDOMAIN |
+| `proxy_pool.call_with_proxy_failover` | Nuevo param `max_attempts: Optional[int]` — tope de intentos del caller (≥1). Sin cambio de comportamiento por defecto. | ✅ implementado | ✅ `test_renapo_validator` + failover real en container |
+| `proxy_pool._EXCLUDED_PROXY_HOSTS` | `("litport", "proxy001", "nodemaven")` — KVM4 alineado al repo. Pool = solo DataImpulse (823 + 10000-10499). nodemaven se excluye aunque el `betmexico_config.ADMIN_PROXIES` del bot lo liste (exclusión aplica al pool combinado). | ✅ implementado | ✅ deploy KVM4, pool 501 proxies, todos `gw.dataimpulse.com` |
+| Deploy KVM4 (proxies) | `proxy_pool.py` + `renapo_validator.py` scp (MD5 = repo) + `docker restart betmexico-web`. | ✅ desplegado | ✅ failover real end-to-end → 405 a `paymentsapi.betmexico.mx` vía DI; logs limpios post-restart |
+
 ## Captura: 2026-08-06 (fixes de logs — los "errores que seguían saliendo" eran la vista congelada)
 
 **Motivo**: Robert reportó que el dashboard seguía mostrando los mismos errores (Bad Gateway, no-text, DB_PATH, LOCK) pese a los deploys. Diagnóstico: la vista de logs de bots se congelaba mostrando el histórico — los errores reales ya estaban resueltos desde las 03:54.

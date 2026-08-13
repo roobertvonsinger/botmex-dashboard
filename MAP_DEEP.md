@@ -391,8 +391,11 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `_check_curp_with_proxy` | def | L24–L54 |
-| `validate_renapo_curp` | def | L57–L89 |
+| `_host_of` | def | L45–L47 |
+| `_host_resolves` | def | L50–L61 |
+| `_check_curp_with_proxy` | def | L64–L94 |
+| `validate_renapo_curp` | def | L97–L148 |
+| `_fallback` | def | L151–L154 |
 
 ### `scripts/backfill_account_cards.py`
 
@@ -834,7 +837,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `TestRenapoValidator` | class | L10–L105 |
+| `TestRenapoValidator` | class | L10–L107 |
 
 ### `test_scheduled_deposit_3ds_logging.py`
 

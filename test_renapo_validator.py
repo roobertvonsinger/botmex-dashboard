@@ -9,8 +9,9 @@ from curp_utils import generate_curp_candidates
 
 class TestRenapoValidator(unittest.TestCase):
 
+    @patch("renapo_validator._host_resolves", return_value=True)
     @patch("renapo_validator.pp.call_with_proxy_failover")
-    def test_validate_renapo_curp_success(self, mock_failover):
+    def test_validate_renapo_curp_success(self, mock_failover, _mock_dns):
         def _side_effect(fn, **kwargs):
             # Probar la función objetivo con un proxy mock
             return (
@@ -50,8 +51,9 @@ class TestRenapoValidator(unittest.TestCase):
         self.assertEqual(res["curp"], "SILG951020HTLVRR08")
 
     @patch("proxy_pool.shuffled_proxy_urls", return_value=["http://user:pass@proxy.test:8080"])
+    @patch("renapo_validator._host_resolves", return_value=True)
     @patch("httpx.AsyncClient")
-    def test_validate_renapo_curp_awaits_real_proxy_failover(self, mock_async_client_cls, _mock_urls):
+    def test_validate_renapo_curp_awaits_real_proxy_failover(self, mock_async_client_cls, _mock_dns, _mock_urls):
         """Bug real (2026-08-01, cuenta drakarolinaalmara@gmail.com, log de prod):
         renapo_validator llamaba pp.call_with_proxy_failover (async) SIN await ->
         'cannot unpack non-iterable coroutine object' en los 32 candidatos, caía

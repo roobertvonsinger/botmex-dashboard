@@ -124,7 +124,10 @@ DATAIMPULSE_PROXIES: List[Dict[str, str]] = [
 # - litport: US IP / quemado.
 # - proxy001: us.proxy001.com:7878 devuelve 503/502 (servidor caído 2026-08-13).
 #   Reactivar quitando "proxy001" cuando el proveedor restaure el servicio.
-_EXCLUDED_PROXY_HOSTS: tuple = ("litport", "proxy001")
+# - nodemaven: degradado 504/407 (commit b3d0361, 2026-08-13). El bot del
+#   monorepo aún lo lista en ADMIN_PROXIES, pero el dashboard NO debe usarlo —
+#   la exclusión aplica al pool combinado (bot + extras).
+_EXCLUDED_PROXY_HOSTS: tuple = ("litport", "proxy001", "nodemaven")
 
 
 def _bot_proxies() -> List[Dict[str, str]]:
@@ -247,6 +250,7 @@ async def call_with_proxy_failover(
     proxy: Optional[str] = None,
     proxy_kwarg: str = "proxy",
     captcha_retries: int = 5,
+    max_attempts: Optional[int] = None,
     **kwargs: Any,
 ) -> Tuple[Any, Optional[str]]:
     """Llama `fn(*args, proxy=URL, **kwargs)` con failover + retry de captcha.
@@ -291,6 +295,10 @@ async def call_with_proxy_failover(
     # Cicla el pool hasta cubrir captcha_retries â€” cada vuelta reconecta al
     # proxy (rotativo) dando una IP fresca, que es lo que rescata del 406.
     n_attempts = max(len(urls), captcha_retries)
+    if max_attempts is not None:
+        # Tope explícito del caller: acota el gasto del pool (ej. validaciones
+        # auxiliares que NO deben quemar los ~500 puertos). Nunca menos de 1.
+        n_attempts = max(1, min(max_attempts, n_attempts))
     for i in range(n_attempts):
         url = urls[i % len(urls)]
         try:

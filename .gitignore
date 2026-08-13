@@ -55,3 +55,8 @@ tools/*.log
 
 # Visual inspect — screenshots efímeros del inspector Playwright
 _screenshots/
+
+# Memoria de sesion de herramienta local (Claude Code) + backups graphify
+memory/
+.claude/settings.json.graphify-bak
+

@@ -110,8 +110,8 @@ prewarm.py (router)
 | `jwt_keeper.py` | 396 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 448 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 907 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
-| `proxy_pool.py` | 381 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
-| `renapo_validator.py` | 89 | `betmexico.renapo_validator` | _[completar]_ |
+| `proxy_pool.py` | 389 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `renapo_validator.py` | 154 | `betmexico.renapo_validator` | _[completar]_ |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/migrate_status_no_banco.py` | 80 | `—` | _[completar]_ |
@@ -144,7 +144,7 @@ prewarm.py (router)
 | `test_mission_sem_leak.py` | 97 | `—` | _[completar]_ |
 | `test_pool_manage.py` | 52 | `—` | _[completar]_ |
 | `test_refresh_single_guard.py` | 77 | `—` | _[completar]_ |
-| `test_renapo_validator.py` | 108 | `—` | _[completar]_ |
+| `test_renapo_validator.py` | 110 | `—` | _[completar]_ |
 | `test_scheduled_deposit_3ds_logging.py` | 93 | `—` | _[completar]_ |
 | `test_scheduled_deposit_card_locked.py` | 80 | `—` | _[completar]_ |
 | `test_search.py` | 70 | `—` | _[completar]_ |
@@ -252,6 +252,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `91deb84` | docs: actualizar NEXT-SESSION para handoff de resolucion de proxies |
 | `b3d0361` | fix(proxy): remover iproyal y nodemaven por degradacion (504/407) |
 | `a5247b1` | docs: generar HANDOFF con post-mortem de errores y estado critico |
 | `ad64b86` | docs: actualizar NEXT-SESSION con arquitectura dual de bots en prod |
@@ -263,7 +264,6 @@ prewarm.py (router)
 | `bbca351` | fix(proxy): reactivar DataImpulse y expandir rango sticky a 10000-10500 |
 | `f023074` | fix(bot/proxy): corregir AttributeError de Message.text y excluir DataImpulse caido por 502 |
 | `45332e0` | fix(proxy): actualizar proxies Proxy001 de zona MX y corregir exclusiones |
-| `d059024` | fix(proxy_pool): excluir temporalmente proxy001 por caida masiva de gateway (502/ConnectTimeout) |
 <!-- GEN:end:recientes -->
 
 ---
