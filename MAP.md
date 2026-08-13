@@ -250,6 +250,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `6d61e12` | fix(proxy): reactivar DataImpulse con puerto 823 rotativo + rango 10000-10100 |
 | `64ce4de` | fix(proxy): revertir exclusion de Proxy001 y mantener IPRoyal excluido |
 | `0ca4d83` | docs(next-session): actualizar estado deploy fix backup de cuentas (2026-08-13) |
 | `7a17cb2` | fix: reactivar IPRoyal + excluir Proxy001 muerto + atrapar 409 en auto_mission |
@@ -261,7 +262,6 @@ prewarm.py (router)
 | `a6d8e87` | fix(deposits): desactivar restriccion de lock por operador (409) en auto_lock_for_deposit |
 | `36d9b3c` | fix(bot): resolver fallos de pytest en /bet, /check y card_checker |
 | `5108533` | fix(cards): cache 30m utopia para tarjetas aprobadas y alerta SSE para CARD_MARRIED |
-| `3a45562` | fix(core): rate-limit dead permanente, drenado tokens captcha, persistencia BANK_REJECTED y check tarjetas casadas |
 <!-- GEN:end:recientes -->
 
 ---

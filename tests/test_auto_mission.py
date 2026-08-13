@@ -232,8 +232,8 @@ def test_mission_caps_declines_per_account_per_run(H):
         return {"success": False, "result_code": "BANK_REJECTED", "error": "x"}
     H.script = script
     run(H, plan(1))
-    probes = [c for c in H.run_calls if c["amount"] == ad.PROBE_AMOUNT]
-    assert len(probes) == ad.MM_MAX_ACCOUNT_DECLINES_PER_RUN
+    probes_acc1 = [c for c in H.run_calls if c["amount"] == ad.PROBE_AMOUNT and c["email"] == "acc1@x.com"]
+    assert len(probes_acc1) == ad.MM_MAX_ACCOUNT_DECLINES_PER_RUN
 
 
 def test_mission_no_lock_before_card_candidates(H):
