@@ -250,6 +250,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a966a46` | fix(auto_deposit): garantizar con.close en try/finally al filtrar tarjetas fallidas |
 | `ba9e423` | fix(auto_deposit): penalizar cuentas intentadas <60m en la ordenacion para romper el ciclo deterministico |
 | `9876977` | fix(auto_deposit): eliminar bypass de 2s en cooldown y pre-excluir tarjetas casadas de BD |
 | `1352ef1` | test: actualizar assert de declines por cuenta tras backup dinamico |
@@ -261,7 +262,6 @@ prewarm.py (router)
 | `a897075` | chore: actualizar NEXT-SESSION para debugging urgente post-Gemini |
 | `6a04113` | fix: jubilar tarjeta tras CARD_LOCKED_OTHER_ACCOUNT en auto_mission |
 | `78bb7fd` | docs(next-session): update NEXT-SESSION.md for bot/liveness changes |
-| `668ab62` | fix(bot/liveness): bypass Ruthopia liveness check, remove bet confirmation, hide dashboard during matchmaking |
 <!-- GEN:end:recientes -->
 
 ---
