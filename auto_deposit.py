@@ -1411,6 +1411,27 @@ async def run_auto_mission(
                 failed=failed,
                 accounts=len(matches),
             )
+        except Exception as exc:
+            # Atrapar cualquier excepción no manejada (ej. 409 lock de cuenta)
+            # para que el task no crashee y spamee tracebacks dobles.
+            detail = getattr(exc, "detail", str(exc))
+            status_code = getattr(exc, "status_code", 0)
+            logger.error(
+                f"[Auto {mission_id}] misión abortada: [{status_code}] {detail}"
+            )
+            _m_update(
+                mission_id,
+                status="failed",
+                phase_detail=str(detail)[:200],
+                completed_at=_iso(),
+            )
+            _broadcast_mission(
+                mission_id,
+                "failed",
+                user,
+                on_progress=on_progress,
+                reason=str(detail)[:200],
+            )
         finally:
             await _stop_pool(pool, mission_id)
             for aid in locked_ids:  # regla 7: la misión no deja cuentas reservadas

@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 577 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5092 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1420 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1441 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `card_checker.py` | 305 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
@@ -110,7 +110,7 @@ prewarm.py (router)
 | `jwt_keeper.py` | 396 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 448 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 904 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
-| `proxy_pool.py` | 860 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `proxy_pool.py` | 862 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_validator.py` | 89 | `betmexico.renapo_validator` | _[completar]_ |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
@@ -250,6 +250,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b155a05` | fix(auto_deposit): backup de cuentas de respaldo dispara sin límite de 10 en plan original |
 | `a897075` | chore: actualizar NEXT-SESSION para debugging urgente post-Gemini |
 | `6a04113` | fix: jubilar tarjeta tras CARD_LOCKED_OTHER_ACCOUNT en auto_mission |
 | `78bb7fd` | docs(next-session): update NEXT-SESSION.md for bot/liveness changes |
@@ -261,7 +262,6 @@ prewarm.py (router)
 | `1030c10` | fix: card_num dict key, failed_cards set extraction, BANK_REJECTED persistence |
 | `87e25d6` | fix(proxy): embeber literalmente los 500 proxies de Proxy001 en proxy_pool.py sin lectura de disco |
 | `001e85e` | fix(proxy): resolver ruta relativa de Proxy001 en Docker (KVM4) para cargar los 500 proxies |
-| `55f346e` | fix(proxy): excluir DataImpulse por 502 NO_HOST_CONNECTION y suplantar con Proxy001 (500 MX) |
 <!-- GEN:end:recientes -->
 
 ---
