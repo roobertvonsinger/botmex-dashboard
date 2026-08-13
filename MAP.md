@@ -252,6 +252,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `6cee146` | feat(auto_deposit): seleccion dinamica por actividad + disposicion por tier 40/40/20 (RF4/RF5) |
 | `98b9059` | feat(card_checker): bridge ruthopia HTTP (POST /api/rw/check) + tolerancias de pase en precheck (RF1/RF3) |
 | `dcd023d` | feat(agents): suite superpowers adaptada a opencode + comandos Smartplan/Smartexe |
 | `bd9d2a2` | docs(superpowers): puente ruthopia en /bet — decisiones de Robert (RF5 dinamico, RF8 segundo intento, 5 tarjetas, retries infra, no-mask) |
@@ -263,7 +264,6 @@ prewarm.py (router)
 | `fd6bc56` | revert: restaurar manejo de errores original en app.py (print/pass) |
 | `7cc66c8` | fix: force=True en update manual ignora cooldown (no DEAD) |
 | `e5999fa` | fix: deshabilitar proxy001 (503 caído) + Optional import en bot.py |
-| `f496233` | fix: reemplazar todos los except silenciosos por logging.warning/error |
 <!-- GEN:end:recientes -->
 
 ---

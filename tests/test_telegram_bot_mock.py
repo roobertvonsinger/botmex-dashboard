@@ -26,6 +26,7 @@ from telegram_bot_mock.bot import (
     process_bet_input,
     handle_check_callback,
     handle_bet_callback,
+    handle_retry_mission_callback,
     start_buttons_callback,
     setup_bot_commands,
     _run_check_task,
@@ -514,6 +515,50 @@ async def test_bet_card_invalid_or_cooldown(seed_db):
     assert "CARDING FALLIDO" in args[0] or "NO SE DETECTARON TARJETAS LIVE" in args[0]
 
 
+@pytest.mark.asyncio
+async def test_bet_confirm_splits_live_tol(seed_db, monkeypatch):
+    """D1 (RF1/RF3/RF7): /bet separa live/tol, guarda pendientes y espera confirmación."""
+    import card_checker
+
+    def fake_bridge(pipe_4parts):
+        # 4555... -> live (Approved); 416916... -> Declined, pero BIN tolerado -> tol_bin
+        if pipe_4parts.startswith("45552900000000040"):
+            return ("Approved", "Card Updated (Last4: 0040)")
+        return ("Declined", "declined")
+
+    monkeypatch.setattr(card_checker, "ruthopia_bridge_check", fake_bridge)
+
+    update = MagicMock(spec=Update)
+    user = MagicMock(spec=User)
+    user.id = SUPERADMIN_ID
+    update.effective_user = user
+    update.message = AsyncMock(spec=Message)
+    update.message.text = (
+        "45552900000000040|12|28|123\n"
+        "41691600000000070|12|28|123"
+    )
+    context = MagicMock()
+    context.user_data = {}
+
+    res = await process_bet_input(update, context)
+    assert res == WAIT_BET_CONFIRM
+
+    # Live + tol pasan a pending_bet_pipes; solo la tol queda en pending_tol_pipes
+    pending = context.user_data["pending_bet_pipes"]
+    assert "45552900000000040|1228|123" in pending
+    assert "41691600000000070|1228|123" in pending
+    assert "41691600000000070|1228|123" in context.user_data["pending_tol_pipes"]
+    assert "45552900000000040|1228|123" not in context.user_data["pending_tol_pipes"]
+
+    # Mensaje de confirmación con conteo + botones confirm/cancel
+    args, kwargs = update.message.reply_text.call_args
+    assert "Toleradas" in args[0]
+    kb = kwargs["reply_markup"]
+    flat = [b.callback_data for row in kb.inline_keyboard for b in row]
+    assert "confirm_bet" in flat
+    assert "cancel_bet" in flat
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # PRUEBA DEDUPLICACIÓN EN BD Y COMBOS
 # ─────────────────────────────────────────────────────────────────────────────
@@ -593,3 +638,155 @@ async def test_run_check_task_marks_dead_account_without_crashing(seed_db, monke
     final_text = bot.send_message.call_args_list[-1].kwargs["text"]
     assert "Cuentas Muertas (DEAD):</b> 1" in final_text
     assert "❌ Error durante el check" not in final_text
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PRUEBA RF8 — BOTÓN "SEGUNDO INTENTO" CUANDO LA MISIÓN TERMINA SIN MATCH
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _flat_callback_data(kb):
+    return [b.callback_data for row in kb.inline_keyboard for b in row]
+
+
+@pytest.mark.asyncio
+async def test_retry_button_offered_on_failed_no_match(seed_db):
+    """RF8: misión terminal failed con reason='sin matches' ofrece botón retry_mission_."""
+    status_msg = AsyncMock(spec=Message)
+    user_info = {"telegram_id": SUPERADMIN_ID, "username": "robertvs"}
+    plan = {"accounts": [], "feasible": False, "reason": "sin matches"}
+
+    captured = {}
+
+    async def fake_run(mission_id, plan, user_info, on_progress=None, confirm_gate=None):
+        captured["on_progress"] = on_progress
+
+    import telegram_bot_mock.bot as bot_mod
+    original = bot_mod.run_auto_mission
+    bot_mod.run_auto_mission = fake_run
+    try:
+        bot_mod._launch_auto_mission_ui(
+            MagicMock(), SUPERADMIN_ID, "m_fail", plan, user_info, status_msg
+        )
+    finally:
+        bot_mod.run_auto_mission = original
+
+    # dar tiempo al create_task
+    await asyncio.sleep(0.1)
+    assert "on_progress" in captured
+
+    captured["on_progress"]("failed", {"reason": "sin matches"})
+    await asyncio.sleep(0.1)
+
+    args, kwargs = status_msg.edit_text.call_args
+    kb = kwargs.get("reply_markup")
+    flat = _flat_callback_data(kb)
+    assert "retry_mission_m_fail" in flat
+
+
+@pytest.mark.asyncio
+async def test_retry_button_not_offered_on_other_failure(seed_db):
+    """RF8: failed con otra razón NO ofrece botón retry."""
+    status_msg = AsyncMock(spec=Message)
+    user_info = {"telegram_id": SUPERADMIN_ID, "username": "robertvs"}
+    plan = {"accounts": [], "feasible": False, "reason": "otro"}
+
+    captured = {}
+
+    async def fake_run(mission_id, plan, user_info, on_progress=None, confirm_gate=None):
+        captured["on_progress"] = on_progress
+
+    import telegram_bot_mock.bot as bot_mod
+    original = bot_mod.run_auto_mission
+    bot_mod.run_auto_mission = fake_run
+    try:
+        bot_mod._launch_auto_mission_ui(
+            MagicMock(), SUPERADMIN_ID, "m_fail2", plan, user_info, status_msg
+        )
+    finally:
+        bot_mod.run_auto_mission = original
+
+    await asyncio.sleep(0.1)
+    captured["on_progress"]("failed", {"reason": "otro"})
+    await asyncio.sleep(0.1)
+
+    args, kwargs = status_msg.edit_text.call_args
+    kb = kwargs.get("reply_markup")
+    flat = _flat_callback_data(kb)
+    assert "retry_mission_m_fail2" not in flat
+
+
+@pytest.mark.asyncio
+async def test_retry_mission_callback_launches_new_mission(seed_db, monkeypatch):
+    """RF8: el botón retry_mission_ relee la misión fallida y lanza un nuevo intento."""
+    import telegram_bot_mock.bot as bot_mod
+
+    with db(write=True) as c:
+        c.execute(
+            "INSERT OR REPLACE INTO auto_missions (mission_id, operator_id, status, card_pipes, amount, target_count, created_at, updated_at) "
+            "VALUES ('m_old', ?, 'failed', '[\"4532015112830366|12|28|123\"]', 150.0, 9, 'now', 'now')",
+            (SUPERADMIN_ID,)
+        )
+
+    monkeypatch.setattr(bot_mod, "_mission_sem", MagicMock(locked=lambda: False))
+
+    new_id_holder = {}
+
+    def fake_persist(mission_id, operator_id, card_pipes, amount, target_count, plan):
+        new_id_holder["new_id"] = mission_id
+        assert card_pipes == ["4532015112830366|12|28|123"]
+        assert amount == 150.0
+        assert target_count == 9
+
+    monkeypatch.setattr(bot_mod, "_persist_auto_mission", fake_persist)
+
+    def fake_plan(db_path, card_pipes, amount, target_count, tol_pipes=None):
+        return {
+            "feasible": True,
+            "reason": "OK",
+            "accounts": [{"id": 1, "email": "a@test.com", "card_pipe": card_pipes[0]}],
+        }
+
+    monkeypatch.setattr(bot_mod, "plan_auto_mission", fake_plan)
+    monkeypatch.setattr(bot_mod, "_launch_auto_mission_ui", MagicMock())
+
+    query = AsyncMock()
+    query.data = "retry_mission_m_old"
+    update = MagicMock(spec=Update)
+    user = MagicMock(spec=User)
+    user.id = SUPERADMIN_ID
+    update.effective_user = user
+    update.callback_query = query
+    context = MagicMock()
+
+    res = await bot_mod.handle_retry_mission_callback(update, context)
+    assert res == ConversationHandler.END
+    assert "new_id" in new_id_holder
+    assert new_id_holder["new_id"] != "m_old"
+    assert bot_mod._launch_auto_mission_ui.called
+
+
+@pytest.mark.asyncio
+async def test_retry_mission_callback_not_authorized(seed_db):
+    """RF8: un operador que no es dueño de la misión no puede reintentarla."""
+    import telegram_bot_mock.bot as bot_mod
+
+    with db(write=True) as c:
+        c.execute(
+            "INSERT OR REPLACE INTO auto_missions (mission_id, operator_id, status, card_pipes, amount, target_count, created_at, updated_at) "
+            "VALUES ('m_own', 999, 'failed', '[\"4532015112830366|12|28|123\"]', 150.0, 9, 'now', 'now')",
+        )
+
+    query = AsyncMock()
+    query.data = "retry_mission_m_own"
+    update = MagicMock(spec=Update)
+    user = MagicMock(spec=User)
+    user.id = SUPERADMIN_ID
+    update.effective_user = user
+    update.callback_query = query
+    context = MagicMock()
+
+    res = await bot_mod.handle_retry_mission_callback(update, context)
+    assert res is None
+    query.edit_message_text.assert_called_once_with(
+        "No autorizado para reintentar esta misión.", parse_mode="HTML"
+    )
