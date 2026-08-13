@@ -611,7 +611,7 @@ DATAIMPULSE_PROXIES: List[Dict[str, str]] = [
 # - dataimpulse: 502 NO_HOST_CONNECTION (gateway caÃ­do). Excluido 2026-08-12.
 # - iproyal: REACTIVADO 2026-08-12 (Robert confirma servicio operativo).
 # - proxy001: us.proxy001.com caído (ConnectTimeout/502 masivo). Excluido 2026-08-12.
-_EXCLUDED_PROXY_HOSTS: tuple = ("litport", "iproyal")
+_EXCLUDED_PROXY_HOSTS: tuple = ("litport", "iproyal", "proxy001")
 
 
 def _bot_proxies() -> List[Dict[str, str]]:

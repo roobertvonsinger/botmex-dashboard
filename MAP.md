@@ -251,6 +251,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `ac107e5` | fix(script): resolver import circular de betmexico_config en verificador masivo |
 | `51f9160` | feat: agregar script de verificacion masiva activa de cuentas con proxy rotativo |
 | `93e78cc` | fix: desinstalar hooks y eliminar seccion de graphify para evitar spam |
 | `a966a46` | fix(auto_deposit): garantizar con.close en try/finally al filtrar tarjetas fallidas |
@@ -262,7 +263,6 @@ prewarm.py (router)
 | `0ca4d83` | docs(next-session): actualizar estado deploy fix backup de cuentas (2026-08-13) |
 | `7a17cb2` | fix: reactivar IPRoyal + excluir Proxy001 muerto + atrapar 409 en auto_mission |
 | `b155a05` | fix(auto_deposit): backup de cuentas de respaldo dispara sin límite de 10 en plan original |
-| `a897075` | chore: actualizar NEXT-SESSION para debugging urgente post-Gemini |
 <!-- GEN:end:recientes -->
 
 ---
