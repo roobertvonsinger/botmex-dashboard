@@ -425,8 +425,9 @@ def _auto_lock_for_deposit(
             cur_lock_int = int(cur_lock) if cur_lock else None
         except (TypeError, ValueError):
             cur_lock_int = None
-        if cur_lock and cur_lock_int != operator_id and not is_sa:
-            raise HTTPException(409, f"Cuenta lockeada por otro operador ({cur_lock}). Espera o pide al SA que libere.")
+        # Locks desactivados por requerimiento operativo: las misiones y depósitos
+        # no rebotan por cuentas lockeadas por otros operadores o tareas anteriores.
+        pass
         c.execute(
             "UPDATE accounts SET locked_by=?, locked_at=?, locked_until=? WHERE id=?",
             (str(operator_id), locked_at, locked_until, account_id),
