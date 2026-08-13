@@ -97,7 +97,9 @@ def test_select_orders_by_grade_then_score():
     assert [r["email"] for r in sel] == ["ap@t.com", "a_high@t.com"]
 
 
-def test_select_stratified_round_robin():
+def test_select_stratified_quota_2_2_2():
+    """RF5 (Robert 2026-08-13): count=6 -> cuota 40/40/20 = 2 top, 2 mid, 2 low.
+    Reemplaza el round-robin 1-1-1 viejo por la disposición por tier."""
     rows = [
         _row(f"top_{i}@t.com", grade="A+", grade_score=90) for i in range(3)
     ] + [
@@ -108,10 +110,10 @@ def test_select_stratified_round_robin():
     emails = [r["email"] for r in rows]
     sel = select_accounts_for_auto(rows, 150, 6, _win(*emails))
     selected_emails = [r["email"] for r in sel]
-    # Debe intercalar un Top, un Mid, un Low
-    assert selected_emails[0].startswith("top_")
-    assert selected_emails[1].startswith("mid_")
-    assert selected_emails[2].startswith("low_")
+    # Cuota 2-2-2: 2 top, 2 mid, 2 low
+    assert sum(1 for e in selected_emails if e.startswith("top_")) == 2
+    assert sum(1 for e in selected_emails if e.startswith("mid_")) == 2
+    assert sum(1 for e in selected_emails if e.startswith("low_")) == 2
 
 
 def test_select_respects_count():

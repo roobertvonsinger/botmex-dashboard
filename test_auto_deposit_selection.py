@@ -186,3 +186,66 @@ def test_bin_cooldown_30d_on_approval(tmp_path):
     # 3. Probar asignación enviando pipe_viego (misma tarjeta exacta aprobada -> debe pasar)
     res3 = ad.plan_auto_mission(db, card_pipes=[pipe_viego], amount=150, target_count=1)
     assert res3["accounts"][0]["card_pipe"] == pipe_viego_norm
+
+
+def test_tol_pipe_only_one_account(tmp_path):
+    """RF4: un pipe tolerado solo se asigna a 1 cuenta, aunque haya 3 cuentas."""
+    db = _make_db(tmp_path)
+    con = sqlite3.connect(str(db))
+    for i in range(3):
+        con.execute("INSERT INTO accounts (email, status, published_to_pool) VALUES (?, 'LIVE', 1)",
+                    (f"acc{i}@test.com",))
+    con.commit()
+    con.close()
+    pipe = "4169160000000000|12|28|123"
+    res = ad.plan_auto_mission(db, card_pipes=[pipe], amount=150, target_count=3, tol_pipes={pipe})
+    with_pipe = [a for a in res["accounts"] if a["card_pipe"] == ad._normalize_pipe_to_3part(pipe)]
+    assert len(with_pipe) <= 1
+
+
+def test_dynamic_order_recently_tried_last(tmp_path):
+    """RF5: una cuenta intentada <60min queda al final de su tier (mismo grade)."""
+    db = _make_db(tmp_path)
+    con = sqlite3.connect(str(db))
+    con.execute("INSERT INTO accounts (email, status, grade, published_to_pool) VALUES ('fresh@test.com', 'LIVE', 'A', 1)")
+    con.execute("INSERT INTO accounts (email, status, grade, published_to_pool) VALUES ('tried@test.com', 'LIVE', 'A', 1)")
+    now_iso = datetime.now(timezone.utc).isoformat()
+    con.execute("INSERT INTO deposit_attempts (account_email, amount, status, created_at) VALUES ('tried@test.com', 150, 'rejected', ?)", (now_iso,))
+    con.commit()
+    con.close()
+    res = ad.plan_auto_mission(db, card_pipes=["4111111111111111|12|28|123"], amount=150, target_count=2)
+    order = [a["email"] for a in res["accounts"]]
+    assert order.index("tried@test.com") > order.index("fresh@test.com")
+
+
+def test_cards_heavy_deprioritized(tmp_path):
+    """RF5: cuenta con 2+ tarjetas asociadas se deprioriza sobre una con 0."""
+    db = _make_db(tmp_path)
+    con = sqlite3.connect(str(db))
+    con.execute("INSERT INTO accounts (email, status, grade, published_to_pool) VALUES ('light@test.com', 'LIVE', 'A', 1)")
+    con.execute("INSERT INTO accounts (email, status, grade, published_to_pool) VALUES ('heavy@test.com', 'LIVE', 'A', 1)")
+    for i in range(2):
+        con.execute("INSERT INTO account_cards (number, account_email) VALUES (?, 'heavy@test.com')", (f"4{i}999999999999",))
+    con.commit()
+    con.close()
+    res = ad.plan_auto_mission(db, card_pipes=["4111111111111111|12|28|123"], amount=150, target_count=2)
+    order = [a["email"] for a in res["accounts"]]
+    assert order.index("heavy@test.com") > order.index("light@test.com")
+
+
+def test_tier_proportion_2_2_1(tmp_path):
+    """RF5: con 5 cuentas (2 top/2 mid/1 low disponibles) la cuota es 2-2-1."""
+    db = _make_db(tmp_path)
+    con = sqlite3.connect(str(db))
+    for i in range(2):
+        con.execute("INSERT INTO accounts (email, status, grade, published_to_pool) VALUES (?, 'LIVE', 'A+', 1)", (f"top{i}@test.com",))
+    for i in range(3):
+        con.execute("INSERT INTO accounts (email, status, grade, published_to_pool) VALUES (?, 'LIVE', 'A', 1)", (f"mid{i}@test.com",))
+    con.execute("INSERT INTO accounts (email, status, grade, published_to_pool, jwt_expires_at) VALUES ('low@test.com', 'LIVE', 'C', 1, 0)")
+    con.commit()
+    con.close()
+    res = ad.plan_auto_mission(db, card_pipes=["4111111111111111|12|28|123"], amount=150, target_count=5, max_accounts=5)
+    emails = [a["email"] for a in res["accounts"]]
+    assert sum(1 for e in emails if e.startswith("top")) == 2
+    assert sum(1 for e in emails if e.startswith("mid")) == 2
+    assert sum(1 for e in emails if e == "low@test.com") == 1

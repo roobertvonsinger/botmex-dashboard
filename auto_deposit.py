@@ -281,26 +281,21 @@ def select_accounts_for_auto(
     def sort_key(r):
         email = r.get("email")
         meta = meta_map.get(email) or {}
-        # Penalizar si tuvo intento en los últimos 60 minutos (evita ciclo determinístico en /bet)
+        # RF5: cuentas ya intentadas (<60 min) SIEMPRE al final de su tier
         mins = meta.get("mins_since_last_attempt", 99999)
         recently_tried = 1 if mins < 60 else 0
+        # RF5: 2+ tarjetas asociadas pierden prioridad (probabilidad de depósito baja)
+        cards_heavy = 1 if (meta.get("cards_count") or 0) >= 2 else 0
         return (
             recently_tried,
+            cards_heavy,
             _grade_rank(r.get("grade")),
             -(float(r.get("grade_score") or 0)),
+            -int(meta.get("last_activity_epoch") or 0),  # más activo reciente primero
         )
 
     tier_top.sort(key=sort_key)
     tier_mid.sort(key=sort_key)
-    # LOW mezcla dos perfiles de riesgo distinto: cuentas JWT-vivo degradadas
-    # (SPEI reciente / intento <24h / grade B-D — buena cuenta, solo con mala
-    # suerte temporal) y cuentas 🔑 sin JWT (necesitan Login Full: captcha +
-    # proxy + una superficie de fallo extra ANTES de llegar siquiera al probe).
-    # Robert 2026-08-05: preferencia leve, no exclusión — dentro de LOW, probar
-    # primero las 🟢 (más baratas, mismo riesgo de tarjeta) y dejar las 🔑 para
-    # cuando ya no queden alternativas vivas en este tier. No cambia CUÁLES
-    # cuentas entran (siguen todas, round-robin intacto), solo el ORDEN dentro
-    # del tier — no le quita presupuesto de captcha a la búsqueda del match.
     tier_low.sort(key=lambda r: (0 if r.get("_jwt_alive") else 1, *sort_key(r)))
 
     # Si count <= 3 o hay muy pocas cuentas, entregar las mejores disponibles (TOP -> MID -> LOW)
@@ -308,35 +303,15 @@ def select_accounts_for_auto(
         combined = tier_top + tier_mid + tier_low
         return combined[:count]
 
-    # Distribución intercalada (1 TOP, 1 MID, 1 LOW)
+    # RF5: disposición casi fija por tier (Robert 2026-08-13):
+    # count=5 -> 2 top, 2 mid, 1 low; count=10 -> 4/4/2. Fall-through si un tier se vacía.
+    n_top = int(round(count * 0.4))
+    n_mid = int(round(count * 0.4))
+    n_low = count - n_top - n_mid
+
     stratified: List[Dict[str, Any]] = []
-    i_top, i_mid, i_low = 0, 0, 0
-
-    while len(stratified) < count and (
-        i_top < len(tier_top) or i_mid < len(tier_mid) or i_low < len(tier_low)
-    ):
-        # 1 TOP
-        if i_top < len(tier_top):
-            stratified.append(tier_top[i_top])
-            i_top += 1
-            if len(stratified) == count:
-                break
-
-        # 1 MID
-        if i_mid < len(tier_mid):
-            stratified.append(tier_mid[i_mid])
-            i_mid += 1
-            if len(stratified) == count:
-                break
-
-        # 1 LOW
-        if i_low < len(tier_low):
-            stratified.append(tier_low[i_low])
-            i_low += 1
-            if len(stratified) == count:
-                break
-
-    # Si aún falta para completar count (fall-through de seguridad)
+    for tier, quota in ((tier_top, n_top), (tier_mid, n_mid), (tier_low, n_low)):
+        stratified.extend(tier[:quota])
     if len(stratified) < count:
         remaining = [r for r in out if r not in stratified]
         remaining.sort(key=sort_key)
@@ -372,6 +347,7 @@ def plan_auto_mission(
     amount: float = 150,
     target_count: int = 9,
     max_accounts: Optional[int] = None,
+    tol_pipes: Optional[set] = None,
 ) -> Dict[str, Any]:
     """Plan de misión auto: cuentas elegibles + tarjeta asignada a cada una.
 
@@ -398,6 +374,8 @@ def plan_auto_mission(
 
     if max_accounts is None:
         max_accounts = _max_accounts_for_cards(len(card_pipes or []))
+
+    tol_pipes = {_normalize_pipe_to_3part(p) for p in (tol_pipes or [])}
 
     con = sqlite3.connect(str(db_path))
     con.row_factory = sqlite3.Row
@@ -514,6 +492,29 @@ def plan_auto_mission(
                 except Exception:
                     pass
 
+            # RF5: tarjetas asociadas en la cuenta (depriorización si >= 2)
+            cards_n = con.execute(
+                "SELECT COUNT(*) AS n FROM account_cards WHERE account_email=?",
+                (email,),
+            ).fetchone()["n"]
+
+            # RF5: recencia de actividad (movimientos/bets) para mover la cuenta en la lista
+            last_act = con.execute(
+                "SELECT MAX(last) AS last FROM ("
+                "  SELECT created_at AS last FROM deposit_attempts WHERE account_email=?"
+                "  UNION ALL SELECT txn_date AS last FROM account_transactions WHERE account_email=?"
+                ")"
+            , (email, email)).fetchone()["last"]
+            last_activity_epoch = 0
+            if last_act:
+                try:
+                    dt = datetime.fromisoformat(str(last_act).replace(" ", "T").replace("Z", "+00:00"))
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    last_activity_epoch = int(dt.timestamp())
+                except Exception:
+                    pass
+
             meta_map[email] = {
                 "has_dashboard_approved_48h": bool(app_48h),
                 "has_spei_24h": bool(spei_24h),
@@ -523,6 +524,8 @@ def plan_auto_mission(
                 "is_dead_blocked": bool(dead_blocked),
                 "approved_bin_pipes": approved_bin_pipes,
                 "mins_since_last_attempt": mins_since,
+                "cards_count": int(cards_n or 0),
+                "last_activity_epoch": last_activity_epoch,
             }
 
         try:
@@ -550,6 +553,7 @@ def plan_auto_mission(
         pool.sort(key=lambda c: _rank_key(c, bin_stats_map))
 
         accounts_out: List[Dict[str, Any]] = []
+        assigned_tol: set = set()
         for r in selected:
             email = r.get("email")
             meta = meta_map.get(email) or {}
@@ -564,12 +568,16 @@ def plan_auto_mission(
                 for cand in pool:
                     cand_pipe_str = _pipe_str(cand)
                     cand_bin = cand_pipe_str[:6] if len(cand_pipe_str) >= 6 else ""
+                    # RF4: tarjeta tolerada solo en 1 cuenta por misión
+                    if cand_pipe_str in tol_pipes and cand_pipe_str in assigned_tol:
+                        continue
                     # Cooldown 30d del BIN: Si el BIN aprobó con OTRO pipe en los últimos 30d en esta cuenta -> omitir
                     if cand_bin in app_bin_pipes:
                         if cand_pipe_str not in app_bin_pipes[cand_bin]:
                             continue  # Mismo BIN pero otra tarjeta -> bloquear por 30 días
 
                     pipe = cand_pipe_str
+                    assigned_tol.add(cand_pipe_str)
                     break
 
             if pipe:

@@ -14,6 +14,16 @@
 | `card_checker` import `os` | `os` agregado a imports a nivel módulo (antes lazy dentro de `perform_wabox_liveness_check`). | ✅ implementado | ✅ py_compile + suite |
 | Tests ajustados al bridge | `test_bot_bet` y dedup (`test_bot_check`, `test_telegram_bot_mock`) mockean `ruthopia_bridge_check` en vez de `perform_wabox_liveness_check` (función que ya no se invoca en este flujo). | ✅ implementado | ✅ suite completa 445 verdes (2 fallos preexistentes `account_withdrawals` sin relación) |
 
+## Captura: 2026-08-13 (selección dinámica por actividad + disposición por tier en auto_deposit — RF4/RF5)
+
+**Motivo**: RF4 — el auto-depósito ignoraba las tarjetas toleradas (pases `tol_bin`/`tol_reason`) que el bridge ruthopia sí identifica; RF5 — el matchmaker intercalaba round-robin 1-1-1 sin considerar actividad reciente ni peso de tarjetas, taladrando cuentas ya intentadas o con tarjetas casadas. Espec: `docs/superpowers/specs/2026-08-13-puente-ruthopia-bet-design.md`; plan: `docs/superpowers/plans/2026-08-13-puente-ruthopia-bet.md`.
+
+| Función | Spec (2026-08-13) | Estado | Verificado |
+|---|---|---|---|
+| `auto_deposit.plan_auto_mission` | Firma nueva `tol_pipes: Optional[set]` (RF4): las CC que el bridge marcó toleradas (`tol_bin`/`tol_reason`) NO se descartan — se asignan en `assigned_tol` y entran a la misión como tarjetas de prueba, manteniendo la señal para el gate real. `tol_pipes` normalizado a 3 partes al inicio. | ✅ implementado | ✅ 9 tests RF4/RF5 + suite completa 449 verdes (2 fallos preexistentes `account_withdrawals` sin relación) |
+| `auto_deposit.select_accounts_for_auto` | RF5: reemplaza el intercalado round-robin por disposición casi fija por tier (Robert 2026-08-13) — `n_top=round(count*0.4)`, `n_mid=round(count*0.4)`, `n_low=count-n_top-n_mid`, fall-through si un tier se vacía. `sort_key` nuevo: `recently_tried` (intento <60min → siempre al final de su tier), `cards_heavy` (2+ tarjetas asociadas → depriorizada), grade, grade_score, `last_activity_epoch` desc. `meta_map` nuevo con `cards_count` (COUNT account_cards) y `last_activity_epoch` (MAX deposit_attempts/account_transactions). Firma sin cambios (backward-compat). | ✅ implementado | ✅ `test_dynamic_order_recently_tried_last`, `test_cards_heavy_deprioritized`, `test_tier_proportion_2_2_1`, `test_select_stratified_quota_2_2_2` verdes |
+| `tests/test_auto_deposit.py::test_select_stratified_round_robin` | Renombrado a `test_select_stratified_quota_2_2_2` — valida la cuota 40/40/20 (2-2-2 con count=6) en vez del intercalado 1-1-1 que RF5 reemplazó. | ✅ actualizado | ✅ suite completa verdes |
+
 ## Captura: 2026-08-13 (fix de raíz — yoyo de proxies por valida-curp.com NXDOMAIN)
 
 **Motivo**: yoyo de exclusiones de proxies durante 36h. El `502 NO_HOST_CONNECTION` masivo NO era DataImpulse caído — era `renapo_validator.py` golpeando `valida-curp.com` (NXDOMAIN) con el pool completo en failover. KVM4 quedó desplegado en `f023074` (DI excluido, 3 sustitutos caídos). Ver `docs/ERRORS.md` para el post-mortem completo.

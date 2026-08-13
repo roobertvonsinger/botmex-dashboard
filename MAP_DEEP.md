@@ -216,19 +216,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_pipe_str` | def | L116–L121 |
 | `_parse_card_pipe` | def | L124–L145 |
 | `_normalize_pipe_to_3part` | def | L148–L150 |
-| `select_accounts_for_auto` | def | L159–L349 |
-| `_max_accounts_for_cards` | def | L358–L366 |
-| `plan_auto_mission` | def | L369–L599 |
-| `_fake_progress_pct` | def | L640–L671 |
-| `_iso` | def | L675–L676 |
-| `_m_load` | def | L679–L687 |
-| `_m_status` | def | L690–L692 |
-| `_m_update` | def | L695–L705 |
-| `_fetch_account` | def | L708–L715 |
-| `_unlock` | def | L718–L727 |
-| `_broadcast_mission` | def | L730–L759 |
-| `_stop_pool` | def | L762–L769 |
-| `run_auto_mission` | def | L773–L1466 |
+| `select_accounts_for_auto` | def | L159–L324 |
+| `_max_accounts_for_cards` | def | L333–L341 |
+| `plan_auto_mission` | def | L344–L607 |
+| `_fake_progress_pct` | def | L648–L679 |
+| `_iso` | def | L683–L684 |
+| `_m_load` | def | L687–L695 |
+| `_m_status` | def | L698–L700 |
+| `_m_update` | def | L703–L713 |
+| `_fetch_account` | def | L716–L723 |
+| `_unlock` | def | L726–L735 |
+| `_broadcast_mission` | def | L738–L767 |
+| `_stop_pool` | def | L770–L777 |
+| `run_auto_mission` | def | L781–L1474 |
 
 ### `autoexclusion.py`
 
@@ -630,6 +630,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_spei_external_deposit_relegates_to_low` | def | L121–L137 |
 | `test_boost_3ds_recent_to_top` | def | L140–L154 |
 | `test_bin_cooldown_30d_on_approval` | def | L157–L188 |
+| `test_tol_pipe_only_one_account` | def | L191–L203 |
+| `test_dynamic_order_recently_tried_last` | def | L206–L218 |
+| `test_cards_heavy_deprioritized` | def | L221–L233 |
+| `test_tier_proportion_2_2_1` | def | L236–L251 |
 
 ### `test_auto_missions_migrate.py`
 
