@@ -252,6 +252,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `bbca351` | fix(proxy): reactivar DataImpulse y expandir rango sticky a 10000-10500 |
 | `f023074` | fix(bot/proxy): corregir AttributeError de Message.text y excluir DataImpulse caido por 502 |
 | `45332e0` | fix(proxy): actualizar proxies Proxy001 de zona MX y corregir exclusiones |
 | `d059024` | fix(proxy_pool): excluir temporalmente proxy001 por caida masiva de gateway (502/ConnectTimeout) |
@@ -263,7 +264,6 @@ prewarm.py (router)
 | `9876977` | fix(auto_deposit): eliminar bypass de 2s en cooldown y pre-excluir tarjetas casadas de BD |
 | `1352ef1` | test: actualizar assert de declines por cuenta tras backup dinamico |
 | `6d61e12` | fix(proxy): reactivar DataImpulse con puerto 823 rotativo + rango 10000-10100 |
-| `64ce4de` | fix(proxy): revertir exclusion de Proxy001 y mantener IPRoyal excluido |
 <!-- GEN:end:recientes -->
 
 ---

@@ -5,32 +5,29 @@
 
 ## 🎯 Objetivo en curso
 
-**DEBUGGING URGENTE** — Gemini metió cambios que rompieron cosas. Robert reporta bugs múltiples en el flujo automático (`auto_deposit.py` / `deposits.py` / bot). Sesión de debugging de raíz.
+**REVISIÓN Y SMOKE TEST DE CORRECCIONES DE VERIFICACIÓN, PROXIES Y TELEGRAM** — Se completaron e integraron fixes críticos en el pool de proxies, bot de Telegram y la verificación masiva de cuentas. En la siguiente sesión se realizará la verificación en vivo con tráfico real y revisión de resultados.
 
 ## ▶ Con qué arrancas (PRIMERA acción)
 
-1. **Preguntarle a Robert QUÉ bugs exactos está viendo** — pedir logs/screenshots/comportamiento esperado vs real.
-2. Revisar `git log --oneline -20` para identificar commits de Gemini y qué tocó.
-3. Comparar estado actual contra el último commit estable conocido antes de los cambios de Gemini.
-4. Para cada bug: root cause → fix → test → deploy → verificar en vivo.
+1. **Revisar estado de la verificación masiva** en KVM4 (`verify_all_accounts_active.py`) y conteo final de cuentas `LIVE` vs `DEAD` en SQLite (`/data/betmexico_accounts.db`).
+2. **Revisar logs del bot de Telegram** (`betmexico-bot`) para confirmar 0 ocurrencias de `AttributeError` en la interacción de usuarios con `/bet`.
+3. **Verificar estabilidad del pool de proxies** (`proxy_pool.py`) monitoreando logs de DataImpulse (puertos 10000..10499) y Proxy001.
 
 ## 🧭 Recomendación de approach
 
-- **NO asumir qué rompió Gemini** — Robert dice qué ve, tú investigas con evidencia (logs, código, git diff).
-- Priorizar por impacto operativo (lo que bloquea operaciones primero).
-- Cada fix: test local → deploy → smoke real.
+- Monitorear logs vivos vía `/api/logs` o `docker logs betmexico-web` / `betmexico-bot`.
+- Ejecutar un smoke test completo de `/bet` desde Telegram para validar la autoselección de tarjetas y matchmaking.
 
 ## ⏳ Pendientes próximos
 
-- **Fix aplicado esta sesión (2026-08-13 03:59 UTC)**: `CARD_LOCKED_OTHER_ACCOUNT` no jubilaba la tarjeta en `run_auto_mission` → la misma tarjeta casada se intentaba 5+ veces en cuentas restantes. Fix: `retired_cards.add(pipe)`. Commit `6a04113`, deployado. **Pendiente verificar en vivo.**
-- **Plan de matchmaking optimization** aprobado pero NO implementado aún (`docs/plans/2026-08-13-matchmaking-optimization.md`). Los 4 cambios propuestos (jubilación dinámica, cooldown inteligente, matriz diagnóstico, expansión dinámica) son mejoras — NO fixes de bugs. Retomar DESPUÉS del debugging.
-- **Front del Portal**: animación + KPIs (sin spec aún).
+- **Revisión en vivo de los cambios (2026-08-13)**: Validar descarte de cuentas en rate limit, estabilidad del bot y consumo de DataImpulse.
+- **Plan de matchmaking optimization** aprobado (`docs/plans/2026-08-13-matchmaking-optimization.md`). Retomar implementación de las 4 fases.
+- **Front del Portal**: animación + KPIs.
 - **Intervalo adaptativo de `jwt_keeper`** cuando hay hot pendientes.
-- **Extraer `_refresh_account_after_*` a helper común** en `prewarm.py`.
-- **`feat/support-agent`** (commit `8cc125c`) — rama viva, NO mergeada. Solo si Robert lo pide.
 
 ## ✅ Hecho esta sesión (2026-08-13)
 
-- **Fix CARD_LOCKED_OTHER_ACCOUNT** en `auto_deposit.py` — tarjeta casada se jubila de inmediato en `retired_cards` para que no se intente en cuentas siguientes del plan. Commit `6a04113`, deployado a KVM4 (web + raíz), contenedor reiniciado 03:59 UTC.
-- **Fix gap backup de cuentas** — el disparador de expansión dinámica exigía `len(accounts_list) < 10`, cortando el backup cuando el plan original ya alcanzó el techo (10) pero falló todas. Relajado a `MAX_ACCOUNTS_HARD_CAP`, con `remaining = HARD_CAP - len(actuales)`. Commit `b155a05`.
-- **Deploy verificado** — `auto_deposit.py` md5 `81807e48` en container betmexico-web (`/app/auto_deposit.py`). Syntax + import OK. `/` → 302, `/api/version` responde. StartedAt `2026-08-13T04:26:59Z`. Tests: `test_auto_deposit.py` + `test_auto_mission.py` → 39/39 verdes.
+- **Fix `AttributeError` en Telegram Bot**: `process_bet_input` actualizado con `override_text` opcional para evitar mutar `update.message.text`. Commit `f023074`.
+- **Reactivación y Expansión de DataImpulse**: Se validó conectividad de 500 puertos sticky (`10000..10499`) y se reactivó la pasarela en `proxy_pool.py`. Commit `bbca351`.
+- **Actualización de Proxy001**: 35 proxies residenciales MX cargados y enrutados sin exclusión. Commit `45332e0`.
+- **Re-ejecución de Verificación Masiva**: `verify_all_accounts_active.py` corriendo secuencialmente en segundo plano en KVM4 (PID 62) para limpiar cuentas quemadas / en rate limit de forma persistente.
