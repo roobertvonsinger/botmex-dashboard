@@ -5,29 +5,38 @@
 
 ## 🎯 Objetivo en curso
 
-**REVISIÓN Y SMOKE TEST DE CORRECCIONES DE VERIFICACIÓN, PROXIES Y TELEGRAM** — Se completaron e integraron fixes críticos en el pool de proxies, bot de Telegram y la verificación masiva de cuentas. En la siguiente sesión se realizará la verificación en vivo con tráfico real y revisión de resultados.
+**ESTABILIZAR FLUJOS Y SEPARAR BOTS DE TELEGRAM** — Hemos resuelto los choques de concurrencia de BD, el bug de update manual y estabilizado los proxies. Ahora mantenemos dos carriles paralelos de bots de Telegram sin mezclar tokens ni código.
+
+## 🚦 Arquitectura de Telegram en Prod (KVM4) - ¡LEER PARA NO CONFUNDIRSE!
+
+1. **Bot Oficial (Legacy)**: Contenedor `betmexico-bot`.
+   - **Código**: Monorepo (`/app/betmexico_bot.py`).
+   - **Token**: `BMX_BOT_TOKEN`.
+2. **Bot Dashboard (Nuevo)**: Contenedor `betmexico-mock-bot`.
+   - **Código**: Repo dashboard (`/app/web/telegram_bot_mock/bot.py`).
+   - **Token**: `BMX_MOCK_BOT_TOKEN`.
+   - *Nota: Todos los fixes recientes de /bet, override_text y proxies viven AQUÍ.*
 
 ## ▶ Con qué arrancas (PRIMERA acción)
 
-1. **Revisar estado de la verificación masiva** en KVM4 (`verify_all_accounts_active.py`) y conteo final de cuentas `LIVE` vs `DEAD` en SQLite (`/data/betmexico_accounts.db`).
-2. **Revisar logs del bot de Telegram** (`betmexico-bot`) para confirmar 0 ocurrencias de `AttributeError` en la interacción de usuarios con `/bet`.
-3. **Verificar estabilidad del pool de proxies** (`proxy_pool.py`) monitoreando logs de DataImpulse (puertos 10000..10499) y Proxy001.
+1. **Monitorear en vivo el uso de `betmexico-mock-bot`** para confirmar que el `/bet` procesa limpio y sin `AttributeError`.
+2. **Monitorear logs de `betmexico-web`** para confirmar que el update manual `force=True` sí logra atravesar las cuentas en cooldown.
 
 ## 🧭 Recomendación de approach
 
-- Monitorear logs vivos vía `/api/logs` o `docker logs betmexico-web` / `betmexico-bot`.
-- Ejecutar un smoke test completo de `/bet` desde Telegram para validar la autoselección de tarjetas y matchmaking.
+- Si hay que modificar lógica del bot nuevo, editar **SOLO** en `telegram_bot_mock/bot.py` de este repo y desplegar a `betmexico-mock-bot`.
+- Respetar los proxies estables: `proxy001`, `iproyal` y `nodemaven` están DESACTIVADOS (502/407/504). `DataImpulse` (10000..10499) es el único activo.
 
 ## ⏳ Pendientes próximos
 
-- **Revisión en vivo de los cambios (2026-08-13)**: Validar descarte de cuentas en rate limit, estabilidad del bot y consumo de DataImpulse.
 - **Plan de matchmaking optimization** aprobado (`docs/plans/2026-08-13-matchmaking-optimization.md`). Retomar implementación de las 4 fases.
 - **Front del Portal**: animación + KPIs.
 - **Intervalo adaptativo de `jwt_keeper`** cuando hay hot pendientes.
 
 ## ✅ Hecho esta sesión (2026-08-13)
 
-- **Fix `AttributeError` en Telegram Bot**: `process_bet_input` actualizado con `override_text` opcional para evitar mutar `update.message.text`. Commit `f023074`.
-- **Reactivación y Expansión de DataImpulse**: Se validó conectividad de 500 puertos sticky (`10000..10499`) y se reactivó la pasarela en `proxy_pool.py`. Commit `bbca351`.
-- **Actualización de Proxy001**: 35 proxies residenciales MX cargados y enrutados sin exclusión. Commit `45332e0`.
-- **Re-ejecución de Verificación Masiva**: `verify_all_accounts_active.py` corriendo secuencialmente en segundo plano en KVM4 (PID 62) para limpiar cuentas quemadas / en rate limit de forma persistente.
+- **Fix `AttributeError` en Telegram Bot**: `process_bet_input` actualizado con `override_text` en el **bot nuevo**.
+- **Fix Update Manual vs Cooldown**: Prewarm manual (`force=True`) ahora salta el `cooldown_until` pero respeta `DEAD`.
+- **Limpieza de Proxies**: Se removieron `proxy001`, `iproyal` y `nodemaven` del pool activo por caídas masivas (502/407/504).
+- **Separación de Bots en Prod**: Clarificada la frontera entre el bot legacy y el bot nuevo del dashboard; ambos corren en paralelo con sus propios tokens.
+- **Reversión de Logging en Background Loops**: Se restauró la estabilidad de los hilos asíncronos devolviendo el uso de `print` y `pass` originales.

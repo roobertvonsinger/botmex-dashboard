@@ -252,6 +252,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `fd6bc56` | revert: restaurar manejo de errores original en app.py (print/pass) |
 | `7cc66c8` | fix: force=True en update manual ignora cooldown (no DEAD) |
 | `e5999fa` | fix: deshabilitar proxy001 (503 caído) + Optional import en bot.py |
 | `f496233` | fix: reemplazar todos los except silenciosos por logging.warning/error |
@@ -263,7 +264,6 @@ prewarm.py (router)
 | `ac107e5` | fix(script): resolver import circular de betmexico_config en verificador masivo |
 | `51f9160` | feat: agregar script de verificacion masiva activa de cuentas con proxy rotativo |
 | `93e78cc` | fix: desinstalar hooks y eliminar seccion de graphify para evitar spam |
-| `a966a46` | fix(auto_deposit): garantizar con.close en try/finally al filtrar tarjetas fallidas |
 <!-- GEN:end:recientes -->
 
 ---
