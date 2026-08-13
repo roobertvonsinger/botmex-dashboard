@@ -252,6 +252,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `9321a0f` | fix(proxy/renapo): causa raiz del yoyo de proxies - valida-curp.com NXDOMAIN quemaba el pool |
 | `91deb84` | docs: actualizar NEXT-SESSION para handoff de resolucion de proxies |
 | `b3d0361` | fix(proxy): remover iproyal y nodemaven por degradacion (504/407) |
 | `a5247b1` | docs: generar HANDOFF con post-mortem de errores y estado critico |
@@ -263,7 +264,6 @@ prewarm.py (router)
 | `29f1717` | docs: actualizar NEXT-SESSION con estado de proxies, telegram bot y verificacion masiva |
 | `bbca351` | fix(proxy): reactivar DataImpulse y expandir rango sticky a 10000-10500 |
 | `f023074` | fix(bot/proxy): corregir AttributeError de Message.text y excluir DataImpulse caido por 502 |
-| `45332e0` | fix(proxy): actualizar proxies Proxy001 de zona MX y corregir exclusiones |
 <!-- GEN:end:recientes -->
 
 ---
