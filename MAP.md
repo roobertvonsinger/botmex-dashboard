@@ -250,6 +250,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `668ab62` | fix(bot/liveness): bypass Ruthopia liveness check, remove bet confirmation, hide dashboard during matchmaking |
 | `a6d8e87` | fix(deposits): desactivar restriccion de lock por operador (409) en auto_lock_for_deposit |
 | `36d9b3c` | fix(bot): resolver fallos de pytest en /bet, /check y card_checker |
 | `5108533` | fix(cards): cache 30m utopia para tarjetas aprobadas y alerta SSE para CARD_MARRIED |
@@ -261,7 +262,6 @@ prewarm.py (router)
 | `9ed5931` | docs(errors): corregir mecanismo real del log viejo (archivo persistente, no buffer Docker) + limpiar bloques muertos |
 | `8bdb146` | fix(retiros): guardarrail gateway/dígitos mismatch ciego — PASO5 pegaba a bankTransaction (vacío) en vez de Transactions/ByUser |
 | `d19e53f` | fix(retiros): badge de institucion seguia mostrando el cache de readiness, no el retiro real |
-| `638f85a` | docs(errors): corregir ERRORS.md — LoginResult.status ya estaba deployado y verificado, no pendiente |
 <!-- GEN:end:recientes -->
 
 ---
