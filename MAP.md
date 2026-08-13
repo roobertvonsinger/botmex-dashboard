@@ -250,6 +250,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `6a04113` | fix: jubilar tarjeta tras CARD_LOCKED_OTHER_ACCOUNT en auto_mission |
 | `78bb7fd` | docs(next-session): update NEXT-SESSION.md for bot/liveness changes |
 | `668ab62` | fix(bot/liveness): bypass Ruthopia liveness check, remove bet confirmation, hide dashboard during matchmaking |
 | `a6d8e87` | fix(deposits): desactivar restriccion de lock por operador (409) en auto_lock_for_deposit |
@@ -261,7 +262,6 @@ prewarm.py (router)
 | `001e85e` | fix(proxy): resolver ruta relativa de Proxy001 en Docker (KVM4) para cargar los 500 proxies |
 | `55f346e` | fix(proxy): excluir DataImpulse por 502 NO_HOST_CONNECTION y suplantar con Proxy001 (500 MX) |
 | `9ed5931` | docs(errors): corregir mecanismo real del log viejo (archivo persistente, no buffer Docker) + limpiar bloques muertos |
-| `8bdb146` | fix(retiros): guardarrail gateway/dígitos mismatch ciego — PASO5 pegaba a bankTransaction (vacío) en vez de Transactions/ByUser |
 <!-- GEN:end:recientes -->
 
 ---
