@@ -26,27 +26,7 @@ logger = logging.getLogger("dashboard.proxy_pool")
 # Mismo formato: {server, username, password}. El sufijo `_country-mx` o
 # `-country-mx` en username fuerza ruteo por IP MÃ©xico.
 EXTRA_ADMIN_PROXIES: List[Dict[str, str]] = [
-    # IPRoyal (Premium MX residencial, ROTATIVO nacional) â€” corregido 2026-05-29.
-    # Antes estaba con `city-ciudadobregon` (puerto 11200) = IP PEGADA a una ciudad
-    # â†’ se quemaba y daba 406 masivo. Robert dio el correcto: puerto 11201 +
-    # `_country-mx_streaming-1` (sin city) â†’ rota IPs por todo MX = IP fresca por
-    # intento, mucho mejor contra el antifraude de BetMexico. Compartido con
-    # Ruthopia (telcel gate) â€” vigilar consumo.
-    {
-        "server": "geo.iproyal.com:11201",
-        "username": "sH3PhyrRotHpRxYY2sEiS",
-        "password": "u7JSejn6ZTSHfbpR_country-mx_streaming-1",
-    },
-    # NodeMaven (Premium MX) â€” agregado 2026-05-21.
-    # âš ï¸ DEGRADADO: 504 Gateway Timeout intermitente (~22% medido 2026-06-24) +
-    # 406 crÃ³nico (IP quemada). Se mantiene SOLO como fallback de OTRO proveedor
-    # (diversidad ante caÃ­da de Data Impulse); su peso real es ~2/52. Ver Data
-    # Impulse abajo, que pasa a ser el proxy primario.
-    {
-        "server": "gate.nodemaven.com:8080",
-        "username": "andregutti97_gmail_com-country-mx",
-        "password": "5qpn3scda5",
-    },
+    # IPRoyal y NodeMaven desactivados 2026-08-13 (407/504 en prod). Solo DataImpulse activo.
 ]
 
 # Data Impulse (Premium MX residencial) â€” PRIMARIO. Host/user/pass FIJOS; el PUERTO

@@ -252,6 +252,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a5247b1` | docs: generar HANDOFF con post-mortem de errores y estado critico |
 | `ad64b86` | docs: actualizar NEXT-SESSION con arquitectura dual de bots en prod |
 | `fd6bc56` | revert: restaurar manejo de errores original en app.py (print/pass) |
 | `7cc66c8` | fix: force=True en update manual ignora cooldown (no DEAD) |
@@ -263,7 +264,6 @@ prewarm.py (router)
 | `45332e0` | fix(proxy): actualizar proxies Proxy001 de zona MX y corregir exclusiones |
 | `d059024` | fix(proxy_pool): excluir temporalmente proxy001 por caida masiva de gateway (502/ConnectTimeout) |
 | `ac107e5` | fix(script): resolver import circular de betmexico_config en verificador masivo |
-| `51f9160` | feat: agregar script de verificacion masiva activa de cuentas con proxy rotativo |
 <!-- GEN:end:recientes -->
 
 ---
