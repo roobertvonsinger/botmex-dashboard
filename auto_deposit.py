@@ -913,6 +913,21 @@ async def run_auto_mission(
             accounts_list = list(plan.get("accounts", []))
             already_checked_emails = set(a["email"] for a in accounts_list)
             retired_cards = set()
+            # Pre-cargar tarjetas que ya estén casadas/bloqueadas con OTRA cuenta en BD
+            try:
+                from app import DB_PATH
+                con = sqlite3.connect(str(DB_PATH))
+                locked_db_cards = set(r[0] for r in con.execute("""
+                    SELECT DISTINCT card_pipe FROM deposit_attempts
+                    WHERE status = 'approved' AND card_pipe IS NOT NULL AND card_pipe != ''
+                """).fetchall() if r[0])
+                con.close()
+                for l_pipe in locked_db_cards:
+                    retired_cards.add(_normalize_pipe_to_3part(l_pipe))
+                if locked_db_cards:
+                    logger.info(f"🛡️ Pre-excluidas {len(locked_db_cards)} tarjetas ya casadas en BD")
+            except Exception as ex_db_lock:
+                logger.warning(f"No se pudieron pre-cargar tarjetas casadas de BD: {ex_db_lock}")
 
             acc_idx = 0
             while acc_idx < len(accounts_list):
@@ -1109,7 +1124,8 @@ async def run_auto_mission(
                             # no cuenta para MM_MAX_ACCOUNT_DECLINES_PER_RUN.
                             # JUBILAR la tarjeta: ya está casada con otra cuenta,
                             # no tiene sentido seguirla probando en las demás.
-                            retired_cards.add(_normalize_pipe_to_3part(pipe))
+                            norm_pipe = _normalize_pipe_to_3part(pipe)
+                            retired_cards.add(norm_pipe)
                             logger.info(f"🚫 TARJETA JUBILADA (CARD_LOCKED_OTHER_ACCOUNT) | {pipe}")
                             failed += 1
                             break  # siguiente tarjeta
@@ -1121,8 +1137,7 @@ async def run_auto_mission(
                         await asyncio.sleep(25)
                     if code and (code == "RATE_LIMITED" or code in dep.MM_DEAD_RC):
                         break  # siguiente cuenta inmediatamente
-                    # Regla Robert 2026-07-28: 60s SOLO si vamos a reintentar OTRA
-                    # tarjeta en la MISMA cuenta (no al salir hacia la siguiente cuenta).
+                    # Regla Robert: Cooldown estricto anti-rafagueo entre tarjetas en la MISMA cuenta
                     has_more_candidates = pipe_idx < len(candidates) - 1
                     if (
                         not matched
@@ -1130,12 +1145,8 @@ async def run_auto_mission(
                         and has_more_candidates
                         and account_declines < MM_MAX_ACCOUNT_DECLINES_PER_RUN
                     ):
-                        sj, sp = dep._mm_session_get(sessions, email)
-                        if sj and code not in ("BANK_REJECTED", "3DS_REQUIRED"):
-                            logger.info(f"⚡ Bypass de cooldown (2s) para {email} debido a sesión JWT activa y error transitorio ({code})")
-                            await asyncio.sleep(2)
-                        else:
-                            await asyncio.sleep(dep.MM_COOLDOWN)
+                        logger.info(f"⏳ Cooldown anti-rafagueo {dep.MM_COOLDOWN}s antes de siguiente tarjeta en {email}")
+                        await asyncio.sleep(dep.MM_COOLDOWN)
                 if locked and not matched:
                     _unlock(account_id)  # regla 7: no dejar 4h/perpetuo sin match
                     locked_ids.discard(account_id)
