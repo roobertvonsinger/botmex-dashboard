@@ -236,10 +236,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_is_balance_fresh` | def | L389–L397 |
 | `_capmonster_balance` | def | L402–L418 |
 | `_run_prewarm` | def | L423–L598 |
-| `prewarm_select` | def | L604–L685 |
-| `prewarm_cancel` | def | L689–L699 |
-| `prewarm_status` | def | L703–L718 |
-| `prewarm_refresh_stream` | def | L724–L904 |
+| `prewarm_select` | def | L604–L688 |
+| `prewarm_cancel` | def | L692–L702 |
+| `prewarm_status` | def | L706–L721 |
+| `prewarm_refresh_stream` | def | L727–L907 |
 
 ### `renapo_validator.py`
 

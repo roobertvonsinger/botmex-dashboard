@@ -644,13 +644,16 @@ async def prewarm_select(request: Request, user: dict = Depends(require_session)
             skipped_reasons["no_account"] = skipped_reasons.get("no_account", 0) + 1
             continue
 
-        # Cuarentena (forense 2026-07-11): saltar quemadas (DEAD) y en cooldown.
+        # Cuarentena (forense 2026-07-11): saltar quemadas (DEAD) siempre.
+        # cooldown_until: solo en automático — con force=True el operador pidió
+        # explícitamente actualizar, no bloqueamos por cooldown (el cooldown
+        # existe para frenar logins automáticos, no para bloquear al operador).
         if acc.get("status") == "DEAD":
             skipped += 1
             skipped_reasons["dead"] = skipped_reasons.get("dead", 0) + 1
             continue
         from deposits import _cooldown_active
-        if _cooldown_active(acc.get("cooldown_until")):
+        if not force and _cooldown_active(acc.get("cooldown_until")):
             skipped += 1
             skipped_reasons["cooldown"] = skipped_reasons.get("cooldown", 0) + 1
             continue
@@ -791,7 +794,7 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
                     await q.put({"type": "skip", "id": acc["id"], "email": email, "reason": "dead"})
                     return
                 from deposits import _cooldown_active, _cooldown_remaining_min
-                if _cooldown_active(acc.get("cooldown_until")):
+                if not force and _cooldown_active(acc.get("cooldown_until")):
                     await q.put({"type": "skip", "id": acc["id"], "email": email,
                                  "reason": "cooldown",
                                  "cooldown_min": _cooldown_remaining_min(acc.get("cooldown_until"))})
