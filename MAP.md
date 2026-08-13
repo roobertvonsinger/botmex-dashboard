@@ -252,6 +252,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `bd9d2a2` | docs(superpowers): puente ruthopia en /bet — decisiones de Robert (RF5 dinamico, RF8 segundo intento, 5 tarjetas, retries infra, no-mask) |
 | `9321a0f` | fix(proxy/renapo): causa raiz del yoyo de proxies - valida-curp.com NXDOMAIN quemaba el pool |
 | `91deb84` | docs: actualizar NEXT-SESSION para handoff de resolucion de proxies |
 | `b3d0361` | fix(proxy): remover iproyal y nodemaven por degradacion (504/407) |
@@ -263,7 +264,6 @@ prewarm.py (router)
 | `f496233` | fix: reemplazar todos los except silenciosos por logging.warning/error |
 | `29f1717` | docs: actualizar NEXT-SESSION con estado de proxies, telegram bot y verificacion masiva |
 | `bbca351` | fix(proxy): reactivar DataImpulse y expandir rango sticky a 10000-10500 |
-| `f023074` | fix(bot/proxy): corregir AttributeError de Message.text y excluir DataImpulse caido por 502 |
 <!-- GEN:end:recientes -->
 
 ---
