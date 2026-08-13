@@ -438,6 +438,14 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_import_analyzer` | def | L21–L40 |
 | `main` | def | L43–L132 |
 
+### `scripts/verify_all_accounts_active.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `get_all_target_accounts` | def | L27–L42 |
+| `mark_account_dead` | def | L45–L60 |
+| `verify_all` | def | L63–L130 |
+
 ### `shared/betmexico_payment_analyzer.py`
 
 | Símbolo | Tipo | Líneas |
@@ -1178,4 +1186,5 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `betmexico.web.grading` | `web_grading.py` |
 | `betmexico.web.utils` | `web_utils.py` |
 | `dashboard.proxy_pool` | `proxy_pool.py` |
+| `verify_all_accounts` | `scripts/verify_all_accounts_active.py` |
 <!-- GEN:end:loggers -->

@@ -116,6 +116,7 @@ prewarm.py (router)
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/migrate_status_no_banco.py` | 80 | `—` | _[completar]_ |
 | `scripts/recalc_grades.py` | 136 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
+| `scripts/verify_all_accounts_active.py` | 134 | `verify_all_accounts` | _[completar]_ |
 | `shared/betmexico_payment_analyzer.py` | 592 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
@@ -250,6 +251,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `93e78cc` | fix: desinstalar hooks y eliminar seccion de graphify para evitar spam |
 | `a966a46` | fix(auto_deposit): garantizar con.close en try/finally al filtrar tarjetas fallidas |
 | `ba9e423` | fix(auto_deposit): penalizar cuentas intentadas <60m en la ordenacion para romper el ciclo deterministico |
 | `9876977` | fix(auto_deposit): eliminar bypass de 2s en cooldown y pre-excluir tarjetas casadas de BD |
@@ -261,7 +263,6 @@ prewarm.py (router)
 | `b155a05` | fix(auto_deposit): backup de cuentas de respaldo dispara sin límite de 10 en plan original |
 | `a897075` | chore: actualizar NEXT-SESSION para debugging urgente post-Gemini |
 | `6a04113` | fix: jubilar tarjeta tras CARD_LOCKED_OTHER_ACCOUNT en auto_mission |
-| `78bb7fd` | docs(next-session): update NEXT-SESSION.md for bot/liveness changes |
 <!-- GEN:end:recientes -->
 
 ---
