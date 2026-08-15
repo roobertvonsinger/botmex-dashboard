@@ -133,6 +133,16 @@
       loadAccounts();
       return;
     }
+    if (ev.kind === 'auto_withdrawal_progress') {
+      showToast('💸 Retirado acumulado: ' + fmtMoney(ev.total_withdrawn) + ' (' + ev.batches_count + ' transferencias)', 'ok');
+      loadAccounts();
+      return;
+    }
+    if (ev.kind === 'withdrawal_card_refund_alert') {
+      showToast('⚠️ Retiro detenido: se desvió a reembolso de tarjeta. Realiza un depósito SPEI de $20 a tu CLABE STP para restablecer tu cuenta bancaria.', 'err');
+      loadAccounts();
+      return;
+    }
     if (ev.kind === 'auto_mission') {
       if (activeMissionId && ev.mission_id === activeMissionId) {
         onMissionEvent(ev);
@@ -330,6 +340,14 @@
       ? '<span class="mv-countdown"><span class="cd-dot"></span>en curso…</span>'
       : '';
 
+    // Botones de confirmación de llenado directo en la web
+    const confirmActionHtml = (s.status === 'awaiting_confirmation')
+      ? '<div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">' +
+        '<button class="btn btn-primary" id="btnWebConfirmSched">🚀 Iniciar Acreditación de Fondos</button>' +
+        '<button class="btn btn-danger" id="btnWebStopSched">🛑 Detener</button>' +
+        '</div>'
+      : '';
+
     // Resumen terminal anti-fuga (handoff 2026-08-05 §2 Área C):
     // - s.deposited se muestra SOLO si completed && !stopped_by_user
     //   (camino 4: misión corrió Fase 2 completa — el único con monto real que
@@ -340,7 +358,7 @@
     const summaryHtml = (s.status === 'completed' || s.status === 'failed' || s.status === 'cancelled')
       ? '<div class="mv-summary">' +
         (showDeposited
-          ? '<div class="mv-stat"><div class="mv-stat-val">' + fmtMoney(s.deposited) + '</div><div class="mv-stat-lbl">Depositado</div></div>'
+          ? '<div class="mv-stat"><div class="mv-stat-val">' + fmtMoney(s.deposited) + '</div><div class="mv-stat-lbl">Acreditado</div></div>'
           : '<div class="mv-stat"><div class="mv-stat-val">—</div><div class="mv-stat-lbl">Sin datos</div></div>') +
         '</div>'
       : '';
@@ -358,6 +376,7 @@
           '<div class="mv-sub">' + (s.sub || '') + '</div>' +
         '</div>' +
         (matchesHtml ? '<div class="mv-matches">' + matchesHtml + '</div>' : '') +
+        confirmActionHtml +
         summaryHtml +
         (s.status === 'completed' || s.status === 'failed' || s.status === 'cancelled'
           ? '<div style="margin-top:16px;display:flex;gap:8px">' +
@@ -368,6 +387,49 @@
 
     const btnGo = $('#btnGoAccounts');
     if (btnGo) btnGo.addEventListener('click', exitMission);
+
+    const btnWebConfirm = $('#btnWebConfirmSched');
+    if (btnWebConfirm) {
+      btnWebConfirm.addEventListener('click', async () => {
+        btnWebConfirm.disabled = true;
+        btnWebConfirm.textContent = 'Iniciando…';
+        try {
+          const res = await fetch(apiUrl('/api/deposits/auto/' + activeMissionId + '/confirm'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ decision: true }),
+          });
+          if (res.ok) {
+            showToast('Acreditación de fondos iniciada', 'ok');
+          } else {
+            showToast('No se pudo confirmar la misión', 'err');
+            btnWebConfirm.disabled = false;
+            btnWebConfirm.textContent = '🚀 Iniciar Acreditación de Fondos';
+          }
+        } catch (e) {
+          showToast('Error: ' + e.message, 'err');
+          btnWebConfirm.disabled = false;
+        }
+      });
+    }
+
+    const btnWebStop = $('#btnWebStopSched');
+    if (btnWebStop) {
+      btnWebStop.addEventListener('click', async () => {
+        btnWebStop.disabled = true;
+        btnWebStop.textContent = 'Deteniendo…';
+        try {
+          await fetch(apiUrl('/api/deposits/auto/' + activeMissionId + '/confirm'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ decision: false }),
+          });
+          showToast('Proceso cancelado por el operador', 'ok');
+        } catch (e) {
+          showToast('Error: ' + e.message, 'err');
+        }
+      });
+    }
   }
 
   function exitMission() {
@@ -725,18 +787,17 @@
     overlay.className = 'modal-overlay';
     overlay.innerHTML =
       '<div class="modal-box">' +
-      '<div class="modal-title">💸 Retirar</div>' +
+      '<div class="modal-title">💸 Retiro Automático</div>' +
       '<div class="modal-info">Cuenta: <span style="color:var(--accent);font-family:monospace">' + shortEmail(email) + '</span><br>' +
-      'Saldo disponible: <b style="color:var(--green-bright)">' + fmtMoney(balance) + '</b></div>' +
-      '<input type="number" class="modal-input" id="wdAmount" placeholder="Monto MXN" step="0.01" min="0.01" max="' + balance + '" autofocus>' +
+      'Saldo a retirar: <b style="color:var(--green-bright)">' + fmtMoney(balance) + ' MXN</b><br><br>' +
+      '<span style="font-size:12px;color:var(--text-dim)">Los fondos se enviarán de forma automática a tu cuenta bancaria de origen vinculada por SPEI.</span></div>' +
       '<div class="modal-actions">' +
       '<button class="btn" id="wdCancel">Cancelar</button>' +
-      '<button class="btn btn-primary" id="wdConfirm">Retirar</button>' +
+      '<button class="btn btn-primary" id="wdConfirm">💸 Confirmar Retiro</button>' +
       '</div>' +
       '</div>';
     document.body.appendChild(overlay);
 
-    const inp = overlay.querySelector('#wdAmount');
     const cancel = overlay.querySelector('#wdCancel');
     const confirm = overlay.querySelector('#wdConfirm');
     const close = () => {
@@ -749,40 +810,32 @@
     cancel.addEventListener('click', close);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
     document.addEventListener('keydown', onKeydown);
-    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') confirm.click(); });
 
     confirm.addEventListener('click', async () => {
-      const amount = parseFloat(inp.value);
-      if (!amount || amount <= 0) { showToast('Monto inválido', 'err'); return; }
-      if (amount > balance) { showToast('Saldo insuficiente', 'err'); return; }
       confirm.disabled = true;
-      confirm.textContent = 'Procesando…';
+      confirm.textContent = 'Iniciando retiro…';
       try {
-        const res = await fetch(apiUrl('/api/operator/accounts/' + accountId + '/withdraw'), {
+        const res = await fetch(apiUrl('/api/operator/accounts/' + accountId + '/auto-withdraw'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount }),
         });
         const d = await res.json();
         if (res.ok) {
-          showToast('Retiro enviado: ' + (d.transactionId || ''), 'ok');
+          showToast('🚀 Retiro automático iniciado en segundo plano', 'ok');
           close();
           loadAccounts();
-          if (d.transactionId) startWithdrawPoll(accountId, d.transactionId);
         } else {
-          const detail = d.detail || 'Error';
+          const detail = d.detail || d.message || 'Error al iniciar retiro';
           showToast(detail, 'err');
           confirm.disabled = false;
-          confirm.textContent = 'Retirar';
+          confirm.textContent = '💸 Confirmar Retiro';
         }
       } catch (e) {
         showToast('Error: ' + e.message, 'err');
         confirm.disabled = false;
-        confirm.textContent = 'Retirar';
+        confirm.textContent = '💸 Confirmar Retiro';
       }
     });
-
-    setTimeout(() => inp.focus(), 50);
   }
 
   // ── Init ───────────────────────────────────────────────────────

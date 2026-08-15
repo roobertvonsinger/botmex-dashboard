@@ -733,3 +733,196 @@ async def _refresh_account_after_withdrawal(
             pass
     except Exception as e:
         logger.warning(f"[withdrawals] refresh post-retiro {email}: {str(e)[:160]}")
+
+
+# ── ORQUESTADOR DE RETIROS POR BATCHES ($200 C/U) CON GUARDARRAÍL ANTI-TARJETA ──
+DEFAULT_BATCH_AMOUNT = 200.0
+BATCH_WITHDRAWAL_COOLDOWN_SEC = 30.0
+
+
+async def execute_auto_batch_withdrawal(
+    db_path: str,
+    account_id: int,
+    operator_id: int,
+    on_progress=None,
+) -> dict:
+    """Ejecuta el retiro automático total de la cuenta en batches de $200 cada 30-45s.
+
+    Reglas de protección y anti-detección:
+    1. No solicita monto al usuario — calcula el saldo Real disponible y lo procesa en batches de $200.
+    2. Valida en cada paso que el destino sea SPEI bancario (gateway == 2).
+    3. GUARDARRAÍL CRÍTICO ANTI-REEMBOLSO: Si algún retiro se desvía a reembolso de tarjeta (gateway == 1
+       o gateway_mismatch), DETIENE el proceso inmediatamente, invalida withdrawal_ready y exige
+       un nuevo depósito SPEI a la cuenta STP para corregir el destino antes de continuar.
+    4. Espera BATCH_WITHDRAWAL_COOLDOWN_SEC entre retiros exitosos.
+    5. Actualiza feedback y emite eventos acumulados sin revelar proactivamente los montos/tiempos exactos.
+    """
+    from clabe_fetch import _load_jwt_for_account, _get_admin_proxy_url
+    import app
+
+    jwt, email, _ = _load_jwt_for_account(db_path, account_id)
+    if not jwt:
+        raise JwtExpired(f"JWT expirado o ausente para cuenta {account_id}")
+
+    proxy_url = _get_admin_proxy_url()
+
+    # 1. Obtener saldo inicial Real
+    bal_data = await get_real_balance(jwt, proxy_url)
+    real_balance = float(bal_data.get("Real", 0) or 0)
+
+    if real_balance <= 0:
+        return {
+            "ok": False,
+            "reason": "Sin saldo real disponible para retirar",
+            "total_withdrawn": 0.0,
+            "batches_count": 0,
+        }
+
+    total_withdrawn = 0.0
+    batches = []
+    consecutive_fails = 0
+
+    logger.info(
+        f"[AutoWithdraw] Iniciando retiro automático para {email} (ID {account_id}) | Saldo Real: ${real_balance:.2f}"
+    )
+
+    try:
+        while real_balance > 0:
+            # Monto de este batch: $200 o el remanente si es menor
+            batch_amt = min(DEFAULT_BATCH_AMOUNT, real_balance)
+            if batch_amt < 1.0:
+                logger.info(f"[AutoWithdraw] Saldo remanente residual (${real_balance:.2f}) completado.")
+                break
+
+            logger.info(
+                f"[AutoWithdraw] Ejecutando batch ${batch_amt:.2f} para {email} (Retirado acumulado: ${total_withdrawn:.2f})"
+            )
+
+            try:
+                # Disparar retiro individual
+                res = await execute_withdrawal(db_path, account_id, batch_amt)
+                tx_id = res.get("transactionId")
+
+                # Persistir en account_withdrawals
+                try:
+                    app._persist_withdrawal(account_id, operator_id, res)
+                except Exception as ex_p:
+                    logger.warning(f"[AutoWithdraw] Error persistiendo retiro: {ex_p}")
+
+                # Refresh post-retiro inmediato
+                await _refresh_account_after_withdrawal(
+                    email, res.get("_jwt"), res.get("_proxy_url"), operator_id
+                )
+
+                # Auditar rail externo para verificar que NO se fue a reembolso de tarjeta
+                is_card_refund = False
+                try:
+                    await asyncio.sleep(2.0)  # Breve pausa para que se registre la transacción
+                    bank_tx = await get_bank_transaction(jwt, proxy_url, tx_id)
+                    if bank_tx.get("gateway_mismatch") or bank_tx.get("gateway") == 1:
+                        is_card_refund = True
+                except Exception as ex_audit:
+                    logger.debug(f"[AutoWithdraw] Auditoría temprana no concluyente ({ex_audit}), continuando.")
+
+                if is_card_refund:
+                    # DETENER INMEDIATAMENTE EL PROCESO
+                    logger.error(
+                        f"🛑 [AutoWithdraw] ¡ALERTA! El retiro tx {tx_id} para {email} se desvió a TARJETA (gateway=1)."
+                    )
+                    try:
+                        con_wd = sqlite3.connect(db_path, timeout=10)
+                        con_wd.execute(
+                            "UPDATE accounts SET withdrawal_ready=0 WHERE id=?",
+                            (account_id,),
+                        )
+                        con_wd.commit()
+                        con_wd.close()
+                    except Exception as ex_db:
+                        logger.warning(f"[AutoWithdraw] Error actualizando withdrawal_ready: {ex_db}")
+
+                    app._broadcast(
+                        {
+                            "type": "activity",
+                            "kind": "withdrawal_card_refund_alert",
+                            "account_id": account_id,
+                            "email": email,
+                            "tx_id": tx_id,
+                            "message": "⚠️ Retiro desviado a reembolso de tarjeta. Proceso detenido. Realiza un depósito SPEI a tu STP para restablecer la cuenta bancaria.",
+                            **app._resolve_who(operator_id),
+                        }
+                    )
+
+                    return {
+                        "ok": False,
+                        "stopped_reason": "card_refund_detected",
+                        "error": "El retiro se desvió a reembolso de tarjeta. Se requiere un nuevo SPEI a la STP para continuar.",
+                        "total_withdrawn": total_withdrawn + batch_amt,
+                        "batches_count": len(batches) + 1,
+                        "batches": batches + [res],
+                    }
+
+                total_withdrawn += batch_amt
+                batches.append(res)
+                consecutive_fails = 0
+
+                # Feedback SSE
+                app._broadcast(
+                    {
+                        "type": "activity",
+                        "kind": "auto_withdrawal_progress",
+                        "account_id": account_id,
+                        "email": email,
+                        "total_withdrawn": total_withdrawn,
+                        "batches_count": len(batches),
+                        "latest_tx_id": tx_id,
+                        **app._resolve_who(operator_id),
+                    }
+                )
+
+                if on_progress:
+                    try:
+                        on_progress(total_withdrawn, len(batches), res)
+                    except Exception:
+                        pass
+
+            except ConcurrentWithdrawalPending:
+                logger.warning(f"[AutoWithdraw] Retiro pendiente en proceso en {email}. Esperando resolución...")
+                await asyncio.sleep(20.0)
+                continue
+            except InsufficientBalance:
+                logger.info(f"[AutoWithdraw] Saldo agotado para {email}.")
+                break
+            except Exception as e_batch:
+                consecutive_fails += 1
+                logger.error(f"[AutoWithdraw] Error en batch de retiro para {email}: {e_batch}")
+                if consecutive_fails >= 2:
+                    logger.error(f"[AutoWithdraw] 2 fallos consecutivos. Deteniendo ciclo.")
+                    break
+                await asyncio.sleep(15.0)
+
+            # Consultar saldo fresco para la siguiente iteración
+            try:
+                bal_data = await get_real_balance(jwt, proxy_url)
+                real_balance = float(bal_data.get("Real", 0) or 0)
+            except Exception:
+                real_balance -= batch_amt
+
+            if real_balance > 0:
+                logger.info(
+                    f"[AutoWithdraw] Esperando {BATCH_WITHDRAWAL_COOLDOWN_SEC}s antes del siguiente batch de retiro en {email}..."
+                )
+                await asyncio.sleep(BATCH_WITHDRAWAL_COOLDOWN_SEC)
+
+    except Exception as exc:
+        logger.exception(f"[AutoWithdraw] Excepción general durante retiro automático en {email}: {exc}")
+
+    logger.info(
+        f"✅ [AutoWithdraw] Proceso finalizado para {email}. Total retirado: ${total_withdrawn:.2f} en {len(batches)} batches."
+    )
+
+    return {
+        "ok": True,
+        "total_withdrawn": total_withdrawn,
+        "batches_count": len(batches),
+        "batches": batches,
+    }

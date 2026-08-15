@@ -164,19 +164,21 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `operator_my_accounts` | def | L4291–L4381 |
 | `operator_release_account` | def | L4385–L4402 |
 | `operator_withdraw` | def | L4406–L4464 |
-| `operator_missions` | def | L4468–L4486 |
-| `auto_deposit_status` | def | L4490–L4501 |
-| `register_operator_strike` | def | L4504–L4537 |
-| `bot_start_info` | def | L4541–L4577 |
-| `bot_operator_info` | def | L4581–L4620 |
-| `bot_help_info` | def | L4624–L4638 |
-| `bot_pause_mission` | def | L4642–L4671 |
-| `bot_resume_mission` | def | L4675–L4693 |
-| `bot_cancel_mission` | def | L4698–L4733 |
-| `bot_bet_create` | def | L4737–L4906 |
-| `filter_and_sanitize_check_combos` | def | L4909–L4994 |
-| `BotCheckRequest` | class | L4997–L5001 |
-| `bot_check` | def | L5004–L5085 |
+| `operator_auto_withdraw` | def | L4468–L4504 |
+| `auto_deposit_confirm` | def | L4508–L4527 |
+| `operator_missions` | def | L4531–L4549 |
+| `auto_deposit_status` | def | L4553–L4564 |
+| `register_operator_strike` | def | L4567–L4600 |
+| `bot_start_info` | def | L4604–L4640 |
+| `bot_operator_info` | def | L4644–L4683 |
+| `bot_help_info` | def | L4687–L4701 |
+| `bot_pause_mission` | def | L4705–L4734 |
+| `bot_resume_mission` | def | L4738–L4756 |
+| `bot_cancel_mission` | def | L4761–L4796 |
+| `bot_bet_create` | def | L4800–L4969 |
+| `filter_and_sanitize_check_combos` | def | L4972–L5057 |
+| `BotCheckRequest` | class | L5060–L5064 |
+| `bot_check` | def | L5067–L5148 |
 
 ### `auth.py`
 
@@ -216,19 +218,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_pipe_str` | def | L116–L121 |
 | `_parse_card_pipe` | def | L124–L145 |
 | `_normalize_pipe_to_3part` | def | L148–L150 |
-| `select_accounts_for_auto` | def | L159–L324 |
-| `_max_accounts_for_cards` | def | L333–L341 |
-| `plan_auto_mission` | def | L344–L607 |
-| `_fake_progress_pct` | def | L648–L679 |
-| `_iso` | def | L683–L684 |
-| `_m_load` | def | L687–L695 |
-| `_m_status` | def | L698–L700 |
-| `_m_update` | def | L703–L713 |
-| `_fetch_account` | def | L716–L723 |
-| `_unlock` | def | L726–L735 |
-| `_broadcast_mission` | def | L738–L767 |
-| `_stop_pool` | def | L770–L777 |
-| `run_auto_mission` | def | L781–L1495 |
+| `select_accounts_for_auto` | def | L159–L328 |
+| `_max_accounts_for_cards` | def | L337–L345 |
+| `plan_auto_mission` | def | L348–L611 |
+| `_fake_progress_pct` | def | L652–L683 |
+| `_iso` | def | L687–L688 |
+| `_m_load` | def | L691–L699 |
+| `_m_status` | def | L702–L704 |
+| `_m_update` | def | L707–L717 |
+| `_fetch_account` | def | L720–L727 |
+| `_unlock` | def | L730–L739 |
+| `_broadcast_mission` | def | L742–L771 |
+| `_stop_pool` | def | L774–L781 |
+| `run_auto_mission` | def | L785–L1506 |
 
 ### `autoexclusion.py`
 
@@ -1062,6 +1064,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `resolve_withdrawal_status` | def | L395–L546 |
 | `execute_withdrawal` | def | L552–L649 |
 | `_refresh_account_after_withdrawal` | def | L652–L735 |
+| `execute_auto_batch_withdrawal` | def | L743–L928 |
 <!-- GEN:end:simbolos -->
 
 ---
@@ -1144,6 +1147,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `GET` | `/api/operator/my-accounts` | `app.py` |
 | `POST` | `/api/operator/accounts/{account_id}/release` | `app.py` |
 | `POST` | `/api/operator/accounts/{account_id}/withdraw` | `app.py` |
+| `POST` | `/api/operator/accounts/{account_id}/auto-withdraw` | `app.py` |
+| `POST` | `/api/deposits/auto/{mission_id}/confirm` | `app.py` |
 | `GET` | `/api/operator/missions` | `app.py` |
 | `GET` | `/api/deposits/auto/{mission_id}/status` | `app.py` |
 | `GET` | `/api/bot/start` | `app.py` |

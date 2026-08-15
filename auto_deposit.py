@@ -298,14 +298,18 @@ def select_accounts_for_auto(
     tier_mid.sort(key=sort_key)
     tier_low.sort(key=lambda r: (0 if r.get("_jwt_alive") else 1, *sort_key(r)))
 
-    # Si count <= 3 o hay muy pocas cuentas, entregar las mejores disponibles (TOP -> MID -> LOW)
+    # Si count <= 3 o hay pocas cuentas, garantizar al menos 1 cuenta TOP si existe
     if count <= 3:
+        # Si hay cuentas TOP disponibles, asegurar que al menos la primera sea TOP
+        if tier_top and count >= 1:
+            combined = [tier_top[0]] + [r for r in (tier_top[1:] + tier_mid + tier_low) if r != tier_top[0]]
+            return combined[:count]
         combined = tier_top + tier_mid + tier_low
         return combined[:count]
 
-    # RF5: disposición casi fija por tier (Robert 2026-08-13):
-    # count=5 -> 2 top, 2 mid, 1 low; count=10 -> 4/4/2. Fall-through si un tier se vacía.
-    n_top = int(round(count * 0.4))
+    # RF5: disposición por tier garantizando calidad (Robert 2026-08-13 / 2026-08-14):
+    # Asegurar como mínimo 1 TOP siempre que haya disponibles.
+    n_top = max(1 if tier_top else 0, int(round(count * 0.4)))
     n_mid = int(round(count * 0.4))
     n_low = count - n_top - n_mid
 
@@ -1204,15 +1208,22 @@ async def run_auto_mission(
                                 if backup_plan and backup_plan.get("feasible"):
                                     for b_acc in backup_plan.get("accounts", []):
                                         b_email = b_acc.get("email")
-                                        # 2026-08-13: GATE KYC — solo cuentas con kyc_verified=1 entran al respaldo
-                                        # Si no hay kyc_verified, saltar
-                                        if b_acc.get("kyc_verified") != 1:
-                                            logger.info(f"➖ CUENTA DE RESPALDO SALTADA (kyc_verified≠1) | {b_email}")
+                                        # Calidad en respaldo: Grade A+/A o kyc_verified=1
+                                        is_quality = b_acc.get("grade") in ("A+", "A") or b_acc.get("kyc_verified") == 1
+                                        if not is_quality:
+                                            logger.info(f"➖ CUENTA DE RESPALDO SALTADA (sin calidad TOP/MID o kyc) | {b_email}")
                                             continue
                                         if b_email not in already_checked_emails:
                                             accounts_list.append(b_acc)
                                             already_checked_emails.add(b_email)
                                             logger.info(f"➕ CUENTA DE RESPALDO AÑADIDA DINÁMICAMENTE | {b_email}")
+                                            _broadcast_mission(
+                                                mission_id,
+                                                "matching",
+                                                user,
+                                                on_progress=on_progress,
+                                                accounts=len(accounts_list),
+                                            )
                                             if len(accounts_list) >= MAX_ACCOUNTS_HARD_CAP:
                                                 break
                     except Exception as ex_backup:

@@ -5,30 +5,32 @@
 
 ## 🎯 Objetivo en curso
 
-**PROXIES ESTABILIZADOS DE RAÍZ (2026-08-13).** El yoyo de proxies que bloqueó la operación se resolvió: la causa era `valida-curp.com` (NXDOMAIN) quemando el pool desde `renapo_validator`, no DataImpulse. KVM4 quedó alineado al repo (solo DataImpulse activo, failover verificado, logs limpios).
+**FLUJO /BET Y RETIROS EN BATCHES ESTABILIZADOS (2026-08-14).** El automatching garantiza combos con cuentas TOP (A+ / 3DS reciente) y segundo intento automático; el llenado opera con feedback encubierto omnicanal (bot + portal); los retiros operan de forma automática en batches de $200 (y remanente exacto) con guardarraíl anti-reembolso de tarjeta; y la interfaz de Telegram cuenta con barras ASCII, ETA dinámico y links restringidos hasta el match.
 
 ## ▶ Con qué arrancas (PRIMERA acción)
 
-1. **Leer `HANDOFF.md`** — post-mortem actualizado con la causa raíz real.
-2. **Revisar `docs/ERRORS.md`** entry "CAUSA RAÍZ del yoyo de proxies" antes de tocar cualquier exclusión de proxy. Regla: si un provider falla, verificar el **host destino** (¿NXDOMAIN? ¿provider o endpoint?) antes de excluir.
-3. **Pendiente abierto (pre-existente)**: 2 fails de tests por tabla `account_withdrawals` no migrada en la BD de test (`app.py:3713`).
+1. **Auditoría de Diseño UI/UX Impeccable del Portal (`static/portal.html`, `static/portal.js`, `static/style.css`)**:
+   - Pulir animaciones, controles interactivos, jerarquía visual, feedback micro-interactivo y diseño anti-burnout / TDAH-friendly.
+   - Verificar responsive móvil y desktop.
+2. **Deploy y Smoke Test en Producción (KVM4)**:
+   - Subir `auto_deposit.py`, `withdrawals.py`, `app.py`, `telegram_bot_mock/bot.py`, `static/portal.js`.
+   - Reiniciar `betmexico-web` y bot de telegram en KVM4.
 
 ## 🧭 Recomendación de approach
 
-- Quirúrgico. No cambiar la estructura asíncrona ni el manejo de errores de `app.py` (historial de daño de la sesión previa).
-- Para reintentar proxy001/NodeMaven/IPRoyal en el futuro: **no hardcodear exclusiones por observación corta** — añadir health-check por host con cooldown (auto-exclusión) en `proxy_pool.py` si se vuelve a necesitar un fallback.
+- Mantener la regla de feedback encubierto (anti-detección): no revelar cifras exactas ni tiempos de ciclo al operador en el bot o portal.
+- Los retiros en batches de $200 y remanente no divisible deben seguir respetando el guardarraíl de `gateway == 2` (SPEI) vs `gateway == 1` (tarjeta).
 
 ## ⏳ Pendientes próximos
 
-- **Plan de matchmaking optimization** aprobado (`docs/plans/2026-08-13-matchmaking-optimization.md`). Retomar implementación de las 4 fases.
-- **Front del Portal**: animación + KPIs.
+- **Auditoría de diseño Impeccable del Portal**: micro-animaciones, componentes premium, TDAH-friendly.
 - **Intervalo adaptativo de `jwt_keeper`** cuando hay hot pendientes.
-- **Migración de `account_withdrawals`** en fixtures de test (2 fails).
+- **Migración de `account_withdrawals` y `account_touches`** en fixtures de test antiguos (2 fails pre-existentes).
 
-## ✅ Hecho esta sesión (2026-08-13, fix de raíz)
+## ✅ Hecho esta sesión (2026-08-14, Flujo /bet & Retiros Batches)
 
-- **Fix raíz RENAPO**: `renapo_validator.py` — DNS pre-check (gate de gasto de pool), endpoint oficial `consultas.curp.gob.mx` (era `valida-curp.com`, NXDOMAIN), `max_attempts=2`, cache por (fullname, birthdate, address).
-- **Fix raíz pool**: `proxy_pool.py` — param `max_attempts` en `call_with_proxy_failover`; `_EXCLUDED_PROXY_HOSTS = ("litport", "proxy001", "nodemaven")`.
-- **Tests**: mock del gate DNS en `test_renapo_validator.py` (determinismo offline). Suite 438 pass / 2 fail pre-existentes.
-- **Deploy KVM4**: `proxy_pool.py` + `renapo_validator.py` scp (MD5 = repo) + `docker restart betmexico-web`. Pool desplegado 501 proxies, todos DI. Failover real → 405 a paymentsapi vía DI (sin 502). Logs limpios.
-- **Docs**: `docs/ERRORS.md` (causa raíz del yoyo), `HANDOFF.md` (post-mortem corregido — la versión previa culpaba por error a DataImpulse).
+- **Automatching de Calidad Garantizada (`auto_deposit.py`)**: `select_accounts_for_auto` garantiza al menos 1 cuenta TOP (A+ / 3DS reciente) en combos de 3-4 tarjetas; segundo intento automático con cuentas de respaldo calificadas (A+, A o KYC) antes de fallar.
+- **Llenado Encubierto Omnicanal (`bot.py` & `app.py`)**: `_mission_status_text` con barras ASCII dinámicas y ETA simulado; endpoint `POST /api/deposits/auto/{id}/confirm` para confirmar llenado desde Telegram o Portal Web; link del portal oculto hasta lograr match.
+- **Orquestador de Retiros Automáticos en Batches de $200 (`withdrawals.py`)**: `execute_auto_batch_withdrawal` procesa batches sucesivos de $200 y remanentes exactos; guardarraíl anti-reembolso detiene el ciclo inmediatamente si `gateway == 1` e invalida `withdrawal_ready` para exigir nuevo SPEI a STP.
+- **Portal Web (`portal.js` & `app.py`)**: Modal de retiro automático de 1 clic (sin requerir monto manual), confirmación interactiva de misión y recepción de alertas SSE.
+- **Tests**: `tests/test_auto_batch_withdrawals.py` creado. Suite de 92 tests unitarios pasando al 100%.

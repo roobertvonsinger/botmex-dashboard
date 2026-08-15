@@ -4464,6 +4464,69 @@ async def operator_withdraw(account_id: int,
     return {**result, "persisted": persisted}
 
 
+@app.post("/api/operator/accounts/{account_id}/auto-withdraw")
+async def operator_auto_withdraw(account_id: int,
+                                  user: dict = Depends(require_operator_view)):
+    """Dispara el proceso de retiros automáticos en batches de $200 sin pedir monto al usuario."""
+    from withdrawals import execute_auto_batch_withdrawal
+
+    with db() as c:
+        acc = c.execute(
+            "SELECT id, email, withdrawal_ready, balance_real FROM accounts WHERE id=?", (account_id,)
+        ).fetchone()
+    if not acc:
+        raise HTTPException(404, "Cuenta no encontrada")
+    if user.get("role") != "superadmin":
+        with db() as c:
+            vis = _visible_emails(user, c)
+        if vis is not None and acc["email"] not in vis:
+            raise HTTPException(403, "No tienes permiso sobre esta cuenta")
+
+    if not acc["withdrawal_ready"]:
+        raise HTTPException(
+            409,
+            "La cuenta requiere confirmación de SPEI (depósito de $20 a la cuenta STP) para asociar la cuenta bancaria de destino."
+        )
+
+    if float(acc["balance_real"] or 0) < 1.0:
+        raise HTTPException(400, "Sin saldo suficiente para procesar retiro")
+
+    operator_id = user.get("telegram_id") or 0
+    asyncio.create_task(
+        execute_auto_batch_withdrawal(str(DB_PATH), account_id, operator_id)
+    )
+
+    return {
+        "ok": True,
+        "account_id": account_id,
+        "email": acc["email"],
+        "message": "Retiro automático iniciado en segundo plano."
+    }
+
+
+@app.post("/api/deposits/auto/{mission_id}/confirm")
+async def auto_deposit_confirm(mission_id: str,
+                              payload: dict = None,
+                              user: dict = Depends(require_operator_view)):
+    """Permite confirmar la continuación del llenado automático ($150 x 9) desde el portal o el bot."""
+    payload = payload or {}
+    decision = payload.get("decision", True)
+
+    try:
+        from telegram_bot_mock.bot import resolve_mission_confirm_gate
+        resolved = resolve_mission_confirm_gate(mission_id, decision)
+    except Exception:
+        resolved = False
+
+    return {
+        "ok": True,
+        "mission_id": mission_id,
+        "decision": decision,
+        "gate_resolved": resolved,
+        "message": "Confirmación de llenado procesada exitosamente." if decision else "Llenado detenido."
+    }
+
+
 @app.get("/api/operator/missions")
 def operator_missions(user: dict = Depends(require_operator_view)):
     """Misiones del operador (o todas si SA)."""

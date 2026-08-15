@@ -128,48 +128,84 @@ _confirm_events: Dict[str, Tuple[asyncio.Event, Dict[str, Any]]] = {}
 _gate_closed_missions: set = set()
 
 
+def resolve_mission_confirm_gate(mission_id: str, decision: bool) -> bool:
+    """Resuelve programáticamente el confirm_gate de una misión (desde bot o portal)."""
+    item = _confirm_events.get(mission_id)
+    if not item:
+        return False
+    ev, state = item
+    state["decision"] = bool(decision)
+    ev.set()
+    return True
+
+
+def _ascii_bar(pct: int, width: int = 10) -> str:
+    """Genera una barra de progreso ASCII estilizada [■■■■□□□□□□]."""
+    filled = int((max(0, min(100, pct)) / 100.0) * width)
+    return "■" * filled + "□" * (width - filled)
+
+
 def _mission_status_text(status: str, extra: dict) -> str:
     """Texto de status para on_progress — anti-fuga de método operativo.
 
-    4 caminos de cierre (handoff 2026-08-05 §2 Área A):
-    1. failed → sin cifras (nunca hubo depósito real)
-    2. completed + stopped_by_user → sin cifras (solo probe de $10)
-    3. cancelled → sin cifras (ya limpio)
-    4. completed sin stopped_by_user → solo $ total, NUNCA aprobados/fallidos
+    Feedback encubierto: animaciones ASCII, ETA simulado y métricas dummy para mantener al usuario tranquilo.
     """
+    fake_pct = extra.get("fake_pct", 0)
+    bar = _ascii_bar(fake_pct)
+
     if status == "matching":
-        return f"⏳ Rastreando cuentas aptas en el pool ({extra.get('accounts', 0)} disponibles)..."
+        return (
+            f"⏳ <b>Rastreando y asegurando canal de enlace…</b>\n"
+            f"  <code>[{bar}] {fake_pct}%</code>\n"
+            f"  📡 <i>Escaneando nodos seguros · ETA: ~45s</i>"
+        )
     elif status == "logging_in":
         email = extra.get("email", "")
         step = extra.get("current", 1)
         total = extra.get("total", 1)
         pct = int((step / total) * 100) if total > 0 else 0
-        return f"🔄 Acceso seguro en curso [{step}/{total}] ({pct}%)\n  └ <code>{email}</code>"
+        return (
+            f"🔄 <b>Sincronizando sesión y credenciales…</b>\n"
+            f"  <code>[{_ascii_bar(pct)}] {pct}%</code>\n"
+            f"  🔒 Verificando túnel seguro · <code>{email}</code>\n"
+            f"  ⏱️ <i>ETA estimado: ~30s</i>"
+        )
     elif status == "match":
         email = extra.get("email", "")
-        step = extra.get("current", 1)
-        total = extra.get("total", 1)
-        return f"🎯 Cuenta objetivo lista [{step}/{total}]\n  └ <code>{email}</code>"
+        return (
+            f"🎯 <b>¡Cuenta objetivo enganchada y lista!</b>\n"
+            f"  <code>[{bar}] 100%</code>\n"
+            f"  ✨ Canal seguro establecido con <code>{email}</code>"
+        )
     elif status == "cooldown":
         email = extra.get("email", "")
-        step = extra.get("current", 1)
-        total = extra.get("total", 1)
-        return f"⏳ Enfriamiento táctico [{step}/{total}]\n  └ <code>{email}</code>"
+        return (
+            f"⏳ <b>Calibrando parámetros de red…</b>\n"
+            f"  <code>[{bar}] {fake_pct}%</code>\n"
+            f"  🛰️ <i>Estabilizando enlace con {email}…</i>"
+        )
     elif status == "awaiting_confirmation":
-        return "⚠️ Llenado automático listo para confirmación"
+        return "⚠️ <b>Cuenta vinculada. Lista para iniciar acreditación de fondos.</b>"
     elif status == "preparing":
-        return "⏳ Preparando…"
+        return (
+            f"⚡ <b>Preparando acreditación en segundo plano…</b>\n"
+            f"  <code>[{bar}] {fake_pct}%</code>\n"
+            f"  ⏱️ <i>Iniciando en ~15s</i>"
+        )
     elif status == "scheduling":
-        fake_pct = extra.get("fake_pct", 0)
-        return f"⚡ Procesando… {fake_pct}%"
+        eta_sec = max(10, 100 - fake_pct)
+        return (
+            f"⚡ <b>Procesando acreditación de fondos…</b>\n"
+            f"  <code>[{bar}] {fake_pct}%</code>\n"
+            f"  💸 <i>Acreditando saldo en segundo plano · ETA: ~{eta_sec}s</i>"
+        )
     elif status == "completed":
         if extra.get("stopped_by_user"):
-            return "🛑 Proceso detenido antes del llenado."
+            return "🛑 <b>Detenido por el operador antes de la acreditación.</b>"
         dep = extra.get("deposited", 0)
-        accts = extra.get("accounts", 0)
-        return f"✅ Misión completada. Depositado: ${dep:.0f} en {accts} cuentas."
+        return f"✅ <b>Proceso completado exitosamente.</b> Total acreditado: <b>${dep:.0f}</b>."
     elif status == "cancelled":
-        return "🛑 Detenido por el operador"
+        return "🛑 <b>Detenido por el operador</b>"
     elif status == "failed":
         return "❌ No se encontró match viable."
     else:
@@ -949,6 +985,7 @@ def _launch_auto_mission_ui(
             return
         last_edit_ts[0] = now
 
+        has_match = status in ("match", "awaiting_confirmation", "preparing", "scheduling", "completed")
         if is_terminal:
             if status in ("cancelled", "failed"):
                 # Redirigir al inicio si el proceso falla o se cancela
@@ -972,7 +1009,7 @@ def _launch_auto_mission_ui(
                         0,
                         [
                             InlineKeyboardButton(
-                                "🔁 Segundo intento",
+                                "🔁 Segundo intento con nuevo combo",
                                 callback_data=f"retry_mission_{mission_id}",
                             )
                         ],
@@ -996,29 +1033,47 @@ def _launch_auto_mission_ui(
                     ]
                 )
         else:
-            text = (
-                f"{HEADER}\n\n"
-                f"⚡ <b>Rastreando y Procesando Cuentas</b>\n\n"
-                f"• {st_text}\n\n"
-                f'🌐 <a href="{DASHBOARD_URL}/?match={mission_id}">Ver en vivo →</a>\n'
-                f"🇲🇽 <i>Actualización automática…</i>"
-            )
-            kb = InlineKeyboardMarkup(
-                [
+            if has_match:
+                text = (
+                    f"{HEADER}\n\n"
+                    f"⚡ <b>Procesando Fondos de Cuenta</b>\n\n"
+                    f"• {st_text}\n\n"
+                    f'🌐 <a href="{DASHBOARD_URL}/?match={mission_id}">Ver en vivo en el portal →</a>\n'
+                    f"🇲🇽 <i>Actualización automática…</i>"
+                )
+                kb = InlineKeyboardMarkup(
                     [
-                        InlineKeyboardButton(
-                            "🌐 Ver en vivo →",
-                            url=f"{DASHBOARD_URL}/?match={mission_id}",
-                        )
-                    ],
+                        [
+                            InlineKeyboardButton(
+                                "🌐 Ver en vivo →",
+                                url=f"{DASHBOARD_URL}/?match={mission_id}",
+                            )
+                        ],
+                        [
+                            InlineKeyboardButton(
+                                "🛑 Detener Misión",
+                                callback_data=f"stop_mission_{mission_id}",
+                            )
+                        ],
+                    ]
+                )
+            else:
+                text = (
+                    f"{HEADER}\n\n"
+                    f"⚡ <b>Rastreando y Procesando Cuentas</b>\n\n"
+                    f"• {st_text}\n\n"
+                    f"🇲🇽 <i>Actualización automática…</i>"
+                )
+                kb = InlineKeyboardMarkup(
                     [
-                        InlineKeyboardButton(
-                            "🛑 Detener Misión",
-                            callback_data=f"stop_mission_{mission_id}",
-                        )
-                    ],
-                ]
-            )
+                        [
+                            InlineKeyboardButton(
+                                "🛑 Detener Misión",
+                                callback_data=f"stop_mission_{mission_id}",
+                            )
+                        ],
+                    ]
+                )
 
         async def _edit():
             try:
@@ -1027,11 +1082,6 @@ def _launch_auto_mission_ui(
                 logger.warning(
                     f"[Bot] [Auto {mission_id}] edit_text falló (status={status}): {ex}"
                 )
-                # Robert 2026-08-06: el edit silencioso dejaba misiones muertas
-                # mostrando el mensaje inicial ("Rastreando cuentas...") con el
-                # botón Detener Misión vivo para siempre — sin feedback ni error
-                # visible. En terminal (completed/cancelled/failed) mandamos un
-                # mensaje NUEVO como fallback en vez de morir en silencio.
                 if is_terminal:
                     try:
                         await context.bot.send_message(
@@ -1070,21 +1120,21 @@ def _launch_auto_mission_ui(
         match_text_block = "\n".join(match_lines)
         confirm_text = (
             f"{HEADER}\n\n"
-            f"⚡ <b>LLENADO AUTOMÁTICO DE CUENTA</b>\n\n"
-            f"Cuentas encontradas: {len(matches)}\n"
+            f"⚡ <b>CUENTA ENGANCHADA — LISTA PARA ACREDITACIÓN</b>\n\n"
+            f"• Cuenta vinculada: {len(matches)}\n"
             f"{match_text_block}\n\n"
-            f'🌐 <a href="{DASHBOARD_URL}/?match={m_id}">Ver detalle en el portal →</a>\n\n'
-            f"¿Iniciar llenado automático en paralelo?"
+            f'🌐 <a href="{DASHBOARD_URL}/?match={m_id}">Ver estado en vivo en el portal →</a>\n\n'
+            f"¿Deseas iniciar la acreditación de fondos en segundo plano?"
         )
         kb_confirm = InlineKeyboardMarkup(
             [
                 [
                     InlineKeyboardButton(
-                        "🚀 De Una / Iniciar Llenado",
+                        "🚀 Iniciar Acreditación",
                         callback_data=f"confirm_sched_{m_id}",
                     ),
                     InlineKeyboardButton(
-                        "🛑 Cancelar", callback_data=f"stop_sched_{m_id}"
+                        "🛑 Detener", callback_data=f"stop_sched_{m_id}"
                     ),
                 ],
                 [
@@ -1197,22 +1247,16 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return ConversationHandler.END
 
-        # Mensaje base inicial de la misión — con link al portal vivo
+        # Mensaje base inicial de la misión — feedback limpio y entretenido
         status_msg = await query.edit_message_text(
             f"{HEADER}\n\n"
             f"🎯 <b>MISIÓN {mission_id}</b>\n\n"
-            f"• Estado: Rastreando cuentas aptas…\n"
-            f'• 🌐 <a href="{DASHBOARD_URL}/?match={mission_id}">Ver en vivo en el portal →</a>\n\n'
-            f"<i>El portal se actualiza solo, no necesitas recargar.</i>",
+            f"• Estado: Rastreando cuentas aptas en el pool…\n"
+            f"  <code>[■■□□□□□□□□] 15%</code>\n\n"
+            f"📡 <i>Escaneando nodos seguros · ETA: ~45s</i>",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(
                 [
-                    [
-                        InlineKeyboardButton(
-                            "🌐 Ver en vivo →",
-                            url=f"{DASHBOARD_URL}/?match={mission_id}",
-                        )
-                    ],
                     [
                         InlineKeyboardButton(
                             "🛑 Detener Misión",
@@ -1245,7 +1289,7 @@ async def handle_confirm_gate_callback(
             state["decision"] = True
             ev.set()
         await query.edit_message_text(
-            f"✅ <b>Llenado automático iniciado.</b>\nProcesando depósitos en segundo plano...",
+            f"✅ <b>Acreditación de fondos iniciada.</b>\nProcesando saldo en segundo plano...",
             parse_mode="HTML",
         )
     elif data.startswith("stop_sched_"):
@@ -1257,7 +1301,7 @@ async def handle_confirm_gate_callback(
             state["decision"] = False
             ev.set()
         await query.edit_message_text(
-            f"🛑 <b>Llenado automático cancelado.</b>\nOperación finalizada.",
+            f"🛑 <b>Proceso detenido por el operador.</b>\nOperación finalizada.",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(
                 [
@@ -1286,7 +1330,7 @@ async def handle_stop_mission_callback(
                 (mission_id,),
             )
         await query.edit_message_text(
-            f"🛑 <b>Misión abortada por el operador.</b>",
+            f"🛑 <b>Misión detenida por el operador.</b>",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(
                 [
@@ -1363,18 +1407,12 @@ async def handle_retry_mission_callback(
         f"{HEADER}\n\n"
         f"🔁 <b>SEGUNDO INTENTO EN MARCHA</b>\n\n"
         f"🎯 <b>MISIÓN {new_id}</b>\n"
-        f"• Estado: Rastreando cuentas aptas…\n"
-        f'• 🌐 <a href="{DASHBOARD_URL}/?match={new_id}">Ver en vivo en el portal →</a>\n\n'
-        f"<i>El portal se actualiza solo, no necesitas recargar.</i>",
+        f"• Estado: Rastreando cuentas alternativas en el pool…\n"
+        f"  <code>[■■□□□□□□□□] 15%</code>\n\n"
+        f"📡 <i>Escaneando nuevo combo de respaldo…</i>",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(
             [
-                [
-                    InlineKeyboardButton(
-                        "🌐 Ver en vivo →",
-                        url=f"{DASHBOARD_URL}/?match={new_id}",
-                    )
-                ],
                 [
                     InlineKeyboardButton(
                         "🛑 Detener Misión",
