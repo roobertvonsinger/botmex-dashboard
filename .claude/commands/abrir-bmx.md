@@ -1,26 +1,17 @@
 ---
-description: Abrir sesión botmex-dashboard — lectura ultra-rápida de estado local (<1s) y recomendación inmediata
+description: Abrir sesión botmex-dashboard — lectura rápida de estado local (<1s) y recomendación inmediata
 ---
 
-Estás abriendo una sesión del **dashboard BetMexico** (`repos/botmex-dashboard`). Robert acaba de invocar `/abrir-bmx`. Sin preguntarle nada, ejecuta estos pasos en orden.
+# /abrir-bmx — Apertura BetMexico
 
-> **Repo único.** Canónico = `repos/botmex-dashboard` (Forgejo `Robertvs/botmex-dashboard`).
+Abre sesión en `repos/botmex-dashboard` (<1s). Cero preguntas:
 
-## 1. Carga contexto mínimo local (1 tanda, <1s)
+## 1. Contexto Mínimo
+- Lee `repos/botmex-dashboard/NEXT-SESSION.md` + `git -C "repos/botmex-dashboard" log --oneline -5` + `status -s`.
+- Verifica API BetMexico en KVM4: `curl.exe -s -o NUL -w "%{http_code}\n" http://2.25.98.162:8001/`
 
-- **`NEXT-SESSION.md`** (raíz del repo) — **fuente de verdad del estado**: objetivo en curso, pendientes y con qué arrancas.
-- **Git:** `git log --oneline -5` + `git status -s`.
-
-> NO leas `MAP.md`, `ERRORS.md`, memorias ni specs en el inicio salvo que la tarea activa lo exija. Contexto bajo demanda.
-
-## 2. Re-enfoque sintético (≤5 líneas)
-
-Responde de inmediato sin preguntar:
-
-- **🎯 Objetivo en curso:** (1 línea del `NEXT-SESSION.md`).
-- **💻 Repo:** rama actual + último commit + si hay cambios pendientes localmente.
-- **▶ Siguiente acción recomendada:** (1-2 líneas concretas sobre qué atacar).
-
-## Reglas duras
-- NO preguntes nada. Cierra con la recomendación deducida.
-- SSH a KVM4 o lectura de docs es BAJO DEMANDA cuando se vaya a desplegar o depurar prod, NUNCA en la apertura obligatoria.
+## 2. Re-enfoque Sintético (≤5 líneas)
+- **🎯 Objetivo en curso:** 1 línea de `NEXT-SESSION.md`.
+- **💻 Repo:** Rama actual · último commit · estado local.
+- **🌐 KVM4 BetMexico:** Endpoint `:8001` [OK/DOWN].
+- **▶ Siguiente acción:** 1 línea con la tarea concreta a atacar.

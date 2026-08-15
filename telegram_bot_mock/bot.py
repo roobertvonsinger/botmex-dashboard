@@ -1154,40 +1154,48 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         return ConversationHandler.END
 
     if query.data == "confirm_bet":
-        valid_pipes = context.user_data.get("pending_bet_pipes", [])
-        if not valid_pipes:
-            await query.edit_message_text("❌ No hay tarjetas guardadas.")
-            return ConversationHandler.END
+        try:
+            valid_pipes = context.user_data.get("pending_bet_pipes", [])
+            if not valid_pipes:
+                await query.edit_message_text("❌ No hay tarjetas guardadas.")
+                return ConversationHandler.END
 
-        if _mission_sem.locked():
+            if _mission_sem.locked():
+                await query.edit_message_text(
+                    "⚠️ Ya hay una misión de depósitos activa en el sistema. Intenta de nuevo en unos momentos."
+                )
+                return ConversationHandler.END
+
+            operator_id = update.effective_user.id
+            amount = 150.0
+            target_count = 9
+
+            tol_pipes = context.user_data.get("pending_tol_pipes", [])
+            # RF4: pasar tol_pipes al plan
+            plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count, tol_pipes=tol_pipes)
+            if not plan.get("feasible"):
+                await query.edit_message_text(
+                    f"❌ No fue posible armar el plan: {plan.get('reason', 'desconocido')}"
+                )
+                return ConversationHandler.END
+
+            from uuid import uuid4
+
+            mission_id = str(uuid4())[:8]
+            user_info = {
+                "telegram_id": operator_id,
+                "username": update.effective_user.username or "operator",
+            }
+
+            _persist_auto_mission(
+                mission_id, operator_id, valid_pipes, amount, target_count, plan
+            )
+        except Exception as e:
+            logger.exception(f"[handle_bet_callback] Error al confirmar bet: {e}")
             await query.edit_message_text(
-                "⚠️ Ya hay una misión de depósitos activa en el sistema. Intenta de nuevo en unos momentos."
+                "❌ Error interno al iniciar la misión. Intenta de nuevo o contacta al SuperAdmin."
             )
             return ConversationHandler.END
-
-        operator_id = update.effective_user.id
-        amount = 150.0
-        target_count = 9
-
-        tol_pipes = context.user_data.get("pending_tol_pipes", [])
-        plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count, tol_pipes=tol_pipes)
-        if not plan["feasible"]:
-            await query.edit_message_text(
-                f"❌ No fue posible armar el plan: {plan['reason']}"
-            )
-            return ConversationHandler.END
-
-        from uuid import uuid4
-
-        mission_id = str(uuid4())[:8]
-        user_info = {
-            "telegram_id": operator_id,
-            "username": update.effective_user.username or "operator",
-        }
-
-        _persist_auto_mission(
-            mission_id, operator_id, valid_pipes, amount, target_count, plan
-        )
 
         # Mensaje base inicial de la misión — con link al portal vivo
         status_msg = await query.edit_message_text(

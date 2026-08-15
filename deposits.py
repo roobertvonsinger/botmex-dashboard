@@ -1178,6 +1178,29 @@ async def _acquire_session_and_begin(
         err = step1.get("error") or "begin_deposit falló"
         logger.warning(f"[Deposits/phases] begin_deposit FALLÓ {email}: {err}")
         low = str(err).lower()
+        # 2026-08-13: IsUserInValidationProcess es terminal (cuenta en proceso de validación de BetMexico)
+        # Debe clasificarse ANTES del falso positivo redirectlogin/401
+        if "isuserinvalidationprocess" in low or "the_transaction_does_not_comply" in low:
+            # Marcar como KYC_PENDING para que el caller lo trate como cuenta DEAD
+            err = f"Cuenta bloqueada por BetMexico (IsUserInValidationProcess) — no reintentar"
+            await client.aclose()
+            # Persistir dead_reason para que futuras misiones no la tomen
+            try:
+                from app import db as _dash_db
+                with _dash_db() as c:
+                    c.execute(
+                        "UPDATE accounts SET dead_reason='IsUserInValidationProcess', dead_at=? WHERE email=?",
+                        (datetime.now(timezone.utc).isoformat(), email)
+                    )
+            except Exception as e:
+                logger.warning(f"[Deposits] No se pudo marcar dead_reason para {email}: {e}")
+            await _safe_phase(phase_cb, "done", {
+                "success": False, "result_code": "KYC_PENDING", "error": err,
+            })
+            return {"fail": {
+                "success": False, "result_code": "KYC_PENDING", "error": err,
+                "duration_ms": int((time.time() - t_total) * 1000),
+            }}
         if "redirectlogin" in low or "401" in low:
             # Confirmar autoexclusión sobre el JWT (reusado/cache) antes de concluir.
             try:

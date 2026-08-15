@@ -1136,6 +1136,21 @@ async def run_auto_mission(
                             else:
                                 account_declines += 1
                             break  # siguiente tarjeta (decline real o cargo ambiguo: terminal)
+                        # 2026-08-13: IsUserInValidationProcess (KYC_PENDING) es terminal — marcar como validation_blocked
+                        if code == "KYC_PENDING":
+                            failed += 1
+                            account_declines += 1
+                            # Marcar en meta para que no se reintente en futuras misiones
+                            try:
+                                from app import db as _dash_db
+                                with _dash_db() as c:
+                                    c.execute(
+                                        "UPDATE accounts SET dead_reason='IsUserInValidationProcess', dead_at=? WHERE email=?",
+                                        (datetime.utcnow().isoformat(), email)
+                                    )
+                            except Exception as e:
+                                logger.warning(f"[Auto {mission_id}] No se pudo marcar dead_reason para {email}: {e}")
+                            break  # cuenta muerta — siguiente cuenta
                         if code in dep.MM_DEAD_RC:
                             failed += 1
                             account_declines += 1
@@ -1177,6 +1192,7 @@ async def run_auto_mission(
                 # La condición `not matches` ya garantiza que no hubo match; quitamos el
                 # `len(accounts_list) < 10` que impedía el backup cuando el plan original
                 # ya alcanzó el techo de 10 pero falló todas (gap 2026-08-13).
+                # 2026-08-13: GATE KYC en respaldo — solo cuentas con kyc_verified=1 (Verified=True) entran al respaldo
                 if not matches and acc_idx == len(accounts_list) - 1:
                     try:
                         from app import DB_PATH
@@ -1188,6 +1204,11 @@ async def run_auto_mission(
                                 if backup_plan and backup_plan.get("feasible"):
                                     for b_acc in backup_plan.get("accounts", []):
                                         b_email = b_acc.get("email")
+                                        # 2026-08-13: GATE KYC — solo cuentas con kyc_verified=1 entran al respaldo
+                                        # Si no hay kyc_verified, saltar
+                                        if b_acc.get("kyc_verified") != 1:
+                                            logger.info(f"➖ CUENTA DE RESPALDO SALTADA (kyc_verified≠1) | {b_email}")
+                                            continue
                                         if b_email not in already_checked_emails:
                                             accounts_list.append(b_acc)
                                             already_checked_emails.add(b_email)
