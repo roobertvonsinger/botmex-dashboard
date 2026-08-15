@@ -75,27 +75,71 @@ from deposits import _mission_sem
 # Frases de saludo dinámicas (Slang directo)
 POC_GREETINGS = [
     "Hey,",
-    "¡Qué pedo!",
-    "¿Cómo andas?",
-    "¿Qué onda,",
-    "¡Listo pa' darle!",
+    "¡Qué onda,",
+    "¡Listo pa' darle,",
     "¿Qué trampa,",
     "¡Échale,",
+    "¿Cómo andas,",
+    "¡Firme ahí,",
 ]
 
-# Barras en 2a Persona Directa con Variación de Métricas (Estructuras de Rap Complejas)
-# Flow escrito: 4 barras, rima al final de cada línea, métrica pareja pa' que se lea y se escuche.
-RAP_DISCLAIMERS = [
-    "Buenas compa carder, qué bueno que traes feria, ya te habías tardado.\nDijiste que el billete iba a salir de cualquier lado,\npero le bajaste a tu mamá los doscientos del mandado\ny me trajiste puro carbón, ni un LIVE bien cargado. 🥩🔥",
-    "Llegaste muy picudo presumiendo que traías el truco aprendido,\nte fundiste la feria del mandado pa' meterte en este ruido.\nTraes tres CCs quemadas de un checker sin sentido\ny crees que con ChatGPT vas a salir del olvido. 💀⚡",
-    "Soñabas con tu Airbnb en automático y un cashout de revista,\nandabas de mamador en Discord dándotela de artista.\nTe vendieron puro carbón esos vagos de la lista\ny en BoTMexico te dejo sin saldo y fuera de vista. 🚀💸",
-    "Creíste que con abliteración ya te dabas de exquisito,\nte fundiste los doscientos pesitos en un mito.\nTus combos de Telegram salieron muertos de a bonito\ny te apagué el asador antes de empezar tu escrito. 🎤🥩",
-    "Traes la cara de hacker y el bolsillo pelado en ceros,\nte quemaste la feria del mandado con estafadores rateros.\nAquí BoTMexico no consuela noobs ni escucha tus peros:\no tiras la CC correcta o te regresas a los primeros. 🌵⚡",
+# Matriz Lírica Freestyle MC (Barras cortas, rima exacta y carrilla de campeón de batalla)
+RAP_PUNCHLINES_START = [
+    "Entra a la cabina con la mente fría,\nque aquí la pasarela no perdona tonterías. 🎤⚡",
+    "Traes flow de novato o colmillo de gallo,\nsi tiras con certeza hoy no tienes ni un fallo. 🇲🇽🔥",
+    "Saca las tarjetas que empieza la función,\nmenos bla-bla-bla y más liquidación. 💳✨",
+    "Directo a la tarima con el pulso exacto,\nsi vienes por feria cerramos el pacto. 🎯💸",
+    "Aquí no hay ensayo, puro golpe seco,\nsuelta ese combo que retumbe en el hueco. 🚀🥊",
+    "Vengo con el micro y el sistema afilado,\nsi traes buen material saldrás coronado. 👑🔥",
 ]
+
+RAP_PUNCHLINES_FAIL = [
+    "Le bajaste a tu jefa la feria del mandado\ny me trajiste un plástico quemado y oxidado. 🥩💀",
+    "Te la dabas de hacker con aires de revista\ny tu checker chafa te dejó fuera de pista. 🚀📉",
+    "Mucho cuento en Discord y pantalla de cristal,\npero tu tarjeta no pasa ni en el Oxxo local. 🏪❌",
+    "Soñabas con cashout y viaje de primera,\ny tu combo muerto no cruzó ni la frontera. 🌵⚡",
+    "Tiraste tres tiros y los tres al chamusco,\npa' vender humo mejor ni te busco. 💨💀",
+    "Te vendieron carbón como si fuera oro,\nya te vi llorando en el próximo coro. 🎤🍂",
+]
+
+RAP_PUNCHLINES_MATCH = [
+    "Cazamos la cuenta con precisión quirúrgica,\nprepárate el bolsillo pa' la magia metalúrgica. 🪄💳",
+    "Túnel enlazado y el radar calibrado,\nespera la señal que el tiro está cantado. 🎯🔒",
+    "Enganchó en corto, sin hacer tanto ruido,\neste es el flow de un campeón bien curtido. 🇲🇽⚡",
+    "Cayó la indicada, directo al objetivo,\nahora mira cómo se mueve el saldo en vivo. 📊✨",
+    "Paso firme y seguro en la pasarela,\nmientras el algoritmo solito se la vuela. 🚀🔥",
+]
+
+RAP_PUNCHLINES_SUCCESS = [
+    "Se acreditó la feria y se cerró la jugada,\nrecoge tus ganancias y no presumas nada. 🤫💸",
+    "Misión coronada, billete en el bolsillo,\nquedó demostrado quién tiene el verdadero brillo. 💎✨",
+    "Rima con punchline y depósito clavado,\nasí se trabaja cuando el gallo está entrenado. 👑🥊",
+    "El saldo cayó limpio directo a la balanza,\neso te pasa cuando tienes confianza. 📈🇲🇽",
+]
+
+RAP_PUNCHLINES_IDLE = [
+    "BoTMexico al mando, sin titubeo alguno,\nsi vas a tirar que no se te escape ninguno. 🌵🎯",
+    "Aquí no hay suerte, puro cálculo y rima,\nsi traes nivel nos vemos en la cima. 🏔️🔥",
+    "El juego es sencillo pal que sabe operar,\npon la tarjeta y deja de inventar. 💳⚡",
+    "El micro está prendido y el motor al cien,\nsi sabes a qué vienes te va a ir muy bien. 🚀🎤",
+]
+
+
+def get_random_mc_punchline(category: str = "idle") -> str:
+    """Obtiene un punchline lírico corto de freestyle según el contexto operativo."""
+    cat_map = {
+        "start": RAP_PUNCHLINES_START,
+        "fail": RAP_PUNCHLINES_FAIL,
+        "match": RAP_PUNCHLINES_MATCH,
+        "success": RAP_PUNCHLINES_SUCCESS,
+        "idle": RAP_PUNCHLINES_IDLE,
+    }
+    pool = cat_map.get(category, RAP_PUNCHLINES_IDLE)
+    return random.choice(pool)
 
 
 def get_random_greeting() -> str:
-    return f'<i>"{random.choice(RAP_DISCLAIMERS)}"</i>'
+    return get_random_mc_punchline("idle")
 
 
 def get_random_poc_greeting(nickname: str) -> str:
@@ -104,7 +148,7 @@ def get_random_poc_greeting(nickname: str) -> str:
 
 
 def get_random_rap_intro() -> str:
-    return random.choice(RAP_DISCLAIMERS)
+    return get_random_mc_punchline("start")
 
 
 # Membrete Oficial BoTMexico
@@ -228,19 +272,21 @@ def _start_menu_msg(user_id: int, nickname: str):
     msg = (
         f"{HEADER}\n\n"
         f"{poc_saludo}\n"
-        f"• ID Telegram: <code>{user_id}</code>\n\n"
-        f"🎤 <i>{rap_intro}</i>"
+        f"• 👤 <b>Operador:</b> <code>{nickname}</code>\n"
+        f"• 🆔 <b>Telegram ID:</b> <code>{user_id}</code>\n"
+        f"• ⚡ <b>Núcleo:</b> <code>v2026.08 · Ultra High-Speed</code>\n\n"
+        f"🎤 <i>\"{rap_intro}\"</i>"
     )
     kb = InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("💳 CC Auto-Match", callback_data="btn_start_bet")],
+            [InlineKeyboardButton("💳 CC Auto-Match (/bet)", callback_data="btn_start_bet")],
             [
                 InlineKeyboardButton(
-                    "🔑 Check Combos/Accesos", callback_data="btn_start_check"
+                    "🔑 Check Combos (/check)", callback_data="btn_start_check"
                 )
             ],
-            [InlineKeyboardButton("❔ Ayuda", callback_data="btn_start_help")],
-            [InlineKeyboardButton("🇲🇽 botmexico.net (Dashboard)", url=DASHBOARD_URL)],
+            [InlineKeyboardButton("❔ Manual & Ayuda", callback_data="btn_start_help")],
+            [InlineKeyboardButton("🌐 Portal Web (botmexico.net)", url=DASHBOARD_URL)],
         ]
     )
     return msg, kb
@@ -300,13 +346,13 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
         await _edit_msg(
             query,
             f"{HEADER}\n\n"
-            "💳 <b>Auto Deposito [CC Auto-match] (/BET)</b>\n\n"
-            "Pega tus CeCes en formato:\n"
+            "💳 <b>Auto Depósito · CC Auto-Match (/bet)</b>\n\n"
+            "Pega tus tarjetas en formato estándar:\n"
             "<code>4111111111111111|12|28|123</code>\n\n"
-            "🌵 Una por línea (máximo 4 tarjetas por intento).\n"
-            "🇲🇽 <b>BoTMexico</b> encuentra una cuenta para tu CC 💳\n"
-            "🤖 One Click & Watcha la magia...\n\n"
-            f"<i>{get_random_greeting()}</i>",
+            "• 🌵 Una por línea (1 a 4 plásticos por intento).\n"
+            "• ⚡ Auto-matching con cuentas verificadas (A+ / KYC).\n"
+            "• 🤖 Validación liveness en tiempo real.\n\n"
+            f"🎤 <i>\"{get_random_mc_punchline('start')}\"</i>",
             reply_markup=kb,
         )
         return WAIT_BET_CONFIRM
@@ -323,10 +369,12 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
         await _edit_msg(
             query,
             f"{HEADER}\n\n"
-            "📥 <b>VERIFICACIÓN COMBOS (/check)</b>\n\n"
+            "📥 <b>Verificación de Accesos y Combos (/check)</b>\n\n"
             "Envía combos en chat (máx 100) o archivo .txt (máx 5,000):\n"
             "<code>correo:contraseña</code>\n\n"
-            f"<i>{get_random_greeting()}</i>",
+            "• 🔍 Validación silenciosa sin quemar pasarela ni saldo.\n"
+            "• 📊 Calificación automática de perfiles y grado.\n\n"
+            f"🎤 <i>\"{get_random_mc_punchline('start')}\"</i>",
             reply_markup=kb,
         )
         return WAIT_CHECK_CONFIRM
@@ -346,7 +394,7 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
             "  Muestra esta guía rápida de instrucciones.\n\n"
             "• <b>/cancel</b> — 🛑 Cancelar/Detener proceso\n"
             "  Cancela cualquier misión activa y libera cuentas de inmediato.\n\n"
-            f"  🌵 {get_random_greeting()}\n"
+            f"🎤 <i>\"{get_random_mc_punchline('idle')}\"</i>\n"
         )
         kb = InlineKeyboardMarkup(
             [
@@ -400,7 +448,7 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "  Muestra esta guía rápida de instrucciones.\n\n"
         "• <b>/cancel</b> — 🛑 Cancelar/Detener proceso\n"
         "  Cancela cualquier misión activa y libera cuentas de inmediato.\n\n"
-        f"  🌵 {get_random_greeting()}\n"
+        f"🎤 <i>\"{get_random_mc_punchline('idle')}\"</i>\n"
     )
     kb = InlineKeyboardMarkup(
         [
@@ -423,8 +471,8 @@ async def botmex_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(
         f"{HEADER}\n\n"
-        f"Acceso directo al portal web:\n{DASHBOARD_URL}\n\n"
-        f"🌵 {get_random_greeting()}",
+        f"Acceso directo al portal web:\n<code>{DASHBOARD_URL}</code>\n\n"
+        f"🎤 <i>\"{get_random_mc_punchline('idle')}\"</i>",
         parse_mode="HTML",
         reply_markup=kb,
     )
@@ -777,7 +825,7 @@ async def _run_check_task(
 
 
 # ─────────────────────────────────────────────────────────────────────
-# FLUJO /BET
+# FLUJO /BET & AUTO-MATCHING
 # ─────────────────────────────────────────────────────────────────────
 
 
@@ -813,13 +861,13 @@ async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = (
         f"{HEADER}\n\n"
-        "💳 <b>Auto Deposito [CC Auto-match] (/BET)</b>\n\n"
-        "Pega tus CeCes en formato:\n"
+        "💳 <b>Auto Depósito · CC Auto-Match (/bet)</b>\n\n"
+        "Pega tus tarjetas en formato estándar:\n"
         "<code>4111111111111111|12|28|123</code>\n\n"
-        "🌵 Una por línea (máximo 4 tarjetas por intento).\n"
-        "🇲🇽 <b>BoTMexico</b> encuentra una cuenta para tu CC 💳\n"
-        "🤖 One Click & Watcha la magia...\n\n"
-        f"🌵 {get_random_greeting()}"
+        "• 🌵 1 a 4 tarjetas por intento (una por línea).\n"
+        "• ⚡ Matching automático con cuentas calificadas (A+ / KYC).\n"
+        "• 🤖 Acreditación y segundo intento inteligente.\n\n"
+        f"🎤 <i>\"{get_random_mc_punchline('start')}\"</i>"
     )
     await update.message.reply_text(
         msg,
@@ -906,7 +954,7 @@ async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             f"• ⚠️ Strikes acumulados: <b>{strikes_count} / {MAX_DAILY_STRIKES}</b>\n"
             f"  <i>(Ojo: no quemes la pasarela tirando CCs quemadas)</i>\n\n"
             f"{summary_text}\n\n"
-            f"🌵 <i>{get_random_greeting()}</i>"
+            f"🎤 <i>\"{get_random_mc_punchline('fail')}\"</i>"
         )
         kb_fail = InlineKeyboardMarkup(
             [[InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]]

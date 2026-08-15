@@ -254,6 +254,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a0eefaa` | feat(bet_flow): automatch con combo TOP garantizado, llenado encubierto omnicanal y retiros en batches de 200 con anti-reembolso |
 | `6b1e91c` | chore(sync): actualizar bitacora y scripts de depositos |
 | `d85c975` | feat(bot): /bet confirma antes del auto match, separa toleradas y ofrece segundo intento (RF4/RF7/RF8) |
 | `6cee146` | feat(auto_deposit): seleccion dinamica por actividad + disposicion por tier 40/40/20 (RF4/RF5) |
@@ -265,7 +266,6 @@ prewarm.py (router)
 | `b3d0361` | fix(proxy): remover iproyal y nodemaven por degradacion (504/407) |
 | `a5247b1` | docs: generar HANDOFF con post-mortem de errores y estado critico |
 | `ad64b86` | docs: actualizar NEXT-SESSION con arquitectura dual de bots en prod |
-| `fd6bc56` | revert: restaurar manejo de errores original en app.py (print/pass) |
 <!-- GEN:end:recientes -->
 
 ---

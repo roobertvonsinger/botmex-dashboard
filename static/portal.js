@@ -692,10 +692,17 @@
     cardEl.addEventListener('click', function (e) {
       const copyBtn = e.target.closest('.copy-clabe');
       if (copyBtn) {
-        const code = copyBtn.parentElement.querySelector('.clabe-code').textContent;
+        const code = copyBtn.parentElement.querySelector('.clabe-code').textContent.trim();
         navigator.clipboard.writeText(code).then(() => {
-          copyBtn.textContent = '✓';
-          setTimeout(() => { copyBtn.textContent = 'Copiar'; }, 2000);
+          copyBtn.textContent = '✓ Copiado';
+          copyBtn.classList.add('copied');
+          showToast('📋 CLABE STP copiada al portapapeles', 'ok');
+          setTimeout(() => {
+            copyBtn.textContent = 'Copiar';
+            copyBtn.classList.remove('copied');
+          }, 2000);
+        }).catch(() => {
+          showToast('No se pudo copiar la CLABE', 'err');
         });
         return;
       }
@@ -787,13 +794,15 @@
     overlay.className = 'modal-overlay';
     overlay.innerHTML =
       '<div class="modal-box">' +
-      '<div class="modal-title">💸 Retiro Automático</div>' +
-      '<div class="modal-info">Cuenta: <span style="color:var(--accent);font-family:monospace">' + shortEmail(email) + '</span><br>' +
-      'Saldo a retirar: <b style="color:var(--green-bright)">' + fmtMoney(balance) + ' MXN</b><br><br>' +
-      '<span style="font-size:12px;color:var(--text-dim)">Los fondos se enviarán de forma automática a tu cuenta bancaria de origen vinculada por SPEI.</span></div>' +
+      '<div class="modal-title">💸 Retiro Automático SPEI</div>' +
+      '<div class="modal-info">' +
+      'Cuenta: <span style="color:var(--accent);font-family:var(--font-mono);font-weight:600">' + shortEmail(email) + '</span><br>' +
+      'Saldo a liquidar: <b style="color:var(--green-bright);font-size:16px">' + fmtMoney(balance) + ' MXN</b><br><br>' +
+      '<span style="font-size:12px;color:var(--text-dim)">Los fondos se acreditarán directamente en batches seguros a tu cuenta bancaria vinculada por SPEI / STP.</span>' +
+      '</div>' +
       '<div class="modal-actions">' +
-      '<button class="btn" id="wdCancel">Cancelar</button>' +
-      '<button class="btn btn-primary" id="wdConfirm">💸 Confirmar Retiro</button>' +
+      '<button class="btn btn-sm" id="wdCancel">Cancelar</button>' +
+      '<button class="btn btn-sm btn-primary" id="wdConfirm">💸 Confirmar Retiro</button>' +
       '</div>' +
       '</div>';
     document.body.appendChild(overlay);
