@@ -63,6 +63,11 @@
     return '$' + (parseFloat(n || 0)).toFixed(2);
   }
 
+  function esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
   // El backend guarda last_deposit_date como "DD/MM/YYYY HH:MM" (formato MX
   // de BetMexico, ver app.py strptime "%d/%m/%Y %H:%M") o el sentinel 'N/A'.
   // new Date(str) lo interpreta como MM/DD/YYYY (ambiguo en JS): swapea
@@ -847,6 +852,260 @@
     });
   }
 
+  // ── Radar de Inteligencia de BINes ─────────────────────────────
+  let radarData = null;
+  let activeTier = 'corona';
+
+  async function loadBinRadar() {
+    const content = $('#brTierContent');
+    if (!content) return;
+    try {
+      const res = await fetch(apiUrl('/api/deposits/bin-recommendations'));
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      radarData = await res.json();
+      renderRadarCounts();
+      renderRadarTier(activeTier);
+    } catch (err) {
+      if (content) content.innerHTML = '<div class="empty-msg" style="padding:20px;color:var(--text-dim)">No se pudieron cargar las recomendaciones de BINes.</div>';
+    }
+  }
+
+  function renderRadarCounts() {
+    if (!radarData || !radarData.totals) return;
+    const totals = radarData.totals;
+    const cEl = $('#badgeCoronaCount');
+    const tEl = $('#badge3dsCount');
+    const teEl = $('#badgeTestingCount');
+    const dEl = $('#badgeDeadCount');
+    if (cEl) cEl.textContent = totals.corona_count || 0;
+    if (tEl) tEl.textContent = totals.threeds_count || 0;
+    if (teEl) teEl.textContent = totals.testing_count || 0;
+    if (dEl) dEl.textContent = totals.dead_count || 0;
+  }
+
+  function renderRadarTier(tier) {
+    const content = $('#brTierContent');
+    if (!content || !radarData) return;
+    const list = radarData[tier] || [];
+
+    if (!list.length) {
+      content.innerHTML = '<div class="empty-msg" style="padding:20px;color:var(--text-dim)">Sin registros en esta categoría.</div>';
+      return;
+    }
+
+    const fillClass = {
+      corona: 'fill-corona',
+      threeds: 'fill-3ds',
+      testing: 'fill-testing',
+      dead: 'fill-dead',
+    }[tier] || 'fill-corona';
+
+    content.innerHTML = list.map((b) => {
+      const rate = b.approval_rate || 0;
+      const btype = (b.type || 'DÉBITO').toUpperCase();
+      const flag = b.flag || '🇲🇽';
+      const bank = b.bank || 'Banco';
+      const app = b.approved || 0;
+      const tds = b.threeds || 0;
+      const rej = b.rejected || 0;
+      const slang = b.slang_reason || '';
+
+      return (
+        '<div class="br-item">' +
+          '<div class="br-item-top">' +
+            '<span class="br-bin-code"><code>' + b.bin + '</code></span>' +
+            '<span class="br-type-pill">' + btype + '</span>' +
+          '</div>' +
+          '<div class="br-bank"><span>' + flag + '</span> <b>' + bank + '</b> · <span style="color:var(--text-dim)">' + (b.scheme || '') + '</span></div>' +
+          '<div class="br-rate-bar-wrap">' +
+            '<div class="br-rate-fill ' + fillClass + '" style="width:' + Math.max(4, Math.min(100, rate)) + '%"></div>' +
+          '</div>' +
+          '<div class="br-item-stats">' +
+            '<span>Tasa: <b>' + rate + '%</b></span>' +
+            '<span>' + app + ' OK · ' + tds + ' 3DS · ' + rej + ' Fallos</span>' +
+          '</div>' +
+          '<div class="br-slang">' + slang + '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function setupRadarTabs() {
+    const tabs = document.querySelectorAll('.br-tab');
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        tabs.forEach((t) => t.classList.remove('active'));
+        tab.classList.add('active');
+        activeTier = tab.getAttribute('data-tier') || 'corona';
+        renderRadarTier(activeTier);
+      });
+    });
+
+    const refreshBtn = $('#btnRefreshRadar');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => {
+        showToast('↻ Actualizando radar…', 'ok');
+        loadBinRadar();
+      });
+    }
+  }
+
+  // ── Recent Ticker & Live Stats & Tips ──────────────────────────
+  let tickerData = null;
+  let currentTipIdx = 0;
+  let tipsInterval = null;
+
+  async function loadRecentTicker() {
+    try {
+      const res = await fetch(apiUrl('/api/operator/recent-ticker'));
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      tickerData = await res.json();
+      renderTopKpis();
+      renderMarquees();
+      renderBarometer();
+      if (tickerData.tips) setupTips(tickerData.tips);
+    } catch (err) {
+      console.warn('Error cargando ticker:', err);
+    }
+  }
+
+  function renderTopKpis() {
+    if (!tickerData || !tickerData.stats_1h) return;
+    const st = tickerData.stats_1h;
+    const tr = tickerData.trending || {};
+
+    const volEl = $('#kpiTotalVolume');
+    const depEl = $('#kpiDeposits1h');
+    const wdEl = $('#kpiWithdrawals1h');
+    const hotEl = $('#kpiHotBin');
+    const warnEl = $('#kpiWarnBin');
+    const poolEl = $('#kpiPoolLive');
+
+    if (volEl) volEl.textContent = fmtMoney(st.total_volume);
+    if (depEl) {
+      depEl.innerHTML = fmtMoney(st.deposits_total) + ' <small class="kpi-badge badge-green">' + (st.deposits_count || 0) + ' ops</small>';
+    }
+    if (wdEl) {
+      wdEl.innerHTML = fmtMoney(st.withdrawals_total) + ' <small class="kpi-badge badge-gold">' + (st.withdrawals_count || 0) + ' SPEI</small>';
+    }
+    if (hotEl && tr.rising && tr.rising.length) {
+      const topR = tr.rising[0];
+      hotEl.innerHTML = topR.bin + ' <small class="kpi-badge badge-accent">' + topR.rate + '% OK</small>';
+    }
+    if (warnEl && tr.falling && tr.falling.length) {
+      const topF = tr.falling[0];
+      warnEl.innerHTML = topF.bin + ' <small class="kpi-badge badge-red">' + topF.badge + '</small>';
+    }
+    if (poolEl) {
+      poolEl.innerHTML = (st.pool_live || 0) + ' <small class="kpi-badge badge-cyan">Cuentas</small>';
+    }
+  }
+
+  function renderMarquees() {
+    if (!tickerData) return;
+    const depTrack = $('#depMarqueeTrack');
+    const wdTrack = $('#wdMarqueeTrack');
+
+    if (depTrack && tickerData.recent_deposits) {
+      const deps = tickerData.recent_deposits;
+      if (deps.length) {
+        const chips = deps.map((d) => {
+          const t = d.created_at ? (d.created_at.slice(11, 16) || d.created_at.slice(0, 16)) : 'reciente';
+          return (
+            '<span class="mq-chip mq-dep">' +
+              '<span>🟢</span> ' +
+              '<span class="mq-email">' + esc(shortEmail(d.email)) + '</span>' +
+              '<span>·</span>' +
+              '<b class="mq-amt-dep">' + fmtMoney(d.amount) + ' MXN</b>' +
+              '<span>·</span>' +
+              '<span class="mq-time">' + esc(t) + '</span>' +
+              '<span>·</span>' +
+              '<span class="mq-op op-glow">⚡ @' + esc(d.operator) + '</span>' +
+              '<span>·</span>' +
+              '<span class="mq-bank">' + (d.flag || '🇲🇽') + ' ' + esc(d.bank) + ' (' + esc(d.bin) + ')</span>' +
+            '</span>'
+          );
+        }).join('');
+        depTrack.innerHTML = chips + chips; // Duplicado para loop infinito fluido sin saltos
+      } else {
+        depTrack.innerHTML = '<span class="mq-chip mq-dep">🟢 Sin depósitos recientes registrados</span>';
+      }
+    }
+
+    if (wdTrack && tickerData.recent_withdrawals) {
+      const wds = tickerData.recent_withdrawals;
+      if (wds.length) {
+        const chips = wds.map((w) => {
+          const t = w.created_at ? (w.created_at.slice(11, 16) || w.created_at.slice(0, 16)) : 'reciente';
+          return (
+            '<span class="mq-chip mq-wd">' +
+              '<span>🟡</span> ' +
+              '<span class="mq-email">' + esc(shortEmail(w.email)) + '</span>' +
+              '<span>·</span>' +
+              '<b class="mq-amt-wd">' + fmtMoney(w.amount) + ' MXN</b>' +
+              '<span>·</span>' +
+              '<span class="mq-time">' + esc(t) + '</span>' +
+              '<span>·</span>' +
+              '<span class="mq-op op-glow-gold">💸 @' + esc(w.operator) + '</span>' +
+              '<span>·</span>' +
+              '<span class="mq-inst">🏦 ' + esc(w.institution) + '</span>' +
+            '</span>'
+          );
+        }).join('');
+        wdTrack.innerHTML = chips + chips; // Duplicado para loop infinito fluido
+      } else {
+        wdTrack.innerHTML = '<span class="mq-chip mq-wd">🟡 Sin retiros recientes registrados</span>';
+      }
+    }
+  }
+
+  function renderBarometer() {
+    if (!tickerData || !tickerData.trending) return;
+    const tr = tickerData.trending;
+    const rEl = $('#chipsRising');
+    const fEl = $('#chipsFalling');
+
+    if (rEl && tr.rising) {
+      rEl.innerHTML = tr.rising.map((r) => (
+        '<span class="bin-chip chip-up" title="' + esc(r.bank) + '">' +
+          (r.flag || '🇲🇽') + ' <b>' + esc(r.bin) + '</b> · ' + esc(r.bank) + ' <span style="color:var(--mx-green-bright);font-weight:700">' + r.rate + '%</span>' +
+        '</span>'
+      )).join('');
+    }
+
+    if (fEl && tr.falling) {
+      fEl.innerHTML = tr.falling.map((f) => (
+        '<span class="bin-chip chip-down" title="' + esc(f.issue) + '">' +
+          (f.flag || '🇲🇽') + ' <b>' + esc(f.bin) + '</b> · ' + esc(f.bank) + ' <span style="color:#fda4af;font-weight:700">' + esc(f.badge) + '</span>' +
+        '</span>'
+      )).join('');
+    }
+  }
+
+  function setupTips(tips) {
+    if (!tips || !tips.length) return;
+    const tipEl = $('#liveTipText');
+    const dotsEl = $('#tipsDots');
+    if (dotsEl) {
+      dotsEl.innerHTML = tips.map((_, i) => '<span class="tips-dot ' + (i === 0 ? 'active' : '') + '"></span>').join('');
+    }
+    if (tipEl) tipEl.textContent = tips[0];
+
+    if (tipsInterval) clearInterval(tipsInterval);
+    tipsInterval = setInterval(() => {
+      currentTipIdx = (currentTipIdx + 1) % tips.length;
+      if (tipEl) {
+        tipEl.style.opacity = '0';
+        setTimeout(() => {
+          tipEl.textContent = tips[currentTipIdx];
+          tipEl.style.opacity = '1';
+        }, 220);
+      }
+      const dots = document.querySelectorAll('.tips-dot');
+      dots.forEach((d, i) => d.classList.toggle('active', i === currentTipIdx));
+    }, 7000);
+  }
+
   // ── Init ───────────────────────────────────────────────────────
   async function init() {
     // Logout + back-link SA: solo en página standalone. En bare (tab embebido)
@@ -871,6 +1130,317 @@
         }
       } catch (_) {}
     }
+
+  // ── Modal Central de Detalle de KPI ─────────────────────────────
+  function setupKpiClicks() {
+    const cards = document.querySelectorAll('.kpi-card');
+    cards.forEach((card) => {
+      card.addEventListener('click', () => {
+        const type = card.getAttribute('data-kpi');
+        if (type) openKpiModal(type);
+      });
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          const type = card.getAttribute('data-kpi');
+          if (type) openKpiModal(type);
+        }
+      });
+    });
+
+    const closeBtn = $('#btnKpiModalClose');
+    const modal = $('#kpiDetailModal');
+    if (closeBtn) closeBtn.addEventListener('click', closeKpiModal);
+    if (modal) {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeKpiModal();
+      });
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal && modal.style.display !== 'none') {
+        closeKpiModal();
+      }
+    });
+  }
+
+  function closeKpiModal() {
+    const modal = $('#kpiDetailModal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  function openKpiModal(type) {
+    const modal = $('#kpiDetailModal');
+    const badge = $('#kpiModalBadge');
+    const title = $('#kpiModalTitle');
+    const body = $('#kpiModalBody');
+    if (!modal || !body) return;
+
+    const st = tickerData ? tickerData.stats_1h : {
+      total_volume: 0, deposits_total: 0, deposits_count: 0,
+      withdrawals_total: 0, withdrawals_count: 0, pool_live: 0
+    };
+    const deps = (tickerData && tickerData.recent_deposits) || [];
+    const wds = (tickerData && tickerData.recent_withdrawals) || [];
+    const tr = (tickerData && tickerData.trending) || {};
+
+    if (type === 'volume') {
+      badge.textContent = '⚡ VOLUMEN 1H · AUDITORÍA';
+      badge.className = 'kpi-modal-badge badge-accent';
+      title.innerHTML = '⚡ Flujo de Capital (Última Hora)';
+      
+      const depPct = st.total_volume > 0 ? Math.round((st.deposits_total / st.total_volume) * 100) : 50;
+      const wdPct = 100 - depPct;
+
+      body.innerHTML = `
+        <div class="kpi-hero-stat hero-volume">
+          <div class="kpi-hero-val" style="color:var(--accent);text-shadow:0 0 16px rgba(56,189,248,0.4)">${fmtMoney(st.total_volume)} MXN</div>
+          <div class="kpi-hero-sub">Volumen combinado procesado en los últimos 60 minutos</div>
+        </div>
+
+        <div class="kpi-breakdown-bar">
+          <div class="kpi-bar-labels">
+            <span style="color:var(--mx-green-bright)">🟢 Depósitos: ${fmtMoney(st.deposits_total)} (${depPct}%)</span>
+            <span style="color:var(--gold-bright)">🟡 Retiros: ${fmtMoney(st.withdrawals_total)} (${wdPct}%)</span>
+          </div>
+          <div class="kpi-bar-track">
+            <div class="kpi-bar-seg-green" style="width:${depPct}%"></div>
+            <div class="kpi-bar-seg-gold" style="width:${wdPct}%"></div>
+          </div>
+        </div>
+
+        <div class="kpi-grid-stats">
+          <div class="kpi-mini-stat">
+            <span class="kpi-mini-label">Operaciones de Depósito</span>
+            <span class="kpi-mini-val" style="color:var(--mx-green-bright)">${st.deposits_count || 0} tiros</span>
+          </div>
+          <div class="kpi-mini-stat">
+            <span class="kpi-mini-label">Disparos de Retiro SPEI</span>
+            <span class="kpi-mini-val" style="color:var(--gold-bright)">${st.withdrawals_count || 0} órdenes</span>
+          </div>
+        </div>
+
+        <p style="font-size:12px;color:var(--text-dim);text-align:center;margin-top:12px;">
+          💡 <i>El volumen contabiliza todas las transacciones aprobadas y liquidadas en pasarela.</i>
+        </p>
+      `;
+    } else if (type === 'deposits') {
+      badge.textContent = '🟢 DEPÓSITOS 1H · CORONACIONES';
+      badge.className = 'kpi-modal-badge badge-green';
+      title.innerHTML = '🟢 Depósitos Recientes en Pasarela';
+
+      const depListHtml = deps.length ? deps.map(d => {
+        const timeStr = d.created_at ? (d.created_at.slice(11, 16) || d.created_at.slice(0, 16)) : 'reciente';
+        return `
+          <div class="kpi-tx-item">
+            <div class="kpi-tx-left">
+              <span class="kpi-tx-email">${esc(shortEmail(d.email))}</span>
+              <div class="kpi-tx-meta">
+                <span>${d.flag || '🇲🇽'} <b>${esc(d.bank)}</b> (${esc(d.bin)})</span>
+                <span>·</span>
+                <span>${esc(timeStr)}</span>
+              </div>
+            </div>
+            <div class="kpi-tx-right">
+              <span class="kpi-tx-amt" style="color:var(--mx-green-bright)">+${fmtMoney(d.amount)} MXN</span>
+              <span class="kpi-tx-op op-glow">⚡ @${esc(d.operator)}</span>
+            </div>
+          </div>
+        `;
+      }).join('') : '<div class="empty-msg" style="padding:16px;">Sin depósitos registrados en la última hora.</div>';
+
+      body.innerHTML = `
+        <div class="kpi-hero-stat hero-dep">
+          <div class="kpi-hero-val" style="color:var(--mx-green-bright);text-shadow:0 0 16px rgba(16,185,129,0.4)">${fmtMoney(st.deposits_total)} MXN</div>
+          <div class="kpi-hero-sub">${st.deposits_count || 0} operaciones aprobadas en menos de 1 hora</div>
+        </div>
+
+        <div style="font-weight:700;font-size:12px;color:var(--text-bright);margin-bottom:8px;display:flex;justify-content:space-between;">
+          <span>ÚLTIMOS TIROS CORONADOS</span>
+          <span style="color:var(--text-dim)">${deps.length} registros</span>
+        </div>
+        <div class="kpi-tx-list">${depListHtml}</div>
+      `;
+    } else if (type === 'withdrawals') {
+      badge.textContent = '🟡 RETIROS 1H · LIQUIDACIÓN SPEI';
+      badge.className = 'kpi-modal-badge badge-gold';
+      title.innerHTML = '🟡 Retiros & Liquidaciones en Vivo';
+
+      const wdListHtml = wds.length ? wds.map(w => {
+        const timeStr = w.created_at ? (w.created_at.slice(11, 16) || w.created_at.slice(0, 16)) : 'reciente';
+        return `
+          <div class="kpi-tx-item">
+            <div class="kpi-tx-left">
+              <span class="kpi-tx-email">${esc(shortEmail(w.email))}</span>
+              <div class="kpi-tx-meta">
+                <span>🏦 <b>${esc(w.institution)}</b></span>
+                <span>·</span>
+                <span>${esc(timeStr)}</span>
+              </div>
+            </div>
+            <div class="kpi-tx-right">
+              <span class="kpi-tx-amt" style="color:var(--gold-bright)">${fmtMoney(w.amount)} MXN</span>
+              <span class="kpi-tx-op op-glow-gold">💸 @${esc(w.operator)}</span>
+            </div>
+          </div>
+        `;
+      }).join('') : '<div class="empty-msg" style="padding:16px;">Sin retiros registrados en la última hora.</div>';
+
+      body.innerHTML = `
+        <div class="kpi-hero-stat hero-wd">
+          <div class="kpi-hero-val" style="color:var(--gold-bright);text-shadow:0 0 16px rgba(245,158,11,0.4)">${fmtMoney(st.withdrawals_total)} MXN</div>
+          <div class="kpi-hero-sub">${st.withdrawals_count || 0} retiros SPEI procesados en menos de 1 hora</div>
+        </div>
+
+        <div style="font-weight:700;font-size:12px;color:var(--text-bright);margin-bottom:8px;display:flex;justify-content:space-between;">
+          <span>ÚLTIMAS LIQUIDACIONES</span>
+          <span style="color:var(--text-dim)">${wds.length} registros</span>
+        </div>
+        <div class="kpi-tx-list">${wdListHtml}</div>
+      `;
+    } else if (type === 'hotbin') {
+      badge.textContent = '🔥 RADAR · BINES A LA ALZA';
+      badge.className = 'kpi-modal-badge badge-accent';
+      title.innerHTML = '🔥 Plásticos Más Calientes del Momento';
+
+      const risingList = (tr.rising || []).map(r => `
+        <div class="kpi-tx-item" style="border-color:rgba(16,185,129,0.3)">
+          <div class="kpi-tx-left">
+            <span class="kpi-tx-email" style="font-size:13px;color:var(--text-bright)"><code>${r.bin}</code> · ${r.flag || '🇲🇽'} <b>${esc(r.bank)}</b></span>
+            <div class="kpi-tx-meta">
+              <span style="color:var(--mx-green-bright);font-weight:700">👑 ${r.badge}</span>
+              <span>·</span>
+              <span>${r.approved || 0} depósitos aprobados</span>
+            </div>
+          </div>
+          <div class="kpi-tx-right">
+            <button class="btn btn-sm btn-primary" onclick="copyBinToClipboard('${r.bin}')">Copiar BIN</button>
+          </div>
+        </div>
+      `).join('');
+
+      body.innerHTML = `
+        <div class="kpi-hero-stat hero-hot">
+          <div class="kpi-hero-val" style="color:#fb923c;text-shadow:0 0 16px rgba(249,115,22,0.4)">${tr.rising && tr.rising[0] ? tr.rising[0].bin : '491566'}</div>
+          <div class="kpi-hero-sub">Tasa de Efectividad: <b>${tr.rising && tr.rising[0] ? tr.rising[0].rate : 75.9}%</b> · ${tr.rising && tr.rising[0] ? tr.rising[0].bank : 'Santander'}</div>
+        </div>
+
+        <div style="font-weight:700;font-size:12px;color:var(--text-bright);margin-bottom:8px;">TOP PLÁSTICOS CORONANDO DIRECTO</div>
+        <div class="kpi-tx-list">${risingList || '<div class="empty-msg">Sin datos de tendencia.</div>'}</div>
+
+        <p style="font-size:12px;color:var(--text-dim);margin-top:14px;line-height:1.45;">
+          💡 <b>Tip de Operación:</b> Estos BINes tienen la menor fricción en pasarela y aprueban sin detonar retos biométricos ni 3DS.
+        </p>
+      `;
+    } else if (type === 'safe3ds') {
+      badge.textContent = '🛡️ ALERTA · EVITAR / 3DS';
+      badge.className = 'kpi-modal-badge badge-red';
+      title.innerHTML = '🛡️ Plásticos a la Baja & Retos 3DS';
+
+      const fallingList = (tr.falling || []).map(f => `
+        <div class="kpi-tx-item" style="border-color:rgba(244,63,94,0.3)">
+          <div class="kpi-tx-left">
+            <span class="kpi-tx-email" style="font-size:13px;color:#fda4af"><code>${f.bin}</code> · ${f.flag || '🇲🇽'} <b>${esc(f.bank)}</b></span>
+            <div class="kpi-tx-meta">
+              <span style="color:#fda4af;font-weight:700">⚠️ ${f.badge}</span>
+              <span>·</span>
+              <span>${esc(f.issue)}</span>
+            </div>
+          </div>
+          <div class="kpi-tx-right">
+            <span class="kpi-badge badge-red">Evitar</span>
+          </div>
+        </div>
+      `).join('');
+
+      body.innerHTML = `
+        <div class="kpi-hero-stat hero-3ds">
+          <div class="kpi-hero-val" style="color:#fda4af;text-shadow:0 0 16px rgba(244,63,94,0.4)">${tr.falling && tr.falling[0] ? tr.falling[0].bin : '551238'}</div>
+          <div class="kpi-hero-sub">Alerta de Seguridad Activa · ${tr.falling && tr.falling[0] ? tr.falling[0].bank : 'HSBC'} (Antifraud 3DS)</div>
+        </div>
+
+        <div style="font-weight:700;font-size:12px;color:var(--text-bright);margin-bottom:8px;">PLÁSTICOS CON RETOS O DECLINADOS</div>
+        <div class="kpi-tx-list">${fallingList || '<div class="empty-msg">Sin alertas activas.</div>'}</div>
+
+        <p style="font-size:12px;color:#fda4af;margin-top:14px;line-height:1.45;">
+          ⚠️ <b>Advertencia:</b> No desperdicies intentos con estos plásticos; la pasarela está solicitando token dinámico o rechazando de plano.
+        </p>
+      `;
+    } else if (type === 'pool') {
+      badge.textContent = '👑 POOL LIVE · DISPONIBILIDAD';
+      badge.className = 'kpi-modal-badge badge-cyan';
+      title.innerHTML = '👑 Pool de Cuentas Activas';
+
+      body.innerHTML = `
+        <div class="kpi-hero-stat hero-pool">
+          <div class="kpi-hero-val" style="color:#67e8f9;text-shadow:0 0 16px rgba(6,182,212,0.4)">${st.pool_live || 0}</div>
+          <div class="kpi-hero-sub">Cuentas con sesión LIVE listas para operar en este momento</div>
+        </div>
+
+        <div class="kpi-grid-stats">
+          <div class="kpi-mini-stat">
+            <span class="kpi-mini-label">Disponibilidad Inmediata</span>
+            <span class="kpi-mini-val" style="color:#67e8f9">100% ONLINE</span>
+          </div>
+          <div class="kpi-mini-stat">
+            <span class="kpi-mini-label">Protección de Sesión</span>
+            <span class="kpi-mini-val" style="color:var(--mx-green-bright)">JWT Activo</span>
+          </div>
+        </div>
+
+        <div style="text-align:center;margin-top:16px;">
+          <button class="btn btn-primary" style="width:100%;padding:12px;" onclick="scrollToAccountsSection()">
+            👑 Ver Todas las Cuentas Abajo ↓
+          </button>
+        </div>
+      `;
+    }
+
+    modal.style.display = 'flex';
+  }
+
+  window.copyBinToClipboard = function(bin) {
+    if (navigator.clipboard && bin) {
+      navigator.clipboard.writeText(bin);
+      showToast('📋 BIN ' + bin + ' copiado al portapapeles', 'ok');
+    }
+  };
+
+  window.scrollToAccountsSection = function() {
+    closeKpiModal();
+    const sec = $('#accountsSection');
+    if (sec) sec.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // ── Init ───────────────────────────────────────────────────────
+  async function init() {
+    // Logout + back-link SA: solo en página standalone. En bare (tab embebido)
+    // el dashboard ya provee logout y navegación — el header (.ph) está oculto.
+    if (!BARE) {
+      $('#logoutBtn').addEventListener('click', async () => {
+        try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (_) {}
+        window.location.href = '/login';
+      });
+
+      // SA viendo /{username} (posiblemente el suyo propio, vía view_as): nunca
+      // debe quedar atrapado sin volver a su dashboard — link directo siempre visible.
+      try {
+        const me = await (await fetch('/api/auth/me')).json();
+        if (me.role === 'superadmin') {
+          const back = document.createElement('a');
+          back.className = 'btn btn-sm';
+          back.href = '/dashboard';
+          back.textContent = '← Dashboard';
+          $('#logoutBtn').insertAdjacentElement('beforebegin', back);
+          if (phRole) phRole.textContent = '· viendo como usuario';
+        }
+      } catch (_) {}
+    }
+
+    setupRadarTabs();
+    setupKpiClicks();
+    loadBinRadar();
+    loadRecentTicker();
+    setInterval(loadRecentTicker, 25000);
 
     // Check for ?match=ID in URL
     const params = new URLSearchParams(window.location.search);

@@ -318,11 +318,24 @@ def _bin_3ds_stats(bin6: str) -> dict:
 
 @router.get("/bin-check/{bin6}")
 def bin_check(bin6: str, _user: dict = Depends(require_session)):
-    """Devuelve historial 3DS del BIN para que el frontend avise al user.
-    `is_3ds_prone = total_3ds >= 1` (cualquier 3DS previo es señal)."""
-    stats = _bin_3ds_stats(bin6[:6] if bin6 else "")
+    """Devuelve historial 3DS y clasificación de inteligencia del BIN."""
+    from bin_intelligence import get_single_card_bin_badge, lookup_bin_metadata
+    b6 = bin6[:6] if bin6 else ""
+    stats = _bin_3ds_stats(b6)
     stats["is_3ds_prone"] = stats.get("total_3ds", 0) >= 1
+    meta = lookup_bin_metadata(b6)
+    badge_info = get_single_card_bin_badge(b6)
+    stats["metadata"] = meta
+    stats["intelligence"] = badge_info
     return stats
+
+
+@router.get("/bin-recommendations")
+def bin_recommendations(_user: dict = Depends(require_session)):
+    """Devuelve el radar de recomendaciones de BINes clasificado en 4 Tiers para el portal y operadores.
+    Tiers: 🔥 TOP Corona, 🛡️ 3DS Antifraud, 🧪 En Pruebas, 💀 Quemadas."""
+    from bin_intelligence import get_bin_intelligence_summary
+    return get_bin_intelligence_summary()
 
 
 @router.get("/bin-stats")
@@ -371,11 +384,21 @@ def bin_stats_overview(user: dict = Depends(require_session)):
     except sqlite3.OperationalError:
         return {"bins": [], "totals": {}}
     bins = []
+    from bin_intelligence import lookup_bin_metadata, classify_bin_tier
     for r in rows:
         d = dict(r)
         att = d["attempts"] or 0
-        d["approval_rate"] = round((d["approved"] / att) * 100, 1) if att else 0.0
-        # Cruzar con bin_stats (historial 3DS persistente) para last_3ds_at.
+        app = d["approved"] or 0
+        tds = d["threeds"] or 0
+        rej = d["rejected"] or 0
+        d["approval_rate"] = round((app / att) * 100, 1) if att else 0.0
+        meta = lookup_bin_metadata(d["bin"])
+        d.update(meta)
+        tier_code, tier_title, tier_badge, slang_reason = classify_bin_tier(att, app, tds, rej)
+        d["tier"] = tier_code
+        d["tier_badge"] = tier_badge
+        d["tier_title"] = tier_title
+        d["slang_reason"] = slang_reason
         bins.append(d)
     totals = {
         "bins": len(bins),

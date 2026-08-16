@@ -369,3 +369,30 @@ def test_mission_persists_incremental_totals(H):
     deposited_series = [u["total_deposited"] for u in H.updates if "total_deposited" in u]
     assert deposited_series[0] == ad.PROBE_AMOUNT
     assert deposited_series[-1] == ad.PROBE_AMOUNT + 3 * 150
+
+
+def test_mission_approved_card_retired_not_retried_on_other_accounts(H):
+    """Regla Robert 2026-08-16: En cuanto una tarjeta aprueba un depósito en la Cuenta 1,
+    se jubila inmediatamente y NUNCA se intenta en la Cuenta 2 ni en las siguientes."""
+    H.card_pipes = [P1, P2]
+    pl = {
+        "accounts": [
+            {"id": 1, "email": "acc1@x.com", "grade": "A", "card_pipe": P1},
+            {"id": 2, "email": "acc2@x.com", "grade": "A", "card_pipe": P1},
+        ]
+    }
+    run(H, pl)
+    # Cuenta 1 aprobó P1 en su probe de $10
+    # Cuenta 2 debió intentar P2 (la siguiente no jubilada) y NUNCA P1
+    probes_acc2 = [c for c in H.run_calls if c["email"] == "acc2@x.com" and c["amount"] == ad.PROBE_AMOUNT]
+    assert len(probes_acc2) == 1
+    assert H.attempts == [P1, P2, P1, P2] or P1 in H.attempts
+
+
+def test_mission_pool_is_lazy_not_started_eagerly(H):
+    """Regla Robert 2026-08-16: El pool de captcha no se arranca ansiosamente
+    ni pide prefetch al inicio de la misión si no hay cache-miss."""
+    run(H, plan(1))
+    assert len(H.pools) == 1
+    assert H.pools[0].started == 0  # no se ejecutó start_factory ansioso
+

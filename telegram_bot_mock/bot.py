@@ -71,6 +71,12 @@ from prewarm import (
 from card_checker import precheck_card_liveness, format_ruthopia_liveness_summary
 from auto_deposit import plan_auto_mission, run_auto_mission
 from deposits import _mission_sem
+from bin_intelligence import (
+    format_telegram_start_banner,
+    format_telegram_bet_warning,
+    format_telegram_radar_full,
+    get_single_card_bin_badge,
+)
 
 # Frases de saludo dinámicas (Slang directo)
 POC_GREETINGS = [
@@ -269,17 +275,20 @@ def _start_menu_msg(user_id: int, nickname: str):
     """Construye mensaje + teclado del menú principal (/start y 'Volver al inicio')."""
     poc_saludo = get_random_poc_greeting(nickname)
     rap_intro = get_random_rap_intro()
+    start_banner = format_telegram_start_banner()
+    banner_section = f"\n\n{start_banner}" if start_banner else ""
     msg = (
         f"{HEADER}\n\n"
         f"{poc_saludo}\n"
         f"• 👤 <b>Operador:</b> <code>{nickname}</code>\n"
         f"• 🆔 <b>Telegram ID:</b> <code>{user_id}</code>\n"
-        f"• ⚡ <b>Núcleo:</b> <code>v2026.08 · Ultra High-Speed</code>\n\n"
+        f"• ⚡ <b>Núcleo:</b> <code>v2026.08 · Ultra High-Speed</code>{banner_section}\n\n"
         f"🎤 <i>\"{rap_intro}\"</i>"
     )
     kb = InlineKeyboardMarkup(
         [
             [InlineKeyboardButton("💳 CC Auto-Match (/bet)", callback_data="btn_start_bet")],
+            [InlineKeyboardButton("📊 Radar & Ranking de BINes", callback_data="btn_start_bin_radar")],
             [
                 InlineKeyboardButton(
                     "🔑 Check Combos (/check)", callback_data="btn_start_check"
@@ -333,7 +342,22 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
     """Callback para botones rápidos del /start."""
     query = update.callback_query
     await query.answer()
-    if query.data == "btn_start_bet":
+    if query.data == "btn_start_bin_radar":
+        radar_text = format_telegram_radar_full()
+        kb = InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("💳 Tirar con Bines TOP (/bet)", callback_data="btn_start_bet")],
+                [InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")],
+            ]
+        )
+        await _edit_msg(
+            query,
+            f"{HEADER}\n\n{radar_text}",
+            reply_markup=kb,
+        )
+        return ConversationHandler.END
+    elif query.data == "btn_start_bet":
+        warning_box = format_telegram_bet_warning()
         kb = InlineKeyboardMarkup(
             [
                 [
@@ -346,6 +370,7 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
         await _edit_msg(
             query,
             f"{HEADER}\n\n"
+            f"{warning_box}\n\n"
             "💳 <b>Auto Depósito · CC Auto-Match (/bet)</b>\n\n"
             "Pega tus tarjetas en formato estándar:\n"
             "<code>4111111111111111|12|28|123</code>\n\n"
@@ -859,8 +884,10 @@ async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         raw_text = " ".join(args)
         return await process_bet_input(update, context, override_text=raw_text)
 
+    warning_box = format_telegram_bet_warning()
     msg = (
         f"{HEADER}\n\n"
+        f"{warning_box}\n\n"
         "💳 <b>Auto Depósito · CC Auto-Match (/bet)</b>\n\n"
         "Pega tus tarjetas en formato estándar:\n"
         "<code>4111111111111111|12|28|123</code>\n\n"
@@ -873,7 +900,10 @@ async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg,
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("🏠 Volver al inicio", callback_data="cancel_bet")]]
+            [
+                [InlineKeyboardButton("📊 Ver Radar Completo", callback_data="btn_start_bin_radar")],
+                [InlineKeyboardButton("🏠 Volver al inicio", callback_data="cancel_bet")],
+            ]
         ),
     )
     return WAIT_BET_CONFIRM

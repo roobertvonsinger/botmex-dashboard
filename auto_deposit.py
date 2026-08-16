@@ -846,8 +846,7 @@ async def run_auto_mission(
             "BMX_CAPMONSTER_KEY", ""
         )
         pool = make_pool(cap_key, size=2, workers=1)
-        await pool.start_factory()
-        asyncio.create_task(pool.prefetch(2))
+        # Pool lazy: no arrancar factory ni prefetch ansioso si hay JWT cache hit
 
         sessions: Dict[str, Any] = {}  # email -> (jwt, proxy) — regla 11
         matches: List[Dict[str, Any]] = []
@@ -955,285 +954,340 @@ async def run_auto_mission(
             except Exception as ex_db_lock:
                 logger.warning(f"No se pudieron pre-cargar tarjetas casadas de BD: {ex_db_lock}")
 
-            acc_idx = 0
-            while acc_idx < len(accounts_list):
-                if _cancelled():
-                    cancelled = True
-                    break
-                acc = accounts_list[acc_idx]
-                account_id, email = acc.get("id"), acc.get("email")
-                acct = _fetch_account(account_id)
+            # Inicializar estado de cuentas para el despachador Round-Robin
+            accounts_state: List[Dict[str, Any]] = []
+            for acc in accounts_list:
+                aid, email = acc.get("id"), acc.get("email")
+                acct = _fetch_account(aid)
                 if not acct:
-                    acc_idx += 1
                     continue
-
-                # Emitir evento SSE de feedback: obteniendo datos/sesión de la cuenta
-                _broadcast_mission(
-                    mission_id,
-                    "logging_in",
-                    user,
-                    on_progress=on_progress,
-                    email=email,
-                    current=acc_idx + 1,
-                    total=len(accounts_list),
-                )
-
-                # Tarjetas candidatas: la asignada por el plan (mejor del pool para
-                # esta cuenta) + resto del pool — SIEMPRE del lote que dio el
-                # operador, nunca de account_cards (regla 7: si no hay ninguna,
-                # siguiente cuenta SIN lockear)
-                candidates = [p for p in [acc.get("card_pipe"), *card_pipes] if p]
-                candidates = [_normalize_pipe_to_3part(p) for p in candidates]
-                candidates = list(dict.fromkeys(candidates))  # dedup, orden estable
-                candidates = [p for p in candidates if p not in retired_cards]
-                if not candidates:
+                cand = [p for p in [acc.get("card_pipe"), *card_pipes] if p]
+                cand = [_normalize_pipe_to_3part(p) for p in cand]
+                cand = list(dict.fromkeys(cand))
+                cand = [p for p in cand if p not in retired_cards]
+                if not cand:
                     logger.info(f"⚠️ Sin tarjetas candidatas activas para {email} (todas jubiladas)")
-                    acc_idx += 1
                     continue
-                matched = False
-                locked = False
-                code = None
-                account_declines = (
-                    0  # regla Robert 2026-07-28: tope por cuenta EN ESTA CORRIDA
-                )
-                for pipe_idx, pipe in enumerate(candidates):
-                    if matched or _cancelled():
-                        break
-                    if account_declines >= MM_MAX_ACCOUNT_DECLINES_PER_RUN:
-                        break  # ya declinó 2 veces esta corrida — no taladrar más, siguiente cuenta
-                    if not locked:  # regla 7: lock justo antes del 1er intento real
-                        dep._auto_lock_for_deposit(
-                            account_id, operator_id, user, hours=4
-                        )
-                        locked = True
-                        locked_ids.add(account_id)
-                    transient = 0
-                    while True:  # reintentos transitorios del PAR (nuestro lado)
-                        sj, sp = dep._mm_session_get(sessions, email)
-                        logger.info(
-                            f"🏦 BEGIN_DEPOSIT | {email} | Target Pipe: {pipe} | Amt: ${PROBE_AMOUNT}"
-                        )
-                        r, ok, code = await _attempt(
-                            email, acct["password"], pipe, PROBE_AMOUNT, sj, sp
-                        )
-                        dep._mm_session_update(sessions, email, r)  # regla 11
-                        if ok:
-                            matched = True
-                            deposited += PROBE_AMOUNT
-                            approved += 1
-                            logger.info(f"🎯 MATCH FOUND | {email} x {pipe}")
+                accounts_state.append({
+                    "id": aid,
+                    "email": email,
+                    "acct": acct,
+                    "grade": acc.get("grade") or acct.get("grade"),
+                    "candidates": cand,
+                    "declines": 0,
+                    "cooldown_until": 0.0,
+                    "locked": False,
+                    "matched": False,
+                    "done": False,
+                })
 
-                            # Obtener CLABE STP para la cuenta casada (sin frenar si falla)
-                            clabe_stp = None
-                            try:
-                                import clabe_fetch
-                                from app import DB_PATH  # lazy: auto_deposit se importa desde app (circular)
+            last_account_id = None
+            backup_checked = False
+            _loop = asyncio.get_event_loop()
+            _clock_offset = 0.0
 
-                                saved_clabes = clabe_fetch.get_saved_clabes(
-                                    DB_PATH, account_id
-                                )
-                                stp_item = next(
-                                    (
-                                        c
-                                        for c in saved_clabes
-                                        if c.get("integration") in ("STP", 2, "2")
-                                    ),
-                                    None,
-                                )
-                                if stp_item:
-                                    clabe_stp = stp_item.get("clabe")
-                                else:
-                                    # Intentar fetch fresco si tenemos JWT
-                                    jwt_token = r.get("jwt")
-                                    used_proxy = r.get("used_proxy")
-                                    if jwt_token:
-                                        fetched_data = await clabe_fetch.fetch_clabes_from_betmexico(
-                                            jwt_token, used_proxy
-                                        )
-                                        clabe_fetch._persist_clabes(
-                                            DB_PATH, account_id, email, fetched_data
-                                        )
-                                        accounts_stp = (
-                                            fetched_data.get("accounts") or []
-                                        )
-                                        stp_acc = next(
-                                            (
-                                                a
-                                                for a in accounts_stp
-                                                if str(a.get("integration"))
-                                                in ("STP", "2")
-                                            ),
-                                            None,
-                                        )
-                                        if stp_acc:
-                                            clabe_stp = str(stp_acc.get("account"))
-                            except Exception as ex_clabe:
-                                logger.warning(
-                                    f"[Auto {mission_id}] No se pudo obtener CLABE STP para {email}: {ex_clabe}"
-                                )
+            def _get_now() -> float:
+                return _loop.time() + _clock_offset
 
-                            matches.append(
-                                {
-                                    "account_id": account_id,
-                                    "email": email,
-                                    "card_pipe": pipe,
-                                    "clabe_stp": clabe_stp,
-                                    "jwt": r.get("jwt"),
-                                    "proxy": r.get("used_proxy"),
-                                    "matched_at": time.time(),
-                                }
-                            )
-                            _m_update(
-                                mission_id,
-                                matches=json.dumps(matches),
-                                total_deposited=deposited,
-                                total_approved=approved,
-                                phase_detail=f"match {email}",
-                            )
-                            _broadcast_mission(
-                                mission_id,
-                                "match",
-                                user,
-                                on_progress=on_progress,
-                                email=email,
-                                card_tail=f"···{pipe[:6]}",
-                                matches_count=len(matches),
-                            )
-                            break
-                        if code in dep.MM_THREEDS_RC:
-                            # 3DS → cuenta premium A+ (no es decline) — patrón :2541-2549
-                            try:
-                                from app import db as _adb
+            async def _sleep_step(seconds: float) -> None:
+                nonlocal _clock_offset
+                t_before = _loop.time()
+                await asyncio.sleep(seconds)
+                t_after = _loop.time()
+                if t_after - t_before < seconds * 0.5:
+                    _clock_offset += seconds
 
-                                with _adb(write=True) as cdb:
-                                    cdb.execute(
-                                        "UPDATE accounts SET grade='A+' WHERE email=?",
-                                        (email,),
-                                    )
-                            except Exception as ex:
-                                logger.error(
-                                    f"[Auto {mission_id}] no pude marcar A+ {email}: {ex}"
-                                )
-                            break  # siguiente tarjeta
-                        if code == "RATE_LIMITED":
-                            # DEAD instantáneo + aviso SSE (Robert 2026-08-06: ya
-                            # no enfriar-y-reintentar, ver dep._mark_rate_limited_dead)
-                            dep._mark_rate_limited_dead(email)
-                            _broadcast_mission(
-                                mission_id,
-                                "cooldown",
-                                user,
-                                on_progress=on_progress,
-                                email=email,
-                                reason="rate_limited",
-                            )
-                            break  # siguiente cuenta inmediatamente (0 espera)
-                        if dep._mm_is_real_decline(code) or dep._mm_is_ambiguous_charge(
-                            code
-                        ):
-                            failed += 1
-                            is_clean_account = acct.get("grade") in ("A+", "A")
-                            if is_clean_account and code == "BANK_REJECTED":
-                                retired_cards.add(_normalize_pipe_to_3part(pipe))
-                                logger.info(f"🚫 TARJETA JUBILADA EN MISIÓN (BANK_REJECTED en cuenta {email} con grado {acct.get('grade')}) | {pipe}")
-                                logger.info(f"ℹ️ Matriz Diagnóstico: Declinación atribuida a tarjeta, no a pasarela de {email}")
-                            else:
-                                account_declines += 1
-                            break  # siguiente tarjeta (decline real o cargo ambiguo: terminal)
-                        # 2026-08-13: IsUserInValidationProcess (KYC_PENDING) es terminal — marcar como validation_blocked
-                        if code == "KYC_PENDING":
-                            failed += 1
-                            account_declines += 1
-                            # Marcar en meta para que no se reintente en futuras misiones
-                            try:
-                                from app import db as _dash_db
-                                with _dash_db() as c:
-                                    c.execute(
-                                        "UPDATE accounts SET dead_reason='IsUserInValidationProcess', dead_at=? WHERE email=?",
-                                        (datetime.utcnow().isoformat(), email)
-                                    )
-                            except Exception as e:
-                                logger.warning(f"[Auto {mission_id}] No se pudo marcar dead_reason para {email}: {e}")
-                            break  # cuenta muerta — siguiente cuenta
-                        if code in dep.MM_DEAD_RC:
-                            failed += 1
-                            account_declines += 1
-                            break  # cuenta muerta — siguiente cuenta
-                        if code == "CARD_LOCKED_OTHER_ACCOUNT":
-                            # Candado DB (deposits.py) — determinístico, jamás
-                            # cambia entre intentos. No es decline de la cuenta:
-                            # no cuenta para MM_MAX_ACCOUNT_DECLINES_PER_RUN.
-                            # JUBILAR la tarjeta: ya está casada con otra cuenta,
-                            # no tiene sentido seguirla probando en las demás.
-                            norm_pipe = _normalize_pipe_to_3part(pipe)
-                            retired_cards.add(norm_pipe)
-                            logger.info(f"🚫 TARJETA JUBILADA (CARD_LOCKED_OTHER_ACCOUNT) | {pipe}")
-                            failed += 1
-                            break  # siguiente tarjeta
-                        # TRANSITORIO (nuestro lado) → reintentar el par
-                        transient += 1
-                        if transient > MATCH_TRANSIENT_RETRIES:
-                            failed += 1
-                            break
-                        await asyncio.sleep(25)
-                    if code and (code == "RATE_LIMITED" or code in dep.MM_DEAD_RC):
-                        break  # siguiente cuenta inmediatamente
-                    # Regla Robert: Cooldown estricto anti-rafagueo entre tarjetas en la MISMA cuenta
-                    has_more_candidates = pipe_idx < len(candidates) - 1
-                    if (
-                        not matched
-                        and code is not None
-                        and has_more_candidates
-                        and account_declines < MM_MAX_ACCOUNT_DECLINES_PER_RUN
-                    ):
-                        logger.info(f"⏳ Cooldown anti-rafagueo {dep.MM_COOLDOWN}s antes de siguiente tarjeta en {email}")
-                        await asyncio.sleep(dep.MM_COOLDOWN)
-                if locked and not matched:
-                    _unlock(account_id)  # regla 7: no dejar 4h/perpetuo sin match
-                    locked_ids.discard(account_id)
+            while not _cancelled():
+                # Actualizar listas de candidatas filtrando tarjetas jubiladas
+                for a in accounts_state:
+                    if a["done"]:
+                        continue
+                    a["candidates"] = [p for p in a["candidates"] if p not in retired_cards]
+                    if not a["candidates"] or a["declines"] >= MM_MAX_ACCOUNT_DECLINES_PER_RUN:
+                        a["done"] = True
+                        if a["locked"] and not a["matched"]:
+                            _unlock(a["id"])
+                            locked_ids.discard(a["id"])
 
-                # Si llegamos al final del plan y NO hemos conseguido ningún match, intentamos buscar cuentas de respaldo.
-                # La condición `not matches` ya garantiza que no hubo match; quitamos el
-                # `len(accounts_list) < 10` que impedía el backup cuando el plan original
-                # ya alcanzó el techo de 10 pero falló todas (gap 2026-08-13).
-                # 2026-08-13: GATE KYC en respaldo — solo cuentas con kyc_verified=1 (Verified=True) entran al respaldo
-                if not matches and acc_idx == len(accounts_list) - 1:
-                    try:
-                        from app import DB_PATH
-                        active_cards = [p for p in card_pipes if _normalize_pipe_to_3part(p) not in retired_cards]
-                        if active_cards:
-                            remaining = MAX_ACCOUNTS_HARD_CAP - len(accounts_list)
-                            if remaining > 0:
-                                backup_plan = plan_auto_mission(DB_PATH, active_cards, amount, target_count, max_accounts=remaining)
-                                if backup_plan and backup_plan.get("feasible"):
-                                    for b_acc in backup_plan.get("accounts", []):
-                                        b_email = b_acc.get("email")
-                                        # Calidad en respaldo: Grade A+/A o kyc_verified=1
-                                        is_quality = b_acc.get("grade") in ("A+", "A") or b_acc.get("kyc_verified") == 1
-                                        if not is_quality:
-                                            logger.info(f"➖ CUENTA DE RESPALDO SALTADA (sin calidad TOP/MID o kyc) | {b_email}")
-                                            continue
-                                        if b_email not in already_checked_emails:
-                                            accounts_list.append(b_acc)
+                active = [a for a in accounts_state if not a["done"]]
+
+                # Si no quedan cuentas activas y no hay matches, buscar cuentas de respaldo
+                if not active:
+                    if not matches and not backup_checked and not _cancelled():
+                        backup_checked = True
+                        try:
+                            from app import DB_PATH
+                            active_cards = [p for p in card_pipes if _normalize_pipe_to_3part(p) not in retired_cards]
+                            if active_cards:
+                                remaining = MAX_ACCOUNTS_HARD_CAP - len(accounts_state)
+                                if remaining > 0:
+                                    backup_plan = plan_auto_mission(DB_PATH, active_cards, amount, target_count, max_accounts=remaining)
+                                    if backup_plan and backup_plan.get("feasible"):
+                                        for b_acc in backup_plan.get("accounts", []):
+                                            b_email = b_acc.get("email")
+                                            is_quality = b_acc.get("grade") in ("A+", "A") or b_acc.get("kyc_verified") == 1
+                                            if not is_quality or b_email in already_checked_emails:
+                                                continue
+                                            b_id = b_acc.get("id")
+                                            b_acct = _fetch_account(b_id)
+                                            if not b_acct:
+                                                continue
+                                            b_cands = [p for p in [b_acc.get("card_pipe"), *card_pipes] if p]
+                                            b_cands = [_normalize_pipe_to_3part(p) for p in b_cands]
+                                            b_cands = list(dict.fromkeys(b_cands))
+                                            b_cands = [p for p in b_cands if p not in retired_cards]
+                                            if not b_cands:
+                                                continue
                                             already_checked_emails.add(b_email)
+                                            accounts_state.append({
+                                                "id": b_id,
+                                                "email": b_email,
+                                                "acct": b_acct,
+                                                "grade": b_acc.get("grade") or b_acct.get("grade"),
+                                                "candidates": b_cands,
+                                                "declines": 0,
+                                                "cooldown_until": 0.0,
+                                                "locked": False,
+                                                "matched": False,
+                                                "done": False,
+                                            })
                                             logger.info(f"➕ CUENTA DE RESPALDO AÑADIDA DINÁMICAMENTE | {b_email}")
                                             _broadcast_mission(
                                                 mission_id,
                                                 "matching",
                                                 user,
                                                 on_progress=on_progress,
-                                                accounts=len(accounts_list),
+                                                accounts=len(accounts_state),
                                             )
-                                            if len(accounts_list) >= MAX_ACCOUNTS_HARD_CAP:
+                                            if len(accounts_state) >= MAX_ACCOUNTS_HARD_CAP:
                                                 break
-                    except Exception as ex_backup:
-                        logger.warning(f"[Auto {mission_id}] No se pudieron buscar cuentas de respaldo: {ex_backup}")
+                        except Exception as ex_backup:
+                            logger.warning(f"[Auto {mission_id}] No se pudieron buscar cuentas de respaldo: {ex_backup}")
 
-                # Regla Robert 2026-07-28: 5s de respiro entre CUENTAS distintas
-                # (no 60s — ese piso es solo para reintentar en la misma cuenta).
-                if not _cancelled() and acc_idx < len(accounts_list) - 1:
-                    await asyncio.sleep(MM_CROSS_ACCOUNT_GAP)
-                acc_idx += 1
+                    active = [a for a in accounts_state if not a["done"]]
+                    if not active:
+                        break
+
+                now = _get_now()
+                ready = [a for a in active if a["cooldown_until"] <= now]
+
+                if not ready:
+                    # Todas las cuentas activas están en cooldown: esperar el tiempo mínimo restante
+                    min_wait = min(a["cooldown_until"] - now for a in active)
+                    min_wait = max(0.1, min_wait)
+                    if abs(min_wait - dep.MM_COOLDOWN) < 0.1:
+                        min_wait = dep.MM_COOLDOWN
+                    logger.info(f"⏳ Cooldown activo en todas las cuentas ({len(active)} en cola) — esperando {min_wait}s")
+                    await _sleep_step(min_wait)
+                    continue
+
+                # Seleccionar cuenta lista (rotación equitativa: si hay más de una, preferir distinta a la anterior)
+                target = None
+                if len(ready) > 1 and last_account_id:
+                    target = next((a for a in ready if a["id"] != last_account_id), None)
+                if not target:
+                    target = ready[0]
+
+                account_id = target["id"]
+                email = target["email"]
+                acct = target["acct"]
+                pipe = target["candidates"].pop(0)
+                norm_pipe = _normalize_pipe_to_3part(pipe)
+
+                if not target["locked"]:
+                    dep._auto_lock_for_deposit(account_id, operator_id, user, hours=4)
+                    target["locked"] = True
+                    locked_ids.add(account_id)
+
+                _broadcast_mission(
+                    mission_id,
+                    "logging_in",
+                    user,
+                    on_progress=on_progress,
+                    email=email,
+                    current=len(matches) + 1,
+                    total=len(accounts_state),
+                )
+
+                transient = 0
+                while True:
+                    sj, sp = dep._mm_session_get(sessions, email)
+                    logger.info(
+                        f"🏦 BEGIN_DEPOSIT | {email} | Target Pipe: {pipe} | Amt: ${PROBE_AMOUNT}"
+                    )
+                    r, ok, code = await _attempt(
+                        email, acct["password"], pipe, PROBE_AMOUNT, sj, sp
+                    )
+                    dep._mm_session_update(sessions, email, r)
+
+                    if ok:
+                        deposited += PROBE_AMOUNT
+                        approved += 1
+                        retired_cards.add(norm_pipe)
+                        logger.info(f"🎯 MATCH FOUND | {email} x {pipe}")
+                        logger.info(f"🚫 TARJETA JUBILADA EN MISIÓN (MATCH APROBADO en {email}) | {pipe}")
+
+                        clabe_stp = None
+                        try:
+                            import clabe_fetch
+                            from app import DB_PATH
+                            saved_clabes = clabe_fetch.get_saved_clabes(DB_PATH, account_id)
+                            stp_item = next(
+                                (c for c in saved_clabes if c.get("integration") in ("STP", 2, "2")),
+                                None,
+                            )
+                            if stp_item:
+                                clabe_stp = stp_item.get("clabe")
+                            else:
+                                jwt_token = r.get("jwt")
+                                used_proxy = r.get("used_proxy")
+                                if jwt_token:
+                                    fetched_data = await clabe_fetch.fetch_clabes_from_betmexico(
+                                        jwt_token, used_proxy
+                                    )
+                                    clabe_fetch._persist_clabes(
+                                        DB_PATH, account_id, email, fetched_data
+                                    )
+                                    accounts_stp = fetched_data.get("accounts") or []
+                                    stp_acc = next(
+                                        (a for a in accounts_stp if str(a.get("integration")) in ("STP", "2")),
+                                        None,
+                                    )
+                                    if stp_acc:
+                                        clabe_stp = str(stp_acc.get("account"))
+                        except Exception as ex_clabe:
+                            logger.warning(f"[Auto {mission_id}] No se pudo obtener CLABE STP para {email}: {ex_clabe}")
+
+                        matches.append(
+                            {
+                                "account_id": account_id,
+                                "email": email,
+                                "card_pipe": pipe,
+                                "clabe_stp": clabe_stp,
+                                "jwt": r.get("jwt"),
+                                "proxy": r.get("used_proxy"),
+                                "matched_at": time.time(),
+                            }
+                        )
+                        _m_update(
+                            mission_id,
+                            matches=json.dumps(matches),
+                            total_deposited=deposited,
+                            total_approved=approved,
+                            phase_detail=f"match {email}",
+                        )
+                        _broadcast_mission(
+                            mission_id,
+                            "match",
+                            user,
+                            on_progress=on_progress,
+                            email=email,
+                            card_tail=f"···{pipe[:6]}",
+                            matches_count=len(matches),
+                        )
+                        target["matched"] = True
+                        target["done"] = True
+                        break
+
+                    if code in dep.MM_THREEDS_RC:
+                        try:
+                            from app import db as _adb
+                            with _adb(write=True) as cdb:
+                                cdb.execute(
+                                    "UPDATE accounts SET grade='A+' WHERE email=?",
+                                    (email,),
+                                )
+                        except Exception as ex:
+                            logger.error(f"[Auto {mission_id}] no pude marcar A+ {email}: {ex}")
+                        target["cooldown_until"] = _get_now() + dep.MM_COOLDOWN
+                        break
+
+                    if code == "RATE_LIMITED":
+                        dep._mark_rate_limited_dead(email)
+                        _broadcast_mission(
+                            mission_id,
+                            "cooldown",
+                            user,
+                            on_progress=on_progress,
+                            email=email,
+                            reason="rate_limited",
+                        )
+                        target["done"] = True
+                        if target["locked"]:
+                            _unlock(account_id)
+                            locked_ids.discard(account_id)
+                        break
+
+                    if dep._mm_is_real_decline(code) or dep._mm_is_ambiguous_charge(code):
+                        failed += 1
+                        target["declines"] += 1
+                        is_clean_account = target.get("grade") in ("A+", "A")
+                        if is_clean_account and code == "BANK_REJECTED":
+                            retired_cards.add(norm_pipe)
+                            logger.info(f"🚫 TARJETA JUBILADA EN MISIÓN (BANK_REJECTED en cuenta {email} con grado {target.get('grade')}) | {pipe}")
+                            logger.info(f"ℹ️ Matriz Diagnóstico: Declinación atribuida a tarjeta, no a pasarela de {email}")
+
+                        target["cooldown_until"] = _get_now() + dep.MM_COOLDOWN
+                        if target["declines"] >= MM_MAX_ACCOUNT_DECLINES_PER_RUN or not target["candidates"]:
+                            target["done"] = True
+                            if target["locked"] and not target["matched"]:
+                                _unlock(account_id)
+                                locked_ids.discard(account_id)
+                        break
+
+                    if code == "KYC_PENDING":
+                        failed += 1
+                        target["declines"] += 1
+                        target["done"] = True
+                        try:
+                            from app import db as _dash_db
+                            with _dash_db() as c:
+                                c.execute(
+                                    "UPDATE accounts SET dead_reason='IsUserInValidationProcess', dead_at=? WHERE email=?",
+                                    (datetime.utcnow().isoformat(), email),
+                                )
+                        except Exception as e:
+                            logger.warning(f"[Auto {mission_id}] No se pudo marcar dead_reason para {email}: {e}")
+                        if target["locked"]:
+                            _unlock(account_id)
+                            locked_ids.discard(account_id)
+                        break
+
+                    if code in dep.MM_DEAD_RC:
+                        failed += 1
+                        target["declines"] += 1
+                        target["done"] = True
+                        if target["locked"]:
+                            _unlock(account_id)
+                            locked_ids.discard(account_id)
+                        break
+
+                    if code == "CARD_LOCKED_OTHER_ACCOUNT":
+                        retired_cards.add(norm_pipe)
+                        logger.info(f"🚫 TARJETA JUBILADA (CARD_LOCKED_OTHER_ACCOUNT) | {pipe}")
+                        failed += 1
+                        target["cooldown_until"] = _get_now() + MM_CROSS_ACCOUNT_GAP
+                        break
+
+                    # TRANSITORIO (nuestro lado) → reintentar el par
+                    transient += 1
+                    if transient > MATCH_TRANSIENT_RETRIES:
+                        failed += 1
+                        target["cooldown_until"] = _get_now() + dep.MM_COOLDOWN
+                        break
+                    await _sleep_step(25)
+
+                last_account_id = account_id
+
+                # Respiro entre cuentas si aún quedan otras cuentas activas por atender
+                if not _cancelled() and any(a["id"] != account_id and not a["done"] for a in accounts_state):
+                    await _sleep_step(MM_CROSS_ACCOUNT_GAP)
+
+            # Liberar cualquier lock de cuenta que no haya conseguido match
+            for aid in list(locked_ids):
+                if not any(m.get("account_id") == aid for m in matches):
+                    _unlock(aid)
+                    locked_ids.discard(aid)
 
             if not matches:
                 _m_update(

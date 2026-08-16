@@ -378,16 +378,20 @@ def precheck_card_liveness(card_pipe: str) -> Tuple[bool, str, Optional[Dict[str
 
 
 def format_ruthopia_liveness_summary(results: List[Dict[str, Any]]) -> str:
-    """Genera la visualización del resultado de liveness con estética del bot Ruthopia.
+    """Genera la visualización del resultado de liveness con estética del bot Ruthopia y radar de BINes."""
+    try:
+        from bin_intelligence import get_single_card_bin_badge
+    except ImportError:
+        get_single_card_bin_badge = lambda p: {"text": ""}
 
-    Estilo Ruthopia Bot: Emojis, HTML format, tarjeta enmascarada y badges.
-    """
-    lines = ["<b>ʀ.ᴜᴛʜᴏᴘɪᴀ ɢᴀᴛᴇ /ʀᴡ — Liveness Check Result</b>", "----------------------------------------"]
+    lines = ["<b>ʀ.ᴜᴛʜᴏᴘɪᴀ ɢᴀᴛᴇ /ʀᴡ — Liveness Check Result</b>", "────────────────────────────────────────"]
     for item in results:
         pipe = item.get("pipe", "")
         status = item.get("status_label", "UNCHECKED")
-        lines.append(f"💳 <code>{pipe}</code> {status}")
-    lines.append("----------------------------------------")
+        intel = get_single_card_bin_badge(pipe)
+        intel_badge = f"\n   └ 🎯 <i>{intel['text']}</i>" if intel.get("text") else ""
+        lines.append(f"💳 <code>{pipe}</code> {status}{intel_badge}")
+    lines.append("────────────────────────────────────────")
     accepted = [i for i in results if i.get("ok")]
     discarded = [i for i in results if not i.get("ok")]
     lines.append(f"✅ Aceptadas: <b>{len(accepted)}</b> | ❌ Descartadas: <b>{len(discarded)}</b>")

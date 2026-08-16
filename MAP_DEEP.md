@@ -167,18 +167,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `operator_auto_withdraw` | def | L4468–L4504 |
 | `auto_deposit_confirm` | def | L4508–L4527 |
 | `operator_missions` | def | L4531–L4549 |
-| `auto_deposit_status` | def | L4553–L4564 |
-| `register_operator_strike` | def | L4567–L4600 |
-| `bot_start_info` | def | L4604–L4640 |
-| `bot_operator_info` | def | L4644–L4683 |
-| `bot_help_info` | def | L4687–L4701 |
-| `bot_pause_mission` | def | L4705–L4734 |
-| `bot_resume_mission` | def | L4738–L4756 |
-| `bot_cancel_mission` | def | L4761–L4796 |
-| `bot_bet_create` | def | L4800–L4969 |
-| `filter_and_sanitize_check_combos` | def | L4972–L5057 |
-| `BotCheckRequest` | class | L5060–L5064 |
-| `bot_check` | def | L5067–L5148 |
+| `operator_recent_ticker` | def | L4553–L4678 |
+| `auto_deposit_status` | def | L4682–L4693 |
+| `register_operator_strike` | def | L4696–L4729 |
+| `bot_start_info` | def | L4733–L4769 |
+| `bot_operator_info` | def | L4773–L4812 |
+| `bot_help_info` | def | L4816–L4830 |
+| `bot_pause_mission` | def | L4834–L4863 |
+| `bot_resume_mission` | def | L4867–L4885 |
+| `bot_cancel_mission` | def | L4890–L4925 |
+| `bot_bet_create` | def | L4929–L5098 |
+| `filter_and_sanitize_check_combos` | def | L5101–L5186 |
+| `BotCheckRequest` | class | L5189–L5193 |
+| `bot_check` | def | L5196–L5277 |
 
 ### `auth.py`
 
@@ -230,7 +231,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_unlock` | def | L730–L739 |
 | `_broadcast_mission` | def | L742–L771 |
 | `_stop_pool` | def | L774–L781 |
-| `run_auto_mission` | def | L785–L1506 |
+| `run_auto_mission` | def | L785–L1560 |
 
 ### `autoexclusion.py`
 
@@ -242,6 +243,20 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `autoexclusion_reason` | def | L137–L142 |
 | `mark_account_autoexcluded` | def | L145–L177 |
 
+### `bin_intelligence.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `lookup_bin_metadata` | def | L94–L122 |
+| `classify_bin_tier` | def | L125–L169 |
+| `fetch_bin_stats_from_db` | def | L172–L196 |
+| `_query_bin_rows` | def | L199–L242 |
+| `get_bin_intelligence_summary` | def | L245–L305 |
+| `format_telegram_start_banner` | def | L308–L329 |
+| `format_telegram_bet_warning` | def | L332–L365 |
+| `format_telegram_radar_full` | def | L368–L399 |
+| `get_single_card_bin_badge` | def | L402–L430 |
+
 ### `card_checker.py`
 
 | Símbolo | Tipo | Líneas |
@@ -252,7 +267,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `parse_and_validate_card_pipe` | def | L101–L150 |
 | `perform_wabox_liveness_check` | def | L158–L284 |
 | `precheck_card_liveness` | def | L287–L377 |
-| `format_ruthopia_liveness_summary` | def | L380–L394 |
+| `format_ruthopia_liveness_summary` | def | L380–L398 |
 
 ### `clabe_fetch.py`
 
@@ -269,10 +284,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `seed_db` | def | L8–L118 |
-| `client` | def | L121–L125 |
-| `make_client` | def | L128–L140 |
-| `mock_bmx_transport` | def | L144–L154 |
+| `seed_db` | def | L8–L148 |
+| `client` | def | L151–L155 |
+| `make_client` | def | L158–L170 |
+| `mock_bmx_transport` | def | L174–L184 |
 
 ### `curp_utils.py`
 
@@ -304,37 +319,38 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_ensure_fresh_captcha` | def | L231–L255 |
 | `_record_bin_3ds` | def | L263–L291 |
 | `_bin_3ds_stats` | def | L294–L316 |
-| `bin_check` | def | L320–L325 |
-| `bin_stats_overview` | def | L329–L388 |
-| `_auto_lock_for_deposit` | def | L391–L447 |
-| `_window_status` | def | L450–L492 |
-| `_check_caps` | def | L495–L511 |
-| `_load_deps` | def | L514–L525 |
-| `_parse_pipe` | def | L528–L549 |
-| `_check_card_velocity` | def | L569–L616 |
-| `_has_recent_approved_deposit` | def | L619–L635 |
-| `_record_attempt` | def | L638–L820 |
-| `_safe_phase` | def | L830–L837 |
-| `_now_mx_str` | def | L845–L854 |
-| `_deposit_step_payload` | def | L863–L871 |
-| `_wrap_deposit_step` | def | L874–L893 |
-| `_build_admin_proxy_url` | def | L896–L900 |
-| `_refresh_account_after_deposit` | def | L903–L962 |
-| `_should_relogin_after_401` | def | L965–L969 |
-| `_acquire_session_and_begin` | def | L972–L1248 |
-| `_run_deposit_with_phases` | def | L1251–L1595 |
-| `deposit_execute_stream` | def | L1599–L1798 |
-| `cap_status` | def | L1802–L1814 |
-| `_mm_is_real_decline` | def | L1851–L1857 |
-| `_mm_is_ambiguous_charge` | def | L1860–L1870 |
-| `classify_deposit_status` | def | L1873–L1904 |
-| `_mm_session_get` | def | L1950–L1954 |
-| `_mm_session_update` | def | L1957–L1966 |
-| `multi_stream` | def | L1970–L2484 |
-| `multi_cancel` | def | L2488–L2493 |
-| `scheduled_create` | def | L2506–L2870 |
-| `scheduled_list` | def | L2874–L2896 |
-| `scheduled_cancel` | def | L2900–L2908 |
+| `bin_check` | def | L320–L330 |
+| `bin_recommendations` | def | L334–L338 |
+| `bin_stats_overview` | def | L342–L411 |
+| `_auto_lock_for_deposit` | def | L414–L470 |
+| `_window_status` | def | L473–L515 |
+| `_check_caps` | def | L518–L534 |
+| `_load_deps` | def | L537–L548 |
+| `_parse_pipe` | def | L551–L572 |
+| `_check_card_velocity` | def | L592–L639 |
+| `_has_recent_approved_deposit` | def | L642–L658 |
+| `_record_attempt` | def | L661–L843 |
+| `_safe_phase` | def | L853–L860 |
+| `_now_mx_str` | def | L868–L877 |
+| `_deposit_step_payload` | def | L886–L894 |
+| `_wrap_deposit_step` | def | L897–L916 |
+| `_build_admin_proxy_url` | def | L919–L923 |
+| `_refresh_account_after_deposit` | def | L926–L985 |
+| `_should_relogin_after_401` | def | L988–L992 |
+| `_acquire_session_and_begin` | def | L995–L1271 |
+| `_run_deposit_with_phases` | def | L1274–L1618 |
+| `deposit_execute_stream` | def | L1622–L1821 |
+| `cap_status` | def | L1825–L1837 |
+| `_mm_is_real_decline` | def | L1874–L1880 |
+| `_mm_is_ambiguous_charge` | def | L1883–L1893 |
+| `classify_deposit_status` | def | L1896–L1927 |
+| `_mm_session_get` | def | L1973–L1977 |
+| `_mm_session_update` | def | L1980–L1989 |
+| `multi_stream` | def | L1993–L2507 |
+| `multi_cancel` | def | L2511–L2516 |
+| `scheduled_create` | def | L2529–L2893 |
+| `scheduled_list` | def | L2897–L2919 |
+| `scheduled_cancel` | def | L2923–L2931 |
 
 ### `jwt_keeper.py`
 
@@ -1150,6 +1166,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `POST` | `/api/operator/accounts/{account_id}/auto-withdraw` | `app.py` |
 | `POST` | `/api/deposits/auto/{mission_id}/confirm` | `app.py` |
 | `GET` | `/api/operator/missions` | `app.py` |
+| `GET` | `/api/operator/recent-ticker` | `app.py` |
 | `GET` | `/api/deposits/auto/{mission_id}/status` | `app.py` |
 | `GET` | `/api/bot/start` | `app.py` |
 | `GET` | `/api/bot/info` | `app.py` |
@@ -1161,6 +1178,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `POST` | `/api/bot/bet` | `app.py` |
 | `POST` | `/api/bot/check` | `app.py` |
 | `GET` | `/bin-check/{bin6}` | `deposits.py` |
+| `GET` | `/bin-recommendations` | `deposits.py` |
 | `GET` | `/bin-stats` | `deposits.py` |
 | `POST` | `/execute-stream` | `deposits.py` |
 | `GET` | `/cap-status/{account_id}` | `deposits.py` |
@@ -1186,6 +1204,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `betmexico.dashboard.account_refresh` | `app.py` |
 | `betmexico.dashboard.auto_deposit` | `auto_deposit.py` |
 | `betmexico.dashboard.autoexclusion` | `autoexclusion.py` |
+| `betmexico.dashboard.bin_intelligence` | `bin_intelligence.py` |
 | `betmexico.dashboard.card_checker` | `card_checker.py` |
 | `betmexico.dashboard.clabe_fetch` | `clabe_fetch.py` |
 | `betmexico.dashboard.db` | `app.py` |

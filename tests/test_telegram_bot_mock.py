@@ -169,7 +169,7 @@ async def test_btn_start_cancel_returns_to_start_menu(seed_db):
     assert kwargs.get("parse_mode") == "HTML"
     kb = kwargs.get("reply_markup")
     labels = [btn.text for row in kb.inline_keyboard for btn in row]
-    assert "💳 CC Auto-Match" in labels
+    assert any("CC Auto-Match" in l for l in labels)
 
 
 @pytest.mark.asyncio

@@ -29,6 +29,7 @@ def seed_db(tmp_path, monkeypatch):
                 grade TEXT DEFAULT '?',
                 grade_score REAL DEFAULT 0,
                 cooldown_until INTEGER DEFAULT NULL,
+                jwt_token TEXT DEFAULT NULL,
                 jwt_expires_at INTEGER DEFAULT NULL
             )
         """)
@@ -98,6 +99,35 @@ def seed_db(tmp_path, monkeypatch):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 account_email TEXT, txn_date TEXT, status INTEGER,
                 txn_type INTEGER, gateway INTEGER, amount REAL
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS account_touches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id INTEGER,
+                account_email TEXT,
+                actor_id INTEGER,
+                touched_at TEXT,
+                touched_date TEXT,
+                UNIQUE(account_id, actor_id, touched_date)
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS account_withdrawals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id INTEGER NOT NULL,
+                account_email TEXT,
+                transaction_id TEXT UNIQUE NOT NULL,
+                reference TEXT,
+                amount REAL NOT NULL,
+                account_digits TEXT,
+                institution_name TEXT,
+                status_api INTEGER,
+                status_description TEXT,
+                gateway INTEGER,
+                last_modified_utc TEXT,
+                disparado_por INTEGER,
+                created_at TEXT NOT NULL
             )
         """)
         # Seed A2.1: a@ asignada al operador 555; c@ lockeada por 555; b@ ajena (del SA)
