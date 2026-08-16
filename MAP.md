@@ -98,10 +98,17 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 577 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5284 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 5286 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1639 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
+| `betmexico_config.py` | 185 | `betmexico` | _[completar]_ |
+| `betmexico_db.py` | 2927 | `—` | _[completar]_ |
+| `betmexico_deposit.py` | 958 | `—` | _[completar]_ |
+| `betmexico_login_api.py` | 1050 | `httpx` | _[completar]_ |
+| `betmexico_login_service.py` | 136 | `betmexico.login_service` | _[completar]_ |
+| `betmexico_payment_analyzer.py` | 492 | `—` | _[completar]_ |
+| `betmexico_utils.py` | 1159 | `—` | _[completar]_ |
 | `bin_intelligence.py` | 430 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
 | `card_checker.py` | 398 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
@@ -178,6 +185,31 @@ prewarm.py (router)
 | `MATCH_TRANSIENT_RETRIES` | `4` | `auto_deposit.py` |
 | `MM_CROSS_ACCOUNT_GAP` | `5` | `auto_deposit.py` |
 | `MM_MAX_ACCOUNT_DECLINES_PER_RUN` | `2` | `auto_deposit.py` |
+| `MAX_TEXT_COMBOS` | `100` | `betmexico_config.py` |
+| `HUMAN_COOLDOWN` | `60` | `betmexico_config.py` |
+| `MAX_COMBOS` | `5000` | `betmexico_config.py` |
+| `FLUSH_EVERY` | `20` | `betmexico_config.py` |
+| `HITS_PER_BLOCK` | `100` | `betmexico_config.py` |
+| `SMART_FILTER_COOLDOWN_MIN` | `20` | `betmexico_config.py` |
+| `SMART_FILTER_STALE_CHECKS` | `3` | `betmexico_config.py` |
+| `SMART_FILTER_ACTIVITY_HOURS` | `12` | `betmexico_config.py` |
+| `SMART_FILTER_BALANCE_THRESHOLD` | `10.0` | `betmexico_config.py` |
+| `FILTER_RECENT_MINUTES` | `10` | `betmexico_config.py` |
+| `FILTER_RECENT_WAIT_MINUTES` | `10` | `betmexico_config.py` |
+| `FILTER_DAILY_LIMIT` | `3` | `betmexico_config.py` |
+| `FILTER_DAILY_WAIT_HOURS` | `3` | `betmexico_config.py` |
+| `LOGO` | `"┏ ◍ B🤖T ━┓
+  chk
+
+"` | `betmexico_config.py` |
+| `BETMEXICO_PAYMENTS_URL` | `"https://paymentsapi.betmexico.mx"` | `betmexico_deposit.py` |
+| `PROCESSORPAY_URL` | `"https://processorpay.com/sanval/api/IframeGames/makePayment"` | `betmexico_deposit.py` |
+| `TXN_STATUS_SUCCESS` | `6` | `betmexico_payment_analyzer.py` |
+| `TXN_STATUS_PENDING` | `0` | `betmexico_payment_analyzer.py` |
+| `TXN_STATUS_FAILED` | `-4` | `betmexico_payment_analyzer.py` |
+| `TXN_TYPE_DEPOSIT` | `1` | `betmexico_payment_analyzer.py` |
+| `GATEWAY_CARD` | `1` | `betmexico_payment_analyzer.py` |
+| `TXN_TYPE_MAP` | `{0: "⬇️", 1: "⬆️"}` | `betmexico_utils.py` |
 | `WABOX_STRIPE_PK` | `"pk_live_WQNz0qa1BmBu47grZwTpj8BR"` | `card_checker.py` |
 | `UTOPIA_CACHE_TTL_SEC` | `1800` | `card_checker.py` |
 | `BETMEXICO_PAYMENTS_API` | `"https://paymentsapi.betmexico.mx"` | `clabe_fetch.py` |
@@ -245,7 +277,12 @@ prewarm.py (router)
 <!-- GEN:start:env -->
 | Variable | Default | Definida en |
 |----------|---------|-------------|
-| — | — | — |
+| `BMX_BOT_TOKEN` | `"8516175452:AAGz_PCh9Oq3D9l5DZtCzgdU5ObAJH-b1Gs"` | `betmexico_config.py` |
+| `BMX_CAPMONSTER_KEY` | `""` | `betmexico_login_api.py` |
+| `BMX_CAPSOLVER_KEY` | `""` | `betmexico_login_api.py` |
+| `BMX_RECAPTCHA_SITEKEY` | `"6Lcz348mAAAAACAn9C2YDf2GT7Rd2UVqhGdWeVc4"` | `betmexico_login_api.py` |
+| `BMX_WEB_URL` | `"https://botmexico.com.mx"` | `betmexico_utils.py` |
+| `DB_PATH` | `"/data/betmexico_accounts.db" if Path("/data/betmexico_accounts.db"` | `betmexico_db.py` |
 <!-- GEN:end:env -->
 
 ---
@@ -255,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `cf8800e` | fix(auto-deposit): blindaje E2E /bet, retiro de tarjetas por PAN, fix portal JS y confirm_gate Telegram |
 | `7ec516d` | docs: actualizar NEXT-SESSION.md con cierre de optimizacion matchmaking |
 | `87c290c` | fix(matchmaking): jubilar tarjetas aprobadas, planificador round-robin no bloqueante y lazy pool |
 | `37c6003` | feat(ui): rediseño dark mode glassmorphism portal, matriz lirica freestyle MC y reactivacion Magdiel |
@@ -266,7 +304,6 @@ prewarm.py (router)
 | `dcd023d` | feat(agents): suite superpowers adaptada a opencode + comandos Smartplan/Smartexe |
 | `bd9d2a2` | docs(superpowers): puente ruthopia en /bet — decisiones de Robert (RF5 dinamico, RF8 segundo intento, 5 tarjetas, retries infra, no-mask) |
 | `9321a0f` | fix(proxy/renapo): causa raiz del yoyo de proxies - valida-curp.com NXDOMAIN quemaba el pool |
-| `91deb84` | docs: actualizar NEXT-SESSION para handoff de resolucion de proxies |
 <!-- GEN:end:recientes -->
 
 ---

@@ -91,6 +91,8 @@ _HERE = Path(__file__).parent
 _BOT_DIR = _HERE.parent
 if (_BOT_DIR / "betmexico_db.py").exists() and str(_BOT_DIR) not in sys.path:
     sys.path.insert(0, str(_BOT_DIR))
+elif str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
 
 # Carga EAGER de deps del bot — antes que prewarm/deposits los importen lazy.
 # Evita circular imports en betmexico_db (carga partial → crash).
@@ -98,7 +100,7 @@ BOT_DEPS_OK = False
 BOT_MAKE_POOL = None
 BOT_SCORE_PAYMENT = None
 try:
-    if (_BOT_DIR / "betmexico_db.py").exists():
+    if (_HERE / "betmexico_db.py").exists() or (_BOT_DIR / "betmexico_db.py").exists():
         # Romper ciclo betmexico_db ↔ betmexico_config: cargar config primero
         # para que cuando betmexico_db haga `from betmexico_config import ...`
         # ya esté completo, y betmexico_config no necesite re-import betmexico_db.
