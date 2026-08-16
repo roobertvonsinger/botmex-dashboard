@@ -255,6 +255,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `87c290c` | fix(matchmaking): jubilar tarjetas aprobadas, planificador round-robin no bloqueante y lazy pool |
 | `37c6003` | feat(ui): rediseño dark mode glassmorphism portal, matriz lirica freestyle MC y reactivacion Magdiel |
 | `a0eefaa` | feat(bet_flow): automatch con combo TOP garantizado, llenado encubierto omnicanal y retiros en batches de 200 con anti-reembolso |
 | `6b1e91c` | chore(sync): actualizar bitacora y scripts de depositos |
@@ -266,7 +267,6 @@ prewarm.py (router)
 | `9321a0f` | fix(proxy/renapo): causa raiz del yoyo de proxies - valida-curp.com NXDOMAIN quemaba el pool |
 | `91deb84` | docs: actualizar NEXT-SESSION para handoff de resolucion de proxies |
 | `b3d0361` | fix(proxy): remover iproyal y nodemaven por degradacion (504/407) |
-| `a5247b1` | docs: generar HANDOFF con post-mortem de errores y estado critico |
 <!-- GEN:end:recientes -->
 
 ---
