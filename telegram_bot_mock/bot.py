@@ -957,9 +957,16 @@ async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     live_pipes = []
     tol_pipes = []
     liveness_records = []
+    seen_pans = set()
     for pipe in lines:
         ok, reason, parsed = precheck_card_liveness(pipe)
         kind = parsed.get("liveness_kind", "dead") if parsed else "dead"
+        c_num = parsed.get("card_number") if parsed else ""
+        if c_num and c_num in seen_pans:
+            liveness_records.append({"pipe": pipe, "ok": False, "status_label": "🔴 DUPLICADA - Misma tarjeta en el combo"})
+            continue
+        if c_num:
+            seen_pans.add(c_num)
         liveness_records.append({"pipe": pipe, "ok": ok, "status_label": reason})
         logger.info(
             f"[CARD_TOUCH] operator={operator_id} | account=N/A(precheck) | "
@@ -1035,6 +1042,12 @@ def _launch_auto_mission_ui(
         now = time.time()
 
         # Guard idempotente (Área A §1.2): si el gate ya cerró el mensaje
+        # Cuando el status es 'awaiting_confirmation', confirm_gate toma el control
+        # total de status_msg para mostrar los botones interactivos ("🚀 Iniciar Acreditación" / "🛑 Detener").
+        # on_progress NO debe sobrescribir status_msg en este estado.
+        if status == "awaiting_confirmation":
+            return
+
         # con texto limpio (stop_sched_), no sobrescribir con el terminal leaky.
         if (
             status in ("completed", "cancelled", "failed")

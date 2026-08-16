@@ -217,21 +217,23 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_threeds_recent` | def | L93–L107 |
 | `_rank_key` | def | L110–L113 |
 | `_pipe_str` | def | L116–L121 |
-| `_parse_card_pipe` | def | L124–L145 |
-| `_normalize_pipe_to_3part` | def | L148–L150 |
-| `select_accounts_for_auto` | def | L159–L328 |
-| `_max_accounts_for_cards` | def | L337–L345 |
-| `plan_auto_mission` | def | L348–L611 |
-| `_fake_progress_pct` | def | L652–L683 |
-| `_iso` | def | L687–L688 |
-| `_m_load` | def | L691–L699 |
-| `_m_status` | def | L702–L704 |
-| `_m_update` | def | L707–L717 |
-| `_fetch_account` | def | L720–L727 |
-| `_unlock` | def | L730–L739 |
-| `_broadcast_mission` | def | L742–L771 |
-| `_stop_pool` | def | L774–L781 |
-| `run_auto_mission` | def | L785–L1560 |
+| `_extract_card_number` | def | L124–L131 |
+| `_parse_card_pipe` | def | L134–L167 |
+| `_normalize_pipe_to_3part` | def | L170–L172 |
+| `_get_married_card_owners` | def | L175–L191 |
+| `select_accounts_for_auto` | def | L200–L369 |
+| `_max_accounts_for_cards` | def | L378–L386 |
+| `plan_auto_mission` | def | L389–L658 |
+| `_fake_progress_pct` | def | L699–L730 |
+| `_iso` | def | L734–L735 |
+| `_m_load` | def | L738–L746 |
+| `_m_status` | def | L749–L751 |
+| `_m_update` | def | L754–L764 |
+| `_fetch_account` | def | L767–L774 |
+| `_unlock` | def | L777–L786 |
+| `_broadcast_mission` | def | L789–L818 |
+| `_stop_pool` | def | L821–L828 |
+| `run_auto_mission` | def | L832–L1639 |
 
 ### `autoexclusion.py`
 

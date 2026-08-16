@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 577 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5284 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1560 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1639 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `bin_intelligence.py` | 430 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
 | `card_checker.py` | 398 | `betmexico.dashboard.card_checker` | _[completar]_ |
@@ -255,6 +255,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `7ec516d` | docs: actualizar NEXT-SESSION.md con cierre de optimizacion matchmaking |
 | `87c290c` | fix(matchmaking): jubilar tarjetas aprobadas, planificador round-robin no bloqueante y lazy pool |
 | `37c6003` | feat(ui): rediseño dark mode glassmorphism portal, matriz lirica freestyle MC y reactivacion Magdiel |
 | `a0eefaa` | feat(bet_flow): automatch con combo TOP garantizado, llenado encubierto omnicanal y retiros en batches de 200 con anti-reembolso |
@@ -266,7 +267,6 @@ prewarm.py (router)
 | `bd9d2a2` | docs(superpowers): puente ruthopia en /bet — decisiones de Robert (RF5 dinamico, RF8 segundo intento, 5 tarjetas, retries infra, no-mask) |
 | `9321a0f` | fix(proxy/renapo): causa raiz del yoyo de proxies - valida-curp.com NXDOMAIN quemaba el pool |
 | `91deb84` | docs: actualizar NEXT-SESSION para handoff de resolucion de proxies |
-| `b3d0361` | fix(proxy): remover iproyal y nodemaven por degradacion (504/407) |
 <!-- GEN:end:recientes -->
 
 ---

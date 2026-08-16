@@ -121,24 +121,46 @@ def _pipe_str(card: Dict[str, Any]) -> str:
     )
 
 
+def _extract_card_number(p: str) -> str:
+    """Extrae únicamente los dígitos del número de tarjeta (PAN, 15-16 dígitos)."""
+    if not p:
+        return ""
+    parts = [part.strip() for part in str(p).replace(" ", "").split("|") if part.strip()]
+    if not parts:
+        return ""
+    return "".join(filter(str.isdigit, parts[0]))
+
+
 def _parse_card_pipe(p: str) -> Optional[Dict[str, Any]]:
-    parts = [part.strip() for part in str(p).split("|") if part.strip()]
+    parts = [part.strip() for part in str(p).replace(" ", "").split("|") if part.strip()]
     if not parts or not parts[0]:
         return None
+    card_num = "".join(filter(str.isdigit, parts[0]))
+    if not card_num:
+        return None
     if len(parts) == 3:
+        exp_raw = parts[1].replace("/", "").strip()
+        if len(exp_raw) == 6:  # MMYYYY -> MMYY
+            exp = f"{exp_raw[:2]}{exp_raw[4:]}"
+        elif len(exp_raw) == 4:
+            exp = exp_raw
+        elif len(exp_raw) == 3:  # MYY -> 0MYY
+            exp = f"0{exp_raw}"
+        else:
+            exp = exp_raw
         return {
-            "card_number": parts[0],
-            "card_expiry": parts[1],
+            "card_number": card_num,
+            "card_expiry": exp,
             "card_cvv": parts[2],
         }
     if len(parts) == 4:
-        mm = parts[1]
+        mm = parts[1].zfill(2)
         yy = parts[2]
         cvv = parts[3]
         if len(yy) == 4:
             yy = yy[-2:]
         return {
-            "card_number": parts[0],
+            "card_number": card_num,
             "card_expiry": f"{mm}{yy}",
             "card_cvv": cvv,
         }
@@ -147,7 +169,26 @@ def _parse_card_pipe(p: str) -> Optional[Dict[str, Any]]:
 
 def _normalize_pipe_to_3part(p: str) -> str:
     c = _parse_card_pipe(p)
-    return _pipe_str(c) if c else p
+    return _pipe_str(c) if c else str(p).strip()
+
+
+def _get_married_card_owners(db_path: Optional[str] = None) -> Dict[str, str]:
+    """Carga el mapa de tarjetas casadas en BD: {card_number -> account_email}."""
+    owners: Dict[str, str] = {}
+    try:
+        from app import DB_PATH
+        target_db = db_path or DB_PATH
+        con = sqlite3.connect(str(target_db))
+        for r in con.execute(
+            "SELECT card_number, account_email FROM account_cards WHERE card_number IS NOT NULL AND card_number != ''"
+        ).fetchall():
+            c_num = _extract_card_number(str(r[0]))
+            if c_num and r[1]:
+                owners[c_num] = str(r[1]).strip().lower()
+        con.close()
+    except Exception as ex:
+        logger.debug(f"No se pudieron leer account_cards: {ex}")
+    return owners
 
 
 # ── B1 — selección de cuentas (pura) ─────────────────────────────────────────
@@ -550,9 +591,15 @@ def plan_auto_mission(
         )[:max_accounts]
 
         pool: List[Dict[str, Any]] = []
+        seen_card_nums = set()
         for p in card_pipes or []:
             c = _parse_card_pipe(p)
             if c:
+                c_num = c.get("card_number") or ""
+                if c_num in seen_card_nums:
+                    # Deduplicar número de tarjeta en el pool para no tener 2 pipes con el mismo PAN
+                    continue
+                seen_card_nums.add(c_num)
                 pool.append(c)
         pool.sort(key=lambda c: _rank_key(c, bin_stats_map))
 
@@ -937,22 +984,42 @@ async def run_auto_mission(
             )
             accounts_list = list(plan.get("accounts", []))
             already_checked_emails = set(a["email"] for a in accounts_list)
-            retired_cards = set()
-            # Pre-cargar tarjetas que ya estén casadas/bloqueadas con OTRA cuenta en BD
-            try:
-                from app import DB_PATH
-                con = sqlite3.connect(str(DB_PATH))
-                locked_db_cards = set(r[0] for r in con.execute("""
-                    SELECT DISTINCT card_pipe FROM deposit_attempts
-                    WHERE status = 'approved' AND card_pipe IS NOT NULL AND card_pipe != ''
-                """).fetchall() if r[0])
-                con.close()
-                for l_pipe in locked_db_cards:
-                    retired_cards.add(_normalize_pipe_to_3part(l_pipe))
-                if locked_db_cards:
-                    logger.info(f"🛡️ Pre-excluidas {len(locked_db_cards)} tarjetas ya casadas en BD")
-            except Exception as ex_db_lock:
-                logger.warning(f"No se pudieron pre-cargar tarjetas casadas de BD: {ex_db_lock}")
+            retired_cards: set = set()
+            retired_card_numbers: set = set()
+
+            def _is_card_retired(p: str) -> bool:
+                if not p:
+                    return True
+                norm = _normalize_pipe_to_3part(p)
+                if p in retired_cards or norm in retired_cards:
+                    return True
+                c_num = _extract_card_number(p)
+                if c_num and c_num in retired_card_numbers:
+                    return True
+                return False
+
+            def _retire_card(p: str, reason: str = "", **kwargs):
+                if not p:
+                    return
+                norm = _normalize_pipe_to_3part(p)
+                c_num = _extract_card_number(p)
+                retired_cards.add(p)
+                retired_cards.add(norm)
+                if c_num:
+                    retired_card_numbers.add(c_num)
+                # Purgar inmediatamente de todas las cuentas activas
+                for a in accounts_state:
+                    a["candidates"] = [c for c in a["candidates"] if not _is_card_retired(c)]
+                    if not a["candidates"] and not a["matched"]:
+                        a["done"] = True
+                        if a["locked"]:
+                            _unlock(a["id"])
+                            locked_ids.discard(a["id"])
+
+            # Pre-cargar mapa de tarjetas casadas por cuenta desde BD
+            married_card_owners = _get_married_card_owners()
+            if married_card_owners:
+                logger.info(f"🛡️ Pre-cargadas {len(married_card_owners)} tarjetas casadas en BD")
 
             # Inicializar estado de cuentas para el despachador Round-Robin
             accounts_state: List[Dict[str, Any]] = []
@@ -964,9 +1031,13 @@ async def run_auto_mission(
                 cand = [p for p in [acc.get("card_pipe"), *card_pipes] if p]
                 cand = [_normalize_pipe_to_3part(p) for p in cand]
                 cand = list(dict.fromkeys(cand))
-                cand = [p for p in cand if p not in retired_cards]
+                email_lower = (email or "").strip().lower()
+                cand = [
+                    p for p in cand
+                    if not _is_card_retired(p) and married_card_owners.get(_extract_card_number(p), email_lower) == email_lower
+                ]
                 if not cand:
-                    logger.info(f"⚠️ Sin tarjetas candidatas activas para {email} (todas jubiladas)")
+                    logger.info(f"⚠️ Sin tarjetas candidatas activas para {email}")
                     continue
                 accounts_state.append({
                     "id": aid,
@@ -1002,7 +1073,11 @@ async def run_auto_mission(
                 for a in accounts_state:
                     if a["done"]:
                         continue
-                    a["candidates"] = [p for p in a["candidates"] if p not in retired_cards]
+                    a_email_lower = (a["email"] or "").strip().lower()
+                    a["candidates"] = [
+                        p for p in a["candidates"]
+                        if not _is_card_retired(p) and married_card_owners.get(_extract_card_number(p), a_email_lower) == a_email_lower
+                    ]
                     if not a["candidates"] or a["declines"] >= MM_MAX_ACCOUNT_DECLINES_PER_RUN:
                         a["done"] = True
                         if a["locked"] and not a["matched"]:
@@ -1017,7 +1092,7 @@ async def run_auto_mission(
                         backup_checked = True
                         try:
                             from app import DB_PATH
-                            active_cards = [p for p in card_pipes if _normalize_pipe_to_3part(p) not in retired_cards]
+                            active_cards = [p for p in card_pipes if not _is_card_retired(p)]
                             if active_cards:
                                 remaining = MAX_ACCOUNTS_HARD_CAP - len(accounts_state)
                                 if remaining > 0:
@@ -1035,7 +1110,11 @@ async def run_auto_mission(
                                             b_cands = [p for p in [b_acc.get("card_pipe"), *card_pipes] if p]
                                             b_cands = [_normalize_pipe_to_3part(p) for p in b_cands]
                                             b_cands = list(dict.fromkeys(b_cands))
-                                            b_cands = [p for p in b_cands if p not in retired_cards]
+                                            b_email_lower = (b_email or "").strip().lower()
+                                            b_cands = [
+                                                p for p in b_cands
+                                                if not _is_card_retired(p) and married_card_owners.get(_extract_card_number(p), b_email_lower) == b_email_lower
+                                            ]
                                             if not b_cands:
                                                 continue
                                             already_checked_emails.add(b_email)
@@ -1123,9 +1202,9 @@ async def run_auto_mission(
                     if ok:
                         deposited += PROBE_AMOUNT
                         approved += 1
-                        retired_cards.add(norm_pipe)
+                        _retire_card(pipe, reason=f"MATCH APROBADO en {email}")
                         logger.info(f"🎯 MATCH FOUND | {email} x {pipe}")
-                        logger.info(f"🚫 TARJETA JUBILADA EN MISIÓN (MATCH APROBADO en {email}) | {pipe}")
+                        logger.info(f"🚫 TARJETA JUBILADA EN MISIÓN (MATCH APROBADO en {email}) | {pipe} (PAN: {_extract_card_number(pipe)})")
 
                         clabe_stp = None
                         try:
@@ -1223,7 +1302,7 @@ async def run_auto_mission(
                         target["declines"] += 1
                         is_clean_account = target.get("grade") in ("A+", "A")
                         if is_clean_account and code == "BANK_REJECTED":
-                            retired_cards.add(norm_pipe)
+                            _retire_card(pipe, reason=f"BANK_REJECTED en cuenta limpia {email}")
                             logger.info(f"🚫 TARJETA JUBILADA EN MISIÓN (BANK_REJECTED en cuenta {email} con grado {target.get('grade')}) | {pipe}")
                             logger.info(f"ℹ️ Matriz Diagnóstico: Declinación atribuida a tarjeta, no a pasarela de {email}")
 
@@ -1263,7 +1342,7 @@ async def run_auto_mission(
                         break
 
                     if code == "CARD_LOCKED_OTHER_ACCOUNT":
-                        retired_cards.add(norm_pipe)
+                        _retire_card(pipe, reason=f"CARD_LOCKED_OTHER_ACCOUNT en {email}")
                         logger.info(f"🚫 TARJETA JUBILADA (CARD_LOCKED_OTHER_ACCOUNT) | {pipe}")
                         failed += 1
                         target["cooldown_until"] = _get_now() + MM_CROSS_ACCOUNT_GAP

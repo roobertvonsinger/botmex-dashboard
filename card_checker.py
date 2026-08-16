@@ -298,7 +298,7 @@ def precheck_card_liveness(card_pipe: str) -> Tuple[bool, str, Optional[Dict[str
     from app import db
     card_num = parsed.get("card_number")
     with db(write=False) as c:
-        # 1. Check de tarjetas asociadas
+        # 1. Check de tarjetas asociadas/casadas en account_cards
         existing = c.execute(
             "SELECT account_email FROM account_cards WHERE card_number=?",
             (card_num,)

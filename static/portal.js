@@ -1106,31 +1106,6 @@
     }, 7000);
   }
 
-  // ── Init ───────────────────────────────────────────────────────
-  async function init() {
-    // Logout + back-link SA: solo en página standalone. En bare (tab embebido)
-    // el dashboard ya provee logout y navegación — el header (.ph) está oculto.
-    if (!BARE) {
-      $('#logoutBtn').addEventListener('click', async () => {
-        try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (_) {}
-        window.location.href = '/login';
-      });
-
-      // SA viendo /{username} (posiblemente el suyo propio, vía view_as): nunca
-      // debe quedar atrapado sin volver a su dashboard — link directo siempre visible.
-      try {
-        const me = await (await fetch('/api/auth/me')).json();
-        if (me.role === 'superadmin') {
-          const back = document.createElement('a');
-          back.className = 'btn btn-sm';
-          back.href = '/dashboard';
-          back.textContent = '← Dashboard';
-          $('#logoutBtn').insertAdjacentElement('beforebegin', back);
-          if (phRole) phRole.textContent = '· viendo como usuario';
-        }
-      } catch (_) {}
-    }
-
   // ── Modal Central de Detalle de KPI ─────────────────────────────
   function setupKpiClicks() {
     const cards = document.querySelectorAll('.kpi-card');

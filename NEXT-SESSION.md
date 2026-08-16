@@ -25,11 +25,24 @@
 - **Intervalo adaptativo de `jwt_keeper`** cuando hay hot pendientes.
 - **Auditoría visual de animaciones en navegador real**.
 
-## ✅ Hecho esta sesión (2026-08-16, Matchmaking Round-Robin & Lazy Pool)
+## ✅ Hecho esta sesión (2026-08-16, Blindaje E2E /bet, Matchmaking & Portal Fix)
 
-- **Jubilación Inmediata de Tarjeta Aprobada (`auto_deposit.py`)**: Al aprobarse probe de $10 (`ok == True`), la tarjeta se agrega de inmediato a `retired_cards`, impidiendo que intente usarse en cuentas siguientes.
-- **Planificador Round-Robin no Bloqueante (`auto_deposit.py`)**: Despachador por estados (`accounts_state`). Al fallar un intento en una cuenta, su cooldown corre en paralelo y el motor avanza de inmediato (a los 5s de respiro) a la siguiente cuenta lista. Solo espera si *todas* las cuentas activas están en cooldown.
-- **Lazy Captcha Pool (`auto_deposit.py`)**: Eliminado arranque ansioso (`start_factory` / `prefetch`). Cuentas con JWT vivo consumen 0 tokens de CapMonster.
-- **Tope de Declines por Cuenta**: Se respeta límite de 2 rechazos por cuenta en la corrida.
-- **Tests**: Suite completa pasando con 100% de éxito (34 tests en `test_auto_mission` + `test_bin_intelligence`, 55 tests adicionales en suites de depósito).
+- **Blindaje de Tarjetas por PAN y Purga en Caliente (`auto_deposit.py`)**:
+  - `_extract_card_number` y `_normalize_pipe_to_3part` limpian y unifican formatos (3 partes con/sin diagonal, 4 partes, espacios).
+  - Al aprobarse un match (`ok == True`), recibir `CARD_LOCKED_OTHER_ACCOUNT` o rechazo en cuenta limpia, `_retire_card` jubila el PAN y purga instantáneamente las candidatas de todas las cuentas restantes en `accounts_state`.
+  - Si una cuenta no tiene más plásticos, finaliza y se desbloquea en el acto, permitiendo que la misión pase de inmediato a **Fase 1.5 (`confirm_gate`)** sin loops fantasma.
+  - Pre-exclusión de tarjetas casadas desde `account_cards` al armar el pool (`plan_auto_mission`) y al arrancar la misión (`run_auto_mission`).
+- **Fix de Teclado y Botón "Iniciar Acreditación" (`telegram_bot_mock/bot.py`)**:
+  - Se eliminó la condición de carrera donde `on_progress("awaiting_confirmation")` sobrescribía el teclado interactivo de `confirm_gate`, restaurando los botones `🚀 Iniciar Acreditación` y `🛑 Detener`.
+  - Deduplicación de tarjetas por PAN en `process_bet_input`.
+- **Fix de Carga en Portal del Operador (`static/portal.js` / `portal.html`)**:
+  - Corregido `SyntaxError` (bloque de inicialización duplicado) que congelaba la interfaz en "Cargando..." y no mostraba cuentas ni métricas en vivo.
+- **Tests Automatizados**:
+  - Agregados tests en `tests/test_auto_mission.py` y `tests/test_auto_mission_edge_cases.py` cubriendo:
+    - Jubilación de tarjetas por PAN y purga instantánea en memoria.
+    - Fallos de pasarela y desbloqueo limpio de cuentas.
+    - Aislamiento de Fase 2 (si una cuenta falla en $150, las demás completan sus cuotas de forma independiente).
+    - Descarte inmediato de plásticos muertos en cuentas limpias (Grado A/A+).
+    - Flujo interactivo directo a `confirm_gate`.
+  - **Suite completa:** 172/172 tests pasando con 100% de éxito en 38s.
 

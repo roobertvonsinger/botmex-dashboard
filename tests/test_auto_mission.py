@@ -45,6 +45,7 @@ def H(monkeypatch):
     h.script = lambda email, amount, kw: {"success": True, "result_code": "BANK_APPROVED",
                                           "jwt": "J", "used_proxy": "P", "duration_ms": 5}
 
+    monkeypatch.setattr(ad, "_get_married_card_owners", lambda *a, **k: {})
     monkeypatch.setattr(ad, "_m_update", lambda mid, **f: h.updates.append(f))
     monkeypatch.setattr(ad, "_m_status", lambda mid: h.status)
     monkeypatch.setattr(ad, "_m_load", lambda mid: {
@@ -211,6 +212,7 @@ def test_mission_same_account_waits_mm_cooldown_between_cards(H):
 def test_mission_cross_account_gap_is_5s_not_60s(H):
     """Regla Robert 2026-07-28: entre cuentas DISTINTAS basta un respiro de 5s,
     no el cooldown de 60s de reintento en la misma cuenta."""
+    H.card_pipes = [P1, P2]
     def script(email, amount, kw):
         if email == "acc1@x.com":
             return {"success": False, "result_code": "BANK_REJECTED", "error": "x"}
@@ -395,4 +397,71 @@ def test_mission_pool_is_lazy_not_started_eagerly(H):
     run(H, plan(1))
     assert len(H.pools) == 1
     assert H.pools[0].started == 0  # no se ejecutó start_factory ansioso
+
+
+def test_mission_retires_card_by_pan_and_prunes_other_accounts_immediately(H):
+    """Verifica que si Cuenta 1 aprueba P1 (4111111111111111|1230|123),
+    Cuenta 2 que tenía una variante de formato (4111111111111111|12/30|123)
+    queda inmediatamente vacía de candidatas, se marca done y NO realiza ningún intento."""
+    P1_VAR = "4111111111111111|12/30|123"
+    H.card_pipes = [P1, P1_VAR]
+    pl = {
+        "accounts": [
+            {"id": 1, "email": "acc1@x.com", "grade": "A", "card_pipe": P1},
+            {"id": 2, "email": "acc2@x.com", "grade": "A", "card_pipe": P1_VAR},
+        ]
+    }
+    run(H, pl)
+    # Cuenta 1 aprueba P1
+    # Cuenta 2 debe quedar vacía y nunca ejecutar _run para acc2
+    acc2_calls = [c for c in H.run_calls if c["email"] == "acc2@x.com"]
+    assert acc2_calls == [], f"Cuenta 2 no debió realizar ningún intento pero hizo: {acc2_calls}"
+    assert 2 in H.unlocked or 2 not in H.locked
+
+
+def test_mission_card_locked_other_account_retires_pan_and_prunes(H):
+    """Verifica que si Cuenta 1 recibe CARD_LOCKED_OTHER_ACCOUNT, la tarjeta
+    queda jubilada a nivel PAN y se purga inmediatamente de Cuenta 2."""
+    def script(email, amount, kw):
+        if email == "acc1@x.com":
+            return {"success": False, "result_code": "CARD_LOCKED_OTHER_ACCOUNT", "error": "locked"}
+        return {"success": True, "result_code": "BANK_APPROVED", "jwt": "J", "used_proxy": "P"}
+    H.script = script
+    H.card_pipes = [P1]
+    pl = {
+        "accounts": [
+            {"id": 1, "email": "acc1@x.com", "grade": "A", "card_pipe": P1},
+            {"id": 2, "email": "acc2@x.com", "grade": "A", "card_pipe": P1},
+        ]
+    }
+    run(H, pl)
+    # Cuenta 1 intentó P1 y recibió CARD_LOCKED_OTHER_ACCOUNT
+    # Cuenta 2 tenía P1 -> debió ser purgada inmediatamente y no intentar P1
+    acc2_calls = [c for c in H.run_calls if c["email"] == "acc2@x.com"]
+    assert acc2_calls == []
+    assert 1 in H.unlocked
+    assert 2 in H.unlocked or 2 not in H.locked
+
+
+def test_mission_confirm_gate_invoked_after_match_and_rest_done(H):
+    """Verifica que cuando hay un match y las demás cuentas terminan, confirm_gate
+    se invoca de inmediato sin atorarse en el matchmaking loop."""
+    gate_invoked = []
+
+    async def my_gate(info):
+        gate_invoked.append(info)
+        return True
+
+    H.card_pipes = [P1]
+    pl = {
+        "accounts": [
+            {"id": 1, "email": "acc1@x.com", "grade": "A", "card_pipe": P1},
+            {"id": 2, "email": "acc2@x.com", "grade": "A", "card_pipe": P1},
+        ]
+    }
+    asyncio.run(ad.run_auto_mission("m_gate", pl, {"role": "superadmin", "telegram_id": 555}, confirm_gate=my_gate))
+    assert len(gate_invoked) == 1
+    assert len(gate_invoked[0]["matches"]) == 1
+    assert gate_invoked[0]["matches"][0]["email"] == "acc1@x.com"
+
 
