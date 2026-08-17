@@ -239,6 +239,32 @@ def select_accounts_for_auto(
         if (r.get("status") or "") != "LIVE":
             continue
 
+        # 0. Cuenta degradada (Grade D) -> jamás usar para auto_deposit / match
+        if (r.get("grade") or "").upper() == "D":
+            continue
+
+        # 1. Cuenta con saldo real / dinero significativo (balance_real >= $10.0) -> EXCLUIDA
+        # El auto-depósito /bet es para fondear cuentas vacías; jamás tocar cuentas con fondos en uso.
+        bal_real = r.get("balance_real")
+        if bal_real is not None:
+            try:
+                if float(bal_real) >= 10.0:
+                    continue
+            except (ValueError, TypeError):
+                pass
+        else:
+            bal_fallback = r.get("balance") or r.get("balance_total")
+            if bal_fallback is not None:
+                try:
+                    if float(bal_fallback) >= 10.0:
+                        continue
+                except (ValueError, TypeError):
+                    pass
+
+        # 2. Cuenta en ciclo de retiro o marcada para retiro -> EXCLUIDA
+        if r.get("withdrawal_ready") in (1, "1", True):
+            continue
+
         locked_by = r.get("locked_by")
         # RESERVADA_SA (pool=0 + locked_by del SA) → candidata.
         is_sa_reserved = not r.get("published_to_pool") and str(locked_by).lower() in sa
@@ -252,11 +278,15 @@ def select_accounts_for_auto(
             continue
 
         meta = meta_map.get(email) or {}
-        # 1. Enfriamiento 48h por depósito APROBADO en dashboard
+        # 3. Enfriamiento 48h por depósito APROBADO en dashboard
         if meta.get("has_dashboard_approved_48h"):
             continue
 
-        # 2. Errores de validación o DEAD
+        # 4. Cuenta en uso activa: depósitos SPEI o retiros recientes (<48h) en account_transactions
+        if meta.get("has_spei_48h") or meta.get("has_withdrawal_48h") or meta.get("has_recent_activity_48h"):
+            continue
+
+        # 5. Errores de validación o DEAD
         if meta.get("is_validation_blocked") or meta.get("is_dead_blocked"):
             continue
 
@@ -294,15 +324,12 @@ def select_accounts_for_auto(
             tier_low.append(r)
             continue
 
-        has_spei_24h = meta.get("has_spei_24h", False)
         has_3ds_24h = meta.get("has_3ds_24h", False)
         total_fails = meta.get("total_fails", 0)
         mins_since_attempt = meta.get("mins_since_last_attempt", 99999)
         grade = r.get("grade") or ""
 
-        if has_spei_24h:
-            tier_low.append(r)
-        elif has_3ds_24h:
+        if has_3ds_24h:
             tier_top.append(r)
         elif mins_since_attempt <= 1440:
             tier_low.append(r)
@@ -460,13 +487,25 @@ def plan_auto_mission(
                 (email,),
             ).fetchone()["n"]
 
-            # 2. Depósitos por SPEI / externos recientes (<24h) en account_transactions (gateway=2, status=6, txn_type=1)
-            spei_24h = con.execute(
-                "SELECT COUNT(*) AS n FROM account_transactions "
-                "WHERE account_email=? AND gateway=2 AND status=6 AND txn_type=1 "
-                "AND txn_date >= datetime('now','-24 hours')",
-                (email,),
-            ).fetchone()["n"]
+            # 2. Depósitos por SPEI / externos recientes (<48h) en account_transactions (gateway=2 o status=6 o txn_type=1)
+            spei_48h = con.execute("""
+                SELECT COUNT(*) AS n FROM account_transactions 
+                WHERE account_email=? AND (gateway=2 OR status=6) AND txn_type=1 
+                AND (
+                    (julianday('now') - julianday(REPLACE(txn_date, 'T', ' '))) <= 2.0
+                    OR txn_date >= datetime('now','-48 hours')
+                )
+            """, (email,)).fetchone()["n"]
+
+            # 2b. Retiros recientes (<48h) en account_transactions (txn_type=2)
+            with_48h = con.execute("""
+                SELECT COUNT(*) AS n FROM account_transactions 
+                WHERE account_email=? AND txn_type=2 
+                AND (
+                    (julianday('now') - julianday(REPLACE(txn_date, 'T', ' '))) <= 2.0
+                    OR txn_date >= datetime('now','-48 hours')
+                )
+            """, (email,)).fetchone()["n"]
 
             # 3. Evento 3DS_REQUIRED reciente (<24h)
             threeds_24h = con.execute(
@@ -562,7 +601,9 @@ def plan_auto_mission(
 
             meta_map[email] = {
                 "has_dashboard_approved_48h": bool(app_48h),
-                "has_spei_24h": bool(spei_24h),
+                "has_spei_48h": bool(spei_48h),
+                "has_withdrawal_48h": bool(with_48h),
+                "has_recent_activity_48h": bool(spei_48h or with_48h),
                 "has_3ds_24h": bool(threeds_24h),
                 "total_fails": int(tot_fails or 0),
                 "is_validation_blocked": bool(val_blocked),

@@ -15,7 +15,7 @@ from auto_deposit import (
 def _row(email, **kw):
     r = {
         "id": None, "email": email, "status": "LIVE", "grade": "A",
-        "grade_score": 50, "balance_total": 100.0, "published_to_pool": 1,
+        "grade_score": 50, "balance_total": 0.0, "balance_real": 0.0, "published_to_pool": 1,
         "locked_by": None, "cooldown_until": None,
         "jwt_expires_at": int(time.time()) + 3600,
     }
@@ -145,18 +145,33 @@ def test_select_ignores_decline_map_when_absent():
 
 
 # ── B3 — plan_auto_mission (BD temporal vía fixture seed_db) ─────────────────
-def _add_account(db_path, email, grade="A", grade_score=50, balance=100.0):
+def _add_account(db_path, email, grade="A", grade_score=50, balance=0.0):
     con = sqlite3.connect(str(db_path))
     try:
         con.execute(
-            "INSERT INTO accounts (email,password,balance_total,status,grade,grade_score,"
+            "INSERT INTO accounts (email,password,balance_total,balance_real,status,grade,grade_score,"
             "published_to_pool,cooldown_until,jwt_expires_at,first_checked_at,last_checked_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            (email, "x", balance, "LIVE", grade, grade_score, 1, None,
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (email, "x", balance, balance, "LIVE", grade, grade_score, 1, None,
              int(time.time()) + 3600, "2026-07-01 00:00:00", "2026-07-01 00:00:00"))
         con.commit()
     finally:
         con.close()
+
+
+def test_select_filters_accounts_with_funds():
+    """Cuentas con saldo real o total >= $10.0 quedan excluidas para no arriesgar fondos en uso."""
+    rows = [
+        _row("empty@t.com", balance_real=0.0, balance_total=0.0),
+        _row("rich@t.com", balance_real=598.49, balance_total=598.49),
+        _row("cents@t.com", balance_real=0.54, balance_total=0.54),
+    ]
+    win = _win("empty@t.com", "rich@t.com", "cents@t.com")
+    sel = select_accounts_for_auto(rows, 150, 9, win)
+    sel_emails = [r["email"] for r in sel]
+    assert "rich@t.com" not in sel_emails
+    assert "empty@t.com" in sel_emails
+    assert "cents@t.com" in sel_emails
 
 
 def _add_card(db_path, number, email, status="ACTIVE"):
