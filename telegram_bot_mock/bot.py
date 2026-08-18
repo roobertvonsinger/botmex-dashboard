@@ -327,11 +327,31 @@ async def _edit_msg(query, text: str, reply_markup=None):
     original tiene foto (el /start envía foto+caption), sino edit_message_text.
 
     Fixes 'There is no text in the message to edit' cuando se toca un botón
-    del /start (mensaje con media)."""
+    del /start (mensaje con media).
+
+    Si el texto excede 1024 chars (límite Telegram para captions) y el mensaje
+    tiene foto, elimina el viejo y envía uno nuevo como texto."""
+    TG_CAPTION_LIMIT = 1024
     if query.message and query.message.photo:
-        await query.edit_message_caption(
-            caption=text, parse_mode="HTML", reply_markup=reply_markup
-        )
+        if len(text) <= TG_CAPTION_LIMIT:
+            await query.edit_message_caption(
+                caption=text, parse_mode="HTML", reply_markup=reply_markup
+            )
+        else:
+            # Texto excede límite de caption — eliminar mensaje con foto y
+            # enviar nuevo mensaje de texto para no colgar el handler.
+            chat_id = query.message.chat_id
+            try:
+                await query.message.delete()
+            except Exception:
+                # Si no se puede borrar (permisos), al menos quitar botones
+                try:
+                    await query.edit_message_reply_markup(reply_markup=None)
+                except Exception:
+                    pass
+            await query.message.chat.send_message(
+                text=text, parse_mode="HTML", reply_markup=reply_markup
+            )
     else:
         await query.edit_message_text(
             text=text, parse_mode="HTML", reply_markup=reply_markup

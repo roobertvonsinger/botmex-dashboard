@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 577 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5286 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1680 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1725 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `betmexico_config.py` | 185 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2927 | `—` | _[completar]_ |
@@ -112,7 +112,7 @@ prewarm.py (router)
 | `bin_intelligence.py` | 430 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
 | `card_checker.py` | 398 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
-| `conftest.py` | 184 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
+| `conftest.py` | 213 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
 | `deposits.py` | 2931 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 396 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
@@ -135,7 +135,7 @@ prewarm.py (router)
 | `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
 | `test_anti_rate_limit.py` | 278 | `—` | _[completar]_ |
 | `test_at_hand.py` | 73 | `—` | _[completar]_ |
-| `test_auto_deposit_selection.py` | 289 | `—` | _[completar]_ |
+| `test_auto_deposit_selection.py` | 319 | `—` | _[completar]_ |
 | `test_auto_missions_migrate.py` | 120 | `—` | _[completar]_ |
 | `test_balance_only_real_zero_preserved.py` | 89 | `—` | _[completar]_ |
 | `test_bet_live_plan.py` | 524 | `—` | _[completar]_ |
@@ -157,7 +157,7 @@ prewarm.py (router)
 | `test_scheduled_deposit_card_locked.py` | 80 | `—` | _[completar]_ |
 | `test_search.py` | 70 | `—` | _[completar]_ |
 | `test_sse_visibility.py` | 88 | `—` | _[completar]_ |
-| `test_unificacion_sp1.py` | 49 | `—` | _[completar]_ |
+| `test_unificacion_sp1.py` | 52 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 71 | `—` | _[completar]_ |
 | `test_withdrawals.py` | 806 | `—` | _[completar]_ |
 | `test_withdrawals_endpoints.py` | 627 | `—` | _[completar]_ |
@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `41fa58b` | fix(auto_deposit): exclusion dura para cuentas con saldo real, retiro activo o actividad SPEI/retiros <48h |
 | `fe1f154` | feat: integrar modulos del bot y soporte db canonical para auto_deposit en produccion |
 | `cf8800e` | fix(auto-deposit): blindaje E2E /bet, retiro de tarjetas por PAN, fix portal JS y confirm_gate Telegram |
 | `7ec516d` | docs: actualizar NEXT-SESSION.md con cierre de optimizacion matchmaking |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `6cee146` | feat(auto_deposit): seleccion dinamica por actividad + disposicion por tier 40/40/20 (RF4/RF5) |
 | `98b9059` | feat(card_checker): bridge ruthopia HTTP (POST /api/rw/check) + tolerancias de pase en precheck (RF1/RF3) |
 | `dcd023d` | feat(agents): suite superpowers adaptada a opencode + comandos Smartplan/Smartexe |
-| `bd9d2a2` | docs(superpowers): puente ruthopia en /bet — decisiones de Robert (RF5 dinamico, RF8 segundo intento, 5 tarjetas, retries infra, no-mask) |
 <!-- GEN:end:recientes -->
 
 ---

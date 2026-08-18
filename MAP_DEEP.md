@@ -220,20 +220,20 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_extract_card_number` | def | L124–L131 |
 | `_parse_card_pipe` | def | L134–L167 |
 | `_normalize_pipe_to_3part` | def | L170–L172 |
-| `_get_married_card_owners` | def | L175–L191 |
-| `select_accounts_for_auto` | def | L200–L396 |
-| `_max_accounts_for_cards` | def | L405–L413 |
-| `plan_auto_mission` | def | L416–L699 |
-| `_fake_progress_pct` | def | L740–L771 |
-| `_iso` | def | L775–L776 |
-| `_m_load` | def | L779–L787 |
-| `_m_status` | def | L790–L792 |
-| `_m_update` | def | L795–L805 |
-| `_fetch_account` | def | L808–L815 |
-| `_unlock` | def | L818–L827 |
-| `_broadcast_mission` | def | L830–L859 |
-| `_stop_pool` | def | L862–L869 |
-| `run_auto_mission` | def | L873–L1680 |
+| `_get_married_card_owners` | def | L175–L194 |
+| `select_accounts_for_auto` | def | L203–L424 |
+| `_max_accounts_for_cards` | def | L433–L441 |
+| `plan_auto_mission` | def | L444–L738 |
+| `_fake_progress_pct` | def | L779–L810 |
+| `_iso` | def | L814–L815 |
+| `_m_load` | def | L818–L826 |
+| `_m_status` | def | L829–L831 |
+| `_m_update` | def | L834–L844 |
+| `_fetch_account` | def | L847–L854 |
+| `_unlock` | def | L857–L866 |
+| `_broadcast_mission` | def | L869–L898 |
+| `_stop_pool` | def | L901–L908 |
+| `run_auto_mission` | def | L912–L1725 |
 
 ### `autoexclusion.py`
 
@@ -414,10 +414,12 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `seed_db` | def | L8–L148 |
-| `client` | def | L151–L155 |
-| `make_client` | def | L158–L170 |
-| `mock_bmx_transport` | def | L174–L184 |
+| `seed_db` | def | L8–L149 |
+| `client` | def | L152–L156 |
+| `make_client` | def | L159–L171 |
+| `mock_bmx_transport` | def | L175–L185 |
+| `OutgoingNetworkBlockedError` | class | L192–L194 |
+| `guard_external_network` | def | L197–L212 |
 
 ### `curp_utils.py`
 
@@ -776,14 +778,16 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_gate_duro_published_to_pool` | def | L79–L92 |
 | `test_cooldown_48h_dashboard_approved` | def | L98–L118 |
 | `test_spei_or_funds_excluded_from_auto_mission` | def | L121–L138 |
-| `test_accounts_with_real_funds_excluded` | def | L141–L160 |
-| `test_accounts_withdrawal_ready_or_grade_d_excluded` | def | L163–L175 |
-| `test_boost_3ds_recent_to_top` | def | L178–L192 |
-| `test_bin_cooldown_30d_on_approval` | def | L195–L226 |
-| `test_tol_pipe_only_one_account` | def | L229–L241 |
-| `test_dynamic_order_recently_tried_last` | def | L244–L256 |
-| `test_cards_heavy_deprioritized` | def | L259–L271 |
-| `test_tier_proportion_2_2_1` | def | L274–L289 |
+| `test_gate_duro_kyc_verified` | def | L141–L153 |
+| `test_gate_duro_dead_reason` | def | L156–L168 |
+| `test_accounts_with_real_funds_excluded` | def | L171–L190 |
+| `test_accounts_withdrawal_ready_or_grade_d_excluded` | def | L193–L205 |
+| `test_boost_3ds_recent_to_top` | def | L208–L222 |
+| `test_bin_cooldown_30d_on_approval` | def | L225–L256 |
+| `test_tol_pipe_only_one_account` | def | L259–L271 |
+| `test_dynamic_order_recently_tried_last` | def | L274–L286 |
+| `test_cards_heavy_deprioritized` | def | L289–L301 |
+| `test_tier_proportion_2_2_1` | def | L304–L319 |
 
 ### `test_auto_missions_migrate.py`
 
@@ -1049,8 +1053,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_execute_stream_still_registered` | def | L10–L14 |
 | `test_multi_and_scheduled_still_registered` | def | L16–L20 |
 | `test_load_deps_returns_pool_without_bot_run_deposit` | def | L22–L28 |
-| `test_legacy_modules_archived` | def | L32–L39 |
-| `test_no_live_import_of_legacy` | def | L41–L49 |
+| `test_legacy_modules_archived` | def | L33–L41 |
+| `test_no_live_import_of_legacy` | def | L43–L52 |
 
 ### `test_unificacion_sp2.py`
 
