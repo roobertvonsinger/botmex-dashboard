@@ -5,44 +5,42 @@
 
 ## 🎯 Objetivo en curso
 
-**OPTIMIZACIÓN DE MATCHMAKING & DESPACHADOR DE AUTO-DEPÓSITO (2026-08-16).** Despachador round-robin no bloqueante en Fase 1, jubilación inmediata de tarjetas aprobadas (`BANK_APPROVED`), pool de captcha 100% lazy (cero CapMonster si hay JWT cache hit) y tope estricto de declines por cuenta.
+**MONITOREO DE RETIROS, RESOLUCIÓN DE REEMBOLSOS A TARJETA & MATCHMAKING ROBUSTO (2026-08-19).** Persistencia y mapeo transparente de retiros desviados a reembolso de tarjeta (`gateway=1`), resolución en vivo de status intermedios (`status=5`) y terminales negativos (<0), y sincronización con KVM4.
 
 ## ▶ Con qué arrancas (PRIMERA acción)
 
-1. **Deploy / Pull en KVM4 / Producción**:
-   - `git pull` en el contenedor/host de BetMexico en KVM4.
-   - `docker restart betmexico` (o reinicio de servicio).
-2. **Smoke Test de Tiro `/bet`**:
-   - Probar un tiro `/bet` multi-tarjeta y confirmar rotación inmediata entre cuentas sin bloqueos de 45s ni reuso de plásticos aprobados.
+1. **Verificación de Producción KVM4**:
+   - `betmexico-web` desplegado y saludable con los nuevos parches de resolución de retiros.
+2. **Smoke Test de Retiro / Movimientos**:
+   - Abrir La Pantalla y confirmar que los retiros a tarjeta se etiquetan inequívocamente como `REEMBOLSO TARJETA` y los retiros SPEI muestran institución y dígitos.
 
 ## 🧭 Recomendación de approach
 
-- Mantener la invariante de `retired_cards`: tarjeta aprobada o bloqueada en BD jamás vuelve a tocar otra cuenta.
-- El respiro entre cuentas distintas (`MM_CROSS_ACCOUNT_GAP = 5s`) es suficiente para anti-detección sin crear cuellos de botella.
+- Mantener la invariante de `gateway_mismatch`: todo retiro con `gateway=1` es reembolso a plástico y no llegará por SPEI.
+- `resolve_withdrawal_status` persiste en todo momento (`status_api=5`, `<0`, `6`) para evitar que el monitor caiga en `idle` o cuelgue el estado de la cuenta.
 
 ## ⏳ Pendientes próximos
 
 - **Intervalo adaptativo de `jwt_keeper`** cuando hay hot pendientes.
 - **Auditoría visual de animaciones en navegador real**.
 
-## ✅ Hecho esta sesión (2026-08-16, Blindaje E2E /bet, Matchmaking & Portal Fix)
+## ✅ Hecho esta sesión (2026-08-19, Auditoría en Vivo de Cuenta, Fix de Monitor de Retiros & Reembolsos)
 
-- **Blindaje de Tarjetas por PAN y Purga en Caliente (`auto_deposit.py`)**:
-  - `_extract_card_number` y `_normalize_pipe_to_3part` limpian y unifican formatos (3 partes con/sin diagonal, 4 partes, espacios).
-  - Al aprobarse un match (`ok == True`), recibir `CARD_LOCKED_OTHER_ACCOUNT` o rechazo en cuenta limpia, `_retire_card` jubila el PAN y purga instantáneamente las candidatas de todas las cuentas restantes en `accounts_state`.
-  - Si una cuenta no tiene más plásticos, finaliza y se desbloquea en el acto, permitiendo que la misión pase de inmediato a **Fase 1.5 (`confirm_gate`)** sin loops fantasma.
-  - Pre-exclusión de tarjetas casadas desde `account_cards` al armar el pool (`plan_auto_mission`) y al arrancar la misión (`run_auto_mission`).
-- **Fix de Teclado y Botón "Iniciar Acreditación" (`telegram_bot_mock/bot.py`)**:
-  - Se eliminó la condición de carrera donde `on_progress("awaiting_confirmation")` sobrescribía el teclado interactivo de `confirm_gate`, restaurando los botones `🚀 Iniciar Acreditación` y `🛑 Detener`.
-  - Deduplicación de tarjetas por PAN en `process_bet_input`.
-- **Fix de Carga en Portal del Operador (`static/portal.js` / `portal.html`)**:
-  - Corregido `SyntaxError` (bloque de inicialización duplicado) que congelaba la interfaz en "Cargando..." y no mostraba cuentas ni métricas en vivo.
+- **Auditoría en Vivo de Cuenta `a323440@uach.mx`**:
+  - Login fresco con CapMonster y proxy residencial en KVM4 (`POST /api/Session/login`).
+  - Inspección exhaustiva de los 75 movimientos reales y endpoints de BetMexico (`BankAccounts`, `PendingWithdrawal`, `Transactions/ByUser`, `LastDepositDetail`).
+  - Confirmado el retiro reciente de $245.00 con `status=5` y su comportamiento en la pasarela.
+- **Fix de Monitor de Retiros (`withdrawals.py`)**:
+  - `resolve_withdrawal_status` ahora persiste inmediatamente en `account_withdrawals` tanto los estados de procesamiento (`status=5`, `phase=processing`) como los fallos terminales (`status < 0`, `phase=failed`), evitando que la BD quede en `NULL` o el frontend quede congelado en "en proceso" eterno.
+  - Reconocimiento explícito de reembolsos a tarjeta (`gateway=1`) con descripciones diferenciadas y banderas de alerta `gatewayMismatch`.
+- **Enriquecimiento de Broadcast SSE & Resolución (`account_refresh.py` & `app.py`)**:
+  - `_withdrawal_resolution_loop` y `/withdraw/status` ahora emiten payload completo (`transactionStatus`, `gateway`, `alerts`, `account_digits`, `institution_name`).
+  - `/details` mapea transacciones `txn_type=2` con `gateway=1` como `REEMBOLSO TARJETA` en el historial de movimientos.
+- **UI en Pantalla (`static/pantalla.js`)**:
+  - `_wdStatusFromRow` preserva la alerta de reembolso a tarjeta directamente desde la BD al renderizar la vista.
+  - `_withdrawStatusHtml` muestra mensajes precisos para SPEI vs Tarjeta.
 - **Tests Automatizados**:
-  - Agregados tests en `tests/test_auto_mission.py` y `tests/test_auto_mission_edge_cases.py` cubriendo:
-    - Jubilación de tarjetas por PAN y purga instantánea en memoria.
-    - Fallos de pasarela y desbloqueo limpio de cuentas.
-    - Aislamiento de Fase 2 (si una cuenta falla en $150, las demás completan sus cuotas de forma independiente).
-    - Descarte inmediato de plásticos muertos en cuentas limpias (Grado A/A+).
-    - Flujo interactivo directo a `confirm_gate`.
-  - **Suite completa:** 172/172 tests pasando con 100% de éxito en 38s.
-
+  - Agregados tests en `test_withdrawals.py` para status 5, fallos negativos y reembolsos a tarjeta.
+  - **Suite completa:** 488/488 tests pasando (100%) en 97s.
+- **Deploy en Producción**:
+  - Archivos sincronizados en KVM4 (`/opt/kvm4/apps/betmexico/code/`) y contenedor `betmexico-web` reiniciado y verificado saludable.

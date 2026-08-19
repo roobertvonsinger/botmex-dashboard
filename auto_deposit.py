@@ -179,12 +179,15 @@ def _get_married_card_owners(db_path: Optional[str] = None) -> Dict[str, str]:
         from app import DB_PATH
         target_db = db_path or DB_PATH
         con = sqlite3.connect(str(target_db))
-        for r in con.execute(
-            "SELECT card_number, account_email FROM account_cards WHERE card_number IS NOT NULL AND card_number != ''"
-        ).fetchall():
-            c_num = _extract_card_number(str(r[0]))
-            if c_num and r[1]:
-                owners[c_num] = str(r[1]).strip().lower()
+        cols = [c[1] for c in con.execute("PRAGMA table_info(account_cards)").fetchall()]
+        num_col = "card_number" if "card_number" in cols else "number" if "number" in cols else None
+        if num_col:
+            for r in con.execute(
+                f"SELECT {num_col}, account_email FROM account_cards WHERE {num_col} IS NOT NULL AND {num_col} != ''"
+            ).fetchall():
+                c_num = _extract_card_number(str(r[0]))
+                if c_num and r[1]:
+                    owners[c_num] = str(r[1]).strip().lower()
         con.close()
     except Exception as ex:
         logger.debug(f"No se pudieron leer account_cards: {ex}")
@@ -208,7 +211,9 @@ def select_accounts_for_auto(
     """Filtra + clasifica internamente (Top, Mid, Low) + limita cuentas candidatas al depósito auto.
 
     Filtros de Exclusión Dura:
-      1. status == 'LIVE'
+      0. Gate KYC Innegociable: kyc_verified == 1 (cuentas sin verificar o con validación revocada jamás depositan)
+      0b. Cero dead_reason o dead_at persistidos en BD
+      1. status == 'LIVE' (estricto)
       2. published_to_pool == 1 (o excepción RESERVADA_SA)
       3. locked_by IS NULL
       4. cooldown_until no activo
@@ -216,18 +221,18 @@ def select_accounts_for_auto(
       6. window_map[email]["available"] >= amount * count
       7. decline_map[email] < MM_ACCOUNT_RECENT_DECLINE_LIMIT (2 declines en 12h)
       8. Cero IsUserInValidationProcess o DEAD reciente en meta_map
+      9. Cero racha de declinaciones terminales (a_plus_decline_streak < 2)
 
-    Estratificación Oculta Backend (sin badges ni labels visuales):
-      - Tier TOP: 3DS reciente (<24h) o Grade A+
-      - Tier MID: Grade A
-      - Tier LOW: Depósitos SPEI/externos recientes (<24h), reposo corto o Grade B/C/D
+    Estratificación Inteligente Backend:
+      - Tier TOP: 3DS reciente (<24h), Grade A+ con sesión activa 🟢 o alta afinidad de conversión.
+      - Tier MID: Grade A / Grade B con sesión activa 🟢 o historial limpio sin declinaciones.
+      - Tier LOW: Depósitos SPEI/externos recientes (<24h), sin sesión activa 🔑 (Login Full) o Grade C.
 
-    JWT vivo NO es exclusión dura (Robert 2026-08-05): el matchmaker PRIORIZA
-    cuentas con sesión 🟢 por rapidez, pero si no hay suficientes, toma 🔑 sin
-    JWT y el flujo hace Login Full — última prioridad, no bloquea. Las cuentas
-    sin JWT vivo caen siempre al tier más bajo.
+    JWT vivo NO es exclusión dura: el matchmaker PRIORIZA cuentas con sesión 🟢 por
+    rapidez y menor latencia de captcha, pero si no hay suficientes, toma 🔑 sin JWT
+    y el flujo hace Login Full.
 
-    Selección: 1 TOP, 1 MID, 1 LOW (round-robin con fall-through).
+    Selección: distribución por tiers priorizando calidad y velocidad de conversión.
     """
     now = _now_epoch()
     sa = _sa_tokens()
@@ -236,11 +241,26 @@ def select_accounts_for_auto(
 
     for r in rows:
         email = r.get("email")
-        if (r.get("status") or "") != "LIVE":
+
+        # 0. Gate KYC Duro e Innegociable: Solo cuentas con KYC 100% verificado
+        kyc_val = r.get("kyc_verified")
+        if kyc_val not in (1, "1", True):
             continue
 
-        # 0. Cuenta degradada (Grade D) -> jamás usar para auto_deposit / match
+        # 0b. Cuenta muerta o con bloqueo terminal (dead_reason / dead_at persistidos en BD)
+        if r.get("dead_reason") or r.get("dead_at"):
+            continue
+
+        # 0c. Status LIVE estricto
+        if (r.get("status") or "").upper() != "LIVE":
+            continue
+
+        # 0d. Cuenta degradada (Grade D) -> jamás usar para auto_deposit / match
         if (r.get("grade") or "").upper() == "D":
+            continue
+
+        # 0e. Racha de declinaciones activa (a_plus_decline_streak >= 2) -> en reposo
+        if (r.get("a_plus_decline_streak") or 0) >= 2:
             continue
 
         # 1. Cuenta con saldo real / dinero significativo (balance_real >= $10.0) -> EXCLUIDA
@@ -266,13 +286,23 @@ def select_accounts_for_auto(
             continue
 
         locked_by = r.get("locked_by")
+        is_sa_owned = str(locked_by).lower() in sa if locked_by is not None else False
         # RESERVADA_SA (pool=0 + locked_by del SA) → candidata.
-        is_sa_reserved = not r.get("published_to_pool") and str(locked_by).lower() in sa
+        is_sa_reserved = not r.get("published_to_pool") and is_sa_owned
         if not is_sa_reserved:
             if not r.get("published_to_pool"):
                 continue
-            if locked_by is not None:
-                continue
+            if locked_by is not None and not is_sa_owned:
+                # Comprobar si el lock de otro operador ya expiró
+                locked_until = r.get("locked_until")
+                locked_at = r.get("locked_at")
+                is_stale = False
+                if locked_until:
+                    is_stale = str(locked_until) < datetime.now(timezone.utc).isoformat()
+                elif locked_at:
+                    is_stale = True  # lock huérfano sin fecha límite
+                if not is_stale:
+                    continue
 
         if _cd_active(r.get("cooldown_until"), now):
             continue
@@ -325,26 +355,21 @@ def select_accounts_for_auto(
             continue
 
         has_3ds_24h = meta.get("has_3ds_24h", False)
+        has_approved_bin = bool(meta.get("approved_bin_pipes"))
         total_fails = meta.get("total_fails", 0)
         mins_since_attempt = meta.get("mins_since_last_attempt", 99999)
-        grade = r.get("grade") or ""
+        grade = (r.get("grade") or "").upper()
 
-        if has_3ds_24h:
+        if has_3ds_24h or (grade == "A+" and r.get("_jwt_alive")):
             tier_top.append(r)
-        elif mins_since_attempt <= 1440:
+        elif mins_since_attempt <= 1440 and total_fails >= 3:
             tier_low.append(r)
-        elif meta:
-            if grade == "A+":
-                tier_top.append(r)
-            else:
-                tier_mid.append(r)
+        elif grade in ("A+", "A"):
+            tier_mid.append(r)
+        elif grade == "B" and has_approved_bin:
+            tier_mid.append(r)
         else:
-            if grade == "A+":
-                tier_top.append(r)
-            elif grade == "A":
-                tier_mid.append(r)
-            else:
-                tier_low.append(r)
+            tier_low.append(r)
 
     def sort_key(r):
         email = r.get("email")
@@ -354,9 +379,12 @@ def select_accounts_for_auto(
         recently_tried = 1 if mins < 60 else 0
         # RF5: 2+ tarjetas asociadas pierden prioridad (probabilidad de depósito baja)
         cards_heavy = 1 if (meta.get("cards_count") or 0) >= 2 else 0
+        # Afinidad de BIN exitoso previo
+        has_bin_success = 0 if meta.get("approved_bin_pipes") else 1
         return (
             recently_tried,
             cards_heavy,
+            has_bin_success,
             _grade_rank(r.get("grade")),
             -(float(r.get("grade_score") or 0)),
             -int(meta.get("last_activity_epoch") or 0),  # más activo reciente primero
@@ -452,6 +480,17 @@ def plan_auto_mission(
     con = sqlite3.connect(str(db_path))
     con.row_factory = sqlite3.Row
     try:
+        try:
+            con.execute(
+                "UPDATE accounts SET locked_by=NULL, locked_until=NULL "
+                "WHERE locked_by IS NOT NULL AND ("
+                "  (locked_until IS NOT NULL AND locked_until < datetime('now')) OR "
+                "  (locked_at IS NOT NULL AND locked_at < datetime('now', '-4 hours'))"
+                ")"
+            )
+            con.commit()
+        except Exception:
+            pass
         rows = [dict(r) for r in con.execute("SELECT * FROM accounts").fetchall()]
         window_map: Dict[str, Dict[str, Any]] = {}
         decline_map: Dict[str, int] = {}
@@ -1073,9 +1112,10 @@ async def run_auto_mission(
                 cand = [_normalize_pipe_to_3part(p) for p in cand]
                 cand = list(dict.fromkeys(cand))
                 email_lower = (email or "").strip().lower()
+                planned_pipe = _normalize_pipe_to_3part(acc.get("card_pipe")) if acc.get("card_pipe") else None
                 cand = [
                     p for p in cand
-                    if not _is_card_retired(p) and married_card_owners.get(_extract_card_number(p), email_lower) == email_lower
+                    if not _is_card_retired(p) and (p == planned_pipe or married_card_owners.get(_extract_card_number(p), email_lower) == email_lower)
                 ]
                 if not cand:
                     logger.info(f"⚠️ Sin tarjetas candidatas activas para {email}")
@@ -1114,10 +1154,9 @@ async def run_auto_mission(
                 for a in accounts_state:
                     if a["done"]:
                         continue
-                    a_email_lower = (a["email"] or "").strip().lower()
                     a["candidates"] = [
                         p for p in a["candidates"]
-                        if not _is_card_retired(p) and married_card_owners.get(_extract_card_number(p), a_email_lower) == a_email_lower
+                        if not _is_card_retired(p)
                     ]
                     if not a["candidates"] or a["declines"] >= MM_MAX_ACCOUNT_DECLINES_PER_RUN:
                         a["done"] = True
@@ -1141,20 +1180,26 @@ async def run_auto_mission(
                                     if backup_plan and backup_plan.get("feasible"):
                                         for b_acc in backup_plan.get("accounts", []):
                                             b_email = b_acc.get("email")
-                                            is_quality = b_acc.get("grade") in ("A+", "A") or b_acc.get("kyc_verified") == 1
-                                            if not is_quality or b_email in already_checked_emails:
-                                                continue
                                             b_id = b_acc.get("id")
                                             b_acct = _fetch_account(b_id)
                                             if not b_acct:
                                                 continue
+                                            # Gate KYC y calidad obligatorio en respaldo dinámico
+                                            is_kyc_ok = b_acc.get("kyc_verified") in (1, "1", True) or b_acct.get("kyc_verified") in (1, "1", True)
+                                            is_dead = b_acc.get("dead_reason") or b_acct.get("dead_reason") or b_acct.get("dead_at")
+                                            if not is_kyc_ok or is_dead or b_email in already_checked_emails:
+                                                logger.info(f"➖ CUENTA DE RESPALDO SALTADA (kyc≠1 o dead) | {b_email}")
+                                                continue
+                                            is_quality = (b_acc.get("grade") or b_acct.get("grade") or "").upper() in ("A+", "A", "B")
+                                            if not is_quality:
+                                                continue
                                             b_cands = [p for p in [b_acc.get("card_pipe"), *card_pipes] if p]
                                             b_cands = [_normalize_pipe_to_3part(p) for p in b_cands]
                                             b_cands = list(dict.fromkeys(b_cands))
-                                            b_email_lower = (b_email or "").strip().lower()
+                                            b_planned_pipe = _normalize_pipe_to_3part(b_acc.get("card_pipe")) if b_acc.get("card_pipe") else None
                                             b_cands = [
                                                 p for p in b_cands
-                                                if not _is_card_retired(p) and married_card_owners.get(_extract_card_number(p), b_email_lower) == b_email_lower
+                                                if not _is_card_retired(p) and (p == b_planned_pipe or married_card_owners.get(_extract_card_number(p), b_email_lower) == b_email_lower)
                                             ]
                                             if not b_cands:
                                                 continue
@@ -1363,8 +1408,8 @@ async def run_auto_mission(
                             from app import db as _dash_db
                             with _dash_db() as c:
                                 c.execute(
-                                    "UPDATE accounts SET dead_reason='IsUserInValidationProcess', dead_at=? WHERE email=?",
-                                    (datetime.utcnow().isoformat(), email),
+                                    "UPDATE accounts SET dead_reason='IsUserInValidationProcess', dead_at=?, kyc_verified=0 WHERE email=?",
+                                    (datetime.now(timezone.utc).isoformat(), email),
                                 )
                         except Exception as e:
                             logger.warning(f"[Auto {mission_id}] No se pudo marcar dead_reason para {email}: {e}")

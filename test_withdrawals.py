@@ -804,3 +804,147 @@ def test_execute_withdrawal_persists_institution_bug2(monkeypatch, seed_db):
     con.close()
     assert row[0] == "INBURSA"
     assert row[1] == 1
+
+
+def test_resolve_status_processing_5_persists_full(mock_bmx_transport, monkeypatch):
+    """PASO4 retorna None → PASO5 retorna status=5 (En proceso) → out.status=pending, persiste status_api=5."""
+    persisted = []
+    monkeypatch.setattr(
+        wd,
+        "_persist_wd_status",
+        lambda tx_id, status_api, gateway=None, last_mod=None, full=False: persisted.append(
+            {"tx_id": tx_id, "status_api": status_api, "gateway": gateway, "full": full}
+        ),
+    )
+
+    def handler(request):
+        url = str(request.url)
+        if "PendingWithdrawal" in url:
+            return _json_response(200, {"id": None})
+        if "Transactions/ByUser" in url:
+            return _txlist_response(
+                [
+                    {
+                        "id": "tx-proc-5",
+                        "status": 5,
+                        "gateway": 2,
+                        "lastAccountDigits": "5646",
+                        "date": "2026-08-19T03:30:04",
+                    }
+                ]
+            )
+        return httpx.Response(404, text="not found")
+
+    transport, _ = mock_bmx_transport(handler)
+    out = asyncio.run(
+        wd.resolve_withdrawal_status(
+            jwt="JWT",
+            proxy_url=None,
+            tx_id="tx-proc-5",
+            expected_digits="5646",
+            prev_status_api=None,
+            transport=transport,
+        )
+    )
+    assert out["status"] == "pending"
+    assert out["phase"] == "processing"
+    assert out["transactionStatus"] == 5
+    assert len(persisted) == 1
+    assert persisted[0]["status_api"] == 5
+    assert persisted[0]["gateway"] == 2
+    assert persisted[0]["full"] is True
+
+
+def test_resolve_status_failed_negative_persists_full(mock_bmx_transport, monkeypatch):
+    """PASO4 retorna None → PASO5 retorna status=-4 (Rechazado) → out.status=failed, out.phase=failed."""
+    persisted = []
+    monkeypatch.setattr(
+        wd,
+        "_persist_wd_status",
+        lambda tx_id, status_api, gateway=None, last_mod=None, full=False: persisted.append(
+            {"tx_id": tx_id, "status_api": status_api, "gateway": gateway, "full": full}
+        ),
+    )
+
+    def handler(request):
+        url = str(request.url)
+        if "PendingWithdrawal" in url:
+            return _json_response(200, {"id": None})
+        if "Transactions/ByUser" in url:
+            return _txlist_response(
+                [
+                    {
+                        "id": "tx-fail-4",
+                        "status": -4,
+                        "gateway": 2,
+                        "lastAccountDigits": "5646",
+                        "date": "2026-08-19T04:00:00",
+                    }
+                ]
+            )
+        return httpx.Response(404, text="not found")
+
+    transport, _ = mock_bmx_transport(handler)
+    out = asyncio.run(
+        wd.resolve_withdrawal_status(
+            jwt="JWT",
+            proxy_url=None,
+            tx_id="tx-fail-4",
+            expected_digits="5646",
+            prev_status_api=None,
+            transport=transport,
+        )
+    )
+    assert out["status"] == "failed"
+    assert out["phase"] == "failed"
+    assert out["transactionStatus"] == -4
+    assert len(persisted) == 1
+    assert persisted[0]["status_api"] == -4
+    assert persisted[0]["full"] is True
+
+
+def test_resolve_card_refund_gateway_1(mock_bmx_transport, monkeypatch):
+    """PASO5 retorna gateway=1 (Tarjeta) → out.alerts.gatewayMismatch=True y descripción de reembolso."""
+    persisted = []
+    monkeypatch.setattr(
+        wd,
+        "_persist_wd_status",
+        lambda tx_id, status_api, gateway=None, last_mod=None, full=False: persisted.append(
+            {"tx_id": tx_id, "status_api": status_api, "gateway": gateway, "full": full}
+        ),
+    )
+
+    def handler(request):
+        url = str(request.url)
+        if "PendingWithdrawal" in url:
+            return _json_response(200, {"id": None})
+        if "Transactions/ByUser" in url:
+            return _txlist_response(
+                [
+                    {
+                        "id": "tx-card-refund",
+                        "status": 6,
+                        "gateway": 1,
+                        "lastAccountDigits": "",
+                        "date": "2026-08-19T03:30:00",
+                    }
+                ]
+            )
+        return httpx.Response(404, text="not found")
+
+    transport, _ = mock_bmx_transport(handler)
+    out = asyncio.run(
+        wd.resolve_withdrawal_status(
+            jwt="JWT",
+            proxy_url=None,
+            tx_id="tx-card-refund",
+            expected_digits="5646",
+            prev_status_api=None,
+            transport=transport,
+        )
+    )
+    assert out["status"] == "successful"
+    assert out["alerts"]["gatewayMismatch"] is True
+    assert "reembolso a tarjeta" in out["description"].lower()
+    assert len(persisted) == 1
+    assert persisted[0]["gateway"] == 1

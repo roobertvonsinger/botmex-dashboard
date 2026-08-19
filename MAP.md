@@ -97,8 +97,8 @@ prewarm.py (router)
 <!-- GEN:start:modulos -->
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
-| `account_refresh.py` | 577 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5286 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `account_refresh.py` | 585 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
+| `app.py` | 5309 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1725 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -159,13 +159,13 @@ prewarm.py (router)
 | `test_sse_visibility.py` | 88 | `—` | _[completar]_ |
 | `test_unificacion_sp1.py` | 52 | `—` | _[completar]_ |
 | `test_unificacion_sp2.py` | 71 | `—` | _[completar]_ |
-| `test_withdrawals.py` | 806 | `—` | _[completar]_ |
+| `test_withdrawals.py` | 950 | `—` | _[completar]_ |
 | `test_withdrawals_endpoints.py` | 627 | `—` | _[completar]_ |
 | `test_withdrawals_migrate.py` | 46 | `—` | _[completar]_ |
 | `web_auth.py` | 159 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
 | `web_grading.py` | 197 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
 | `web_utils.py` | 265 | `betmexico.web.utils` | Helpers compartidos: _friendly_error, _normalize_ccexp, _build_proxy_url |
-| `withdrawals.py` | 928 | `betmexico.dashboard.withdrawals` | Retiro automático vía API BetMexico (5 pasos). `execute_withdrawal` orquesta PASO0-3. `_refresh_account_after_withdrawal` refresca saldo post-retiro reusando JWT |
+| `withdrawals.py` | 968 | `betmexico.dashboard.withdrawals` | Retiro automático vía API BetMexico (5 pasos). `execute_withdrawal` orquesta PASO0-3. `_refresh_account_after_withdrawal` refresca saldo post-retiro reusando JWT |
 <!-- GEN:end:modulos -->
 
 ---
@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `66b44b0` | fix(bot): caption overflow kills /bet entry from /start photo menu — fallback to delete+send for text >1024 chars |
 | `41fa58b` | fix(auto_deposit): exclusion dura para cuentas con saldo real, retiro activo o actividad SPEI/retiros <48h |
 | `fe1f154` | feat: integrar modulos del bot y soporte db canonical para auto_deposit en produccion |
 | `cf8800e` | fix(auto-deposit): blindaje E2E /bet, retiro de tarjetas por PAN, fix portal JS y confirm_gate Telegram |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `d85c975` | feat(bot): /bet confirma antes del auto match, separa toleradas y ofrece segundo intento (RF4/RF7/RF8) |
 | `6cee146` | feat(auto_deposit): seleccion dinamica por actividad + disposicion por tier 40/40/20 (RF4/RF5) |
 | `98b9059` | feat(card_checker): bridge ruthopia HTTP (POST /api/rw/check) + tolerancias de pase en precheck (RF1/RF3) |
-| `dcd023d` | feat(agents): suite superpowers adaptada a opencode + comandos Smartplan/Smartexe |
 <!-- GEN:end:recientes -->
 
 ---

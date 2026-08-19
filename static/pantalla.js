@@ -493,19 +493,23 @@
   // Convierte la fila cruda de account_withdrawals (último retiro conocido,
   // servido por /details) al mismo shape que devuelve GET /withdraw/status —
   // pinta algo de inmediato al reabrir La Pantalla, antes de que el poll fresco
-  // confirme el estado real (nunca inventa alerts: quedan en false hasta refetch).
+  // confirme el estado real (detecta gatewayMismatch si gateway==1).
   function _wdStatusFromRow(row) {
     if (!row) return null;
     let status;
     if (row.status_api === 6) status = 'completed';
     else if (row.status_api != null && row.status_api < 0) status = 'failed';
+    else if (row.status_api != null && row.status_api > 0) status = 'pending';
     else status = 'idle';
+    const isCardRefund = row.gateway === 1;
+    const digitsMismatch = Boolean(row.account_digits && row.actual_digits && String(row.actual_digits).slice(-4) !== String(row.account_digits).slice(-4));
     return {
       transactionId: row.transaction_id, reference: row.reference, amount: row.amount,
-      accountDigits: row.account_digits, transactionStatus: row.status_api,
+      accountDigits: row.account_digits, institutionName: row.institution_name,
+      transactionStatus: row.status_api,
       gateway: row.gateway, lastModifiedUtc: row.last_modified_utc,
       status, phase: status,
-      alerts: { gatewayMismatch: false, digitsMismatch: false },
+      alerts: { gatewayMismatch: isCardRefund, digitsMismatch: digitsMismatch },
     };
   }
 
@@ -514,18 +518,31 @@
     const g = window.esc || (s => s);
     const money = window.fmtMoney || (v => `$${(v || 0).toFixed(2)}`);
     const ref = st.reference ? g(st.reference) : '';
+    const isCard = st.gateway === 1 || (st.alerts && st.alerts.gatewayMismatch);
     let line;
     if (st.status === 'successful' || st.status === 'completed') {
-      line = `<span class="pat-wd-line pat-wd-ok"><i class="ph-bold ph-check-circle"></i> BetMexico procesó el retiro${ref ? ` (ref ${ref})` : ''}. Confirma en tu banco.</span>`;
+      if (isCard) {
+        line = `<span class="pat-wd-line pat-wd-warn"><i class="ph-bold ph-credit-card"></i> Retiro procesado como REEMBOLSO A TARJETA${ref ? ` (ref ${ref})` : ''}. (Se reflejará en el plástico que depositó).</span>`;
+      } else {
+        const dest = st.institutionName ? ` a ${g(st.institutionName)}` : '';
+        const digs = st.accountDigits ? ` (···${g(st.accountDigits)})` : '';
+        line = `<span class="pat-wd-line pat-wd-ok"><i class="ph-bold ph-check-circle"></i> BetMexico procesó el retiro SPEI${dest}${digs}${ref ? ` (ref ${ref})` : ''}. Confirma en tu banco.</span>`;
+      }
     } else if (st.status === 'failed') {
-      line = `<span class="pat-wd-line pat-wd-fail"><i class="ph-bold ph-x-circle"></i> Retiro fallido${ref ? ` (ref ${ref})` : ''}.</span>`;
+      line = `<span class="pat-wd-line pat-wd-fail"><i class="ph-bold ph-x-circle"></i> Retiro fallido / rechazado${ref ? ` (ref ${ref})` : ''}.</span>`;
     } else {
-      line = `<span class="pat-wd-line"><span class="dep-spinner"></span> Retiro en proceso${ref ? ` (ref ${ref})` : ''}…</span>`;
+      if (isCard) {
+        line = `<span class="pat-wd-line"><span class="dep-spinner"></span> Reembolso a Tarjeta en proceso${ref ? ` (ref ${ref})` : ''}…</span>`;
+      } else {
+        const dest = st.institutionName ? ` a ${g(st.institutionName)}` : '';
+        const digs = st.accountDigits ? ` (···${g(st.accountDigits)})` : '';
+        line = `<span class="pat-wd-line"><span class="dep-spinner"></span> Retiro SPEI en proceso${dest}${digs}${ref ? ` (ref ${ref})` : ''}…</span>`;
+      }
     }
     const alerts = st.alerts || {};
     let alertHtml = '';
     if (alerts.gatewayMismatch) {
-      alertHtml += `<div class="pat-wd-alert">⚠️ BetMexico mandó el retiro a TARJETA, no a SPEI.</div>`;
+      alertHtml += `<div class="pat-wd-alert">⚠️ BetMexico desvió el retiro a REEMBOLSO DE TARJETA, no a la CLABE SPEI.</div>`;
     }
     if (alerts.digitsMismatch) {
       alertHtml += `<div class="pat-wd-alert">⚠️ El retiro fue a dígitos distintos a la cuenta esperada (${g(st.accountDigits || '?')}).</div>`;

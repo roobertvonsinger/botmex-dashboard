@@ -16,6 +16,7 @@ def _row(email, **kw):
     r = {
         "id": None, "email": email, "status": "LIVE", "grade": "A",
         "grade_score": 50, "balance_total": 0.0, "balance_real": 0.0, "published_to_pool": 1,
+        "kyc_verified": 1,
         "locked_by": None, "cooldown_until": None,
         "jwt_expires_at": int(time.time()) + 3600,
     }
@@ -28,6 +29,12 @@ def _win(*emails, available=2000.0):
 
 
 # ── B1 — select_accounts_for_auto ────────────────────────────────────────────
+def test_select_filters_unverified_kyc():
+    rows = [_row("live_kyc@t.com", kyc_verified=1), _row("nokyc@t.com", kyc_verified=0), _row("nonekyc@t.com", kyc_verified=None)]
+    sel = select_accounts_for_auto(rows, 150, 9, _win("live_kyc@t.com", "nokyc@t.com", "nonekyc@t.com"))
+    assert [r["email"] for r in sel] == ["live_kyc@t.com"]
+
+
 def test_select_filters_dead_accounts():
     rows = [_row("live@t.com"), _row("dead@t.com", status="DEAD")]
     sel = select_accounts_for_auto(rows, 150, 9, _win("live@t.com", "dead@t.com"))
@@ -145,14 +152,14 @@ def test_select_ignores_decline_map_when_absent():
 
 
 # ── B3 — plan_auto_mission (BD temporal vía fixture seed_db) ─────────────────
-def _add_account(db_path, email, grade="A", grade_score=50, balance=0.0):
+def _add_account(db_path, email, grade="A", grade_score=50, balance=0.0, kyc_verified=1):
     con = sqlite3.connect(str(db_path))
     try:
         con.execute(
             "INSERT INTO accounts (email,password,balance_total,balance_real,status,grade,grade_score,"
-            "published_to_pool,cooldown_until,jwt_expires_at,first_checked_at,last_checked_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-            (email, "x", balance, balance, "LIVE", grade, grade_score, 1, None,
+            "kyc_verified,published_to_pool,cooldown_until,jwt_expires_at,first_checked_at,last_checked_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (email, "x", balance, balance, "LIVE", grade, grade_score, kyc_verified, 1, None,
              int(time.time()) + 3600, "2026-07-01 00:00:00", "2026-07-01 00:00:00"))
         con.commit()
     finally:

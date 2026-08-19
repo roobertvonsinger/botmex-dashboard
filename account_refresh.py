@@ -528,12 +528,15 @@ async def _resolve_pending_withdrawals() -> Dict[str, Any]:
 
         stats["resolved"] += 1
         new_status_api = out.get("transactionStatus")
-        new_terminal = new_status_api in _WD_TERMINAL or out.get("status") in (
-            "successful",
-            "completed",
-            "failed",
+        new_terminal = (
+            new_status_api in _WD_TERMINAL
+            or (new_status_api is not None and new_status_api < 0)
+            or out.get("status") in ("successful", "completed", "failed")
         )
-        was_terminal = row["status_api"] in _WD_TERMINAL
+        was_terminal = (
+            row["status_api"] in _WD_TERMINAL
+            or (row["status_api"] is not None and row["status_api"] < 0)
+        )
         if new_terminal and not was_terminal:
             stats["terminal"] += 1
             try:
@@ -548,7 +551,12 @@ async def _resolve_pending_withdrawals() -> Dict[str, Any]:
                         "id": row["account_id"],
                         "transactionId": row["transaction_id"],
                         "status": out["status"],
+                        "transactionStatus": out.get("transactionStatus"),
+                        "gateway": out.get("gateway"),
+                        "alerts": out.get("alerts"),
                         "amount": row["amount"],
+                        "account_digits": row.get("account_digits"),
+                        "institution_name": row.get("institution_name"),
                     }
                 )
             except Exception:

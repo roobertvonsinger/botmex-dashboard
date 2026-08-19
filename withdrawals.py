@@ -453,7 +453,11 @@ async def resolve_withdrawal_status(
                     bank_tx = None
             out["status"] = "successful"
             out["phase"] = "executed"
-            out["description"] = "Ejecutado por BetMexico — confirma en tu banco"
+            out["description"] = (
+                "Ejecutado por BetMexico — confirma en tu banco"
+                if (bank_tx is None or bank_tx.get("gateway") != 1)
+                else "Procesado por BetMexico como reembolso a tarjeta"
+            )
             if bank_tx is not None:
                 out["lastModifiedUtc"] = bank_tx.get("lastModifiedUtc")
                 out["gateway"] = bank_tx.get("gateway")
@@ -468,11 +472,19 @@ async def resolve_withdrawal_status(
                 )
             else:
                 _persist_wd_status(tx_id, status_api)
+        elif status_api is not None and status_api < 0:
+            out["status"] = "failed"
+            out["phase"] = "failed"
+            out["description"] = (
+                pending.get("transactionStatusDescription") or "Retiro rechazado por BetMexico"
+            )
+            _persist_wd_status(tx_id, status_api)
         else:
             out["status"] = "pending"
-            out["phase"] = "pending"
+            out["phase"] = "processing" if status_api == 5 else "pending"
             out["description"] = (
-                pending.get("transactionStatusDescription") or "Pendiente"
+                pending.get("transactionStatusDescription")
+                or ("En dispersión / proceso por BetMexico" if status_api == 5 else "Pendiente")
             )
             _persist_wd_status(tx_id, status_api)
     elif prev_status_api == 6:
@@ -481,12 +493,14 @@ async def resolve_withdrawal_status(
         out["transactionStatus"] = prev_status_api
         out["lastModifiedUtc"] = prev_last_modified
         out["gateway"] = prev_gateway
+        out["alerts"]["gatewayMismatch"] = bool(prev_gateway == 1)
     elif prev_status_api is not None and prev_status_api < 0:
         out["status"] = "failed"
         out["phase"] = "failed"
         out["transactionStatus"] = prev_status_api
         out["lastModifiedUtc"] = prev_last_modified
         out["gateway"] = prev_gateway
+        out["alerts"]["gatewayMismatch"] = bool(prev_gateway == 1)
     else:
         # Root cause (2026-07-26, medido con tx real 232b8814...): BetMexico saca
         # el retiro de PendingWithdrawal (PASO4→None) en cuanto se resuelve — MUCHO
@@ -509,30 +523,55 @@ async def resolve_withdrawal_status(
                 )
             except Exception:
                 bank_tx = None
-        if bank_tx is not None and bank_tx.get("transactionStatus") == 6:
-            out["status"] = "successful"
-            out["phase"] = "executed"
-            out["description"] = "Ejecutado por BetMexico — confirma en tu banco"
-            out["transactionStatus"] = 6
+        if bank_tx is not None:
+            tx_stat = bank_tx.get("transactionStatus")
+            out["transactionStatus"] = tx_stat
             out["lastModifiedUtc"] = bank_tx.get("lastModifiedUtc")
             out["gateway"] = bank_tx.get("gateway")
             out["alerts"]["gatewayMismatch"] = bool(bank_tx.get("gateway_mismatch"))
             out["alerts"]["digitsMismatch"] = bool(bank_tx.get("digits_mismatch"))
-            _persist_wd_status(
-                tx_id,
-                6,
-                bank_tx.get("gateway"),
-                bank_tx.get("lastModifiedUtc"),
-                full=True,
-            )
-        elif bank_tx is not None:
-            # El rail respondió pero sin status 6 — reporta lo que dice, no lo
-            # pisamos con un valor inventado.
-            out["status"] = "pending"
-            out["phase"] = "pending"
-            out["transactionStatus"] = bank_tx.get("transactionStatus")
-            out["lastModifiedUtc"] = bank_tx.get("lastModifiedUtc")
-            out["gateway"] = bank_tx.get("gateway")
+
+            if tx_stat == 6:
+                out["status"] = "successful"
+                out["phase"] = "executed"
+                out["description"] = (
+                    "Ejecutado por BetMexico — confirma en tu banco"
+                    if bank_tx.get("gateway") != 1
+                    else "Procesado por BetMexico como reembolso a tarjeta"
+                )
+                _persist_wd_status(
+                    tx_id,
+                    6,
+                    bank_tx.get("gateway"),
+                    bank_tx.get("lastModifiedUtc"),
+                    full=True,
+                )
+            elif tx_stat is not None and tx_stat < 0:
+                out["status"] = "failed"
+                out["phase"] = "failed"
+                out["description"] = "Retiro rechazado/fallido por BetMexico"
+                _persist_wd_status(
+                    tx_id,
+                    tx_stat,
+                    bank_tx.get("gateway"),
+                    bank_tx.get("lastModifiedUtc"),
+                    full=True,
+                )
+            else:
+                out["status"] = "pending"
+                out["phase"] = "processing" if tx_stat == 5 else "pending"
+                out["description"] = (
+                    "En dispersión / proceso por BetMexico"
+                    if tx_stat == 5
+                    else "Pendiente por BetMexico"
+                )
+                _persist_wd_status(
+                    tx_id,
+                    tx_stat,
+                    bank_tx.get("gateway"),
+                    bank_tx.get("lastModifiedUtc"),
+                    full=True,
+                )
         else:
             # Ni PASO4 ni PASO5 confirman nada ahora mismo — de verdad desconocido,
             # NO se disfraza de completado ni de fallido sin evidencia. El próximo
@@ -542,6 +581,7 @@ async def resolve_withdrawal_status(
             out["transactionStatus"] = prev_status_api
             out["lastModifiedUtc"] = prev_last_modified
             out["gateway"] = prev_gateway
+            out["alerts"]["gatewayMismatch"] = bool(prev_gateway == 1)
 
     return out
 

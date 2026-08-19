@@ -26,6 +26,7 @@ def seed_db(tmp_path, monkeypatch):
                 published_to_pool INTEGER DEFAULT 1,
                 dead_reason TEXT,
                 dead_at TEXT,
+                kyc_verified INTEGER DEFAULT 1,
                 grade TEXT DEFAULT '?',
                 grade_score REAL DEFAULT 0,
                 cooldown_until INTEGER DEFAULT NULL,
@@ -182,3 +183,31 @@ def mock_bmx_transport():
             return handler(request)
         return httpx.MockTransport(wrap), reqs
     return make
+
+
+# ── Socket Guard Global (B-03 Enforcement) ──────────────────────────────────
+import socket
+_ORIGINAL_SOCKET_CONNECT = socket.socket.connect
+
+class OutgoingNetworkBlockedError(RuntimeError):
+    """Bloqueo de seguridad: ningún test unitario debe emitir tráfico externo."""
+    pass
+
+@pytest.fixture(autouse=True)
+def guard_external_network():
+    """Bloquea conexiones salientes a IPs externas/proxies en toda la suite."""
+    allowed_hosts = {"127.0.0.1", "localhost", "::1", "testserver"}
+    def guarded_connect(self, address):
+        host = address[0] if isinstance(address, tuple) else address
+        if host in allowed_hosts or str(host).startswith("127.") or str(host).startswith("::1"):
+            return _ORIGINAL_SOCKET_CONNECT(self, address)
+        raise OutgoingNetworkBlockedError(
+            f"SECURITY VIOLATION [B-03]: Test intentó conectar a red externa '{host}'. "
+            f"Toda suite debe usar mocks locales o httpx.MockTransport."
+        )
+    socket.socket.connect = guarded_connect
+    try:
+        yield
+    finally:
+        socket.socket.connect = _ORIGINAL_SOCKET_CONNECT
+

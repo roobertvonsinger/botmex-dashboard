@@ -138,6 +138,36 @@ def test_spei_or_funds_excluded_from_auto_mission(tmp_path):
     assert "clean_acc@test.com" in emails
 
 
+def test_gate_duro_kyc_verified(tmp_path):
+    """Cuentas con kyc_verified != 1 quedan totalmente excluidas."""
+    rows = [
+        {"id": 1, "email": "nokyc@test.com", "status": "LIVE", "published_to_pool": 1, "kyc_verified": 0, "grade": "A"},
+        {"id": 2, "email": "unverified@test.com", "status": "LIVE", "published_to_pool": 1, "kyc_verified": None, "grade": "A"},
+        {"id": 3, "email": "okkyc@test.com", "status": "LIVE", "published_to_pool": 1, "kyc_verified": 1, "grade": "A"},
+    ]
+    win = {r["email"]: {"available": 2000.0} for r in rows}
+    sel = ad.select_accounts_for_auto(rows, 150, 5, win)
+    sel_emails = [r["email"] for r in sel]
+    assert "nokyc@test.com" not in sel_emails
+    assert "unverified@test.com" not in sel_emails
+    assert "okkyc@test.com" in sel_emails
+
+
+def test_gate_duro_dead_reason(tmp_path):
+    """Cuentas con dead_reason o dead_at quedan totalmente excluidas."""
+    rows = [
+        {"id": 1, "email": "dead_reason@test.com", "status": "LIVE", "published_to_pool": 1, "kyc_verified": 1, "dead_reason": "IsUserInValidationProcess", "grade": "A"},
+        {"id": 2, "email": "dead_at@test.com", "status": "LIVE", "published_to_pool": 1, "kyc_verified": 1, "dead_at": "2026-08-18 01:00:00", "grade": "A"},
+        {"id": 3, "email": "alive@test.com", "status": "LIVE", "published_to_pool": 1, "kyc_verified": 1, "grade": "A"},
+    ]
+    win = {r["email"]: {"available": 2000.0} for r in rows}
+    sel = ad.select_accounts_for_auto(rows, 150, 5, win)
+    sel_emails = [r["email"] for r in sel]
+    assert "dead_reason@test.com" not in sel_emails
+    assert "dead_at@test.com" not in sel_emails
+    assert "alive@test.com" in sel_emails
+
+
 def test_accounts_with_real_funds_excluded(tmp_path):
     """Cuentas con saldo real o total >= $10.0 quedan TOTALMENTE EXCLUIDAS del auto-match."""
     db = _make_db(tmp_path)
@@ -150,8 +180,8 @@ def test_accounts_with_real_funds_excluded(tmp_path):
 
     # Simulamos rows con balance_real
     rows = [
-        {"id": 1, "email": "rich_acc@test.com", "status": "LIVE", "published_to_pool": 1, "balance_real": 598.49, "grade": "A"},
-        {"id": 2, "email": "empty_acc@test.com", "status": "LIVE", "published_to_pool": 1, "balance_real": 0.0, "grade": "A"},
+        {"id": 1, "email": "rich_acc@test.com", "status": "LIVE", "published_to_pool": 1, "balance_real": 598.49, "grade": "A", "kyc_verified": 1},
+        {"id": 2, "email": "empty_acc@test.com", "status": "LIVE", "published_to_pool": 1, "balance_real": 0.0, "grade": "A", "kyc_verified": 1},
     ]
     win = {"rich_acc@test.com": {"available": 2000.0}, "empty_acc@test.com": {"available": 2000.0}}
     sel = ad.select_accounts_for_auto(rows, 150, 5, win)
@@ -163,9 +193,9 @@ def test_accounts_with_real_funds_excluded(tmp_path):
 def test_accounts_withdrawal_ready_or_grade_d_excluded(tmp_path):
     """Cuentas con withdrawal_ready=1 o grado D quedan TOTALMENTE EXCLUIDAS."""
     rows = [
-        {"id": 1, "email": "with_acc@test.com", "status": "LIVE", "published_to_pool": 1, "withdrawal_ready": 1, "grade": "A"},
-        {"id": 2, "email": "grade_d@test.com", "status": "LIVE", "published_to_pool": 1, "grade": "D"},
-        {"id": 3, "email": "ok_acc@test.com", "status": "LIVE", "published_to_pool": 1, "grade": "A"},
+        {"id": 1, "email": "with_acc@test.com", "status": "LIVE", "published_to_pool": 1, "withdrawal_ready": 1, "grade": "A", "kyc_verified": 1},
+        {"id": 2, "email": "grade_d@test.com", "status": "LIVE", "published_to_pool": 1, "grade": "D", "kyc_verified": 1},
+        {"id": 3, "email": "ok_acc@test.com", "status": "LIVE", "published_to_pool": 1, "grade": "A", "kyc_verified": 1},
     ]
     win = {r["email"]: {"available": 2000.0} for r in rows}
     sel = ad.select_accounts_for_auto(rows, 150, 5, win)

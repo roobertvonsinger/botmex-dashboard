@@ -3485,8 +3485,19 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                 kind = "withdrawal" if is_wd else "deposit"
                 gw = t.get("gateway")
                 if is_wd:
-                    state = "wd"
-                    method_label = "TARJETA" if gw == 1 else spei_default_label
+                    s = t.get("status")
+                    if s == 6:
+                        state = "wd"
+                    elif s is not None and s < 0:
+                        state = "fail"
+                    else:
+                        state = "pending"
+                    if gw == 1:
+                        method_label = "REEMBOLSO TARJETA"
+                    elif gw == 2:
+                        method_label = spei_default_label
+                    else:
+                        method_label = "RETIRO"
                 else:
                     s = t.get("status")
                     if s == 6:
@@ -3842,15 +3853,27 @@ async def withdraw_status(account_id: int, tx_id: str, user: dict = Depends(requ
     # otros clientes/tabs/feed vean el cambio sin tener que hacer poll.
     _WD_TERMINAL = {6}  # status_api 6 = ejecutado
     new_status_api = out.get("transactionStatus")
-    new_terminal = new_status_api in _WD_TERMINAL or out.get("status") in ("successful", "completed", "failed")
-    was_terminal = row["status_api"] in _WD_TERMINAL
+    new_terminal = (
+        new_status_api in _WD_TERMINAL
+        or (new_status_api is not None and new_status_api < 0)
+        or out.get("status") in ("successful", "completed", "failed")
+    )
+    was_terminal = (
+        row["status_api"] in _WD_TERMINAL
+        or (row["status_api"] is not None and row["status_api"] < 0)
+    )
     if new_terminal and not was_terminal:
         _broadcast({
             "type": "activity", "kind": "withdrawal_status",
             "ts": datetime.now(timezone.utc).isoformat(),
             "target": row["account_email"], "id": account_id,
             "transactionId": tx_id, "status": out["status"],
+            "transactionStatus": out.get("transactionStatus"),
+            "gateway": out.get("gateway"),
+            "alerts": out.get("alerts"),
             "amount": row["amount"],
+            "account_digits": row["account_digits"],
+            "institution_name": row["institution_name"],
         })
 
     return out
