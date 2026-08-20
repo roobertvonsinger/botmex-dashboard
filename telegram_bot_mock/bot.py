@@ -82,9 +82,27 @@ from withdrawals import (
     JwtExpired,
 )
 from bin_intelligence import (
+    format_telegram_start_banner,
+    format_telegram_bet_warning,
+    format_telegram_radar_full,
+    get_single_card_bin_badge,
     fetch_operator_personal_stats,
     format_telegram_operator_stats,
 )
+
+# Frases de saludo directas del operador
+POC_GREETINGS = [
+    "Hola,",
+    "Bienvenido,",
+    "Operador,",
+    "Listo pa' darle,",
+    "Firme ahí,",
+]
+
+
+def get_random_poc_greeting(nickname: str) -> str:
+    poc = random.choice(POC_GREETINGS)
+    return f"<b>{poc} {nickname}!</b> 👋"
 
 
 # Membrete Oficial BoTMexico
@@ -190,11 +208,15 @@ def _logo_path() -> Path:
 
 def _start_menu_msg(user_id: int, nickname: str):
     """Construye mensaje + teclado del menú principal (/start y 'Volver al inicio')."""
+    poc_saludo = get_random_poc_greeting(nickname)
+    start_banner = format_telegram_start_banner()
+    banner_section = f"\n\n{start_banner}" if start_banner else ""
     msg = (
         f"{HEADER}\n\n"
+        f"{poc_saludo}\n"
         f"• 👤 <b>Operador:</b> <code>{nickname}</code>\n"
         f"• 🆔 <b>ID:</b> <code>{user_id}</code>\n"
-        f"• 🌐 <b>Portal:</b> <code>botmexico.net</code>"
+        f"• 🌐 <b>Portal:</b> <code>botmexico.net</code>{banner_section}"
     )
     buttons = []
     if user_id in _active_operator_missions or user_id in _active_operator_withdrawals or user_id in _pending_spei_fundings:
@@ -204,6 +226,7 @@ def _start_menu_msg(user_id: int, nickname: str):
         [InlineKeyboardButton("💳 CC Auto-Match (/bet)", callback_data="btn_start_bet")],
         [InlineKeyboardButton("🔑 Check Combos (/check)", callback_data="btn_start_check")],
         [InlineKeyboardButton("📊 Mi Rendimiento", callback_data="btn_start_operator_stats")],
+        [InlineKeyboardButton("📡 Radar & Ranking de BINes", callback_data="btn_start_bin_radar")],
         [InlineKeyboardButton("❔ Manual & Ayuda", callback_data="btn_start_help")],
         [InlineKeyboardButton("🌐 Portal Web", url=DASHBOARD_URL)],
     ])
@@ -922,8 +945,10 @@ async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         raw_text = " ".join(args)
         return await process_bet_input(update, context, override_text=raw_text)
 
+    warning_box = format_telegram_bet_warning()
     msg = (
         f"{HEADER}\n\n"
+        f"{warning_box}\n\n"
         "💳 <b>Auto Depósito · CC Auto-Match (/bet)</b>\n\n"
         "Pega tus tarjetas en formato estándar:\n"
         "<code>4111111111111111|12|28|123</code>\n\n"
@@ -936,6 +961,7 @@ async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(
             [
+                [InlineKeyboardButton("📡 Ver Radar de BINes", callback_data="btn_start_bin_radar")],
                 [InlineKeyboardButton("🏠 Volver al inicio", callback_data="cancel_bet")],
             ]
         ),
