@@ -849,9 +849,20 @@ def _fetch_account(account_id: int) -> Optional[Dict[str, Any]]:
 
     with db() as c:
         row = c.execute(
-            "SELECT id, email, password FROM accounts WHERE id=?", (account_id,)
+            "SELECT * FROM accounts WHERE id=?", (account_id,)
         ).fetchone()
     return dict(row) if row else None
+
+
+def _is_account_dead(acct: Optional[Dict[str, Any]]) -> bool:
+    if not acct:
+        return False
+    st = str(acct.get("status") or "").strip().upper()
+    if st in ("DEAD", "BAN", "RATE_LIMITED", "RATE_LIMITED_PERMANENT"):
+        return True
+    if acct.get("dead_reason") or acct.get("dead_at"):
+        return True
+    return False
 
 
 def _unlock(account_id: int) -> None:
@@ -1108,6 +1119,10 @@ async def run_auto_mission(
                 acct = _fetch_account(aid)
                 if not acct:
                     continue
+                # Filtro estricto: Si la cuenta está muerta o bloqueada, no entra al ciclo
+                if _is_account_dead(acct) or _is_account_dead(acc):
+                    logger.warning(f"💀 Cuenta {email} descartada en inicio de misión (status={acct.get('status')}, dead_reason={acct.get('dead_reason')})")
+                    continue
                 cand = [p for p in [acc.get("card_pipe"), *card_pipes] if p]
                 cand = [_normalize_pipe_to_3part(p) for p in cand]
                 cand = list(dict.fromkeys(cand))
@@ -1179,53 +1194,53 @@ async def run_auto_mission(
                                     backup_plan = plan_auto_mission(DB_PATH, active_cards, amount, target_count, max_accounts=remaining)
                                     if backup_plan and backup_plan.get("feasible"):
                                         for b_acc in backup_plan.get("accounts", []):
-                                            b_email = b_acc.get("email")
-                                            b_id = b_acc.get("id")
-                                            b_acct = _fetch_account(b_id)
-                                            if not b_acct:
-                                                continue
-                                            # Gate KYC y calidad obligatorio en respaldo dinámico
-                                            is_kyc_ok = b_acc.get("kyc_verified") in (1, "1", True) or b_acct.get("kyc_verified") in (1, "1", True)
-                                            is_dead = b_acc.get("dead_reason") or b_acct.get("dead_reason") or b_acct.get("dead_at")
-                                            if not is_kyc_ok or is_dead or b_email in already_checked_emails:
-                                                logger.info(f"➖ CUENTA DE RESPALDO SALTADA (kyc≠1 o dead) | {b_email}")
-                                                continue
-                                            is_quality = (b_acc.get("grade") or b_acct.get("grade") or "").upper() in ("A+", "A", "B")
-                                            if not is_quality:
-                                                continue
-                                            b_cands = [p for p in [b_acc.get("card_pipe"), *card_pipes] if p]
-                                            b_cands = [_normalize_pipe_to_3part(p) for p in b_cands]
-                                            b_cands = list(dict.fromkeys(b_cands))
-                                            b_planned_pipe = _normalize_pipe_to_3part(b_acc.get("card_pipe")) if b_acc.get("card_pipe") else None
-                                            b_cands = [
-                                                p for p in b_cands
-                                                if not _is_card_retired(p) and (p == b_planned_pipe or married_card_owners.get(_extract_card_number(p), b_email_lower) == b_email_lower)
-                                            ]
-                                            if not b_cands:
-                                                continue
-                                            already_checked_emails.add(b_email)
-                                            accounts_state.append({
-                                                "id": b_id,
-                                                "email": b_email,
-                                                "acct": b_acct,
-                                                "grade": b_acc.get("grade") or b_acct.get("grade"),
-                                                "candidates": b_cands,
-                                                "declines": 0,
-                                                "cooldown_until": 0.0,
-                                                "locked": False,
-                                                "matched": False,
-                                                "done": False,
-                                            })
-                                            logger.info(f"➕ CUENTA DE RESPALDO AÑADIDA DINÁMICAMENTE | {b_email}")
-                                            _broadcast_mission(
-                                                mission_id,
-                                                "matching",
-                                                user,
-                                                on_progress=on_progress,
-                                                accounts=len(accounts_state),
-                                            )
-                                            if len(accounts_state) >= MAX_ACCOUNTS_HARD_CAP:
-                                                break
+                                             b_email = b_acc.get("email")
+                                             b_id = b_acc.get("id")
+                                             b_acct = _fetch_account(b_id)
+                                             if not b_acct:
+                                                 continue
+                                             # Gate KYC y calidad obligatorio en respaldo dinámico
+                                             is_kyc_ok = b_acc.get("kyc_verified") in (1, "1", True) or b_acct.get("kyc_verified") in (1, "1", True)
+                                             if not is_kyc_ok or _is_account_dead(b_acc) or _is_account_dead(b_acct) or b_email in already_checked_emails:
+                                                 logger.info(f"➖ CUENTA DE RESPALDO SALTADA (kyc≠1 o dead) | {b_email}")
+                                                 continue
+                                             is_quality = (b_acc.get("grade") or b_acct.get("grade") or "").upper() in ("A+", "A", "B")
+                                             if not is_quality:
+                                                 continue
+                                             b_cands = [p for p in [b_acc.get("card_pipe"), *card_pipes] if p]
+                                             b_cands = [_normalize_pipe_to_3part(p) for p in b_cands]
+                                             b_cands = list(dict.fromkeys(b_cands))
+                                             b_email_lower = (b_email or "").strip().lower()
+                                             b_planned_pipe = _normalize_pipe_to_3part(b_acc.get("card_pipe")) if b_acc.get("card_pipe") else None
+                                             b_cands = [
+                                                 p for p in b_cands
+                                                 if not _is_card_retired(p) and (p == b_planned_pipe or married_card_owners.get(_extract_card_number(p), b_email_lower) == b_email_lower)
+                                             ]
+                                             if not b_cands:
+                                                 continue
+                                             already_checked_emails.add(b_email)
+                                             accounts_state.append({
+                                                 "id": b_id,
+                                                 "email": b_email,
+                                                 "acct": b_acct,
+                                                 "grade": b_acc.get("grade") or b_acct.get("grade"),
+                                                 "candidates": b_cands,
+                                                 "declines": 0,
+                                                 "cooldown_until": 0.0,
+                                                 "locked": False,
+                                                 "matched": False,
+                                                 "done": False,
+                                             })
+                                             logger.info(f"➕ CUENTA DE RESPALDO AÑADIDA DINÁMICAMENTE | {b_email}")
+                                             _broadcast_mission(
+                                                 mission_id,
+                                                 "matching",
+                                                 user,
+                                                 on_progress=on_progress,
+                                                 accounts=len(accounts_state),
+                                             )
+                                             if len(accounts_state) >= MAX_ACCOUNTS_HARD_CAP:
+                                                 break
                         except Exception as ex_backup:
                             logger.warning(f"[Auto {mission_id}] No se pudieron buscar cuentas de respaldo: {ex_backup}")
 
@@ -1256,6 +1271,21 @@ async def run_auto_mission(
                 account_id = target["id"]
                 email = target["email"]
                 acct = target["acct"]
+
+                # Verificación fresca en BD antes de tocar la cuenta (anti-race condition)
+                fresh_acct = _fetch_account(account_id)
+                if fresh_acct:
+                    if _is_account_dead(fresh_acct):
+                        logger.warning(f"💀 CUENTA DETECTADA DEAD EN BD | {email} — descartando de inmediato sin intentar")
+                        target["done"] = True
+                        target["candidates"] = []
+                        if target["locked"]:
+                            _unlock(account_id)
+                            locked_ids.discard(account_id)
+                        continue
+                    acct = fresh_acct
+                    target["acct"] = fresh_acct
+
                 pipe = target["candidates"].pop(0)
                 norm_pipe = _normalize_pipe_to_3part(pipe)
 
@@ -1367,20 +1397,53 @@ async def run_auto_mission(
                         target["cooldown_until"] = _get_now() + dep.MM_COOLDOWN
                         break
 
-                    if code == "RATE_LIMITED":
-                        dep._mark_rate_limited_dead(email)
-                        _broadcast_mission(
-                            mission_id,
-                            "cooldown",
-                            user,
-                            on_progress=on_progress,
-                            email=email,
-                            reason="rate_limited",
-                        )
+                    # RATE_LIMITED, DEAD, BAN, KYC_PENDING o cualquier código de cuenta muerta
+                    if (
+                        code in ("RATE_LIMITED", "DEAD", "BAN", "RATE_LIMITED_PERMANENT", "KYC_PENDING")
+                        or code in dep.MM_DEAD_RC
+                        or r.get("account_dead")
+                        or "RATE_LIMITED" in str(r.get("error") or "")
+                        or "429" in str(r.get("error") or "")
+                    ):
+                        if code == "RATE_LIMITED" or "RATE_LIMITED" in str(r.get("error") or "") or "429" in str(r.get("error") or ""):
+                            dep._mark_rate_limited_dead(email)
+                        elif code == "KYC_PENDING":
+                            try:
+                                from app import db as _dash_db
+                                with _dash_db(write=True) as c:
+                                    c.execute(
+                                        "UPDATE accounts SET status='DEAD', dead_reason='IsUserInValidationProcess', dead_at=datetime('now'), kyc_verified=0 WHERE email=?",
+                                        (email,),
+                                    )
+                            except Exception as e:
+                                logger.warning(f"[Auto {mission_id}] No se pudo marcar dead_reason para {email}: {e}")
+                        else:
+                            try:
+                                from app import db as _appdb
+                                with _appdb(write=True) as cdb:
+                                    cdb.execute(
+                                        "UPDATE accounts SET status='DEAD', dead_reason=?, dead_at=datetime('now') "
+                                        "WHERE email=? AND status != 'DEAD'",
+                                        (r.get("error") or code, email)
+                                    )
+                            except Exception:
+                                pass
+                        failed += 1
+                        target["declines"] += 1
                         target["done"] = True
+                        target["candidates"] = []  # Eliminar inmediatamente todas las tarjetas restantes para esta cuenta
                         if target["locked"]:
                             _unlock(account_id)
                             locked_ids.discard(account_id)
+                        _broadcast_mission(
+                            mission_id,
+                            "cooldown" if (code == "RATE_LIMITED" or "429" in str(r.get("error") or "")) else "scheduling",
+                            user,
+                            on_progress=on_progress,
+                            email=email,
+                            reason="rate_limited" if (code == "RATE_LIMITED" or "429" in str(r.get("error") or "")) else "dead_account",
+                            aborted=code,
+                        )
                         break
 
                     if dep._mm_is_real_decline(code) or dep._mm_is_ambiguous_charge(code):
@@ -1398,33 +1461,6 @@ async def run_auto_mission(
                             if target["locked"] and not target["matched"]:
                                 _unlock(account_id)
                                 locked_ids.discard(account_id)
-                        break
-
-                    if code == "KYC_PENDING":
-                        failed += 1
-                        target["declines"] += 1
-                        target["done"] = True
-                        try:
-                            from app import db as _dash_db
-                            with _dash_db() as c:
-                                c.execute(
-                                    "UPDATE accounts SET dead_reason='IsUserInValidationProcess', dead_at=?, kyc_verified=0 WHERE email=?",
-                                    (datetime.now(timezone.utc).isoformat(), email),
-                                )
-                        except Exception as e:
-                            logger.warning(f"[Auto {mission_id}] No se pudo marcar dead_reason para {email}: {e}")
-                        if target["locked"]:
-                            _unlock(account_id)
-                            locked_ids.discard(account_id)
-                        break
-
-                    if code in dep.MM_DEAD_RC:
-                        failed += 1
-                        target["declines"] += 1
-                        target["done"] = True
-                        if target["locked"]:
-                            _unlock(account_id)
-                            locked_ids.discard(account_id)
                         break
 
                     if code == "CARD_LOCKED_OTHER_ACCOUNT":
@@ -1622,16 +1658,30 @@ async def run_auto_mission(
                         continue
                     # Terminal para ESTA cuenta (no las demás) — misma ley que scheduled
                     if (
-                        code == "RATE_LIMITED"
+                        code in ("RATE_LIMITED", "DEAD", "BAN", "RATE_LIMITED_PERMANENT")
                         or code in dep.MM_THREEDS_RC
                         or dep._mm_is_real_decline(code)
                         or code in dep.MM_DEAD_RC
                         or code == "PENDING_NOT_APPLIED"
                         or code == "CARD_LOCKED_OTHER_ACCOUNT"
                         or dep._mm_is_ambiguous_charge(code)
+                        or r.get("account_dead")
+                        or "RATE_LIMITED" in str(r.get("error") or "")
+                        or "429" in str(r.get("error") or "")
                     ):
-                        if code == "RATE_LIMITED":
+                        if code == "RATE_LIMITED" or "RATE_LIMITED" in str(r.get("error") or "") or "429" in str(r.get("error") or ""):
                             dep._mark_rate_limited_dead(email)
+                        elif code in dep.MM_DEAD_RC or code == "DEAD" or r.get("account_dead"):
+                            try:
+                                from app import db as _appdb
+                                with _appdb(write=True) as cdb:
+                                    cdb.execute(
+                                        "UPDATE accounts SET status='DEAD', dead_reason=?, dead_at=datetime('now') "
+                                        "WHERE email=? AND status != 'DEAD'",
+                                        (r.get("error") or code, email)
+                                    )
+                            except Exception:
+                                pass
                         failed += 1
                         _m_update(
                             mission_id,

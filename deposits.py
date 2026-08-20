@@ -1067,15 +1067,17 @@ async def _acquire_session_and_begin(
                 # y no vuelve a ser candidata (status != LIVE).
                 # Robert 2026-08-05: el operador NO debe ver "rate-limit" — es
                 # pedo interno del backend. Copy neutro.
-                if login_res.code == "RATE_LIMITED":
+                if login_res.code in ("RATE_LIMITED", "DEAD", "BAN") or login_res.account_dead:
                     _mark_rate_limited_dead(email)
                     msg = (f"Cuenta dada de baja automáticamente — no vuelve "
                            f"a intentarse.")
+                    rc = "RATE_LIMITED" if login_res.code == "RATE_LIMITED" else (login_res.code or "DEAD")
                     await _safe_phase(phase_cb, "done", {
-                        "success": False, "result_code": "RATE_LIMITED", "error": msg,
+                        "success": False, "result_code": rc, "error": msg,
                     })
                     return {"fail": {
-                        "success": False, "result_code": "RATE_LIMITED", "error": msg,
+                        "success": False, "result_code": rc, "error": msg,
+                        "account_dead": True,
                         "duration_ms": int((time.time() - t_total) * 1000),
                     }}
                 # LOGIN_RETRY_LATER (agotó reintentos, nuestro lado) → LOGIN_FAILED:
@@ -1864,7 +1866,10 @@ def cap_status(account_id: int, _user: dict = Depends(require_session)):
 #          primero). Par (card, account) terminal sólo se intenta una vez.
 
 # Clasificación de result_code (criterio Robert, espejo de SCHED_TERMINAL_RC).
-MM_DEAD_RC = frozenset({"AUTOEXCLUSION", "KYC_PENDING", "LOGIN_DENIED"})
+MM_DEAD_RC = frozenset({
+    "DEAD", "AUTOEXCLUSION", "KYC_PENDING", "LOGIN_DENIED",
+    "RATE_LIMITED", "RATE_LIMITED_PERMANENT", "BAN"
+})
 MM_THREEDS_RC = frozenset({"3DS_REQUIRED"})
 MM_REAL_DECLINE_RC = frozenset({
     "BANK_REJECTED", "BANK_REJECTED_AFTER_APPROVE", "PENDING_NOT_APPLIED",
@@ -1912,10 +1917,10 @@ def classify_deposit_status(result_code: str, success: bool) -> str:
         return "threeds"
     if _mm_is_real_decline(rc):
         return "rejected"                       # ← ÚNICO "banco"
-    if rc in MM_DEAD_RC:                          # AUTOEXCLUSION, KYC_PENDING, LOGIN_DENIED
-        return "account_dead"
-    if rc == "RATE_LIMITED":
+    if rc in ("RATE_LIMITED", "RATE_LIMITED_PERMANENT", "BAN"):
         return "rate_limited"
+    if rc in MM_DEAD_RC or rc == "DEAD":        # AUTOEXCLUSION, KYC_PENDING, LOGIN_DENIED, DEAD
+        return "account_dead"
     if rc in ("LOGIN_FAILED", "CAPTCHA_POOL_EMPTY", "DEPS_MISSING"):
         return "login_lost"
     if rc in ("BEGIN_ERROR", "PAYMENT_ERROR"):

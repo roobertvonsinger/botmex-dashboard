@@ -230,10 +230,11 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_m_status` | def | L829–L831 |
 | `_m_update` | def | L834–L844 |
 | `_fetch_account` | def | L847–L854 |
-| `_unlock` | def | L857–L866 |
-| `_broadcast_mission` | def | L869–L898 |
-| `_stop_pool` | def | L901–L908 |
-| `run_auto_mission` | def | L912–L1725 |
+| `_is_account_dead` | def | L857–L865 |
+| `_unlock` | def | L868–L877 |
+| `_broadcast_mission` | def | L880–L909 |
+| `_stop_pool` | def | L912–L919 |
+| `run_auto_mission` | def | L923–L1775 |
 
 ### `autoexclusion.py`
 
@@ -469,20 +470,20 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_build_admin_proxy_url` | def | L919–L923 |
 | `_refresh_account_after_deposit` | def | L926–L985 |
 | `_should_relogin_after_401` | def | L988–L992 |
-| `_acquire_session_and_begin` | def | L995–L1271 |
-| `_run_deposit_with_phases` | def | L1274–L1618 |
-| `deposit_execute_stream` | def | L1622–L1821 |
-| `cap_status` | def | L1825–L1837 |
-| `_mm_is_real_decline` | def | L1874–L1880 |
-| `_mm_is_ambiguous_charge` | def | L1883–L1893 |
-| `classify_deposit_status` | def | L1896–L1927 |
-| `_mm_session_get` | def | L1973–L1977 |
-| `_mm_session_update` | def | L1980–L1989 |
-| `multi_stream` | def | L1993–L2507 |
-| `multi_cancel` | def | L2511–L2516 |
-| `scheduled_create` | def | L2529–L2893 |
-| `scheduled_list` | def | L2897–L2919 |
-| `scheduled_cancel` | def | L2923–L2931 |
+| `_acquire_session_and_begin` | def | L995–L1273 |
+| `_run_deposit_with_phases` | def | L1276–L1620 |
+| `deposit_execute_stream` | def | L1624–L1823 |
+| `cap_status` | def | L1827–L1839 |
+| `_mm_is_real_decline` | def | L1879–L1885 |
+| `_mm_is_ambiguous_charge` | def | L1888–L1898 |
+| `classify_deposit_status` | def | L1901–L1932 |
+| `_mm_session_get` | def | L1978–L1982 |
+| `_mm_session_update` | def | L1985–L1994 |
+| `multi_stream` | def | L1998–L2512 |
+| `multi_cancel` | def | L2516–L2521 |
+| `scheduled_create` | def | L2534–L2898 |
+| `scheduled_list` | def | L2902–L2924 |
+| `scheduled_cancel` | def | L2928–L2936 |
 
 ### `jwt_keeper.py`
 

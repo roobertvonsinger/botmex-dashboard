@@ -165,6 +165,35 @@ def test_mission_matchmaking_rate_limit_marks_dead(H):
     assert 1 in H.unlocked  # cuenta sin match no queda lockeada
 
 
+def test_mission_matchmaking_dead_code_no_transient_no_more_cards(H):
+    """Cuando gentle_login devuelve code='DEAD' (429 BAN):
+    1) Se aborta la cuenta inmediatamente sin sleep de 25s (transient).
+    2) NO se prueban más tarjetas candidatas en esa cuenta muerta.
+    3) Se pasa de inmediato a la siguiente cuenta."""
+    H.card_pipes = [P1, P2, "4333333333333333|1029|789"]
+    calls_acc1 = 0
+
+    def script(email, amount, kw):
+        nonlocal calls_acc1
+        if email == "acc1@x.com":
+            calls_acc1 += 1
+            return {
+                "success": False,
+                "result_code": "DEAD",
+                "error": "RATE_LIMITED_PERMANENT (429 — BetMexico bloqueó la cuenta)",
+                "account_dead": True,
+            }
+        return {"success": True, "result_code": "BANK_APPROVED", "jwt": "J", "used_proxy": "P"}
+
+    H.script = script
+    run(H, plan(1, 2))
+    assert calls_acc1 == 1, "La cuenta DEAD solo debe recibir 1 intento, no reintentar otras tarjetas"
+    assert 25 not in H.sleeps, "No debe haber backoff de retry transitorio (25s) en cuenta DEAD"
+    matches = json.loads(next(u["matches"] for u in H.updates if "matches" in u))
+    assert [m["account_id"] for m in matches] == [2]
+    assert 1 in H.unlocked
+
+
 def test_mission_matchmaking_reuses_session_between_cards(H):
     """Regla 11: tras un intento con jwt (aunque transitorio), el siguiente
     intento de la MISMA cuenta reusa session_jwt/session_proxy."""
