@@ -494,6 +494,30 @@ def _migrate():
     except sqlite3.OperationalError:
         pass
 
+    # Tabla de accesos de cuentas de retiro por operador y banco (reutilización y fricción cero)
+    try:
+        with db(write=True) as c:
+            c.execute(
+                "CREATE TABLE IF NOT EXISTS account_withdrawal_access ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "account_email TEXT NOT NULL, "
+                "account_id INTEGER, "
+                "operator_id INTEGER NOT NULL, "
+                "operator_name TEXT, "
+                "bank_name TEXT NOT NULL, "
+                "bank_digits TEXT, "
+                "phone TEXT, "
+                "email TEXT, "
+                "username TEXT, "
+                "password TEXT, "
+                "extra_data TEXT, "
+                "created_at TEXT NOT NULL, "
+                "updated_at TEXT NOT NULL, "
+                "UNIQUE(account_email, bank_name))"
+            )
+    except sqlite3.OperationalError:
+        pass
+
     _backfill_grades_v10_m7()
 
 

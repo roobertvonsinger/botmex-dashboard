@@ -98,9 +98,9 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 585 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5309 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 5333 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1768 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1789 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `betmexico_config.py` | 185 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2927 | `—` | _[completar]_ |
@@ -109,7 +109,7 @@ prewarm.py (router)
 | `betmexico_login_service.py` | 136 | `betmexico.login_service` | _[completar]_ |
 | `betmexico_payment_analyzer.py` | 492 | `—` | _[completar]_ |
 | `betmexico_utils.py` | 1159 | `—` | _[completar]_ |
-| `bin_intelligence.py` | 430 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
+| `bin_intelligence.py` | 654 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
 | `card_checker.py` | 398 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 213 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `1cea8e3` | fix(auto_deposit): tier_mid exige _jwt_alive para evitar selecciones de cuentas expiradas |
 | `2fb94af` | fix(auto_deposit): jwt_first prioritario absoluto y corregir check de ventana individual |
 | `92f21d6` | fix(auto_deposit): cortar de golpe en 429/DEAD sin retry transitorio ni quema de captcha |
 | `6202b1d` | fix(withdrawals): persistencia de status 5/fallos, mapeo claro de reembolsos a tarjeta y enriquecimiento de monitor SSE |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `87c290c` | fix(matchmaking): jubilar tarjetas aprobadas, planificador round-robin no bloqueante y lazy pool |
 | `37c6003` | feat(ui): rediseño dark mode glassmorphism portal, matriz lirica freestyle MC y reactivacion Magdiel |
 | `a0eefaa` | feat(bet_flow): automatch con combo TOP garantizado, llenado encubierto omnicanal y retiros en batches de 200 con anti-reembolso |
-| `6b1e91c` | chore(sync): actualizar bitacora y scripts de depositos |
 <!-- GEN:end:recientes -->
 
 ---

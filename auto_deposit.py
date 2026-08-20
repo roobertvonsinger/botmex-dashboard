@@ -322,7 +322,9 @@ def select_accounts_for_auto(
 
         win = (window_map or {}).get(email) or {}
         avail = win.get("available")
-        if avail is not None and float(avail) < amount:
+        # El límite disponible debe cubrir al menos amount * count (el plan total) o amount si count=1
+        required_cap = float(amount) * max(1, count)
+        if avail is not None and float(avail) < required_cap:
             continue
 
         if decline_map is not None:
@@ -1602,22 +1604,41 @@ async def run_auto_mission(
 
                 completed = 0
                 retries = 0
+                # Robert 2026-08-20: La cantidad por repetición es configurable (por default amount de la misión, ej 150)
+                # Si el operador o el backend definen amount=190, se ejecuta a 190 con fallback silencioso a 150.
                 while completed < target_count:
                     if _cancelled():
                         cancelled = True
                         break
+
+                    curr_amt = amount
                     r, ok, code = await _attempt(
                         email,
                         acct["password"],
                         m["card_pipe"],
-                        amount,
+                        curr_amt,
                         session_jwt,
                         session_proxy,
                     )
+
+                    # Si $190 falló por declinación / límite de pasarela, intentar fallback a $150
+                    if not ok and curr_amt == 190.0 and not r.get("account_dead") and code not in ("RATE_LIMITED", "DEAD", "BAN", "RATE_LIMITED_PERMANENT"):
+                        logger.info(f"🔄 Fallback de depósito inteligente ($190 -> $150) en {email}")
+                        r, ok, code = await _attempt(
+                            email,
+                            acct["password"],
+                            m["card_pipe"],
+                            150.0,
+                            session_jwt,
+                            session_proxy,
+                        )
+                        if ok:
+                            curr_amt = 150.0
+
                     if ok:
                         completed += 1
                         retries = 0
-                        deposited += amount
+                        deposited += curr_amt
                         approved += 1
                         if session_jwt is None and r.get(
                             "jwt"

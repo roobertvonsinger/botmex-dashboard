@@ -428,3 +428,227 @@ def get_single_card_bin_badge(card_pipe_or_num: str, summary: Optional[Dict[str,
     badge = "🧪 TEST"
     text = f"{meta['flag']} {meta['bank']} [{btype}] · {badge}"
     return {"badge": badge, "text": text, "tier": "testing", "bank": meta["bank"], "flag": meta["flag"]}
+
+
+def get_random_tactical_tip(summary: Optional[Dict[str, Any]] = None) -> str:
+    """Genera un tip táctico en tiempo real con datos 100% reales de la BD y catálogo mexicano.
+
+    Rota entre:
+    1. Bines Corona (Santander, BBVA, Banorte, etc. con su tasa real de éxito).
+    2. Alertas 3DS (bancos que están pidiendo OTP para no quemar intentos).
+    3. Consejos tácticos de pasarela.
+    """
+    import random
+    if not summary:
+        summary = get_bin_intelligence_summary()
+
+    corona = summary.get("corona", [])
+    tds = summary.get("threeds", [])
+    dead = summary.get("dead", [])
+
+    candidates = []
+
+    for b in corona[:6]:
+        bank = b.get("bank", "Banco")
+        btype = "Débito" if "DEB" in b.get("type", "").upper() else "Crédito"
+        flag = b.get("flag", "🇲🇽")
+        rate = b.get("approval_rate", 0)
+        bin_str = b.get("bin", "")
+        candidates.append(
+            f"👑 <b>Recomendación TOP:</b> <code>{bin_str}</code> · {bank} {btype} {flag} "
+            f"tiene <b>{rate}%</b> de éxito en pasarela."
+        )
+
+    for b in tds[:4]:
+        bank = b.get("bank", "Banco")
+        bin_str = b.get("bin", "")
+        candidates.append(
+            f"🛡️ <b>Alerta de Seguridad:</b> <code>{bin_str}</code> ({bank}) está disparando 3DS/OTP. "
+            "Evita sobrecargar ese BIN hoy."
+        )
+
+    for b in dead[:4]:
+        bank = b.get("bank", "Banco")
+        bin_str = b.get("bin", "")
+        candidates.append(
+            f"💀 <b>Precaución:</b> <code>{bin_str}</code> ({bank}) con alto rechazo en pasarela. "
+            "Revisa fecha de corte o prueba BIN alterno."
+        )
+
+    # Tips generales de operación
+    candidates.append("💡 <i>Tip: Las tarjetas de Débito de bancos tradicionales (Santander/Banorte) tienen mayor tasa sin 3DS.</i>")
+    candidates.append("💡 <i>Tip: El sistema rota intervalos de 45-60s para no disparar alertas en la pasarela.</i>")
+    candidates.append("💡 <i>Tip: Si una tarjeta pasa el probe de $10, el sistema la aparta para el lote programado.</i>")
+
+    return random.choice(candidates) if candidates else "💡 <i>Analizando telemetría de pasarela en tiempo real…</i>"
+
+
+def fetch_operator_personal_stats(operator_id: int, conn_or_path: Any = None) -> Dict[str, Any]:
+    """Obtiene las estadísticas agregadas personales del operador (sin exponer cuentas bancarias).
+
+    Métricas calculadas:
+    - Misiones creadas / matches logrados.
+    - Total de tarjetas probadas por el operador (Aprobadas / 3DS / Rechazadas).
+    - Volumen total depositado ($ MXN).
+    - Volumen total retirado ($ MXN).
+    - Top 3 BINes más usados por el operador y su tasa de éxito particular.
+    """
+    import sqlite3
+    close_conn = False
+    conn = None
+
+    try:
+        if conn_or_path is None:
+            from app import db
+            with db() as c:
+                return _query_operator_stats(c, operator_id)
+        elif isinstance(conn_or_path, (str, bytes, os.PathLike)):
+            conn = sqlite3.connect(str(conn_or_path))
+            conn.row_factory = sqlite3.Row
+            close_conn = True
+            return _query_operator_stats(conn, operator_id)
+        else:
+            return _query_operator_stats(conn_or_path, operator_id)
+    except Exception as exc:
+        logger.warning(f"[BinIntel] Error consultando stats de operador {operator_id}: {exc}")
+        return {
+            "missions_count": 0,
+            "matches_count": 0,
+            "total_deposited": 0.0,
+            "total_withdrawn": 0.0,
+            "cards_tested": 0,
+            "cards_approved": 0,
+            "cards_3ds": 0,
+            "cards_rejected": 0,
+            "approval_rate": 0.0,
+            "top_bins": [],
+        }
+    finally:
+        if close_conn and conn:
+            conn.close()
+
+
+def _query_operator_stats(c: Any, operator_id: int) -> Dict[str, Any]:
+    op_str = str(operator_id).strip()
+
+    # 1. Intentos de depósito del operador
+    attempts_q = """
+    SELECT
+        COUNT(*) as total_attempts,
+        SUM(CASE WHEN status='approved' THEN 1 ELSE 0 END) as approved_count,
+        SUM(CASE WHEN status='threeds' OR LOWER(COALESCE(rejection_reason,'')) LIKE '%3ds%' THEN 1 ELSE 0 END) as tds_count,
+        SUM(CASE WHEN status='rejected' AND LOWER(COALESCE(rejection_reason,'')) NOT LIKE '%3ds%' THEN 1 ELSE 0 END) as rej_count,
+        COALESCE(SUM(CASE WHEN status='approved' THEN amount ELSE 0 END), 0) as total_deposited,
+        COUNT(DISTINCT card_pipe) as unique_cards
+    FROM deposit_attempts
+    WHERE operator_id = ? OR operator_id = ?
+    """
+    row_att = c.execute(attempts_q, (operator_id, op_str)).fetchone()
+    att_d = dict(row_att) if row_att else {}
+
+    tot_att = att_d.get("total_attempts", 0) or 0
+    app_cnt = att_d.get("approved_count", 0) or 0
+    tds_cnt = att_d.get("tds_count", 0) or 0
+    rej_cnt = att_d.get("rej_count", 0) or 0
+    tot_dep = float(att_d.get("total_deposited", 0.0) or 0.0)
+    cards_cnt = att_d.get("unique_cards", 0) or 0
+    rate = round((app_cnt / tot_att) * 100, 1) if tot_att > 0 else 0.0
+
+    # 2. Retiros del operador
+    withdrawn_q = """
+    SELECT COALESCE(SUM(amount), 0) as total_withdrawn, COUNT(*) as wd_count
+    FROM account_withdrawals
+    WHERE operator_id = ? OR operator_id = ?
+    """
+    row_wd = c.execute(withdrawn_q, (operator_id, op_str)).fetchone()
+    wd_d = dict(row_wd) if row_wd else {}
+    tot_wd = float(wd_d.get("total_withdrawn", 0.0) or 0.0)
+    wd_cnt = wd_d.get("wd_count", 0) or 0
+
+    # 3. Misiones del operador
+    missions_q = """
+    SELECT COUNT(*) as total_missions
+    FROM auto_missions
+    WHERE operator_id = ? OR operator_id = ?
+    """
+    row_m = c.execute(missions_q, (operator_id, op_str)).fetchone()
+    tot_missions = (row_m[0] if row_m else 0) or 0
+
+    # 4. Top BINes del operador
+    top_bins_q = """
+    SELECT
+        SUBSTR(card_pipe, 1, 6) as bin,
+        COUNT(*) as attempts,
+        SUM(CASE WHEN status='approved' THEN 1 ELSE 0 END) as approved
+    FROM deposit_attempts
+    WHERE (operator_id = ? OR operator_id = ?) AND card_pipe IS NOT NULL AND LENGTH(card_pipe) >= 6
+    GROUP BY bin
+    ORDER BY attempts DESC
+    LIMIT 3
+    """
+    top_bins_rows = c.execute(top_bins_q, (operator_id, op_str)).fetchall()
+    top_bins = []
+    for r in top_bins_rows:
+        b_dict = dict(r)
+        meta = lookup_bin_metadata(b_dict["bin"])
+        b_att = b_dict.get("attempts", 0) or 0
+        b_app = b_dict.get("approved", 0) or 0
+        b_rate = round((b_app / b_att) * 100, 1) if b_att else 0.0
+        top_bins.append({
+            "bin": b_dict["bin"],
+            "bank": meta.get("bank", "Banco"),
+            "flag": meta.get("flag", "🇲🇽"),
+            "type": meta.get("type", "CARD"),
+            "attempts": b_att,
+            "approved": b_app,
+            "rate": b_rate,
+        })
+
+    return {
+        "missions_count": tot_missions,
+        "total_deposited": tot_dep,
+        "total_withdrawn": tot_wd,
+        "withdrawals_count": wd_cnt,
+        "cards_tested": cards_cnt,
+        "total_attempts": tot_att,
+        "cards_approved": app_cnt,
+        "cards_3ds": tds_cnt,
+        "cards_rejected": rej_cnt,
+        "approval_rate": rate,
+        "top_bins": top_bins,
+    }
+
+
+def format_telegram_operator_stats(stats: Dict[str, Any], nickname: str) -> str:
+    """Formatea la vista de rendimiento personal del operador para Telegram."""
+    lines = [
+        "═════════════════════════",
+        "🇲🇽  🌵 · <b><code>ᴍ ɪ · ʀ ᴇ ɴ ᴅ ɪ ᴍ ɪ ᴇ ɴ ᴛ ᴏ</code></b> · 🌵  🇲🇽",
+        "═════════════════════════\n",
+        f"👤 <b>Operador:</b> <code>{nickname}</code>\n",
+        "📊 <b>MÉTRICAS PERSONALES CONSOLIDADAS:</b>",
+        f"• 💰 Total Acreditado: <b>${stats.get('total_deposited', 0):,.2f} MXN</b>",
+        f"• 💸 Total Liquidado (Retiros): <b>${stats.get('total_withdrawn', 0):,.2f} MXN</b>",
+        f"• 🎯 Misiones Ejecutadas: <b>{stats.get('missions_count', 0)}</b>",
+        f"• 💳 Tarjetas Testeadas: <b>{stats.get('cards_tested', 0)}</b> plásticos",
+        f"• 🟢 Depósitos Aprobados: <b>{stats.get('cards_approved', 0)}</b>",
+        f"• 🟡 Desafíos 3DS / OTP: <b>{stats.get('cards_3ds', 0)}</b>",
+        f"• 🔴 Rechazos de Pasarela: <b>{stats.get('cards_rejected', 0)}</b>",
+        f"• ⚡ Tasa de Efectividad: <b>{stats.get('approval_rate', 0)}%</b>\n",
+    ]
+
+    top_bins = stats.get("top_bins", [])
+    if top_bins:
+        lines.append("👑 <b>TUS BINES MÁS EFECTIVOS:</b>")
+        for b in top_bins:
+            btype = "DÉB" if "DEB" in b.get("type", "").upper() else "CRÉD"
+            lines.append(
+                f"• <code>{b['bin']}</code> · {b['bank']} [{btype}] {b['flag']} "
+                f"➔ <b>{b['rate']}%</b> ({b['approved']}/{b['attempts']} ok)"
+            )
+    else:
+        lines.append("<i>💡 Aún no registras suficientes tiros para generar tu ranking de BINes.</i>")
+
+    lines.append("\n🔒 <i>Tus estadísticas son personales y privadas.</i>")
+    return "\n".join(lines)
+

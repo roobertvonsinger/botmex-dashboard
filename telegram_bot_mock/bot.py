@@ -71,11 +71,24 @@ from prewarm import (
 from card_checker import precheck_card_liveness, format_ruthopia_liveness_summary
 from auto_deposit import plan_auto_mission, run_auto_mission
 from deposits import _mission_sem
+from clabe_fetch import get_saved_clabes, fetch_clabes_from_betmexico, _persist_clabes, _load_jwt_for_account, _get_admin_proxy_url
+from withdrawals import (
+    get_bank_accounts,
+    get_real_balance,
+    execute_withdrawal,
+    execute_auto_batch_withdrawal,
+    NoApprovedWithdrawalAccount,
+    InsufficientBalance,
+    JwtExpired,
+)
 from bin_intelligence import (
     format_telegram_start_banner,
     format_telegram_bet_warning,
     format_telegram_radar_full,
     get_single_card_bin_badge,
+    get_random_tactical_tip,
+    fetch_operator_personal_stats,
+    format_telegram_operator_stats,
 )
 
 # Frases de saludo dinámicas (Slang directo)
@@ -167,7 +180,12 @@ HEADER_DECORATIVE = (
 HEADER = HEADER_DECORATIVE
 
 # Estados de Conversación
-(WAIT_CHECK_CONFIRM, WAIT_BET_CONFIRM, WAIT_ADDUSER_INPUT) = range(3)
+(
+    WAIT_CHECK_CONFIRM,
+    WAIT_BET_CONFIRM,
+    WAIT_ADDUSER_INPUT,
+    WAIT_BANK_ACCESS_INPUT,
+) = range(4)
 
 
 # Eventos de confirmación en espera para /bet confirm_gate
@@ -176,6 +194,14 @@ _confirm_events: Dict[str, Tuple[asyncio.Event, Dict[str, Any]]] = {}
 # Misiones cerradas por el gate (stop_sched_) — evita que on_progress
 # sobrescriba el mensaje limpio de cancelación con el texto terminal leaky.
 _gate_closed_missions: set = set()
+
+# Diccionarios de tracking de procesos activos para multitarea del operador
+# operator_id -> mission_id / info de misión activa
+_active_operator_missions: Dict[int, Dict[str, Any]] = {}
+# operator_id -> withdrawal_id / info de retiro activo
+_active_operator_withdrawals: Dict[int, Dict[str, Any]] = {}
+# operator_id -> info de ficha SPEI pendiente de pago
+_pending_spei_fundings: Dict[int, Dict[str, Any]] = {}
 
 
 def resolve_mission_confirm_gate(mission_id: str, decision: bool) -> bool:
@@ -285,19 +311,24 @@ def _start_menu_msg(user_id: int, nickname: str):
         f"• ⚡ <b>Núcleo:</b> <code>v2026.08 · Ultra High-Speed</code>{banner_section}\n\n"
         f"🎤 <i>\"{rap_intro}\"</i>"
     )
-    kb = InlineKeyboardMarkup(
+    buttons = []
+    # Botón dinámico de proceso activo si tiene misión o retiro corriendo
+    if user_id in _active_operator_missions or user_id in _active_operator_withdrawals or user_id in _pending_spei_fundings:
+        buttons.append([InlineKeyboardButton("⚡ Ver Proceso Activo en Curso", callback_data="btn_start_active_process")])
+
+    buttons.extend([
+        [InlineKeyboardButton("💳 CC Auto-Match (/bet)", callback_data="btn_start_bet")],
+        [InlineKeyboardButton("📊 Mi Rendimiento & Historial", callback_data="btn_start_operator_stats")],
+        [InlineKeyboardButton("📡 Radar & Ranking de BINes", callback_data="btn_start_bin_radar")],
         [
-            [InlineKeyboardButton("💳 CC Auto-Match (/bet)", callback_data="btn_start_bet")],
-            [InlineKeyboardButton("📊 Radar & Ranking de BINes", callback_data="btn_start_bin_radar")],
-            [
-                InlineKeyboardButton(
-                    "🔑 Check Combos (/check)", callback_data="btn_start_check"
-                )
-            ],
-            [InlineKeyboardButton("❔ Manual & Ayuda", callback_data="btn_start_help")],
-            [InlineKeyboardButton("🌐 Portal Web (botmexico.net)", url=DASHBOARD_URL)],
-        ]
-    )
+            InlineKeyboardButton(
+                "🔑 Check Combos (/check)", callback_data="btn_start_check"
+            )
+        ],
+        [InlineKeyboardButton("❔ Manual & Ayuda", callback_data="btn_start_help")],
+        [InlineKeyboardButton("🌐 Portal Web (botmexico.net)", url=DASHBOARD_URL)],
+    ])
+    kb = InlineKeyboardMarkup(buttons)
     return msg, kb
 
 
@@ -376,6 +407,126 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
             reply_markup=kb,
         )
         return ConversationHandler.END
+    elif query.data == "btn_start_operator_stats":
+        user_id = update.effective_user.id
+        nickname = get_user_nickname(user_id, update.effective_user.first_name)
+        stats = fetch_operator_personal_stats(user_id, DB_PATH)
+        stats_text = format_telegram_operator_stats(stats, nickname)
+        kb = InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("💳 Tirar CCs (/bet)", callback_data="btn_start_bet")],
+                [InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")],
+            ]
+        )
+        await _edit_msg(
+            query,
+            f"{HEADER}\n\n{stats_text}",
+            reply_markup=kb,
+        )
+        return ConversationHandler.END
+    elif query.data == "btn_start_active_process":
+        user_id = update.effective_user.id
+        active_m = _active_operator_missions.get(user_id)
+        active_w = _active_operator_withdrawals.get(user_id)
+        pending_s = _pending_spei_fundings.get(user_id)
+
+        if not active_m and not active_w and not pending_s:
+            kb = InlineKeyboardMarkup(
+                [[InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]]
+            )
+            await _edit_msg(
+                query,
+                f"{HEADER}\n\n"
+                "ℹ️ <b>Sin procesos activos en este momento.</b>\n"
+                "No tienes misiones ni retiros en curso.\n\n"
+                f"🎤 <i>\"{get_random_mc_punchline('idle')}\"</i>",
+                reply_markup=kb,
+            )
+            return ConversationHandler.END
+
+        # Mostrar el status del proceso activo prioritario
+        if active_w:
+            w_id = active_w.get("withdrawal_id", "N/A")
+            email = active_w.get("email", "N/A")
+            pct = active_w.get("pct", 0)
+            withdrawn = active_w.get("withdrawn", 0.0)
+            total = active_w.get("total", 0.0)
+            bar = _ascii_bar(pct)
+            tip = get_random_tactical_tip()
+            tip_box = f"\n\n💡 <b>Tip Operativo:</b>\n<i>{tip}</i>" if tip else ""
+
+            kb = InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton("🔄 Actualizar Vista", callback_data="btn_start_active_process")],
+                    [InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")],
+                ]
+            )
+            await _edit_msg(
+                query,
+                f"{HEADER}\n\n"
+                f"💸 <b>RETIRO AUTOMÁTICO EN CURSO</b>\n\n"
+                f"• 👤 Cuenta: <code>{email}</code>\n"
+                f"• 📊 Avance: <code>[{bar}] {pct}%</code>\n"
+                f"• 💰 Retirado: <b>${withdrawn:,.2f}</b> / ${total:,.2f}\n"
+                f"• ⚡ Estado: Dispersando en batches seguros…{tip_box}\n\n"
+                f"🇲🇽 <i>Puedes volver al menú sin interrumpir la operación.</i>",
+                reply_markup=kb,
+            )
+            return ConversationHandler.END
+
+        if pending_s:
+            email = pending_s.get("email", "")
+            clabe_stp = pending_s.get("clabe_stp", "")
+            curp = pending_s.get("curp", "")
+            m_id = pending_s.get("mission_id", "")
+            tip = get_random_tactical_tip()
+            tip_box = f"\n\n💡 <b>Tip Operativo:</b>\n<i>{tip}</i>" if tip else ""
+
+            kb = InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton("✅ Ya mandé el SPEI", callback_data=f"verify_spei_{m_id}")],
+                    [InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")],
+                ]
+            )
+            await _edit_msg(
+                query,
+                f"{HEADER}\n\n"
+                f"📑 <b>FICHA DE FONDEO SPEI PENDIENTE</b>\n\n"
+                f"• 👤 Cuenta: <code>{email}</code>\n"
+                f"• 🏦 CLABE STP: <code>{clabe_stp}</code>\n"
+                f"• 🆔 CURP Titular: <code>{curp}</code>\n"
+                f"• 💵 Monto requerido: <b>$10.00 MXN</b>\n\n"
+                f"<i>(Toca sobre la CLABE o CURP para copiar rápido en tu banca móvil)</i>{tip_box}\n\n"
+                f"👉 <i>Una vez enviado, presiona 'Ya mandé el SPEI' para validar y habilitar tu retiro.</i>",
+                reply_markup=kb,
+            )
+            return ConversationHandler.END
+
+        if active_m:
+            m_id = active_m.get("mission_id", "N/A")
+            pct = active_m.get("fake_pct", 15)
+            bar = _ascii_bar(pct)
+            tip = get_random_tactical_tip()
+            tip_box = f"\n\n💡 <b>Tip Operativo:</b>\n<i>{tip}</i>" if tip else ""
+
+            kb = InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton("🔄 Actualizar Vista", callback_data="btn_start_active_process")],
+                    [InlineKeyboardButton("🛑 Detener Misión", callback_data=f"stop_mission_{m_id}")],
+                    [InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")],
+                ]
+            )
+            await _edit_msg(
+                query,
+                f"{HEADER}\n\n"
+                f"🎯 <b>MISIÓN {m_id} EN EJECUCIÓN</b>\n\n"
+                f"• 📊 Avance: <code>[{bar}] {pct}%</code>\n"
+                f"• ⚡ Estado: Enlazando y procesando fondos de manera segura…{tip_box}\n\n"
+                f"🇲🇽 <i>Puedes volver al menú principal sin que se cancele la misión.</i>",
+                reply_markup=kb,
+            )
+            return ConversationHandler.END
+
     elif query.data == "btn_start_bet":
         warning_box = format_telegram_bet_warning()
         kb = InlineKeyboardMarkup(
@@ -1098,6 +1249,7 @@ def _launch_auto_mission_ui(
 
         has_match = status in ("match", "awaiting_confirmation", "preparing", "scheduling", "completed")
         if is_terminal:
+            _active_operator_missions.pop(operator_id, None)
             if status in ("cancelled", "failed"):
                 # Redirigir al inicio si el proceso falla o se cancela
                 text = (
@@ -1127,20 +1279,80 @@ def _launch_auto_mission_ui(
                     )
                 kb = InlineKeyboardMarkup(kb_btns)
             else:
+                # ÉXITO: Misión completada — Entrega de FICHA SPEI in-bot (Cero dependencia web)
+                matches = extra.get("matches") or []
+                match_obj = matches[0] if matches else {}
+                account_id = match_obj.get("account_id")
+                email = match_obj.get("email") or extra.get("email") or "N/A"
+                clabe_stp = match_obj.get("clabe_stp") or extra.get("clabe_stp") or ""
+
+                curp = ""
+                try:
+                    with db() as c:
+                        if account_id:
+                            row_ac = c.execute(
+                                "SELECT curp, fullname FROM accounts WHERE id=?", (account_id,)
+                            ).fetchone()
+                        else:
+                            row_ac = c.execute(
+                                "SELECT id, curp, fullname FROM accounts WHERE email=?", (email,)
+                            ).fetchone()
+                            if row_ac:
+                                account_id = row_ac["id"]
+                        if row_ac and row_ac["curp"]:
+                            curp = row_ac["curp"]
+                except Exception as ex_curp:
+                    logger.warning(f"[Bot] No pude leer CURP de BD: {ex_curp}")
+
+                if not clabe_stp and account_id:
+                    try:
+                        clabes = get_saved_clabes(DB_PATH, account_id)
+                        stp_c = next((cl.get("clabe") for cl in clabes if str(cl.get("integration")) in ("STP", "2")), None)
+                        if stp_c:
+                            clabe_stp = stp_c
+                    except Exception:
+                        pass
+
+                _pending_spei_fundings[operator_id] = {
+                    "mission_id": mission_id,
+                    "account_id": account_id,
+                    "email": email,
+                    "clabe_stp": clabe_stp,
+                    "curp": curp,
+                }
+
+                dep = extra.get("deposited", 0)
+                tip = get_random_tactical_tip()
+                tip_box = f"\n\n💡 <b>Tip Operativo:</b>\n<i>{tip}</i>" if tip else ""
+
                 text = (
                     f"{HEADER}\n\n"
-                    f"🎯 <b>MISIÓN {mission_id}</b>\n\n"
-                    f"• {st_text}\n\n"
-                    f'🌐 <a href="{DASHBOARD_URL}/?match={mission_id}">Gestionar cuentas en el portal →</a>'
+                    f"🎉 <b>¡MISIÓN {mission_id} COMPLETADA!</b>\n\n"
+                    f"• 💰 Total depositado: <b>${dep:,.2f} MXN</b>\n"
+                    f"• 👤 Cuenta asignada: <code>{email}</code>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📑 <b>FICHA DE FONDEO SPEI OBLIGATORIA</b>\n\n"
+                    f"Envía tu SPEI ($10 o $20 MXN) para vincular la cuenta bancaria de retiro:\n\n"
+                    f"• 🏦 <b>CLABE STP:</b>\n<code>{clabe_stp or 'Consultar en soporte'}</code>\n\n"
+                    f"• 🆔 <b>CURP Titular:</b>\n<code>{curp or 'No asignado'}</code>\n\n"
+                    f"<i>(Toca sobre la CLABE o CURP para copiar en un solo tap)</i>{tip_box}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"👉 <i>Una vez enviado tu SPEI desde tu app bancaria, presiona el botón abajo para validar y habilitar tu retiro automático.</i>"
                 )
                 kb = InlineKeyboardMarkup(
                     [
                         [
                             InlineKeyboardButton(
-                                "🌐 Ver cuentas y gestionar →",
-                                url=f"{DASHBOARD_URL}/?match={mission_id}",
+                                "✅ Ya mandé el SPEI",
+                                callback_data=f"verify_spei_{mission_id}",
                             )
-                        ]
+                        ],
+                        [
+                            InlineKeyboardButton(
+                                "🏠 Volver al inicio",
+                                callback_data="btn_start_cancel",
+                            )
+                        ],
                     ]
                 )
         else:
@@ -1540,6 +1752,577 @@ async def handle_retry_mission_callback(
     return ConversationHandler.END
 
 
+# ─────────────────────────────────────────────────────────────────────
+# FLUJO DE VERIFICACIÓN SPEI, ACCESOS BANCARIOS Y RETIRO IN-BOT
+# ─────────────────────────────────────────────────────────────────────
+
+def _normalize_bank_key(institution_name: str) -> str:
+    """Normaliza el nombre de la institución para mapear los campos requeridos de acceso."""
+    n = (institution_name or "").strip().lower()
+    if "claropay" in n or "inbursa" in n:
+        return "claropay"
+    if "hey" in n:
+        return "hey"
+    if "banorte" in n:
+        return "banorte"
+    if "mifel" in n:
+        return "mifel"
+    if "clip" in n:
+        return "clip"
+    if "openbank" in n or "open" in n:
+        return "openbank"
+    return "general"
+
+
+def _get_bank_access_requirements(bank_key: str) -> dict:
+    """Retorna los requerimientos de credenciales según el banco."""
+    reqs = {
+        "claropay": {
+            "name": "Claro Pay (Inbursa)",
+            "fields": ["phone"],
+            "prompt": "Envía el <b>Número de Teléfono</b> registrado en tu cuenta Claro Pay:",
+            "example": "<code>5512345678</code>",
+        },
+        "hey": {
+            "name": "Hey Banco",
+            "fields": ["phone", "email", "username"],
+            "prompt": "Envía los datos de tu cuenta Hey Banco en este formato:\n<code>telefono|correo|usuario</code>",
+            "example": "<code>5512345678|tu_correo@gmail.com|tu_usuario</code>",
+        },
+        "banorte": {
+            "name": "Banorte Móvil",
+            "fields": ["phone"],
+            "prompt": "Envía el <b>Número de Teléfono</b> asociado a tu banca Banorte:",
+            "example": "<code>5512345678</code>",
+        },
+        "mifel": {
+            "name": "Mifel",
+            "fields": ["phone", "email", "username", "password"],
+            "prompt": "Envía los accesos de tu cuenta Mifel en este formato:\n<code>telefono|correo|usuario|contraseña</code>",
+            "example": "<code>5512345678|correo@mail.com|mi_user|MiPass123</code>",
+        },
+        "clip": {
+            "name": "Clip Now",
+            "fields": ["phone"],
+            "prompt": "Envía el <b>Número de Teléfono</b> de tu cuenta Clip Now:",
+            "example": "<code>5512345678</code>",
+        },
+        "openbank": {
+            "name": "Openbank",
+            "fields": ["phone", "email"],
+            "prompt": "Envía los accesos de tu cuenta Openbank en este formato:\n<code>telefono|correo</code>",
+            "example": "<code>5512345678|tu_correo@gmail.com</code>",
+        },
+        "general": {
+            "name": "Banca Digital",
+            "fields": ["phone"],
+            "prompt": "Envía tu <b>Teléfono o Referencia de Acceso</b> de retiro:",
+            "example": "<code>5512345678</code>",
+        },
+    }
+    return reqs.get(bank_key, reqs["general"])
+
+
+async def handle_verify_spei_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja el botón '✅ Ya mandé el SPEI' tras completar la misión."""
+    query = update.callback_query
+    await query.answer()
+    operator_id = update.effective_user.id
+    data = query.data or ""
+    mission_id = data.replace("verify_spei_", "").strip()
+
+    pending_info = _pending_spei_fundings.get(operator_id)
+    if not pending_info or pending_info.get("mission_id") != mission_id:
+        try:
+            with db() as c:
+                row_m = c.execute(
+                    "SELECT matches FROM auto_missions WHERE mission_id=?", (mission_id,)
+                ).fetchone()
+                if row_m:
+                    m_arr = json.loads(row_m["matches"] or "[]")
+                    if m_arr:
+                        pending_info = {
+                            "mission_id": mission_id,
+                            "account_id": m_arr[0].get("account_id"),
+                            "email": m_arr[0].get("email"),
+                        }
+        except Exception:
+            pass
+
+    if not pending_info:
+        await _edit_msg(
+            query,
+            f"{HEADER}\n\n❌ <b>No se encontró información de la misión.</b>",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]]
+            ),
+        )
+        return
+
+    account_id = pending_info.get("account_id")
+    email = pending_info.get("email")
+
+    await _edit_msg(
+        query,
+        f"{HEADER}\n\n"
+        f"🔍 <b>Validando acreditación SPEI y cuenta de retiro…</b>\n"
+        f"  <code>[■■■■■□□□□□] 50%</code>\n\n"
+        f"🛰️ <i>Consultando pasarela de pagos…</i>",
+    )
+
+    jwt, email_db, _ = _load_jwt_for_account(DB_PATH, account_id)
+    proxy_url = _get_admin_proxy_url()
+
+    approved_accounts = []
+    if jwt:
+        try:
+            approved_accounts = await get_bank_accounts(jwt, proxy_url)
+        except Exception as ex_b:
+            logger.warning(f"[Bot] Error consultando cuentas de retiro: {ex_b}")
+
+    if not approved_accounts:
+        # Reintentar o avisar que aún no cae el SPEI
+        kb = InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("🔄 Reintentar Validación", callback_data=f"verify_spei_{mission_id}")],
+                [InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")],
+            ]
+        )
+        tip = get_random_tactical_tip()
+        tip_box = f"\n\n💡 <b>Tip Operativo:</b>\n<i>{tip}</i>" if tip else ""
+
+        await _edit_msg(
+            query,
+            f"{HEADER}\n\n"
+            f"⏳ <b>Acreditación bancaria en tránsito</b>\n\n"
+            f"• Cuenta: <code>{email}</code>\n"
+            f"• Estado: El SPEI aún no se refleja en el sistema.\n\n"
+            f"<i>Los bancos suelen tardar de 30 a 90 segundos en asentar la transferencia. Espera un momento y vuelve a presionar el botón.</i>{tip_box}",
+            reply_markup=kb,
+        )
+        return
+
+    bank_acc = approved_accounts[0]
+    bank_name = bank_acc.get("institutionName", "Banco")
+    account_digits = str(bank_acc.get("account", ""))[-4:]
+    bank_key = _normalize_bank_key(bank_name)
+
+    # Revisar si ya existen accesos guardados en account_withdrawal_access
+    saved_access = None
+    try:
+        with db() as c:
+            row_acc = c.execute(
+                "SELECT * FROM account_withdrawal_access WHERE account_email=? AND bank_name=? LIMIT 1",
+                (email, bank_name),
+            ).fetchone()
+            if row_acc:
+                saved_access = dict(row_acc)
+    except Exception as ex_acc:
+        logger.warning(f"[Bot] Error leyendo account_withdrawal_access: {ex_acc}")
+
+    # CASO 1: Si ya fue configurada previamente
+    if saved_access:
+        saved_op_id = saved_access.get("operator_id")
+        saved_op_name = saved_access.get("operator_name") or f"Operador_{saved_op_id}"
+
+        if saved_op_id == operator_id:
+            # Mismo operador: recordatorio proactivo y confirmación directa
+            phone_hint = saved_access.get("phone") or "Registrado"
+            context.user_data["pending_withdrawal"] = {
+                "account_id": account_id,
+                "email": email,
+                "bank_name": bank_name,
+                "account_digits": account_digits,
+            }
+            kb = InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            "🚀 Iniciar Retiro Automático",
+                            callback_data=f"confirm_auto_withdrawal_{account_id}",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            "✏️ Actualizar mis accesos",
+                            callback_data=f"edit_bank_access_{account_id}",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            "🏠 Volver al inicio",
+                            callback_data="btn_start_cancel",
+                        )
+                    ],
+                ]
+            )
+            await _edit_msg(
+                query,
+                f"{HEADER}\n\n"
+                f"🏦 <b>CUENTA DE RETIRO DETECTADA & RECORDADA</b>\n\n"
+                f"• Banco: <b>{bank_name}</b> (Terminación: <code>••••{account_digits}</code>)\n"
+                f"• Titular / Cuenta: <code>{email}</code>\n"
+                f"• Acceso guardado: Teléfono <code>{phone_hint}</code>\n\n"
+                f"✨ <i>Ya habías retirado de esta cuenta. Tus accesos están listos.</i>\n\n"
+                f"¿Deseas iniciar el retiro automático por fases?",
+                reply_markup=kb,
+            )
+            return
+        else:
+            # Asignada por otro operador: avisar quién la configuró
+            context.user_data["pending_bank_access"] = {
+                "account_id": account_id,
+                "email": email,
+                "bank_name": bank_name,
+                "account_digits": account_digits,
+                "bank_key": bank_key,
+            }
+            req_info = _get_bank_access_requirements(bank_key)
+            kb = InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            "🚀 Continuar y Retirar",
+                            callback_data=f"confirm_auto_withdrawal_{account_id}",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            "🏠 Volver al inicio",
+                            callback_data="btn_start_cancel",
+                        )
+                    ],
+                ]
+            )
+            await _edit_msg(
+                query,
+                f"{HEADER}\n\n"
+                f"🏦 <b>CUENTA BANCARIA DETECTADA</b>\n\n"
+                f"• Banco: <b>{bank_name}</b> (Terminación: <code>••••{account_digits}</code>)\n"
+                f"• Cuenta: <code>{email}</code>\n\n"
+                f"ℹ️ <b>Nota de Asignación:</b>\n"
+                f"Esta cuenta bancaria fue enlazada originalmente por <b>{saved_op_name}</b>. Si requieres acceso a la app bancaria para recibir la dispersión, contáctale para apoyo.\n\n"
+                f"Si prefieres registrar nuevos datos de acceso para ti, responde en el chat con tu información, o presiona 'Continuar y Retirar':",
+                reply_markup=kb,
+            )
+            return
+
+    # CASO 2: Cuenta nueva / sin accesos previos registrados -> Solicitar datos de acceso
+    context.user_data["pending_bank_access"] = {
+        "account_id": account_id,
+        "email": email,
+        "bank_name": bank_name,
+        "account_digits": account_digits,
+        "bank_key": bank_key,
+    }
+    req_info = _get_bank_access_requirements(bank_key)
+
+    kb = InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]
+        ]
+    )
+
+    await _edit_msg(
+        query,
+        f"{HEADER}\n\n"
+        f"🏦 <b>CUENTA DE RETIRO VINCULADA</b>\n\n"
+        f"• Banco: <b>{bank_name}</b>\n"
+        f"• Terminación: <code>••••{account_digits}</code>\n"
+        f"• Titular / Cuenta: <code>{email}</code>\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔑 <b>REGISTRO DE ACCESOS BANCARIOS ({req_info['name']})</b>\n\n"
+        f"{req_info['prompt']}\n"
+        f"Ejemplo: {req_info['example']}\n\n"
+        f"<i>(Esto permite recordar tu acceso para futuros retiros sin fricción)</i>",
+        reply_markup=kb,
+    )
+
+
+async def handle_edit_bank_access_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Permite al operador re-ingresar sus credenciales si cambiaron."""
+    query = update.callback_query
+    await query.answer()
+    account_id_str = query.data.replace("edit_bank_access_", "").strip()
+    account_id = int(account_id_str)
+
+    pending = context.user_data.get("pending_withdrawal", {})
+    bank_name = pending.get("bank_name", "Banco")
+    bank_key = _normalize_bank_key(bank_name)
+    req_info = _get_bank_access_requirements(bank_key)
+
+    context.user_data["pending_bank_access"] = {
+        "account_id": account_id,
+        "email": pending.get("email"),
+        "bank_name": bank_name,
+        "account_digits": pending.get("account_digits"),
+        "bank_key": bank_key,
+    }
+
+    kb = InlineKeyboardMarkup(
+        [[InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]]
+    )
+
+    await _edit_msg(
+        query,
+        f"{HEADER}\n\n"
+        f"🔑 <b>ACTUALIZAR ACCESOS ({req_info['name']})</b>\n\n"
+        f"{req_info['prompt']}\n"
+        f"Ejemplo: {req_info['example']}\n\n"
+        f"Envía los nuevos datos en el chat para guardarlos:",
+        reply_markup=kb,
+    )
+
+
+async def process_bank_access_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Procesa el mensaje de texto del operador con los accesos bancarios."""
+    user_id = update.effective_user.id
+    if not is_authorized(user_id):
+        return
+
+    text = update.message.text.strip()
+    bank_info = context.user_data.get("pending_bank_access")
+    if not bank_info:
+        return
+
+    account_id = bank_info["account_id"]
+    email = bank_info["email"]
+    bank_name = bank_info["bank_name"]
+    bank_digits = bank_info["account_digits"]
+    bank_key = bank_info["bank_key"]
+    nickname = get_user_nickname(user_id, update.effective_user.first_name)
+
+    parts = [p.strip() for p in text.split("|")]
+    phone, acc_email, username, password = None, None, None, None
+
+    if bank_key in ("claropay", "banorte", "clip", "general"):
+        phone = parts[0]
+    elif bank_key == "hey":
+        phone = parts[0] if len(parts) > 0 else None
+        acc_email = parts[1] if len(parts) > 1 else None
+        username = parts[2] if len(parts) > 2 else None
+    elif bank_key == "mifel":
+        phone = parts[0] if len(parts) > 0 else None
+        acc_email = parts[1] if len(parts) > 1 else None
+        username = parts[2] if len(parts) > 2 else None
+        password = parts[3] if len(parts) > 3 else None
+    elif bank_key == "openbank":
+        phone = parts[0] if len(parts) > 0 else None
+        acc_email = parts[1] if len(parts) > 1 else None
+
+    # Guardar en BD
+    now_iso = datetime.now(timezone.utc).isoformat()
+    try:
+        with db(write=True) as c:
+            c.execute(
+                "INSERT OR REPLACE INTO account_withdrawal_access "
+                "(account_email, account_id, operator_id, operator_name, bank_name, bank_digits, phone, email, username, password, extra_data, created_at, updated_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    email,
+                    account_id,
+                    user_id,
+                    nickname,
+                    bank_name,
+                    bank_digits,
+                    phone,
+                    acc_email,
+                    username,
+                    password,
+                    text,
+                    now_iso,
+                    now_iso,
+                ),
+            )
+    except Exception as ex_save:
+        logger.warning(f"[Bot] Error guardando account_withdrawal_access: {ex_save}")
+
+    context.user_data.pop("pending_bank_access", None)
+    context.user_data["pending_withdrawal"] = {
+        "account_id": account_id,
+        "email": email,
+        "bank_name": bank_name,
+        "account_digits": bank_digits,
+    }
+
+    kb = InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    "🚀 Iniciar Retiro Automático",
+                    callback_data=f"confirm_auto_withdrawal_{account_id}",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "🏠 Volver al inicio",
+                    callback_data="btn_start_cancel",
+                )
+            ],
+        ]
+    )
+
+    await update.message.reply_text(
+        f"{HEADER}\n\n"
+        f"✅ <b>ACCESOS GUARDADOS CORRECTAMENTE</b>\n\n"
+        f"• Banco: <b>{bank_name}</b> (<code>••••{bank_digits}</code>)\n"
+        f"• Datos asociados al operador: <b>{nickname}</b>\n\n"
+        f"¿Deseas iniciar el retiro automático por fases?",
+        parse_mode="HTML",
+        reply_markup=kb,
+    )
+
+
+async def handle_confirm_auto_withdrawal_callback(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+):
+    """Dispara la ejecución del retiro automático en segundo plano con telemetría visual in-bot."""
+    query = update.callback_query
+    await query.answer()
+    operator_id = update.effective_user.id
+    account_id = int(query.data.replace("confirm_auto_withdrawal_", "").strip())
+
+    jwt, email, _ = _load_jwt_for_account(DB_PATH, account_id)
+    proxy_url = _get_admin_proxy_url()
+
+    # Saldo Real inicial
+    try:
+        bal_data = await get_real_balance(jwt, proxy_url)
+        real_balance = float(bal_data.get("Real", 0) or 0)
+    except Exception:
+        real_balance = 0.0
+
+    if real_balance <= 0:
+        await _edit_msg(
+            query,
+            f"{HEADER}\n\n"
+            f"ℹ️ <b>Sin saldo para retirar</b>\n\n"
+            f"La cuenta <code>{email}</code> no tiene saldo Real disponible para retiro.",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]]
+            ),
+        )
+        return
+
+    _pending_spei_fundings.pop(operator_id, None)
+
+    _active_operator_withdrawals[operator_id] = {
+        "account_id": account_id,
+        "email": email,
+        "pct": 10,
+        "withdrawn": 0.0,
+        "total": real_balance,
+        "withdrawal_id": f"wd_{account_id}_{int(time.time())}",
+    }
+
+    status_msg = await query.edit_message_text(
+        f"{HEADER}\n\n"
+        f"💸 <b>RETIRO AUTOMÁTICO INICIADO</b>\n\n"
+        f"• 👤 Cuenta: <code>{email}</code>\n"
+        f"• 📊 Avance: <code>[{_ascii_bar(10)}] 10%</code>\n"
+        f"• 💰 Retirado: <b>$0.00</b> / ${real_balance:,.2f}\n"
+        f"• ⚡ Estado: Preparando micro-dispersión segura…\n\n"
+        f"📡 <i>Procesando en segundo plano…</i>",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("🔄 Actualizar Vista", callback_data="btn_start_active_process")],
+                [InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")],
+            ]
+        ),
+    )
+
+    loop = asyncio.get_running_loop()
+
+    def on_wd_progress(withdrawn: float, batches_count: int, latest_res: dict):
+        pct = min(95, int((withdrawn / max(real_balance, 1.0)) * 100))
+        _active_operator_withdrawals[operator_id]["pct"] = pct
+        _active_operator_withdrawals[operator_id]["withdrawn"] = withdrawn
+
+        bar = _ascii_bar(pct)
+        tip = get_random_tactical_tip()
+        tip_box = f"\n\n💡 <b>Tip Operativo:</b>\n<i>{tip}</i>" if tip else ""
+
+        text = (
+            f"{HEADER}\n\n"
+            f"💸 <b>RETIRO AUTOMÁTICO EN CURSO</b>\n\n"
+            f"• 👤 Cuenta: <code>{email}</code>\n"
+            f"• 📊 Avance: <code>[{bar}] {pct}%</code>\n"
+            f"• 💰 Retirado: <b>${withdrawn:,.2f}</b> / ${real_balance:,.2f}\n"
+            f"• ⚡ Estado: Dispersión en marcha ({batches_count} fases procesadas){tip_box}\n\n"
+            f"🇲🇽 <i>Puedes volver al menú principal sin interrumpir la operación.</i>"
+        )
+        kb = InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("🔄 Actualizar Vista", callback_data="btn_start_active_process")],
+                [InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")],
+            ]
+        )
+
+        async def _edit():
+            try:
+                await status_msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
+            except Exception:
+                pass
+
+        asyncio.run_coroutine_threadsafe(_edit(), loop)
+
+    async def _run_withdrawal_background():
+        try:
+            res = await execute_auto_batch_withdrawal(
+                DB_PATH,
+                account_id,
+                operator_id,
+                on_progress=on_wd_progress,
+            )
+            _active_operator_withdrawals.pop(operator_id, None)
+
+            if res.get("ok"):
+                total_w = res.get("total_withdrawn", real_balance)
+                await status_msg.edit_text(
+                    f"{HEADER}\n\n"
+                    f"🎉 <b>¡RETIRO AUTOMÁTICO COMPLETADO!</b>\n\n"
+                    f"• 👤 Cuenta: <code>{email}</code>\n"
+                    f"• 💰 Total transferido a tu banco: <b>${total_w:,.2f} MXN</b>\n"
+                    f"• 📊 Avance: <code>[{_ascii_bar(100)}] 100%</code>\n\n"
+                    f"🎤 <i>\"{get_random_mc_punchline('success')}\"</i>",
+                    parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup(
+                        [[InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]]
+                    ),
+                )
+            else:
+                reason = res.get("error") or res.get("reason") or "Detenido por protección"
+                await status_msg.edit_text(
+                    f"{HEADER}\n\n"
+                    f"🛑 <b>RETIRO PAUSADO / FINALIZADO</b>\n\n"
+                    f"• 👤 Cuenta: <code>{email}</code>\n"
+                    f"• 💰 Retirado acumulado: <b>${res.get('total_withdrawn', 0.0):,.2f} MXN</b>\n"
+                    f"• ⚠️ Motivo: {reason}\n\n"
+                    f"<i>Revisa el estado en tu banca o comunícate con soporte.</i>",
+                    parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup(
+                        [[InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]]
+                    ),
+                )
+        except Exception as ex_wd:
+            _active_operator_withdrawals.pop(operator_id, None)
+            logger.exception(f"[Bot] Error en retiro automático background: {ex_wd}")
+            try:
+                await status_msg.edit_text(
+                    f"{HEADER}\n\n"
+                    f"❌ <b>Error durante el retiro automático:</b>\n<code>{ex_wd}</code>",
+                    parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup(
+                        [[InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]]
+                    ),
+                )
+            except Exception:
+                pass
+
+    asyncio.create_task(_run_withdrawal_background())
+
+
 async def setup_bot_commands(application):
     """Registra el menú nativo de comandos en la interfaz de Telegram.
 
@@ -1645,6 +2428,25 @@ def build_app():
     app.add_handler(
         CallbackQueryHandler(
             handle_confirm_gate_callback, pattern="^(confirm_sched_|stop_sched_)"
+        )
+    )
+
+    # Handlers para verificación de SPEI y confirmación/edición de retiro in-bot
+    app.add_handler(
+        CallbackQueryHandler(handle_verify_spei_callback, pattern="^verify_spei_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(handle_edit_bank_access_callback, pattern="^edit_bank_access_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(handle_confirm_auto_withdrawal_callback, pattern="^confirm_auto_withdrawal_")
+    )
+
+    # Handler para captura de accesos bancarios de retiro
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            process_bank_access_input,
         )
     )
 
