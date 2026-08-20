@@ -698,10 +698,13 @@ function renderTable() {
     // Glow "la que veo" (Task 1.4, feature semilla de Robert) — recalculado en
     // cada render desde window.Pantalla.currentId, así sobrevive SSE/sort/filtro
     // igual que row-sel. El toggle instantáneo al abrir/cerrar vive en pantalla.js.
-    const pantallaSrcClass = (window.Pantalla && window.Pantalla.currentId === r.id) ? 'pantalla-source' : '';
-    const trClasses = `r-grade-${g} ${lockedCls} ${selCls} ${opClass} ${trasClass} ${coolingClass} ${pantallaSrcClass}`.trim();
+    const isNewCls = r.is_new ? 'row-is-new' : '';
+    const trClasses = `r-grade-${g} ${lockedCls} ${selCls} ${opClass} ${trasClass} ${coolingClass} ${pantallaSrcClass} ${isNewCls}`.trim();
     const lockChip = r.locked_by
       ? `<span class="lock-chip op-${esc(opCol)} ${until?.expired ? 'expired' : ''}" title="Lockeada por ${esc(r.locked_by)}${until ? ` · ${until.expired ? 'vencido' : `vence en ${until.text}`}` : ''}">🔒 ${esc(r.locked_by)}${until && !until.expired ? ` <span class="lock-chip-time dim">${until.text}</span>` : ''}</span>`
+      : '';
+    const newBadge = r.is_new
+      ? `<span class="chip-new-acc" title="Cuenta recién agregada (${fmtAgo(r.first_checked_at)})">✨ NUEVA</span>`
       : '';
     // Badge de acceso — visible para TODOS (guardarril Frictionless).
     // Prioridad: cuarentena > sesión JWT.
@@ -748,7 +751,7 @@ function renderTable() {
         <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
         <td class="sel-cell"></td>
         <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-        <td class="combo" title="Click: ver detalle · Ctrl/Shift+Click: seleccionar">${jwtBadge}<b class="combo-txt d-copy" data-copy="${esc(combo)}" title="Click: copiar combo">${esc(combo)}</b>${lockChip}</td>
+        <td class="combo" title="Click: ver detalle · Ctrl/Shift+Click: seleccionar">${jwtBadge}${newBadge}<b class="combo-txt d-copy" data-copy="${esc(combo)}" title="Click: copiar combo">${esc(combo)}</b>${lockChip}</td>
         <td class="dep" title="Último depósito hecho">${dep}</td>
         ${cellAcciones}
       </tr>`;
@@ -757,7 +760,7 @@ function renderTable() {
       <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
       <td class="sel-cell"></td>
       <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-      <td class="combo" title="Click: ver detalle · Ctrl/Shift+Click: seleccionar">${jwtBadge}<b class="combo-txt d-copy" data-copy="${esc(combo)}" title="Click: copiar combo">${esc(combo)}</b></td>
+      <td class="combo" title="Click: ver detalle · Ctrl/Shift+Click: seleccionar">${jwtBadge}${newBadge}<b class="combo-txt d-copy" data-copy="${esc(combo)}" title="Click: copiar combo">${esc(combo)}</b></td>
       <td class="dep" title="Último depósito hecho">${dep}</td>
       <td class="dep dim check-cell" title="Última actualización real · total de checks">${fmtAgo(r.last_updated_at || r.last_checked_at)}<span class="check-cnt">· ${r.check_count || 0}</span></td>
       ${cellAcciones}

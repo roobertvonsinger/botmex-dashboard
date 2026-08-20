@@ -1143,6 +1143,7 @@ def list_accounts(
         "a.balance_total, a.balance_real, "
         "a.last_deposit_amount, a.last_deposit_date, a.status, a.grade, "
         "a.locked_by, a.locked_at, a.locked_until, a.last_checked_at, a.check_count, "
+        "a.first_checked_at, "
         "a.jwt_expires_at, a.dead_reason, a.cooldown_until, a.rl_streak, "
         "a.last_updated_at, "
         "COALESCE(a.published_to_pool, 1) AS published_to_pool, "
@@ -1216,6 +1217,21 @@ def list_accounts(
                     r["cooldown_min"] = max(0, round((int(_cd) - _now) / 60)) if _cd not in (None, "") and int(_cd) > _now else 0
                 except (TypeError, ValueError):
                     r["cooldown_min"] = 0
+
+                # ── Highlight visual para Cuentas Recién Agregadas (mínimo 48 horas / 2 días) ──
+                fc = r.get("first_checked_at")
+                is_new = False
+                if fc and str(fc) not in ("N/A", "Sin dato", "None", ""):
+                    try:
+                        fc_clean = str(fc).replace("T", " ").split(".")[0].strip()
+                        fc_dt = datetime.strptime(fc_clean[:19], "%Y-%m-%d %H:%M:%S")
+                        now_dt = datetime.utcnow() - timedelta(hours=6)  # Hora MX (UTC-6)
+                        diff_sec = (now_dt - fc_dt).total_seconds()
+                        if 0 <= diff_sec <= 172800:  # 48 horas = 2 días
+                            is_new = True
+                    except Exception:
+                        pass
+                r["is_new"] = is_new
             return rows
     except sqlite3.OperationalError as e:
         if "account_assignments" in str(e):

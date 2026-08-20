@@ -98,7 +98,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 585 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5333 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 5349 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1789 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `9a9b3bd` | feat(bot): implement crisp card validation layout with LIVE/TIESAS blocks and direct summary |
 | `f1a436d` | fix(bot): purge fake sample_bins, parallelize card liveness precheck and auto-route raw text |
 | `b9b062a` | docs: update NEXT-SESSION with E2E user driver as next milestone |
 | `68aec5f` | feat(bot): retain operator greetings, BIN radar and start banners with clean handlers |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `1cea8e3` | fix(auto_deposit): tier_mid exige _jwt_alive para evitar selecciones de cuentas expiradas |
 | `2fb94af` | fix(auto_deposit): jwt_first prioritario absoluto y corregir check de ventana individual |
 | `92f21d6` | fix(auto_deposit): cortar de golpe en 429/DEAD sin retry transitorio ni quema de captcha |
-| `6202b1d` | fix(withdrawals): persistencia de status 5/fallos, mapeo claro de reembolsos a tarjeta y enriquecimiento de monitor SSE |
 <!-- GEN:end:recientes -->
 
 ---
