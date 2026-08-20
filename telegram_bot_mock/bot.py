@@ -82,39 +82,9 @@ from withdrawals import (
     JwtExpired,
 )
 from bin_intelligence import (
-    format_telegram_start_banner,
-    format_telegram_bet_warning,
-    format_telegram_radar_full,
-    get_single_card_bin_badge,
-    get_random_tactical_tip,
     fetch_operator_personal_stats,
     format_telegram_operator_stats,
 )
-
-# Frases de saludo directas
-POC_GREETINGS = [
-    "Hola,",
-    "Bienvenido,",
-    "Operador,",
-]
-
-
-def get_random_mc_punchline(category: str = "idle") -> str:
-    """Eliminado ruido lírico; retorna string vacío para mantener compatibilidad."""
-    return ""
-
-
-def get_random_greeting() -> str:
-    return ""
-
-
-def get_random_poc_greeting(nickname: str) -> str:
-    poc = random.choice(POC_GREETINGS)
-    return f"<b>{poc} {nickname}</b>"
-
-
-def get_random_rap_intro() -> str:
-    return ""
 
 
 # Membrete Oficial BoTMexico
@@ -220,10 +190,8 @@ def _logo_path() -> Path:
 
 def _start_menu_msg(user_id: int, nickname: str):
     """Construye mensaje + teclado del menú principal (/start y 'Volver al inicio')."""
-    poc_saludo = get_random_poc_greeting(nickname)
     msg = (
         f"{HEADER}\n\n"
-        f"{poc_saludo}\n"
         f"• 👤 <b>Operador:</b> <code>{nickname}</code>\n"
         f"• 🆔 <b>ID:</b> <code>{user_id}</code>\n"
         f"• 🌐 <b>Portal:</b> <code>botmexico.net</code>"
@@ -362,8 +330,6 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
             withdrawn = active_w.get("withdrawn", 0.0)
             total = active_w.get("total", 0.0)
             bar = _ascii_bar(pct)
-            tip = get_random_tactical_tip()
-            tip_box = f"\n\n💡 <b>Tip Operativo:</b>\n<i>{tip}</i>" if tip else ""
 
             kb = InlineKeyboardMarkup(
                 [
@@ -1753,8 +1719,6 @@ async def handle_verify_spei_callback(update: Update, context: ContextTypes.DEFA
                 [InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")],
             ]
         )
-        tip = get_random_tactical_tip()
-        tip_box = f"\n\n💡 <b>Tip Operativo:</b>\n<i>{tip}</i>" if tip else ""
 
         await _edit_msg(
             query,
@@ -1762,7 +1726,7 @@ async def handle_verify_spei_callback(update: Update, context: ContextTypes.DEFA
             f"⏳ <b>Acreditación bancaria en tránsito</b>\n\n"
             f"• Cuenta: <code>{email}</code>\n"
             f"• Estado: El SPEI aún no se refleja en el sistema.\n\n"
-            f"<i>Los bancos suelen tardar de 30 a 90 segundos en asentar la transferencia. Espera un momento y vuelve a presionar el botón.</i>{tip_box}",
+            f"<i>Los bancos suelen tardar de 30 a 90 segundos en asentar la transferencia. Espera un momento y vuelve a presionar el botón.</i>",
             reply_markup=kb,
         )
         return
@@ -2105,8 +2069,6 @@ async def handle_confirm_auto_withdrawal_callback(
         _active_operator_withdrawals[operator_id]["withdrawn"] = withdrawn
 
         bar = _ascii_bar(pct)
-        tip = get_random_tactical_tip()
-        tip_box = f"\n\n💡 <b>Tip Operativo:</b>\n<i>{tip}</i>" if tip else ""
 
         text = (
             f"{HEADER}\n\n"
@@ -2114,7 +2076,7 @@ async def handle_confirm_auto_withdrawal_callback(
             f"• 👤 Cuenta: <code>{email}</code>\n"
             f"• 📊 Avance: <code>[{bar}] {pct}%</code>\n"
             f"• 💰 Retirado: <b>${withdrawn:,.2f}</b> / ${real_balance:,.2f}\n"
-            f"• ⚡ Estado: Dispersión en marcha ({batches_count} fases procesadas){tip_box}\n\n"
+            f"• ⚡ Estado: Dispersión en marcha ({batches_count} fases procesadas)\n\n"
             f"🇲🇽 <i>Puedes volver al menú principal sin interrumpir la operación.</i>"
         )
         kb = InlineKeyboardMarkup(

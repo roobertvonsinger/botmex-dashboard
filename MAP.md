@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d808ee6` | fix(bot): fix text intercept in /bet, remove cringe visual noise, sanitize telemetry and update tests |
 | `d8076c6` | fix(bot): eliminar minuto muerto en /bet con ticker asincrono continuo y tips tacticos |
 | `33f83d0` | chore: mover .impeccable a skills-disabled (skills UI no aplican a este stack) |
 | `1292e14` | feat(bot): flujo 100% in-bot con telemetría visual, ficha SPEI, accesos bancarios y retiro por fases |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `41fa58b` | fix(auto_deposit): exclusion dura para cuentas con saldo real, retiro activo o actividad SPEI/retiros <48h |
 | `fe1f154` | feat: integrar modulos del bot y soporte db canonical para auto_deposit en produccion |
 | `cf8800e` | fix(auto-deposit): blindaje E2E /bet, retiro de tarjetas por PAN, fix portal JS y confirm_gate Telegram |
-| `7ec516d` | docs: actualizar NEXT-SESSION.md con cierre de optimizacion matchmaking |
 <!-- GEN:end:recientes -->
 
 ---
