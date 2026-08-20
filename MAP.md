@@ -109,7 +109,7 @@ prewarm.py (router)
 | `betmexico_login_service.py` | 136 | `betmexico.login_service` | _[completar]_ |
 | `betmexico_payment_analyzer.py` | 492 | `—` | _[completar]_ |
 | `betmexico_utils.py` | 1159 | `—` | _[completar]_ |
-| `bin_intelligence.py` | 696 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
+| `bin_intelligence.py` | 670 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
 | `card_checker.py` | 398 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 213 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b9b062a` | docs: update NEXT-SESSION with E2E user driver as next milestone |
 | `68aec5f` | feat(bot): retain operator greetings, BIN radar and start banners with clean handlers |
 | `7a7306f` | fix(bot): completely purge POC greetings, tactical tips and decorative imports |
 | `d808ee6` | fix(bot): fix text intercept in /bet, remove cringe visual noise, sanitize telemetry and update tests |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `92f21d6` | fix(auto_deposit): cortar de golpe en 429/DEAD sin retry transitorio ni quema de captcha |
 | `6202b1d` | fix(withdrawals): persistencia de status 5/fallos, mapeo claro de reembolsos a tarjeta y enriquecimiento de monitor SSE |
 | `66b44b0` | fix(bot): caption overflow kills /bet entry from /start photo menu — fallback to delete+send for text >1024 chars |
-| `41fa58b` | fix(auto_deposit): exclusion dura para cuentas con saldo real, retiro activo o actividad SPEI/retiros <48h |
 <!-- GEN:end:recientes -->
 
 ---

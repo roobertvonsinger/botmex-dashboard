@@ -78,25 +78,41 @@ def test_classify_bin_tier_testing():
 
 
 def test_format_telegram_start_banner():
-    """Verifica que el banner de /start contenga formato HTML y emojis."""
-    banner = format_telegram_start_banner()
-    assert "TOP BINES CORONANDO" in banner
+    """Verifica que el banner de /start contenga formato HTML y emojis cuando hay datos."""
+    mock_summary = {
+        "top_5": [{"bin": "491566", "bank": "Santander", "type": "DEBIT", "flag": "🇲🇽", "approval_rate": 75.0}]
+    }
+    banner = format_telegram_start_banner(mock_summary)
+    assert "TOP BINES" in banner
     assert "👑" in banner
     assert "🇲🇽" in banner
+    # Si no hay datos, retorna vacío
+    assert format_telegram_start_banner({"top_5": []}) == ""
 
 
 def test_format_telegram_bet_warning():
     """Verifica que el aviso comercial de /bet contenga recomendaciones y advertencias."""
-    warning = format_telegram_bet_warning()
+    mock_summary = {
+        "top_5": [{"bin": "491566", "bank": "Santander", "type": "DEBIT", "flag": "🇲🇽", "approval_rate": 75.0}],
+        "threeds": [{"bin": "551238"}],
+        "dead": [{"bin": "525343"}],
+    }
+    warning = format_telegram_bet_warning(mock_summary)
     assert "RADAR DE INTELIGENCIA DE PASARELA" in warning
-    assert "BINES CALIENTES RECOMENDADOS" in warning
+    assert "BINES CON MAYOR TASA DE ÉXITO" in warning
     assert "3DS" in warning
-    assert "Quemadas" in warning
+    assert "Decline" in warning
 
 
 def test_format_telegram_radar_full():
     """Verifica que el radar completo presente las 4 categorías."""
-    radar = format_telegram_radar_full()
+    mock_summary = {
+        "corona": [{"bin": "491566", "bank": "Santander", "type": "DEBIT", "flag": "🇲🇽", "approval_rate": 75.0, "approved": 10}],
+        "threeds": [{"bin": "551238", "bank": "HSBC", "threeds": 3}],
+        "testing": [{"bin": "510125", "bank": "Banorte", "attempts": 2}],
+        "dead": [{"bin": "525343", "bank": "Scotiabank", "rejected": 5}],
+    }
+    radar = format_telegram_radar_full(mock_summary)
     assert "TOP CORONA" in radar
     assert "3DS / ANTIFRAUD" in radar
     assert "EN PRUEBAS" in radar
@@ -105,8 +121,11 @@ def test_format_telegram_radar_full():
 
 def test_get_single_card_bin_badge():
     """Verifica que una tarjeta individual reciba su badge correspondiente."""
-    # Santander debito (TOP)
-    res = get_single_card_bin_badge("4915661234567890|12|28|123")
+    mock_summary = {
+        "corona": [{"bin": "491566", "tier": "corona", "tier_badge": "👑 CORONA"}]
+    }
+    # Santander debito con summary
+    res = get_single_card_bin_badge("4915661234567890|12|28|123", summary=mock_summary)
     assert "Santander" in res["bank"]
     assert res["flag"] == "🇲🇽"
     assert res["tier"] == "corona"

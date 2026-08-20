@@ -970,10 +970,11 @@ async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE, override_text: Optional[str] = None):
-    """Procesa las tarjetas ingresadas para /bet con validación de liveness."""
+    """Procesa las tarjetas ingresadas para /bet con validación de liveness concurrente."""
     text = (override_text or (update.message.text if update.message else "") or "").strip()
     if text.startswith("/") and not any(char.isdigit() for char in text):
-        await update.message.reply_text("❌ Envía las tarjetas, no un comando.")
+        if update.message:
+            await update.message.reply_text("❌ Envía las tarjetas, no un comando.")
         return WAIT_BET_CONFIRM
 
     # Limpiar líneas de tarjetas
@@ -988,9 +989,10 @@ async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             lines = [line.strip() for line in parts[1].splitlines() if line.strip()]
 
     if not lines or len(lines) > 4:
-        await update.message.reply_text(
-            "❌ Debes enviar entre 1 y 4 tarjetas por intento."
-        )
+        if update.message:
+            await update.message.reply_text(
+                "❌ Debes enviar entre 1 y 4 tarjetas por intento."
+            )
         return WAIT_BET_CONFIRM
 
     operator_id = update.effective_user.id
@@ -1005,21 +1007,36 @@ async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         strikes_count = (row["strikes_count"] or 0) if row else 0
 
     if strikes_count >= MAX_DAILY_STRIKES:
-        await update.message.reply_text(
+        fail_strike_msg = (
             f"{HEADER}\n\n"
             f"❌ <b>Límite de {MAX_DAILY_STRIKES} strikes diarios alcanzado.</b> Contacta al SuperAdmin.\n"
-            f"<i>Los strikes previenen el quema de pasarelas con tarjetas inválidas.</i>",
-            parse_mode="HTML",
+            f"<i>Los strikes previenen el quema de pasarelas con tarjetas inválidas.</i>"
         )
+        if update.message:
+            await update.message.reply_text(fail_strike_msg, parse_mode="HTML")
         return ConversationHandler.END
 
-    # Validar liveness via puente ruthopia (RF1/RF2/RF3)
+    status_msg = None
+    if update.message:
+        try:
+            status_msg = await update.message.reply_text(
+                f"⏳ <b>Validando {len(lines)} tarjeta(s) en pasarela…</b>",
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
+
+    # Validar liveness en paralelo sin bloquear el event loop
+    results = await asyncio.gather(
+        *[asyncio.to_thread(precheck_card_liveness, pipe) for pipe in lines]
+    )
+
     live_pipes = []
     tol_pipes = []
     liveness_records = []
     seen_pans = set()
-    for pipe in lines:
-        ok, reason, parsed = precheck_card_liveness(pipe)
+
+    for pipe, (ok, reason, parsed) in zip(lines, results):
         kind = parsed.get("liveness_kind", "dead") if parsed else "dead"
         c_num = parsed.get("card_number") if parsed else ""
         if c_num and c_num in seen_pans:
@@ -1039,7 +1056,6 @@ async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 tol_pipes.append(parsed["pipe_3parts"])
 
     summary_text = format_ruthopia_liveness_summary(liveness_records)
-    strikes_left = MAX_DAILY_STRIKES - strikes_count
     valid_pipes = live_pipes + tol_pipes
     live_count = len(live_pipes)
 
@@ -1054,10 +1070,10 @@ async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         kb_fail = InlineKeyboardMarkup(
             [[InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]]
         )
-        await update.message.reply_text(fail_msg, parse_mode="HTML", reply_markup=kb_fail)
+        if update.message:
+            await update.message.reply_text(fail_msg, parse_mode="HTML", reply_markup=kb_fail)
         return ConversationHandler.END
 
-    # RF7: confirmación antes del auto match (se restauró lo que quitó 668ab62)
     context.user_data["pending_bet_pipes"] = valid_pipes
     context.user_data["pending_tol_pipes"] = tol_pipes
     confirm_msg = (
@@ -1077,7 +1093,8 @@ async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             ],
         ]
     )
-    await update.message.reply_text(confirm_msg, parse_mode="HTML", reply_markup=kb)
+    if update.message:
+        await update.message.reply_text(confirm_msg, parse_mode="HTML", reply_markup=kb)
     return WAIT_BET_CONFIRM
 
 
@@ -1930,14 +1947,31 @@ async def handle_edit_bank_access_callback(update: Update, context: ContextTypes
 
 
 async def process_bank_access_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Procesa el mensaje de texto del operador con los accesos bancarios."""
+    """Procesa el mensaje de texto del operador con los accesos bancarios o auto-enruta según formato."""
     user_id = update.effective_user.id
     if not is_authorized(user_id):
         return
 
-    text = update.message.text.strip()
+    text = (update.message.text if update.message else "") or ""
+    text = text.strip()
+    if not text:
+        return
+
     bank_info = context.user_data.get("pending_bank_access")
     if not bank_info:
+        # Si el texto parece una lista de tarjetas (num|mm|yy|cvv)
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if lines and any("|" in line and any(c.isdigit() for c in line) for line in lines):
+            return await process_bet_input(update, context)
+        # Si el texto parece combos (correo:password)
+        if lines and any(":" in line and "@" in line for line in lines):
+            return await process_check_input(update, context)
+        
+        # De lo contrario, no dejar en silencio: responder con el menú de inicio
+        nickname = get_user_nickname(user_id, update.effective_user.first_name)
+        msg, kb = _start_menu_msg(user_id, nickname)
+        if update.message:
+            await update.message.reply_text(msg, parse_mode="HTML", reply_markup=kb)
         return
 
     account_id = bank_info["account_id"]

@@ -96,7 +96,7 @@ def lookup_bin_metadata(bin6: str) -> Dict[str, str]:
     if not bin6 or len(bin6) < 6:
         return {
             "bin": bin6 or "",
-            "bank": "Desconocido",
+            "bank": "",
             "scheme": "CARD",
             "type": "CARD",
             "level": "STANDARD",
@@ -113,9 +113,9 @@ def lookup_bin_metadata(bin6: str) -> Dict[str, str]:
     scheme = "VISA" if bin6.startswith("4") else ("MASTERCARD" if bin6.startswith("5") else ("AMEX" if bin6.startswith("3") else "CARD"))
     return {
         "bin": bin6,
-        "bank": "Banco Mexicano",
+        "bank": "",
         "scheme": scheme,
-        "type": "DÉBITO",
+        "type": "CARD",
         "level": "STANDARD",
         "country": "MEXICO",
         "flag": "🇲🇽",
@@ -157,7 +157,7 @@ def classify_bin_tier(attempts: int, approved: int, threeds: int, rejected: int)
             "dead",
             "💀 QUEMADA (Ultra Decline)",
             "💀 QUEMADA",
-            f"Ultra decline ({rej} rechazos seguidos). Sabrá Dios cuándo jalen, al día de hoy nadie ha coronado con estas."
+            f"Ultra decline ({rej} rechazos seguidos). al día de hoy nadie ha coronado con estas."
         )
 
     # 4. TIER TESTING: Pocos intentos (<= 3), sin 3DS ni aprobación
@@ -243,37 +243,8 @@ def _query_bin_rows(c: Any) -> List[Dict[str, Any]]:
 
 
 def get_bin_intelligence_summary(conn_or_path: Any = None) -> Dict[str, Any]:
-    """Genera el reporte clasificado completo para Telegram y Web."""
+    """Genera el reporte clasificado completo para Telegram y Web basado 100% en BD real."""
     all_bins = fetch_bin_stats_from_db(conn_or_path)
-    
-    # Si la BD local de test está vacía, enriquecer con BINes conocidos del catálogo
-    if not all_bins:
-        # Fallback sintético basado en el historial consolidado
-        sample_bins = [
-            {"bin": "491566", "attempts": 216, "approved": 164, "threeds": 11, "rejected": 34, "approved_amount": 24600.0, "approved_cards": 4, "total_cards": 13, "last_seen": "2026-08-02"},
-            {"bin": "526424", "attempts": 217, "approved": 88, "threeds": 2, "rejected": 73, "approved_amount": 13200.0, "approved_cards": 11, "total_cards": 29, "last_seen": "2026-08-06"},
-            {"bin": "544548", "attempts": 80, "approved": 35, "threeds": 0, "rejected": 33, "approved_amount": 5250.0, "approved_cards": 4, "total_cards": 11, "last_seen": "2026-07-11"},
-            {"bin": "557908", "attempts": 26, "approved": 11, "threeds": 0, "rejected": 12, "approved_amount": 1650.0, "approved_cards": 2, "total_cards": 7, "last_seen": "2026-07-20"},
-            {"bin": "511916", "attempts": 366, "approved": 122, "threeds": 9, "rejected": 115, "approved_amount": 18300.0, "approved_cards": 8, "total_cards": 37, "last_seen": "2026-08-01"},
-            {"bin": "491366", "attempts": 43, "approved": 15, "threeds": 0, "rejected": 26, "approved_amount": 2250.0, "approved_cards": 4, "total_cards": 8, "last_seen": "2026-08-05"},
-            {"bin": "551238", "attempts": 19, "approved": 0, "threeds": 2, "rejected": 5, "approved_amount": 0.0, "approved_cards": 0, "total_cards": 5, "last_seen": "2026-07-15"},
-            {"bin": "526354", "attempts": 15, "approved": 0, "threeds": 2, "rejected": 9, "approved_amount": 0.0, "approved_cards": 0, "total_cards": 4, "last_seen": "2026-07-28"},
-            {"bin": "525343", "attempts": 18, "approved": 0, "threeds": 0, "rejected": 14, "approved_amount": 0.0, "approved_cards": 0, "total_cards": 4, "last_seen": "2026-07-19"},
-            {"bin": "526777", "attempts": 17, "approved": 0, "threeds": 0, "rejected": 10, "approved_amount": 0.0, "approved_cards": 0, "total_cards": 5, "last_seen": "2026-07-28"},
-            {"bin": "510125", "attempts": 4, "approved": 0, "threeds": 0, "rejected": 0, "approved_amount": 0.0, "approved_cards": 0, "total_cards": 1, "last_seen": "2026-06-28"},
-        ]
-        for b in sample_bins:
-            att = b["attempts"]
-            app = b["approved"]
-            b["approval_rate"] = round((app / att) * 100, 1) if att else 0.0
-            meta = lookup_bin_metadata(b["bin"])
-            b.update(meta)
-            tier_code, tier_title, tier_badge, slang_reason = classify_bin_tier(att, app, b["threeds"], b["rejected"])
-            b["tier"] = tier_code
-            b["tier_title"] = tier_title
-            b["tier_badge"] = tier_badge
-            b["slang_reason"] = slang_reason
-            all_bins.append(b)
 
     tier_corona = [b for b in all_bins if b["tier"] == "corona"]
     tier_3ds = [b for b in all_bins if b["tier"] == "threeds"]
@@ -306,7 +277,7 @@ def get_bin_intelligence_summary(conn_or_path: Any = None) -> Dict[str, Any]:
 
 
 def format_telegram_start_banner(summary: Optional[Dict[str, Any]] = None) -> str:
-    """Genera el banner compacto y llamativo para el comando /start."""
+    """Genera el banner compacto para /start únicamente si existen estadísticas reales."""
     if not summary:
         summary = get_bin_intelligence_summary()
     
@@ -315,22 +286,21 @@ def format_telegram_start_banner(summary: Optional[Dict[str, Any]] = None) -> st
         return ""
 
     lines = [
-        "🔥 <b>TOP BINES CORONANDO (PASAN DIRECTO):</b>",
+        "🔥 <b>TOP BINES EN HISTÓRICO:</b>",
     ]
     for b in top[:3]:
         bin_str = b["bin"]
-        bank = b.get("bank", "Banco")
+        bank = b.get("bank") or "Banco"
         btype = "DÉB" if "DEB" in b.get("type", "").upper() else "CRÉD"
         flag = b.get("flag", "🇲🇽")
         rate = b.get("approval_rate", 0)
         lines.append(f"• 👑 <code>{bin_str}</code> · <b>{bank}</b> [{btype}] {flag} · <code>{rate}%</code>")
 
-    lines.append("<i>💡 Tira con estos para asegurar acreditación inmediata.</i>")
     return "\n".join(lines)
 
 
 def format_telegram_bet_warning(summary: Optional[Dict[str, Any]] = None) -> str:
-    """Genera el aviso comercial / heads-up al entrar al flujo /bet."""
+    """Genera el aviso para /bet únicamente si existen registros reales en BD."""
     if not summary:
         summary = get_bin_intelligence_summary()
 
@@ -338,30 +308,32 @@ def format_telegram_bet_warning(summary: Optional[Dict[str, Any]] = None) -> str
     dead = summary.get("dead", [])
     tds = summary.get("threeds", [])
 
+    if not top and not dead and not tds:
+        return ""
+
     lines = [
         "⚡ <b>RADAR DE INTELIGENCIA DE PASARELA</b> ⚡",
         "─────────────────────────",
-        "🎯 <b>BINES CALIENTES RECOMENDADOS:</b>",
     ]
-    for b in top[:4]:
-        bin_str = b["bin"]
-        bank = b.get("bank", "Banco")
-        btype = "DÉBITO" if "DEB" in b.get("type", "").upper() else "CRÉDITO"
-        flag = b.get("flag", "🇲🇽")
-        rate = b.get("approval_rate", 0)
-        lines.append(f"  🔥 <code>{bin_str}</code> <b>{bank}</b> ({btype}) {flag} ➔ <b>{rate}% éxito</b>")
+    if top:
+        lines.append("🎯 <b>BINES CON MAYOR TASA DE ÉXITO:</b>")
+        for b in top[:3]:
+            bin_str = b["bin"]
+            bank = b.get("bank") or "Banco"
+            btype = "DÉBITO" if "DEB" in b.get("type", "").upper() else "CRÉDITO"
+            flag = b.get("flag", "🇲🇽")
+            rate = b.get("approval_rate", 0)
+            lines.append(f"  🔥 <code>{bin_str}</code> <b>{bank}</b> ({btype}) {flag} ➔ <b>{rate}% éxito</b>")
 
-    lines.append("")
     if tds:
         tds_bins = ", ".join(f"<code>{b['bin']}</code>" for b in tds[:3])
-        lines.append(f"🛡️ <b>Piden 3DS / Antifraud:</b> {tds_bins} <i>(reto banco)</i>")
+        lines.append(f"🛡️ <b>3DS / Antifraud en histórico:</b> {tds_bins}")
     
     if dead:
         dead_bins = ", ".join(f"<code>{b['bin']}</code>" for b in dead[:3])
-        lines.append(f"💀 <b>Quemadas / Decline:</b> {dead_bins} <i>(0% histórico)</i>")
+        lines.append(f"💀 <b>Decline recurrente:</b> {dead_bins}")
 
     lines.append("─────────────────────────")
-    lines.append("🇲🇽 <i>Pega tus tarjetas abajo para validarlas de una.</i>")
     return "\n".join(lines)
 
 
@@ -415,19 +387,21 @@ def get_single_card_bin_badge(card_pipe_or_num: str, summary: Optional[Dict[str,
         for b in summary.get(cat, []):
             all_bins_map[b["bin"]] = b
 
+    bank = meta.get("bank", "")
+    bank_part = f"{bank} " if bank else ""
+    btype = "[DÉB]" if "DEB" in meta.get("type", "").upper() else ("[CRÉD]" if "CRED" in meta.get("type", "").upper() else "")
+
     if bin6 in all_bins_map:
         b = all_bins_map[bin6]
         tier = b.get("tier", "testing")
         badge = b.get("tier_badge", "🧪 TEST")
-        btype = "DÉB" if "DEB" in meta.get("type", "").upper() else "CRÉD"
-        text = f"{meta['flag']} {meta['bank']} [{btype}] · {badge}"
-        return {"badge": badge, "text": text, "tier": tier, "bank": meta["bank"], "flag": meta["flag"]}
+        text = f"{meta['flag']} {bank_part}{btype} · {badge}".strip()
+        return {"badge": badge, "text": text, "tier": tier, "bank": bank, "flag": meta["flag"]}
 
     # No visto en BD
-    btype = "DÉB" if "DEB" in meta.get("type", "").upper() else "CRÉD"
     badge = "🧪 TEST"
-    text = f"{meta['flag']} {meta['bank']} [{btype}] · {badge}"
-    return {"badge": badge, "text": text, "tier": "testing", "bank": meta["bank"], "flag": meta["flag"]}
+    text = f"{meta['flag']} {bank_part}{btype} · {badge}".strip()
+    return {"badge": badge, "text": text, "tier": "testing", "bank": bank, "flag": meta["flag"]}
 
 
 def get_random_tactical_tip(summary: Optional[Dict[str, Any]] = None) -> str:

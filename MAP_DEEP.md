@@ -382,15 +382,15 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `classify_bin_tier` | def | L125–L169 |
 | `fetch_bin_stats_from_db` | def | L172–L196 |
 | `_query_bin_rows` | def | L199–L242 |
-| `get_bin_intelligence_summary` | def | L245–L305 |
-| `format_telegram_start_banner` | def | L308–L329 |
-| `format_telegram_bet_warning` | def | L332–L365 |
-| `format_telegram_radar_full` | def | L368–L399 |
-| `get_single_card_bin_badge` | def | L402–L430 |
-| `get_random_tactical_tip` | def | L433–L483 |
-| `fetch_operator_personal_stats` | def | L486–L528 |
-| `_query_operator_stats` | def | L531–L661 |
-| `format_telegram_operator_stats` | def | L664–L695 |
+| `get_bin_intelligence_summary` | def | L245–L276 |
+| `format_telegram_start_banner` | def | L279–L299 |
+| `format_telegram_bet_warning` | def | L302–L337 |
+| `format_telegram_radar_full` | def | L340–L371 |
+| `get_single_card_bin_badge` | def | L374–L404 |
+| `get_random_tactical_tip` | def | L407–L457 |
+| `fetch_operator_personal_stats` | def | L460–L502 |
+| `_query_operator_stats` | def | L505–L635 |
+| `format_telegram_operator_stats` | def | L638–L669 |
 
 ### `card_checker.py`
 
