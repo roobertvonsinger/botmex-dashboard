@@ -511,8 +511,9 @@ async def test_bet_card_invalid_or_cooldown(seed_db):
 
     res = await process_bet_input(update, context)
     assert res == ConversationHandler.END
-    args, kwargs = update.message.reply_text.call_args
-    assert "CARDING FALLIDO" in args[0] or "NO SE DETECTARON TARJETAS LIVE" in args[0]
+    status_msg = update.message.reply_text.return_value
+    args, kwargs = status_msg.edit_text.call_args if status_msg.edit_text.called else update.message.reply_text.call_args
+    assert "TIESAS" in args[0] or "Descartadas" in args[0] or "CARDING FALLIDO" in args[0]
 
 
 @pytest.mark.asyncio
@@ -551,8 +552,9 @@ async def test_bet_confirm_splits_live_tol(seed_db, monkeypatch):
     assert "45552900000000040|1228|123" not in context.user_data["pending_tol_pipes"]
 
     # Mensaje de confirmación con conteo + botones confirm/cancel
-    args, kwargs = update.message.reply_text.call_args
-    assert "Toleradas" in args[0]
+    status_msg = update.message.reply_text.return_value
+    args, kwargs = status_msg.edit_text.call_args if status_msg.edit_text.called else update.message.reply_text.call_args
+    assert "LIVE · 2" in args[0] or "Aceptadas: <b>2</b>" in args[0]
     kb = kwargs["reply_markup"]
     flat = [b.callback_data for row in kb.inline_keyboard for b in row]
     assert "confirm_bet" in flat

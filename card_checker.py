@@ -378,21 +378,46 @@ def precheck_card_liveness(card_pipe: str) -> Tuple[bool, str, Optional[Dict[str
 
 
 def format_ruthopia_liveness_summary(results: List[Dict[str, Any]]) -> str:
-    """Genera la visualización del resultado de liveness con estética del bot Ruthopia y radar de BINes."""
+    """Genera la visualización del resultado de liveness con la jerarquía visual oficial de BoTMexico."""
     try:
-        from bin_intelligence import get_single_card_bin_badge
+        from bin_intelligence import lookup_bin_metadata
     except ImportError:
-        get_single_card_bin_badge = lambda p: {"text": ""}
+        lookup_bin_metadata = lambda b: {}
 
-    lines = ["<b>ʀ.ᴜᴛʜᴏᴘɪᴀ ɢᴀᴛᴇ /ʀᴡ — Liveness Check Result</b>", "────────────────────────────────────────"]
-    for item in results:
-        pipe = item.get("pipe", "")
-        status = item.get("status_label", "UNCHECKED")
-        intel = get_single_card_bin_badge(pipe)
-        intel_badge = f"\n   └ 🎯 <i>{intel['text']}</i>" if intel.get("text") else ""
-        lines.append(f"💳 <code>{pipe}</code> {status}{intel_badge}")
-    lines.append("────────────────────────────────────────")
-    accepted = [i for i in results if i.get("ok")]
-    discarded = [i for i in results if not i.get("ok")]
-    lines.append(f"✅ Aceptadas: <b>{len(accepted)}</b> | ❌ Descartadas: <b>{len(discarded)}</b>")
-    return "\n".join(lines)
+    live_items = [i for i in results if i.get("ok")]
+    dead_items = [i for i in results if not i.get("ok")]
+
+    sections = []
+
+    if live_items:
+        live_lines = [f"<b>LIVE · {len(live_items)}</b>", "━━━━━━━━"]
+        for item in live_items:
+            pipe = item.get("pipe", "")
+            bin6 = pipe.replace("|", "")[:6]
+            meta = lookup_bin_metadata(bin6)
+            bank = (meta.get("bank") or meta.get("scheme") or "BANCO").upper()
+            flag = meta.get("flag", "🇲🇽")
+            raw_type = meta.get("type", "Credit").capitalize()
+            if "DEB" in meta.get("type", "").upper():
+                raw_type = "Debit"
+            elif "CRED" in meta.get("type", "").upper():
+                raw_type = "Credit"
+            level = meta.get("level", "STANDARD").upper()
+            live_lines.append(f"✅ <code>{pipe}</code>")
+            live_lines.append(f"⌬ {bank} {flag} - {raw_type} {level} ⌬")
+        sections.append("\n".join(live_lines))
+
+    if dead_items:
+        dead_lines = [f"<b>TIESAS · {len(dead_items)}</b>", "━━━━━━━━"]
+        for item in dead_items:
+            pipe = item.get("pipe", "")
+            dead_lines.append(f"❌ <code>{pipe}</code>")
+        sections.append("\n".join(dead_lines))
+
+    divider = "═════════════════════════"
+    body = f"\n{divider}\n\n".join(sections) if sections else ""
+    summary_footer = f"{divider}\n✅ Aceptadas: <b>{len(live_items)}</b> | ❌ Descartadas: <b>{len(dead_items)}</b>"
+
+    if body:
+        return f"{body}\n{summary_footer}"
+    return summary_footer

@@ -71,7 +71,7 @@ def test_bot_bet_luhn_failure(sa_client):
         "card_pipes": ["4111111111111112|1230|123"]
     })
     assert res.status_code == 400
-    assert "liveness" in res.json()["detail"].lower()
+    assert "validaciones" in res.json()["detail"].lower() or "tiesas" in res.json()["detail"].lower() or "liveness" in res.json()["detail"].lower()
 
 
 def test_bot_bet_require_confirmation(sa_client, monkeypatch):

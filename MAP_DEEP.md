@@ -402,7 +402,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `parse_and_validate_card_pipe` | def | L101–L150 |
 | `perform_wabox_liveness_check` | def | L158–L284 |
 | `precheck_card_liveness` | def | L287–L377 |
-| `format_ruthopia_liveness_summary` | def | L380–L398 |
+| `format_ruthopia_liveness_summary` | def | L380–L423 |
 
 ### `clabe_fetch.py`
 

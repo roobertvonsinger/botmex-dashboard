@@ -69,7 +69,8 @@ def test_format_ruthopia_liveness_summary():
         {"pipe": "4111111111111112|1230|123", "ok": False, "status_label": "🔴 DECLINED"}
     ]
     summary = format_ruthopia_liveness_summary(items)
-    assert "ʀ.ᴜᴛʜᴏᴘɪᴀ ɢᴀᴛᴇ /ʀᴡ" in summary
+    assert "LIVE · 1" in summary
+    assert "TIESAS · 1" in summary
     assert "Aceptadas: <b>1</b>" in summary
     assert "Descartadas: <b>1</b>" in summary
 

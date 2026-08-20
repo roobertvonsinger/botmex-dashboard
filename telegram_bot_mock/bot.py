@@ -1062,15 +1062,19 @@ async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     if not valid_pipes:
         fail_msg = (
             f"{HEADER}\n\n"
-            f"🔴 <b>CARDING FALLIDO — SIN TARJETAS LIVE</b>\n\n"
-            f"• 💳 CCs LIVE: <b>0</b>\n"
-            f"• ⚠️ Strikes acumulados: <b>{strikes_count} / {MAX_DAILY_STRIKES}</b>\n\n"
-            f"{summary_text}"
+            f"{summary_text}\n\n"
+            f"⚠️ <i>Strikes acumulados: <b>{strikes_count} / {MAX_DAILY_STRIKES}</b></i>"
         )
         kb_fail = InlineKeyboardMarkup(
             [[InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]]
         )
-        if update.message:
+        if status_msg:
+            try:
+                await status_msg.edit_text(fail_msg, parse_mode="HTML", reply_markup=kb_fail)
+            except Exception:
+                if update.message:
+                    await update.message.reply_text(fail_msg, parse_mode="HTML", reply_markup=kb_fail)
+        elif update.message:
             await update.message.reply_text(fail_msg, parse_mode="HTML", reply_markup=kb_fail)
         return ConversationHandler.END
 
@@ -1078,10 +1082,6 @@ async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     context.user_data["pending_tol_pipes"] = tol_pipes
     confirm_msg = (
         f"{HEADER}\n\n"
-        f"💳 <b>Filtro de tarjetas completado</b>\n\n"
-        f"• ✅ Aceptadas (LIVE): <b>{live_count}</b>\n"
-        f"• 🟡 Toleradas: <b>{len(tol_pipes)}</b>\n"
-        f"• ❌ Descartadas: <b>{len(lines) - len(valid_pipes)}</b>\n\n"
         f"{summary_text}\n\n"
         f"¿Continuar al auto match de cuentas?"
     )
@@ -1093,7 +1093,13 @@ async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             ],
         ]
     )
-    if update.message:
+    if status_msg:
+        try:
+            await status_msg.edit_text(confirm_msg, parse_mode="HTML", reply_markup=kb)
+        except Exception:
+            if update.message:
+                await update.message.reply_text(confirm_msg, parse_mode="HTML", reply_markup=kb)
+    elif update.message:
         await update.message.reply_text(confirm_msg, parse_mode="HTML", reply_markup=kb)
     return WAIT_BET_CONFIRM
 
