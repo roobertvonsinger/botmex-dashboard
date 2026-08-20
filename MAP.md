@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `55ae7d4` | feat: visual badge and highlight for accounts newly added in last 48h |
 | `9a9b3bd` | feat(bot): implement crisp card validation layout with LIVE/TIESAS blocks and direct summary |
 | `f1a436d` | fix(bot): purge fake sample_bins, parallelize card liveness precheck and auto-route raw text |
 | `b9b062a` | docs: update NEXT-SESSION with E2E user driver as next milestone |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `1292e14` | feat(bot): flujo 100% in-bot con telemetría visual, ficha SPEI, accesos bancarios y retiro por fases |
 | `1cea8e3` | fix(auto_deposit): tier_mid exige _jwt_alive para evitar selecciones de cuentas expiradas |
 | `2fb94af` | fix(auto_deposit): jwt_first prioritario absoluto y corregir check de ventana individual |
-| `92f21d6` | fix(auto_deposit): cortar de golpe en 429/DEAD sin retry transitorio ni quema de captcha |
 <!-- GEN:end:recientes -->
 
 ---

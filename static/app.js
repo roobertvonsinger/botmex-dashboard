@@ -698,6 +698,7 @@ function renderTable() {
     // Glow "la que veo" (Task 1.4, feature semilla de Robert) — recalculado en
     // cada render desde window.Pantalla.currentId, así sobrevive SSE/sort/filtro
     // igual que row-sel. El toggle instantáneo al abrir/cerrar vive en pantalla.js.
+    const pantallaSrcClass = (window.Pantalla && window.Pantalla.currentId === r.id) ? 'pantalla-source' : '';
     const isNewCls = r.is_new ? 'row-is-new' : '';
     const trClasses = `r-grade-${g} ${lockedCls} ${selCls} ${opClass} ${trasClass} ${coolingClass} ${pantallaSrcClass} ${isNewCls}`.trim();
     const lockChip = r.locked_by
