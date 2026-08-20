@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `1292e14` | feat(bot): flujo 100% in-bot con telemetría visual, ficha SPEI, accesos bancarios y retiro por fases |
 | `1cea8e3` | fix(auto_deposit): tier_mid exige _jwt_alive para evitar selecciones de cuentas expiradas |
 | `2fb94af` | fix(auto_deposit): jwt_first prioritario absoluto y corregir check de ventana individual |
 | `92f21d6` | fix(auto_deposit): cortar de golpe en 429/DEAD sin retry transitorio ni quema de captcha |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `7ec516d` | docs: actualizar NEXT-SESSION.md con cierre de optimizacion matchmaking |
 | `87c290c` | fix(matchmaking): jubilar tarjetas aprobadas, planificador round-robin no bloqueante y lazy pool |
 | `37c6003` | feat(ui): rediseño dark mode glassmorphism portal, matriz lirica freestyle MC y reactivacion Magdiel |
-| `a0eefaa` | feat(bet_flow): automatch con combo TOP garantizado, llenado encubierto omnicanal y retiros en batches de 200 con anti-reembolso |
 <!-- GEN:end:recientes -->
 
 ---
