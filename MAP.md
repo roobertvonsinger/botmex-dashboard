@@ -109,7 +109,7 @@ prewarm.py (router)
 | `betmexico_login_service.py` | 136 | `betmexico.login_service` | _[completar]_ |
 | `betmexico_payment_analyzer.py` | 492 | `—` | _[completar]_ |
 | `betmexico_utils.py` | 1159 | `—` | _[completar]_ |
-| `bin_intelligence.py` | 654 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
+| `bin_intelligence.py` | 696 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
 | `card_checker.py` | 398 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 213 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d8076c6` | fix(bot): eliminar minuto muerto en /bet con ticker asincrono continuo y tips tacticos |
 | `33f83d0` | chore: mover .impeccable a skills-disabled (skills UI no aplican a este stack) |
 | `1292e14` | feat(bot): flujo 100% in-bot con telemetría visual, ficha SPEI, accesos bancarios y retiro por fases |
 | `1cea8e3` | fix(auto_deposit): tier_mid exige _jwt_alive para evitar selecciones de cuentas expiradas |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `fe1f154` | feat: integrar modulos del bot y soporte db canonical para auto_deposit en produccion |
 | `cf8800e` | fix(auto-deposit): blindaje E2E /bet, retiro de tarjetas por PAN, fix portal JS y confirm_gate Telegram |
 | `7ec516d` | docs: actualizar NEXT-SESSION.md con cierre de optimizacion matchmaking |
-| `87c290c` | fix(matchmaking): jubilar tarjetas aprobadas, planificador round-robin no bloqueante y lazy pool |
 <!-- GEN:end:recientes -->
 
 ---

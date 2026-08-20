@@ -790,3 +790,26 @@ async def test_retry_mission_callback_not_authorized(seed_db):
     query.edit_message_text.assert_called_once_with(
         "No autorizado para reintentar esta misión.", parse_mode="HTML"
     )
+
+
+def test_build_app_handlers_order():
+    """Valida que los ConversationHandlers (/check, /adduser, /bet) se registren
+    antes que cualquier MessageHandler genérico de texto en el grupo principal."""
+    from telegram.ext import ConversationHandler, MessageHandler
+    app = mock_bot.build_app()
+    handlers_group_0 = app.handlers.get(0, [])
+    
+    conv_indices = [i for i, h in enumerate(handlers_group_0) if isinstance(h, ConversationHandler)]
+    msg_text_indices = [
+        i for i, h in enumerate(handlers_group_0)
+        if isinstance(h, MessageHandler) and not isinstance(h, ConversationHandler)
+    ]
+    
+    assert len(conv_indices) >= 3, "Deben estar registrados check, adduser y bet handlers"
+    last_conv_idx = max(conv_indices)
+    for msg_idx in msg_text_indices:
+        assert msg_idx > last_conv_idx, (
+            f"El MessageHandler en el índice {msg_idx} debe registrarse después "
+            f"del último ConversationHandler (índice {last_conv_idx}) para no interceptar inputs de texto"
+        )
+

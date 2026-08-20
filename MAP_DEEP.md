@@ -389,8 +389,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `get_single_card_bin_badge` | def | L402–L430 |
 | `get_random_tactical_tip` | def | L433–L483 |
 | `fetch_operator_personal_stats` | def | L486–L528 |
-| `_query_operator_stats` | def | L531–L619 |
-| `format_telegram_operator_stats` | def | L622–L653 |
+| `_query_operator_stats` | def | L531–L661 |
+| `format_telegram_operator_stats` | def | L664–L695 |
 
 ### `card_checker.py`
 

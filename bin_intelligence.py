@@ -531,7 +531,7 @@ def fetch_operator_personal_stats(operator_id: int, conn_or_path: Any = None) ->
 def _query_operator_stats(c: Any, operator_id: int) -> Dict[str, Any]:
     op_str = str(operator_id).strip()
 
-    # 1. Intentos de depósito del operador
+    # 1. Intentos de depósito del operador (consultar deposit_attempts o account_touches)
     attempts_q = """
     SELECT
         COUNT(*) as total_attempts,
@@ -543,7 +543,26 @@ def _query_operator_stats(c: Any, operator_id: int) -> Dict[str, Any]:
     FROM deposit_attempts
     WHERE operator_id = ? OR operator_id = ?
     """
-    row_att = c.execute(attempts_q, (operator_id, op_str)).fetchone()
+    try:
+        row_att = c.execute(attempts_q, (operator_id, op_str)).fetchone()
+    except Exception:
+        # Fallback a la tabla canónica de eventos: account_touches
+        touches_q = """
+        SELECT
+            COUNT(*) as total_attempts,
+            SUM(CASE WHEN status='approved' THEN 1 ELSE 0 END) as approved_count,
+            SUM(CASE WHEN status='threeds' OR LOWER(COALESCE(rejection_reason,'')) LIKE '%3ds%' THEN 1 ELSE 0 END) as tds_count,
+            SUM(CASE WHEN status='rejected' AND LOWER(COALESCE(rejection_reason,'')) NOT LIKE '%3ds%' THEN 1 ELSE 0 END) as rej_count,
+            COALESCE(SUM(CASE WHEN status='approved' THEN amount ELSE 0 END), 0) as total_deposited,
+            COUNT(DISTINCT card_pipe) as unique_cards
+        FROM account_touches
+        WHERE (operator_id = ? OR operator_id = ?) AND touch_type='deposit'
+        """
+        try:
+            row_att = c.execute(touches_q, (operator_id, op_str)).fetchone()
+        except Exception:
+            row_att = None
+
     att_d = dict(row_att) if row_att else {}
 
     tot_att = att_d.get("total_attempts", 0) or 0
@@ -560,7 +579,10 @@ def _query_operator_stats(c: Any, operator_id: int) -> Dict[str, Any]:
     FROM account_withdrawals
     WHERE operator_id = ? OR operator_id = ?
     """
-    row_wd = c.execute(withdrawn_q, (operator_id, op_str)).fetchone()
+    try:
+        row_wd = c.execute(withdrawn_q, (operator_id, op_str)).fetchone()
+    except Exception:
+        row_wd = None
     wd_d = dict(row_wd) if row_wd else {}
     tot_wd = float(wd_d.get("total_withdrawn", 0.0) or 0.0)
     wd_cnt = wd_d.get("wd_count", 0) or 0
@@ -571,7 +593,10 @@ def _query_operator_stats(c: Any, operator_id: int) -> Dict[str, Any]:
     FROM auto_missions
     WHERE operator_id = ? OR operator_id = ?
     """
-    row_m = c.execute(missions_q, (operator_id, op_str)).fetchone()
+    try:
+        row_m = c.execute(missions_q, (operator_id, op_str)).fetchone()
+    except Exception:
+        row_m = None
     tot_missions = (row_m[0] if row_m else 0) or 0
 
     # 4. Top BINes del operador
@@ -586,7 +611,24 @@ def _query_operator_stats(c: Any, operator_id: int) -> Dict[str, Any]:
     ORDER BY attempts DESC
     LIMIT 3
     """
-    top_bins_rows = c.execute(top_bins_q, (operator_id, op_str)).fetchall()
+    try:
+        top_bins_rows = c.execute(top_bins_q, (operator_id, op_str)).fetchall()
+    except Exception:
+        fallback_bins_q = """
+        SELECT
+            SUBSTR(card_pipe, 1, 6) as bin,
+            COUNT(*) as attempts,
+            SUM(CASE WHEN status='approved' THEN 1 ELSE 0 END) as approved
+        FROM account_touches
+        WHERE (operator_id = ? OR operator_id = ?) AND touch_type='deposit' AND card_pipe IS NOT NULL AND LENGTH(card_pipe) >= 6
+        GROUP BY bin
+        ORDER BY attempts DESC
+        LIMIT 3
+        """
+        try:
+            top_bins_rows = c.execute(fallback_bins_q, (operator_id, op_str)).fetchall()
+        except Exception:
+            top_bins_rows = []
     top_bins = []
     for r in top_bins_rows:
         b_dict = dict(r)

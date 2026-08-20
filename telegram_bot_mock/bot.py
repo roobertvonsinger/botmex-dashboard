@@ -91,83 +91,30 @@ from bin_intelligence import (
     format_telegram_operator_stats,
 )
 
-# Frases de saludo dinámicas (Slang directo)
+# Frases de saludo directas
 POC_GREETINGS = [
-    "Hey,",
-    "¡Qué onda,",
-    "¡Listo pa' darle,",
-    "¿Qué trampa,",
-    "¡Échale,",
-    "¿Cómo andas,",
-    "¡Firme ahí,",
-]
-
-# Matriz Lírica Freestyle MC (Barras cortas, rima exacta y carrilla de campeón de batalla)
-RAP_PUNCHLINES_START = [
-    "Entra a la cabina con la mente fría,\nque aquí la pasarela no perdona tonterías. 🎤⚡",
-    "Traes flow de novato o colmillo de gallo,\nsi tiras con certeza hoy no tienes ni un fallo. 🇲🇽🔥",
-    "Saca las tarjetas que empieza la función,\nmenos bla-bla-bla y más liquidación. 💳✨",
-    "Directo a la tarima con el pulso exacto,\nsi vienes por feria cerramos el pacto. 🎯💸",
-    "Aquí no hay ensayo, puro golpe seco,\nsuelta ese combo que retumbe en el hueco. 🚀🥊",
-    "Vengo con el micro y el sistema afilado,\nsi traes buen material saldrás coronado. 👑🔥",
-]
-
-RAP_PUNCHLINES_FAIL = [
-    "Le bajaste a tu jefa la feria del mandado\ny me trajiste un plástico quemado y oxidado. 🥩💀",
-    "Te la dabas de hacker con aires de revista\ny tu checker chafa te dejó fuera de pista. 🚀📉",
-    "Mucho cuento en Discord y pantalla de cristal,\npero tu tarjeta no pasa ni en el Oxxo local. 🏪❌",
-    "Soñabas con cashout y viaje de primera,\ny tu combo muerto no cruzó ni la frontera. 🌵⚡",
-    "Tiraste tres tiros y los tres al chamusco,\npa' vender humo mejor ni te busco. 💨💀",
-    "Te vendieron carbón como si fuera oro,\nya te vi llorando en el próximo coro. 🎤🍂",
-]
-
-RAP_PUNCHLINES_MATCH = [
-    "Cazamos la cuenta con precisión quirúrgica,\nprepárate el bolsillo pa' la magia metalúrgica. 🪄💳",
-    "Túnel enlazado y el radar calibrado,\nespera la señal que el tiro está cantado. 🎯🔒",
-    "Enganchó en corto, sin hacer tanto ruido,\neste es el flow de un campeón bien curtido. 🇲🇽⚡",
-    "Cayó la indicada, directo al objetivo,\nahora mira cómo se mueve el saldo en vivo. 📊✨",
-    "Paso firme y seguro en la pasarela,\nmientras el algoritmo solito se la vuela. 🚀🔥",
-]
-
-RAP_PUNCHLINES_SUCCESS = [
-    "Se acreditó la feria y se cerró la jugada,\nrecoge tus ganancias y no presumas nada. 🤫💸",
-    "Misión coronada, billete en el bolsillo,\nquedó demostrado quién tiene el verdadero brillo. 💎✨",
-    "Rima con punchline y depósito clavado,\nasí se trabaja cuando el gallo está entrenado. 👑🥊",
-    "El saldo cayó limpio directo a la balanza,\neso te pasa cuando tienes confianza. 📈🇲🇽",
-]
-
-RAP_PUNCHLINES_IDLE = [
-    "BoTMexico al mando, sin titubeo alguno,\nsi vas a tirar que no se te escape ninguno. 🌵🎯",
-    "Aquí no hay suerte, puro cálculo y rima,\nsi traes nivel nos vemos en la cima. 🏔️🔥",
-    "El juego es sencillo pal que sabe operar,\npon la tarjeta y deja de inventar. 💳⚡",
-    "El micro está prendido y el motor al cien,\nsi sabes a qué vienes te va a ir muy bien. 🚀🎤",
+    "Hola,",
+    "Bienvenido,",
+    "Operador,",
 ]
 
 
 def get_random_mc_punchline(category: str = "idle") -> str:
-    """Obtiene un punchline lírico corto de freestyle según el contexto operativo."""
-    cat_map = {
-        "start": RAP_PUNCHLINES_START,
-        "fail": RAP_PUNCHLINES_FAIL,
-        "match": RAP_PUNCHLINES_MATCH,
-        "success": RAP_PUNCHLINES_SUCCESS,
-        "idle": RAP_PUNCHLINES_IDLE,
-    }
-    pool = cat_map.get(category, RAP_PUNCHLINES_IDLE)
-    return random.choice(pool)
+    """Eliminado ruido lírico; retorna string vacío para mantener compatibilidad."""
+    return ""
 
 
 def get_random_greeting() -> str:
-    return get_random_mc_punchline("idle")
+    return ""
 
 
 def get_random_poc_greeting(nickname: str) -> str:
     poc = random.choice(POC_GREETINGS)
-    return f"<b>{poc} {nickname}!</b> 👋"
+    return f"<b>{poc} {nickname}</b>"
 
 
 def get_random_rap_intro() -> str:
-    return get_random_mc_punchline("start")
+    return ""
 
 
 # Membrete Oficial BoTMexico
@@ -222,58 +169,32 @@ def _ascii_bar(pct: int, width: int = 10) -> str:
 
 
 def _mission_status_text(status: str, extra: dict) -> str:
-    """Texto de status para on_progress — anti-fuga de método operativo.
-
-    Feedback encubierto: animaciones ASCII, ETA simulado y métricas dummy para mantener al usuario tranquilo.
-    """
+    """Retorna texto de status bajo protocolo de seguridad anti-fuga (sin exponer conteo de intentos ni cadencia de pasarela)."""
     fake_pct = extra.get("fake_pct", 0)
     bar = _ascii_bar(fake_pct)
 
     if status == "matching":
         return (
-            f"⏳ <b>Rastreando y asegurando canal de enlace…</b>\n"
-            f"  <code>[{bar}] {fake_pct}%</code>\n"
-            f"  📡 <i>Escaneando nodos seguros · ETA: ~45s</i>"
+            f"🔍 <b>Rastreando cuenta en pool (KYC Verificado / Grado A+)…</b>\n"
+            f"  <code>[{bar}] {fake_pct}%</code>"
         )
     elif status == "logging_in":
         email = extra.get("email", "")
-        step = extra.get("current", 1)
-        total = extra.get("total", 1)
-        pct = int((step / total) * 100) if total > 0 else 0
-        return (
-            f"🔄 <b>Sincronizando sesión y credenciales…</b>\n"
-            f"  <code>[{_ascii_bar(pct)}] {pct}%</code>\n"
-            f"  🔒 Verificando túnel seguro · <code>{email}</code>\n"
-            f"  ⏱️ <i>ETA estimado: ~30s</i>"
-        )
+        return f"🔑 <b>Verificando sesión segura:</b> <code>{email}</code>"
     elif status == "match":
         email = extra.get("email", "")
-        return (
-            f"🎯 <b>¡Cuenta objetivo enganchada y lista!</b>\n"
-            f"  <code>[{bar}] 100%</code>\n"
-            f"  ✨ Canal seguro establecido con <code>{email}</code>"
-        )
-    elif status == "cooldown":
-        email = extra.get("email", "")
-        return (
-            f"⏳ <b>Calibrando parámetros de red…</b>\n"
-            f"  <code>[{bar}] {fake_pct}%</code>\n"
-            f"  🛰️ <i>Estabilizando enlace con {email}…</i>"
-        )
+        return f"🎯 <b>Cuenta enlazada:</b> <code>{email}</code>"
     elif status == "awaiting_confirmation":
-        return "⚠️ <b>Cuenta vinculada. Lista para iniciar acreditación de fondos.</b>"
+        return "⚠️ <b>Cuenta vinculada. Lista para acreditación de fondos.</b>"
     elif status == "preparing":
         return (
             f"⚡ <b>Preparando acreditación en segundo plano…</b>\n"
-            f"  <code>[{bar}] {fake_pct}%</code>\n"
-            f"  ⏱️ <i>Iniciando en ~15s</i>"
+            f"  <code>[{bar}] {fake_pct}%</code>"
         )
     elif status == "scheduling":
-        eta_sec = max(10, 100 - fake_pct)
         return (
-            f"⚡ <b>Procesando acreditación de fondos…</b>\n"
-            f"  <code>[{bar}] {fake_pct}%</code>\n"
-            f"  💸 <i>Acreditando saldo en segundo plano · ETA: ~{eta_sec}s</i>"
+            f"⚡ <b>Procesando depósitos en segundo plano…</b>\n"
+            f"  <code>[{bar}] {fake_pct}%</code>"
         )
     elif status == "completed":
         if extra.get("stopped_by_user"):
@@ -285,7 +206,7 @@ def _mission_status_text(status: str, extra: dict) -> str:
     elif status == "failed":
         return "❌ No se encontró match viable."
     else:
-        return f"⏳ {status}"
+        return f"⏳ <b>Estado:</b> {status}"
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -300,33 +221,23 @@ def _logo_path() -> Path:
 def _start_menu_msg(user_id: int, nickname: str):
     """Construye mensaje + teclado del menú principal (/start y 'Volver al inicio')."""
     poc_saludo = get_random_poc_greeting(nickname)
-    rap_intro = get_random_rap_intro()
-    start_banner = format_telegram_start_banner()
-    banner_section = f"\n\n{start_banner}" if start_banner else ""
     msg = (
         f"{HEADER}\n\n"
         f"{poc_saludo}\n"
         f"• 👤 <b>Operador:</b> <code>{nickname}</code>\n"
-        f"• 🆔 <b>Telegram ID:</b> <code>{user_id}</code>\n"
-        f"• ⚡ <b>Núcleo:</b> <code>v2026.08 · Ultra High-Speed</code>{banner_section}\n\n"
-        f"🎤 <i>\"{rap_intro}\"</i>"
+        f"• 🆔 <b>ID:</b> <code>{user_id}</code>\n"
+        f"• 🌐 <b>Portal:</b> <code>botmexico.net</code>"
     )
     buttons = []
-    # Botón dinámico de proceso activo si tiene misión o retiro corriendo
     if user_id in _active_operator_missions or user_id in _active_operator_withdrawals or user_id in _pending_spei_fundings:
-        buttons.append([InlineKeyboardButton("⚡ Ver Proceso Activo en Curso", callback_data="btn_start_active_process")])
+        buttons.append([InlineKeyboardButton("⚡ Ver Proceso Activo", callback_data="btn_start_active_process")])
 
     buttons.extend([
         [InlineKeyboardButton("💳 CC Auto-Match (/bet)", callback_data="btn_start_bet")],
-        [InlineKeyboardButton("📊 Mi Rendimiento & Historial", callback_data="btn_start_operator_stats")],
-        [InlineKeyboardButton("📡 Radar & Ranking de BINes", callback_data="btn_start_bin_radar")],
-        [
-            InlineKeyboardButton(
-                "🔑 Check Combos (/check)", callback_data="btn_start_check"
-            )
-        ],
+        [InlineKeyboardButton("🔑 Check Combos (/check)", callback_data="btn_start_check")],
+        [InlineKeyboardButton("📊 Mi Rendimiento", callback_data="btn_start_operator_stats")],
         [InlineKeyboardButton("❔ Manual & Ayuda", callback_data="btn_start_help")],
-        [InlineKeyboardButton("🌐 Portal Web (botmexico.net)", url=DASHBOARD_URL)],
+        [InlineKeyboardButton("🌐 Portal Web", url=DASHBOARD_URL)],
     ])
     kb = InlineKeyboardMarkup(buttons)
     return msg, kb
@@ -438,8 +349,7 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
                 query,
                 f"{HEADER}\n\n"
                 "ℹ️ <b>Sin procesos activos en este momento.</b>\n"
-                "No tienes misiones ni retiros en curso.\n\n"
-                f"🎤 <i>\"{get_random_mc_punchline('idle')}\"</i>",
+                "No tienes misiones ni retiros en curso.",
                 reply_markup=kb,
             )
             return ConversationHandler.END
@@ -468,7 +378,7 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
                 f"• 👤 Cuenta: <code>{email}</code>\n"
                 f"• 📊 Avance: <code>[{bar}] {pct}%</code>\n"
                 f"• 💰 Retirado: <b>${withdrawn:,.2f}</b> / ${total:,.2f}\n"
-                f"• ⚡ Estado: Dispersando en batches seguros…{tip_box}\n\n"
+                f"• ⚡ Estado: Dispersando en batches seguros.\n\n"
                 f"🇲🇽 <i>Puedes volver al menú sin interrumpir la operación.</i>",
                 reply_markup=kb,
             )
@@ -479,8 +389,6 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
             clabe_stp = pending_s.get("clabe_stp", "")
             curp = pending_s.get("curp", "")
             m_id = pending_s.get("mission_id", "")
-            tip = get_random_tactical_tip()
-            tip_box = f"\n\n💡 <b>Tip Operativo:</b>\n<i>{tip}</i>" if tip else ""
 
             kb = InlineKeyboardMarkup(
                 [
@@ -496,7 +404,7 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
                 f"• 🏦 CLABE STP: <code>{clabe_stp}</code>\n"
                 f"• 🆔 CURP Titular: <code>{curp}</code>\n"
                 f"• 💵 Monto requerido: <b>$10.00 MXN</b>\n\n"
-                f"<i>(Toca sobre la CLABE o CURP para copiar rápido en tu banca móvil)</i>{tip_box}\n\n"
+                f"<i>(Toca sobre la CLABE o CURP para copiar rápido)</i>\n\n"
                 f"👉 <i>Una vez enviado, presiona 'Ya mandé el SPEI' para validar y habilitar tu retiro.</i>",
                 reply_markup=kb,
             )
@@ -504,10 +412,6 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
 
         if active_m:
             m_id = active_m.get("mission_id", "N/A")
-            pct = active_m.get("fake_pct", 15)
-            bar = _ascii_bar(pct)
-            tip = get_random_tactical_tip()
-            tip_box = f"\n\n💡 <b>Tip Operativo:</b>\n<i>{tip}</i>" if tip else ""
 
             kb = InlineKeyboardMarkup(
                 [
@@ -520,15 +424,13 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
                 query,
                 f"{HEADER}\n\n"
                 f"🎯 <b>MISIÓN {m_id} EN EJECUCIÓN</b>\n\n"
-                f"• 📊 Avance: <code>[{bar}] {pct}%</code>\n"
-                f"• ⚡ Estado: Enlazando y procesando fondos de manera segura…{tip_box}\n\n"
+                f"• ⚡ Estado: Procesando depósitos en segundo plano.\n\n"
                 f"🇲🇽 <i>Puedes volver al menú principal sin que se cancele la misión.</i>",
                 reply_markup=kb,
             )
             return ConversationHandler.END
 
     elif query.data == "btn_start_bet":
-        warning_box = format_telegram_bet_warning()
         kb = InlineKeyboardMarkup(
             [
                 [
@@ -541,14 +443,12 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
         await _edit_msg(
             query,
             f"{HEADER}\n\n"
-            f"{warning_box}\n\n"
             "💳 <b>Auto Depósito · CC Auto-Match (/bet)</b>\n\n"
             "Pega tus tarjetas en formato estándar:\n"
             "<code>4111111111111111|12|28|123</code>\n\n"
-            "• 🌵 Una por línea (1 a 4 plásticos por intento).\n"
-            "• ⚡ Auto-matching con cuentas verificadas (A+ / KYC).\n"
-            "• 🤖 Validación liveness en tiempo real.\n\n"
-            f"🎤 <i>\"{get_random_mc_punchline('start')}\"</i>",
+            "• 1 a 4 tarjetas por intento (una por línea).\n"
+            "• Matching automático con cuentas verificadas (A+ / KYC).\n"
+            "• Validación liveness en tiempo real.",
             reply_markup=kb,
         )
         return WAIT_BET_CONFIRM
@@ -568,9 +468,8 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
             "📥 <b>Verificación de Accesos y Combos (/check)</b>\n\n"
             "Envía combos en chat (máx 100) o archivo .txt (máx 5,000):\n"
             "<code>correo:contraseña</code>\n\n"
-            "• 🔍 Validación silenciosa sin quemar pasarela ni saldo.\n"
-            "• 📊 Calificación automática de perfiles y grado.\n\n"
-            f"🎤 <i>\"{get_random_mc_punchline('start')}\"</i>",
+            "• Validación silenciosa sin alterar saldo.\n"
+            "• Calificación automática de perfiles y grado.",
             reply_markup=kb,
         )
         return WAIT_CHECK_CONFIRM
@@ -579,18 +478,15 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
             f"{HEADER}\n\n"
             "<b>Manual Operativo BoTMexico:</b>\n\n"
             "• <b>/bet</b> — 💳 CC Auto-Match\n"
-            "  Pega 1 a 4 tarjetas <code>num|mm|yy|cvv</code> (o escribe <code>/bet &lt;tarjetas&gt;</code> directo).\n"
-            "  <i>Valida liveness vía Ruthopia gate, hace match y liquida de una.</i>\n\n"
+            "  Pega 1 a 4 tarjetas <code>num|mm|yy|cvv</code> (o escribe <code>/bet &lt;tarjetas&gt;</code> directo).\n\n"
             "• <b>/check</b> — 🔑 Check Combos/Accesos\n"
-            "  Envía combos <code>correo:pass</code> en chat (máx 100) o adjunta <code>.txt</code> (máx 5,000).\n"
-            "  <i>Valida balance y estado sin tocar saldo ni quemar cuentas.</i>\n\n"
+            "  Envía combos <code>correo:pass</code> en chat (máx 100) o adjunta <code>.txt</code> (máx 5,000).\n\n"
             "• <b>/botmex</b> — 🇲🇽 botmexico.net (Dashboard)\n"
-            "  Enlace directo al núcleo del Dashboard de Operador.\n\n"
+            "  Enlace directo al Dashboard de Operador.\n\n"
             "• <b>/help</b> — ❔ Ayuda\n"
-            "  Muestra esta guía rápida de instrucciones.\n\n"
-            "• <b>/cancel</b> — 🛑 Cancelar/Detener proceso\n"
-            "  Cancela cualquier misión activa y libera cuentas de inmediato.\n\n"
-            f"🎤 <i>\"{get_random_mc_punchline('idle')}\"</i>\n"
+            "  Muestra esta guía rápida.\n\n"
+            "• <b>/cancel</b> — 🛑 Cancelar proceso\n"
+            "  Cancela misiones activas y libera cuentas.\n"
         )
         kb = InlineKeyboardMarkup(
             [
@@ -614,13 +510,12 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
         await _edit_msg(query, msg, reply_markup=kb)
     elif query.data == "btn_start_cancel":
         user_id = update.effective_user.id
-        with db(write=True) as c:
-            c.execute(
-                "UPDATE auto_missions SET status='cancelled' "
-                "WHERE operator_id=? AND status IN ('pending', 'running', 'paused')",
-                (user_id,),
-            )
-        context.user_data.clear()
+        # Limpiar estados transitorios pero preservar procesos activos en segundo plano
+        context.user_data.pop("pending_check", None)
+        context.user_data.pop("filtered_summary", None)
+        context.user_data.pop("pending_bet_pipes", None)
+        context.user_data.pop("pending_tol_pipes", None)
+        context.user_data.pop("pending_bank_access", None)
         nickname = get_user_nickname(user_id, update.effective_user.first_name)
         home_msg, home_kb = _start_menu_msg(user_id, nickname)
         await _edit_msg(query, home_msg, reply_markup=home_kb)
@@ -643,8 +538,7 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• <b>/help</b> — ❔ Ayuda\n"
         "  Muestra esta guía rápida de instrucciones.\n\n"
         "• <b>/cancel</b> — 🛑 Cancelar/Detener proceso\n"
-        "  Cancela cualquier misión activa y libera cuentas de inmediato.\n\n"
-        f"🎤 <i>\"{get_random_mc_punchline('idle')}\"</i>\n"
+        "  Cancela cualquier misión activa y libera cuentas de inmediato.\n"
     )
     kb = InlineKeyboardMarkup(
         [
@@ -667,8 +561,7 @@ async def botmex_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(
         f"{HEADER}\n\n"
-        f"Acceso directo al portal web:\n<code>{DASHBOARD_URL}</code>\n\n"
-        f"🎤 <i>\"{get_random_mc_punchline('idle')}\"</i>",
+        f"Acceso directo al portal web:\n<code>{DASHBOARD_URL}</code>",
         parse_mode="HTML",
         reply_markup=kb,
     )
@@ -685,10 +578,18 @@ async def cancel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             (user_id,),
         )
 
+    _active_operator_missions.pop(user_id, None)
+    _active_operator_withdrawals.pop(user_id, None)
+    _pending_spei_fundings.pop(user_id, None)
     context.user_data.clear()
+
+    nickname = get_user_nickname(user_id, update.effective_user.first_name)
+    _, home_kb = _start_menu_msg(user_id, nickname)
+
     await update.message.reply_text(
-        f"{HEADER}\n\n🛑 <b>Proceso abortado.</b>\nOperaciones detenidas limpiamente.",
+        f"{HEADER}\n\n🛑 <b>Proceso abortado.</b>\nOperaciones detenidas y liberadas limpiamente.",
         parse_mode="HTML",
+        reply_markup=home_kb,
     )
     return ConversationHandler.END
 
@@ -1055,24 +956,20 @@ async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         raw_text = " ".join(args)
         return await process_bet_input(update, context, override_text=raw_text)
 
-    warning_box = format_telegram_bet_warning()
     msg = (
         f"{HEADER}\n\n"
-        f"{warning_box}\n\n"
         "💳 <b>Auto Depósito · CC Auto-Match (/bet)</b>\n\n"
         "Pega tus tarjetas en formato estándar:\n"
         "<code>4111111111111111|12|28|123</code>\n\n"
-        "• 🌵 1 a 4 tarjetas por intento (una por línea).\n"
-        "• ⚡ Matching automático con cuentas calificadas (A+ / KYC).\n"
-        "• 🤖 Acreditación y segundo intento inteligente.\n\n"
-        f"🎤 <i>\"{get_random_mc_punchline('start')}\"</i>"
+        "• 1 a 4 tarjetas por intento (una por línea).\n"
+        "• Matching automático con cuentas calificadas (A+ / KYC).\n"
+        "• Validación liveness en tiempo real."
     )
     await update.message.reply_text(
         msg,
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(
             [
-                [InlineKeyboardButton("📊 Ver Radar Completo", callback_data="btn_start_bin_radar")],
                 [InlineKeyboardButton("🏠 Volver al inicio", callback_data="cancel_bet")],
             ]
         ),
@@ -1081,7 +978,7 @@ async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE, override_text: Optional[str] = None):
-    """Procesa las tarjetas ingresadas para /bet con feedback animado y liveness premium."""
+    """Procesa las tarjetas ingresadas para /bet con validación de liveness."""
     text = (override_text or (update.message.text if update.message else "") or "").strip()
     if text.startswith("/") and not any(char.isdigit() for char in text):
         await update.message.reply_text("❌ Envía las tarjetas, no un comando.")
@@ -1157,12 +1054,10 @@ async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     if not valid_pipes:
         fail_msg = (
             f"{HEADER}\n\n"
-            f"🏴‍☠️ <b>CARDING FALLIDO — CCs SIN VIDA</b>\n\n"
+            f"🔴 <b>CARDING FALLIDO — SIN TARJETAS LIVE</b>\n\n"
             f"• 💳 CCs LIVE: <b>0</b>\n"
-            f"• ⚠️ Strikes acumulados: <b>{strikes_count} / {MAX_DAILY_STRIKES}</b>\n"
-            f"  <i>(Ojo: no quemes la pasarela tirando CCs quemadas)</i>\n\n"
-            f"{summary_text}\n\n"
-            f"🎤 <i>\"{get_random_mc_punchline('fail')}\"</i>"
+            f"• ⚠️ Strikes acumulados: <b>{strikes_count} / {MAX_DAILY_STRIKES}</b>\n\n"
+            f"{summary_text}"
         )
         kb_fail = InlineKeyboardMarkup(
             [[InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]]
@@ -1203,129 +1098,17 @@ def _launch_auto_mission_ui(
     user_info: dict,
     status_msg: object,
 ):
-    """Arranca run_auto_mission en background con UI viva, heartbeat asíncrono continuo
-    (animaciones ASCII, barra de progreso fluida, ETA decreciente y rotación de tips tácticos reales),
-    on_progress y confirm_gate."""
+    """Arranca run_auto_mission en background con telemetría 100% real, on_progress y confirm_gate."""
     last_edit_ts = [0.0]
     loop = asyncio.get_running_loop()
 
-    # Estado reactivo compartido para el ticker visual de alta frecuencia
     state = {
         "status": "matching",
-        "extra": {"fake_pct": 12},
+        "extra": {},
         "is_terminal": False,
         "stopped": False,
-        "simulated_pct": 12,
-        "tip_idx": 0,
-        "last_tip_change": time.time(),
-        "current_tip": get_random_tactical_tip() or "Usa tarjetas Santander o Citibanamex para máxima tasa de aprobación sin 3DS.",
         "start_time": time.time(),
     }
-
-    RADAR_FRAMES = ["📡 [ ⠋ ]", "📡 [ ⠙ ]", "📡 [ ⠹ ]", "📡 [ ⠸ ]", "📡 [ ⠼ ]", "📡 [ ⠴ ]", "📡 [ ⠦ ]", "📡 [ ⠧ ]", "📡 [ ⠇ ]", "📡 [ ⠏ ]"]
-    radar_idx = [0]
-
-    async def _ui_heartbeat_ticker():
-        """Ticker visual continuo cada ~2.2s para eliminar por completo el 'minuto muerto'.
-        Actualiza animaciones, barra de progreso y tips tácticos reales mientras el backend procesa."""
-        while not state["stopped"] and not state["is_terminal"]:
-            await asyncio.sleep(2.2)
-            if state["stopped"] or state["is_terminal"]:
-                break
-
-            curr_st = state["status"]
-            if curr_st == "awaiting_confirmation":
-                continue
-            if curr_st in ("completed", "cancelled", "failed"):
-                break
-            if mission_id in _gate_closed_missions:
-                break
-
-            # Avanzar porcentaje simulado suavemente sin congelar la pantalla
-            now = time.time()
-            elapsed = now - state["start_time"]
-
-            if curr_st == "matching":
-                # Escalar de 12% a 88% progresivamente durante ~45s
-                target_pct = min(88, int(12 + (elapsed / 45.0) * 76))
-                if state["simulated_pct"] < target_pct:
-                    state["simulated_pct"] += 2
-                eta = max(5, int(45 - elapsed))
-                state["extra"]["fake_pct"] = state["simulated_pct"]
-            elif curr_st == "scheduling":
-                # Escalar hacia 96% mientras corre la fase programada
-                if state["simulated_pct"] < 96:
-                    state["simulated_pct"] += 1
-                state["extra"]["fake_pct"] = state["simulated_pct"]
-                eta = max(5, int(60 - (elapsed % 60)))
-            else:
-                eta = 20
-
-            # Rotar tips tácticos reales cada 6.5s
-            if now - state["last_tip_change"] >= 6.5:
-                state["current_tip"] = get_random_tactical_tip() or state["current_tip"]
-                state["last_tip_change"] = now
-
-            radar_idx[0] = (radar_idx[0] + 1) % len(RADAR_FRAMES)
-            radar_icon = RADAR_FRAMES[radar_idx[0]]
-            bar = _ascii_bar(state["simulated_pct"])
-
-            tip_str = state["current_tip"]
-            tip_section = f"\n\n💡 <b>Tip Táctico:</b>\n<i>{tip_str}</i>" if tip_str else ""
-
-            has_match = curr_st in ("match", "awaiting_confirmation", "preparing", "scheduling", "completed")
-
-            if curr_st == "matching":
-                live_text = (
-                    f"{HEADER}\n\n"
-                    f"⚡ <b>Rastreando y Procesando Cuentas</b>\n\n"
-                    f"• {radar_icon} <b>Buscando cuenta óptima en pool…</b>\n"
-                    f"  <code>[{bar}] {state['simulated_pct']}%</code>\n"
-                    f"  📡 <i>Escaneando nodos seguros · ETA: ~{eta}s</i>"
-                    f"{tip_section}\n\n"
-                    f"🔄 <i>Operación en curso · Actualizando en vivo…</i>"
-                )
-            elif curr_st == "scheduling":
-                dep_so_far = state["extra"].get("deposited", 0)
-                dep_box = f"• 💰 Acreditado: <b>${dep_so_far:,.2f} MXN</b>\n" if dep_so_far > 0 else ""
-                live_text = (
-                    f"{HEADER}\n\n"
-                    f"⚡ <b>Procesando Fondos de Cuenta</b>\n\n"
-                    f"{dep_box}"
-                    f"• {radar_icon} <b>Acreditando saldo en segundo plano…</b>\n"
-                    f"  <code>[{bar}] {state['simulated_pct']}%</code>\n"
-                    f"  💸 <i>Dispersando lotes · ETA ciclo: ~{eta}s</i>"
-                    f"{tip_section}\n\n"
-                    f"🔄 <i>Actualización automática…</i>"
-                )
-            else:
-                st_text = _mission_status_text(curr_st, state["extra"])
-                live_text = (
-                    f"{HEADER}\n\n"
-                    f"⚡ <b>Rastreando y Procesando Cuentas</b>\n\n"
-                    f"• {st_text}"
-                    f"{tip_section}\n\n"
-                    f"🔄 <i>Actualización automática…</i>"
-                )
-
-            live_kb = InlineKeyboardMarkup(
-                [
-                    [
-                        InlineKeyboardButton(
-                            "🛑 Detener Misión",
-                            callback_data=f"stop_mission_{mission_id}",
-                        )
-                    ]
-                ]
-            )
-
-            try:
-                await status_msg.edit_text(live_text, parse_mode="HTML", reply_markup=live_kb)
-                last_edit_ts[0] = time.time()
-            except Exception:
-                pass
-
-    ticker_task = asyncio.create_task(_ui_heartbeat_ticker())
 
     def on_progress(status: str, extra: dict):
         now = time.time()
@@ -1340,12 +1123,10 @@ def _launch_auto_mission_ui(
             and mission_id in _gate_closed_missions
         ):
             state["stopped"] = True
-            ticker_task.cancel()
             return
         if status in ("completed", "cancelled", "failed"):
             state["is_terminal"] = True
             state["stopped"] = True
-            ticker_task.cancel()
             _gate_closed_missions.discard(mission_id)
 
         st_text = _mission_status_text(status, extra)
@@ -1357,11 +1138,10 @@ def _launch_auto_mission_ui(
             "failed",
             "preparing",
         )
-        if not is_priority and (now - last_edit_ts[0] < 2.5):
+        if not is_priority and (now - last_edit_ts[0] < 1.5):
             return
         last_edit_ts[0] = now
 
-        has_match = status in ("match", "awaiting_confirmation", "preparing", "scheduling", "completed")
         if is_terminal:
             _active_operator_missions.pop(operator_id, None)
             if status in ("cancelled", "failed"):
@@ -1391,7 +1171,7 @@ def _launch_auto_mission_ui(
                     )
                 kb = InlineKeyboardMarkup(kb_btns)
             else:
-                # ÉXITO: Misión completada — Entrega de FICHA SPEI in-bot (Cero dependencia web)
+                # ÉXITO: Misión completada — Ficha SPEI in-bot limpia
                 matches = extra.get("matches") or []
                 match_obj = matches[0] if matches else {}
                 account_id = match_obj.get("account_id")
@@ -1434,22 +1214,19 @@ def _launch_auto_mission_ui(
                 }
 
                 dep = extra.get("deposited", 0)
-                tip = get_random_tactical_tip()
-                tip_box = f"\n\n💡 <b>Tip Operativo:</b>\n<i>{tip}</i>" if tip else ""
-
                 text = (
                     f"{HEADER}\n\n"
                     f"🎉 <b>¡MISIÓN {mission_id} COMPLETADA!</b>\n\n"
                     f"• 💰 Total depositado: <b>${dep:,.2f} MXN</b>\n"
                     f"• 👤 Cuenta asignada: <code>{email}</code>\n\n"
                     f"━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"📑 <b>FICHA DE FONDEO SPEI OBLIGATORIA</b>\n\n"
-                    f"Envía tu SPEI ($10 o $20 MXN) para vincular la cuenta bancaria de retiro:\n\n"
+                    f"📑 <b>FICHA DE FONDEO SPEI</b>\n\n"
+                    f"Envía tu SPEI ($10 o $20 MXN) para vincular tu cuenta de retiro:\n\n"
                     f"• 🏦 <b>CLABE STP:</b>\n<code>{clabe_stp or 'Consultar en soporte'}</code>\n\n"
                     f"• 🆔 <b>CURP Titular:</b>\n<code>{curp or 'No asignado'}</code>\n\n"
-                    f"<i>(Toca sobre la CLABE o CURP para copiar en un solo tap)</i>{tip_box}\n"
+                    f"<i>(Toca sobre la CLABE o CURP para copiar rápido)</i>\n"
                     f"━━━━━━━━━━━━━━━━━━━━━\n\n"
-                    f"👉 <i>Una vez enviado tu SPEI desde tu app bancaria, presiona el botón abajo para validar y habilitar tu retiro automático.</i>"
+                    f"👉 <i>Una vez enviado tu SPEI, presiona el botón abajo para validar y habilitar tu retiro automático.</i>"
                 )
                 kb = InlineKeyboardMarkup(
                     [
@@ -1468,44 +1245,22 @@ def _launch_auto_mission_ui(
                     ]
                 )
         else:
-            tip_str = state["current_tip"]
-            tip_section = f"\n\n💡 <b>Tip Táctico:</b>\n<i>{tip_str}</i>" if tip_str else ""
-            if has_match:
-                text = (
-                    f"{HEADER}\n\n"
-                    f"⚡ <b>Procesando Fondos de Cuenta</b>\n\n"
-                    f"• {st_text}"
-                    f"{tip_section}\n\n"
-                    f"🇲🇽 <i>Actualización automática…</i>"
-                )
-                kb = InlineKeyboardMarkup(
+            text = (
+                f"{HEADER}\n\n"
+                f"🎯 <b>MISIÓN {mission_id} EN CURSO</b>\n\n"
+                f"• {st_text}\n\n"
+                f"🔄 <i>Actualización en tiempo real…</i>"
+            )
+            kb = InlineKeyboardMarkup(
+                [
                     [
-                        [
-                            InlineKeyboardButton(
-                                "🛑 Detener Misión",
-                                callback_data=f"stop_mission_{mission_id}",
-                            )
-                        ],
+                        InlineKeyboardButton(
+                            "🛑 Detener Misión",
+                            callback_data=f"stop_mission_{mission_id}",
+                        )
                     ]
-                )
-            else:
-                text = (
-                    f"{HEADER}\n\n"
-                    f"⚡ <b>Rastreando y Procesando Cuentas</b>\n\n"
-                    f"• {st_text}"
-                    f"{tip_section}\n\n"
-                    f"🇲🇽 <i>Actualización automática…</i>"
-                )
-                kb = InlineKeyboardMarkup(
-                    [
-                        [
-                            InlineKeyboardButton(
-                                "🛑 Detener Misión",
-                                callback_data=f"stop_mission_{mission_id}",
-                            )
-                        ],
-                    ]
-                )
+                ]
+            )
 
         async def _edit():
             try:
@@ -1745,19 +1500,22 @@ async def handle_confirm_gate_callback(
 async def handle_stop_mission_callback(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ):
-    """Maneja el botón '🛑 Detener Misión' enviado en el mensaje de éxito."""
+    """Maneja el botón '🛑 Detener Misión' enviado durante la ejecución de la misión."""
     query = update.callback_query
     await query.answer()
     if query.data.startswith("stop_mission_"):
         mission_id = query.data.replace("stop_mission_", "").strip()
         user_id = update.effective_user.id
+        _gate_closed_missions.add(mission_id)
+        _active_operator_missions.pop(user_id, None)
+
         with db(write=True) as c:
             c.execute(
                 "UPDATE auto_missions SET status='cancelled' WHERE mission_id=?",
                 (mission_id,),
             )
         await query.edit_message_text(
-            f"🛑 <b>Misión detenida por el operador.</b>",
+            f"🛑 <b>Misión {mission_id} detenida por el operador.</b>",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(
                 [
@@ -1819,9 +1577,12 @@ async def handle_retry_mission_callback(
     plan = plan_auto_mission(DB_PATH, card_pipes, amount, target_count)
     if not plan["feasible"]:
         await q.edit_message_text(
-            "No hay cuentas viables para un segundo intento.\n\n"
-            "🏠 <a href='tel:0'>Volver al inicio</a>",
+            f"{HEADER}\n\n"
+            f"❌ No hay cuentas viables para un segundo intento en este momento.",
             parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]]
+            ),
         )
         return
 
@@ -2388,8 +2149,7 @@ async def handle_confirm_auto_withdrawal_callback(
                     f"🎉 <b>¡RETIRO AUTOMÁTICO COMPLETADO!</b>\n\n"
                     f"• 👤 Cuenta: <code>{email}</code>\n"
                     f"• 💰 Total transferido a tu banco: <b>${total_w:,.2f} MXN</b>\n"
-                    f"• 📊 Avance: <code>[{_ascii_bar(100)}] 100%</code>\n\n"
-                    f"🎤 <i>\"{get_random_mc_punchline('success')}\"</i>",
+                    f"• 📊 Avance: <code>[{_ascii_bar(100)}] 100%</code>",
                     parse_mode="HTML",
                     reply_markup=InlineKeyboardMarkup(
                         [[InlineKeyboardButton("🏠 Volver al inicio", callback_data="btn_start_cancel")]]
@@ -2513,10 +2273,11 @@ def build_app():
     app.add_handler(CommandHandler("botmex", botmex_cmd))
     app.add_handler(CommandHandler("cancel", cancel_cmd))
 
-    # Handler callback para botones standalone del /start (help y cancel)
+    # Handler callback para botones standalone del /start (help, cancel, radar, stats, active_process)
     app.add_handler(
         CallbackQueryHandler(
-            start_buttons_callback, pattern="^(btn_start_help|btn_start_cancel)$"
+            start_buttons_callback,
+            pattern="^btn_start_(help|cancel|bin_radar|operator_stats|active_process)$",
         )
     )
 
@@ -2544,14 +2305,6 @@ def build_app():
     )
     app.add_handler(
         CallbackQueryHandler(handle_confirm_auto_withdrawal_callback, pattern="^confirm_auto_withdrawal_")
-    )
-
-    # Handler para captura de accesos bancarios de retiro
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            process_bank_access_input,
-        )
     )
 
     # ConversationHandler para /check
@@ -2600,11 +2353,22 @@ def build_app():
                 CallbackQueryHandler(
                     handle_bet_callback, pattern="^(confirm_bet|cancel_bet)$"
                 ),
+                CallbackQueryHandler(
+                    start_buttons_callback, pattern="^btn_start_bin_radar$"
+                ),
             ]
         },
         fallbacks=[CommandHandler("cancel", cancel_cmd)],
     )
     app.add_handler(bet_handler)
+
+    # Handler para captura de accesos bancarios de retiro (solo procesa si no está en un ConversationHandler)
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            process_bank_access_input,
+        )
+    )
 
     return app
 
