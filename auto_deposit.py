@@ -355,9 +355,9 @@ def select_accounts_for_auto(
             tier_top.append(r)
         elif mins_since_attempt <= 1440 and total_fails >= 3:
             tier_low.append(r)
-        elif grade in ("A+", "A"):
+        elif grade in ("A+", "A") and r.get("_jwt_alive"):
             tier_mid.append(r)
-        elif grade == "B" and has_approved_bin:
+        elif grade == "B" and has_approved_bin and r.get("_jwt_alive"):
             tier_mid.append(r)
         else:
             tier_low.append(r)

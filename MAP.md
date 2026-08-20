@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `2fb94af` | fix(auto_deposit): jwt_first prioritario absoluto y corregir check de ventana individual |
 | `92f21d6` | fix(auto_deposit): cortar de golpe en 429/DEAD sin retry transitorio ni quema de captcha |
 | `6202b1d` | fix(withdrawals): persistencia de status 5/fallos, mapeo claro de reembolsos a tarjeta y enriquecimiento de monitor SSE |
 | `66b44b0` | fix(bot): caption overflow kills /bet entry from /start photo menu — fallback to delete+send for text >1024 chars |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `37c6003` | feat(ui): rediseño dark mode glassmorphism portal, matriz lirica freestyle MC y reactivacion Magdiel |
 | `a0eefaa` | feat(bet_flow): automatch con combo TOP garantizado, llenado encubierto omnicanal y retiros en batches de 200 con anti-reembolso |
 | `6b1e91c` | chore(sync): actualizar bitacora y scripts de depositos |
-| `d85c975` | feat(bot): /bet confirma antes del auto match, separa toleradas y ofrece segundo intento (RF4/RF7/RF8) |
 <!-- GEN:end:recientes -->
 
 ---
