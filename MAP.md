@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `68aec5f` | feat(bot): retain operator greetings, BIN radar and start banners with clean handlers |
 | `7a7306f` | fix(bot): completely purge POC greetings, tactical tips and decorative imports |
 | `d808ee6` | fix(bot): fix text intercept in /bet, remove cringe visual noise, sanitize telemetry and update tests |
 | `d8076c6` | fix(bot): eliminar minuto muerto en /bet con ticker asincrono continuo y tips tacticos |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `6202b1d` | fix(withdrawals): persistencia de status 5/fallos, mapeo claro de reembolsos a tarjeta y enriquecimiento de monitor SSE |
 | `66b44b0` | fix(bot): caption overflow kills /bet entry from /start photo menu — fallback to delete+send for text >1024 chars |
 | `41fa58b` | fix(auto_deposit): exclusion dura para cuentas con saldo real, retiro activo o actividad SPEI/retiros <48h |
-| `fe1f154` | feat: integrar modulos del bot y soporte db canonical para auto_deposit en produccion |
 <!-- GEN:end:recientes -->
 
 ---

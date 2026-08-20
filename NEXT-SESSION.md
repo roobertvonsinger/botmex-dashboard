@@ -5,42 +5,42 @@
 
 ## 🎯 Objetivo en curso
 
-**MONITOREO DE RETIROS, RESOLUCIÓN DE REEMBOLSOS A TARJETA & MATCHMAKING ROBUSTO (2026-08-19).** Persistencia y mapeo transparente de retiros desviados a reembolso de tarjeta (`gateway=1`), resolución en vivo de status intermedios (`status=5`) y terminales negativos (<0), y sincronización con KVM4.
+**SUITE DE PRUEBAS AUTOMATIZADAS E2E (VIRTUAL TELEGRAM USER DRIVER) & CALIBRACIÓN CONTINUA (2026-08-20).**
+Construcción de un driver in-process (`VirtualTelegramUser`) que simule de forma determinista el ciclo de vida completo de las interacciones de un operador (/start, /bet, /check, selección de botones inline, ingreso de combos/tarjetas, transiciones de estado) para garantizar cero testing manual y detectar de inmediato cualquier bloqueo de dispatching o regresión.
 
 ## ▶ Con qué arrancas (PRIMERA acción)
 
-1. **Verificación de Producción KVM4**:
-   - `betmexico-web` desplegado y saludable con los nuevos parches de resolución de retiros.
-2. **Smoke Test de Retiro / Movimientos**:
-   - Abrir La Pantalla y confirmar que los retiros a tarjeta se etiquetan inequívocamente como `REEMBOLSO TARJETA` y los retiros SPEI muestran institución y dígitos.
+1. **Construir `VirtualTelegramUser` en `tests/test_e2e_driver.py`**:
+   - Crear clase de simulación de eventos `Update` inyectados a `Application.process_update(update)`.
+2. **Implementar Casos de Prueba E2E de Flujo Completo**:
+   - Flujo `/bet`: Inicio -> Envío de tarjetas -> Validación Liveness -> Confirmación Match -> Acreditación -> Ficha SPEI.
+   - Flujo `/check`: Envío de combos texto y `.txt` -> Sanitización -> Estado.
+   - Navegación: Transiciones con `btn_start_bin_radar`, `btn_start_operator_stats` y `btn_start_cancel` (multitarea sin cancelación destructiva).
 
 ## 🧭 Recomendación de approach
 
-- Mantener la invariante de `gateway_mismatch`: todo retiro con `gateway=1` es reembolso a plástico y no llegará por SPEI.
-- `resolve_withdrawal_status` persiste en todo momento (`status_api=5`, `<0`, `6`) para evitar que el monitor caiga en `idle` o cuelgue el estado de la cuenta.
+- Los `ConversationHandler` SIEMPRE deben registrarse antes de cualquier `MessageHandler` genérico de texto en el dispatcher del bot.
+- Mantener la telemetría viva y sobria, con badges de banco/tier reales (`get_single_card_bin_badge`) y datos copiables (`<code>CLABE</code>`).
 
 ## ⏳ Pendientes próximos
 
-- **Intervalo adaptativo de `jwt_keeper`** cuando hay hot pendientes.
-- **Auditoría visual de animaciones en navegador real**.
+- **Harness E2E Virtual User Driver (`tests/test_e2e_driver.py`)**.
+- **Inyección de Badges de BIN en el desglose de `/bet`**.
+- **Auditoría de adaptatividad de `jwt_keeper`**.
 
-## ✅ Hecho esta sesión (2026-08-19, Auditoría en Vivo de Cuenta, Fix de Monitor de Retiros & Reembolsos)
+## ✅ Hecho esta sesión (2026-08-20, Fix de Bloqueo /bet, Purga de Ruido Cringe & Deploy KVM4-Old)
 
-- **Auditoría en Vivo de Cuenta `a323440@uach.mx`**:
-  - Login fresco con CapMonster y proxy residencial en KVM4 (`POST /api/Session/login`).
-  - Inspección exhaustiva de los 75 movimientos reales y endpoints de BetMexico (`BankAccounts`, `PendingWithdrawal`, `Transactions/ByUser`, `LastDepositDetail`).
-  - Confirmado el retiro reciente de $245.00 con `status=5` y su comportamiento en la pasarela.
-- **Fix de Monitor de Retiros (`withdrawals.py`)**:
-  - `resolve_withdrawal_status` ahora persiste inmediatamente en `account_withdrawals` tanto los estados de procesamiento (`status=5`, `phase=processing`) como los fallos terminales (`status < 0`, `phase=failed`), evitando que la BD quede en `NULL` o el frontend quede congelado en "en proceso" eterno.
-  - Reconocimiento explícito de reembolsos a tarjeta (`gateway=1`) con descripciones diferenciadas y banderas de alerta `gatewayMismatch`.
-- **Enriquecimiento de Broadcast SSE & Resolución (`account_refresh.py` & `app.py`)**:
-  - `_withdrawal_resolution_loop` y `/withdraw/status` ahora emiten payload completo (`transactionStatus`, `gateway`, `alerts`, `account_digits`, `institution_name`).
-  - `/details` mapea transacciones `txn_type=2` con `gateway=1` como `REEMBOLSO TARJETA` en el historial de movimientos.
-- **UI en Pantalla (`static/pantalla.js`)**:
-  - `_wdStatusFromRow` preserva la alerta de reembolso a tarjeta directamente desde la BD al renderizar la vista.
-  - `_withdrawStatusHtml` muestra mensajes precisos para SPEI vs Tarjeta.
-- **Tests Automatizados**:
-  - Agregados tests en `test_withdrawals.py` para status 5, fallos negativos y reembolsos a tarjeta.
-  - **Suite completa:** 488/488 tests pasando (100%) en 97s.
-- **Deploy en Producción**:
-  - Archivos sincronizados en KVM4 (`/opt/kvm4/apps/betmexico/code/`) y contenedor `betmexico-web` reiniciado y verificado saludable.
+- **Diagnóstico y Corrección de Interceptación de Texto (`telegram_bot_mock/bot.py`)**:
+  - Se identificó que `MessageHandler(filters.TEXT & ~filters.COMMAND, process_bank_access_input)` colocado antes de los `ConversationHandler` consumía todos los mensajes de texto y silenciaba el bot en `/bet` y `/check`.
+  - Reubicado al final de `build_app()`, priorizando los estados de conversación.
+  - Agregado test `test_build_app_handlers_order` a la suite.
+- **Control de Excepciones Asíncronas**:
+  - Envoltura `try ... except (asyncio.CancelledError, GeneratorExit): pass` en corrutinas en segundo plano para evitar logs de error al cancelar tareas.
+- **Calibración y Purga de Ruido Visual**:
+  - Erradicadas rimas de freestyle, chistes y rotaciones de porcentajes inventados.
+  - Retenidos y calibrados: saludos por apodo (`POC_GREETINGS`), Radar & Ranking de BINes (`bin_intelligence.py`), ficha SPEI in-bot monoespaciada copiable al toque y panel de rendimiento (`/stats`).
+- **Verificación Automatizada**:
+  - **165/165 tests pasando al 100%** en `pytest tests/`.
+- **Deploy en Producción (KVM4-Old `100.77.154.31`)**:
+  - Archivos `bot.py` y `bin_intelligence.py` transferidos a `/docker/betmexico/code/`.
+  - Contenedores `betmexico-mock-bot` y `betmexico-web` reiniciados y validados arriba.
