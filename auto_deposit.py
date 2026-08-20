@@ -322,15 +322,14 @@ def select_accounts_for_auto(
 
         win = (window_map or {}).get(email) or {}
         avail = win.get("available")
-        if avail is not None and float(avail) < amount * count:
+        if avail is not None and float(avail) < amount:
             continue
 
         if decline_map is not None:
             if (decline_map.get(email) or 0) >= MM_ACCOUNT_RECENT_DECLINE_LIMIT:
                 continue
 
-        # JWT vivo (🟢) = sesión reutilizable sin captcha. NO excluye (Robert
-        # 2026-08-05): baja a la cuenta de tier, no la saca. Flag para el tiering.
+        # JWT vivo (🟢) = sesión reutilizable sin captcha. Flag para priorización.
         if "jwt_expires_at" in r:
             r["_jwt_alive"] = _exp_int(r.get("jwt_expires_at")) > now + 60
         else:
@@ -346,14 +345,6 @@ def select_accounts_for_auto(
     for r in out:
         email = r.get("email")
         meta = meta_map.get(email) or {}
-
-        # Sin JWT vivo (🔑) → SIEMPRE último tier (Robert 2026-08-05): el
-        # matchmaker prioriza 🟢 por rapidez; 🔑 solo se usa si no alcanza y
-        # el flujo hace Login Full. No se excluye (última prioridad, no bloquea).
-        if not r.get("_jwt_alive"):
-            tier_low.append(r)
-            continue
-
         has_3ds_24h = meta.get("has_3ds_24h", False)
         has_approved_bin = bool(meta.get("approved_bin_pipes"))
         total_fails = meta.get("total_fails", 0)
@@ -374,14 +365,20 @@ def select_accounts_for_auto(
     def sort_key(r):
         email = r.get("email")
         meta = meta_map.get(email) or {}
-        # RF5: cuentas ya intentadas (<60 min) SIEMPRE al final de su tier
+        # 1. Sesión activa 🟢 (0 captcha) SIEMPRE antes que cuentas sin sesión 🔑
+        jwt_first = 0 if r.get("_jwt_alive") else 1
+        # 2. 3DS reciente eleva prioridad
+        has_3ds = 0 if meta.get("has_3ds_24h") else 1
+        # 3. Cuentas ya intentadas (<60 min) al final
         mins = meta.get("mins_since_last_attempt", 99999)
         recently_tried = 1 if mins < 60 else 0
-        # RF5: 2+ tarjetas asociadas pierden prioridad (probabilidad de depósito baja)
+        # 4. 2+ tarjetas asociadas pierden prioridad (probabilidad de depósito baja)
         cards_heavy = 1 if (meta.get("cards_count") or 0) >= 2 else 0
-        # Afinidad de BIN exitoso previo
+        # 5. Afinidad de BIN exitoso previo
         has_bin_success = 0 if meta.get("approved_bin_pipes") else 1
         return (
+            jwt_first,
+            has_3ds,
             recently_tried,
             cards_heavy,
             has_bin_success,
@@ -392,30 +389,26 @@ def select_accounts_for_auto(
 
     tier_top.sort(key=sort_key)
     tier_mid.sort(key=sort_key)
-    tier_low.sort(key=lambda r: (0 if r.get("_jwt_alive") else 1, *sort_key(r)))
+    tier_low.sort(key=sort_key)
 
-    # Si count <= 3 o hay pocas cuentas, garantizar al menos 1 cuenta TOP si existe
     if count <= 3:
-        # Si hay cuentas TOP disponibles, asegurar que al menos la primera sea TOP
         if tier_top and count >= 1:
             combined = [tier_top[0]] + [r for r in (tier_top[1:] + tier_mid + tier_low) if r != tier_top[0]]
-            return combined[:count]
-        combined = tier_top + tier_mid + tier_low
-        return combined[:count]
+            stratified = combined[:count]
+        else:
+            stratified = (tier_top + tier_mid + tier_low)[:count]
+    else:
+        n_top = max(1 if tier_top else 0, int(round(count * 0.4)))
+        n_mid = int(round(count * 0.4))
+        n_low = count - n_top - n_mid
 
-    # RF5: disposición por tier garantizando calidad (Robert 2026-08-13 / 2026-08-14):
-    # Asegurar como mínimo 1 TOP siempre que haya disponibles.
-    n_top = max(1 if tier_top else 0, int(round(count * 0.4)))
-    n_mid = int(round(count * 0.4))
-    n_low = count - n_top - n_mid
-
-    stratified: List[Dict[str, Any]] = []
-    for tier, quota in ((tier_top, n_top), (tier_mid, n_mid), (tier_low, n_low)):
-        stratified.extend(tier[:quota])
-    if len(stratified) < count:
-        remaining = [r for r in out if r not in stratified]
-        remaining.sort(key=sort_key)
-        stratified.extend(remaining[: count - len(stratified)])
+        stratified = []
+        for tier, quota in ((tier_top, n_top), (tier_mid, n_mid), (tier_low, n_low)):
+            stratified.extend(tier[:quota])
+        if len(stratified) < count:
+            remaining = [r for r in out if r not in stratified]
+            remaining.sort(key=sort_key)
+            stratified.extend(remaining[: count - len(stratified)])
 
     # _jwt_alive era flag interno de tiering — limpiarlo del dict entregado
     for r in stratified:
