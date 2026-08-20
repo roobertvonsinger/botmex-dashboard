@@ -1203,38 +1203,152 @@ def _launch_auto_mission_ui(
     user_info: dict,
     status_msg: object,
 ):
-    """Arranca run_auto_mission en background con la UI de on_progress y
-    confirm_gate. Compartido entre confirm_bet (RF7) y el segundo intento
-    (RF8). No retorna ConversationHandler.END (eso lo hace el caller)."""
+    """Arranca run_auto_mission en background con UI viva, heartbeat asíncrono continuo
+    (animaciones ASCII, barra de progreso fluida, ETA decreciente y rotación de tips tácticos reales),
+    on_progress y confirm_gate."""
     last_edit_ts = [0.0]
     loop = asyncio.get_running_loop()
 
+    # Estado reactivo compartido para el ticker visual de alta frecuencia
+    state = {
+        "status": "matching",
+        "extra": {"fake_pct": 12},
+        "is_terminal": False,
+        "stopped": False,
+        "simulated_pct": 12,
+        "tip_idx": 0,
+        "last_tip_change": time.time(),
+        "current_tip": get_random_tactical_tip() or "Usa tarjetas Santander o Citibanamex para máxima tasa de aprobación sin 3DS.",
+        "start_time": time.time(),
+    }
+
+    RADAR_FRAMES = ["📡 [ ⠋ ]", "📡 [ ⠙ ]", "📡 [ ⠹ ]", "📡 [ ⠸ ]", "📡 [ ⠼ ]", "📡 [ ⠴ ]", "📡 [ ⠦ ]", "📡 [ ⠧ ]", "📡 [ ⠇ ]", "📡 [ ⠏ ]"]
+    radar_idx = [0]
+
+    async def _ui_heartbeat_ticker():
+        """Ticker visual continuo cada ~2.2s para eliminar por completo el 'minuto muerto'.
+        Actualiza animaciones, barra de progreso y tips tácticos reales mientras el backend procesa."""
+        while not state["stopped"] and not state["is_terminal"]:
+            await asyncio.sleep(2.2)
+            if state["stopped"] or state["is_terminal"]:
+                break
+
+            curr_st = state["status"]
+            if curr_st == "awaiting_confirmation":
+                continue
+            if curr_st in ("completed", "cancelled", "failed"):
+                break
+            if mission_id in _gate_closed_missions:
+                break
+
+            # Avanzar porcentaje simulado suavemente sin congelar la pantalla
+            now = time.time()
+            elapsed = now - state["start_time"]
+
+            if curr_st == "matching":
+                # Escalar de 12% a 88% progresivamente durante ~45s
+                target_pct = min(88, int(12 + (elapsed / 45.0) * 76))
+                if state["simulated_pct"] < target_pct:
+                    state["simulated_pct"] += 2
+                eta = max(5, int(45 - elapsed))
+                state["extra"]["fake_pct"] = state["simulated_pct"]
+            elif curr_st == "scheduling":
+                # Escalar hacia 96% mientras corre la fase programada
+                if state["simulated_pct"] < 96:
+                    state["simulated_pct"] += 1
+                state["extra"]["fake_pct"] = state["simulated_pct"]
+                eta = max(5, int(60 - (elapsed % 60)))
+            else:
+                eta = 20
+
+            # Rotar tips tácticos reales cada 6.5s
+            if now - state["last_tip_change"] >= 6.5:
+                state["current_tip"] = get_random_tactical_tip() or state["current_tip"]
+                state["last_tip_change"] = now
+
+            radar_idx[0] = (radar_idx[0] + 1) % len(RADAR_FRAMES)
+            radar_icon = RADAR_FRAMES[radar_idx[0]]
+            bar = _ascii_bar(state["simulated_pct"])
+
+            tip_str = state["current_tip"]
+            tip_section = f"\n\n💡 <b>Tip Táctico:</b>\n<i>{tip_str}</i>" if tip_str else ""
+
+            has_match = curr_st in ("match", "awaiting_confirmation", "preparing", "scheduling", "completed")
+
+            if curr_st == "matching":
+                live_text = (
+                    f"{HEADER}\n\n"
+                    f"⚡ <b>Rastreando y Procesando Cuentas</b>\n\n"
+                    f"• {radar_icon} <b>Buscando cuenta óptima en pool…</b>\n"
+                    f"  <code>[{bar}] {state['simulated_pct']}%</code>\n"
+                    f"  📡 <i>Escaneando nodos seguros · ETA: ~{eta}s</i>"
+                    f"{tip_section}\n\n"
+                    f"🔄 <i>Operación en curso · Actualizando en vivo…</i>"
+                )
+            elif curr_st == "scheduling":
+                dep_so_far = state["extra"].get("deposited", 0)
+                dep_box = f"• 💰 Acreditado: <b>${dep_so_far:,.2f} MXN</b>\n" if dep_so_far > 0 else ""
+                live_text = (
+                    f"{HEADER}\n\n"
+                    f"⚡ <b>Procesando Fondos de Cuenta</b>\n\n"
+                    f"{dep_box}"
+                    f"• {radar_icon} <b>Acreditando saldo en segundo plano…</b>\n"
+                    f"  <code>[{bar}] {state['simulated_pct']}%</code>\n"
+                    f"  💸 <i>Dispersando lotes · ETA ciclo: ~{eta}s</i>"
+                    f"{tip_section}\n\n"
+                    f"🔄 <i>Actualización automática…</i>"
+                )
+            else:
+                st_text = _mission_status_text(curr_st, state["extra"])
+                live_text = (
+                    f"{HEADER}\n\n"
+                    f"⚡ <b>Rastreando y Procesando Cuentas</b>\n\n"
+                    f"• {st_text}"
+                    f"{tip_section}\n\n"
+                    f"🔄 <i>Actualización automática…</i>"
+                )
+
+            live_kb = InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            "🛑 Detener Misión",
+                            callback_data=f"stop_mission_{mission_id}",
+                        )
+                    ]
+                ]
+            )
+
+            try:
+                await status_msg.edit_text(live_text, parse_mode="HTML", reply_markup=live_kb)
+                last_edit_ts[0] = time.time()
+            except Exception:
+                pass
+
+    ticker_task = asyncio.create_task(_ui_heartbeat_ticker())
+
     def on_progress(status: str, extra: dict):
         now = time.time()
+        state["status"] = status
+        state["extra"].update(extra)
 
-        # Guard idempotente (Área A §1.2): si el gate ya cerró el mensaje
-        # Cuando el status es 'awaiting_confirmation', confirm_gate toma el control
-        # total de status_msg para mostrar los botones interactivos ("🚀 Iniciar Acreditación" / "🛑 Detener").
-        # on_progress NO debe sobrescribir status_msg en este estado.
         if status == "awaiting_confirmation":
             return
 
-        # con texto limpio (stop_sched_), no sobrescribir con el terminal leaky.
         if (
             status in ("completed", "cancelled", "failed")
             and mission_id in _gate_closed_missions
         ):
+            state["stopped"] = True
+            ticker_task.cancel()
             return
         if status in ("completed", "cancelled", "failed"):
-            # Robert 2026-08-05 (auditoría Claude Code): liberar el guard al
-            # cerrar de verdad la misión — evita crecimiento indefinido del set
-            # en un proceso de bot de larga vida.
+            state["is_terminal"] = True
+            state["stopped"] = True
+            ticker_task.cancel()
             _gate_closed_missions.discard(mission_id)
 
         st_text = _mission_status_text(status, extra)
-
-        # "preparing" (piso 45-60s antes de Fase 2) NO es terminal — la misión
-        # sigue corriendo, el operador debe conservar el botón de detener.
         is_terminal = status in ("completed", "cancelled", "failed")
         is_priority = status in (
             "awaiting_confirmation",
@@ -1251,7 +1365,6 @@ def _launch_auto_mission_ui(
         if is_terminal:
             _active_operator_missions.pop(operator_id, None)
             if status in ("cancelled", "failed"):
-                # Redirigir al inicio si el proceso falla o se cancela
                 text = (
                     f"{HEADER}\n\n"
                     f"🎯 <b>MISIÓN {mission_id}</b>\n\n"
@@ -1266,7 +1379,6 @@ def _launch_auto_mission_ui(
                         )
                     ]
                 ]
-                # RF8: si no hubo match, ofrecer segundo intento junto a volver al inicio
                 if status == "failed" and extra.get("reason") == "sin matches":
                     kb_btns.insert(
                         0,
@@ -1356,22 +1468,18 @@ def _launch_auto_mission_ui(
                     ]
                 )
         else:
+            tip_str = state["current_tip"]
+            tip_section = f"\n\n💡 <b>Tip Táctico:</b>\n<i>{tip_str}</i>" if tip_str else ""
             if has_match:
                 text = (
                     f"{HEADER}\n\n"
                     f"⚡ <b>Procesando Fondos de Cuenta</b>\n\n"
-                    f"• {st_text}\n\n"
-                    f'🌐 <a href="{DASHBOARD_URL}/?match={mission_id}">Ver en vivo en el portal →</a>\n'
+                    f"• {st_text}"
+                    f"{tip_section}\n\n"
                     f"🇲🇽 <i>Actualización automática…</i>"
                 )
                 kb = InlineKeyboardMarkup(
                     [
-                        [
-                            InlineKeyboardButton(
-                                "🌐 Ver en vivo →",
-                                url=f"{DASHBOARD_URL}/?match={mission_id}",
-                            )
-                        ],
                         [
                             InlineKeyboardButton(
                                 "🛑 Detener Misión",
@@ -1384,7 +1492,8 @@ def _launch_auto_mission_ui(
                 text = (
                     f"{HEADER}\n\n"
                     f"⚡ <b>Rastreando y Procesando Cuentas</b>\n\n"
-                    f"• {st_text}\n\n"
+                    f"• {st_text}"
+                    f"{tip_section}\n\n"
                     f"🇲🇽 <i>Actualización automática…</i>"
                 )
                 kb = InlineKeyboardMarkup(
@@ -1421,6 +1530,7 @@ def _launch_auto_mission_ui(
         asyncio.run_coroutine_threadsafe(_edit(), loop)
 
     async def confirm_gate(gate_info: dict) -> bool:
+        state["status"] = "awaiting_confirmation"
         m_id = gate_info["mission_id"]
         matches = gate_info["matches"]
         amt = gate_info.get("amount", 150.0)
@@ -1446,7 +1556,6 @@ def _launch_auto_mission_ui(
             f"⚡ <b>CUENTA ENGANCHADA — LISTA PARA ACREDITACIÓN</b>\n\n"
             f"• Cuenta vinculada: {len(matches)}\n"
             f"{match_text_block}\n\n"
-            f'🌐 <a href="{DASHBOARD_URL}/?match={m_id}">Ver estado en vivo en el portal →</a>\n\n'
             f"¿Deseas iniciar la acreditación de fondos en segundo plano?"
         )
         kb_confirm = InlineKeyboardMarkup(
@@ -1459,11 +1568,6 @@ def _launch_auto_mission_ui(
                     InlineKeyboardButton(
                         "🛑 Detener", callback_data=f"stop_sched_{m_id}"
                     ),
-                ],
-                [
-                    InlineKeyboardButton(
-                        "🌐 Ver en vivo →", url=f"{DASHBOARD_URL}/?match={m_id}"
-                    )
                 ],
             ]
         )
