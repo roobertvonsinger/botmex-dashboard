@@ -28,7 +28,7 @@ import logging
 import random
 import time
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("betmexico.dashboard.login_orch")
 
@@ -156,6 +156,8 @@ class LoginResult:
     # El caller lo usa para decidir re-login si el JWT cacheado da 401 en el
     # depósito (JWT muerto server-side) — ver spec anti-rate-limit Capa 1.
     from_cache: bool = False
+    details: Optional[Dict[str, Any]] = None
+    raw_result: Optional[Dict[str, Any]] = None
 
     @property
     def used_proxy(self) -> Optional[str]:
@@ -400,10 +402,18 @@ async def gentle_login(
                     _persist_jwt_cache(email, jwt)
                 except Exception:
                     pass
+                acct_details = login_result.get("account_details") if isinstance(login_result, dict) else None
                 logger.info(f"[gentle_login] {email} LIVE en intento {attempts_done+1} "
                             f"(token reusado {token_reuses}x, edad {time.time()-token_born:.0f}s)")
-                return LoginResult(ok=True, jwt=jwt, code="LIVE",
-                                   sticky_session=cur, attempts=attempts_done + 1)
+                return LoginResult(
+                    ok=True,
+                    jwt=jwt,
+                    code="LIVE",
+                    sticky_session=cur,
+                    attempts=attempts_done + 1,
+                    details=acct_details,
+                    raw_result=login_result if isinstance(login_result, dict) else None,
+                )
             logger.warning(f"[gentle_login] {email} LIVE sin JWT — reintento")
             streak += 1; attempts_done += 1; token_reuses += 1; last_status = "LIVE_NO_JWT"
             continue

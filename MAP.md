@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `458ba08` | fix(auto_deposit): regla estricta 1 tarjeta = 1 cuenta permanente y lectura de deposit_attempts approved para married cards |
 | `b741504` | fix(auto_deposit): jubilacion incondicional de tarjeta ante rechazo bancario y boton global de paro de emergencia |
 | `26a279a` | fix: restore pantallaSrcClass in static/app.js |
 | `55ae7d4` | feat: visual badge and highlight for accounts newly added in last 48h |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `d808ee6` | fix(bot): fix text intercept in /bet, remove cringe visual noise, sanitize telemetry and update tests |
 | `d8076c6` | fix(bot): eliminar minuto muerto en /bet con ticker asincrono continuo y tips tacticos |
 | `33f83d0` | chore: mover .impeccable a skills-disabled (skills UI no aplican a este stack) |
-| `1292e14` | feat(bot): flujo 100% in-bot con telemetría visual, ficha SPEI, accesos bancarios y retiro por fases |
 <!-- GEN:end:recientes -->
 
 ---

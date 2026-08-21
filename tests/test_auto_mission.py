@@ -494,3 +494,53 @@ def test_mission_confirm_gate_invoked_after_match_and_rest_done(H):
     assert gate_invoked[0]["matches"][0]["email"] == "acc1@x.com"
 
 
+def test_mission_balance_limit_exceeded_preserves_card_and_skips_account(H):
+    """Verifica que si una cuenta tiene saldo activo (>= $100) y devuelve
+    BALANCE_LIMIT_EXCEEDED, la cuenta se salta pero la tarjeta NO se jubila
+    y pasa limpia a la siguiente cuenta."""
+    def script(email, amount, kw):
+        if email == "acc1@x.com":
+            return {"success": False, "result_code": "BALANCE_LIMIT_EXCEEDED", "error": "Cuenta con saldo"}
+        return {"success": True, "result_code": "BANK_APPROVED", "jwt": "J", "used_proxy": "P"}
+    H.script = script
+    H.card_pipes = [P1]
+    pl = {
+        "accounts": [
+            {"id": 1, "email": "acc1@x.com", "grade": "A", "card_pipe": P1},
+            {"id": 2, "email": "acc2@x.com", "grade": "A", "card_pipe": P1},
+        ]
+    }
+    run(H, pl)
+    assert 1 in H.unlocked
+    # Cuenta 2 debió recibir la tarjeta P1 y hacer probe + match
+    acc2_probes = [c for c in H.run_calls if c["email"] == "acc2@x.com" and c["amount"] == ad.PROBE_AMOUNT]
+    assert len(acc2_probes) == 1
+    matches = json.loads(next(u["matches"] for u in H.updates if "matches" in u))
+    assert len(matches) == 1
+    assert matches[0]["email"] == "acc2@x.com"
+
+
+def test_mission_db_balance_over_100_skipped_pre_attempt(H, monkeypatch):
+    """Verifica que si la BD ya sabe que la cuenta tiene balance >= $100,
+    se salta inmediatamente sin siquiera ejecutar _attempt."""
+    def fake_fetch(aid):
+        if aid == 1:
+            return {"id": 1, "email": "acc1@x.com", "password": "pw", "balance_real": 116.91}
+        return {"id": 2, "email": "acc2@x.com", "password": "pw", "balance_real": 0.0}
+    monkeypatch.setattr(ad, "_fetch_account", fake_fetch)
+    H.card_pipes = [P1]
+    pl = {
+        "accounts": [
+            {"id": 1, "email": "acc1@x.com", "grade": "A", "card_pipe": P1},
+            {"id": 2, "email": "acc2@x.com", "grade": "A", "card_pipe": P1},
+        ]
+    }
+    run(H, pl)
+    # acc1 nunca llamó a _run_deposit_with_phases
+    acc1_calls = [c for c in H.run_calls if c["email"] == "acc1@x.com"]
+    assert acc1_calls == []
+    # acc2 sí corrió y completó match
+    acc2_probes = [c for c in H.run_calls if c["email"] == "acc2@x.com" and c["amount"] == ad.PROBE_AMOUNT]
+    assert len(acc2_probes) == 1
+
+

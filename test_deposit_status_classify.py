@@ -89,7 +89,7 @@ def test_invariant_only_real_bank_declines_are_rejected():
         "RATE_LIMITED", "AUTOEXCLUSION", "KYC_PENDING", "LOGIN_DENIED",
         "LOGIN_FAILED", "CAPTCHA_POOL_EMPTY", "DEPS_MISSING", "BEGIN_ERROR",
         "PAYMENT_ERROR", "TIMEOUT", "SUBMIT_ERROR", "UNKNOWN_TXN_STATUS_5",
-        "ERROR", "VELOCITY_SKIP", "UNKNOWN", "",
+        "BALANCE_LIMIT_EXCEEDED", "ERROR", "VELOCITY_SKIP", "UNKNOWN", "",
     ]
     for rc in non_bank:
         assert classify_deposit_status(rc, False) != "rejected", rc
