@@ -1278,6 +1278,18 @@ async def run_auto_mission(
                             _unlock(account_id)
                             locked_ids.discard(account_id)
                         continue
+                    bal_db = fresh_acct.get("balance_real") if fresh_acct.get("balance_real") is not None else fresh_acct.get("balance_total")
+                    try:
+                        if bal_db is not None and float(bal_db) >= 100.0:
+                            logger.info(f"💰 CUENTA CON SALDO EN BD (${float(bal_db):.2f} >= $100) | {email} — saltada del plan")
+                            target["done"] = True
+                            target["candidates"] = []
+                            if target["locked"]:
+                                _unlock(account_id)
+                                locked_ids.discard(account_id)
+                            continue
+                    except (ValueError, TypeError):
+                        pass
                     acct = fresh_acct
                     target["acct"] = fresh_acct
 
@@ -1379,6 +1391,19 @@ async def run_auto_mission(
                         target["done"] = True
                         break
 
+                    if code == "BALANCE_LIMIT_EXCEEDED":
+                        logger.warning(f"💰 CUENTA CON SALDO ACTIVO ({email}) — saltada del plan sin quemar tarjeta {pipe}")
+                        target["done"] = True
+                        target["candidates"] = []
+                        if target["locked"] and not target["matched"]:
+                            _unlock(account_id)
+                            locked_ids.discard(account_id)
+                        # Re-inyectar la tarjeta a otras cuentas activas si no la tenían
+                        for other in accounts_state:
+                            if not other["done"] and pipe not in other["candidates"] and not _is_card_retired(pipe):
+                                other["candidates"].append(pipe)
+                        break
+
                     if code in dep.MM_THREEDS_RC:
                         try:
                             from app import db as _adb
@@ -1444,11 +1469,10 @@ async def run_auto_mission(
                     if dep._mm_is_real_decline(code) or dep._mm_is_ambiguous_charge(code):
                         failed += 1
                         target["declines"] += 1
-                        is_clean_account = target.get("grade") in ("A+", "A")
-                        if is_clean_account and code == "BANK_REJECTED":
-                            _retire_card(pipe, reason=f"BANK_REJECTED en cuenta limpia {email}")
-                            logger.info(f"🚫 TARJETA JUBILADA EN MISIÓN (BANK_REJECTED en cuenta {email} con grado {target.get('grade')}) | {pipe}")
-                            logger.info(f"ℹ️ Matriz Diagnóstico: Declinación atribuida a tarjeta, no a pasarela de {email}")
+                        # Retiro incondicional de tarjeta: Si el banco la rechazó, se jubila INMEDIATAMENTE
+                        # de todas las cuentas candidatas para evitar quemar plásticos.
+                        _retire_card(pipe, reason=f"{code} en {email}")
+                        logger.warning(f"🚫 TARJETA JUBILADA EN MISIÓN ({code} en cuenta {email}) | {pipe}")
 
                         target["cooldown_until"] = _get_now() + dep.MM_COOLDOWN
                         if target["declines"] >= MM_MAX_ACCOUNT_DECLINES_PER_RUN or not target["candidates"]:

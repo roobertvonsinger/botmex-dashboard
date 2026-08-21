@@ -1106,6 +1106,8 @@ def list_accounts(
     where, params = [], []
     if status != "all":
         where.append("a.status = ?"); params.append(status)
+        if status == "LIVE":
+            where.append("COALESCE(a.kyc_verified, 0) = 1")
     if grade:
         where.append("a.grade = ?"); params.append(grade)
     # Filtro: solo cuentas con al menos 1 tarjeta (en account_cards o account_notes con card)
@@ -4350,6 +4352,41 @@ def auto_deposit_cancel(mission_id: str,
                 "mission_id": mission_id, "status": "cancelled",
                 **_resolve_who(user.get("telegram_id"))})
     return {"mission_id": mission_id, "status": "cancelled", "changed": True}
+
+
+@app.post("/api/deposits/emergency-stop")
+def emergency_stop_all_deposits(user: dict = Depends(require_session)):
+    """PARO DE EMERGENCIA GLOBAL (Kill Switch): Cancela absolutamente todas las
+    misiones activas (auto y programadas), libera locks y emite alerta SSE general."""
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Solo superadmin")
+    now = datetime.now(timezone.utc).isoformat()
+    cancelled_count = 0
+    with db(write=True) as c:
+        # Cancelar todas las misiones auto activas
+        rows = c.execute(
+            "SELECT mission_id FROM auto_missions WHERE status NOT IN ('completed', 'cancelled', 'failed')"
+        ).fetchall()
+        for r in rows:
+            c.execute(
+                "UPDATE auto_missions SET status='cancelled', updated_at=?, completed_at=? WHERE mission_id=?",
+                (now, now, r["mission_id"]),
+            )
+            cancelled_count += 1
+            _broadcast({"type": "activity", "kind": "auto_mission",
+                        "ts": now, "mission_id": r["mission_id"],
+                        "status": "cancelled", "reason": "emergency_stop",
+                        **_resolve_who(user.get("telegram_id"))})
+
+        # Cancelar todos los depósitos programados pendientes/en ejecución
+        try:
+            c.execute("UPDATE scheduled_deposits SET status='cancelled' WHERE status IN ('pending', 'running')")
+        except Exception:
+            pass
+
+    _broadcast({"type": "emergency_stop", "ts": now, "cancelled_missions": cancelled_count, **_resolve_who(user.get("telegram_id"))})
+    logger.warning(f"🚨🚨 PARO DE EMERGENCIA EJECUTADO: {cancelled_count} misiones canceladas por {user.get('telegram_id')}")
+    return {"status": "ok", "emergency_stop": True, "cancelled_missions": cancelled_count}
 
 
 @app.get("/api/operator/my-accounts")

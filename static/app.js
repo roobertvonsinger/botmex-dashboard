@@ -7074,9 +7074,40 @@ _acctWrap()?.addEventListener('scroll', _saveAcctStateSoon, { passive: true });
   // compartido) si el operador tenía el popup abierto armando su propia selección
   // multi-cuenta al mismo tiempo. Causó depósito real a cuenta no seleccionada
   // (Robert, en vivo). Ver docs/ERRORS.md. Vuelve al drawer legacy (aislado, no
-  // comparte `_dx`) hasta tener un fix que no toque estado compartido en autoload.
   rehydrateActiveScheduled();
 })();
+
+// PARO DE EMERGENCIA GLOBAL (Kill Switch)
+const btnEmergencyStop = document.getElementById('btnEmergencyStop');
+if (btnEmergencyStop) {
+  btnEmergencyStop.addEventListener('click', async () => {
+    if (!confirm('🛑 ¿CONFIRMAR PARO DE EMERGENCIA TOTAL?\n\nSe cancelarán de inmediato todos los depósitos, misiones y procesos activos.')) {
+      return;
+    }
+    try {
+      btnEmergencyStop.disabled = true;
+      btnEmergencyStop.textContent = '🛑 PARANDO...';
+      const r = await fetch('/api/deposits/emergency-stop', { method: 'POST' });
+      const data = await r.json();
+      if (r.ok) {
+        showToast(`🛑 Paro ejecutado: ${data.cancelled_missions || 0} misiones canceladas`);
+      } else {
+        showToast(`Error al parar: ${data.detail || 'Fallo de red'}`, 'error');
+      }
+      if (window._dx) {
+        window._dx.running = false;
+        window._dx.cancelled = true;
+      }
+    } catch (e) {
+      showToast(`Error al ejecutar paro: ${e.message}`, 'error');
+    } finally {
+      setTimeout(() => {
+        btnEmergencyStop.disabled = false;
+        btnEmergencyStop.innerHTML = '<span class="ti">🛑</span>PARAR TODO';
+      }, 1500);
+    }
+  });
+}
 
 window.addEventListener('beforeunload', () => {
   if (_evtSrc) _evtSrc.close();
