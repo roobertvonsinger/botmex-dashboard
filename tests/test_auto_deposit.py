@@ -227,9 +227,7 @@ def test_plan_normalizes_4part_pool_cards(seed_db):
 
 def test_plan_feasibility_check(seed_db):
     # seed base: a@ lockeada, c@ DEAD → solo b@ (LIVE, sin JWT) es candidata.
-    # Robert 2026-08-05: JWT vivo NO es exclusión — b@ sin JWT entra (última
-    # prioridad, Login Full), así que el plan es factible con ella.
-    plan = plan_auto_mission(seed_db, ["4111111111111111|1230|123"], amount=150, target_count=9)
+    plan = plan_auto_mission(seed_db, ["4555555555555555|1230|123"], amount=150, target_count=9)
     assert plan["feasible"] is True
     assert any(r["email"] == "b@test.com" for r in plan["accounts"])
 
@@ -237,12 +235,13 @@ def test_plan_feasibility_check(seed_db):
 def test_plan_estimates_total(seed_db):
     _add_account(seed_db, "t1@t.com")
     _add_account(seed_db, "t2@t.com")
-    plan = plan_auto_mission(seed_db, ["4999999999999999|0130|999"], amount=150, target_count=9)
-    # t1 + t2 (JWT vivo) + b@ del seed (LIVE sin JWT) — el JWT ya no excluye
-    # (Robert 2026-08-05). Las 3 se asignan desde el pool, ninguna married.
+    # 3 tarjetas distintas para 3 cuentas (1:1 estricto)
+    cards = ["4999999999999999|0130|999", "4888888888888888|0130|999", "4777777777777777|0130|999"]
+    plan = plan_auto_mission(seed_db, cards, amount=150, target_count=9)
     assert len(plan["accounts"]) == 3
     assert plan["total_estimated"] == 150 * 9 * 3
-    assert all(a["card_pipe"] == "4999999999999999|0130|999" for a in plan["accounts"])
+    assigned_pipes = [a["card_pipe"] for a in plan["accounts"]]
+    assert len(set(assigned_pipes)) == 3  # Cada cuenta tiene su propia tarjeta única
 
 
 def _add_rejected_attempt(db_path, email, hours_ago=1):
@@ -261,8 +260,7 @@ def _add_rejected_attempt(db_path, email, hours_ago=1):
 
 def test_plan_excludes_accounts_with_recent_declines(seed_db):
     """Regla Robert: cuenta con 2 declines en las últimas 12h NO entra al plan
-    aunque cumpla el resto de filtros (no taladrar cuentas ya quemadas).
-    burned@ queda fuera; b@ del seed (sin declines) sí entra."""
+    aunque cumpla el resto de filtros (no taladrar cuentas ya quemadas)."""
     _add_account(seed_db, "burned@t.com")
     _add_rejected_attempt(seed_db, "burned@t.com", hours_ago=1)
     _add_rejected_attempt(seed_db, "burned@t.com", hours_ago=2)
@@ -272,8 +270,7 @@ def test_plan_excludes_accounts_with_recent_declines(seed_db):
 
 
 def test_plan_max_accounts_scales_with_card_count(seed_db):
-    """Regla Robert: 3 cuentas para la 1a tarjeta + 1 extra por tarjeta
-    adicional (no taladrar todo el pool para lograr el match)."""
+    """Regla: 1 tarjeta = 1 cuenta (máximo tantas cuentas como tarjetas disponibles)."""
     for i in range(6):
         _add_account(seed_db, f"u{i}@t.com")
     plan_1card = plan_auto_mission(seed_db, ["4999999999999999|0130|999"],
@@ -283,18 +280,14 @@ def test_plan_max_accounts_scales_with_card_count(seed_db):
         ["4999999999999999|0130|999", "4888888888888888|0130|999",
          "4777777777777777|0130|999"],
         amount=150, target_count=9)
-    assert len(plan_1card["accounts"]) == 3
-    assert len(plan_3cards["accounts"]) == 5
+    assert len(plan_1card["accounts"]) == 1  # 1 tarjeta -> 1 cuenta
+    assert len(plan_3cards["accounts"]) == 3  # 3 tarjetas -> 3 cuentas
 
 
 def test_plan_max_accounts_hard_cap_at_10(seed_db):
-    """Regla Robert 2026-08-05: tope duro de 10 cuentas por corrida, sea cual
-    sea la razón (aunque la fórmula 3+1×extra dé más con muchas tarjetas)."""
+    """Regla Robert: tope duro de 10 cuentas por corrida y 1:1 tarjeta/cuenta."""
     for i in range(15):
         _add_account(seed_db, f"v{i}@t.com")
-    many_cards = [f"49{i:014d}|0130|999" for i in range(9)]  # 9 tarjetas → 3+8=11 sin cap
-    # amount chico + target_count alto: el tope real que se prueba es max_accounts
-    # (10), no el cap de 24h (amount*count) ni el count de select_accounts_for_auto.
-    plan = plan_auto_mission(seed_db, many_cards, amount=10, target_count=20)
+    many_cards = [f"49{i:014d}|0130|999" for i in range(12)]  # 12 tarjetas distintas -> tope 10
+    plan = plan_auto_mission(seed_db, many_cards, amount=10, target_count=20, max_accounts=10)
     assert len(plan["accounts"]) == 10
-    assert _max_accounts_for_cards(9) == 10

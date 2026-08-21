@@ -1053,7 +1053,12 @@ async def _acquire_session_and_begin(
             jwt = login_res.jwt
             used_proxy = login_res.used_proxy
             from_cache = login_res.from_cache
-            login_result = {"status": login_res.code, "error": login_res.error}
+            login_result = getattr(login_res, "raw_result", None) or {
+                "status": getattr(login_res, "code", ""),
+                "error": getattr(login_res, "error", None),
+                "email": email,
+                "password": password,
+            }
             login_ms = int((time.time() - t0) * 1000)
 
             if not jwt:
@@ -1122,6 +1127,9 @@ async def _acquire_session_and_begin(
             try:
                 from betmexico_db import db as _bot_db
                 from web_grading import recalc_grade_from_db
+                from prewarm import _db_upsert_balance
+                if getattr(login_res, "details", None) and not from_cache:
+                    await asyncio.to_thread(_db_upsert_balance, email, login_res.details)
                 if login_result and not from_cache:
                     await asyncio.to_thread(
                         _bot_db.upsert_account, login_result, user.get("telegram_id", 0)
@@ -1159,6 +1167,55 @@ async def _acquire_session_and_begin(
                     "success": False, "result_code": "AUTOEXCLUSION", "error": msg,
                     "duration_ms": int((time.time() - t_total) * 1000),
                 }}
+
+        # ── Gate de Saldo Activo (Robert: cuenta con >= $100 no puede depositar) ──
+        bal_real = None
+        bal_bonos = 0.0
+        if getattr(login_res, "details", None):
+            bal_real = login_res.details.get("balance_real")
+            bal_bonos = login_res.details.get("balance_bonos") or 0.0
+        elif login_result and isinstance(login_result, dict):
+            acct_details = login_result.get("account_details") or {}
+            bal_real = acct_details.get("balance_real")
+            bal_bonos = acct_details.get("balance_bonos") or 0.0
+
+        if bal_real is None:
+            try:
+                from app import db as _dash_db
+                with _dash_db() as _c:
+                    _row = _c.execute(
+                        "SELECT balance_real, balance_bonos, balance_total FROM accounts WHERE email=?",
+                        (email,),
+                    ).fetchone()
+                    if _row:
+                        bal_real = _row["balance_real"] if _row["balance_real"] is not None else _row["balance_total"]
+                        bal_bonos = _row["balance_bonos"] or 0.0
+            except Exception:
+                pass
+
+        if bal_real is not None:
+            try:
+                bal_f = float(bal_real or 0.0)
+                bal_tot = bal_f + float(bal_bonos or 0.0)
+                if bal_f >= 100.0 or bal_tot >= 100.0:
+                    msg = (
+                        f"Cuenta con saldo activo (${bal_f:.2f}) — "
+                        f"BetMexico no permite depositar a cuentas con >= $100."
+                    )
+                    logger.warning(
+                        f"[Deposits/phases] {email} SALDO ACTIVO (${bal_f:.2f} >= $100) — "
+                        f"abortando depósito sin quemar captcha ni tarjeta"
+                    )
+                    await _safe_phase(phase_cb, "done", {
+                        "success": False, "result_code": "BALANCE_LIMIT_EXCEEDED", "error": msg,
+                    })
+                    return {"fail": {
+                        "success": False, "result_code": "BALANCE_LIMIT_EXCEEDED", "error": msg,
+                        "balance_real": bal_f,
+                        "duration_ms": int((time.time() - t_total) * 1000),
+                    }}
+            except (ValueError, TypeError):
+                pass
 
         # ── Abrir client + begin_deposit (retry ante 50x/timeout transitorios) ──
         # Pre-cobro → reintentar es seguro (no duplica cargos).
@@ -1939,12 +1996,9 @@ MM_CARD_COOLDOWN = 5
 # Límites igualados a 3 DECLINES REALES por CUENTA y por TARJETA (Robert 2026-07-30).
 # Una cuenta sale del run a los 3 declines reales (su pasarela rechaza 3 tarjetas distintas);
 # una tarjeta se retira a los 3 declines reales (3 cuentas distintas la declinan).
-MM_MAX_ACCOUNT_FAILS = 3
-MM_MAX_CARD_FAILS = 3
-# Tope de cuentas DISTINTAS que una tarjeta puede tocar en el run (Robert 2026-06-28).
-# Al alcanzar resultado terminal (aprobado/decline/3ds) en 3 cuentas, la tarjeta se
-# retira aunque no haya juntado 3 declines (p.ej. casó en 2 y declinó en 1).
-MM_MAX_ACCOUNTS_PER_CARD = 3
+MM_MAX_ACCOUNT_FAILS = 2
+MM_MAX_CARD_FAILS = 1        # Al primer decline real bancario la tarjeta queda jubilada inmediatamente
+MM_MAX_ACCOUNTS_PER_CARD = 1  # 1 tarjeta = 1 cuenta máximo (jamás exponer una tarjeta a múltiples cuentas)
 # Reintentos transitorios (gateway 50x/timeout/error = nuestro lado) por PAR antes
 # de abandonar ese par. NO descarta tarjeta ni cuenta — sólo deja de insistir en
 # esa combinación. (LOGIN_FAILED tiene su propio tope: MM_MAX_LOGIN_RETRIES.)

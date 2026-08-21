@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 585 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5386 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1813 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1836 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `betmexico_config.py` | 185 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2927 | `—` | _[completar]_ |
@@ -114,7 +114,7 @@ prewarm.py (router)
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 213 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
-| `deposits.py` | 2993 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 2990 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 396 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 458 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 907 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -229,9 +229,9 @@ prewarm.py (router)
 | `CARD_VELOCITY_COOLDOWN_SEC` | `60` | `deposits.py` |
 | `MM_COOLDOWN` | `45` | `deposits.py` |
 | `MM_CARD_COOLDOWN` | `5` | `deposits.py` |
-| `MM_MAX_ACCOUNT_FAILS` | `3` | `deposits.py` |
-| `MM_MAX_CARD_FAILS` | `3` | `deposits.py` |
-| `MM_MAX_ACCOUNTS_PER_CARD` | `3` | `deposits.py` |
+| `MM_MAX_ACCOUNT_FAILS` | `2` | `deposits.py` |
+| `MM_MAX_CARD_FAILS` | `1` | `deposits.py` |
+| `MM_MAX_ACCOUNTS_PER_CARD` | `1` | `deposits.py` |
 | `MM_MAX_PAIR_TRANSIENT` | `4` | `deposits.py` |
 | `MM_MAX_LOGIN_RETRIES` | `2` | `deposits.py` |
 | `CAP_PER_OPERATOR_10MIN` | `9999` | `prewarm.py` |
@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b741504` | fix(auto_deposit): jubilacion incondicional de tarjeta ante rechazo bancario y boton global de paro de emergencia |
 | `26a279a` | fix: restore pantallaSrcClass in static/app.js |
 | `55ae7d4` | feat: visual badge and highlight for accounts newly added in last 48h |
 | `9a9b3bd` | feat(bot): implement crisp card validation layout with LIVE/TIESAS blocks and direct summary |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `d8076c6` | fix(bot): eliminar minuto muerto en /bet con ticker asincrono continuo y tips tacticos |
 | `33f83d0` | chore: mover .impeccable a skills-disabled (skills UI no aplican a este stack) |
 | `1292e14` | feat(bot): flujo 100% in-bot con telemetría visual, ficha SPEI, accesos bancarios y retiro por fases |
-| `1cea8e3` | fix(auto_deposit): tier_mid exige _jwt_alive para evitar selecciones de cuentas expiradas |
 <!-- GEN:end:recientes -->
 
 ---

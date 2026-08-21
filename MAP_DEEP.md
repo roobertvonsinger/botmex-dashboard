@@ -221,21 +221,21 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_extract_card_number` | def | L124–L131 |
 | `_parse_card_pipe` | def | L134–L167 |
 | `_normalize_pipe_to_3part` | def | L170–L172 |
-| `_get_married_card_owners` | def | L175–L194 |
-| `select_accounts_for_auto` | def | L203–L419 |
-| `_max_accounts_for_cards` | def | L428–L436 |
-| `plan_auto_mission` | def | L439–L733 |
-| `_fake_progress_pct` | def | L774–L805 |
-| `_iso` | def | L809–L810 |
-| `_m_load` | def | L813–L821 |
-| `_m_status` | def | L824–L826 |
-| `_m_update` | def | L829–L839 |
-| `_fetch_account` | def | L842–L849 |
-| `_is_account_dead` | def | L852–L860 |
-| `_unlock` | def | L863–L872 |
-| `_broadcast_mission` | def | L875–L904 |
-| `_stop_pool` | def | L907–L914 |
-| `run_auto_mission` | def | L918–L1813 |
+| `_get_married_card_owners` | def | L175–L207 |
+| `select_accounts_for_auto` | def | L216–L432 |
+| `_max_accounts_for_cards` | def | L441–L449 |
+| `plan_auto_mission` | def | L452–L756 |
+| `_fake_progress_pct` | def | L797–L828 |
+| `_iso` | def | L832–L833 |
+| `_m_load` | def | L836–L844 |
+| `_m_status` | def | L847–L849 |
+| `_m_update` | def | L852–L862 |
+| `_fetch_account` | def | L865–L872 |
+| `_is_account_dead` | def | L875–L883 |
+| `_unlock` | def | L886–L895 |
+| `_broadcast_mission` | def | L898–L927 |
+| `_stop_pool` | def | L930–L937 |
+| `run_auto_mission` | def | L941–L1836 |
 
 ### `autoexclusion.py`
 
@@ -482,13 +482,13 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_mm_is_real_decline` | def | L1936–L1942 |
 | `_mm_is_ambiguous_charge` | def | L1945–L1955 |
 | `classify_deposit_status` | def | L1958–L1989 |
-| `_mm_session_get` | def | L2035–L2039 |
-| `_mm_session_update` | def | L2042–L2051 |
-| `multi_stream` | def | L2055–L2569 |
-| `multi_cancel` | def | L2573–L2578 |
-| `scheduled_create` | def | L2591–L2955 |
-| `scheduled_list` | def | L2959–L2981 |
-| `scheduled_cancel` | def | L2985–L2993 |
+| `_mm_session_get` | def | L2032–L2036 |
+| `_mm_session_update` | def | L2039–L2048 |
+| `multi_stream` | def | L2052–L2566 |
+| `multi_cancel` | def | L2570–L2575 |
+| `scheduled_create` | def | L2588–L2952 |
+| `scheduled_list` | def | L2956–L2978 |
+| `scheduled_cancel` | def | L2982–L2990 |
 
 ### `jwt_keeper.py`
 

@@ -173,12 +173,15 @@ def _normalize_pipe_to_3part(p: str) -> str:
 
 
 def _get_married_card_owners(db_path: Optional[str] = None) -> Dict[str, str]:
-    """Carga el mapa de tarjetas casadas en BD: {card_number -> account_email}."""
+    """Carga el mapa de tarjetas casadas en BD: {card_number -> account_email}
+    tanto de account_cards como de deposit_attempts con status='APPROVED'.
+    Si una tarjeta pagó en una cuenta, JAMÁS puede usarse en otra."""
     owners: Dict[str, str] = {}
     try:
         from app import DB_PATH
         target_db = db_path or DB_PATH
         con = sqlite3.connect(str(target_db))
+        # 1. De account_cards
         cols = [c[1] for c in con.execute("PRAGMA table_info(account_cards)").fetchall()]
         num_col = "card_number" if "card_number" in cols else "number" if "number" in cols else None
         if num_col:
@@ -188,9 +191,19 @@ def _get_married_card_owners(db_path: Optional[str] = None) -> Dict[str, str]:
                 c_num = _extract_card_number(str(r[0]))
                 if c_num and r[1]:
                     owners[c_num] = str(r[1]).strip().lower()
+        # 2. De deposit_attempts con pago aprobado
+        try:
+            for r in con.execute(
+                "SELECT card_pipe, account_email FROM deposit_attempts WHERE UPPER(status)='APPROVED' AND card_pipe IS NOT NULL AND account_email IS NOT NULL"
+            ).fetchall():
+                c_num = _extract_card_number(str(r[0]))
+                if c_num and r[1]:
+                    owners[c_num] = str(r[1]).strip().lower()
+        except Exception:
+            pass
         con.close()
     except Exception as ex:
-        logger.debug(f"No se pudieron leer account_cards: {ex}")
+        logger.debug(f"No se pudieron leer tarjetas casadas: {ex}")
     return owners
 
 
@@ -679,31 +692,41 @@ def plan_auto_mission(
         pool.sort(key=lambda c: _rank_key(c, bin_stats_map))
 
         accounts_out: List[Dict[str, Any]] = []
-        assigned_tol: set = set()
+        assigned_card_pans: set = set()
+        married_owners = _get_married_card_owners(db_path)
+
         for r in selected:
             email = r.get("email")
+            email_lower = (email or "").strip().lower()
             meta = meta_map.get(email) or {}
             app_bin_pipes = meta.get("approved_bin_pipes") or {}
 
-            # Asignar la mejor tarjeta candidata del pool (dado por el operador)
-            # que no viole el cooldown de 30d de BIN. NUNCA se consulta
-            # account_cards aquí — Robert 2026-08-05: el automático no usa
-            # tarjetas ya guardadas en la cuenta, solo el pool entregado.
+            # Asignar 1 tarjeta del pool por cuenta (1:1 estricto).
+            # Jamás reutilizar una tarjeta ya asignada a otra cuenta en el plan
+            # ni una tarjeta que ya haya pagado o esté casada con otra cuenta.
             pipe = None
             if pool:
                 for cand in pool:
                     cand_pipe_str = _pipe_str(cand)
+                    cand_pan = _extract_card_number(cand_pipe_str)
                     cand_bin = cand_pipe_str[:6] if len(cand_pipe_str) >= 6 else ""
-                    # RF4: tarjeta tolerada solo en 1 cuenta por misión
-                    if cand_pipe_str in tol_pipes and cand_pipe_str in assigned_tol:
+
+                    # REGLA 1: 1 tarjeta = 1 cuenta (jamás asignar el mismo PAN a 2 cuentas)
+                    if cand_pan in assigned_card_pans:
                         continue
+
+                    # REGLA 2: Si la tarjeta ya pagó / casada con otra cuenta -> PROHIBIDA
+                    married_to = married_owners.get(cand_pan)
+                    if married_to and married_to != email_lower:
+                        continue
+
                     # Cooldown 30d del BIN: Si el BIN aprobó con OTRO pipe en los últimos 30d en esta cuenta -> omitir
                     if cand_bin in app_bin_pipes:
                         if cand_pipe_str not in app_bin_pipes[cand_bin]:
-                            continue  # Mismo BIN pero otra tarjeta -> bloquear por 30 días
+                            continue
 
                     pipe = cand_pipe_str
-                    assigned_tol.add(cand_pipe_str)
+                    assigned_card_pans.add(cand_pan)
                     break
 
             if pipe:
