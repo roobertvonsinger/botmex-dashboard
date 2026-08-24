@@ -27,7 +27,13 @@ _RUTHOPIA_RETRYABLE_STATUS = {"Error"}  # no se reintenta un Declined/Approved r
 
 
 def _load_ruthopia_dashboard_token() -> str:
-    """Lee DASHBOARD_TOKEN del mount /app/ruthopia_env (KVM4). Devuelve '' si no existe."""
+    """Lee DASHBOARD_TOKEN del entorno, archivo .env o del mount /app/ruthopia_env (KVM4)."""
+    # 1. Variable de entorno directa
+    tok = os.environ.get("RUTHOPIA_DASHBOARD_TOKEN") or os.environ.get("DASHBOARD_TOKEN")
+    if tok:
+        return tok.strip()
+
+    # 2. Mount en KVM4 /app/ruthopia_env
     env_path = Path("/app/ruthopia_env")
     try:
         if env_path.exists():
@@ -35,10 +41,28 @@ def _load_ruthopia_dashboard_token() -> str:
                 line = line.strip()
                 if line and not line.startswith("#") and "=" in line:
                     k, v = line.split("=", 1)
-                    if k.strip() == "DASHBOARD_TOKEN":
+                    if k.strip() in ("DASHBOARD_TOKEN", "RUTHOPIA_DASHBOARD_TOKEN"):
                         return v.strip()
     except Exception as exc:
         logger.warning(f"[Bridge] No se pudo leer token de ruthopia: {exc}")
+
+    # 3. Archivo local .env en repo ruthopia
+    for candidate in (
+        DASHBOARD_DIR.parent / "ruthopia" / ".env",
+        DASHBOARD_DIR.parent.parent / "repos" / "ruthopia" / ".env",
+        DASHBOARD_DIR.parent.parent / ".env",
+    ):
+        if candidate.exists():
+            try:
+                for line in candidate.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        if k.strip() in ("DASHBOARD_TOKEN", "RUTHOPIA_DASHBOARD_TOKEN"):
+                            return v.strip()
+            except Exception:
+                pass
+
     return ""
 
 
@@ -346,6 +370,7 @@ def precheck_card_liveness(card_pipe: str) -> Tuple[bool, str, Optional[Dict[str
     # Puente auténtico: las tarjetas pasan por el gate rw de ruthopia (HTTP)
     status, msg = ruthopia_bridge_check(parsed["pipe_4parts"])
 
+    # 1. LIVE confirmado por pasarela
     if status == "Approved":
         parsed["liveness_kind"] = "live"
         status_label = f"🟢 LIVE (Auth OK) - <i>{msg[:50]}</i>"
@@ -353,23 +378,33 @@ def precheck_card_liveness(card_pipe: str) -> Tuple[bool, str, Optional[Dict[str
         parsed["is_live"] = True
         return True, status_label, parsed
 
-    # Tolerancias (RF3): solo estas pasan sin aprobar el rw
+    # 2. Tolerancias bancarias (RF3): BINs exceptuados o mensajes bancarios conocidos
     bin6 = card_num[:6]
-    if bin6 in _TOL_BINS:
+    msg_lower = (msg or "").lower()
+
+    if status == "Declined" and bin6 in _TOL_BINS:
         parsed["liveness_kind"] = "tol_bin"
-        status_label = "🟡 TOLERADA (BIN) - pase sin aprobar rw"
+        status_label = "🟡 TOLERADA (BIN) - decline bancario exceptuado"
         parsed["liveness_label"] = status_label
         parsed["is_live"] = True
         return True, status_label, parsed
 
-    msg_lower = (msg or "").lower()
     if any(sub in msg_lower for sub in _TOL_REASON_SUBSTRINGS):
         parsed["liveness_kind"] = "tol_reason"
-        status_label = "🟡 TOLERADA (reason) - pase sin aprobar rw"
+        status_label = "🟡 TOLERADA (reason) - decline bancario exceptuado"
         parsed["liveness_label"] = status_label
         parsed["is_live"] = True
         return True, status_label, parsed
 
+    # 3. Errores de infraestructura (token missing, red caída, bridge inaccesible)
+    if status == "Error":
+        parsed["liveness_kind"] = "error"
+        status_label = f"🔴 ERROR (Gate Inaccesible) - <i>{msg[:50]}</i>"
+        parsed["liveness_label"] = status_label
+        parsed["is_live"] = False
+        return False, status_label, parsed
+
+    # 4. Declined estándar (muerta confirmada)
     parsed["liveness_kind"] = "dead"
     status_label = f"🔴 DECLINED (Auth Failed) - <i>{msg[:50]}</i>"
     parsed["liveness_label"] = status_label

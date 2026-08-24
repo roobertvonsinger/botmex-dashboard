@@ -98,26 +98,26 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 585 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5386 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
-| `auth.py` | 285 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
+| `app.py` | 5389 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1836 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `betmexico_config.py` | 185 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2927 | `—` | _[completar]_ |
 | `betmexico_deposit.py` | 958 | `—` | _[completar]_ |
-| `betmexico_login_api.py` | 1050 | `httpx` | _[completar]_ |
+| `betmexico_login_api.py` | 1056 | `httpx` | _[completar]_ |
 | `betmexico_login_service.py` | 136 | `betmexico.login_service` | _[completar]_ |
 | `betmexico_payment_analyzer.py` | 492 | `—` | _[completar]_ |
 | `betmexico_utils.py` | 1159 | `—` | _[completar]_ |
 | `bin_intelligence.py` | 670 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
-| `card_checker.py` | 423 | `betmexico.dashboard.card_checker` | _[completar]_ |
+| `card_checker.py` | 458 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 213 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
-| `deposits.py` | 2990 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 3003 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 396 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 458 | `betmexico.dashboard.login_orch` | _[completar]_ |
-| `prewarm.py` | 907 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
+| `prewarm.py` | 918 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 389 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_validator.py` | 154 | `betmexico.renapo_validator` | _[completar]_ |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
@@ -277,12 +277,12 @@ prewarm.py (router)
 <!-- GEN:start:env -->
 | Variable | Default | Definida en |
 |----------|---------|-------------|
+| `BETMEX_DB` | `os.getenv("DB_PATH", "/data/betmexico_accounts.db" if Path("/data/betmexico_accounts.db"` | `betmexico_db.py` |
 | `BMX_BOT_TOKEN` | `"8516175452:AAGz_PCh9Oq3D9l5DZtCzgdU5ObAJH-b1Gs"` | `betmexico_config.py` |
 | `BMX_CAPMONSTER_KEY` | `""` | `betmexico_login_api.py` |
 | `BMX_CAPSOLVER_KEY` | `""` | `betmexico_login_api.py` |
 | `BMX_RECAPTCHA_SITEKEY` | `"6Lcz348mAAAAACAn9C2YDf2GT7Rd2UVqhGdWeVc4"` | `betmexico_login_api.py` |
 | `BMX_WEB_URL` | `"https://botmexico.com.mx"` | `betmexico_utils.py` |
-| `DB_PATH` | `"/data/betmexico_accounts.db" if Path("/data/betmexico_accounts.db"` | `betmexico_db.py` |
 <!-- GEN:end:env -->
 
 ---
@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `58828e1` | feat(orchestrator): account_details en LoginResult y preservacion de tarjeta en cuentas con saldo |
 | `458ba08` | fix(auto_deposit): regla estricta 1 tarjeta = 1 cuenta permanente y lectura de deposit_attempts approved para married cards |
 | `b741504` | fix(auto_deposit): jubilacion incondicional de tarjeta ante rechazo bancario y boton global de paro de emergencia |
 | `26a279a` | fix: restore pantallaSrcClass in static/app.js |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `7a7306f` | fix(bot): completely purge POC greetings, tactical tips and decorative imports |
 | `d808ee6` | fix(bot): fix text intercept in /bet, remove cringe visual noise, sanitize telemetry and update tests |
 | `d8076c6` | fix(bot): eliminar minuto muerto en /bet con ticker asincrono continuo y tips tacticos |
-| `33f83d0` | chore: mover .impeccable a skills-disabled (skills UI no aplican a este stack) |
 <!-- GEN:end:recientes -->
 
 ---
