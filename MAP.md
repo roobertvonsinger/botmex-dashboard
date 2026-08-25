@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `0e91b0f` | docs: actualizar NEXT-SESSION con reglas de oro 3DS y matrimonio APPROVED |
 | `432684f` | feat(deposits): suavizado 3ds, matrimonio exclusivo approved, alerta 24h y distintivo visual a+ |
 | `38a82a4` | fix(auto_deposit): jubilacion inmediata y matrimonio de tarjeta en 3DS, candado DB multi-origen y limpieza de logs |
 | `7b8861a` | fix(checker): eliminar bypass de tolerancia en error de gate para proteger cuentas live |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `9a9b3bd` | feat(bot): implement crisp card validation layout with LIVE/TIESAS blocks and direct summary |
 | `f1a436d` | fix(bot): purge fake sample_bins, parallelize card liveness precheck and auto-route raw text |
 | `b9b062a` | docs: update NEXT-SESSION with E2E user driver as next milestone |
-| `68aec5f` | feat(bot): retain operator greetings, BIN radar and start banners with clean handlers |
 <!-- GEN:end:recientes -->
 
 ---
