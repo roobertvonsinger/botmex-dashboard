@@ -4587,3 +4587,39 @@ tr.row-is-new td.grade-bar-cell::after {
   border-radius: 1px;
 }
 
+/* ─── Cuentas Grade A+ (Distintivo Dorado Suave — Robert) ─── */
+tr.r-grade-Aplus .combo-txt {
+  color: #f6ad55 !important;
+  text-shadow: 0 0 10px rgba(246, 173, 85, 0.35);
+}
+tr.r-grade-Aplus td.num .balance {
+  border: 1px solid rgba(246, 173, 85, 0.45);
+  box-shadow: 0 0 8px rgba(246, 173, 85, 0.20);
+  background: rgba(246, 173, 85, 0.06);
+}
+tr.r-grade-Aplus td.grade-bar-cell {
+  position: relative;
+}
+tr.r-grade-Aplus td.grade-bar-cell::before {
+  content: "";
+  position: absolute;
+  top: 3px; bottom: 3px; left: 0; width: 3px;
+  background: #f6ad55;
+  box-shadow: 0 0 8px rgba(246, 173, 85, 0.7);
+  border-radius: 2px;
+}
+tr.r-grade-Aplus {
+  background: linear-gradient(90deg, rgba(246, 173, 85, 0.04) 0%, transparent 35%);
+}
+
+.acc-card.grade-a-plus {
+  border-color: rgba(246, 173, 85, 0.45) !important;
+  box-shadow: 0 0 10px rgba(246, 173, 85, 0.15) !important;
+}
+.acc-card.grade-a-plus .acc-email {
+  color: #f6ad55 !important;
+  text-shadow: 0 0 8px rgba(246, 173, 85, 0.25);
+}
+
+
+

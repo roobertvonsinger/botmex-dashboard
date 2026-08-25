@@ -159,8 +159,9 @@ def test_scenario_phase2_one_account_declines_other_continues(Harness):
 
 
 def test_scenario_clean_account_bank_rejected_retires_card_for_all(Harness):
-    """Si una cuenta limpia (Grado A/A+) recibe BANK_REJECTED, la tarjeta queda
-    jubilada inmediatamente porque el fallo es de la tarjeta, no de la pasarela."""
+    """Regla Robert 2026-08-25: Si una cuenta recibe BANK_REJECTED, la tarjeta tiene 1
+    intento restante en otra cuenta. Al 2do rechazo en cuentas distintas, la tarjeta
+    queda jubilada definitivamente y NO toca una tercera cuenta."""
     Harness.script = lambda email, pan, amt, kw: {"success": False, "result_code": "BANK_REJECTED", "error": "Declined"}
     Harness.card_pipes = [P_A]
 
@@ -168,13 +169,17 @@ def test_scenario_clean_account_bank_rejected_retires_card_for_all(Harness):
         "accounts": [
             {"id": 1, "email": "user1@bet.com", "grade": "A+", "card_pipe": P_A},
             {"id": 2, "email": "user2@bet.com", "grade": "A", "card_pipe": P_A},
+            {"id": 3, "email": "user3@bet.com", "grade": "A", "card_pipe": P_A},
         ]
     }
 
     asyncio.run(ad.run_auto_mission("m_clean_rej", plan, {"role": "superadmin", "telegram_id": 999}))
 
-    # Solo user1 intentó P_A. user2 fue purgado al instante y NO la intentó
-    assert len(Harness.calls) == 1
+    # user1 y user2 intentaron P_A (2 rechazos). user3 fue purgado al instante y NO la intentó
+    assert len(Harness.calls) == 2
     assert Harness.calls[0]["email"] == "user1@bet.com"
+    assert Harness.calls[1]["email"] == "user2@bet.com"
     assert 1 in Harness.unlocked
-    assert 2 in Harness.unlocked or 2 not in Harness.locked
+    assert 2 in Harness.unlocked
+    assert 3 in Harness.unlocked or 3 not in Harness.locked
+

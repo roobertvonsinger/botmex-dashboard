@@ -665,7 +665,7 @@
       ? 'Esperando confirmación de SPEI en BetMexico'
       : (parseFloat(balReal) <= 0 ? 'Sin saldo disponible para retirar' : '');
 
-    return '<div class="acc-card' + (isLocked ? ' locked' : '') + '" data-id="' + acc.id + '" data-email="' + (acc.email || '') + '">' +
+    return '<div class="acc-card' + (isLocked ? ' locked' : '') + (grade === 'A+' ? ' grade-a-plus' : '') + '" data-id="' + acc.id + '" data-email="' + (acc.email || '') + '">' +
       '<div class="acc-top">' +
         '<span class="acc-email">' + (acc.email || '') + '</span>' +
         '<span class="acc-grade grade ' + gradeCls + '">' + grade + '</span>' +

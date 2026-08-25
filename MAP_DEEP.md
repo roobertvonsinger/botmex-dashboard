@@ -221,21 +221,21 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_extract_card_number` | def | L124–L131 |
 | `_parse_card_pipe` | def | L134–L167 |
 | `_normalize_pipe_to_3part` | def | L170–L172 |
-| `_get_married_card_owners` | def | L175–L207 |
-| `select_accounts_for_auto` | def | L216–L432 |
-| `_max_accounts_for_cards` | def | L441–L449 |
-| `plan_auto_mission` | def | L452–L756 |
-| `_fake_progress_pct` | def | L797–L828 |
-| `_iso` | def | L832–L833 |
-| `_m_load` | def | L836–L844 |
-| `_m_status` | def | L847–L849 |
-| `_m_update` | def | L852–L862 |
-| `_fetch_account` | def | L865–L872 |
-| `_is_account_dead` | def | L875–L883 |
-| `_unlock` | def | L886–L895 |
-| `_broadcast_mission` | def | L898–L927 |
-| `_stop_pool` | def | L930–L937 |
-| `run_auto_mission` | def | L941–L1869 |
+| `_get_married_card_owners` | def | L175–L209 |
+| `select_accounts_for_auto` | def | L218–L434 |
+| `_max_accounts_for_cards` | def | L443–L451 |
+| `plan_auto_mission` | def | L454–L758 |
+| `_fake_progress_pct` | def | L799–L830 |
+| `_iso` | def | L834–L835 |
+| `_m_load` | def | L838–L846 |
+| `_m_status` | def | L849–L851 |
+| `_m_update` | def | L854–L864 |
+| `_fetch_account` | def | L867–L874 |
+| `_is_account_dead` | def | L877–L885 |
+| `_unlock` | def | L888–L897 |
+| `_broadcast_mission` | def | L900–L929 |
+| `_stop_pool` | def | L932–L939 |
+| `run_auto_mission` | def | L943–L1882 |
 
 ### `autoexclusion.py`
 
@@ -402,8 +402,9 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `check_luhn` | def | L109–L122 |
 | `parse_and_validate_card_pipe` | def | L125–L174 |
 | `perform_wabox_liveness_check` | def | L182–L308 |
-| `precheck_card_liveness` | def | L311–L417 |
-| `format_ruthopia_liveness_summary` | def | L420–L463 |
+| `get_card_declines_24h` | def | L311–L346 |
+| `precheck_card_liveness` | def | L349–L466 |
+| `format_ruthopia_liveness_summary` | def | L469–L512 |
 
 ### `clabe_fetch.py`
 
@@ -476,19 +477,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_refresh_account_after_deposit` | def | L928–L987 |
 | `_should_relogin_after_401` | def | L990–L994 |
 | `_acquire_session_and_begin` | def | L997–L1333 |
-| `_run_deposit_with_phases` | def | L1336–L1685 |
-| `deposit_execute_stream` | def | L1689–L1891 |
-| `cap_status` | def | L1895–L1907 |
-| `_mm_is_real_decline` | def | L1947–L1953 |
-| `_mm_is_ambiguous_charge` | def | L1956–L1966 |
-| `classify_deposit_status` | def | L1969–L2000 |
-| `_mm_session_get` | def | L2043–L2047 |
-| `_mm_session_update` | def | L2050–L2059 |
-| `multi_stream` | def | L2063–L2586 |
-| `multi_cancel` | def | L2590–L2595 |
-| `scheduled_create` | def | L2608–L2972 |
-| `scheduled_list` | def | L2976–L2998 |
-| `scheduled_cancel` | def | L3002–L3010 |
+| `_run_deposit_with_phases` | def | L1336–L1687 |
+| `deposit_execute_stream` | def | L1691–L1893 |
+| `cap_status` | def | L1897–L1909 |
+| `_mm_is_real_decline` | def | L1949–L1955 |
+| `_mm_is_ambiguous_charge` | def | L1958–L1968 |
+| `classify_deposit_status` | def | L1971–L2002 |
+| `_mm_session_get` | def | L2045–L2049 |
+| `_mm_session_update` | def | L2052–L2061 |
+| `multi_stream` | def | L2065–L2588 |
+| `multi_cancel` | def | L2592–L2597 |
+| `scheduled_create` | def | L2610–L2974 |
+| `scheduled_list` | def | L2978–L3000 |
+| `scheduled_cancel` | def | L3004–L3012 |
 
 ### `jwt_keeper.py`
 
@@ -793,7 +794,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_tol_pipe_only_one_account` | def | L259–L271 |
 | `test_dynamic_order_recently_tried_last` | def | L274–L286 |
 | `test_cards_heavy_deprioritized` | def | L289–L301 |
-| `test_tier_proportion_2_2_1` | def | L304–L319 |
+| `test_tier_proportion_2_2_1` | def | L304–L320 |
 
 ### `test_auto_missions_migrate.py`
 

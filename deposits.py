@@ -737,11 +737,11 @@ def _record_attempt(
     # endpoints, la tarjeta no quedaba ligada a la cuenta y el operador tenía que
     # volverla a pegar manualmente. Fix 2026-05-25: persistimos aquí (idempotente
     # por UNIQUE card_number — INSERT OR IGNORE).
-    # ── 2. Persistir tarjeta en account_cards si APPROVED o 3DS ──────
-    # Si la tarjeta fue aprobada o retó 3DS, ya fue presentada y asociada a esta
-    # cuenta en la pasarela. Persistirla en account_cards protege la tarjeta
-    # para que jamás se intente en otra cuenta (anti-burn).
-    if status in ("approved", "threeds") and card_pipe:
+    # ── 2. Persistir tarjeta en account_cards si APPROVED ──────
+    # Regla operativa (Robert 2026-08-25): solo APPROVED real cuenta. 3DS_REQUIRED
+    # o THREEDS no guarda porque la tarjeta no se acreditó con fondos y se preserva
+    # para certificar otras cuentas o usarse sin quemarse.
+    if status == "approved" and card_pipe:
         try:
             cc_num, cc_exp, cc_cvv = _parse_pipe(card_pipe)
             from betmexico_db import db as _bot_db
@@ -1375,12 +1375,14 @@ async def _run_deposit_with_phases(
                 (cc_num, email),
             ).fetchone()
             if not _locked:
-                _locked = _c.execute(
-                    "SELECT account_email FROM deposit_attempts WHERE card_pipe LIKE ? AND account_email!=? AND UPPER(status) IN ('APPROVED', 'THREEDS', '3DS_REQUIRED') LIMIT 1",
-                    (f"{cc_num}%", email),
-                ).fetchone()
+                _cols = [col[1] for col in _c.execute("PRAGMA table_info(deposit_attempts)").fetchall()]
+                if "card_pipe" in _cols:
+                    _locked = _c.execute(
+                        "SELECT account_email FROM deposit_attempts WHERE card_pipe LIKE ? AND account_email!=? AND UPPER(status)='APPROVED' LIMIT 1",
+                        (f"{cc_num}%", email),
+                    ).fetchone()
         if _locked:
-            _msg = f"Tarjeta ya aprobada o asociada en {_locked['account_email']} — bloqueada para otras cuentas"
+            _msg = f"Tarjeta ya aprobada en {_locked['account_email']} — bloqueada para otras cuentas"
             await _safe_phase(phase_cb, "done", {
                 "success": False, "result_code": "CARD_LOCKED_OTHER_ACCOUNT", "error": _msg,
             })

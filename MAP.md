@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 585 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5422 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1869 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1882 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `betmexico_config.py` | 185 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2927 | `—` | _[completar]_ |
@@ -110,11 +110,11 @@ prewarm.py (router)
 | `betmexico_payment_analyzer.py` | 492 | `—` | _[completar]_ |
 | `betmexico_utils.py` | 1159 | `—` | _[completar]_ |
 | `bin_intelligence.py` | 670 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
-| `card_checker.py` | 463 | `betmexico.dashboard.card_checker` | _[completar]_ |
+| `card_checker.py` | 512 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 213 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
-| `deposits.py` | 3010 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 3012 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 396 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 458 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 918 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -135,7 +135,7 @@ prewarm.py (router)
 | `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
 | `test_anti_rate_limit.py` | 278 | `—` | _[completar]_ |
 | `test_at_hand.py` | 73 | `—` | _[completar]_ |
-| `test_auto_deposit_selection.py` | 319 | `—` | _[completar]_ |
+| `test_auto_deposit_selection.py` | 321 | `—` | _[completar]_ |
 | `test_auto_missions_migrate.py` | 120 | `—` | _[completar]_ |
 | `test_balance_only_real_zero_preserved.py` | 89 | `—` | _[completar]_ |
 | `test_bet_live_plan.py` | 524 | `—` | _[completar]_ |
@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `38a82a4` | fix(auto_deposit): jubilacion inmediata y matrimonio de tarjeta en 3DS, candado DB multi-origen y limpieza de logs |
 | `7b8861a` | fix(checker): eliminar bypass de tolerancia en error de gate para proteger cuentas live |
 | `58828e1` | feat(orchestrator): account_details en LoginResult y preservacion de tarjeta en cuentas con saldo |
 | `458ba08` | fix(auto_deposit): regla estricta 1 tarjeta = 1 cuenta permanente y lectura de deposit_attempts approved para married cards |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `b9b062a` | docs: update NEXT-SESSION with E2E user driver as next milestone |
 | `68aec5f` | feat(bot): retain operator greetings, BIN radar and start banners with clean handlers |
 | `7a7306f` | fix(bot): completely purge POC greetings, tactical tips and decorative imports |
-| `d808ee6` | fix(bot): fix text intercept in /bet, remove cringe visual noise, sanitize telemetry and update tests |
 <!-- GEN:end:recientes -->
 
 ---

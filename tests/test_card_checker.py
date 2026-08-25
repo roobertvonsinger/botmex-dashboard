@@ -140,3 +140,41 @@ def test_ruthopia_bridge_check_no_retry_on_decline(monkeypatch):
     monkeypatch.setattr(cc, "_load_ruthopia_dashboard_token", lambda: "tok-test")
     status, msg = cc.ruthopia_bridge_check("4169160000000000|12|28|123")
     assert status == "Declined" and len(calls) == 1  # respuesta real → NO reintenta
+
+
+def test_get_card_declines_24h_and_alert(monkeypatch, tmp_path):
+    import sqlite3
+    import card_checker as cc
+    from datetime import datetime, timezone
+
+    db_path = tmp_path / "test.db"
+    con = sqlite3.connect(str(db_path))
+    con.executescript("""
+    CREATE TABLE deposit_attempts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        account_email TEXT,
+        amount REAL,
+        status TEXT,
+        rejection_reason TEXT,
+        card_pipe TEXT,
+        created_at TEXT
+    );
+    """)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    # 4 declinaciones recientes para la tarjeta 4111...
+    for i in range(4):
+        con.execute(
+            "INSERT INTO deposit_attempts (account_email, status, card_pipe, created_at) "
+            "VALUES (?, 'rejected', '4111111111111111|1230|123', ?)",
+            (f"acc{i}@test.com", now_iso),
+        )
+    con.commit()
+    con.close()
+
+    # Probar con conexión explícita
+    con2 = sqlite3.connect(str(db_path))
+    con2.row_factory = sqlite3.Row
+    declines = cc.get_card_declines_24h("4111111111111111", db_conn=con2)
+    assert declines == 4
+    con2.close()
+

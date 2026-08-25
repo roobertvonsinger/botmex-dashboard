@@ -2490,8 +2490,9 @@ function _categorizeLog(p) {
   const lg = (p.logger || '').toLowerCase();
   const msg = p.msg || '';
   if (lvl === 'INFO' && /account_refresh|\bprewarm\b|jwt_keeper/.test(lg)) return 'refresh';
-  if (/submit success|match found|\baprobad[oa]|http_approved|charge approved|\bauth ok\b/i.test(msg)) return 'deposit_ok';
-  if (/submit rejected|dead account|bank_rejected|\brechazad[oa]|declined|sin fondos/i.test(msg)) return 'deposit_fail';
+  if (/3ds challenge|3ds_required|cuenta a\+/i.test(msg)) return '3ds_challenge';
+  if (/\[depósito exitoso\]|submit success|match found|\baprobad[oa]|http_approved|charge approved|\bauth ok\b/i.test(msg)) return 'deposit_ok';
+  if (/\[depósito rechazado\]|submit rejected|dead account|bank_rejected|\brechazad[oa]|declined|sin fondos/i.test(msg)) return 'deposit_fail';
   if (lg.includes('withdrawals')) {
     if (lvl === 'ERROR' || /insuficiente/i.test(msg)) return 'withdraw_fail';
     if (/disparado/i.test(msg)) return 'withdraw_ok';
@@ -2503,12 +2504,13 @@ function _categorizeLog(p) {
 function _cardStatusCat(status) {
   const s = (status || '').toLowerCase();
   if (s === 'approved' || s === 'live') return 'deposit_ok';
+  if (s === 'threeds' || s === '3ds_required') return '3ds_challenge';
   if (s === 'rejected' || s === 'account_dead' || s === 'dead') return 'deposit_fail';
   if (s === 'rate_limited' || s === 'login_lost') return 'login_fail';
   return null;
 }
 const _LOG_CAT_LABEL = {
-  deposit_ok: 'depósito ok', deposit_fail: 'depósito fail', withdraw_ok: 'retiro ok',
+  deposit_ok: 'depósito ok', '3ds_challenge': '3ds (a+)', deposit_fail: 'depósito fail', withdraw_ok: 'retiro ok',
   withdraw_fail: 'retiro fail', login_fail: 'login/rate', system_error: 'error', refresh: 'refresh',
 };
 // Líneas [CARD_TOUCH] (deposits._record_attempt / bot mock precheck) — único
@@ -2586,6 +2588,11 @@ function _renderLogLine(p) {
       safeMsg = safeMsg.replace(esc(emailM[1]), _chip('chip-account', '📧', emailM[1], { nav: true }));
     }
   }
+
+  // Resaltado explícito BetMexico de éxito real vs 3DS vs declinación
+  safeMsg = safeMsg.replace(/\[DEP[OÓ]SITO EXITOSO\]/gi, '<span class="log-chip chip-op" style="background:#064e3b;color:#34d399;font-weight:700;border:1px solid rgba(52,211,153,0.3);">💰 DEPÓSITO EXITOSO</span>');
+  safeMsg = safeMsg.replace(/\[3DS CHALLENGE\]/gi, '<span class="log-chip chip-op" style="background:#451a03;color:#fbbf24;font-weight:700;border:1px solid rgba(251,191,36,0.3);">🔐 3DS CHALLENGE</span>');
+  safeMsg = safeMsg.replace(/\[DEP[OÓ]SITO RECHAZADO\]/gi, '<span class="log-chip chip-op" style="background:#450a0a;color:#f87171;font-weight:700;border:1px solid rgba(248,113,113,0.3);">❌ RECHAZADO</span>');
 
   // Resaltado de pasarelas y eventos de Ruthopia
   safeMsg = safeMsg.replace(/\[(Wabox|MagicBox|Telcel|Stripe|Bot|BetMexico|FundraiseUp|Mozilla)\]/gi, '<span class="log-chip chip-op" style="background:#003b46;color:#00e5ff;font-weight:600;">[$1]</span>');

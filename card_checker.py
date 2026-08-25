@@ -308,6 +308,44 @@ def perform_wabox_liveness_check(card_data: Dict[str, str]) -> Tuple[bool, str, 
             return True, label, {"error": str(ex)}
 
 
+def get_card_declines_24h(card_identifier: str, db_conn=None) -> int:
+    """Cuenta el número de rechazos bancarios de una tarjeta en deposit_attempts en las últimas 24 horas."""
+    if not card_identifier:
+        return 0
+    c_num = "".join(filter(str.isdigit, str(card_identifier).split("|")[0]))
+    if not c_num:
+        return 0
+
+    def _query(c):
+        cols = [col[1] for col in c.execute("PRAGMA table_info(deposit_attempts)").fetchall()]
+        if "card_pipe" not in cols:
+            return 0
+        row = c.execute(
+            "SELECT COUNT(*) AS cnt FROM deposit_attempts "
+            "WHERE card_pipe LIKE ? "
+            "AND UPPER(status) NOT IN ('APPROVED', 'THREEDS', '3DS_REQUIRED') "
+            "AND created_at >= datetime('now', '-24 hours')",
+            (f"{c_num}%",),
+        ).fetchone()
+        if row is None:
+            return 0
+        try:
+            return int(row["cnt"])
+        except Exception:
+            return int(row[0])
+
+    try:
+        if db_conn is not None:
+            return _query(db_conn)
+        from app import db
+        with db(write=False) as c:
+            return _query(c)
+    except Exception as ex:
+        import logging
+        logging.getLogger("betmexico.dashboard.card_checker").debug(f"Error consultando declines 24h: {ex}")
+        return 0
+
+
 def precheck_card_liveness(card_pipe: str) -> Tuple[bool, str, Optional[Dict[str, str]]]:
     """Realiza la verificación completa de liveness pre-depósito.
 
@@ -322,16 +360,18 @@ def precheck_card_liveness(card_pipe: str) -> Tuple[bool, str, Optional[Dict[str
     from app import db
     card_num = parsed.get("card_number")
     with db(write=False) as c:
-        # 1. Check de tarjetas asociadas/casadas en account_cards o deposit_attempts (approved/3ds)
+        # 1. Check de tarjetas asociadas/casadas en account_cards o deposit_attempts (APPROVED real)
         existing = c.execute(
             "SELECT account_email FROM account_cards WHERE card_number=?",
             (card_num,)
         ).fetchone()
         if not existing:
-            existing = c.execute(
-                "SELECT account_email FROM deposit_attempts WHERE card_pipe LIKE ? AND UPPER(status) IN ('APPROVED', 'THREEDS', '3DS_REQUIRED') LIMIT 1",
-                (f"{card_num}%",)
-            ).fetchone()
+            cols = [col[1] for col in c.execute("PRAGMA table_info(deposit_attempts)").fetchall()]
+            if "card_pipe" in cols:
+                existing = c.execute(
+                    "SELECT account_email FROM deposit_attempts WHERE card_pipe LIKE ? AND UPPER(status)='APPROVED' LIMIT 1",
+                    (f"{card_num}%",)
+                ).fetchone()
         if existing:
             email = existing["account_email"]
             # Registrar en logs del dashboard (no en Telegram) y emitir alerta SSE al dashboard
@@ -353,6 +393,15 @@ def precheck_card_liveness(card_pipe: str) -> Tuple[bool, str, Optional[Dict[str
                 logger.debug(f"No se pudo emitir broadcast para CARD_MARRIED: {_b_err}")
 
             return False, f"🔴 MARRIED - <i>Tarjeta ya asociada a {email}</i>", parsed
+
+        # 1b. Detección de plásticos con alto rechazo en 24h (>= 4 declines)
+        declines_24h = get_card_declines_24h(card_num, db_conn=c)
+        parsed["declines_24h"] = declines_24h
+        parsed["high_decline_alert"] = declines_24h >= 4
+        if declines_24h >= 4:
+            import logging
+            logger = logging.getLogger("betmexico.dashboard.card_checker")
+            logger.warning(f"[CARD_HIGH_DECLINES] Tarjeta {card_num[:6]}··· acumula {declines_24h} rechazos en las últimas 24h")
 
         # 2. Check de RATE_LIMITED (excluir cuentas bloqueadas permanentemente)
         # Nota: `email` debe pasarse como argumento a `precheck_card_liveness` desde el caller

@@ -1097,7 +1097,49 @@ async def process_bet_input(
             await update.message.reply_text(fail_msg, parse_mode="HTML", reply_markup=kb_fail)
         return ConversationHandler.END
 
-    # FLUJO DIRECTO AUTOMÁTICO (si se envió comando + tarjetas de golpe)
+    # Detección de tarjetas con alto rechazo en 24h (>= 4 declines)
+    high_decline_pipes = []
+    clean_pipes = []
+    for pipe, (ok, reason, parsed) in zip(lines, results):
+        if ok and parsed and parsed.get("pipe_3parts") in valid_pipes:
+            if parsed.get("high_decline_alert"):
+                high_decline_pipes.append(parsed["pipe_3parts"])
+            else:
+                clean_pipes.append(parsed["pipe_3parts"])
+
+    if high_decline_pipes:
+        high_declined_tails = [f"···{p.split('|')[0][-4:]}" for p in high_decline_pipes]
+        alert_text = (
+            f"{HEADER}\n\n"
+            f"{summary_text}\n\n"
+            f"⚠️ <b>ALERTA: TARJETA(S) CON ALTO RECHAZO (24H)</b>\n"
+            f"La tarjeta <code>{', '.join(high_declined_tails)}</code> acumula <b>4+ rechazos hoy</b>.\n\n"
+            f"¿Deseas continuar con todas o excluir las de alto rechazo?"
+        )
+        context.user_data["pending_all_pipes"] = valid_pipes
+        context.user_data["pending_clean_pipes"] = clean_pipes
+        context.user_data["pending_tol_pipes"] = tol_pipes
+        context.user_data["pending_bet_pipes"] = valid_pipes
+
+        buttons = [
+            [InlineKeyboardButton(f"▶ Continuar con todas ({len(valid_pipes)})", callback_data="btn_bet_launch_all")]
+        ]
+        if clean_pipes:
+            buttons.append([InlineKeyboardButton(f"✂ Excluir alto rechazo ({len(clean_pipes)} limpias)", callback_data="btn_bet_launch_clean")])
+        buttons.append([InlineKeyboardButton("🛑 Cancelar", callback_data="cancel_bet")])
+        kb_alert = InlineKeyboardMarkup(buttons)
+
+        if status_msg:
+            try:
+                await status_msg.edit_text(alert_text, parse_mode="HTML", reply_markup=kb_alert)
+            except Exception:
+                if update.message:
+                    await update.message.reply_text(alert_text, parse_mode="HTML", reply_markup=kb_alert)
+        elif update.message:
+            await update.message.reply_text(alert_text, parse_mode="HTML", reply_markup=kb_alert)
+        return WAIT_BET_CONFIRM
+
+    # FLUJO DIRECTO AUTOMÁTICO (si se envió comando + tarjetas de golpe sin alertas)
     if auto_launch:
         if _mission_sem.locked():
             fail_sem = (
@@ -1503,11 +1545,17 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         await query.edit_message_text("❌ Proceso /bet cancelado.")
         return ConversationHandler.END
 
-    if query.data == "confirm_bet":
+    if query.data in ("confirm_bet", "btn_bet_launch_all", "btn_bet_launch_clean"):
         try:
-            valid_pipes = context.user_data.get("pending_bet_pipes", [])
+            if query.data == "btn_bet_launch_clean":
+                valid_pipes = context.user_data.get("pending_clean_pipes", [])
+            elif query.data == "btn_bet_launch_all":
+                valid_pipes = context.user_data.get("pending_all_pipes") or context.user_data.get("pending_bet_pipes", [])
+            else:
+                valid_pipes = context.user_data.get("pending_bet_pipes", [])
+
             if not valid_pipes:
-                await query.edit_message_text("❌ No hay tarjetas guardadas.")
+                await query.edit_message_text("❌ No hay tarjetas válidas para iniciar.")
                 return ConversationHandler.END
 
             if _mission_sem.locked():
@@ -1520,7 +1568,7 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             amount = 150.0
             target_count = 9
 
-            tol_pipes = context.user_data.get("pending_tol_pipes", [])
+            tol_pipes = [p for p in context.user_data.get("pending_tol_pipes", []) if p in valid_pipes]
             # RF4: pasar tol_pipes al plan
             plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count, tol_pipes=tol_pipes)
             if not plan.get("feasible"):
@@ -2482,7 +2530,7 @@ def build_app():
             WAIT_BET_CONFIRM: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, process_bet_input),
                 CallbackQueryHandler(
-                    handle_bet_callback, pattern="^(confirm_bet|cancel_bet)$"
+                    handle_bet_callback, pattern="^(confirm_bet|cancel_bet|btn_bet_launch_all|btn_bet_launch_clean)$"
                 ),
                 CallbackQueryHandler(
                     start_buttons_callback, pattern="^btn_start_bin_radar$"

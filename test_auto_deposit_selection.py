@@ -281,7 +281,7 @@ def test_dynamic_order_recently_tried_last(tmp_path):
     con.execute("INSERT INTO deposit_attempts (account_email, amount, status, created_at) VALUES ('tried@test.com', 150, 'rejected', ?)", (now_iso,))
     con.commit()
     con.close()
-    res = ad.plan_auto_mission(db, card_pipes=["4111111111111111|12|28|123"], amount=150, target_count=2)
+    res = ad.plan_auto_mission(db, card_pipes=["4111111111111111|12|28|123", "4222222222222222|12|28|123"], amount=150, target_count=2)
     order = [a["email"] for a in res["accounts"]]
     assert order.index("tried@test.com") > order.index("fresh@test.com")
 
@@ -296,7 +296,7 @@ def test_cards_heavy_deprioritized(tmp_path):
         con.execute("INSERT INTO account_cards (number, account_email) VALUES (?, 'heavy@test.com')", (f"4{i}999999999999",))
     con.commit()
     con.close()
-    res = ad.plan_auto_mission(db, card_pipes=["4111111111111111|12|28|123"], amount=150, target_count=2)
+    res = ad.plan_auto_mission(db, card_pipes=["4111111111111111|12|28|123", "4222222222222222|12|28|123"], amount=150, target_count=2)
     order = [a["email"] for a in res["accounts"]]
     assert order.index("heavy@test.com") > order.index("light@test.com")
 
@@ -312,8 +312,10 @@ def test_tier_proportion_2_2_1(tmp_path):
     con.execute("INSERT INTO accounts (email, status, grade, published_to_pool, jwt_expires_at) VALUES ('low@test.com', 'LIVE', 'C', 1, 0)")
     con.commit()
     con.close()
-    res = ad.plan_auto_mission(db, card_pipes=["4111111111111111|12|28|123"], amount=150, target_count=5, max_accounts=5)
+    pipes = [f"411111111111111{i}|12|28|123" for i in range(5)]
+    res = ad.plan_auto_mission(db, card_pipes=pipes, amount=150, target_count=5, max_accounts=5)
     emails = [a["email"] for a in res["accounts"]]
     assert sum(1 for e in emails if e.startswith("top")) == 2
     assert sum(1 for e in emails if e.startswith("mid")) == 2
     assert sum(1 for e in emails if e == "low@test.com") == 1
+
