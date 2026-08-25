@@ -8,6 +8,7 @@ from fastapi import Cookie, HTTPException, Query
 # ── Users ─────────────────────────────────────────────────────────────────────
 DEFAULT_USERS: dict[str, dict] = {
     "robertvs": {"display": "RobertVS", "telegram_id": 1341812706, "role": "superadmin"},
+    "karen":    {"display": "Karen (AI)", "telegram_id": 8642001,   "role": "operator"},
     "lau":      {"display": "Lau",      "telegram_id": 7599631505, "role": "operator"},
     "luisito":  {"display": "Luisito",  "telegram_id": 7847239854, "role": "operator"},
     "magdiel":  {"display": "Magdiel",  "telegram_id": 1059367082, "role": "operator"},
@@ -15,6 +16,7 @@ DEFAULT_USERS: dict[str, dict] = {
 
 USER_COLORS: dict[int, str] = {
     1341812706: "warn",     # RobertVS — amarillo
+    8642001:    "cyan",     # Karen (AI) — cyan / turquesa
     7599631505: "purple",   # Lau — morado
     7847239854: "accent",   # Luisito — verde
     1059367082: "azure",    # Magdiel — azul

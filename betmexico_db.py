@@ -6,6 +6,7 @@ BetMexico Database Module v2
 - Threading lock para escrituras concurrentes seguras
 """
 
+import os
 import sqlite3
 import logging
 import threading
@@ -21,9 +22,8 @@ from betmexico_config import (
     FILTER_DAILY_LIMIT, FILTER_DAILY_WAIT_HOURS
 )
 
-import os
 logger = logging.getLogger(__name__)
-DB_FILE = Path(os.getenv("DB_PATH", "/data/betmexico_accounts.db" if Path("/data/betmexico_accounts.db").exists() else "betmexico_accounts.db"))
+DB_FILE = Path(os.getenv("BETMEX_DB", os.getenv("DB_PATH", "/data/betmexico_accounts.db" if Path("/data/betmexico_accounts.db").exists() else str(Path(__file__).resolve().parent / "betmexico_accounts.db"))))
 
 
 class BetmexicoDB:

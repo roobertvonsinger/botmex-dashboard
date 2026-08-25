@@ -191,10 +191,10 @@ def _get_married_card_owners(db_path: Optional[str] = None) -> Dict[str, str]:
                 c_num = _extract_card_number(str(r[0]))
                 if c_num and r[1]:
                     owners[c_num] = str(r[1]).strip().lower()
-        # 2. De deposit_attempts con pago aprobado
+        # 2. De deposit_attempts con pago aprobado o 3DS
         try:
             for r in con.execute(
-                "SELECT card_pipe, account_email FROM deposit_attempts WHERE UPPER(status)='APPROVED' AND card_pipe IS NOT NULL AND account_email IS NOT NULL"
+                "SELECT card_pipe, account_email FROM deposit_attempts WHERE UPPER(status) IN ('APPROVED', 'THREEDS', '3DS_REQUIRED') AND card_pipe IS NOT NULL AND account_email IS NOT NULL"
             ).fetchall():
                 c_num = _extract_card_number(str(r[0]))
                 if c_num and r[1]:
@@ -1051,7 +1051,11 @@ async def run_auto_mission(
                     f"💳 SUBMIT SUCCESS | {email} | Pipe: {pipe} | Code: {code} | Duration: {duration}ms"
                 )
             else:
-                if code == "RATE_LIMITED":
+                if code in _d.MM_THREEDS_RC or code == "3DS_REQUIRED":
+                    logger.info(
+                        f"🔐 3DS CHALLENGE (CUENTA A+) | {email} | Pipe: {pipe} | Code: {code} | Duration: {duration}ms"
+                    )
+                elif code == "RATE_LIMITED":
                     # Robert 2026-08-05: el rate-limit es pedo interno del backend,
                     # se resuelve en silencio (cooldown en deposits). El operador
                     # no debe verlo en el log de misión.
@@ -1060,9 +1064,13 @@ async def run_auto_mission(
                     logger.error(
                         f"💀 DEAD ACCOUNT | {email} | Pipe: {pipe} | Code: {code}"
                     )
+                elif code == "CARD_LOCKED_OTHER_ACCOUNT":
+                    logger.warning(
+                        f"🔒 TARJETA BLOQUEADA (OTRA CUENTA) | {email} | Pipe: {pipe} | Reason: {reason}"
+                    )
                 else:
                     logger.warning(
-                        f"💳 SUBMIT REJECTED | {email} | Pipe: {pipe} | Code: {code} | Reason: {reason}"
+                        f"❌ SUBMIT REJECTED | {email} | Pipe: {pipe} | Code: {code} | Reason: {reason}"
                     )
 
             _d._record_attempt(
@@ -1437,7 +1445,32 @@ async def run_auto_mission(
                                 )
                         except Exception as ex:
                             logger.error(f"[Auto {mission_id}] no pude marcar A+ {email}: {ex}")
+
+                        # 1. Jubilar la tarjeta INMEDIATAMENTE de todas las demás cuentas (asociada/inoperable en otras)
+                        _retire_card(pipe, reason=f"3DS_REQUIRED (asociada) en {email}")
+                        logger.warning(
+                            f"🛡️ TARJETA ASOCIADA CON 3DS EN {email} — Jubilada de otras cuentas para protegerla | {pipe}"
+                        )
+                        # 2. Registrar en married_card_owners en memoria y BD
+                        c_pan = _extract_card_number(pipe)
+                        if c_pan:
+                            married_card_owners[c_pan] = (email or "").strip().lower()
+                            try:
+                                from app import db as _dash_db
+                                with _dash_db(write=True) as cdb:
+                                    cdb.execute(
+                                        "INSERT OR IGNORE INTO account_cards (card_number, account_email) VALUES (?, ?)",
+                                        (c_pan, email),
+                                    )
+                            except Exception as ex_mc:
+                                logger.debug(f"[Auto {mission_id}] no pude guardar account_cards en 3DS: {ex_mc}")
+
                         target["cooldown_until"] = _get_now() + dep.MM_COOLDOWN
+                        if not target["candidates"]:
+                            target["done"] = True
+                            if target["locked"] and not target["matched"]:
+                                _unlock(account_id)
+                                locked_ids.discard(account_id)
                         break
 
                     # RATE_LIMITED, DEAD, BAN, KYC_PENDING o cualquier código de cuenta muerta

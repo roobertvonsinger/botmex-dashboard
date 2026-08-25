@@ -933,17 +933,31 @@ async def _animate_loading_dots(message, base_text: str, total_seconds: float = 
 
 
 async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Punto de entrada para /bet — Solicita tarjetas o procesa si venían en args."""
+    """Punto de entrada para /bet — Solicita tarjetas o procesa si venían en args/mensaje."""
     user_id = update.effective_user.id
     if not is_authorized(user_id):
         await update.message.reply_text("❌ No autorizado.")
         return ConversationHandler.END
 
-    # Verificar si el usuario envió tarjetas directamente junto al comando: /bet 4111...|12|28|123
-    args = context.args
-    if args:
-        raw_text = " ".join(args)
-        return await process_bet_input(update, context, override_text=raw_text)
+    msg_text = (update.message.text if update.message else "") or ""
+    cards_text = ""
+    if context.args:
+        cards_text = " ".join(context.args)
+    elif msg_text:
+        lines = [l.strip() for l in msg_text.splitlines() if l.strip()]
+        card_lines = [l for l in lines if not l.lower().startswith("/bet")]
+        if card_lines:
+            cards_text = "\n".join(card_lines)
+        elif len(lines) == 1 and any(char.isdigit() for char in lines[0]):
+            parts = lines[0].split(maxsplit=1)
+            if len(parts) > 1 and any(char.isdigit() for char in parts[1]):
+                cards_text = parts[1].strip()
+
+    # Si se enviaron tarjetas junto con el comando -> FLUJO DIRECTO AUTOMÁTICO (1 solo paso)
+    if cards_text:
+        return await process_bet_input(
+            update, context, override_text=cards_text, auto_launch=True
+        )
 
     warning_box = format_telegram_bet_warning()
     msg = (
@@ -969,7 +983,12 @@ async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return WAIT_BET_CONFIRM
 
 
-async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE, override_text: Optional[str] = None):
+async def process_bet_input(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    override_text: Optional[str] = None,
+    auto_launch: bool = False,
+):
     """Procesa las tarjetas ingresadas para /bet con validación de liveness concurrente."""
     text = (override_text or (update.message.text if update.message else "") or "").strip()
     if text.startswith("/") and not any(char.isdigit() for char in text):
@@ -1078,6 +1097,84 @@ async def process_bet_input(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             await update.message.reply_text(fail_msg, parse_mode="HTML", reply_markup=kb_fail)
         return ConversationHandler.END
 
+    # FLUJO DIRECTO AUTOMÁTICO (si se envió comando + tarjetas de golpe)
+    if auto_launch:
+        if _mission_sem.locked():
+            fail_sem = (
+                f"{HEADER}\n\n"
+                f"{summary_text}\n\n"
+                "⚠️ <b>Ya hay una misión activa en el sistema.</b> Intenta de nuevo en unos momentos."
+            )
+            if status_msg:
+                try:
+                    await status_msg.edit_text(fail_sem, parse_mode="HTML")
+                except Exception:
+                    pass
+            elif update.message:
+                await update.message.reply_text(fail_sem, parse_mode="HTML")
+            return ConversationHandler.END
+
+        amount = 150.0
+        target_count = 9
+        plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count, tol_pipes=tol_pipes)
+        if not plan.get("feasible"):
+            fail_plan = (
+                f"{HEADER}\n\n"
+                f"{summary_text}\n\n"
+                f"❌ <b>No fue posible armar el plan:</b> {plan.get('reason', 'desconocido')}"
+            )
+            if status_msg:
+                try:
+                    await status_msg.edit_text(fail_plan, parse_mode="HTML")
+                except Exception:
+                    pass
+            elif update.message:
+                await update.message.reply_text(fail_plan, parse_mode="HTML")
+            return ConversationHandler.END
+
+        from uuid import uuid4
+        mission_id = str(uuid4())[:8]
+        user_info = {
+            "telegram_id": operator_id,
+            "username": update.effective_user.username or "operator",
+        }
+        _persist_auto_mission(
+            mission_id, operator_id, valid_pipes, amount, target_count, plan
+        )
+
+        init_text = (
+            f"{HEADER}\n\n"
+            f"🎯 <b>MISIÓN {mission_id} INICIADA</b>\n\n"
+            f"{summary_text}\n\n"
+            f"• Estado: Rastreando cuentas aptas en el pool…\n"
+            f"  <code>[■■□□□□□□□□] 15%</code>\n\n"
+            f"📡 <i>Escaneando nodos seguros · ETA: ~45s</i>"
+        )
+        kb_init = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "🛑 Detener Misión",
+                        callback_data=f"stop_mission_{mission_id}",
+                    )
+                ]
+            ]
+        )
+        if status_msg:
+            try:
+                await status_msg.edit_text(init_text, parse_mode="HTML", reply_markup=kb_init)
+            except Exception:
+                if update.message:
+                    status_msg = await update.message.reply_text(init_text, parse_mode="HTML", reply_markup=kb_init)
+        elif update.message:
+            status_msg = await update.message.reply_text(init_text, parse_mode="HTML", reply_markup=kb_init)
+
+        _launch_auto_mission_ui(
+            context, operator_id, mission_id, plan, user_info, status_msg, auto_confirm_gate=True
+        )
+        return ConversationHandler.END
+
+    # FLUJO INTERACTIVO EN 2 PASOS (si se envió /bet sin tarjetas)
     context.user_data["pending_bet_pipes"] = valid_pipes
     context.user_data["pending_tol_pipes"] = tol_pipes
     confirm_msg = (
@@ -1112,6 +1209,7 @@ def _launch_auto_mission_ui(
     plan: Dict[str, Any],
     user_info: dict,
     status_msg: object,
+    auto_confirm_gate: bool = False,
 ):
     """Arranca run_auto_mission en background con telemetría 100% real, on_progress y confirm_gate."""
     last_edit_ts = [0.0]
@@ -1300,6 +1398,10 @@ def _launch_auto_mission_ui(
         asyncio.run_coroutine_threadsafe(_edit(), loop)
 
     async def confirm_gate(gate_info: dict) -> bool:
+        if auto_confirm_gate:
+            logger.info(f"[Bot] [Auto {mission_id}] auto_confirm_gate=True: acreditación directa sin espera.")
+            return True
+
         state["status"] = "awaiting_confirmation"
         m_id = gate_info["mission_id"]
         matches = gate_info["matches"]
@@ -1378,13 +1480,14 @@ def _launch_auto_mission_ui(
 
         return res
 
+    gate_cb = None if auto_confirm_gate else confirm_gate
     asyncio.create_task(
         run_auto_mission(
             mission_id,
             plan,
             user_info,
             on_progress=on_progress,
-            confirm_gate=confirm_gate,
+            confirm_gate=gate_cb,
         )
     )
 

@@ -737,9 +737,11 @@ def _record_attempt(
     # endpoints, la tarjeta no quedaba ligada a la cuenta y el operador tenía que
     # volverla a pegar manualmente. Fix 2026-05-25: persistimos aquí (idempotente
     # por UNIQUE card_number — INSERT OR IGNORE).
-    # Regla operativa (Robert): solo APPROVED real cuenta. 3DS_REQUIRED no guarda
-    # porque la tarjeta no se acreditó.
-    if status == "approved" and card_pipe:
+    # ── 2. Persistir tarjeta en account_cards si APPROVED o 3DS ──────
+    # Si la tarjeta fue aprobada o retó 3DS, ya fue presentada y asociada a esta
+    # cuenta en la pasarela. Persistirla en account_cards protege la tarjeta
+    # para que jamás se intente en otra cuenta (anti-burn).
+    if status in ("approved", "threeds") and card_pipe:
         try:
             cc_num, cc_exp, cc_cvv = _parse_pipe(card_pipe)
             from betmexico_db import db as _bot_db
@@ -966,8 +968,8 @@ async def _refresh_account_after_deposit(
             return
         await asyncio.to_thread(_db_upsert_balance, email, details)
         await asyncio.to_thread(_db_save_txns_and_recalc, email, details, operator_id)
-        logger.info(f"[Deposits/phases] refresh post-depósito OK {email} "
-                    f"(balance_real={details.get('balance_real')})")
+        logger.info(f"[Deposits/phases] refresh balance {email} -> "
+                    f"balance_real={details.get('balance_real')}")
         try:
             from app import _broadcast, _resolve_who
             _broadcast({
@@ -1025,6 +1027,7 @@ async def _acquire_session_and_begin(
     used_proxy: Optional[str] = None
     from_cache = False
     login_result: dict = {}
+    login_res: Any = None
 
     while True:
         # ── Adquirir JWT: reuso de run > cache de BD > login fresco ──
@@ -1371,8 +1374,13 @@ async def _run_deposit_with_phases(
                 "SELECT account_email FROM account_cards WHERE card_number=? AND account_email!=?",
                 (cc_num, email),
             ).fetchone()
+            if not _locked:
+                _locked = _c.execute(
+                    "SELECT account_email FROM deposit_attempts WHERE card_pipe LIKE ? AND account_email!=? AND UPPER(status) IN ('APPROVED', 'THREEDS', '3DS_REQUIRED') LIMIT 1",
+                    (f"{cc_num}%", email),
+                ).fetchone()
         if _locked:
-            _msg = f"Tarjeta ya aprobada en {_locked['account_email']} — bloqueada para otras cuentas"
+            _msg = f"Tarjeta ya aprobada o asociada en {_locked['account_email']} — bloqueada para otras cuentas"
             await _safe_phase(phase_cb, "done", {
                 "success": False, "result_code": "CARD_LOCKED_OTHER_ACCOUNT", "error": _msg,
             })
@@ -1815,6 +1823,9 @@ async def deposit_execute_stream(request: Request, user: dict = Depends(require_
                 "duration_ms": duration_ms,
             }) + "\n\n"
 
+        except (asyncio.CancelledError, GeneratorExit):
+            # Desconexión normal del cliente SSE (cierre de pestaña o modal)
+            pass
         except Exception as e:
             logger.error(f"[execute-stream] generator error: {e}")
             yield f"data: {json.dumps({'type':'fatal','attempt_id':attempt_id,'error':str(e)[:300]})}\n\n"
@@ -2535,6 +2546,9 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
             # una excepción en el while haría que finally limpie pero el frontend
             # nunca recibe 'done' y las pair rows quedan stuck en busy.
             yield f"data: {json.dumps({'type':'done','matches':len(matches),'attempts':attempts,'pending':sum(1 for a in accounts if not a['done'] and a['fail_count']<MM_MAX_ACCOUNT_FAILS)})}\n\n"
+        except (asyncio.CancelledError, GeneratorExit):
+            # Desconexión normal del cliente SSE (cierre de modal o recarga)
+            pass
         except Exception as e:
             logger.error(f"[Matchmaker {run_id}] generator error: {e}")
             try:
@@ -2549,10 +2563,16 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                 for t in list(_inflight_tasks):
                     if not t.done():
                         t.cancel()
+                if _inflight_tasks:
+                    await asyncio.gather(*_inflight_tasks, return_exceptions=True)
             except Exception:
                 pass
             if prefetch is not None and not prefetch.done():
                 prefetch.cancel()
+                try:
+                    await prefetch
+                except (asyncio.CancelledError, Exception):
+                    pass
             if pool is not None:
                 try:
                     await pool.stop()

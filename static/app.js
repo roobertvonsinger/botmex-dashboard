@@ -2470,27 +2470,28 @@ function _bumpLogsAlert() {
 }
 
 // Parsea una línea de log en componentes estructurados.
-// Formato: "2026-07-26 12:34:56,789 [INFO] [betmexico.dashboard.db] message"
+// Formato BetMexico: "2026-07-26 12:34:56,789 [INFO] [betmexico.dashboard.db] message"
+// Formato Ruthopia:   "2026-08-25 01:33:36,298 - ruthopia.gates.wabox - INFO - [Wabox] message"
 const _LOG_LINE_RE = /^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d{3})\s+\[(\w+)\]\s+\[([^\]]+)\]\s+(.*)$/;
+const _RUTHOPIA_LINE_RE = /^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d{3})\s+-\s+([^\s]+)\s+-\s+(\w+)\s+-\s+(.*)$/;
 function _parseLogLine(line) {
-  const m = line.match(_LOG_LINE_RE);
-  if (!m) return { raw: line };
-  return { ts: m[1], level: m[2], logger: m[3], msg: m[4] };
+  let m = line.match(_LOG_LINE_RE);
+  if (m) return { ts: m[1], level: m[2], logger: m[3], msg: m[4] };
+  m = line.match(_RUTHOPIA_LINE_RE);
+  if (m) return { ts: m[1], level: m[3], logger: m[2], msg: m[4] };
+  return { raw: line };
 }
 
 // Categoriza por criterio de DOMINIO (no por nivel de log): reusa los
-// marcadores que YA emiten deposits.py/auto_deposit.py/withdrawals.py
-// (SUBMIT SUCCESS/REJECTED, DEAD ACCOUNT, RATE-LIMIT, "disparado"…) — no
-// inventa taxonomía nueva. `refresh` = ruido rutinario (solo a nivel INFO;
-// un WARNING/ERROR del propio refresh nunca se oculta).
+// marcadores que YA emiten deposits.py/auto_deposit.py/withdrawals.py y Ruthopia
 function _categorizeLog(p) {
   if (p.raw != null) return null;
   const lvl = (p.level || '').toUpperCase();
   const lg = (p.logger || '').toLowerCase();
   const msg = p.msg || '';
   if (lvl === 'INFO' && /account_refresh|\bprewarm\b|jwt_keeper/.test(lg)) return 'refresh';
-  if (/submit success|match found|\baprobad[oa]/i.test(msg)) return 'deposit_ok';
-  if (/submit rejected|dead account|bank_rejected|\brechazad[oa]/i.test(msg)) return 'deposit_fail';
+  if (/submit success|match found|\baprobad[oa]|http_approved|charge approved|\bauth ok\b/i.test(msg)) return 'deposit_ok';
+  if (/submit rejected|dead account|bank_rejected|\brechazad[oa]|declined|sin fondos/i.test(msg)) return 'deposit_fail';
   if (lg.includes('withdrawals')) {
     if (lvl === 'ERROR' || /insuficiente/i.test(msg)) return 'withdraw_fail';
     if (/disparado/i.test(msg)) return 'withdraw_ok';
@@ -2585,6 +2586,11 @@ function _renderLogLine(p) {
       safeMsg = safeMsg.replace(esc(emailM[1]), _chip('chip-account', '📧', emailM[1], { nav: true }));
     }
   }
+
+  // Resaltado de pasarelas y eventos de Ruthopia
+  safeMsg = safeMsg.replace(/\[(Wabox|MagicBox|Telcel|Stripe|Bot|BetMexico|FundraiseUp|Mozilla)\]/gi, '<span class="log-chip chip-op" style="background:#003b46;color:#00e5ff;font-weight:600;">[$1]</span>');
+  safeMsg = safeMsg.replace(/\b(HTTP_APPROVED|STRIPE_TOKEN_OK)\b/g, '<span style="color:#00e676;font-weight:600;">$1</span>');
+  safeMsg = safeMsg.replace(/\b(DECLINED)\b/g, '<span style="color:#ff5252;font-weight:600;">$1</span>');
 
   const isRefresh = cat === 'refresh';
   return `<span class="${lineCls}${isRefresh ? ' is-refresh' : ''}"><span class="log-ts">${esc(shortTs)}</span>${catBadge}<span class="log-level ${cls}">${esc(lvl)}</span><span class="log-logger">${esc(shortLog)}</span><span class="log-msg">${safeMsg}</span></span>`;

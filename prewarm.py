@@ -874,31 +874,42 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
                 logger.warning(f"[refresh-stream] {email}: {e}")
                 await q.put({"type": "fail", "id": acc["id"], "email": email, "error": str(e)[:120]})
 
-        # Lanza todo en paralelo (asyncio gather con producción a la queue)
         tasks = [asyncio.create_task(_process(acc, i)) for i, acc in enumerate(accs)]
 
-        done_count = 0
-        last_keepalive = asyncio.get_event_loop().time()
-        while done_count < len(accs):
-            if await request.is_disconnected():
-                # Cliente cerró la conexión — cancelar tasks en vuelo para no quemar captchas
-                for t in tasks:
-                    if not t.done():
-                        t.cancel()
-                break
-            try:
-                ev = await asyncio.wait_for(q.get(), timeout=2.0)
-                yield f"data: {json.dumps(ev)}\n\n"
-                done_count += 1
-                last_keepalive = asyncio.get_event_loop().time()
-            except asyncio.TimeoutError:
-                # Heartbeat para mantener la conexión viva
-                yield f": ping\n\n"
-                # Si todas las tasks terminaron pero la queue se vació, salir
-                if all(t.done() for t in tasks) and q.empty():
+        try:
+            done_count = 0
+            last_keepalive = asyncio.get_event_loop().time()
+            while done_count < len(accs):
+                if await request.is_disconnected():
+                    # Cliente cerró la conexión — cancelar tasks en vuelo para no quemar captchas
+                    for t in tasks:
+                        if not t.done():
+                            t.cancel()
                     break
+                try:
+                    ev = await asyncio.wait_for(q.get(), timeout=2.0)
+                    yield f"data: {json.dumps(ev)}\n\n"
+                    done_count += 1
+                    last_keepalive = asyncio.get_event_loop().time()
+                except asyncio.TimeoutError:
+                    # Heartbeat para mantener la conexión viva
+                    yield f": ping\n\n"
+                    # Si todas las tasks terminaron pero la queue se vació, salir
+                    if all(t.done() for t in tasks) and q.empty():
+                        break
 
-        yield f"data: {json.dumps({'type':'done','total':len(accs),'completed':done_count})}\n\n"
+            yield f"data: {json.dumps({'type':'done','total':len(accs),'completed':done_count})}\n\n"
+        except (asyncio.CancelledError, GeneratorExit):
+            pass
+        finally:
+            for t in tasks:
+                if not t.done():
+                    t.cancel()
+            if tasks:
+                try:
+                    await asyncio.gather(*tasks, return_exceptions=True)
+                except (asyncio.CancelledError, Exception):
+                    pass
 
     return StreamingResponse(
         gen(),

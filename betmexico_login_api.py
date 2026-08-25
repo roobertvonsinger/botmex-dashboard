@@ -801,6 +801,10 @@ class BetmexicoApiChecker:
                 await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=15.0)
             except asyncio.TimeoutError:
                 logger.warning(f"[DETAILS] Timeout 15s en fetch_account_details_parallel (mode={fetch_mode}) — devolviendo lo logrado")
+            except (asyncio.CancelledError, GeneratorExit):
+                pass
+        except (asyncio.CancelledError, GeneratorExit):
+            pass
         except Exception as e:
             logger.error(f"[DETAILS] Error en gather parallel: {e}")
 
@@ -885,6 +889,8 @@ class CaptchaTokenPool:
             )
         except asyncio.TimeoutError:
             logger.error(f"[POOL] Prefetch timeout ({timeout}s) — {self.pool.qsize()} tokens listos")
+        except (asyncio.CancelledError, GeneratorExit):
+            pass
         logger.info(
             f"[POOL] Prefetch completado: {self.pool.qsize()} tokens listos"
         )

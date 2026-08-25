@@ -1930,6 +1930,8 @@ def get_logs(limit: int = 200, since: Optional[str] = None,
 _TELEGRAM_LOG_FILES = {
     "main": Path("/data/logs/telegram_bot.log"),
     "mock": Path("/data/logs/telegram_mock_bot.log"),
+    "betmex": Path("/data/logs/telegram_mock_bot.log"),
+    "ruthopia": Path("/data/logs/ruthopia.log"),
 }
 
 
@@ -1937,15 +1939,46 @@ _TELEGRAM_LOG_FILES = {
 def get_logs_telegram(bot: str = "main", limit: int = 300, since: Optional[str] = None,
                        level: Optional[str] = None,
                        user: dict = Depends(require_session)):
-    """Lee las últimas N líneas del log de uno de los 2 bots de Telegram de
-    BetMexico (main=bot real, mock=bot de pruebas). Ambos containers montan
-    el mismo volumen /data que betmexico-web — lectura directa a archivo,
-    sin red ni docker exec (2026-07-31, vista dual de Logs)."""
+    """Lee las últimas N líneas del log de los bots:
+    - main: Bot BetMexico legacy/prod (telegram_bot.log)
+    - mock / betmex: Bot BetMexico interactivo (telegram_mock_bot.log)
+    - ruthopia: Bot ʀ.ᴜᴛʜᴏᴘɪᴀ (Ruth, Gates y pipeline)
+    """
     if user.get("role") != "superadmin":
         raise HTTPException(403, "Solo superadmin")
-    log_file = _TELEGRAM_LOG_FILES.get(bot)
-    if log_file is None:
-        raise HTTPException(400, f"bot inválido: {bot!r} (usar 'main' o 'mock')")
+    
+    # Manejo de Ruthopia (solo cuando se solicita explícitamente ruthopia)
+    if bot == "ruthopia":
+        ruth_candidates = [
+            Path("/data/logs/ruthopia.log"),
+            Path("/docker/ruthopia/ruthopia.log"),
+            Path("/app/ruthopia.log"),
+            Path("ruthopia.log"),
+        ]
+        for p in ruth_candidates:
+            if p.exists():
+                try:
+                    return {"lines": _tail_log_file(p, limit, since, level)}
+                except Exception:
+                    pass
+        # Fallback HTTP a Ruthopia API en KVM4
+        try:
+            import httpx
+            tok = os.environ.get("RUTHOPIA_DASHBOARD_TOKEN") or os.environ.get("DASHBOARD_TOKEN") or ""
+            headers = {"Authorization": f"Bearer {tok}"} if tok else {}
+            url = os.environ.get("RUTHOPIA_API_URL", "http://100.77.154.31:8787/api/logs")
+            resp = httpx.get(f"{url}?limit={limit}", headers=headers, timeout=2.5)
+            if resp.status_code == 200:
+                data = resp.json()
+                lines = data.get("lines", [])
+                if level:
+                    lvl = level.upper()
+                    lines = [ln for ln in lines if lvl in ln.upper()]
+                return {"lines": lines}
+        except Exception:
+            pass
+
+    log_file = _TELEGRAM_LOG_FILES.get(bot, Path("/data/logs/telegram_mock_bot.log"))
     try:
         return {"lines": _tail_log_file(log_file, limit, since, level)}
     except Exception as e:
@@ -3128,6 +3161,9 @@ async def _sse_generator(ctx: dict):
                 None, _dequeue_blocking, q, 25.0
             )
             yield msg
+    except (asyncio.CancelledError, GeneratorExit):
+        # Desconexión normal del cliente SSE (recarga o navegación)
+        pass
     except Exception as e:
         _sse_log.warning(f"[SSE] q_id={q_id} excepción no-Cancelled: {type(e).__name__}: {e}")
         raise

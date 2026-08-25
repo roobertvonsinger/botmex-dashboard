@@ -133,6 +133,25 @@ def test_mission_matchmaking_skips_on_3ds(H):
     assert matches[0]["card_pipe"] == P2  # 3DS no es decline: probó la siguiente
 
 
+def test_mission_matchmaking_3ds_retires_card_from_all_accounts(H):
+    """Regla Robert 2026-08-25: Si una tarjeta recibe 3DS_REQUIRED en una cuenta,
+    queda asociada a esa cuenta y SE JUBILA de todas las demás cuentas activas
+    de la misión inmediatamente. Ninguna otra cuenta debe volver a intentar esa tarjeta."""
+    H.card_pipes = [P1]
+    attempted_emails = []
+
+    def script(email, amount, kw):
+        attempted_emails.append(email)
+        return {"success": False, "result_code": "3DS_REQUIRED", "error": "3ds challenge"}
+
+    H.script = script
+    run(H, plan(1, 2))
+    # Solo la primera cuenta debió haber intentado la tarjeta P1
+    assert attempted_emails == ["acc1@x.com"], f"Se intentó en cuentas no esperadas: {attempted_emails}"
+    assert 1 in H.unlocked, "Cuenta 1 debió desbloquearse limpiamente"
+
+
+
 def test_mission_matchmaking_terminal_on_card_locked(H):
     """Bug 2026-08-07: CARD_LOCKED_OTHER_ACCOUNT es el candado DB de deposits.py
     (tarjeta ya ligada a otro email) — determinístico, jamás cambia entre

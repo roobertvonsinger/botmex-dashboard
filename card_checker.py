@@ -322,11 +322,16 @@ def precheck_card_liveness(card_pipe: str) -> Tuple[bool, str, Optional[Dict[str
     from app import db
     card_num = parsed.get("card_number")
     with db(write=False) as c:
-        # 1. Check de tarjetas asociadas/casadas en account_cards
+        # 1. Check de tarjetas asociadas/casadas en account_cards o deposit_attempts (approved/3ds)
         existing = c.execute(
             "SELECT account_email FROM account_cards WHERE card_number=?",
             (card_num,)
         ).fetchone()
+        if not existing:
+            existing = c.execute(
+                "SELECT account_email FROM deposit_attempts WHERE card_pipe LIKE ? AND UPPER(status) IN ('APPROVED', 'THREEDS', '3DS_REQUIRED') LIMIT 1",
+                (f"{card_num}%",)
+            ).fetchone()
         if existing:
             email = existing["account_email"]
             # Registrar en logs del dashboard (no en Telegram) y emitir alerta SSE al dashboard
