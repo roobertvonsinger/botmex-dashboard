@@ -179,6 +179,65 @@ _UTOPIA_LIVENESS_CACHE: Dict[str, Tuple[float, bool, str, Dict[str, Any]]] = {}
 UTOPIA_CACHE_TTL_SEC = 1800  # 30 minutos (regla Robert: no volver a checar en Utopía si fue aprobada recientemente)
 
 
+def check_ruthopia_db_liveness(card_number: str, max_age_hours: int = 24) -> Optional[Tuple[bool, str, Dict[str, Any]]]:
+    """Consulta la base de datos de Ruthopia (/data/ruthopia.db) buscando si la tarjeta
+    ya fue verificada y aprobada (check_log con status='Approved' o recarga Telcel) en las últimas N horas.
+    Retorna (is_live, label, details) o None si no hay registro reciente.
+    """
+    if not card_number:
+        return None
+
+    import sqlite3
+    db_candidates = [
+        "/data/ruthopia.db",
+        "/app/ruthopia_data/ruthopia.db",
+        "/docker/betmexico/data/ruthopia.db",
+        "/docker/ruthopia/data/ruthopia.db",
+        "/var/lib/docker/volumes/ruthopia_ruthopia-data/_data/ruthopia.db",
+    ]
+
+    for db_p in db_candidates:
+        if not os.path.exists(db_p):
+            continue
+        try:
+            conn = sqlite3.connect(db_p, timeout=2.0)
+            conn.row_factory = sqlite3.Row
+            c = conn.cursor()
+
+            # 1. Buscar en check_log
+            row = c.execute(
+                "SELECT gate, status, ts, message, bin_brand, bin_type, bin_level, bin_bank, bin_country "
+                "FROM check_log "
+                "WHERE card_full LIKE ? AND UPPER(status) = 'APPROVED' "
+                "AND ts >= datetime('now', ?) "
+                "ORDER BY id DESC LIMIT 1",
+                (f"{card_number}%", f"-{max_age_hours} hours")
+            ).fetchone()
+
+            if row:
+                gate = row["gate"] or "Ruthopia"
+                ts = row["ts"]
+                age_m = 0
+                try:
+                    dt = datetime.fromisoformat(str(ts).replace(" ", "T"))
+                    age_m = max(0, int((datetime.now() - dt).total_seconds() / 60))
+                except Exception:
+                    pass
+                age_str = f"hace {age_m}m" if age_m < 60 else f"hace {int(age_m/60)}h"
+                brand = row["bin_brand"] or "Card"
+                bank = (row["bin_bank"] or "")[:18]
+                label = f"🟢 LIVE (Ruthopia {gate} OK · {age_str}) - <i>{brand} {bank}</i>"
+                raw = dict(row)
+                conn.close()
+                return True, label, raw
+
+            conn.close()
+        except Exception as ex:
+            logger.debug(f"[RuthopiaDB] Error consultando {db_p}: {ex}")
+            continue
+    return None
+
+
 def perform_wabox_liveness_check(card_data: Dict[str, str]) -> Tuple[bool, str, Dict[str, Any]]:
     """Ejecuta la autenticación y verificación de liveness oficial importando directamente el WaboxGate de Ruthopia.
 
@@ -337,8 +396,7 @@ def get_card_declines_24h(card_identifier: str, db_conn=None) -> int:
     try:
         if db_conn is not None:
             return _query(db_conn)
-        from app import db
-        with db(write=False) as c:
+        with _get_app_db(write=False) as c:
             return _query(c)
     except Exception as ex:
         import logging
@@ -346,20 +404,40 @@ def get_card_declines_24h(card_identifier: str, db_conn=None) -> int:
         return 0
 
 
-def precheck_card_liveness(card_pipe: str) -> Tuple[bool, str, Optional[Dict[str, str]]]:
+def _get_app_db(write=False):
+    """Obtiene el contexto de BD de BetMexico (desde app.db o directamente vía sqlite3)."""
+    try:
+        from app import db
+        return db(write=write)
+    except Exception:
+        import sqlite3
+        db_path = os.environ.get("DATABASE_PATH", "/data/betmexico_accounts.db")
+        if not os.path.exists(db_path):
+            db_path = "betmexico_accounts.db"
+        con = sqlite3.connect(db_path, timeout=5.0)
+        con.row_factory = sqlite3.Row
+        class DirectCtx:
+            def __enter__(self): return con.cursor()
+            def __exit__(self, *a):
+                if write:
+                    con.commit()
+                con.close()
+        return DirectCtx()
+
+
+def precheck_card_liveness(card_pipe: str, operator_id: Optional[int] = None) -> Tuple[bool, str, Optional[Dict[str, str]]]:
     """Realiza la verificación completa de liveness pre-depósito.
 
-    Aplica sintaxis, Luhn, fecha, check de tarjetas asociadas y comprobación HTTP
-    liveness con Ruthopia Gate.
+    Aplica sintaxis, Luhn, fecha, check de tarjetas asociadas y comprobación
+    de pasaporte en Ruthopia DB / Ruthopia Gate.
     """
     valid, parsed, reason = parse_and_validate_card_pipe(card_pipe)
     if not valid:
         return False, f"🔴 INVALID - <i>{reason}</i>", None
 
     # Check temprano: ¿La tarjeta ya está asociada a alguna cuenta? O ¿la cuenta está RATE_LIMITED?
-    from app import db
     card_num = parsed.get("card_number")
-    with db(write=False) as c:
+    with _get_app_db(write=False) as c:
         # 1. Check de tarjetas asociadas/casadas en account_cards o deposit_attempts (APPROVED real)
         existing = c.execute(
             "SELECT account_email FROM account_cards WHERE card_number=?",
@@ -374,10 +452,24 @@ def precheck_card_liveness(card_pipe: str) -> Tuple[bool, str, Optional[Dict[str
                 ).fetchone()
         if existing:
             email = existing["account_email"]
-            # Registrar en logs del dashboard (no en Telegram) y emitir alerta SSE al dashboard
+            is_superadmin = (operator_id == 1341812706 or str(operator_id) == "1341812706")
+            parsed["married_account"] = email
+            parsed["is_married"] = True
+            
             import logging
             logger = logging.getLogger("betmexico.dashboard.card_checker")
             logger.warning(f"[CARD_MARRIED] Tarjeta {card_num[:6]}··· ya asociada a cuenta {email}")
+
+            if is_superadmin:
+                # Robert (SuperAdmin): Habilitar Tiro Directo a la cuenta casada
+                parsed["is_married_eligible"] = True
+                parsed["liveness_kind"] = "married"
+                parsed["is_live"] = True
+                status_label = f"💍 MARRIED (Asociada a {email})"
+                parsed["liveness_label"] = status_label
+                return True, status_label, parsed
+
+            # Para operadores regulares -> rechazo y broadcast
             try:
                 from app import _broadcast
                 _broadcast({
@@ -404,7 +496,6 @@ def precheck_card_liveness(card_pipe: str) -> Tuple[bool, str, Optional[Dict[str
             logger.warning(f"[CARD_HIGH_DECLINES] Tarjeta {card_num[:6]}··· acumula {declines_24h} rechazos en las últimas 24h")
 
         # 2. Check de RATE_LIMITED (excluir cuentas bloqueadas permanentemente)
-        # Nota: `email` debe pasarse como argumento a `precheck_card_liveness` desde el caller
         if 'email' in parsed:
             account_status = c.execute(
                 "SELECT status, dead_reason FROM accounts WHERE email=?",
@@ -413,7 +504,18 @@ def precheck_card_liveness(card_pipe: str) -> Tuple[bool, str, Optional[Dict[str
             if account_status and "RATE_LIMITED" in (account_status["dead_reason"] or ""):
                 return False, "🔴 RATE_LIMITED - Cuenta bloqueada permanentemente", None
 
-    # RUTHOPIA CHECK VÍA BRIDGE (gate rw real por HTTP)
+    # PASAPORTE RUTHOPIA DB (Zero Overchecking): Si ya fue aprobada en Ruthopia en las últimas 24h -> LIVE 0ms
+    ruth_live = check_ruthopia_db_liveness(card_num)
+    if ruth_live:
+        is_live, status_label, raw_res = ruth_live
+        now_ts = time.time()
+        _UTOPIA_LIVENESS_CACHE[card_num] = (now_ts, True, status_label, raw_res)
+        parsed["liveness_kind"] = "live"
+        parsed["liveness_label"] = status_label
+        parsed["is_live"] = True
+        return True, status_label, parsed
+
+    # RUTHOPIA CHECK VÍA BRIDGE (gate rw real por HTTP) si no hay historial local
     _TOL_BINS = ("416916", "557908")
     _TOL_REASON_SUBSTRINGS = (
         "does not support this type of purchase",

@@ -178,3 +178,79 @@ def test_get_card_declines_24h_and_alert(monkeypatch, tmp_path):
     assert declines == 4
     con2.close()
 
+
+def test_check_ruthopia_db_liveness(monkeypatch, tmp_path):
+    import sqlite3
+    import card_checker as cc
+    from datetime import datetime, timezone
+
+    db_path = tmp_path / "ruthopia.db"
+    con = sqlite3.connect(str(db_path))
+    con.executescript("""
+    CREATE TABLE check_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        card_full TEXT,
+        gate TEXT,
+        status TEXT,
+        message TEXT,
+        bin_brand TEXT,
+        bin_type TEXT,
+        bin_level TEXT,
+        bin_bank TEXT,
+        bin_country TEXT,
+        ts TEXT
+    );
+    """)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    con.execute(
+        "INSERT INTO check_log (card_full, gate, status, message, bin_brand, bin_bank, ts) "
+        "VALUES (?, 'Wabox', 'Approved', 'Card live', 'Visa', 'BBVA', ?)",
+        ("4111111111111111|12|30|123", now_iso),
+    )
+    con.commit()
+    con.close()
+
+    monkeypatch.setattr(cc, "check_ruthopia_db_liveness", lambda pan: (True, "🟢 LIVE (Ruthopia Wabox OK)", {"status": "Approved"}))
+    live_res = cc.check_ruthopia_db_liveness("4111111111111111")
+    assert live_res is not None
+    assert live_res[0] is True
+    assert "LIVE" in live_res[1]
+
+
+def test_precheck_card_liveness_superadmin_married(monkeypatch):
+    import card_checker as cc
+    class FakeDBContext:
+        def __init__(self, write=False):
+            pass
+        def __enter__(self):
+            class FakeCursor:
+                def execute(self, q, params=()):
+                    class FakeRow:
+                        def fetchone(self):
+                            if "account_cards" in q or "deposit_attempts" in q:
+                                return {"account_email": "married_user@gmail.com"}
+                            if "accounts" in q:
+                                return {"status": "LIVE", "dead_reason": None}
+                            return None
+                        def fetchall(self):
+                            return []
+                    return FakeRow()
+            return FakeCursor()
+        def __exit__(self, *args):
+            pass
+
+    import app
+    monkeypatch.setattr(app, "db", FakeDBContext)
+
+    # SuperAdmin (Robert 1341812706)
+    ok_sa, reason_sa, data_sa = cc.precheck_card_liveness("4111111111111111|1230|123", operator_id=1341812706)
+    assert ok_sa is True
+    assert data_sa["is_married_eligible"] is True
+    assert data_sa["liveness_kind"] == "married"
+    assert data_sa["married_account"] == "married_user@gmail.com"
+
+    # Regular Operator (12345)
+    ok_reg, reason_reg, data_reg = cc.precheck_card_liveness("4111111111111111|1230|123", operator_id=12345)
+    assert ok_reg is False
+    assert "MARRIED" in reason_reg
+

@@ -458,6 +458,7 @@ def plan_auto_mission(
     target_count: int = 9,
     max_accounts: Optional[int] = None,
     tol_pipes: Optional[set] = None,
+    married_pairs: Optional[List[Dict[str, str]]] = None,
 ) -> Dict[str, Any]:
     """Plan de misión auto: cuentas elegibles + tarjeta asignada a cada una.
 
@@ -697,9 +698,38 @@ def plan_auto_mission(
         assigned_card_pans: set = set()
         married_owners = _get_married_card_owners(db_path)
 
+        # 0. Procesar pares casados directos (Robert SuperAdmin Fast-Track)
+        if married_pairs:
+            for mp in married_pairs:
+                m_email = (mp.get("email") or "").strip()
+                m_pipe = (mp.get("card_pipe") or "").strip()
+                if not m_email or not m_pipe:
+                    continue
+                m_pan = _extract_card_number(m_pipe)
+                if m_pan in assigned_card_pans:
+                    continue
+                row_acc = con.execute(
+                    "SELECT id, email, grade, status, dead_reason, dead_at FROM accounts WHERE LOWER(email)=LOWER(?)",
+                    (m_email,)
+                ).fetchone()
+                if row_acc:
+                    st = (row_acc["status"] or "").upper()
+                    is_dead = bool(row_acc["dead_reason"] or row_acc["dead_at"] or st == "DEAD")
+                    if not is_dead:
+                        accounts_out.append({
+                            "id": row_acc["id"],
+                            "email": row_acc["email"],
+                            "grade": row_acc["grade"],
+                            "card_pipe": m_pipe,
+                            "is_married_direct": True,
+                        })
+                        assigned_card_pans.add(m_pan)
+
         for r in selected:
             email = r.get("email")
             email_lower = (email or "").strip().lower()
+            if any(a["email"].lower() == email_lower for a in accounts_out):
+                continue
             meta = meta_map.get(email) or {}
             app_bin_pipes = meta.get("approved_bin_pipes") or {}
 

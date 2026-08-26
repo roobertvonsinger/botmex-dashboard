@@ -224,18 +224,18 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_get_married_card_owners` | def | L175–L209 |
 | `select_accounts_for_auto` | def | L218–L434 |
 | `_max_accounts_for_cards` | def | L443–L451 |
-| `plan_auto_mission` | def | L454–L758 |
-| `_fake_progress_pct` | def | L799–L830 |
-| `_iso` | def | L834–L835 |
-| `_m_load` | def | L838–L846 |
-| `_m_status` | def | L849–L851 |
-| `_m_update` | def | L854–L864 |
-| `_fetch_account` | def | L867–L874 |
-| `_is_account_dead` | def | L877–L885 |
-| `_unlock` | def | L888–L897 |
-| `_broadcast_mission` | def | L900–L929 |
-| `_stop_pool` | def | L932–L939 |
-| `run_auto_mission` | def | L943–L1882 |
+| `plan_auto_mission` | def | L454–L788 |
+| `_fake_progress_pct` | def | L829–L860 |
+| `_iso` | def | L864–L865 |
+| `_m_load` | def | L868–L876 |
+| `_m_status` | def | L879–L881 |
+| `_m_update` | def | L884–L894 |
+| `_fetch_account` | def | L897–L904 |
+| `_is_account_dead` | def | L907–L915 |
+| `_unlock` | def | L918–L927 |
+| `_broadcast_mission` | def | L930–L959 |
+| `_stop_pool` | def | L962–L969 |
+| `run_auto_mission` | def | L973–L1912 |
 
 ### `autoexclusion.py`
 
@@ -401,10 +401,12 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `ruthopia_bridge_check` | def | L69–L106 |
 | `check_luhn` | def | L109–L122 |
 | `parse_and_validate_card_pipe` | def | L125–L174 |
-| `perform_wabox_liveness_check` | def | L182–L308 |
-| `get_card_declines_24h` | def | L311–L346 |
-| `precheck_card_liveness` | def | L349–L466 |
-| `format_ruthopia_liveness_summary` | def | L469–L512 |
+| `check_ruthopia_db_liveness` | def | L182–L238 |
+| `perform_wabox_liveness_check` | def | L241–L367 |
+| `get_card_declines_24h` | def | L370–L404 |
+| `_get_app_db` | def | L407–L425 |
+| `precheck_card_liveness` | def | L428–L568 |
+| `format_ruthopia_liveness_summary` | def | L571–L614 |
 
 ### `clabe_fetch.py`
 

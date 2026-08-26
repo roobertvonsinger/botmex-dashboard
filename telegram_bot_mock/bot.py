@@ -940,11 +940,14 @@ async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg_text = (update.message.text if update.message else "") or ""
     cards_text = ""
+    is_fast_mode = msg_text.lower().startswith("/betf") or "fast" in msg_text.lower().split()[:2]
+
     if context.args:
-        cards_text = " ".join(context.args)
+        args_clean = [a for a in context.args if a.lower() != "fast"]
+        cards_text = " ".join(args_clean)
     elif msg_text:
         lines = [l.strip() for l in msg_text.splitlines() if l.strip()]
-        card_lines = [l for l in lines if not l.lower().startswith("/bet")]
+        card_lines = [l for l in lines if not l.lower().startswith("/bet") and not l.lower().startswith("/betf")]
         if card_lines:
             cards_text = "\n".join(card_lines)
         elif len(lines) == 1 and any(char.isdigit() for char in lines[0]):
@@ -955,7 +958,7 @@ async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Si se enviaron tarjetas junto con el comando -> FLUJO DIRECTO AUTOMÁTICO (1 solo paso)
     if cards_text:
         return await process_bet_input(
-            update, context, override_text=cards_text, auto_launch=True
+            update, context, override_text=cards_text, auto_launch=True, is_fast_mode=is_fast_mode
         )
 
     warning_box = format_telegram_bet_warning()
@@ -967,7 +970,7 @@ async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "<code>4111111111111111|12|28|123</code>\n\n"
         "• 1 a 4 tarjetas por intento (una por línea).\n"
         "• Matching automático con cuentas calificadas (A+ / KYC).\n"
-        "• Validación liveness en tiempo real."
+        "• Pasaporte Ruthopia DB y liveness en tiempo real."
     )
     await update.message.reply_text(
         msg,
@@ -987,6 +990,7 @@ async def process_bet_input(
     context: ContextTypes.DEFAULT_TYPE,
     override_text: Optional[str] = None,
     auto_launch: bool = False,
+    is_fast_mode: bool = False,
 ):
     """Procesa las tarjetas ingresadas para /bet con validación de liveness concurrente."""
     text = (override_text or (update.message.text if update.message else "") or "").strip()
@@ -1041,13 +1045,22 @@ async def process_bet_input(
         except Exception:
             pass
 
-    # Validar liveness en paralelo sin bloquear el event loop
-    results = await asyncio.gather(
-        *[asyncio.to_thread(precheck_card_liveness, pipe) for pipe in lines]
-    )
+    # Validar liveness en paralelo sin bloquear el event loop (o salto fast)
+    if is_fast_mode:
+        results = []
+        for p in lines:
+            parts = [x.strip() for x in p.split("|") if x.strip()]
+            c_pan = parts[0] if parts else ""
+            p3 = "|".join(parts[:3]) if len(parts) >= 3 else p
+            results.append((True, "🟢 LIVE (Fast Mode · Pasaporte)", {"card_number": c_pan, "pipe_3parts": p3, "liveness_kind": "live"}))
+    else:
+        results = await asyncio.gather(
+            *[asyncio.to_thread(precheck_card_liveness, pipe, operator_id) for pipe in lines]
+        )
 
     live_pipes = []
     tol_pipes = []
+    married_pairs = []
     liveness_records = []
     seen_pans = set()
 
@@ -1064,14 +1077,20 @@ async def process_bet_input(
             f"[CARD_TOUCH] operator={operator_id} | account=N/A(precheck) | "
             f"pipe={pipe} | status={kind} | reason={reason}"
         )
-        if ok and kind in ("live", "tol_bin", "tol_reason"):
+        if ok and kind in ("live", "tol_bin", "tol_reason", "married"):
             if kind == "live":
                 live_pipes.append(parsed["pipe_3parts"])
-            else:
+            elif kind in ("tol_bin", "tol_reason"):
                 tol_pipes.append(parsed["pipe_3parts"])
+            elif kind == "married" and parsed.get("is_married_eligible"):
+                married_pairs.append({
+                    "card_pipe": parsed["pipe_3parts"],
+                    "email": parsed.get("married_account", ""),
+                })
 
     summary_text = format_ruthopia_liveness_summary(liveness_records)
-    valid_pipes = live_pipes + tol_pipes
+    regular_pipes = live_pipes + tol_pipes
+    valid_pipes = regular_pipes + [p["card_pipe"] for p in married_pairs]
     live_count = len(live_pipes)
 
     if not valid_pipes:
@@ -1103,6 +1122,42 @@ async def process_bet_input(
             else:
                 clean_pipes.append(parsed["pipe_3parts"])
 
+    context.user_data["pending_all_pipes"] = valid_pipes
+    context.user_data["pending_clean_pipes"] = clean_pipes
+    context.user_data["pending_tol_pipes"] = tol_pipes
+    context.user_data["pending_bet_pipes"] = valid_pipes
+    context.user_data["pending_married_pairs"] = married_pairs
+
+    # Caso Robert (SuperAdmin) con tarjetas casadas reconocidas
+    if is_sa and married_pairs:
+        married_details = "\n".join([f"• <code>···{p['card_pipe'].split('|')[0][-4:]}</code> ➔ Cuenta: <code>{p['email']}</code>" for p in married_pairs])
+        married_prompt = (
+            f"{HEADER}\n\n"
+            f"{summary_text}\n\n"
+            f"💍 <b>TARJETA(S) CASADA(S) RECONOCIDA(S) (SuperAdmin):</b>\n"
+            f"{married_details}\n\n"
+            f"¿Cómo deseas proceder?"
+        )
+        m_buttons = []
+        if regular_pipes:
+            m_buttons.append([InlineKeyboardButton(f"🚀 Lanzar Todo ({len(valid_pipes)} c/ Casadas)", callback_data="btn_bet_launch_all")])
+            m_buttons.append([InlineKeyboardButton(f"🎯 Solo Casadas Directas ({len(married_pairs)})", callback_data="btn_bet_launch_married")])
+            m_buttons.append([InlineKeyboardButton(f"⚡ Solo Pool Limpio ({len(regular_pipes)})", callback_data="btn_bet_launch_clean")])
+        else:
+            m_buttons.append([InlineKeyboardButton(f"🎯 Tiro Directo a Cuenta Casada ({len(married_pairs)})", callback_data="btn_bet_launch_married")])
+        m_buttons.append([InlineKeyboardButton("🛑 Cancelar", callback_data="cancel_bet")])
+        kb_married = InlineKeyboardMarkup(m_buttons)
+
+        if status_msg:
+            try:
+                await status_msg.edit_text(married_prompt, parse_mode="HTML", reply_markup=kb_married)
+            except Exception:
+                if update.message:
+                    await update.message.reply_text(married_prompt, parse_mode="HTML", reply_markup=kb_married)
+        elif update.message:
+            await update.message.reply_text(married_prompt, parse_mode="HTML", reply_markup=kb_married)
+        return WAIT_BET_CONFIRM
+
     if high_decline_pipes:
         high_declined_tails = [f"···{p.split('|')[0][-4:]}" for p in high_decline_pipes]
         alert_text = (
@@ -1112,11 +1167,6 @@ async def process_bet_input(
             f"La tarjeta <code>{', '.join(high_declined_tails)}</code> acumula <b>4+ rechazos hoy</b>.\n\n"
             f"¿Deseas continuar con todas o excluir las de alto rechazo?"
         )
-        context.user_data["pending_all_pipes"] = valid_pipes
-        context.user_data["pending_clean_pipes"] = clean_pipes
-        context.user_data["pending_tol_pipes"] = tol_pipes
-        context.user_data["pending_bet_pipes"] = valid_pipes
-
         buttons = [
             [InlineKeyboardButton(f"▶ Continuar con todas ({len(valid_pipes)})", callback_data="btn_bet_launch_all")]
         ]
@@ -1154,7 +1204,7 @@ async def process_bet_input(
 
         amount = 150.0
         target_count = 9
-        plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count, tol_pipes=tol_pipes)
+        plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count, tol_pipes=tol_pipes, married_pairs=married_pairs)
         if not plan.get("feasible"):
             fail_plan = (
                 f"{HEADER}\n\n"
@@ -1213,8 +1263,6 @@ async def process_bet_input(
         return ConversationHandler.END
 
     # FLUJO INTERACTIVO EN 2 PASOS (si se envió /bet sin tarjetas)
-    context.user_data["pending_bet_pipes"] = valid_pipes
-    context.user_data["pending_tol_pipes"] = tol_pipes
     confirm_msg = (
         f"{HEADER}\n\n"
         f"{summary_text}\n\n"
@@ -1541,14 +1589,20 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         await query.edit_message_text("❌ Proceso /bet cancelado.")
         return ConversationHandler.END
 
-    if query.data in ("confirm_bet", "btn_bet_launch_all", "btn_bet_launch_clean"):
+    if query.data in ("confirm_bet", "btn_bet_launch_all", "btn_bet_launch_clean", "btn_bet_launch_married"):
         try:
-            if query.data == "btn_bet_launch_clean":
+            married_pairs = []
+            if query.data == "btn_bet_launch_married":
+                married_pairs = context.user_data.get("pending_married_pairs", [])
+                valid_pipes = [p["card_pipe"] for p in married_pairs]
+            elif query.data == "btn_bet_launch_clean":
                 valid_pipes = context.user_data.get("pending_clean_pipes", [])
             elif query.data == "btn_bet_launch_all":
                 valid_pipes = context.user_data.get("pending_all_pipes") or context.user_data.get("pending_bet_pipes", [])
+                married_pairs = context.user_data.get("pending_married_pairs", [])
             else:
                 valid_pipes = context.user_data.get("pending_bet_pipes", [])
+                married_pairs = context.user_data.get("pending_married_pairs", [])
 
             if not valid_pipes:
                 await query.edit_message_text("❌ No hay tarjetas válidas para iniciar.")
@@ -1565,8 +1619,8 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             target_count = 9
 
             tol_pipes = [p for p in context.user_data.get("pending_tol_pipes", []) if p in valid_pipes]
-            # RF4: pasar tol_pipes al plan
-            plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count, tol_pipes=tol_pipes)
+            # RF4: pasar tol_pipes al plan + married_pairs para tiro directo
+            plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count, tol_pipes=tol_pipes, married_pairs=married_pairs)
             if not plan.get("feasible"):
                 await query.edit_message_text(
                     f"❌ No fue posible armar el plan: {plan.get('reason', 'desconocido')}"
@@ -2516,17 +2570,17 @@ def build_app():
     )
     app.add_handler(adduser_handler)
 
-    # ConversationHandler para /bet
+    # ConversationHandler para /bet, /betf, /betfast
     bet_handler = ConversationHandler(
         entry_points=[
-            CommandHandler("bet", bet_cmd),
+            CommandHandler(["bet", "betf", "betfast"], bet_cmd),
             CallbackQueryHandler(start_buttons_callback, pattern="^btn_start_bet$"),
         ],
         states={
             WAIT_BET_CONFIRM: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, process_bet_input),
                 CallbackQueryHandler(
-                    handle_bet_callback, pattern="^(confirm_bet|cancel_bet|btn_bet_launch_all|btn_bet_launch_clean)$"
+                    handle_bet_callback, pattern="^(confirm_bet|cancel_bet|btn_bet_launch_all|btn_bet_launch_clean|btn_bet_launch_married)$"
                 ),
                 CallbackQueryHandler(
                     start_buttons_callback, pattern="^btn_start_bin_radar$"
