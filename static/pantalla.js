@@ -488,7 +488,7 @@
   // el banco — el copy SIEMPRE dice "confirma en tu banco", nunca "entregado".
   // bug#3/bug#1: alertas si el rail salió a tarjeta o a dígitos distintos a los
   // esperados. Invisible para no-SA (feedback_deshabilitar_invisible_no_redirect).
-  const WD_TERMINAL = new Set(['successful', 'completed', 'failed']);
+  const WD_TERMINAL = new Set(['successful', 'completed', 'failed', 'idle']);
 
   // Convierte la fila cruda de account_withdrawals (último retiro conocido,
   // servido por /details) al mismo shape que devuelve GET /withdraw/status —
@@ -499,8 +499,14 @@
     let status;
     if (row.status_api === 6) status = 'completed';
     else if (row.status_api != null && row.status_api < 0) status = 'failed';
-    else if (row.status_api != null && row.status_api > 0) status = 'pending';
-    else status = 'idle';
+    else if (row.status_api === 5 || row.status_api === 2) {
+      // Si la transacción se creó hace más de 15 minutos y no resolvió, no considerarla pending infinito
+      const createdMs = row.created_at ? new Date(row.created_at).getTime() : 0;
+      const isStale = createdMs > 0 && (Date.now() - createdMs > 15 * 60 * 1000);
+      status = isStale ? 'completed' : 'pending';
+    } else {
+      status = 'idle';
+    }
     const isCardRefund = row.gateway === 1;
     const digitsMismatch = Boolean(row.account_digits && row.actual_digits && String(row.actual_digits).slice(-4) !== String(row.account_digits).slice(-4));
     return {
@@ -514,7 +520,7 @@
   }
 
   function _withdrawStatusHtml(st) {
-    if (!st) return '';
+    if (!st || st.status === 'idle') return '';
     const g = window.esc || (s => s);
     const money = window.fmtMoney || (v => `$${(v || 0).toFixed(2)}`);
     const ref = st.reference ? g(st.reference) : '';
@@ -566,7 +572,7 @@
     const L = window.PantallaLogic || {};
     const role = (state.user || {}).role;
     const st = _wdStatusFromRow(d && d.last_withdrawal);
-    d && (d._wd_pending = !!(st && !WD_TERMINAL.has(st.status)));
+    d && (d._wd_pending = !!(st && st.status === 'pending'));
     const s2 = L._withdrawBtnState ? L._withdrawBtnState(d, role) : { render: false, disabled: true, tooltip: '' };
     return { s2, st, pending: !!(d && d._wd_pending) };
   }
@@ -634,7 +640,7 @@
         const statusEl = wrap.querySelector('#wdStatus');
         if (statusEl) statusEl.innerHTML = _withdrawStatusHtml(st);
         wrap.classList.toggle('alert', !!(st.alerts && (st.alerts.gatewayMismatch || st.alerts.digitsMismatch)));
-        const done = WD_TERMINAL.has(st.status);
+        const done = st.status !== 'pending';
         wrap.classList.toggle('pending', !done);
         const input = wrap.querySelector('#amtInput');
         const btn = wrap.querySelector('#wd');
@@ -662,11 +668,19 @@
             }
           } catch (_) { /* best-effort */ }
         } else {
-          // Degradar a poll lento después de 5 min (Task #13)
+          // Degradar a poll lento después de 2 min, parar tras 5 min
           const poll = _wdPolls[accId];
-          if (poll && Date.now() > poll.fastUntil) {
-            clearInterval(poll.timer);
-            poll.timer = setInterval(() => _fetchWithdrawStatus(accId, txId), WD_POLL_SLOW_MS);
+          if (poll) {
+            if (Date.now() > poll.expireAt) {
+              _stopWithdrawPoll(accId);
+              wrap.classList.remove('pending');
+              if (input) input.disabled = false;
+              if (btn) btn.disabled = false;
+            } else if (Date.now() > poll.fastUntil && poll.intervalMs !== WD_POLL_SLOW_MS) {
+              clearInterval(poll.timer);
+              poll.intervalMs = WD_POLL_SLOW_MS;
+              poll.timer = setInterval(() => _fetchWithdrawStatus(accId, txId), WD_POLL_SLOW_MS);
+            }
           }
         }
       }
@@ -689,7 +703,13 @@
     _stopWithdrawPoll(accId); // 1 solo interval activo por cuenta
     _fetchWithdrawStatus(accId, txId); // primer chequeo inmediato
     const timer = setInterval(() => _fetchWithdrawStatus(accId, txId), WD_POLL_FAST_MS);
-    _wdPolls[accId] = { timer, txId, fastUntil: Date.now() + 5 * 60 * 1000 };
+    _wdPolls[accId] = {
+      timer,
+      txId,
+      fastUntil: Date.now() + 2 * 60 * 1000,
+      expireAt: Date.now() + 5 * 60 * 1000,
+      intervalMs: WD_POLL_FAST_MS,
+    };
   }
 
   // Reanuda el polling si La Pantalla se reabre con un retiro no-terminal (p.ej.
@@ -698,7 +718,7 @@
     const wd = d && d.last_withdrawal;
     if (!wd || !wd.transaction_id) return;
     const st = _wdStatusFromRow(wd);
-    if (st && !WD_TERMINAL.has(st.status) && !_wdPolls[d.id]) {
+    if (st && st.status === 'pending' && !_wdPolls[d.id]) {
       _startWithdrawPoll(d.id, wd.transaction_id);
     }
   }

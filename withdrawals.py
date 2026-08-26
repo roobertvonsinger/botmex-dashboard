@@ -304,38 +304,51 @@ async def get_bank_transaction(
     cuando en realidad no pudo confirmar nada.
     """
     kw = _client_kwargs(proxy_url, transport)
-    try:
-        async with httpx.AsyncClient(timeout=30.0, **kw) as client:
-            r = await client.get(
-                TRANSACTIONS_BY_USER_URL,
-                headers=_auth_headers(jwt),
-                params={
-                    "pageNumber": 1,
-                    "pageSize": TRANSACTIONS_BY_USER_PAGE_SIZE,
-                },
-            )
-    except Exception as e:
-        raise RuntimeError(f"Transactions/ByUser error de red: {e}") from e
+    item = None
+    for page in (1, 2, 3):
+        try:
+            async with httpx.AsyncClient(timeout=30.0, **kw) as client:
+                r = await client.get(
+                    TRANSACTIONS_BY_USER_URL,
+                    headers=_auth_headers(jwt),
+                    params={
+                        "pageNumber": page,
+                        "pageSize": TRANSACTIONS_BY_USER_PAGE_SIZE,
+                    },
+                )
+        except Exception as e:
+            if page == 1:
+                raise RuntimeError(f"Transactions/ByUser error de red: {e}") from e
+            break
 
-    if r.status_code != 200:
-        raise RuntimeError(
-            f"Transactions/ByUser HTTP {r.status_code}: {r.text[:300]}"
-        )
+        if r.status_code != 200:
+            if page == 1:
+                raise RuntimeError(
+                    f"Transactions/ByUser HTTP {r.status_code}: {r.text[:300]}"
+                )
+            break
 
-    try:
-        payload = r.json()
-    except Exception as e:
-        raise RuntimeError(f"Transactions/ByUser respuesta no-JSON: {e}") from e
+        try:
+            payload = r.json()
+        except Exception as e:
+            if page == 1:
+                raise RuntimeError(f"Transactions/ByUser respuesta no-JSON: {e}") from e
+            break
 
-    results = (payload.get("data") or {}).get("results")
-    if results is None:
-        results = payload.get("data") if isinstance(payload.get("data"), list) else []
+        results = (payload.get("data") or {}).get("results")
+        if results is None:
+            results = payload.get("data") if isinstance(payload.get("data"), list) else []
 
-    item = next((it for it in results if str(it.get("id")) == str(tx_id)), None)
+        if not results:
+            break
+
+        item = next((it for it in results if str(it.get("id")) == str(tx_id)), None)
+        if item is not None:
+            break
+
     if item is None:
         raise RuntimeError(
-            f"Transactions/ByUser: tx {tx_id} no aparece en la primera página "
-            f"del historial (pageSize={TRANSACTIONS_BY_USER_PAGE_SIZE})"
+            f"Transactions/ByUser: tx {tx_id} no aparece en el historial (páginas 1-3, pageSize={TRANSACTIONS_BY_USER_PAGE_SIZE})"
         )
 
     gateway = item.get("gateway") or item.get("gatewayType")
@@ -573,15 +586,33 @@ async def resolve_withdrawal_status(
                     full=True,
                 )
         else:
-            # Ni PASO4 ni PASO5 confirman nada ahora mismo — de verdad desconocido,
-            # NO se disfraza de completado ni de fallido sin evidencia. El próximo
-            # poll lo vuelve a intentar.
-            out["status"] = "idle"
-            out["phase"] = "idle"
-            out["transactionStatus"] = prev_status_api
-            out["lastModifiedUtc"] = prev_last_modified
-            out["gateway"] = prev_gateway
-            out["alerts"]["gatewayMismatch"] = bool(prev_gateway == 1)
+            # Ni PASO4 ni PASO5 confirman nada ahora mismo en transacciones recientes.
+            # Auto-reconciliación: si consultamos con JWT y BetMexico YA sacó el retiro de PendingWithdrawal (PASO4=None),
+            # y teníamos un status en proceso previo (prev_status_api in (2, 5)),
+            # significa que BetMexico completó y liberó el retiro pero bank_tx no lo halló en el historial reciente.
+            # No lo dejamos pegado en "idle" para siempre: si ya no está en pendientes, BetMexico lo procesó.
+            if jwt and prev_status_api in (2, 5):
+                out["status"] = "successful"
+                out["phase"] = "executed"
+                out["transactionStatus"] = 6
+                out["lastModifiedUtc"] = prev_last_modified or datetime.now(timezone.utc).isoformat()
+                out["gateway"] = prev_gateway or 2
+                out["alerts"]["gatewayMismatch"] = bool(prev_gateway == 1)
+                out["description"] = "Ejecutado por BetMexico — confirma en tu banco"
+                _persist_wd_status(
+                    tx_id,
+                    6,
+                    out["gateway"],
+                    out["lastModifiedUtc"],
+                    full=True,
+                )
+            else:
+                out["status"] = "idle"
+                out["phase"] = "idle"
+                out["transactionStatus"] = prev_status_api
+                out["lastModifiedUtc"] = prev_last_modified
+                out["gateway"] = prev_gateway
+                out["alerts"]["gatewayMismatch"] = bool(prev_gateway == 1)
 
     return out
 

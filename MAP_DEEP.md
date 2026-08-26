@@ -29,8 +29,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `run_refresh_cycle` | def | L252–L448 |
 | `run_refresh_cycle_from_env` | def | L451–L458 |
 | `_load_pending_withdrawals` | def | L473–L482 |
-| `_resolve_pending_withdrawals` | def | L485–L566 |
-| `_withdrawal_resolution_loop` | def | L569–L585 |
+| `_resolve_pending_withdrawals` | def | L485–L573 |
+| `_withdrawal_resolution_loop` | def | L576–L592 |
 
 ### `app.py`
 
@@ -1223,12 +1223,12 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `get_real_balance` | def | L145–L172 |
 | `begin_withdrawal` | def | L178–L238 |
 | `get_pending_withdrawal` | def | L244–L273 |
-| `get_bank_transaction` | def | L279–L361 |
-| `_persist_wd_status` | def | L367–L392 |
-| `resolve_withdrawal_status` | def | L395–L586 |
-| `execute_withdrawal` | def | L592–L689 |
-| `_refresh_account_after_withdrawal` | def | L692–L775 |
-| `execute_auto_batch_withdrawal` | def | L783–L968 |
+| `get_bank_transaction` | def | L279–L374 |
+| `_persist_wd_status` | def | L380–L405 |
+| `resolve_withdrawal_status` | def | L408–L617 |
+| `execute_withdrawal` | def | L623–L720 |
+| `_refresh_account_after_withdrawal` | def | L723–L806 |
+| `execute_auto_batch_withdrawal` | def | L814–L999 |
 <!-- GEN:end:simbolos -->
 
 ---

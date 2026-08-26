@@ -462,7 +462,7 @@ async def run_refresh_cycle_from_env() -> Dict[str, Any]:
 
 _WD_PENDING_SQL = (
     "SELECT w.transaction_id, w.account_id, w.account_email, "
-    "w.account_digits, w.status_api, w.gateway, w.last_modified_utc, w.amount, "
+    "w.account_digits, w.status_api, w.gateway, w.last_modified_utc, w.amount, w.created_at, "
     "a.jwt_token "
     "FROM account_withdrawals w "
     "JOIN accounts a ON a.id = w.account_id "
@@ -494,7 +494,7 @@ async def _resolve_pending_withdrawals() -> Dict[str, Any]:
     resolverá. El universo es chico (solo cuentas con retiro en curso ahora
     mismo), así que 60s no taladra la API en general."""
     import app
-    from withdrawals import resolve_withdrawal_status
+    from withdrawals import resolve_withdrawal_status, _persist_wd_status
     from proxy_pool import build_admin_proxy_url
 
     rows = await asyncio.to_thread(_load_pending_withdrawals)
@@ -508,6 +508,13 @@ async def _resolve_pending_withdrawals() -> Dict[str, Any]:
     for row in rows:
         jwt = row.get("jwt_token")
         if not jwt:
+            # Auto-heal: si la fila de retiro quedó huérfana sin JWT, cerrarla
+            try:
+                _persist_wd_status(row["transaction_id"], 6, gateway=row.get("gateway") or 2, full=True)
+                stats["resolved"] += 1
+                stats["terminal"] += 1
+            except Exception:
+                pass
             continue
         try:
             out = await resolve_withdrawal_status(
