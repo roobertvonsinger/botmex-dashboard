@@ -98,7 +98,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 585 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5424 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 5425 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1882 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `fb810a5` | feat(logs-superadmin): 4 dedicated log viewers, unlimited cards for superadmin and stealth hierarchy in botmex |
 | `9587952` | docs: sync MAP.md |
 | `0e91b0f` | docs: actualizar NEXT-SESSION con reglas de oro 3DS y matrimonio APPROVED |
 | `432684f` | feat(deposits): suavizado 3ds, matrimonio exclusivo approved, alerta 24h y distintivo visual a+ |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `26a279a` | fix: restore pantallaSrcClass in static/app.js |
 | `55ae7d4` | feat: visual badge and highlight for accounts newly added in last 48h |
 | `9a9b3bd` | feat(bot): implement crisp card validation layout with LIVE/TIESAS blocks and direct summary |
-| `f1a436d` | fix(bot): purge fake sample_bins, parallelize card liveness precheck and auto-route raw text |
 <!-- GEN:end:recientes -->
 
 ---

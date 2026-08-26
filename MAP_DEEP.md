@@ -177,10 +177,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `bot_pause_mission` | def | L4974–L5003 |
 | `bot_resume_mission` | def | L5007–L5025 |
 | `bot_cancel_mission` | def | L5030–L5065 |
-| `bot_bet_create` | def | L5069–L5238 |
-| `filter_and_sanitize_check_combos` | def | L5241–L5326 |
-| `BotCheckRequest` | class | L5329–L5333 |
-| `bot_check` | def | L5336–L5417 |
+| `bot_bet_create` | def | L5069–L5239 |
+| `filter_and_sanitize_check_combos` | def | L5242–L5327 |
+| `BotCheckRequest` | class | L5330–L5334 |
+| `bot_check` | def | L5337–L5418 |
 
 ### `auth.py`
 

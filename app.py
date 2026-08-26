@@ -5086,7 +5086,8 @@ async def bot_bet_create(request: Request, user: dict = Depends(require_session)
     confirmed = body.get("confirmed", False)
     operator_id = user.get("telegram_id") or body.get("telegram_id") or 0
 
-    if not card_pipes or len(card_pipes) > 4:
+    is_sa = (user.get("role") == "superadmin" or operator_id == 1341812706)
+    if not card_pipes or (len(card_pipes) > 4 and not is_sa):
         raise HTTPException(400, "Se requieren de 1 a 4 tarjetas por intento (card_pipes)")
 
     now_dt = datetime.now(timezone.utc)
