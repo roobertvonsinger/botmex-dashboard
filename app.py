@@ -1929,7 +1929,9 @@ def get_logs(limit: int = 200, since: Optional[str] = None,
 
 _TELEGRAM_LOG_FILES = {
     "main": Path("/data/logs/telegram_bot.log"),
+    "legacy": Path("/data/logs/telegram_bot.log"),
     "mock": Path("/data/logs/telegram_mock_bot.log"),
+    "telegram": Path("/data/logs/telegram_mock_bot.log"),
     "betmex": Path("/data/logs/telegram_mock_bot.log"),
     "ruthopia": Path("/data/logs/ruthopia.log"),
 }

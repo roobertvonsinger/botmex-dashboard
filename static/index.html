@@ -677,7 +677,9 @@
         <h2>Logs <span class="dim mono" id="logsCount">—</span><span class="log-level-counts" id="logsLevelCounts"></span></h2>
         <div class="seg logs-mode-seg" data-seg="logsmode" title="Fuente de logs">
           <button data-v="dashboard" class="on">Dashboard</button>
-          <button data-v="telegram">🤖 Bots Telegram</button>
+          <button data-v="telegram">🤖 Bot Telegram</button>
+          <button data-v="legacy">📜 Bot Legacy</button>
+          <button data-v="ruthopia">⚡ ʀ.ᴜᴛʜᴏᴘɪᴀ</button>
         </div>
         <div class="grow"></div>
         <div class="seg" data-seg="loglevel" title="Filtra por nivel de severidad" id="logsLevelSeg">
@@ -695,21 +697,17 @@
         <pre id="logsView" class="logs-view hide-refresh">Conectando…</pre>
         <button type="button" class="logs-float-bottom" id="logsFloatBottom"><span class="ic">↓</span> Ir al fondo <span class="cnt" id="logsFloatCount"></span></button>
       </section>
-      <section class="logs-bots-grid" id="logsBotsWrap" style="display:none;">
-        <div class="logs-bot-panel">
-          <div class="logs-bot-head"><span class="dot"></span> Bot BetMexico (prod) <span class="grow"></span>
-            <button class="seg-btn" id="btnBotMainPause" style="padding:1px 6px;font-size:10px;">⏸</button>
-            <button class="seg-btn" id="btnBotMainClear" style="padding:1px 6px;font-size:10px;">Limpiar</button>
-          </div>
-          <pre class="logs-view logs-bot-view" id="logsBotMainView">Conectando…</pre>
-        </div>
-        <div class="logs-bot-panel">
-          <div class="logs-bot-head"><span class="dot" style="background:#00e5ff;"></span> ʀ.ᴜᴛʜᴏᴘɪᴀ (Ruth & Gates) <span class="grow"></span>
-            <button class="seg-btn" id="btnBotMockPause" style="padding:1px 6px;font-size:10px;">⏸</button>
-            <button class="seg-btn" id="btnBotMockClear" style="padding:1px 6px;font-size:10px;">Limpiar</button>
-          </div>
-          <pre class="logs-view logs-bot-view" id="logsBotMockView">Conectando…</pre>
-        </div>
+      <section class="tablewrap" id="logsTelegramWrap" style="position:relative;display:none;">
+        <pre id="logsBotMockView" class="logs-view hide-refresh">Conectando…</pre>
+        <button type="button" class="logs-float-bottom" id="logsBotMockFloatBottom"><span class="ic">↓</span> Ir al fondo <span class="cnt" id="logsBotMockFloatCount"></span></button>
+      </section>
+      <section class="tablewrap" id="logsLegacyWrap" style="position:relative;display:none;">
+        <pre id="logsBotLegacyView" class="logs-view hide-refresh">Conectando…</pre>
+        <button type="button" class="logs-float-bottom" id="logsBotLegacyFloatBottom"><span class="ic">↓</span> Ir al fondo <span class="cnt" id="logsBotLegacyFloatCount"></span></button>
+      </section>
+      <section class="tablewrap" id="logsRuthopiaWrap" style="position:relative;display:none;">
+        <pre id="logsRuthopiaView" class="logs-view hide-refresh">Conectando…</pre>
+        <button type="button" class="logs-float-bottom" id="logsRuthopiaFloatBottom"><span class="ic">↓</span> Ir al fondo <span class="cnt" id="logsRuthopiaFloatCount"></span></button>
       </section>
     </div>
 

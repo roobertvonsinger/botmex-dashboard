@@ -591,7 +591,6 @@ async def adduser_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Punto de entrada /adduser — exclusivo Superadmin."""
     user_id = update.effective_user.id
     if user_id != SUPERADMIN_ID:
-        await update.message.reply_text("❌ Comando exclusivo para Superadmin.")
         return ConversationHandler.END
 
     args = context.args or []
@@ -1002,19 +1001,16 @@ async def process_bet_input(
         for line in text.splitlines()
         if line.strip() and not line.startswith("/")
     ]
-    if not lines and text.startswith("/bet"):
-        parts = text.split(maxsplit=1)
-        if len(parts) > 1:
-            lines = [line.strip() for line in parts[1].splitlines() if line.strip()]
+    operator_id = update.effective_user.id
+    is_sa = (operator_id == SUPERADMIN_ID)
 
-    if not lines or len(lines) > 4:
+    if not lines or (len(lines) > 4 and not is_sa):
         if update.message:
             await update.message.reply_text(
                 "❌ Debes enviar entre 1 y 4 tarjetas por intento."
             )
         return WAIT_BET_CONFIRM
 
-    operator_id = update.effective_user.id
     MAX_DAILY_STRIKES = 5
 
     # Comprobar strikes
@@ -1028,8 +1024,8 @@ async def process_bet_input(
     if strikes_count >= MAX_DAILY_STRIKES:
         fail_strike_msg = (
             f"{HEADER}\n\n"
-            f"❌ <b>Límite de {MAX_DAILY_STRIKES} strikes diarios alcanzado.</b> Contacta al SuperAdmin.\n"
-            f"<i>Los strikes previenen el quema de pasarelas con tarjetas inválidas.</i>"
+            f"❌ <b>Límite de {MAX_DAILY_STRIKES} strikes diarios alcanzado.</b>\n"
+            f"<i>Espera a que se renueve tu cuota o contacta a soporte.</i>"
         )
         if update.message:
             await update.message.reply_text(fail_strike_msg, parse_mode="HTML")
@@ -1591,7 +1587,7 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         except Exception as e:
             logger.exception(f"[handle_bet_callback] Error al confirmar bet: {e}")
             await query.edit_message_text(
-                "❌ Error interno al iniciar la misión. Intenta de nuevo o contacta al SuperAdmin."
+                "❌ Error interno al iniciar la misión. Intenta de nuevo en unos momentos."
             )
             return ConversationHandler.END
 

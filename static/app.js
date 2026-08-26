@@ -2730,18 +2730,45 @@ async function _navigateToAccountByEmail(email) {
   } catch (e) { toast(humanizeApiError(e), 'error'); }
 }
 
-// ─── Vista dual: Bots de Telegram ───
-const _botLogsState = {
-  main: { ts: null, boundary: new Set(), timer: null, paused: false },
-  mock: { ts: null, boundary: new Set(), timer: null, paused: false },
+// ─── Vistas dedicadas de Logs (Dashboard, Bot Telegram, Bot Legacy, Ruthopia) ───
+const _LOGS_CONTAINERS = {
+  dashboard: { view: '#logsView', wrap: '#logsDashboardWrap', floatBtn: '#logsFloatBottom', floatCnt: '#logsFloatCount' },
+  telegram: { view: '#logsBotMockView', wrap: '#logsTelegramWrap', floatBtn: '#logsBotMockFloatBottom', floatCnt: '#logsBotMockFloatCount' },
+  legacy: { view: '#logsBotLegacyView', wrap: '#logsLegacyWrap', floatBtn: '#logsBotLegacyFloatBottom', floatCnt: '#logsBotLegacyFloatCount' },
+  ruthopia: { view: '#logsRuthopiaView', wrap: '#logsRuthopiaWrap', floatBtn: '#logsRuthopiaFloatBottom', floatCnt: '#logsRuthopiaFloatCount' },
 };
+
+const _botLogsState = {
+  telegram: { ts: null, boundary: new Set(), autoScroll: true, pendingHidden: 0 },
+  legacy: { ts: null, boundary: new Set(), autoScroll: true, pendingHidden: 0 },
+  ruthopia: { ts: null, boundary: new Set(), autoScroll: true, pendingHidden: 0 },
+};
+
+function _updateBotFloatBtn(which) {
+  const cfg = _LOGS_CONTAINERS[which];
+  const st = _botLogsState[which];
+  if (!cfg || !st) return;
+  const btn = $(cfg.floatBtn);
+  if (!btn) return;
+  if (st.pendingHidden > 0 && !st.autoScroll) {
+    btn.classList.add('show');
+    const cnt = $(cfg.floatCnt);
+    if (cnt) cnt.textContent = st.pendingHidden;
+  } else {
+    btn.classList.remove('show');
+  }
+}
+
 async function _reloadBotLog(which) {
   const st = _botLogsState[which];
-  const v = $(which === 'main' ? '#logsBotMainView' : '#logsBotMockView');
-  if (!v || !st) return;
+  const cfg = _LOGS_CONTAINERS[which];
+  if (!st || !cfg) return;
+  const v = $(cfg.view);
+  if (!v) return;
   try {
     const params = new URLSearchParams({ bot: which, limit: '300' });
     if (st.ts) params.set('since', st.ts);
+    if (_logsLevel && _logsLevel !== 'ALL') params.set('level', _logsLevel);
     const r = await fetch(`/api/logs/telegram?${params}`);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
@@ -2750,18 +2777,20 @@ async function _reloadBotLog(which) {
     if (fresh.length || isFirstLoad) {
       let html = fresh.map(ln => _renderLogLine(_parseLogLine(ln))).join('');
       // Resalta comandos de operador para escaneo rápido
-      html = html.replace(/(\/(?:botmex|check|bet)\b)/g, '<span class="log-cat-cmd">$1</span>');
+      html = html.replace(/(\/(?:botmex|check|bet|rt|rm|rtm|rw|cc|bin|help|me)\b)/g, '<span class="log-cat-cmd">$1</span>');
+      const wasAtBottom = st.autoScroll;
       requestAnimationFrame(() => {
         if (isFirstLoad) v.innerHTML = html; else v.insertAdjacentHTML('beforeend', html);
         _pruneLogDom(v);
-        v.scrollTop = v.scrollHeight;
+        if (wasAtBottom) {
+          v.scrollTop = v.scrollHeight;
+        } else if (!isFirstLoad) {
+          st.pendingHidden += fresh.length;
+          _updateBotFloatBtn(which);
+        }
       });
     }
     if (data.lines.length) {
-      // El ts de filtro ("since") solo puede ser un timestamp real: si la última
-      // línea es un traceback sin timestamp (p.ej. "telegram.error.NetworkError"),
-      // slice(0,19) corrompe el since y el backend regresa vacío, congelando la
-      // vista. Buscar el último timestamp válido hacia atrás en el batch.
       let lastTs = null;
       for (let i = data.lines.length - 1; i >= 0; i--) {
         const t = data.lines[i].slice(0, 19);
@@ -2772,41 +2801,59 @@ async function _reloadBotLog(which) {
         st.boundary = new Set(data.lines.filter(ln => ln.slice(0, 19) === lastTs));
       }
     }
+    if (which === _logsMode) {
+      $('#logsCount').textContent = `${v.children.length} líneas${st.autoScroll ? '' : ' · 🔒 scroll bloqueado'}`;
+    }
   } catch (e) {
     if (!st.ts) v.textContent = humanizeApiError(e);
   }
 }
-function _startBotLogsPolling() {
-  _stopBotLogsPolling();
-  _attachLogsClickDelegate('#logsBotMainView');
-  _attachLogsClickDelegate('#logsBotMockView');
-  ['main', 'mock'].forEach(which => {
-    const st = _botLogsState[which];
-    if (st.paused) return;
-    _reloadBotLog(which);
-    st.timer = setInterval(() => _reloadBotLog(which), 4000);
+
+function _attachBotScrollDetect(which) {
+  const cfg = _LOGS_CONTAINERS[which];
+  const st = _botLogsState[which];
+  if (!cfg || !st) return;
+  const v = $(cfg.view);
+  if (!v || v.dataset.scrollBound) return;
+  v.dataset.scrollBound = '1';
+  v.addEventListener('scroll', () => {
+    const atBottom = (v.scrollHeight - v.scrollTop - v.clientHeight) < 30;
+    st.autoScroll = atBottom;
+    if (atBottom) { st.pendingHidden = 0; _updateBotFloatBtn(which); }
   });
 }
-function _stopBotLogsPolling() {
-  ['main', 'mock'].forEach(which => {
-    const st = _botLogsState[which];
-    if (st.timer) { clearInterval(st.timer); st.timer = null; }
-  });
+
+function reloadCurrentLog() {
+  if (_logsMode === 'dashboard') {
+    reloadLogs();
+  } else if (_botLogsState[_logsMode]) {
+    _reloadBotLog(_logsMode);
+  }
 }
 
 function startLogsPolling() {
   stopLogsPolling();
   if (state.section !== 'logs' || _logsPaused) return;
-  if (_logsMode === 'telegram') { _startBotLogsPolling(); return; }
-  _attachLogsScrollDetect('#logsView');
-  _attachLogsClickDelegate('#logsView');
-  $('#logsView')?.classList.toggle('hide-refresh', _logsHideRefresh);
-  reloadLogs();
-  _logsTimer = setInterval(reloadLogs, 4000);
+  
+  const cfg = _LOGS_CONTAINERS[_logsMode];
+  if (cfg) {
+    const v = $(cfg.view);
+    if (v) {
+      v.classList.toggle('hide-refresh', _logsHideRefresh);
+      _attachLogsClickDelegate(cfg.view);
+      if (_logsMode === 'dashboard') {
+        _attachLogsScrollDetect(cfg.view);
+      } else {
+        _attachBotScrollDetect(_logsMode);
+      }
+    }
+  }
+  
+  reloadCurrentLog();
+  _logsTimer = setInterval(reloadCurrentLog, 4000);
 }
 function stopLogsPolling() {
   if (_logsTimer) { clearInterval(_logsTimer); _logsTimer = null; }
-  _stopBotLogsPolling();
 }
 
 // ─── Health view ───
@@ -3017,10 +3064,14 @@ $('#btnLogsPause')?.addEventListener('click', () => {
   $('#btnLogsPause').textContent = _logsPaused ? '▶ Reanudar' : '⏸ Pausar';
   if (_logsPaused) stopLogsPolling(); else startLogsPolling();
 });
-$('#btnLogsClear')?.addEventListener('click', () => { $('#logsView').textContent = ''; });
+$('#btnLogsClear')?.addEventListener('click', () => {
+  const cfg = _LOGS_CONTAINERS[_logsMode];
+  if (cfg) { const v = $(cfg.view); if (v) v.textContent = ''; }
+});
 $('#btnBinRefresh')?.addEventListener('click', reloadBinStats);
 $('#btnLogsCopy')?.addEventListener('click', async () => {
-  const txt = $('#logsView').textContent || '';
+  const cfg = _LOGS_CONTAINERS[_logsMode];
+  const txt = (cfg ? $(cfg.view)?.textContent : '') || '';
   if (!txt) { toast('Sin logs para copiar', 'error'); return; }
   try {
     await navigator.clipboard.writeText(txt);
@@ -3028,11 +3079,19 @@ $('#btnLogsCopy')?.addEventListener('click', async () => {
   } catch (e) { toast(humanizeApiError(e), 'error'); }
 });
 $('#btnLogsScrollEnd')?.addEventListener('click', () => {
-  const v = $('#logsView');
+  const cfg = _LOGS_CONTAINERS[_logsMode];
+  if (!cfg) return;
+  const v = $(cfg.view);
   if (!v) return;
-  _logsAutoScroll = true;
-  _logsPendingHidden = 0;
-  _updateLogsFloatBtn();
+  if (_logsMode === 'dashboard') {
+    _logsAutoScroll = true;
+    _logsPendingHidden = 0;
+    _updateLogsFloatBtn();
+  } else if (_botLogsState[_logsMode]) {
+    _botLogsState[_logsMode].autoScroll = true;
+    _botLogsState[_logsMode].pendingHidden = 0;
+    _updateBotFloatBtn(_logsMode);
+  }
   v.scrollTop = v.scrollHeight;
 });
 $('#logsFloatBottom')?.addEventListener('click', () => {
@@ -3043,41 +3102,64 @@ $('#logsFloatBottom')?.addEventListener('click', () => {
   _updateLogsFloatBtn();
   v.scrollTop = v.scrollHeight;
 });
+$('#logsBotMockFloatBottom')?.addEventListener('click', () => {
+  const v = $('#logsBotMockView');
+  if (!v) return;
+  if (_botLogsState.telegram) { _botLogsState.telegram.autoScroll = true; _botLogsState.telegram.pendingHidden = 0; _updateBotFloatBtn('telegram'); }
+  v.scrollTop = v.scrollHeight;
+});
+$('#logsBotLegacyFloatBottom')?.addEventListener('click', () => {
+  const v = $('#logsBotLegacyView');
+  if (!v) return;
+  if (_botLogsState.legacy) { _botLogsState.legacy.autoScroll = true; _botLogsState.legacy.pendingHidden = 0; _updateBotFloatBtn('legacy'); }
+  v.scrollTop = v.scrollHeight;
+});
+$('#logsRuthopiaFloatBottom')?.addEventListener('click', () => {
+  const v = $('#logsRuthopiaView');
+  if (!v) return;
+  if (_botLogsState.ruthopia) { _botLogsState.ruthopia.autoScroll = true; _botLogsState.ruthopia.pendingHidden = 0; _updateBotFloatBtn('ruthopia'); }
+  v.scrollTop = v.scrollHeight;
+});
 $('#btnLogsHideRefresh')?.addEventListener('click', () => {
   _logsHideRefresh = !_logsHideRefresh;
   localStorage.setItem('bmx_logs_hide_refresh', _logsHideRefresh ? '1' : '0');
   $('#btnLogsHideRefresh').classList.toggle('on', _logsHideRefresh);
   $('#btnLogsHideRefresh').setAttribute('aria-pressed', String(_logsHideRefresh));
-  $('#logsView')?.classList.toggle('hide-refresh', _logsHideRefresh);
+  Object.values(_LOGS_CONTAINERS).forEach(cfg => {
+    $(cfg.view)?.classList.toggle('hide-refresh', _logsHideRefresh);
+  });
 });
-// Modo: Dashboard | Bots Telegram (dentro de #logsMain)
+// Modo: Dashboard | Bot Telegram | Bot Legacy | Ruthopia (dentro de #logsMain)
 $('.logs-mode-seg')?.querySelectorAll('button').forEach(btn => {
   btn.addEventListener('click', () => {
     $('.logs-mode-seg').querySelectorAll('button').forEach(b => b.classList.remove('on'));
     btn.classList.add('on');
     _logsMode = btn.dataset.v;
+    
+    // Alternar visibilidad de contenedores
     $('#logsDashboardWrap').style.display = _logsMode === 'dashboard' ? '' : 'none';
-    $('#logsLevelSeg').style.display = _logsMode === 'dashboard' ? '' : 'none';
-    $('#btnLogsHideRefresh').style.display = _logsMode === 'dashboard' ? '' : 'none';
-    $('#logsBotsWrap').style.display = _logsMode === 'telegram' ? 'grid' : 'none';
+    $('#logsTelegramWrap').style.display = _logsMode === 'telegram' ? '' : 'none';
+    $('#logsLegacyWrap').style.display = _logsMode === 'legacy' ? '' : 'none';
+    $('#logsRuthopiaWrap').style.display = _logsMode === 'ruthopia' ? '' : 'none';
     startLogsPolling();
   });
 });
-function _toggleBotLogPause(which, btnSel) {
-  const st = _botLogsState[which];
-  st.paused = !st.paused;
-  $(btnSel).textContent = st.paused ? '▶' : '⏸';
-  if (st.paused) {
-    clearInterval(st.timer); st.timer = null;
-  } else {
-    _reloadBotLog(which);
-    st.timer = setInterval(() => _reloadBotLog(which), 4000);
-  }
-}
-$('#btnBotMainPause')?.addEventListener('click', () => _toggleBotLogPause('main', '#btnBotMainPause'));
-$('#btnBotMockPause')?.addEventListener('click', () => _toggleBotLogPause('mock', '#btnBotMockPause'));
-$('#btnBotMainClear')?.addEventListener('click', () => { $('#logsBotMainView').textContent = ''; });
-$('#btnBotMockClear')?.addEventListener('click', () => { $('#logsBotMockView').textContent = ''; });
+
+// Filtro por nivel (ALL / ERROR / WARNING)
+$('#logsLevelSeg')?.querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $('#logsLevelSeg').querySelectorAll('button').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    _logsLevel = btn.dataset.v || 'ALL';
+    _logsLastTs = null;
+    _logsSeenAtBoundary.clear();
+    Object.keys(_botLogsState).forEach(k => {
+      _botLogsState[k].ts = null;
+      _botLogsState[k].boundary.clear();
+    });
+    reloadCurrentLog();
+  });
+});
 
 // Mobile drawer
 $('#btnMobileMenu')?.addEventListener('click', () => {
