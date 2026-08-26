@@ -625,7 +625,13 @@
         ? ` <span class="pat-wd-balance-note">· ${g(s2.tooltip)}</span>` : '';
       balEl.innerHTML = s2.render ? `Saldo Real: <b class="pat-wd-balance-v">${money(d.balance_real || 0)}</b>${note}` : '';
     }
-    if (statusEl) statusEl.innerHTML = (s2.render && st) ? _withdrawStatusHtml(st) : '';
+    if (statusEl) {
+      if (s2.render && st && st.transactionId && (st.status === 'pending' || st.status === 'successful' || st.status === 'completed' || st.status === 'failed') && st.status !== 'idle') {
+        statusEl.innerHTML = _withdrawStatusHtml(st);
+      } else {
+        statusEl.innerHTML = '';
+      }
+    }
   }
 
   function _stopWithdrawPoll(accId) {

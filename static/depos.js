@@ -1041,6 +1041,8 @@
     } else if (elC.parentNode !== slot) {
       slot.appendChild(elC);
     }
+    const wdSt = elC.querySelector('#wdStatus');
+    if (wdSt) wdSt.innerHTML = '';
     // El botón "Depositar" ahora vive DENTRO del panel (Robert 2026-07-28: junto al
     // monto, no en la esquina lejana) — data-acc-id se refresca en cada mount porque
     // el botón es parte de la plantilla estática (un solo clone, nunca se re-genera).
