@@ -115,6 +115,7 @@ prewarm.py (router)
 | `conftest.py` | 213 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
 | `deposits.py` | 3012 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `inspect_1632.py` | 21 | `—` | _[completar]_ |
 | `jwt_keeper.py` | 396 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 458 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 918 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -292,6 +293,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d5a7793` | fix(portal): agregar idle a estados terminales de retiro y cache buster v20260826a |
 | `e9dc6be` | fix(withdrawals): eliminar bucle infinito de retiro en proceso, auto-reconciliar retiros completados y liberar locks huerfanos |
 | `6c082ba` | feat(bet): pasaporte live ruthopia db, tiro directo a casadas para superadmin y comandos betf/fast |
 | `3d8d96c` | fix(bet-limits): strictly unlimited cards for superadmin in /bet flow only |
@@ -303,7 +305,6 @@ prewarm.py (router)
 | `7b8861a` | fix(checker): eliminar bypass de tolerancia en error de gate para proteger cuentas live |
 | `58828e1` | feat(orchestrator): account_details en LoginResult y preservacion de tarjeta en cuentas con saldo |
 | `458ba08` | fix(auto_deposit): regla estricta 1 tarjeta = 1 cuenta permanente y lectura de deposit_attempts approved para married cards |
-| `b741504` | fix(auto_deposit): jubilacion incondicional de tarjeta ante rechazo bancario y boton global de paro de emergencia |
 <!-- GEN:end:recientes -->
 
 ---

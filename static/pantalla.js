@@ -495,7 +495,7 @@
   // pinta algo de inmediato al reabrir La Pantalla, antes de que el poll fresco
   // confirme el estado real (detecta gatewayMismatch si gateway==1).
   function _wdStatusFromRow(row) {
-    if (!row) return null;
+    if (!row || !row.transaction_id) return null;
     let status;
     if (row.status_api === 6) status = 'completed';
     else if (row.status_api != null && row.status_api < 0) status = 'failed';
@@ -520,9 +520,10 @@
   }
 
   function _withdrawStatusHtml(st) {
-    if (!st || st.status === 'idle') return '';
+    if (!st || st.status === 'idle' || !st.transactionId) return '';
     const g = window.esc || (s => s);
     const money = window.fmtMoney || (v => `$${(v || 0).toFixed(2)}`);
+    const amtHtml = st.amount ? `<span class="pat-wd-amt">${money(st.amount)}</span>` : '';
     const ref = st.reference ? g(st.reference) : '';
     const isCard = st.gateway === 1 || (st.alerts && st.alerts.gatewayMismatch);
     let line;
@@ -536,7 +537,7 @@
       }
     } else if (st.status === 'failed') {
       line = `<span class="pat-wd-line pat-wd-fail"><i class="ph-bold ph-x-circle"></i> Retiro fallido / rechazado${ref ? ` (ref ${ref})` : ''}.</span>`;
-    } else {
+    } else if (st.status === 'pending') {
       if (isCard) {
         line = `<span class="pat-wd-line"><span class="dep-spinner"></span> Reembolso a Tarjeta en proceso${ref ? ` (ref ${ref})` : ''}…</span>`;
       } else {
@@ -544,6 +545,8 @@
         const digs = st.accountDigits ? ` (···${g(st.accountDigits)})` : '';
         line = `<span class="pat-wd-line"><span class="dep-spinner"></span> Retiro SPEI en proceso${dest}${digs}${ref ? ` (ref ${ref})` : ''}…</span>`;
       }
+    } else {
+      return '';
     }
     const alerts = st.alerts || {};
     let alertHtml = '';
@@ -553,7 +556,7 @@
     if (alerts.digitsMismatch) {
       alertHtml += `<div class="pat-wd-alert">⚠️ El retiro fue a dígitos distintos a la cuenta esperada (${g(st.accountDigits || '?')}).</div>`;
     }
-    return `<div class="pat-wd-row"><span class="pat-wd-amt">${money(st.amount)}</span>${line}</div>${alertHtml}`;
+    return `<div class="pat-wd-row">${amtHtml}${line}</div>${alertHtml}`;
   }
 
   // Botón de retiro dedicado en .pat-actions (derecha de Depositar). Dispara directo
