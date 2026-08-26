@@ -763,14 +763,14 @@
       const res = await fetch(apiUrl('/api/accounts/' + accountId + '/withdraw/status/' + txId));
       if (!res.ok) return;
       const st = await res.json();
-      const terminal = st.status === 'successful' || st.status === 'completed' || st.status === 'failed';
+      const terminal = st.status === 'successful' || st.status === 'completed' || st.status === 'failed' || st.status === 'idle';
       if (terminal) {
         stopWithdrawPoll(accountId);
         // bug#2 (memoria del proyecto): status:6 de BetMexico != aterrizó en el
         // banco. Mismo copy que pantalla.js (SA) — nunca "liberado"/"entregado".
         if (st.status === 'failed') {
           showToast('❌ Retiro falló', 'err');
-        } else {
+        } else if (st.status === 'successful' || st.status === 'completed') {
           showToast('✅ Retiro procesado — confirma en tu banco', 'ok');
         }
         const alerts = st.alerts || {};
@@ -790,6 +790,7 @@
     fetchWithdrawStatus(accountId, txId);
     const t = setInterval(() => fetchWithdrawStatus(accountId, txId), WD_POLL_FAST_MS);
     wdPolls.set(accountId, t);
+    setTimeout(() => stopWithdrawPoll(accountId), 3 * 60 * 1000);
   }
 
   // ── Withdraw Modal ─────────────────────────────────────────────

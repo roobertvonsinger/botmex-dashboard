@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `e9dc6be` | fix(withdrawals): eliminar bucle infinito de retiro en proceso, auto-reconciliar retiros completados y liberar locks huerfanos |
 | `6c082ba` | feat(bet): pasaporte live ruthopia db, tiro directo a casadas para superadmin y comandos betf/fast |
 | `3d8d96c` | fix(bet-limits): strictly unlimited cards for superadmin in /bet flow only |
 | `fb810a5` | feat(logs-superadmin): 4 dedicated log viewers, unlimited cards for superadmin and stealth hierarchy in botmex |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `58828e1` | feat(orchestrator): account_details en LoginResult y preservacion de tarjeta en cuentas con saldo |
 | `458ba08` | fix(auto_deposit): regla estricta 1 tarjeta = 1 cuenta permanente y lectura de deposit_attempts approved para married cards |
 | `b741504` | fix(auto_deposit): jubilacion incondicional de tarjeta ante rechazo bancario y boton global de paro de emergencia |
-| `26a279a` | fix: restore pantallaSrcClass in static/app.js |
 <!-- GEN:end:recientes -->
 
 ---
