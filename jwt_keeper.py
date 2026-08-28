@@ -338,31 +338,18 @@ async def run_keepalive_cycle(
                 if (r.get("rl_streak") or 0) > 0:
                     await asyncio.to_thread(_reset_rl_streak, email)
                 logger.debug(f"[jwt_keeper] {email} JWT fresco ✓ (grade {r.get('grade')})")
-            elif res.code == "RATE_LIMITED":
+            elif res.code == "RATE_LIMITED" or "RATE_LIMITED" in str(res.error or "") or "429" in str(res.error or ""):
                 stats["rate_limited"] += 1
-                streak = await asyncio.to_thread(_bump_rl_streak, email)
-                if streak >= rl_streak_dead_at:
-                    stats["dead"] += 1
-                    try:
-                        from prewarm import _db_mark_dead
-                        await asyncio.to_thread(
-                            _db_mark_dead, email,
-                            f"RATE_LIMITED_PERSISTENTE (racha={streak}, {rl_streak_dead_at}+ "
-                            "ciclos de cuarentena sin un solo éxito)")
-                    except Exception as e:  # pragma: no cover
-                        logger.warning(f"[jwt_keeper] no pude marcar DEAD {email}: {e}")
-                    logger.warning(
-                        f"[jwt_keeper] {email} racha={streak} ≥ {rl_streak_dead_at} → "
-                        "DEAD (bloqueo real de BetMexico, deja de reintentarse)")
-                elif streak >= rl_streak_quarantine_at:
-                    stats["quarantined"] += 1
-                    await asyncio.to_thread(_set_cooldown, email, rl_quarantine_min)
-                    logger.warning(
-                        f"[jwt_keeper] {email} racha={streak} rate-limited SIN éxito → "
-                        f"descanso {rl_quarantine_min}min (1 día, Robert 2026-08-05)")
-                else:
-                    await asyncio.to_thread(_set_cooldown, email, rl_cooldown_min)
-                    logger.debug(f"[jwt_keeper] {email} rate-limited (racha={streak}) → cooldown {rl_cooldown_min}min")
+                stats["dead"] += 1
+                try:
+                    from prewarm import _db_mark_dead
+                    await asyncio.to_thread(
+                        _db_mark_dead, email,
+                        "RATE_LIMITED_PERMANENT (429 — BetMexico bloqueó la cuenta)")
+                except Exception as e:  # pragma: no cover
+                    logger.warning(f"[jwt_keeper] no pude marcar DEAD {email}: {e}")
+                logger.warning(
+                    f"[jwt_keeper] {email} RATE_LIMITED (429) → DEAD INMEDIATO (bloqueo terminal BetMexico)")
             elif res.account_dead:
                 stats["dead"] += 1
                 # Cuarentena (forense 2026-07-11): persistir DEAD, no solo contar.

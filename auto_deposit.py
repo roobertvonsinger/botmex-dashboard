@@ -266,8 +266,14 @@ def select_accounts_for_auto(
         if r.get("dead_reason") or r.get("dead_at"):
             continue
 
-        # 0c. Status LIVE estricto
-        if (r.get("status") or "").upper() != "LIVE":
+        # 0c. Status LIVE estricto (excluye DEAD, BAN, RATE_LIMITED)
+        st_acc = (r.get("status") or "").upper()
+        if st_acc != "LIVE" or st_acc in ("DEAD", "BAN", "RATE_LIMITED", "RATE_LIMITED_PERMANENT"):
+            continue
+
+        # 0c2. Excluir cuentas con bloqueo RATE_LIMITED o DEAD en meta_map
+        meta_acc = (meta_map or {}).get(email) or {}
+        if meta_acc.get("is_dead_blocked") or meta_acc.get("is_rate_limited"):
             continue
 
         # 0d. Cuenta degradada (Grade D) -> jamás usar para auto_deposit / match
@@ -331,8 +337,8 @@ def select_accounts_for_auto(
         if meta.get("has_spei_48h") or meta.get("has_withdrawal_48h") or meta.get("has_recent_activity_48h"):
             continue
 
-        # 5. Errores de validación o DEAD
-        if meta.get("is_validation_blocked") or meta.get("is_dead_blocked"):
+        # 5. Errores de validación, Rate Limit o DEAD
+        if meta.get("is_validation_blocked") or meta.get("is_dead_blocked") or meta.get("is_rate_limited"):
             continue
 
         win = (window_map or {}).get(email) or {}
@@ -572,7 +578,7 @@ def plan_auto_mission(
                 (email,),
             ).fetchone()["n"]
 
-            # 5. IsUserInValidationProcess o DEAD reciente
+            # 5. IsUserInValidationProcess, RATE_LIMITED o DEAD histórico/reciente
             val_blocked = con.execute(
                 "SELECT COUNT(*) AS n FROM deposit_attempts "
                 "WHERE account_email=? AND rejection_reason LIKE '%IsUserInValidationProcess%'",
@@ -581,7 +587,25 @@ def plan_auto_mission(
 
             dead_blocked = con.execute(
                 "SELECT COUNT(*) AS n FROM deposit_attempts "
-                "WHERE account_email=? AND (rejection_reason LIKE '%DEAD%' OR rejection_reason LIKE '%UNAUTHORIZED%')",
+                "WHERE account_email=? AND ("
+                "  rejection_reason LIKE '%DEAD%' "
+                "  OR rejection_reason LIKE '%UNAUTHORIZED%' "
+                "  OR rejection_reason LIKE '%RATE%' "
+                "  OR rejection_reason LIKE '%429%' "
+                "  OR UPPER(status) LIKE '%RATE%' "
+                "  OR UPPER(status) IN ('ACCOUNT_DEAD', 'BAN', 'RATE_LIMITED', 'RATE_LIMITED_PERMANENT')"
+                ")",
+                (email,),
+            ).fetchone()["n"]
+
+            rate_limit_blocked = con.execute(
+                "SELECT COUNT(*) AS n FROM deposit_attempts "
+                "WHERE account_email=? AND ("
+                "  UPPER(status) LIKE '%RATE%' "
+                "  OR rejection_reason LIKE '%429%' "
+                "  OR rejection_reason LIKE '%RATE%' "
+                "  OR UPPER(status) IN ('ACCOUNT_DEAD', 'RATE_LIMITED', 'RATE_LIMITED_PERMANENT')"
+                ")",
                 (email,),
             ).fetchone()["n"]
 
@@ -658,6 +682,7 @@ def plan_auto_mission(
                 "total_fails": int(tot_fails or 0),
                 "is_validation_blocked": bool(val_blocked),
                 "is_dead_blocked": bool(dead_blocked),
+                "is_rate_limited": bool(rate_limit_blocked),
                 "approved_bin_pipes": approved_bin_pipes,
                 "mins_since_last_attempt": mins_since,
                 "cards_count": int(cards_n or 0),
@@ -714,7 +739,11 @@ def plan_auto_mission(
                 ).fetchone()
                 if row_acc:
                     st = (row_acc["status"] or "").upper()
-                    is_dead = bool(row_acc["dead_reason"] or row_acc["dead_at"] or st == "DEAD")
+                    has_rl = con.execute(
+                        "SELECT COUNT(*) as n FROM deposit_attempts WHERE account_email=? AND (UPPER(status) LIKE '%RATE%' OR rejection_reason LIKE '%429%' OR rejection_reason LIKE '%RATE%' OR UPPER(status) IN ('ACCOUNT_DEAD', 'BAN', 'RATE_LIMITED', 'RATE_LIMITED_PERMANENT'))",
+                        (m_email,)
+                    ).fetchone()["n"]
+                    is_dead = bool(row_acc["dead_reason"] or row_acc["dead_at"] or st in ("DEAD", "BAN", "RATE_LIMITED", "RATE_LIMITED_PERMANENT") or has_rl > 0)
                     if not is_dead:
                         accounts_out.append({
                             "id": row_acc["id"],
@@ -911,6 +940,9 @@ def _is_account_dead(acct: Optional[Dict[str, Any]]) -> bool:
     if st in ("DEAD", "BAN", "RATE_LIMITED", "RATE_LIMITED_PERMANENT"):
         return True
     if acct.get("dead_reason") or acct.get("dead_at"):
+        return True
+    dr = str(acct.get("dead_reason") or "").upper()
+    if "RATE_LIMIT" in dr or "429" in dr:
         return True
     return False
 

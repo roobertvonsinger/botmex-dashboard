@@ -222,20 +222,20 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_parse_card_pipe` | def | L134–L167 |
 | `_normalize_pipe_to_3part` | def | L170–L172 |
 | `_get_married_card_owners` | def | L175–L209 |
-| `select_accounts_for_auto` | def | L218–L434 |
-| `_max_accounts_for_cards` | def | L443–L451 |
-| `plan_auto_mission` | def | L454–L788 |
-| `_fake_progress_pct` | def | L829–L860 |
-| `_iso` | def | L864–L865 |
-| `_m_load` | def | L868–L876 |
-| `_m_status` | def | L879–L881 |
-| `_m_update` | def | L884–L894 |
-| `_fetch_account` | def | L897–L904 |
-| `_is_account_dead` | def | L907–L915 |
-| `_unlock` | def | L918–L927 |
-| `_broadcast_mission` | def | L930–L959 |
-| `_stop_pool` | def | L962–L969 |
-| `run_auto_mission` | def | L973–L1912 |
+| `select_accounts_for_auto` | def | L218–L440 |
+| `_max_accounts_for_cards` | def | L449–L457 |
+| `plan_auto_mission` | def | L460–L817 |
+| `_fake_progress_pct` | def | L858–L889 |
+| `_iso` | def | L893–L894 |
+| `_m_load` | def | L897–L905 |
+| `_m_status` | def | L908–L910 |
+| `_m_update` | def | L913–L923 |
+| `_fetch_account` | def | L926–L933 |
+| `_is_account_dead` | def | L936–L947 |
+| `_unlock` | def | L950–L959 |
+| `_broadcast_mission` | def | L962–L991 |
+| `_stop_pool` | def | L994–L1001 |
+| `run_auto_mission` | def | L1005–L1944 |
 
 ### `autoexclusion.py`
 
@@ -505,8 +505,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_set_cooldown` | def | L235–L242 |
 | `_bump_rl_streak` | def | L245–L259 |
 | `_reset_rl_streak` | def | L262–L269 |
-| `run_keepalive_cycle` | def | L273–L386 |
-| `run_keepalive_cycle_from_env` | def | L389–L396 |
+| `run_keepalive_cycle` | def | L273–L373 |
+| `run_keepalive_cycle_from_env` | def | L376–L383 |
 
 ### `login_orchestrator.py`
 
