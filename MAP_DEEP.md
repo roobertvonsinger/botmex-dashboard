@@ -309,8 +309,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `TwoCaptchaSolverFast` | class | L197–L286 |
 | `create_solver` | def | L289–L295 |
 | `CapMonsterSolverFast` | class | L302–L370 |
-| `BetmexicoApiChecker` | class | L373–L842 |
-| `CaptchaTokenPool` | class | L848–L1041 |
+| `BetmexicoApiChecker` | class | L373–L891 |
+| `CaptchaTokenPool` | class | L897–L1090 |
 
 ### `betmexico_login_service.py`
 
@@ -534,19 +534,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_db_account_prewarms_today` | def | L130–L145 |
 | `_account_minutes_since_check` | def | L148–L157 |
 | `_db_get_recent_log` | def | L160–L175 |
-| `_fetch_looks_empty` | def | L178–L205 |
-| `_db_upsert_balance` | def | L208–L275 |
-| `_db_save_txns_and_recalc` | def | L278–L331 |
-| `_db_update_last_checked` | def | L334–L346 |
-| `_db_invalidate_jwt` | def | L349–L360 |
-| `_db_mark_dead` | def | L363–L386 |
-| `_is_balance_fresh` | def | L389–L397 |
-| `_capmonster_balance` | def | L402–L418 |
-| `_run_prewarm` | def | L423–L598 |
-| `prewarm_select` | def | L604–L688 |
-| `prewarm_cancel` | def | L692–L702 |
-| `prewarm_status` | def | L706–L721 |
-| `prewarm_refresh_stream` | def | L727–L918 |
+| `_fetch_looks_empty` | def | L178–L195 |
+| `_db_upsert_balance` | def | L198–L265 |
+| `_db_save_txns_and_recalc` | def | L268–L321 |
+| `_db_update_last_checked` | def | L324–L336 |
+| `_db_invalidate_jwt` | def | L339–L350 |
+| `_db_mark_dead` | def | L353–L376 |
+| `_is_balance_fresh` | def | L379–L387 |
+| `_capmonster_balance` | def | L392–L408 |
+| `_run_prewarm` | def | L413–L603 |
+| `prewarm_select` | def | L609–L693 |
+| `prewarm_cancel` | def | L697–L707 |
+| `prewarm_status` | def | L711–L726 |
+| `prewarm_refresh_stream` | def | L732–L923 |
 
 ### `renapo_validator.py`
 

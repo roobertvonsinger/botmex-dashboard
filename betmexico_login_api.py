@@ -602,10 +602,14 @@ class BetmexicoApiChecker:
             "Accept": "application/json",
         }
 
-        # Extraer userId del JWT para construir URL correcta
+        # Extraer userId y nombre del JWT para construir URL y fallback
         jwt_payload = _decode_jwt_payload(jwt_token)
         user_id_jwt = None
-        for claim in ("nameid", "sub", "userId", "UserId", "unique_name"):
+        for claim in (
+            "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/sid",
+            "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier",
+            "sid", "nameid", "sub", "userId", "UserId", "unique_name",
+        ):
             val = jwt_payload.get(claim)
             if val and str(val).isdigit():
                 user_id_jwt = str(val)
@@ -627,10 +631,16 @@ class BetmexicoApiChecker:
             "address": "N/A",
             "verified": False,
             "transactions": {"total_rows": 0, "pages": 0, "items": [], "fetched": False},
+            "_auth_ok": False,
+            "jwt_expired": False,
         }
 
         # Intentar obtener nombre del JWT como primera opción de fallback
-        jwt_name = jwt_payload.get("unique_name") or jwt_payload.get("name")
+        jwt_name = (
+            jwt_payload.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name")
+            or jwt_payload.get("unique_name")
+            or jwt_payload.get("name")
+        )
         if jwt_name and "@" not in jwt_name:
             details["fullname"] = jwt_name
 
@@ -641,7 +651,13 @@ class BetmexicoApiChecker:
                 resp = await client.get(BETMEXICO_URLS["wallet"], headers=auth_headers)
                 if resp.status_code == 200:
                     balance_data = resp.json()
+                    if isinstance(balance_data, dict) and balance_data.get("redirectLogin"):
+                        logger.warning("[BALANCE] 401 redirectLogin detectado — JWT caducado")
+                        details["_jwt_expired"] = True
+                        details["jwt_expired"] = True
+                        return
                     # La API retorna un array de objetos con accountType y totalAmount
+                    details["_auth_ok"] = True
                     if isinstance(balance_data, list):
                         for item in balance_data:
                             acc_type = item.get("accountType", "")
@@ -650,9 +666,15 @@ class BetmexicoApiChecker:
                                 details["balance_real"] = float(amount)
                             elif acc_type == "Bonos":
                                 details["balance_bonos"] = float(amount)
-                    else:
+                    elif isinstance(balance_data, dict):
                         details["balance_real"] = float(balance_data.get("Real", 0.0))
                         details["balance_bonos"] = float(balance_data.get("Bonos", 0.0))
+                elif resp.status_code == 401:
+                    logger.warning("[BALANCE] 401 Unauthorized — JWT caducado en servidor")
+                    details["_jwt_expired"] = True
+                    details["jwt_expired"] = True
+                else:
+                    logger.warning(f"[BALANCE] HTTP {resp.status_code}: {resp.text[:120]}")
             except Exception as e:
                 logger.debug(f"[BALANCE] Error: {e}")
 
@@ -661,6 +683,9 @@ class BetmexicoApiChecker:
                 resp = await client.get(BETMEXICO_URLS["deposit"], headers=auth_headers)
                 if resp.status_code == 200:
                     deposit_data = resp.json()
+                    if isinstance(deposit_data, dict) and deposit_data.get("redirectLogin"):
+                        details["_jwt_expired"] = True
+                        return
                     details["last_deposit_amount"] = float(deposit_data.get("amount", 0.0))
                     raw_date = deposit_data.get("date", "")
                     if raw_date:
@@ -670,6 +695,8 @@ class BetmexicoApiChecker:
                             details["last_deposit_date"] = dt_mx.strftime("%d/%m/%Y %H:%M")
                         except Exception:
                             details["last_deposit_date"] = raw_date[:10]
+                elif resp.status_code == 401:
+                    details["_jwt_expired"] = True
             except Exception as e:
                 logger.debug(f"[DEPOSIT] Error: {e}")
 
@@ -677,12 +704,12 @@ class BetmexicoApiChecker:
             """Datos del usuario: nombre, birthdate, dirección."""
             try:
                 resp = await client.get(user_profile_url, headers=auth_headers)
-                # logger.info(f"[USER_DEBUG] status={resp.status_code} body={resp.text[:200]}")
                 if resp.status_code == 200:
                     user_data = resp.json()
+                    if isinstance(user_data, dict) and user_data.get("redirectLogin"):
+                        details["_jwt_expired"] = True
+                        return
                     data_obj = user_data.get("data", {})
-                    # Extraer usando lógica similar a la extensión (content.js)
-                    # content.js: [u.firstName, u.middleName, u.lastName, u.secondLastName].filter(Boolean).join(' ')
                     fname = data_obj.get("firstName") or ""
                     mname = data_obj.get("middleName") or ""
                     lname = data_obj.get("lastName") or ""
@@ -691,12 +718,12 @@ class BetmexicoApiChecker:
                     
                     if fullname:
                         details["fullname"] = fullname
-                    else:
-                        details["fullname"] = data_obj.get("fullname") or data_obj.get("fullName") or "N/A"
+                    elif data_obj.get("fullname") or data_obj.get("fullName"):
+                        details["fullname"] = data_obj.get("fullname") or data_obj.get("fullName")
                     
-                    details["birthdate"] = (data_obj.get("birthDate") or data_obj.get("birthdate") or "N/A").split("T")[0]
+                    if data_obj.get("birthDate") or data_obj.get("birthdate"):
+                        details["birthdate"] = (data_obj.get("birthDate") or data_obj.get("birthdate")).split("T")[0]
                     
-                    # content.js: [addr.streetAddress, addr.city, addr.state, addr.country].filter(Boolean).join(', ')
                     addr_obj = data_obj.get("address") or {}
                     street = addr_obj.get("streetAddress") or ""
                     city = addr_obj.get("city") or ""
@@ -706,11 +733,10 @@ class BetmexicoApiChecker:
                     
                     if address:
                         details["address"] = address
-                    else:
-                        details["address"] = data_obj.get("address") or "N/A"
-                    
-                    # No inventar Phone/CURP si no están en 'data_obj' explícitamente.
-                    # Quedarán como 'N/A' por defecto según 'details' inicial.
+                    elif data_obj.get("address"):
+                        details["address"] = data_obj.get("address")
+                elif resp.status_code == 401:
+                    details["_jwt_expired"] = True
             except Exception as e:
                 logger.error(f"[USER] Error fetching details: {e}")
 
@@ -720,6 +746,9 @@ class BetmexicoApiChecker:
                 resp = await client.get(BETMEXICO_URLS["kyc"], headers=auth_headers)
                 if resp.status_code == 200:
                     docs = resp.json()
+                    if isinstance(docs, dict) and docs.get("redirectLogin"):
+                        details["_jwt_expired"] = True
+                        return
                     if isinstance(docs, list) and len(docs) > 0:
                         all_approved = all(doc.get("isApproved", False) for doc in docs)
                         details["verified"] = all_approved
@@ -730,6 +759,8 @@ class BetmexicoApiChecker:
                     else:
                         details["verified"] = False
                         logger.warning("[KYC] ❌ Sin documentos")
+                elif resp.status_code == 401:
+                    details["_jwt_expired"] = True
                 else:
                     details["verified"] = False
             except Exception as e:
@@ -741,17 +772,22 @@ class BetmexicoApiChecker:
                 resp = await client.get(BETMEXICO_URLS["kyc_validation"], headers=auth_headers)
                 if resp.status_code == 200:
                     data = resp.json()
+                    if isinstance(data, dict) and data.get("redirectLogin"):
+                        details["_jwt_expired"] = True
+                        return
                     if data.get("isSuccess") and data.get("data") is True:
                         details["verified"] = True
                         logger.info("[KYC-V2] ✅ HasFullValidation = true")
                     else:
                         logger.info("[KYC-V2] ❌ HasFullValidation = false")
+                elif resp.status_code == 401:
+                    details["_jwt_expired"] = True
             except Exception as e:
                 logger.debug(f"[KYC-V2] Error: {e}")
 
         async def fetch_transactions(max_pages: int = 2):
             """Historial de transacciones — hasta max_pages (10 items/page)."""
-            txn_data = {"total_rows": 0, "pages": 0, "items": []}
+            txn_data = {"total_rows": 0, "pages": 0, "items": [], "fetched": False}
             try:
                 # Página 1
                 resp = await client.get(
@@ -761,7 +797,11 @@ class BetmexicoApiChecker:
                 )
                 if resp.status_code == 200:
                     body = resp.json()
-                    data_obj = body.get("data", {})
+                    if isinstance(body, dict) and body.get("redirectLogin"):
+                        details["_jwt_expired"] = True
+                        details["jwt_expired"] = True
+                        return
+                    data_obj = body.get("data", {}) if isinstance(body, dict) else {}
                     metadata = data_obj.get("metadata", {})
                     txn_data["total_rows"] = metadata.get("totalRows", 0)
                     txn_data["pages"] = metadata.get("pages", 0)
@@ -793,9 +833,13 @@ class BetmexicoApiChecker:
                                     "gateway": item.get("gateway", 0),
                                 })
 
-                txn_data["fetched"] = True
-                logger.info(f"[TXN] {len(txn_data['items'])} transacciones obtenidas (total: {txn_data['total_rows']})")
-                details["transactions"] = txn_data
+                    txn_data["fetched"] = True
+                    logger.info(f"[TXN] {len(txn_data['items'])} transacciones obtenidas (total: {txn_data['total_rows']})")
+                    details["transactions"] = txn_data
+                elif resp.status_code == 401:
+                    logger.warning("[TXN] 401 Unauthorized — JWT caducado")
+                    details["_jwt_expired"] = True
+                    details["jwt_expired"] = True
             except Exception as e:
                 logger.debug(f"[TXN] Error: {e}")
 
@@ -822,6 +866,11 @@ class BetmexicoApiChecker:
             pass
         except Exception as e:
             logger.error(f"[DETAILS] Error en gather parallel: {e}")
+
+        if details.get("_jwt_expired") or not details.get("_auth_ok"):
+            details["jwt_expired"] = True
+            details["transactions"]["fetched"] = False
+            logger.warning("[DETAILS] ❌ JWT CADUCADO O SIN AUTORIZACIÓN (401) — details marcados como jwt_expired")
 
         logger.info(
             f"[DETAILS] {details['fullname']} | "
