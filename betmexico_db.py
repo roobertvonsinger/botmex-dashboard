@@ -522,6 +522,17 @@ class BetmexicoDB:
                 has_new_scoring = bool(payment_score)
                 grade = payment_score.get("grade", "?") if has_new_scoring else "?"
                 grade_score = payment_score.get("score", 0) if has_new_scoring else 0
+                
+                jwt_token = account_data.get("jwt_token") or details.get("jwt_token")
+                jwt_expires_at = account_data.get("jwt_expires_at") or details.get("jwt_expires_at")
+                if jwt_expires_at is not None:
+                    try:
+                        jwt_expires_at = int(jwt_expires_at)
+                    except (ValueError, TypeError):
+                        jwt_expires_at = None
+                jwt_user_id = account_data.get("jwt_user_id") or details.get("jwt_user_id")
+                if jwt_user_id is not None:
+                    jwt_user_id = str(jwt_user_id)
 
                 now = now_mx()
                 now_str = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -529,19 +540,19 @@ class BetmexicoDB:
 
                 cursor = self.conn.cursor()
                 cursor.execute(
-                    "SELECT id, check_count, balance_total, last_checked_at, stable_balance_count, check_count_today, last_check_date, fullname, birthdate, address, last_deposit_date, last_deposit_amount, grade, grade_score, phone, curp FROM accounts WHERE email = ? AND password = ?",
-                    (email, password),
+                    "SELECT id, email, password, check_count, balance_real, balance_bonos, balance_total, last_checked_at, stable_balance_count, check_count_today, last_check_date, fullname, birthdate, address, last_deposit_date, last_deposit_amount, grade, grade_score, phone, curp FROM accounts WHERE email = ? COLLATE NOCASE",
+                    (email,),
                 )
                 existing = cursor.fetchone()
 
                 if existing:
-                    new_count = existing["check_count"] + 1
+                    new_count = (existing["check_count"] or 0) + 1
                     if existing["last_check_date"] == today_str:
                         new_count_today = (existing["check_count_today"] or 0) + 1
                     else:
                         new_count_today = 1
 
-                    if abs(balance_total - existing["balance_total"]) < 0.01:
+                    if abs(balance_total - (existing["balance_total"] or 0.0)) < 0.01:
                         new_stable_count = (existing["stable_balance_count"] or 0) + 1
                     else:
                         new_stable_count = 1
@@ -558,12 +569,13 @@ class BetmexicoDB:
                     if last_deposit_amount == 0.0 and (existing["last_deposit_amount"] or 0) > 0:
                         last_deposit_amount = existing["last_deposit_amount"]
 
-                    # Proteger balance: si el API devolvió 0 pero ya teníamos saldo real, conservar
-                    _ex_bal = existing["balance_real"] if "balance_real" in existing.keys() else None
-                    if balance_real == 0.0 and (_ex_bal or 0) > 0:
-                        balance_real = float(_ex_bal)
+                    # Proteger balance: si el API devolvió 0 pero ya teníamos saldo real en BD, conservar
+                    ex_bal_real = existing["balance_real"] if "balance_real" in existing.keys() else 0.0
+                    ex_bal_total = existing["balance_total"] if "balance_total" in existing.keys() else 0.0
+                    if balance_total == 0.0 and (ex_bal_total or 0.0) > 0.0:
+                        balance_real = float(ex_bal_real or 0.0)
                         balance_bonos = float(existing["balance_bonos"] if "balance_bonos" in existing.keys() else 0.0 or 0.0)
-                        balance_total = float(existing["balance_total"] if "balance_total" in existing.keys() else 0.0 or 0.0)
+                        balance_total = float(ex_bal_total)
                         logger.debug(f"[DB] Balance 0 ignorado para {email} — conservando ${balance_total:.2f}")
 
                     # Preservar grade existente si este check no trajo transacciones
@@ -573,7 +585,7 @@ class BetmexicoDB:
 
                     # V6 guard: proteger contra API intermitente de betmexico
                     # Si el algoritmo dice VIRGIN_CARD pero la BD ya tiene txns de tarjeta,
-                    # la API falló en traer transacciones → conservar grade existente
+                    # la API falló en traer transacciones → conservar grade real
                     is_virgin_card = payment_score and "VIRGIN_CARD" in (payment_score.get("flags") or [])
                     if is_virgin_card:
                         old_grade = existing["grade"] or "?"
@@ -597,7 +609,10 @@ class BetmexicoDB:
                             kyc_verified = ?, status = 'LIVE',
                             last_checked_at = ?, check_count = ?, checked_by = ?,
                             stable_balance_count = ?, check_count_today = ?,
-                            last_check_date = ?, grade = ?, grade_score = ?, phone = ?, curp = ?
+                            last_check_date = ?, grade = ?, grade_score = ?, phone = ?, curp = ?,
+                            jwt_token = COALESCE(?, jwt_token),
+                            jwt_expires_at = COALESCE(?, jwt_expires_at),
+                            jwt_user_id = COALESCE(?, jwt_user_id)
                         WHERE id = ?
                     """,
                         (
@@ -621,6 +636,9 @@ class BetmexicoDB:
                             grade_score,
                             phone,
                             curp,
+                            jwt_token,
+                            jwt_expires_at,
+                            jwt_user_id,
                             existing["id"],
                         ),
                     )
@@ -633,8 +651,9 @@ class BetmexicoDB:
                             last_deposit_amount, last_deposit_date, kyc_verified,
                             status, first_checked_at, last_checked_at, check_count, 
                             checked_by, stable_balance_count, check_count_today,
-                            last_check_date, grade, grade_score, phone, curp
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'LIVE', ?, ?, 1, ?, 1, 1, ?, ?, ?, ?, ?)
+                            last_check_date, grade, grade_score, phone, curp,
+                            jwt_token, jwt_expires_at, jwt_user_id
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'LIVE', ?, ?, 1, ?, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                         (
                             email,

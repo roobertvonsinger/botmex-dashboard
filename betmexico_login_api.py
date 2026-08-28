@@ -496,7 +496,22 @@ class BetmexicoApiChecker:
                     logger.warning(f"[SUCCESS] LOGIN OK: {email}")
                     jwt = data.get("token")
                     if jwt:
+                        jwt_payload = _decode_jwt_payload(jwt)
+                        exp = jwt_payload.get("exp")
+                        user_id = None
+                        for claim in ("nameid", "sub", "userId", "UserId", "unique_name"):
+                            val = jwt_payload.get(claim)
+                            if val and str(val).isdigit():
+                                user_id = str(val)
+                                break
+                        result["jwt_token"] = jwt
+                        result["jwt_expires_at"] = exp
+                        result["jwt_user_id"] = user_id
+
                         account_details = await self.fetch_account_details_parallel(jwt, fetch_mode=fetch_mode)
+                        account_details["jwt_token"] = jwt
+                        account_details["jwt_expires_at"] = exp
+                        account_details["jwt_user_id"] = user_id
                         result["account_details"] = account_details
                         # User Rule: KYC_PENDING is DEAD
                         # Check if verified is False and there is a pending documentation flag (if detected)
@@ -878,137 +893,107 @@ class CaptchaTokenPool:
 
     # ── Fase 1: Prefetch one-shot ──────────────────────────────────────
 
-    async def prefetch(self, count: int = 10, timeout: float = 120.0):
-        """Pide N tokens en paralelo. No regenera. Para pre-calentamiento."""
-        logger.info(f"[POOL] Prefetch: solicitando {count} tokens...")
-        tasks = [self._solve_one() for _ in range(count)]
-        try:
-            await asyncio.wait_for(
-                asyncio.gather(*tasks, return_exceptions=True),
-                timeout=timeout
-            )
-        except asyncio.TimeoutError:
-            logger.error(f"[POOL] Prefetch timeout ({timeout}s) — {self.pool.qsize()} tokens listos")
-        except (asyncio.CancelledError, GeneratorExit):
-            pass
-        logger.info(
-            f"[POOL] Prefetch completado: {self.pool.qsize()} tokens listos"
-        )
+    async def prefetch(self, count: int = 1, timeout: float = 120.0):
+        """No-op. Modo 100% JIT bajo demanda (cero desperdicio especulativo)."""
+        pass
 
-    # ── Fase 2: Factory continua ───────────────────────────────────────
+    # ── Fase 2: Factory continua (MODO ON-DEMAND JIT) ───────────────────
 
     async def start_factory(self):
-        """Arranca loop continuo que mantiene el pool lleno."""
+        """Modo 100% bajo demanda. Evita loops que resuelven tokens para quemar saldo."""
         self.stopped = False
-        self._factory_task = asyncio.create_task(self._factory_loop())
-        logger.info("[POOL] Factory iniciada")
+        logger.info("[POOL] Modo 100% JIT bajo demanda activo (cero generación especulativa)")
 
-    async def _factory_loop(self):
-        """Loop fire-and-forget: lanza resoluciones sin esperar a que terminen.
-        Revisa cada 2s si necesita lanzar más, sin bloquearse esperando resultados."""
-        _CIRCUIT_THRESHOLD = 10   # fallos consecutivos para abrir el circuit
-        _CIRCUIT_PAUSE    = 60    # segundos de espera antes de reintentar
+    # ── Drenar tokens viejos ───────────────────────────────────────────
 
-        try:
-            while not self.stopped:
-                # ── Circuit breaker ────────────────────────────────────────
-                if self._consecutive_failures >= _CIRCUIT_THRESHOLD:
-                    if not self._circuit_open:
-                        self._circuit_open = True
-                        logger.error(
-                            f"[POOL] 🔴 CIRCUIT OPEN: {self._consecutive_failures} fallos seguidos "
-                            f"— pausando {_CIRCUIT_PAUSE}s (verificar API key / saldo captcha)"
-                        )
-                    await asyncio.sleep(_CIRCUIT_PAUSE)
-                    continue  # Volver a evaluar sin lanzar workers
+    async def drain_stale_tokens(self, max_age: float = 55.0):
+        """Drena tokens viejos del pool."""
+        fresh = []
+        drained = 0
+        while not self.pool.empty():
+            try:
+                item = self.pool.get_nowait()
+                _, _, ts = item
+                if (time.time() - ts) < max_age:
+                    fresh.append(item)
+                else:
+                    drained += 1
+                    self._stats["expired"] += 1
+            except asyncio.QueueEmpty:
+                break
+        for item in fresh:
+            self.pool.put_nowait(item)
+        if drained > 0:
+            logger.info(f"[POOL] Drenados {drained} tokens expirados")
 
-                current = self.pool.qsize()
-                in_flight = self._pending_solves
-                total_available = current + in_flight
+    # ── Obtener token (1:1 JIT On-Demand) ──────────────────────────────
 
-                # Solo producir si hay déficit real (pool + en vuelo < max)
-                if total_available < self.max_pool:
-                    # Producir solo lo necesario
-                    deficit = self.max_pool - total_available
-                    batch = min(deficit, self.factory_workers - in_flight)
-                    batch = max(0, batch)
-                    if batch > 0:
-                        logger.debug(f"[POOL] Factory: pool={current} inflight={in_flight} → lanzando {batch}")
-                        # Fire-and-forget: lanzar sin esperar, trackear para cleanup
-                        for _ in range(batch):
-                            task = asyncio.create_task(self._solve_one())
-                            self._active_tasks.add(task)
-                            task.add_done_callback(self._active_tasks.discard)
-                await asyncio.sleep(2)  # Revisar cada 2s
-        except asyncio.CancelledError:
-            logger.info("[POOL] Factory cancelada")
-        except Exception as e:
-            logger.error(f"[POOL] Error en factory loop: {e}")
-
-    # ── Obtener token ──────────────────────────────────────────────────
-
-    async def get_token(self, timeout: float = 120) -> Optional[tuple]:
+    async def get_token(self, timeout: float = 120.0) -> Optional[tuple]:
         """
         Obtiene un token fresco del pool.
-        Descarta tokens expirados automáticamente.
-        Retorna (token_str, task_id) o None si timeout.
+        Si hay uno válido en cola, lo entrega.
+        Si no, resuelve EXACTAMENTE 1 token bajo demanda en tiempo real.
+        Cero tokens huérfanos que expiren en el vacío.
         """
-        deadline = time.time() + timeout
-        while True:
-            remaining = deadline - time.time()
-            if remaining <= 0:
-                logger.warning("[POOL] Timeout esperando token")
-                return None
+        if self.stopped:
+            return None
 
+        # 1. Revisar si hay un token fresco en el pool (ej. por reintento inmediato)
+        while not self.pool.empty():
             try:
-                token, task_id, ts = await asyncio.wait_for(
-                    self.pool.get(), timeout=min(remaining, 30)
-                )
-            except asyncio.TimeoutError:
-                continue  # Reintentar hasta deadline
+                token, task_id, ts = self.pool.get_nowait()
+                age = time.time() - ts
+                if age < self.TOKEN_MAX_AGE:
+                    logger.info(f"[POOL] 🎫 Token fresco entregado del pool (edad: {age:.0f}s)")
+                    return (token, task_id)
+                else:
+                    self._stats["expired"] += 1
+                    self._stats["wasted"] += 1
+                    logger.debug(f"[POOL] Token descartado por edad ({age:.0f}s)")
+            except asyncio.QueueEmpty:
+                break
 
-            age = time.time() - ts
-            if age < self.TOKEN_MAX_AGE:
-                logger.info(f"[POOL] 🎫 Token entregado (edad: {age:.0f}s, pool restante: {self.pool.qsize()})")
+        # 2. Resolver exactamente 1 token bajo demanda (JIT)
+        self._stats["requested"] += 1
+        self._pending_solves += 1
+        try:
+            logger.info("[POOL] 🔑 Solicitando 1 resolución de captcha bajo demanda...")
+            result = await asyncio.wait_for(
+                self.solver.get_recaptcha_v2_token(self.website_url, self.website_key),
+                timeout=timeout,
+            )
+            if result and not self.stopped:
+                token, task_id = result
+                self._stats["resolved"] += 1
+                self._consecutive_failures = 0
+                logger.info("[POOL] ✅ 1 Token resuelto y entregado bajo demanda")
                 return (token, task_id)
             else:
-                self._stats["expired"] += 1
-                self._stats["wasted"] += 1
-                logger.warning(f"[POOL] 🗑️ Token EXPIRADO descartado (edad: {age:.0f}s)")
-                # Seguir buscando uno fresco
+                self._stats["failed"] += 1
+                self._consecutive_failures += 1
+                return None
+        except asyncio.TimeoutError:
+            self._stats["failed"] += 1
+            self._consecutive_failures += 1
+            logger.warning(f"[POOL] Timeout ({timeout}s) resolviendo captcha bajo demanda")
+            return None
+        except asyncio.CancelledError:
+            return None
+        except Exception as e:
+            self._stats["failed"] += 1
+            self._consecutive_failures += 1
+            logger.error(f"[POOL] Error resolviendo captcha: {e}")
+            return None
+        finally:
+            self._pending_solves = max(0, self._pending_solves - 1)
 
     # ── Resolver un captcha ────────────────────────────────────────────
 
     async def _solve_one(self):
-        """Resuelve 1 captcha y lo mete al pool. Sin auto-retry."""
-        if self.stopped:
-            return
-        self._stats["requested"] += 1
-        self._pending_solves += 1
-        try:
-            result = await self.solver.get_recaptcha_v2_token(
-                self.website_url, self.website_key
-            )
-            if result and not self.stopped:
-                token, task_id = result
-                await self.pool.put((token, task_id, time.time()))
-                self._stats["resolved"] += 1
-                if self._circuit_open:
-                    logger.info("[POOL] ✅ Circuit CERRADO — captcha volvió a resolver correctamente")
-                    self._circuit_open = False
-                self._consecutive_failures = 0
-                logger.info(f"[POOL] ✅ Token resuelto. Pool: {self.pool.qsize()}")
-            elif not result:
-                self._stats["failed"] += 1
-                self._consecutive_failures += 1
-                logger.warning(f"[POOL] Worker falló ({self._consecutive_failures} seguidos), factory detectará déficit")
-        except asyncio.CancelledError:
-            pass
-        except Exception as e:
-            self._stats["failed"] += 1
-            logger.error(f"[POOL] Error resolviendo captcha: {e}")
-        finally:
-            self._pending_solves = max(0, self._pending_solves - 1)
+        """Compatibilidad para callers que llamen a _solve_one directamente."""
+        res = await self.get_token()
+        if res:
+            await self.pool.put((res[0], res[1], time.time()))
 
     # ── Control ────────────────────────────────────────────────────────
 

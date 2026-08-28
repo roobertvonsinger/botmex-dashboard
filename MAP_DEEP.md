@@ -266,7 +266,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `BetmexicoDB` | class | L29–L2924 |
+| `BetmexicoDB` | class | L29–L2943 |
 
 ### `betmexico_deposit.py`
 
@@ -309,8 +309,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `TwoCaptchaSolverFast` | class | L197–L286 |
 | `create_solver` | def | L289–L295 |
 | `CapMonsterSolverFast` | class | L302–L370 |
-| `BetmexicoApiChecker` | class | L373–L827 |
-| `CaptchaTokenPool` | class | L833–L1056 |
+| `BetmexicoApiChecker` | class | L373–L842 |
+| `CaptchaTokenPool` | class | L848–L1041 |
 
 ### `betmexico_login_service.py`
 

@@ -103,9 +103,9 @@ prewarm.py (router)
 | `auto_deposit.py` | 1961 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `betmexico_config.py` | 185 | `betmexico` | _[completar]_ |
-| `betmexico_db.py` | 2927 | `—` | _[completar]_ |
+| `betmexico_db.py` | 2946 | `—` | _[completar]_ |
 | `betmexico_deposit.py` | 958 | `—` | _[completar]_ |
-| `betmexico_login_api.py` | 1056 | `httpx` | _[completar]_ |
+| `betmexico_login_api.py` | 1041 | `httpx` | _[completar]_ |
 | `betmexico_login_service.py` | 136 | `betmexico.login_service` | _[completar]_ |
 | `betmexico_payment_analyzer.py` | 492 | `—` | _[completar]_ |
 | `betmexico_utils.py` | 1159 | `—` | _[completar]_ |
@@ -294,6 +294,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `05e226e` | fix(selector): priorizar recencia de login/sesion activa y penalizar cuentas fosiles sin verificar |
 | `a4f4a33` | fix(matchmaker): exclusion estricta de cuentas 429/rate_limited a DEAD y purga de zombies en BD |
 | `6990675` | fix(depos): limpiar #wdStatus en mountCompact y forzar version 20260826c |
 | `56e4707` | fix(pantalla): descartar status de retiro si no tiene transactionId o es idle |
@@ -305,7 +306,6 @@ prewarm.py (router)
 | `9587952` | docs: sync MAP.md |
 | `0e91b0f` | docs: actualizar NEXT-SESSION con reglas de oro 3DS y matrimonio APPROVED |
 | `432684f` | feat(deposits): suavizado 3ds, matrimonio exclusivo approved, alerta 24h y distintivo visual a+ |
-| `38a82a4` | fix(auto_deposit): jubilacion inmediata y matrimonio de tarjeta en 3DS, candado DB multi-origen y limpieza de logs |
 <!-- GEN:end:recientes -->
 
 ---
