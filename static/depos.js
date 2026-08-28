@@ -1043,9 +1043,11 @@
     }
     const wdSt = elC.querySelector('#wdStatus');
     if (wdSt) wdSt.innerHTML = '';
-    // El botón "Depositar" ahora vive DENTRO del panel (Robert 2026-07-28: junto al
-    // monto, no en la esquina lejana) — data-acc-id se refresca en cada mount porque
-    // el botón es parte de la plantilla estática (un solo clone, nunca se re-genera).
+    elC.classList.remove('alert', 'pending');
+    const amtInp = elC.querySelector('#amtInput');
+    if (amtInp) { amtInp.disabled = false; amtInp.removeAttribute('disabled'); }
+    const amtMan = elC.querySelector('#amtManual');
+    if (amtMan) amtMan.classList.remove('dis');
     const fireBtn = elC.querySelector('#dep');
     if (fireBtn) fireBtn.setAttribute('data-acc-id', d.id);
     // Multi-cuenta (Robert 2026-07-28, campo: "solo se habilitan los controles de

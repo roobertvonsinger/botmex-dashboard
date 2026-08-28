@@ -591,14 +591,14 @@ async def resolve_withdrawal_status(
             # y teníamos un status en proceso previo (prev_status_api in (2, 5)),
             # significa que BetMexico completó y liberó el retiro pero bank_tx no lo halló en el historial reciente.
             # No lo dejamos pegado en "idle" para siempre: si ya no está en pendientes, BetMexico lo procesó.
-            if jwt and prev_status_api in (2, 5):
-                out["status"] = "successful"
-                out["phase"] = "executed"
+            if prev_status_api in (2, 5):
+                out["status"] = "completed"
+                out["phase"] = "completed"
                 out["transactionStatus"] = 6
                 out["lastModifiedUtc"] = prev_last_modified or datetime.now(timezone.utc).isoformat()
                 out["gateway"] = prev_gateway or 2
                 out["alerts"]["gatewayMismatch"] = bool(prev_gateway == 1)
-                out["description"] = "Ejecutado por BetMexico — confirma en tu banco"
+                out["description"] = "Ejecutado por BetMexico"
                 _persist_wd_status(
                     tx_id,
                     6,
@@ -607,8 +607,8 @@ async def resolve_withdrawal_status(
                     full=True,
                 )
             else:
-                out["status"] = "idle"
-                out["phase"] = "idle"
+                out["status"] = "completed" if prev_status_api == 6 else ("failed" if prev_status_api and prev_status_api < 0 else "idle")
+                out["phase"] = out["status"]
                 out["transactionStatus"] = prev_status_api
                 out["lastModifiedUtc"] = prev_last_modified
                 out["gateway"] = prev_gateway

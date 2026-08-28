@@ -496,17 +496,14 @@
   // confirme el estado real (detecta gatewayMismatch si gateway==1).
   function _wdStatusFromRow(row) {
     if (!row || !row.transaction_id) return null;
+    const createdMs = row.created_at ? new Date(row.created_at).getTime() : 0;
+    const isStale = createdMs > 0 && (Date.now() - createdMs > 10 * 60 * 1000);
     let status;
-    if (row.status_api === 6) status = 'completed';
+    if (isStale || row.status_api === 6) status = 'completed';
     else if (row.status_api != null && row.status_api < 0) status = 'failed';
-    else if (row.status_api === 5 || row.status_api === 2) {
-      // Si la transacción se creó hace más de 15 minutos y no resolvió, no considerarla pending infinito
-      const createdMs = row.created_at ? new Date(row.created_at).getTime() : 0;
-      const isStale = createdMs > 0 && (Date.now() - createdMs > 15 * 60 * 1000);
-      status = isStale ? 'completed' : 'pending';
-    } else {
-      status = 'idle';
-    }
+    else if (row.status_api === 5 || row.status_api === 2) status = 'pending';
+    else status = 'idle';
+
     const isCardRefund = row.gateway === 1;
     const digitsMismatch = Boolean(row.account_digits && row.actual_digits && String(row.actual_digits).slice(-4) !== String(row.account_digits).slice(-4));
     return {
@@ -520,57 +517,25 @@
   }
 
   function _withdrawStatusHtml(st) {
-    if (!st || st.status === 'idle' || !st.transactionId) return '';
+    // Solo generar HTML si el retiro está activamente EN PROCESO (pending). Los retiros ya completados o antiguos no muestran alerta bloqueante.
+    if (!st || st.status !== 'pending' || !st.transactionId) return '';
     const g = window.esc || (s => s);
     const money = window.fmtMoney || (v => `$${(v || 0).toFixed(2)}`);
     const amtHtml = st.amount ? `<span class="pat-wd-amt">${money(st.amount)}</span>` : '';
     const ref = st.reference ? g(st.reference) : '';
     const isCard = st.gateway === 1 || (st.alerts && st.alerts.gatewayMismatch);
     let line;
-    if (st.status === 'successful' || st.status === 'completed') {
-      if (isCard) {
-        line = `<span class="pat-wd-line pat-wd-warn"><i class="ph-bold ph-credit-card"></i> Retiro procesado como REEMBOLSO A TARJETA${ref ? ` (ref ${ref})` : ''}. (Se reflejará en el plástico que depositó).</span>`;
-      } else {
-        const dest = st.institutionName ? ` a ${g(st.institutionName)}` : '';
-        const digs = st.accountDigits ? ` (···${g(st.accountDigits)})` : '';
-        line = `<span class="pat-wd-line pat-wd-ok"><i class="ph-bold ph-check-circle"></i> BetMexico procesó el retiro SPEI${dest}${digs}${ref ? ` (ref ${ref})` : ''}. Confirma en tu banco.</span>`;
-      }
-    } else if (st.status === 'failed') {
-      line = `<span class="pat-wd-line pat-wd-fail"><i class="ph-bold ph-x-circle"></i> Retiro fallido / rechazado${ref ? ` (ref ${ref})` : ''}.</span>`;
-    } else if (st.status === 'pending') {
-      if (isCard) {
-        line = `<span class="pat-wd-line"><span class="dep-spinner"></span> Reembolso a Tarjeta en proceso${ref ? ` (ref ${ref})` : ''}…</span>`;
-      } else {
-        const dest = st.institutionName ? ` a ${g(st.institutionName)}` : '';
-        const digs = st.accountDigits ? ` (···${g(st.accountDigits)})` : '';
-        line = `<span class="pat-wd-line"><span class="dep-spinner"></span> Retiro SPEI en proceso${dest}${digs}${ref ? ` (ref ${ref})` : ''}…</span>`;
-      }
+    if (isCard) {
+      line = `<span class="pat-wd-line"><span class="dep-spinner"></span> Reembolso a Tarjeta en proceso${ref ? ` (ref ${ref})` : ''}…</span>`;
     } else {
-      return '';
+      const dest = st.institutionName ? ` a ${g(st.institutionName)}` : '';
+      const digs = st.accountDigits ? ` (···${g(st.accountDigits)})` : '';
+      line = `<span class="pat-wd-line"><span class="dep-spinner"></span> Retiro SPEI en proceso${dest}${digs}${ref ? ` (ref ${ref})` : ''}…</span>`;
     }
-    const alerts = st.alerts || {};
-    let alertHtml = '';
-    if (alerts.gatewayMismatch) {
-      alertHtml += `<div class="pat-wd-alert">⚠️ BetMexico desvió el retiro a REEMBOLSO DE TARJETA, no a la CLABE SPEI.</div>`;
-    }
-    if (alerts.digitsMismatch) {
-      alertHtml += `<div class="pat-wd-alert">⚠️ El retiro fue a dígitos distintos a la cuenta esperada (${g(st.accountDigits || '?')}).</div>`;
-    }
-    return `<div class="pat-wd-row">${amtHtml}${line}</div>${alertHtml}`;
+    return `<div class="pat-wd-row">${amtHtml}${line}</div>`;
   }
 
-  // Botón de retiro dedicado en .pat-actions (derecha de Depositar). Dispara directo
-  // Panel de monto + estado 2-fases en col 3 (.pat-col-stage). Visible en reposo para SA
-  // (llena el espacio que antes quedaba vacío). Si hay misión de depósito (#depStage visible),
-  // CSS :has() lo oculta — depos.js intacto.
-  // El botón "Retirar" vive JUNTO al campo de monto (Robert 2026-07-28, campo: "no se
-  // entiende qué hacen hasta allá lejos de donde se ponen las cantidades") — antes
-  // disparaba desde `.pat-actions`, en la esquina, sin relación visual con su propio
-  // input. Se fusiona lo que antes era renderPantallaWithdrawButton() aquí mismo.
-  // Estado puro de retiro para esta cuenta — sin tocar el DOM (2026-07-28: antes
-  // esto armaba su propio bloque HTML `.pat-wd-stage`; ahora Depositar/Retirar
-  // comparten UN panel — ver _applyWithdrawToCompact). Muta d._wd_pending como
-  // antes (otros callers lo leen).
+  // Panel de monto + estado 2-fases en col 3 (.pat-col-stage).
   function _withdrawState(d) {
     const L = window.PantallaLogic || {};
     const role = (state.user || {}).role;
@@ -580,11 +545,6 @@
     return { s2, st, pending: !!(d && d._wd_pending) };
   }
 
-  // Columna 3: SOLO los slots que depos.js monta — ya no arma su propio bloque de
-  // retiro aquí (campo, Robert 2026-07-28, 3ª ronda: "reutilizando el cuadro de
-  // texto de monto, botón depositar junto a retirar... en lugar de dos pestañas").
-  // El botón/estado de retiro vive DENTRO de #deposCompactTpl (index.html) y se
-  // rellena en _applyWithdrawToCompact() justo después de montar el panel.
   function renderPantallaStageCol(d) {
     return `<div class="pat-col-stage">
       <div id="patStageSlot"></div>
@@ -592,12 +552,6 @@
     </div>`;
   }
 
-  // Rellena los elementos de retiro que YA existen en la plantilla del depósito
-  // compacto (#wd, #wdBalance, #wdStatus, #wdErr) — un solo panel, un solo campo
-  // de monto (#amtInput, propiedad del motor de depósitos) que ambos botones leen.
-  // Se llama en cada render, después de _mountStage() (que ya clonó/montó la
-  // plantilla). Idempotente: solo lectura+atributos, nunca innerHTML del panel
-  // completo (eso lo hace depos.js, no lo duplicamos).
   function _applyWithdrawToCompact(d) {
     const root = document.getElementById('depCompact');
     if (!root) return;
@@ -636,7 +590,6 @@
       if (s2.render && st && st.transactionId && st.status === 'pending') {
         statusEl.innerHTML = _withdrawStatusHtml(st);
         root.classList.add('pending');
-        root.classList.toggle('alert', !!(st.alerts && (st.alerts.gatewayMismatch || st.alerts.digitsMismatch)));
       } else {
         statusEl.innerHTML = '';
         root.classList.remove('pending');
@@ -658,24 +611,31 @@
       const st = await r.json();
       if (wrap) {
         const statusEl = wrap.querySelector('#wdStatus');
-        if (statusEl) statusEl.innerHTML = _withdrawStatusHtml(st);
-        wrap.classList.toggle('alert', !!(st.alerts && (st.alerts.gatewayMismatch || st.alerts.digitsMismatch)));
         const done = st.status !== 'pending';
-        wrap.classList.toggle('pending', !done);
         const input = wrap.querySelector('#amtInput');
         const btn = wrap.querySelector('#wd');
-        if (input) input.disabled = !done;
-        if (btn) btn.disabled = !done;
-        if (done) {
+
+        if (!done) {
+          if (statusEl) statusEl.innerHTML = _withdrawStatusHtml(st);
+          wrap.classList.add('pending');
+          if (input) input.disabled = true;
+          if (btn) btn.disabled = true;
+        } else {
           _stopWithdrawPoll(accId);
-          // Notificación al operador: retiro completado o fallido (Task #11)
+          if (statusEl) statusEl.innerHTML = '';
+          wrap.classList.remove('pending');
+          wrap.classList.remove('alert');
+          if (input) { input.disabled = false; input.removeAttribute('disabled'); }
+          if (btn) { btn.disabled = false; btn.removeAttribute('disabled'); }
+
+          // Notificación al operador: retiro completado o fallido
           const ref = st.reference ? ` (ref ${st.reference})` : '';
           if (st.status === 'successful' || st.status === 'completed') {
             if (window.toast) toast(`✅ Retiro completado${ref}. Confirma en tu banco.`, 'success');
           } else if (st.status === 'failed') {
             if (window.toast) toast(`❌ Retiro fallido${ref}`, 'error');
           }
-          // Refresh de la cuenta para que el saldo se actualice (Task #13)
+          // Refresh de la cuenta para que el saldo se actualice
           try {
             const cr = await fetch(`/api/accounts/${accId}/details`);
             if (cr.ok) {
@@ -687,21 +647,6 @@
               }
             }
           } catch (_) { /* best-effort */ }
-        } else {
-          // Degradar a poll lento después de 2 min, parar tras 5 min
-          const poll = _wdPolls[accId];
-          if (poll) {
-            if (Date.now() > poll.expireAt) {
-              _stopWithdrawPoll(accId);
-              wrap.classList.remove('pending');
-              if (input) input.disabled = false;
-              if (btn) btn.disabled = false;
-            } else if (Date.now() > poll.fastUntil && poll.intervalMs !== WD_POLL_SLOW_MS) {
-              clearInterval(poll.timer);
-              poll.intervalMs = WD_POLL_SLOW_MS;
-              poll.timer = setInterval(() => _fetchWithdrawStatus(accId, txId), WD_POLL_SLOW_MS);
-            }
-          }
         }
       }
       const cache = _cacheGet(accId);
@@ -713,15 +658,12 @@
     }
   }
 
-  // Poll dinámico: 15s durante retiro activo (el operador quiere ver progreso),
-  // 60s como mínimo absoluto (guardarrail rate-limit BetMexico). Al detectar
-  // estado terminal, el poll se detiene solo (ver _fetchWithdrawStatus).
   const WD_POLL_FAST_MS = 15000;
   const WD_POLL_SLOW_MS = 60000;
 
   function _startWithdrawPoll(accId, txId) {
-    _stopWithdrawPoll(accId); // 1 solo interval activo por cuenta
-    _fetchWithdrawStatus(accId, txId); // primer chequeo inmediato
+    _stopWithdrawPoll(accId);
+    _fetchWithdrawStatus(accId, txId);
     const timer = setInterval(() => _fetchWithdrawStatus(accId, txId), WD_POLL_FAST_MS);
     _wdPolls[accId] = {
       timer,
@@ -732,11 +674,11 @@
     };
   }
 
-  // Reanuda el polling si La Pantalla se reabre con un retiro no-terminal (p.ej.
-  // otro operador la cerró a medio proceso, o hubo reload de página).
   function _resumeWithdrawPollIfPending(d) {
     const wd = d && d.last_withdrawal;
     if (!wd || !wd.transaction_id) return;
+    const createdMs = wd.created_at ? new Date(wd.created_at).getTime() : 0;
+    if (createdMs > 0 && (Date.now() - createdMs > 10 * 60 * 1000)) return;
     const st = _wdStatusFromRow(wd);
     if (st && st.status === 'pending' && !_wdPolls[d.id]) {
       _startWithdrawPoll(d.id, wd.transaction_id);

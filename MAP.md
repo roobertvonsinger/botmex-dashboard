@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `6368d20` | fix(ui): remover bloqueo pointer-events en input de monto y limpiar alertas persistentes de retiros historicos |
 | `3d4c536` | fix(sessions): persistir jwt_token en upsert_account, extraer exp/uid en test_login y solver JIT 1:1 sin quemar capmonster |
 | `05e226e` | fix(selector): priorizar recencia de login/sesion activa y penalizar cuentas fosiles sin verificar |
 | `a4f4a33` | fix(matchmaker): exclusion estricta de cuentas 429/rate_limited a DEAD y purga de zombies en BD |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `3d8d96c` | fix(bet-limits): strictly unlimited cards for superadmin in /bet flow only |
 | `fb810a5` | feat(logs-superadmin): 4 dedicated log viewers, unlimited cards for superadmin and stealth hierarchy in botmex |
 | `9587952` | docs: sync MAP.md |
-| `0e91b0f` | docs: actualizar NEXT-SESSION con reglas de oro 3DS y matrimonio APPROVED |
 <!-- GEN:end:recientes -->
 
 ---
