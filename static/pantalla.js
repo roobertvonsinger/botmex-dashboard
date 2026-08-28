@@ -607,6 +607,18 @@
     const btn = root.querySelector('#wd');
     const balEl = root.querySelector('#wdBalance');
     const statusEl = root.querySelector('#wdStatus');
+    const amtInp = root.querySelector('#amtInput');
+    const amtMan = root.querySelector('#amtManual');
+
+    // Siempre habilitar el input de monto si no hay un retiro activamente en proceso
+    if (amtInp && !pending) {
+      amtInp.disabled = false;
+      amtInp.removeAttribute('disabled');
+    }
+    if (amtMan) {
+      amtMan.classList.remove('dis');
+    }
+
     if (btn) {
       btn.hidden = !s2.render;
       btn.disabled = !!s2.disabled || pending;
@@ -615,21 +627,20 @@
     }
     if (balEl) {
       balEl.hidden = !s2.render;
-      // Motivo de "Retirar" deshabilitado (p.ej. "Saldo < $100") visible SIEMPRE,
-      // no solo al hover del botón (2026-08-01, auditoría: bajo presión no hay
-      // tiempo de pasar el mouse para enterarse de por qué el botón no responde —
-      // ver Nielsen #1 visibilidad de estado). Solo se agrega si está deshabilitado
-      // por una razón real (no cuando ya está "Retirar" listo/redundante, ni
-      // mientras hay un retiro en curso — ese caso ya lo cubre #wdStatus).
       const note = (s2.render && s2.disabled && s2.tooltip && !pending)
         ? ` <span class="pat-wd-balance-note">· ${g(s2.tooltip)}</span>` : '';
       balEl.innerHTML = s2.render ? `Saldo Real: <b class="pat-wd-balance-v">${money(d.balance_real || 0)}</b>${note}` : '';
     }
     if (statusEl) {
-      if (s2.render && st && st.transactionId && (st.status === 'pending' || st.status === 'successful' || st.status === 'completed' || st.status === 'failed') && st.status !== 'idle') {
+      // Solo mostrar status si el retiro está activamente EN PROCESO (pending). Los retiros completados/históricos ya están en Movimientos.
+      if (s2.render && st && st.transactionId && st.status === 'pending') {
         statusEl.innerHTML = _withdrawStatusHtml(st);
+        root.classList.add('pending');
+        root.classList.toggle('alert', !!(st.alerts && (st.alerts.gatewayMismatch || st.alerts.digitsMismatch)));
       } else {
         statusEl.innerHTML = '';
+        root.classList.remove('pending');
+        root.classList.remove('alert');
       }
     }
   }

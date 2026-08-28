@@ -596,7 +596,8 @@
   font-size: 17px; font-weight: 700; color: var(--pat-money);
 }
 .pat-dep-amt input#amtInput:focus { outline: none; }
-.pat-dep-amt.dis input { opacity: .45; pointer-events: none; }
+.pat-dep-amt input#amtInput { pointer-events: auto; }
+.pat-dep-amt.dis input { opacity: 1; pointer-events: auto; }
 /* Presets — la ruta de UN click deliberada para saltarse el teclado. Medido en
    vivo: 18px de alto, más chico que el dedo/cursor puede acertar rápido bajo
    presión — un preset que falla el click cuesta MÁS que escribir el monto, que

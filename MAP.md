@@ -115,8 +115,6 @@ prewarm.py (router)
 | `conftest.py` | 213 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
 | `deposits.py` | 3012 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
-| `inspect_1632.py` | 21 | `—` | _[completar]_ |
-| `inspect_details_row.py` | 16 | `—` | _[completar]_ |
 | `jwt_keeper.py` | 383 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 458 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 918 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -294,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `3d4c536` | fix(sessions): persistir jwt_token en upsert_account, extraer exp/uid en test_login y solver JIT 1:1 sin quemar capmonster |
 | `05e226e` | fix(selector): priorizar recencia de login/sesion activa y penalizar cuentas fosiles sin verificar |
 | `a4f4a33` | fix(matchmaker): exclusion estricta de cuentas 429/rate_limited a DEAD y purga de zombies en BD |
 | `6990675` | fix(depos): limpiar #wdStatus en mountCompact y forzar version 20260826c |
@@ -305,7 +304,6 @@ prewarm.py (router)
 | `fb810a5` | feat(logs-superadmin): 4 dedicated log viewers, unlimited cards for superadmin and stealth hierarchy in botmex |
 | `9587952` | docs: sync MAP.md |
 | `0e91b0f` | docs: actualizar NEXT-SESSION con reglas de oro 3DS y matrimonio APPROVED |
-| `432684f` | feat(deposits): suavizado 3ds, matrimonio exclusivo approved, alerta 24h y distintivo visual a+ |
 <!-- GEN:end:recientes -->
 
 ---

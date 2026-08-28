@@ -1085,9 +1085,9 @@
       <div class="row2">
         <div class="amt-wrap">
           <div class="field-head"><span class="label">Monto</span></div>
-          <div class="amt dis" id="amtManual"><span>$</span><input id="amtInput" value="50" inputmode="numeric" aria-label="Monto manual" /></div>
+          <div class="amt" id="amtManual"><span>$</span><input id="amtInput" value="50" inputmode="numeric" aria-label="Monto manual" /></div>
           <div class="amt-presets" id="amtPresets"></div>
-          <div class="amt-note" id="amtNote">Montos fijos para varias cuentas  $490 = monto alto (tope $499)</div>
+          <div class="amt-note" id="amtNote">Montos fijos para varias cuentas · $490 = monto alto (tope $499)</div>
         </div>
         <div class="reps hide" id="repsBox">
           <div class="field-head"><span class="label">Reps</span></div>
@@ -1139,7 +1139,7 @@
   </div>
   <div class="pat-wd-balance" id="wdBalance"></div>
   <div class="pat-dep-row pat-dep-amt-row">
-    <div class="pat-dep-amt dis" id="amtManual"><span>$</span><input id="amtInput" value="50" inputmode="numeric" aria-label="Monto — depósito o retiro, según el botón" class="pat-input pat-input-mono"></div>
+    <div class="pat-dep-amt" id="amtManual"><span>$</span><input id="amtInput" value="50" inputmode="numeric" aria-label="Monto — depósito o retiro, según el botón" class="pat-input pat-input-mono"></div>
     <div class="pat-dep-presets" id="amtPresets"></div>
   </div>
   <div class="pat-dep-note" id="amtNote"></div>
@@ -1166,16 +1166,16 @@
 <!-- Toast -->
 <div id="toast" class="toast hidden"></div>
 
-<script src="/static/activity_logic.js?v=20260826c"></script>
-<script src="/static/pantalla_logic.js?v=20260826c"></script>
-<script src="/static/strip_logic.js?v=20260826c"></script>
-<script src="/static/app.js?v=20260826c"></script>
-<script src="/static/depos_logic.js?v=20260826c"></script>
-<script src="/static/depos_window.js?v=20260826c"></script>
-<script src="/static/depos.js?v=20260826c"></script>
-<script src="/static/pantalla.js?v=20260826c" defer></script>
+<script src="/static/activity_logic.js?v=20260828a"></script>
+<script src="/static/pantalla_logic.js?v=20260828a"></script>
+<script src="/static/strip_logic.js?v=20260828a"></script>
+<script src="/static/app.js?v=20260828a"></script>
+<script src="/static/depos_logic.js?v=20260828a"></script>
+<script src="/static/depos_window.js?v=20260828a"></script>
+<script src="/static/depos.js?v=20260828a"></script>
+<script src="/static/pantalla.js?v=20260828a" defer></script>
 <!-- Agente de soporte (b.soporte). Va DESPUÉS de depos_window.js: reusa su
      chrome de ventana. Se auto-monta y solo inyecta DOM si el rol es superadmin. -->
-<script src="/static/soporte.js?v=20260826c" defer></script>
+<script src="/static/soporte.js?v=20260828a" defer></script>
 </body>
 </html>
