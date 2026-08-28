@@ -399,15 +399,20 @@ def select_accounts_for_auto(
         cards_heavy = 1 if (meta.get("cards_count") or 0) >= 2 else 0
         # 5. Afinidad de BIN exitoso previo
         has_bin_success = 0 if meta.get("approved_bin_pipes") else 1
+        # 6. Recencia de login/actividad: penalizar cuentas fósiles (>30d sin login/check = 1, recientes = 0)
+        act_epoch = int(meta.get("last_activity_epoch") or 0)
+        days_since_active = (now - act_epoch) / 86400.0 if act_epoch > 0 else 999.0
+        is_stale_fossil = 1 if days_since_active > 30 else 0
         return (
             jwt_first,
             has_3ds,
             recently_tried,
             cards_heavy,
+            is_stale_fossil,
             has_bin_success,
+            -act_epoch,  # Más recientemente activa/logueada PRIMERO (ahorra captchas y evita cuentas muertas)
             _grade_rank(r.get("grade")),
             -(float(r.get("grade_score") or 0)),
-            -int(meta.get("last_activity_epoch") or 0),  # más activo reciente primero
         )
 
     tier_top.sort(key=sort_key)
@@ -656,13 +661,25 @@ def plan_auto_mission(
                 (email,),
             ).fetchone()["n"]
 
-            # RF5: recencia de actividad (movimientos/bets) para mover la cuenta en la lista
-            last_act = con.execute(
-                "SELECT MAX(last) AS last FROM ("
-                "  SELECT created_at AS last FROM deposit_attempts WHERE account_email=?"
-                "  UNION ALL SELECT txn_date AS last FROM account_transactions WHERE account_email=?"
-                ")"
-            , (email, email)).fetchone()["last"]
+            # RF5: recencia de actividad / login para mover la cuenta en la lista
+            last_act = None
+            try:
+                last_act = con.execute(
+                    "SELECT MAX(last) AS last FROM ("
+                    "  SELECT created_at AS last FROM deposit_attempts WHERE account_email=?"
+                    "  UNION ALL SELECT txn_date AS last FROM account_transactions WHERE account_email=?"
+                    "  UNION ALL SELECT last_checked_at AS last FROM accounts WHERE email=?"
+                    ")"
+                , (email, email, email)).fetchone()["last"]
+            except Exception:
+                try:
+                    last_act = con.execute(
+                        "SELECT MAX(created_at) AS last FROM deposit_attempts WHERE account_email=?",
+                        (email,)
+                    ).fetchone()["last"]
+                except Exception:
+                    last_act = None
+
             last_activity_epoch = 0
             if last_act:
                 try:

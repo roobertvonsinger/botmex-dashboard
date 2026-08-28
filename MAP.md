@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 592 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5425 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1944 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1961 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `betmexico_config.py` | 185 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2927 | `—` | _[completar]_ |
@@ -294,6 +294,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a4f4a33` | fix(matchmaker): exclusion estricta de cuentas 429/rate_limited a DEAD y purga de zombies en BD |
 | `6990675` | fix(depos): limpiar #wdStatus en mountCompact y forzar version 20260826c |
 | `56e4707` | fix(pantalla): descartar status de retiro si no tiene transactionId o es idle |
 | `d5a7793` | fix(portal): agregar idle a estados terminales de retiro y cache buster v20260826a |
@@ -305,7 +306,6 @@ prewarm.py (router)
 | `0e91b0f` | docs: actualizar NEXT-SESSION con reglas de oro 3DS y matrimonio APPROVED |
 | `432684f` | feat(deposits): suavizado 3ds, matrimonio exclusivo approved, alerta 24h y distintivo visual a+ |
 | `38a82a4` | fix(auto_deposit): jubilacion inmediata y matrimonio de tarjeta en 3DS, candado DB multi-origen y limpieza de logs |
-| `7b8861a` | fix(checker): eliminar bypass de tolerancia en error de gate para proteger cuentas live |
 <!-- GEN:end:recientes -->
 
 ---
