@@ -103,7 +103,7 @@ prewarm.py (router)
 | `auto_deposit.py` | 1961 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `betmexico_config.py` | 185 | `betmexico` | _[completar]_ |
-| `betmexico_db.py` | 2946 | `—` | _[completar]_ |
+| `betmexico_db.py` | 2950 | `—` | _[completar]_ |
 | `betmexico_deposit.py` | 958 | `—` | _[completar]_ |
 | `betmexico_login_api.py` | 1090 | `httpx` | _[completar]_ |
 | `betmexico_login_service.py` | 136 | `betmexico.login_service` | _[completar]_ |
@@ -292,6 +292,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `8013b21` | fix(api): deteccion estricta de JWT caducado (401/redirectLogin) y auto-recovery con login fresco para evitar sobreescribir balances reales con 0.00 |
 | `2947399` | fix(withdrawals): auto-reconciliar retiros historicos a status 6 y limpiar alertas de retiros terminados en el panel de deposito |
 | `6368d20` | fix(ui): remover bloqueo pointer-events en input de monto y limpiar alertas persistentes de retiros historicos |
 | `3d4c536` | fix(sessions): persistir jwt_token en upsert_account, extraer exp/uid en test_login y solver JIT 1:1 sin quemar capmonster |
@@ -303,7 +304,6 @@ prewarm.py (router)
 | `e9dc6be` | fix(withdrawals): eliminar bucle infinito de retiro en proceso, auto-reconciliar retiros completados y liberar locks huerfanos |
 | `6c082ba` | feat(bet): pasaporte live ruthopia db, tiro directo a casadas para superadmin y comandos betf/fast |
 | `3d8d96c` | fix(bet-limits): strictly unlimited cards for superadmin in /bet flow only |
-| `fb810a5` | feat(logs-superadmin): 4 dedicated log viewers, unlimited cards for superadmin and stealth hierarchy in botmex |
 <!-- GEN:end:recientes -->
 
 ---

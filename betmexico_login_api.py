@@ -635,14 +635,14 @@ class BetmexicoApiChecker:
             "jwt_expired": False,
         }
 
-        # Intentar obtener nombre del JWT como primera opción de fallback
+        # El claim name del JWT en BetMexico es el username (ej. repaid545365077), NO el fullname real.
         jwt_name = (
             jwt_payload.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name")
             or jwt_payload.get("unique_name")
             or jwt_payload.get("name")
         )
         if jwt_name and "@" not in jwt_name:
-            details["fullname"] = jwt_name
+            details["username"] = jwt_name
 
         client = self._get_client()
 

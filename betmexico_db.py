@@ -557,13 +557,17 @@ class BetmexicoDB:
                     else:
                         new_stable_count = 1
 
-                    # Merge robusto: NUNCA sobreescribir datos buenos con vacíos
-                    if not _has_data(fullname) and _has_data(existing["fullname"]):
+                    # Merge robusto: NUNCA sobreescribir datos buenos con vacíos o usernames
+                    if (not _has_data(fullname) or any(ch.isdigit() for ch in str(fullname))) and _has_data(existing["fullname"]):
                         fullname = existing["fullname"]
                     if not _has_data(birthdate) and _has_data(existing["birthdate"]):
                         birthdate = existing["birthdate"]
                     if not _has_data(address) and _has_data(existing["address"]):
                         address = existing["address"]
+                    if not _has_data(curp) and _has_data(existing["curp"]):
+                        curp = existing["curp"]
+                    if not _has_data(phone) and _has_data(existing["phone"]):
+                        phone = existing["phone"]
                     if not _has_data(last_deposit_date) and _has_data(existing["last_deposit_date"]):
                         last_deposit_date = existing["last_deposit_date"]
                     if last_deposit_amount == 0.0 and (existing["last_deposit_amount"] or 0) > 0:

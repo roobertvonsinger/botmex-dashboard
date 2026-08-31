@@ -266,7 +266,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `BetmexicoDB` | class | L29–L2943 |
+| `BetmexicoDB` | class | L29–L2947 |
 
 ### `betmexico_deposit.py`
 
