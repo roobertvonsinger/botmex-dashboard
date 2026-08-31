@@ -514,16 +514,11 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `StickySession` | class | L68–L76 |
-| `parse_nodemaven_line` | def | L79–L96 |
-| `StickySessionManager` | class | L99–L140 |
-| `LoginResult` | class | L145–L164 |
-| `_import_get_jwt` | def | L168–L171 |
-| `_import_login_primitives` | def | L174–L182 |
-| `_classify_dead` | def | L185–L197 |
-| `_pool_session` | def | L200–L211 |
-| `_jitter_base` | def | L214–L221 |
-| `gentle_login` | def | L225–L458 |
+| `StickySession` | class | L17–L24 |
+| `LoginResult` | class | L28–L42 |
+| `StickySessionManager` | class | L45–L56 |
+| `_classify_dead` | def | L59–L70 |
+| `gentle_login` | def | L73–L217 |
 
 ### `prewarm.py`
 
@@ -544,11 +539,11 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_db_mark_dead` | def | L353–L376 |
 | `_is_balance_fresh` | def | L379–L387 |
 | `_capmonster_balance` | def | L392–L408 |
-| `_run_prewarm` | def | L413–L602 |
-| `prewarm_select` | def | L608–L692 |
-| `prewarm_cancel` | def | L696–L706 |
-| `prewarm_status` | def | L710–L725 |
-| `prewarm_refresh_stream` | def | L731–L922 |
+| `_run_prewarm` | def | L413–L595 |
+| `prewarm_select` | def | L601–L685 |
+| `prewarm_cancel` | def | L689–L699 |
+| `prewarm_status` | def | L703–L718 |
+| `prewarm_refresh_stream` | def | L724–L915 |
 
 ### `renapo_validator.py`
 

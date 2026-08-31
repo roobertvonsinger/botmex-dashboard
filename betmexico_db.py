@@ -23,7 +23,7 @@ from betmexico_config import (
 )
 
 logger = logging.getLogger(__name__)
-DB_FILE = Path(os.getenv("BETMEX_DB", os.getenv("DB_PATH", "/data/betmexico_accounts.db" if Path("/data/betmexico_accounts.db").exists() else str(Path(__file__).resolve().parent / "betmexico_accounts.db"))))
+DB_FILE = Path(os.getenv("BETMEX_DB", os.getenv("DB_PATH", "/data/betmexico_accounts.db" if (os.name != "nt" and Path("/data/betmexico_accounts.db").exists()) else str(Path(__file__).resolve().parent / "betmexico_accounts.db"))))
 
 
 class BetmexicoDB:

@@ -429,17 +429,10 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
         # JWT cacheado vigente (sin captcha) en el intento 0 — updates baratos.
         # max_login_retries=5: el update solo trae balance, vale reintentar.
         #
-        # Inicialización del pool lazy. gentle_login se encargará de iniciarlo si hay cache miss.
-        jwt_from_cache = False
-        pool = make_pool(cap_key, size=2, workers=1)
-
         from login_orchestrator import gentle_login
-        login_res = await gentle_login(
-            email, password, max_login_retries=5, throttle=True,
-            pool=pool, use_cache=True,
-        )
+        login_res = await gentle_login(email, password, use_cache=True)
         jwt = login_res.jwt
-        jwt_from_cache = login_res.from_cache  # señal real del orquestador
+        jwt_from_cache = login_res.from_cache
         used_proxy = login_res.used_proxy
         if not jwt:
             # LOGIN_RETRY_LATER / LOGIN_DENIED / KYC_PENDING / AUTOEXCLUSION / RATE_LIMITED.
