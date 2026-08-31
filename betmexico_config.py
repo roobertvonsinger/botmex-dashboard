@@ -132,8 +132,6 @@ FILTER_DAILY_WAIT_HOURS = 3          # Regla 2: horas de espera si superó el l�
 
 LOGO = "┏ ◍ B🤖T ━┓\n  chk\n\n"
 
-from betmexico_db import db  # Moved here to resolve circular dependency with MX_TZ and now_mx
-
 # ─────────────────────────────────────────────────────────────────────
 # PROXIES
 # ─────────────────────────────────────────────────────────────────────

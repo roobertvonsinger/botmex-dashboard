@@ -573,15 +573,6 @@ class BetmexicoDB:
                     if last_deposit_amount == 0.0 and (existing["last_deposit_amount"] or 0) > 0:
                         last_deposit_amount = existing["last_deposit_amount"]
 
-                    # Proteger balance: si el API devolvió 0 pero ya teníamos saldo real en BD, conservar
-                    ex_bal_real = existing["balance_real"] if "balance_real" in existing.keys() else 0.0
-                    ex_bal_total = existing["balance_total"] if "balance_total" in existing.keys() else 0.0
-                    if balance_total == 0.0 and (ex_bal_total or 0.0) > 0.0:
-                        balance_real = float(ex_bal_real or 0.0)
-                        balance_bonos = float(existing["balance_bonos"] if "balance_bonos" in existing.keys() else 0.0 or 0.0)
-                        balance_total = float(ex_bal_total)
-                        logger.debug(f"[DB] Balance 0 ignorado para {email} — conservando ${balance_total:.2f}")
-
                     # Preservar grade existente si este check no trajo transacciones
                     if not has_new_scoring:
                         grade = existing["grade"] or "?"

@@ -83,8 +83,53 @@ USER_AGENTS = [
 
 
 # ******************************************************************************#
-#                         ANTICAPTCHA SOLVER                                    #
+#                         CAPTCHA SOLVERS                                       #
 # ******************************************************************************#
+class CaptchaHubSolverFast:
+    """Solver que utiliza el microservicio central KVM4 captcha-hub (:8889)."""
+    def __init__(self, base_url: str = None):
+        self.base_url = base_url or os.getenv("CAPTCHA_HUB_URL", "http://captcha-hub:8889")
+        self.service_name = "CaptchaHub"
+
+    async def check_balance(self) -> Optional[float]:
+        try:
+            async with httpx.AsyncClient(timeout=4.0) as client:
+                r = await client.get(f"{self.base_url}/stats")
+                return 100.0 if r.status_code == 200 else None
+        except Exception:
+            return None
+
+    async def get_recaptcha_v2_token(self, website_url: str, website_key: str) -> Optional[tuple]:
+        urls_to_try = [
+            self.base_url,
+            "http://captcha-hub:8889",
+            "http://127.0.0.1:8889",
+            "http://2.25.98.162:8889",
+        ]
+        for url in urls_to_try:
+            if not url:
+                continue
+            try:
+                async with httpx.AsyncClient(timeout=35.0) as client:
+                    resp = await client.post(
+                        f"{url}/solve",
+                        params={"sitekey": website_key, "page_url": website_url},
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        token = data.get("token")
+                        if token:
+                            logger.info(f"[CAPTCHA_HUB] Token obtenido vía {url} ({data.get('solver')})")
+                            return (token, "hub")
+            except Exception as e:
+                logger.debug(f"[CAPTCHA_HUB] Falló {url}: {e}")
+                continue
+        return None
+
+    async def report_incorrect(self, task_id: str):
+        pass
+
+
 class AntiCaptchaSolverFast:
     def __init__(self, apikey: str, proxy: Optional[str] = None):
         self.apikey = apikey
@@ -384,7 +429,10 @@ class BetmexicoApiChecker:
         self.headless = headless  # Compatibilidad con BetmexicoLoginTester
         self.proxy = proxy  # {"server": "host:port", "username": "...", "password": "..."}
         self.user_agent = random.choice(USER_AGENTS)
-        self.captcha_solver = CapMonsterSolverFast(CAPMONSTER_API_KEY)
+        # Prioridad de solvers:
+        # 1. KVM4 Central Captcha Hub (:8889) con cache y multi-provider
+        # 2. CapSolver / CapMonster directos como fallback
+        self.captcha_solver = CaptchaHubSolverFast()
         self._client = client
         self._external_client = client is not None
 

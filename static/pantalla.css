@@ -441,10 +441,34 @@
    columna de datos (Robert: "el saldo esta muy grande"). 26px lo baja a segundo
    plano frente al combo/nombre sin perder la lectura rápida del monto. */
 .pat-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--pat-font-display); font-weight: 700;
   font-size: 26px; line-height: 1.1; letter-spacing: .2px;
   color: var(--pat-money);
   text-shadow: 0 1px 2px rgba(0,0,0,.6), 0 0 2px rgba(0,0,0,.5);
+}
+.pat-balance-refresh {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: var(--text-faint);
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+.pat-balance-refresh:hover {
+  color: var(--pat-money);
+  background: rgba(255, 255, 255, 0.05);
+}
+.pat-balance-refresh:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 /* Divisor bajo el saldo — separa combo+saldo de guardado (tarjetas/notas), que ahora
    vive directo debajo (Robert 2026-07-10: "a partir de la linea de division...

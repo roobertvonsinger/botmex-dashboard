@@ -343,7 +343,10 @@
           <div class="pat-combo-line" style="--i:1">
             <button type="button" class="pat-combo d-copy" data-copy="${g(combo)}" title="Copiar">${g(combo)}</button>
           </div>
-          <div class="pat-balance" style="--i:2">${money(balance)}</div>
+          <div class="pat-balance" style="--i:2">
+            ${money(balance)}
+            <button type="button" class="pat-balance-refresh" data-pat-refresh="${d.id}" title="Refrescar saldo en vivo"><i class="ph-bold ph-arrows-clockwise"></i></button>
+          </div>
           <div class="pat-ident-div" style="--i:3"></div>
           ${renderPantallaSaved(d)}
           ${renderPantallaClabes(d)}
@@ -1267,6 +1270,36 @@
         if (errEl) { errEl.textContent = err.message; errEl.hidden = false; }
       } finally {
         curpSave.disabled = false;
+      }
+      return;
+    }
+    const patRefresh = e.target.closest('[data-pat-refresh]');
+    if (patRefresh) {
+      e.preventDefault();
+      const accId = patRefresh.dataset.patRefresh || _currentId;
+      if (!accId) return;
+      const icon = patRefresh.querySelector('i');
+      if (icon) icon.classList.add('ph-spin');
+      patRefresh.disabled = true;
+      try {
+        const r = await fetch(`/api/accounts/${accId}/refresh`, { method: 'POST' });
+        const res = await r.json();
+        if (res.ok) {
+          if (window.toast) toast(`💰 Saldo actualizado: $${(res.balance_real || 0).toFixed(2)}`, 'success');
+          const dr = await fetch(`/api/accounts/${accId}/details`);
+          if (dr.ok) {
+            const data = await dr.json();
+            _cacheSet(accId, data);
+            _renderDetailView(data, false);
+          }
+        } else {
+          if (window.toast) toast(`Error refrescando: ${res.error || res.status}`, 'error');
+        }
+      } catch (err) {
+        if (window.toast) toast(`Error de red refrescando: ${err.message}`, 'error');
+      } finally {
+        if (icon) icon.classList.remove('ph-spin');
+        patRefresh.disabled = false;
       }
       return;
     }

@@ -3297,6 +3297,116 @@ def account_find_id(email: str, _user: dict = Depends(require_session)):
     return {"id": row["id"] if row else None}
 
 
+@app.api_route("/api/accounts/{account_id}/refresh", methods=["GET", "POST"])
+async def account_refresh_api(account_id: int, _user: dict = Depends(require_session)):
+    """Refresca en vivo el balance y estado de una cuenta contra BetMexico.
+    1. Si tiene JWT vigente, consulta balance directo.
+    2. Si el JWT caducó (401 / redirectLogin / None), auto-loguea con CaptchaHub para renovar JWT.
+    3. Persiste en BD con merge seguro y emite broadcast SSE.
+    """
+    with db() as c:
+        acc = c.execute(
+            "SELECT id, email, password, jwt_token, jwt_expires_at, fullname, birthdate, address, curp "
+            "FROM accounts WHERE id=? LIMIT 1",
+            (account_id,),
+        ).fetchone()
+        if not acc:
+            raise HTTPException(404, "Cuenta no encontrada")
+        row = dict(acc)
+
+    email = row["email"]
+    password = row["password"]
+    jwt = row.get("jwt_token")
+
+    from betmexico_login_api import BetmexicoApiChecker
+    from proxy_pool import build_admin_proxy_url
+    from betmexico_db import save_account_check
+
+    proxy = build_admin_proxy_url()
+    checker = BetmexicoApiChecker(proxy=proxy)
+
+    fresh_data = None
+
+    # Intento 1: Si hay JWT, probar balance_only rápido
+    if jwt:
+        try:
+            details = await checker.fetch_account_details_parallel(jwt, fetch_mode="balance_only")
+            if details and details.get("_auth_ok") and not details.get("jwt_expired"):
+                fresh_data = {
+                    "status": "LIVE",
+                    "email": email,
+                    "password": password,
+                    "jwt_token": jwt,
+                    "jwt_expires_at": row.get("jwt_expires_at"),
+                    "account_details": details,
+                    "balance_real": details.get("balance_real", 0.0),
+                    "balance_total": details.get("balance_real", 0.0),
+                    "last_deposit_amount": details.get("last_deposit_amount", 0.0),
+                    "last_deposit_date": details.get("last_deposit_date"),
+                }
+        except Exception as e:
+            _logging.getLogger("betmexico.dashboard").warning(f"Error en refresh rápido JWT para {email}: {e}")
+
+    # Intento 2: Si no hubo datos frescos (JWT caducado / 401), auto-login con CaptchaHub
+    if not fresh_data:
+        try:
+            login_res = await checker.test_login(email, password)
+            if login_res.get("status") == "LIVE":
+                fresh_data = login_res
+            else:
+                return {
+                    "ok": False,
+                    "status": login_res.get("status", "ERROR"),
+                    "error": login_res.get("error", "Login fallido"),
+                }
+        except Exception as e:
+            _logging.getLogger("betmexico.dashboard").error(f"Error en auto-login refresh para {email}: {e}")
+            raise HTTPException(500, f"Error refrescando cuenta: {e}")
+
+    # Persistir en BD usando BetmexicoDB
+    db_path = str(DB_PATH) if "DB_PATH" in globals() else "/data/betmexico_accounts.db"
+    if not os.path.exists(db_path):
+        db_path = "betmexico_accounts.db"
+
+    try:
+        actor_id = int(_user.get("telegram_id") or 999999)
+    except Exception:
+        actor_id = 999999
+
+    from betmexico_db import BetmexicoDB
+    bldb = BetmexicoDB(Path(db_path))
+    bldb.upsert_account(fresh_data, checked_by=actor_id)
+
+    # Broadcast SSE
+    bal_real = fresh_data.get("balance_real")
+    if bal_real is None:
+        bal_real = fresh_data.get("account_details", {}).get("balance_real", 0.0)
+    bal_total = fresh_data.get("balance_total")
+    if bal_total is None:
+        bal_total = fresh_data.get("account_details", {}).get("balance_total", bal_real)
+
+    _broadcast({
+        "type": "account_refreshed",
+        "kind": "account_refreshed",
+        "account_id": account_id,
+        "email": email,
+        "balance_real": bal_real,
+        "balance_total": bal_total,
+        "last_deposit_amount": fresh_data.get("last_deposit_amount") or fresh_data.get("account_details", {}).get("last_deposit_amount"),
+        "last_deposit_date": fresh_data.get("last_deposit_date") or fresh_data.get("account_details", {}).get("last_deposit_date"),
+    })
+
+    return {
+        "ok": True,
+        "account_id": account_id,
+        "email": email,
+        "balance_real": bal_real,
+        "balance_total": bal_total,
+        "last_deposit_amount": fresh_data.get("last_deposit_amount") or fresh_data.get("account_details", {}).get("last_deposit_amount"),
+        "last_deposit_date": fresh_data.get("last_deposit_date") or fresh_data.get("account_details", {}).get("last_deposit_date"),
+    }
+
+
 @app.get("/api/accounts/{account_id}/details")
 def account_details(account_id: int, _user: dict = Depends(require_session)):
     with db() as c:

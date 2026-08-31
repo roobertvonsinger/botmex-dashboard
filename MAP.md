@@ -98,14 +98,14 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 592 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5425 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 5535 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 1961 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
-| `betmexico_config.py` | 185 | `betmexico` | _[completar]_ |
-| `betmexico_db.py` | 2950 | `—` | _[completar]_ |
+| `betmexico_config.py` | 183 | `betmexico` | _[completar]_ |
+| `betmexico_db.py` | 2941 | `—` | _[completar]_ |
 | `betmexico_deposit.py` | 958 | `—` | _[completar]_ |
-| `betmexico_login_api.py` | 1090 | `httpx` | _[completar]_ |
+| `betmexico_login_api.py` | 1138 | `httpx` | _[completar]_ |
 | `betmexico_login_service.py` | 136 | `betmexico.login_service` | _[completar]_ |
 | `betmexico_payment_analyzer.py` | 492 | `—` | _[completar]_ |
 | `betmexico_utils.py` | 1159 | `—` | _[completar]_ |
@@ -283,6 +283,7 @@ prewarm.py (router)
 | `BMX_CAPSOLVER_KEY` | `""` | `betmexico_login_api.py` |
 | `BMX_RECAPTCHA_SITEKEY` | `"6Lcz348mAAAAACAn9C2YDf2GT7Rd2UVqhGdWeVc4"` | `betmexico_login_api.py` |
 | `BMX_WEB_URL` | `"https://botmexico.com.mx"` | `betmexico_utils.py` |
+| `CAPTCHA_HUB_URL` | `"http://captcha-hub:8889"` | `betmexico_login_api.py` |
 <!-- GEN:end:env -->
 
 ---
@@ -292,6 +293,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `73052ed` | fix(identity): prevent jwt username from poisoning fullname and protect curp/phone in merge |
 | `8013b21` | fix(api): deteccion estricta de JWT caducado (401/redirectLogin) y auto-recovery con login fresco para evitar sobreescribir balances reales con 0.00 |
 | `2947399` | fix(withdrawals): auto-reconciliar retiros historicos a status 6 y limpiar alertas de retiros terminados en el panel de deposito |
 | `6368d20` | fix(ui): remover bloqueo pointer-events en input de monto y limpiar alertas persistentes de retiros historicos |
@@ -303,7 +305,6 @@ prewarm.py (router)
 | `d5a7793` | fix(portal): agregar idle a estados terminales de retiro y cache buster v20260826a |
 | `e9dc6be` | fix(withdrawals): eliminar bucle infinito de retiro en proceso, auto-reconciliar retiros completados y liberar locks huerfanos |
 | `6c082ba` | feat(bet): pasaporte live ruthopia db, tiro directo a casadas para superadmin y comandos betf/fast |
-| `3d8d96c` | fix(bet-limits): strictly unlimited cards for superadmin in /bet flow only |
 <!-- GEN:end:recientes -->
 
 ---
