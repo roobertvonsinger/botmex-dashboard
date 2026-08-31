@@ -30,10 +30,18 @@ _MAX_RETRIES = 3
 _JWT_CACHE_MARGIN_SEC = 60  # margen de 1 min para evitar usar JWT a punto de expirar
 
 
-def make_pool(solver_or_key, size: int, workers: int) -> CaptchaTokenPool:
-    """Crea un CaptchaTokenPool estándar para BetMexico."""
-    if isinstance(solver_or_key, str):
-        solver = CapMonsterSolverFast(solver_or_key)
+def make_pool(solver_or_key=None, size: int = 12, workers: int = 10) -> CaptchaTokenPool:
+    """Crea un CaptchaTokenPool estándar para BetMexico usando CaptchaHub."""
+    from betmexico_login_api import CaptchaHubSolverFast, AntiCaptchaSolverFast
+    if solver_or_key is None or solver_or_key == "":
+        solver = CaptchaHubSolverFast()
+    elif isinstance(solver_or_key, str):
+        if solver_or_key.startswith("http"):
+            solver = CaptchaHubSolverFast(solver_or_key)
+        elif solver_or_key.startswith("CAP-"):
+            solver = AntiCaptchaSolverFast(solver_or_key)
+        else:
+            solver = CaptchaHubSolverFast()
     else:
         solver = solver_or_key
     return CaptchaTokenPool(

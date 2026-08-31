@@ -519,35 +519,34 @@ async def _run_prewarm(operator_id: int, email: str, password: str) -> dict:
             return {"ok": False, "status": "autoexclusion", "error": reason}
 
         # Mantener afinidad: ApiChecker usa el mismo proxy que validó el login.
-        # fetch_mode="balance_only" (cambio 2026-05-23): trae balance +
-        # last_deposit + KYC. NO trae txns (~3-5s ahorro). Robert: "el balance
-        # y fechas de depósito y cantidades sí actualizar, pero los datos
-        # estáticos repararse desde BD". Las txns nuevas las trae el watchdog
-        # o el flujo de depósito (que sí usa "full").
+        # fetch_mode="balance_only": trae balance + last_deposit + KYC.
         async with BetmexicoApiChecker(proxy=used_proxy) as checker:
-            details = await asyncio.wait_for(
-                checker.fetch_account_details_parallel(jwt, fetch_mode="balance_only"),
-                timeout=12.0,
-            )
+            try:
+                details = await asyncio.wait_for(
+                    checker.fetch_account_details_parallel(jwt, fetch_mode="balance_only"),
+                    timeout=12.0,
+                )
+            except Exception as e:
+                logger.warning(f"[Prewarm] {email} error en fetch_account_details_parallel: {e}")
+                details = None
+
         fetch_empty = _fetch_looks_empty(details)
-        if fetch_empty and jwt_from_cache:
-            logger.warning(f"[Prewarm] {email} JWT en cache devolvió 401/sin datos — invalidando y reintentando con login fresco...")
+        if fetch_empty:
+            logger.warning(f"[Prewarm] {email} JWT en cache devolvió 401/sin datos — ejecutando login directo vía CaptchaHub...")
             await asyncio.to_thread(_db_invalidate_jwt, email)
-            # Reintento con login fresco (con captcha)
-            login_fresh = await gentle_login(
-                email, password, max_login_retries=3, throttle=True,
-                pool=pool, use_cache=False,
-            )
-            if login_fresh.jwt:
-                jwt = login_fresh.jwt
-                used_proxy = login_fresh.used_proxy or used_proxy
-                jwt_from_cache = False
+            # Reintento con login directo usando CaptchaHub
+            try:
                 async with BetmexicoApiChecker(proxy=used_proxy) as checker:
-                    details = await asyncio.wait_for(
-                        checker.fetch_account_details_parallel(jwt, fetch_mode="balance_only"),
-                        timeout=12.0,
-                    )
-                fetch_empty = _fetch_looks_empty(details)
+                    login_fresh = await checker.test_login(email, password)
+                    if login_fresh and login_fresh.get("status") == "LIVE":
+                        details = login_fresh.get("account_details") or login_fresh
+                        jwt = login_fresh.get("jwt_token") or (login_fresh.get("api") or {}).get("token") or jwt
+                        if jwt:
+                            from betmexico_login_service import _persist_jwt_cache
+                            _persist_jwt_cache(email, jwt)
+                        fetch_empty = _fetch_looks_empty(details)
+            except Exception as ex_lf:
+                logger.error(f"[Prewarm] {email} error en login fresco directo: {ex_lf}")
 
         if details and not fetch_empty:
             await asyncio.to_thread(_db_upsert_balance, email, details)

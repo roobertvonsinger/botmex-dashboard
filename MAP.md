@@ -106,7 +106,7 @@ prewarm.py (router)
 | `betmexico_db.py` | 2941 | `—` | _[completar]_ |
 | `betmexico_deposit.py` | 958 | `—` | _[completar]_ |
 | `betmexico_login_api.py` | 1138 | `httpx` | _[completar]_ |
-| `betmexico_login_service.py` | 136 | `betmexico.login_service` | _[completar]_ |
+| `betmexico_login_service.py` | 144 | `betmexico.login_service` | _[completar]_ |
 | `betmexico_payment_analyzer.py` | 492 | `—` | _[completar]_ |
 | `betmexico_utils.py` | 1159 | `—` | _[completar]_ |
 | `bin_intelligence.py` | 670 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
@@ -117,7 +117,7 @@ prewarm.py (router)
 | `deposits.py` | 3012 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 383 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 458 | `betmexico.dashboard.login_orch` | _[completar]_ |
-| `prewarm.py` | 923 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
+| `prewarm.py` | 922 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 389 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_validator.py` | 154 | `betmexico.renapo_validator` | _[completar]_ |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
@@ -293,6 +293,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `89fe1ed` | feat(refresh): live on-demand refresh via CaptchaHub auto-login, remove balance blocks, add UI refresh |
 | `73052ed` | fix(identity): prevent jwt username from poisoning fullname and protect curp/phone in merge |
 | `8013b21` | fix(api): deteccion estricta de JWT caducado (401/redirectLogin) y auto-recovery con login fresco para evitar sobreescribir balances reales con 0.00 |
 | `2947399` | fix(withdrawals): auto-reconciliar retiros historicos a status 6 y limpiar alertas de retiros terminados en el panel de deposito |
@@ -304,7 +305,6 @@ prewarm.py (router)
 | `56e4707` | fix(pantalla): descartar status de retiro si no tiene transactionId o es idle |
 | `d5a7793` | fix(portal): agregar idle a estados terminales de retiro y cache buster v20260826a |
 | `e9dc6be` | fix(withdrawals): eliminar bucle infinito de retiro en proceso, auto-reconciliar retiros completados y liberar locks huerfanos |
-| `6c082ba` | feat(bet): pasaporte live ruthopia db, tiro directo a casadas para superadmin y comandos betf/fast |
 <!-- GEN:end:recientes -->
 
 ---

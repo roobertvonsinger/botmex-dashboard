@@ -318,9 +318,9 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `make_pool` | def | L33–L45 |
-| `_persist_jwt_cache` | def | L48–L62 |
-| `get_jwt` | def | L65–L136 |
+| `make_pool` | def | L33–L53 |
+| `_persist_jwt_cache` | def | L56–L70 |
+| `get_jwt` | def | L73–L144 |
 
 ### `betmexico_payment_analyzer.py`
 
@@ -544,11 +544,11 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_db_mark_dead` | def | L353–L376 |
 | `_is_balance_fresh` | def | L379–L387 |
 | `_capmonster_balance` | def | L392–L408 |
-| `_run_prewarm` | def | L413–L603 |
-| `prewarm_select` | def | L609–L693 |
-| `prewarm_cancel` | def | L697–L707 |
-| `prewarm_status` | def | L711–L726 |
-| `prewarm_refresh_stream` | def | L732–L923 |
+| `_run_prewarm` | def | L413–L602 |
+| `prewarm_select` | def | L608–L692 |
+| `prewarm_cancel` | def | L696–L706 |
+| `prewarm_status` | def | L710–L725 |
+| `prewarm_refresh_stream` | def | L731–L922 |
 
 ### `renapo_validator.py`
 
