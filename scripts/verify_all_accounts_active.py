@@ -49,13 +49,16 @@ def get_target_accounts():
 
 
 def mark_account_dead(email: str, reason: str):
+    from datetime import datetime, timezone
     conn = get_db_connection()
     c = conn.cursor()
     now_cd = int(time.time()) + (86400 * 30)  # 30 dias de cooldown
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     c.execute(
-        "UPDATE accounts SET status='DEAD', locked_by=NULL, locked_until=NULL, "
+        "UPDATE accounts SET status='DEAD', dead_reason=?, dead_at=COALESCE(dead_at, ?), "
+        "published_to_pool=0, locked_by=NULL, locked_until=NULL, "
         "cooldown_until=? WHERE email=?",
-        (now_cd, email)
+        (reason, now_str, now_cd, email)
     )
     conn.commit()
     conn.close()

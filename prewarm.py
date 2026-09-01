@@ -367,7 +367,10 @@ def _db_mark_dead(email: str, reason: str) -> None:
             c.execute(
                 "UPDATE accounts SET status='DEAD', "
                 "dead_reason=COALESCE(NULLIF(dead_reason,''), ?), "
-                "dead_at=COALESCE(dead_at, ?) "
+                "dead_at=COALESCE(dead_at, ?), "
+                "published_to_pool=0, "
+                "locked_by=NULL, "
+                "locked_until=NULL "
                 "WHERE email=? AND status!='DEAD'",
                 (reason, dead_at, email),
             )

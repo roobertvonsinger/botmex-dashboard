@@ -225,18 +225,18 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_get_married_card_owners` | def | L175–L209 |
 | `select_accounts_for_auto` | def | L218–L445 |
 | `_max_accounts_for_cards` | def | L454–L462 |
-| `plan_auto_mission` | def | L465–L834 |
-| `_fake_progress_pct` | def | L875–L906 |
-| `_iso` | def | L910–L911 |
-| `_m_load` | def | L914–L922 |
-| `_m_status` | def | L925–L927 |
-| `_m_update` | def | L930–L940 |
-| `_fetch_account` | def | L943–L950 |
-| `_is_account_dead` | def | L953–L964 |
-| `_unlock` | def | L967–L976 |
-| `_broadcast_mission` | def | L979–L1008 |
-| `_stop_pool` | def | L1011–L1018 |
-| `run_auto_mission` | def | L1022–L1961 |
+| `plan_auto_mission` | def | L465–L841 |
+| `_fake_progress_pct` | def | L882–L913 |
+| `_iso` | def | L917–L918 |
+| `_m_load` | def | L921–L929 |
+| `_m_status` | def | L932–L934 |
+| `_m_update` | def | L937–L947 |
+| `_fetch_account` | def | L950–L957 |
+| `_is_account_dead` | def | L960–L971 |
+| `_unlock` | def | L974–L983 |
+| `_broadcast_mission` | def | L986–L1015 |
+| `_stop_pool` | def | L1018–L1025 |
+| `run_auto_mission` | def | L1029–L1968 |
 
 ### `autoexclusion.py`
 
@@ -536,14 +536,14 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_db_save_txns_and_recalc` | def | L268–L321 |
 | `_db_update_last_checked` | def | L324–L336 |
 | `_db_invalidate_jwt` | def | L339–L350 |
-| `_db_mark_dead` | def | L353–L376 |
-| `_is_balance_fresh` | def | L379–L387 |
-| `_capmonster_balance` | def | L392–L408 |
-| `_run_prewarm` | def | L413–L595 |
-| `prewarm_select` | def | L601–L685 |
-| `prewarm_cancel` | def | L689–L699 |
-| `prewarm_status` | def | L703–L718 |
-| `prewarm_refresh_stream` | def | L724–L915 |
+| `_db_mark_dead` | def | L353–L379 |
+| `_is_balance_fresh` | def | L382–L390 |
+| `_capmonster_balance` | def | L395–L411 |
+| `_run_prewarm` | def | L416–L598 |
+| `prewarm_select` | def | L604–L688 |
+| `prewarm_cancel` | def | L692–L702 |
+| `prewarm_status` | def | L706–L721 |
+| `prewarm_refresh_stream` | def | L727–L918 |
 
 ### `renapo_validator.py`
 
@@ -605,8 +605,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 |---------|------|--------|
 | `get_db_connection` | def | L31–L38 |
 | `get_target_accounts` | def | L41–L48 |
-| `mark_account_dead` | def | L51–L62 |
-| `main` | def | L65–L133 |
+| `mark_account_dead` | def | L51–L65 |
+| `main` | def | L68–L136 |
 
 ### `shared/betmexico_payment_analyzer.py`
 

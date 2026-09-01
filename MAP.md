@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 592 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5535 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1961 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 1968 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `betmexico_config.py` | 183 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2941 | `—` | _[completar]_ |
@@ -117,7 +117,7 @@ prewarm.py (router)
 | `deposits.py` | 3012 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 383 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 217 | `betmexico.dashboard.login_orch` | _[completar]_ |
-| `prewarm.py` | 915 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
+| `prewarm.py` | 918 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 389 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_validator.py` | 154 | `betmexico.renapo_validator` | _[completar]_ |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
@@ -125,7 +125,7 @@ prewarm.py (router)
 | `scripts/migrate_status_no_banco.py` | 80 | `—` | _[completar]_ |
 | `scripts/recalc_grades.py` | 136 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `scripts/update_proxy001_list.py` | 35 | `—` | _[completar]_ |
-| `scripts/verify_all_accounts_active.py` | 137 | `verify_all_accounts` | _[completar]_ |
+| `scripts/verify_all_accounts_active.py` | 140 | `verify_all_accounts` | _[completar]_ |
 | `shared/betmexico_payment_analyzer.py` | 592 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
 | `test_a1_estados.py` | 305 | `—` | _[completar]_ |
 | `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
@@ -293,6 +293,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d8406d7` | refactor: eliminate gentle_login over-engineering and captcha caching bugs, enable crisp direct login and instant balance refresh |
 | `85bbe1a` | fix(prewarm): wire make_pool to CaptchaHub and execute direct test_login on stale JWT |
 | `89fe1ed` | feat(refresh): live on-demand refresh via CaptchaHub auto-login, remove balance blocks, add UI refresh |
 | `73052ed` | fix(identity): prevent jwt username from poisoning fullname and protect curp/phone in merge |
@@ -304,7 +305,6 @@ prewarm.py (router)
 | `a4f4a33` | fix(matchmaker): exclusion estricta de cuentas 429/rate_limited a DEAD y purga de zombies en BD |
 | `6990675` | fix(depos): limpiar #wdStatus en mountCompact y forzar version 20260826c |
 | `56e4707` | fix(pantalla): descartar status de retiro si no tiene transactionId o es idle |
-| `d5a7793` | fix(portal): agregar idle a estados terminales de retiro y cache buster v20260826a |
 <!-- GEN:end:recientes -->
 
 ---

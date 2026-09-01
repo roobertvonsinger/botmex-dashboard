@@ -513,7 +513,13 @@ def plan_auto_mission(
             con.commit()
         except Exception:
             pass
-        rows = [dict(r) for r in con.execute("SELECT * FROM accounts").fetchall()]
+        rows = [
+            dict(r) for r in con.execute(
+                "SELECT * FROM accounts WHERE status='LIVE' AND COALESCE(grade, '') != 'D' "
+                "AND (published_to_pool=1 OR (locked_by IS NOT NULL AND lower(locked_by) IN ('1341812706', 'robertvs', 'ruth_operator', 'superadmin'))) "
+                "AND (dead_reason IS NULL OR dead_reason='') AND (dead_at IS NULL OR dead_at='')"
+            ).fetchall()
+        ]
         window_map: Dict[str, Dict[str, Any]] = {}
         decline_map: Dict[str, int] = {}
         meta_map: Dict[str, Dict[str, Any]] = {}
@@ -756,11 +762,12 @@ def plan_auto_mission(
                 ).fetchone()
                 if row_acc:
                     st = (row_acc["status"] or "").upper()
+                    gr = (row_acc["grade"] or "").upper()
                     has_rl = con.execute(
                         "SELECT COUNT(*) as n FROM deposit_attempts WHERE account_email=? AND (UPPER(status) LIKE '%RATE%' OR rejection_reason LIKE '%429%' OR rejection_reason LIKE '%RATE%' OR UPPER(status) IN ('ACCOUNT_DEAD', 'BAN', 'RATE_LIMITED', 'RATE_LIMITED_PERMANENT'))",
                         (m_email,)
                     ).fetchone()["n"]
-                    is_dead = bool(row_acc["dead_reason"] or row_acc["dead_at"] or st in ("DEAD", "BAN", "RATE_LIMITED", "RATE_LIMITED_PERMANENT") or has_rl > 0)
+                    is_dead = bool(row_acc["dead_reason"] or row_acc["dead_at"] or st != "LIVE" or gr == "D" or has_rl > 0)
                     if not is_dead:
                         accounts_out.append({
                             "id": row_acc["id"],
