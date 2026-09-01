@@ -1,0 +1,384 @@
+{
+  "nodes": [
+    {
+      "id": "group_canales",
+      "type": "group",
+      "label": "ENTRADAS / CANALES",
+      "x": -640,
+      "y": -700,
+      "width": 1260,
+      "height": 220,
+      "color": "5"
+    },
+    {
+      "id": "group_control",
+      "type": "group",
+      "label": "CAPA DE CONTROL Y EVENTOS",
+      "x": -640,
+      "y": -450,
+      "width": 1260,
+      "height": 210,
+      "color": "6"
+    },
+    {
+      "id": "group_motor",
+      "type": "group",
+      "label": "MOTOR DE NEGOCIO",
+      "x": -640,
+      "y": -210,
+      "width": 1260,
+      "height": 270,
+      "color": "6"
+    },
+    {
+      "id": "group_servicios",
+      "type": "group",
+      "label": "SERVICIOS Y ESTADO",
+      "x": -640,
+      "y": 90,
+      "width": 1260,
+      "height": 220,
+      "color": "4"
+    },
+    {
+      "id": "group_integraciones",
+      "type": "group",
+      "label": "INTEGRACIONES EXTERNAS / INFRAESTRUCTURA",
+      "x": -640,
+      "y": 340,
+      "width": 1260,
+      "height": 210
+    },
+    {
+      "id": "group_cambios",
+      "type": "group",
+      "label": "ÁREA DE CAMBIOS Y GUARDRAILS",
+      "x": 660,
+      "y": -450,
+      "width": 380,
+      "height": 450,
+      "color": "3"
+    },
+    {
+      "id": "node_tg_bot",
+      "type": "text",
+      "x": -590,
+      "y": -660,
+      "width": 540,
+      "height": 150,
+      "color": "5",
+      "text": "### 📱 Telegram Bot\n**Entrada:** Comandos de operador `/start`, `/bet`, `/check`, `/adduser`.\n**Decisión central:** Confirmación de misión (`confirm_gate`) y permisos de rol.\n**Modifica:** Mensaje de misión en vivo en Telegram (edit inline con fallback).\n**Comunica:** Alertas terminales (éxito/fallo), link al portal y ficha SPEI con STP.\n→ Abrir nota: [[01 — Telegram Bot]]"
+    },
+    {
+      "id": "node_dash_web",
+      "type": "text",
+      "x": 40,
+      "y": -660,
+      "width": 540,
+      "height": 150,
+      "color": "5",
+      "text": "### 🖥️ Dashboard / Portal Web\n**Entrada:** Peticiones HTTP de operadores (`/user/{tg_id}`) y Superadmin (`/dashboard`).\n**Decisión central:** Vista normal vs `?view_as=` (degradar rol) y visibilidad de cuentas.\n**Modifica:** Cuentas activas, disparos manuales de depósito y retiro.\n**Comunica:** Actualizaciones instantáneas vía SSE y consola de logs en vivo.\n→ Abrir nota: [[02 — Dashboard y Portal]]"
+    },
+    {
+      "id": "node_auth_roles",
+      "type": "text",
+      "x": -590,
+      "y": -410,
+      "width": 540,
+      "height": 140,
+      "color": "6",
+      "text": "### 🔐 Auth, Roles y Visibilidad\n**Entrada:** Cookies de sesión y headers en rutas protegidas FastAPI.\n**Decisión central:** Validar credenciales; aislar cuentas por operador; SA ve todo.\n**Modifica:** Contexto del usuario autenticado y auditoría de accesos.\n**Comunica:** Redirección a `/login` o error 403 Forbidden.\n→ Abrir nota: [[03 — Auth, Roles y Visibilidad]]"
+    },
+    {
+      "id": "node_events_sse",
+      "type": "text",
+      "x": 40,
+      "y": -410,
+      "width": 540,
+      "height": 140,
+      "color": "6",
+      "text": "### 📡 Eventos SSE / Broadcast\n**Entrada:** Eventos de progreso de depósito, refresco de saldo y logs.\n**Decisión central:** Distribución en tiempo real filtrada por `telegram_id` del canal.\n**Modifica:** Colas en memoria `_sse_queues` en `app.py`.\n**Comunica:** Streams `/api/stream` y `/api/missions/stream` hacia web y bot.\n→ Abrir nota: [[08 — BD, Eventos e Infraestructura]]"
+    },
+    {
+      "id": "node_flow_bet",
+      "type": "text",
+      "x": -590,
+      "y": -170,
+      "width": 260,
+      "height": 190,
+      "color": "6",
+      "text": "### 💳 Flujo /bet\n**Entrada:** Lote de CCs (`pipes`).\n**Decisión:** Valida lote, genera `mission_id` y encola cuentas.\n**Modifica:** Estado de misión y reserva de cuentas.\n**Comunica:** Progreso % en vivo.\n→ Abrir: [[04 — Flujo Auto-deposit]]"
+    },
+    {
+      "id": "node_auto_deposit",
+      "type": "text",
+      "x": -290,
+      "y": -170,
+      "width": 320,
+      "height": 190,
+      "color": "6",
+      "text": "### ⚙️ Auto-deposit / Matchmaker\n**Entrada:** `/bet` confirmado + tarjetas.\n**Decisión:** Cuotas Tier 40/40/20 + exclusiones de seguridad.\n**Modifica:** Intentos, saldo y estado de cuenta.\n**Comunica:** Evento SSE de match y cobro.\n→ Abrir Canvas Detalle: [[04 — Flujo Auto-deposit.canvas]]"
+    },
+    {
+      "id": "node_card_liveness",
+      "type": "text",
+      "x": 60,
+      "y": -170,
+      "width": 240,
+      "height": 190,
+      "color": "3",
+      "text": "### 🔍 Cards & Liveness\n**Entrada:** Tarjetas crudas / Ruthopia.\n**Decisión:** BIN check + liveness previo.\n**Modifica:** Marca tarjeta (Válida/Burned).\n**Comunica:** Estatus de pasarela.\n→ Abrir: [[05 — Validación de Tarjetas]]"
+    },
+    {
+      "id": "node_withdrawals",
+      "type": "text",
+      "x": 330,
+      "y": -170,
+      "width": 250,
+      "height": 190,
+      "color": "4",
+      "text": "### 💸 Retiros & STP\n**Entrada:** Cuentas con saldo > $0.\n**Decisión:** Match STP/CLABE + CURP titular.\n**Modifica:** Retiro en pasarela y saldo BD.\n**Comunica:** Ficha SPEI 1-tap copy.\n→ Abrir: [[07 — Retiros y Reconciliación]]"
+    },
+    {
+      "id": "node_jwt_keeper",
+      "type": "text",
+      "x": -590,
+      "y": 130,
+      "width": 360,
+      "height": 140,
+      "color": "4",
+      "text": "### 🔑 JWT Keeper\n**Entrada:** Cuentas con sesión activa en BetMexico.\n**Decisión:** Renovar JWT antes de expiración silenciosa.\n**Modifica:** Tokens JWT en memoria y SQLite.\n**Comunica:** Mantiene cuentas calientes sin gastar captchas.\n→ Abrir: [[06 — Sesiones, JWT y Refresh]]"
+    },
+    {
+      "id": "node_acc_refresh",
+      "type": "text",
+      "x": -190,
+      "y": 130,
+      "width": 360,
+      "height": 140,
+      "color": "6",
+      "text": "### 🔄 Account Refresh / Prewarm\n**Entrada:** Daemon cíclico de 5 min o `/prewarm`.\n**Decisión:** Priorizar cuentas 'hot' (saldo >$50 o retiro).\n**Modifica:** Balance real, movimientos y grading.\n**Comunica:** Alertas de saldo listo para cobro.\n→ Abrir: [[06 — Sesiones, JWT y Refresh]]"
+    },
+    {
+      "id": "node_sqlite_db",
+      "type": "text",
+      "x": 210,
+      "y": 130,
+      "width": 370,
+      "height": 140,
+      "color": "4",
+      "text": "### 🗃️ SQLite (betmexico_accounts.db)\n**Entrada:** Escrituras de bot, dashboard y daemons.\n**Decisión:** Modo WAL, transacciones atómicas y bloqueos cortos.\n**Modifica:** Tablas `accounts`, `missions`, `cards`, `deposits`.\n**Comunica:** Fuente de verdad única y compartida.\n→ Abrir: [[08 — BD, Eventos e Infraestructura]]"
+    },
+    {
+      "id": "node_proxy_pool",
+      "type": "text",
+      "x": -590,
+      "y": 380,
+      "width": 360,
+      "height": 140,
+      "text": "### 🌐 Proxy Pool (Proxy-Gate)\n**Entrada:** Tráfico HTTP hacia BetMexico y pasarelas.\n**Decisión:** Rotación con failover (`call_with_proxy_failover`).\n**Modifica:** Blacklist de proxies con 402/fallos (LitPort, IPRoyal).\n**Comunica:** Enrutamiento IP residencial transparente.\n→ Abrir: [[08 — BD, Eventos e Infraestructura]]"
+    },
+    {
+      "id": "node_ruthopia_bridge",
+      "type": "text",
+      "x": -190,
+      "y": 380,
+      "width": 360,
+      "height": 140,
+      "text": "### 🤖 Ruthopia Bridge\n**Entrada:** Tarjetas validadas por checkers en Ruthopia.\n**Decisión:** Ingesta selectiva hacia bóveda de tarjetas.\n**Modifica:** Disponibilidad de tarjetas en pipeline local.\n**Comunica:** Sincronización entre VPS1 (Old) y VPS2 (Karen).\n→ Abrir: [[05 — Validación de Tarjetas]]"
+    },
+    {
+      "id": "node_betmexico_api",
+      "type": "text",
+      "x": 210,
+      "y": 380,
+      "width": 370,
+      "height": 140,
+      "text": "### 🏦 BetMexico API / Pasarela\n**Entrada:** BeginDeposit, makePayment, balance check.\n**Decisión:** 200 (OK), 429 (Rate Limit), 406 (Captcha), BANK_REJECTED.\n**Modifica:** Saldo en el casino y estado de la tarjeta.\n**Comunica:** Autorización o rechazo con código de respuesta.\n→ Abrir: [[04 — Flujo Auto-deposit]]"
+    },
+    {
+      "id": "node_propuesta_429",
+      "type": "text",
+      "x": 690,
+      "y": -400,
+      "width": 320,
+      "height": 180,
+      "color": "3",
+      "text": "### 💡 CAMBIO PROPUESTO\n**429 Cooldown vs DEAD Inmediato**\n- **Problema:** El 429 manda la cuenta a `DEAD` sin tolerancia.\n- **Solución:** Aplicar cooldown de 24h (`rate_limited_cooldown`) y revalidar en el siguiente ciclo sin quemar la cuenta.\n→ Abrir Canvas: [[Cambios/Propuesta — 429 cooldown.canvas]]"
+    },
+    {
+      "id": "node_guardrail_married",
+      "type": "text",
+      "x": 690,
+      "y": -180,
+      "width": 320,
+      "height": 170,
+      "color": "1",
+      "text": "### 🛡️ GUARDRAIL INMUTABLE\n**Regla Married Card (1:1)**\n- **1 Tarjeta = 1 Cuenta BetMexico permanente.**\n- Si una tarjeta es aprobada, queda casada (`is_married=1`).\n- PROHIBIDO reutilizarla en otra cuenta (provoca baneo inmediato de ambas cuentas).\n→ Abrir: [[Referencias/Glosario de decisiones]]"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_tg_bet",
+      "fromNode": "node_tg_bot",
+      "fromSide": "bottom",
+      "toNode": "node_flow_bet",
+      "toSide": "top",
+      "color": "6",
+      "label": "Inicia /bet"
+    },
+    {
+      "id": "e_tg_web",
+      "fromNode": "node_tg_bot",
+      "fromSide": "right",
+      "toNode": "node_dash_web",
+      "toSide": "left",
+      "color": "5",
+      "label": "Link al portal"
+    },
+    {
+      "id": "e_web_auth",
+      "fromNode": "node_dash_web",
+      "fromSide": "bottom",
+      "toNode": "node_auth_roles",
+      "toSide": "top",
+      "color": "6",
+      "label": "Valida sesión"
+    },
+    {
+      "id": "e_auth_web",
+      "fromNode": "node_auth_roles",
+      "fromSide": "top",
+      "toNode": "node_dash_web",
+      "toSide": "bottom",
+      "color": "4",
+      "label": "Permisos OK"
+    },
+    {
+      "id": "e_bet_auto",
+      "fromNode": "node_flow_bet",
+      "fromSide": "right",
+      "toNode": "node_auto_deposit",
+      "toSide": "left",
+      "color": "6",
+      "label": "Lote CCs"
+    },
+    {
+      "id": "e_auto_card",
+      "fromNode": "node_auto_deposit",
+      "fromSide": "right",
+      "toNode": "node_card_liveness",
+      "toSide": "left",
+      "color": "3",
+      "label": "Verifica liveness"
+    },
+    {
+      "id": "e_auto_sse",
+      "fromNode": "node_auto_deposit",
+      "fromSide": "top",
+      "toNode": "node_events_sse",
+      "toSide": "bottom",
+      "color": "6",
+      "label": "Broadcast progreso"
+    },
+    {
+      "id": "e_sse_web",
+      "fromNode": "node_events_sse",
+      "fromSide": "top",
+      "toNode": "node_dash_web",
+      "toSide": "bottom",
+      "color": "5",
+      "label": "Stream SSE"
+    },
+    {
+      "id": "e_sse_tg",
+      "fromNode": "node_events_sse",
+      "fromSide": "left",
+      "toNode": "node_tg_bot",
+      "toSide": "bottom",
+      "color": "5",
+      "label": "Edita mensaje"
+    },
+    {
+      "id": "e_auto_db",
+      "fromNode": "node_auto_deposit",
+      "fromSide": "bottom",
+      "toNode": "node_sqlite_db",
+      "toSide": "top",
+      "color": "4",
+      "label": "Guarda match / saldo"
+    },
+    {
+      "id": "e_auto_api",
+      "fromNode": "node_auto_deposit",
+      "fromSide": "bottom",
+      "toNode": "node_betmexico_api",
+      "toSide": "top",
+      "color": "6",
+      "label": "makePayment"
+    },
+    {
+      "id": "e_auto_proxy",
+      "fromNode": "node_auto_deposit",
+      "fromSide": "bottom",
+      "toNode": "node_proxy_pool",
+      "toSide": "top",
+      "color": "5",
+      "label": "Tráfico residencial"
+    },
+    {
+      "id": "e_ret_db",
+      "fromNode": "node_withdrawals",
+      "fromSide": "bottom",
+      "toNode": "node_sqlite_db",
+      "toSide": "top",
+      "color": "4",
+      "label": "withdrawn"
+    },
+    {
+      "id": "e_ret_tg",
+      "fromNode": "node_withdrawals",
+      "fromSide": "top",
+      "toNode": "node_tg_bot",
+      "toSide": "bottom",
+      "color": "4",
+      "label": "Ficha SPEI"
+    },
+    {
+      "id": "e_jwt_db",
+      "fromNode": "node_jwt_keeper",
+      "fromSide": "bottom",
+      "toNode": "node_sqlite_db",
+      "toSide": "left",
+      "color": "4",
+      "label": "Token activo"
+    },
+    {
+      "id": "e_acc_db",
+      "fromNode": "node_acc_refresh",
+      "fromSide": "bottom",
+      "toNode": "node_sqlite_db",
+      "toSide": "top",
+      "color": "4",
+      "label": "Update balance"
+    },
+    {
+      "id": "e_ruth_card",
+      "fromNode": "node_ruthopia_bridge",
+      "fromSide": "top",
+      "toNode": "node_card_liveness",
+      "toSide": "bottom",
+      "color": "3",
+      "label": "Cosecha CCs"
+    },
+    {
+      "id": "e_prop_auto",
+      "fromNode": "node_propuesta_429",
+      "fromSide": "left",
+      "toNode": "node_auto_deposit",
+      "toSide": "right",
+      "color": "3",
+      "label": "Afecta matchmaking"
+    }
+  ]
+}

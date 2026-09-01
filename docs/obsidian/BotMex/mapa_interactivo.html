@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BotMex — Sistema Visual Interactivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #090d16;
+    --surface: #111827;
+    --surface-hover: #1f293d;
+    --border: #1e293b;
+    --text: #f1f5f9;
+    --text-muted: #94a3b8;
+    --blue: #38bdf8;
+    --purple: #c084fc;
+    --green: #4ade80;
+    --yellow: #facc15;
+    --red: #f87171;
+    --gray: #64748b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: rgba(17, 24, 39, 0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 100;
+  }
+  .title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .badge {
+    background: rgba(56, 189, 248, 0.15);
+    color: var(--blue);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    text-transform: uppercase;
+  }
+  h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
+  .controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .btn {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn:hover {
+    background: var(--surface-hover);
+    border-color: var(--blue);
+  }
+  .btn-primary {
+    background: #0284c7;
+    border-color: var(--blue);
+    color: #fff;
+  }
+  .btn-primary:hover {
+    background: #0369a1;
+  }
+  .legend {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  #canvas-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    cursor: grab;
+    background-image: radial-gradient(#1e293b 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  #canvas-container:active { cursor: grabbing; }
+  #world {
+    position: absolute;
+    transform-origin: 0 0;
+    width: 3200px;
+    height: 2400px;
+  }
+  svg#edges-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .card-group {
+    position: absolute;
+    border: 1px dashed rgba(148, 163, 184, 0.25);
+    background: rgba(17, 24, 39, 0.35);
+    border-radius: 16px;
+    padding: 16px;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .group-label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+  .node-card {
+    position: absolute;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .node-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 35px -5px rgba(0, 0, 0, 0.7);
+  }
+  .node-card.blue { border-top: 3px solid var(--blue); }
+  .node-card.purple { border-top: 3px solid var(--purple); }
+  .node-card.green { border-top: 3px solid var(--green); }
+  .node-card.yellow { border-top: 3px solid var(--yellow); }
+  .node-card.red { border-top: 3px solid var(--red); }
+  .node-card.gray { border-top: 3px solid var(--gray); }
+
+  .node-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .node-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .node-body {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.45;
+  }
+  .node-body strong {
+    color: #e2e8f0;
+  }
+  .node-footer {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--blue);
+  }
+
+  /* Drawer Inspector */
+  #drawer {
+    position: fixed;
+    right: -420px;
+    top: 57px;
+    bottom: 0;
+    width: 420px;
+    background: rgba(17, 24, 39, 0.95);
+    backdrop-filter: blur(16px);
+    border-left: 1px solid var(--border);
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.6);
+    transition: right 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 200;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  #drawer.open { right: 0; }
+  .drawer-close {
+    align-self: flex-end;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 20px;
+    cursor: pointer;
+  }
+  .drawer-close:hover { color: #fff; }
+  #drawer-title { font-size: 18px; font-weight: 800; }
+  #drawer-badge {
+    align-self: flex-start;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  #drawer-content {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #cbd5e1;
+    overflow-y: auto;
+    flex: 1;
+    white-space: pre-line;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-wrap">
+    <span class="badge">Soberano</span>
+    <h1>BotMex — Mapa Visual del Sistema</h1>
+    <span style="font-size: 12px; color: var(--text-muted);">Nivel 0: Panorama Canvas</span>
+  </div>
+  <div class="legend">
+    <span><span class="dot" style="background:var(--blue)"></span> Canales</span>
+    <span><span class="dot" style="background:var(--purple)"></span> Motor/Control</span>
+    <span><span class="dot" style="background:var(--green)"></span> Persistencia</span>
+    <span><span class="dot" style="background:var(--yellow)"></span> Propuesta</span>
+    <span><span class="dot" style="background:var(--red)"></span> Guardrail</span>
+  </div>
+  <div class="controls">
+    <button class="btn" onclick="zoomIn()">➕ Zoom In</button>
+    <button class="btn" onclick="zoomOut()">➖ Zoom Out</button>
+    <button class="btn" onclick="resetView()">🎯 Centrar</button>
+    <button class="btn btn-primary" onclick="alert('Abriendo Obsidian... Puedes abrir el archivo 00 — BotMex System Map.canvas directamente dentro de tu vault Obsidian/ANTIGRAVITY.')">📂 Ver en Obsidian</button>
+  </div>
+</header>
+
+<div id="canvas-container">
+  <div id="world">
+    <svg id="edges-layer"></svg>
+    <!-- Groups & Cards dynamically rendered -->
+  </div>
+</div>
+
+<div id="drawer">
+  <button class="drawer-close" onclick="closeDrawer()">&times;</button>
+  <span id="drawer-badge"></span>
+  <h2 id="drawer-title">Detalle del Nodo</h2>
+  <div id="drawer-content"></div>
+</div>
+
+<script>
+const nodesData = [
+  // Grupos
+  { type: 'group', label: 'ENTRADAS / CANALES', x: 200, y: 150, w: 1100, h: 220, color: 'blue' },
+  { type: 'group', label: 'CAPA DE CONTROL Y EVENTOS', x: 200, y: 400, w: 1100, h: 210, color: 'purple' },
+  { type: 'group', label: 'MOTOR DE NEGOCIO', x: 200, y: 640, w: 1100, h: 260, color: 'purple' },
+  { type: 'group', label: 'SERVICIOS Y ESTADO', x: 200, y: 930, w: 1100, h: 210, color: 'green' },
+  { type: 'group', label: 'INTEGRACIONES EXTERNAS / INFRAESTRUCTURA', x: 200, y: 1170, w: 1100, h: 200, color: 'gray' },
+  { type: 'group', label: 'CAMBIOS Y GUARDRAILS', x: 1340, y: 400, w: 380, h: 500, color: 'yellow' },
+
+  // Tarjetas Canales
+  { id: 'tg_bot', title: '📱 Telegram Bot', color: 'blue', x: 240, y: 190, w: 480, h: 140,
+    text: 'Entrada: Comandos /start, /bet, /check, /adduser.\nDecisión: confirm_gate y roles.\nModifica: Mensaje en vivo (edit inline).\nComunica: Ficha SPEI con CURP/STP al completar.',
+    file: '01 — Telegram Bot.md' },
+  { id: 'dash_web', title: '🖥️ Dashboard / Portal Web', color: 'blue', x: 760, y: 190, w: 500, h: 140,
+    text: 'Entrada: Navegador operador (/user) y SA (/dashboard).\nDecisión: Rol y degradación ?view_as.\nModifica: Triggers de retiro y depósito.\nComunica: SSE stream en vivo + consola logs.',
+    file: '02 — Dashboard y Portal.md' },
+
+  // Tarjetas Control
+  { id: 'auth_roles', title: '🔐 Auth, Roles y Visibilidad', color: 'purple', x: 240, y: 440, w: 480, h: 130,
+    text: 'Entrada: Cookies de sesión en FastAPI.\nDecisión: Aislamiento por operador; SA ve todo.\nModifica: Permisos de request.\nComunica: Redirige /login o 403 Forbidden.',
+    file: '03 — Auth, Roles y Visibilidad.md' },
+  { id: 'events_sse', title: '📡 Eventos SSE / Broadcast', color: 'purple', x: 760, y: 440, w: 500, h: 130,
+    text: 'Entrada: Eventos de depósito y cambios de saldo.\nDecisión: Filtrado por telegram_id de cliente.\nModifica: Colas _sse_queues en memoria.\nComunica: /api/stream y /api/missions/stream.',
+    file: '08 — BD, Eventos e Infraestructura.md' },
+
+  // Tarjetas Motor
+  { id: 'flow_bet', title: '💳 Flujo /bet', color: 'purple', x: 240, y: 680, w: 220, h: 180,
+    text: 'Entrada: Pipes de tarjetas crudas.\nDecisión: Valida lote y genera mission_id.\nModifica: Reserva de cuentas.\nComunica: Progreso % en vivo.',
+    file: '04 — Flujo Auto-deposit.md' },
+  { id: 'auto_deposit', title: '⚙️ Auto-deposit / Matchmaker', color: 'purple', x: 490, y: 680, w: 280, h: 180,
+    text: 'Entrada: Misión confirmada + CCs.\nDecisión: Cuotas Tier 40/40/20 + exclusiones.\nModifica: Saldo e intentos en BD.\nComunica: Evento de match/cobro.',
+    file: '04 — Flujo Auto-deposit.canvas' },
+  { id: 'card_liveness', title: '🔍 Cards & Liveness', color: 'yellow', x: 800, y: 680, w: 220, h: 180,
+    text: 'Entrada: CCs crudas / Ruthopia.\nDecisión: BIN check + liveness previo.\nModifica: Marca Válida/Burned.\nComunica: Estado pasarela.',
+    file: '05 — Validación de Tarjetas.md' },
+  { id: 'withdrawals', title: '💸 Retiros & STP', color: 'green', x: 1050, y: 680, w: 220, h: 180,
+    text: 'Entrada: Cuentas con saldo > $0.\nDecisión: Match CLABE STP + CURP.\nModifica: Retiro en pasarela.\nComunica: Ficha SPEI 1-tap copy.',
+    file: '07 — Retiros y Reconciliación.md' },
+
+  // Tarjetas Estado
+  { id: 'jwt_keeper', title: '🔑 JWT Keeper', color: 'green', x: 240, y: 960, w: 320, h: 140,
+    text: 'Entrada: Cuentas con sesión previa.\nDecisión: Renovar JWT antes de expirar.\nModifica: Token en memoria y SQLite.\nComunica: Cuentas hot sin nuevo captcha.',
+    file: '06 — Sesiones, JWT y Refresh.md' },
+  { id: 'acc_refresh', title: '🔄 Account Refresh / Prewarm', color: 'purple', x: 590, y: 960, w: 320, h: 140,
+    text: 'Entrada: Daemon 5min o /prewarm.\nDecisión: Priorizar cuentas con saldo >$50.\nModifica: Balance real y movimientos.\nComunica: Alerta de saldo listo para cobro.',
+    file: '06 — Sesiones, JWT y Refresh.md' },
+  { id: 'sqlite_db', title: '🗃️ SQLite (betmexico.db)', color: 'green', x: 940, y: 960, w: 320, h: 140,
+    text: 'Entrada: Escrituras de bot, web y daemons.\nDecisión: Modo WAL y cero locks largos.\nModifica: Tablas accounts, missions, cards.\nComunica: Fuente de verdad compartida.',
+    file: '08 — BD, Eventos e Infraestructura.md' },
+
+  // Tarjetas Integraciones
+  { id: 'proxy_pool', title: '🌐 Proxy Pool (Proxy-Gate)', color: 'gray', x: 240, y: 1200, w: 320, h: 130,
+    text: 'Entrada: Peticiones HTTP de depósito.\nDecisión: Rotación con failover.\nModifica: Blacklist LitPort/IPRoyal 402.\nComunica: Enrutamiento residencial limpio.',
+    file: '08 — BD, Eventos e Infraestructura.md' },
+  { id: 'ruthopia_bridge', title: '🤖 Ruthopia Bridge', color: 'gray', x: 590, y: 1200, w: 320, h: 130,
+    text: 'Entrada: Tarjetas validadas en Ruthopia.\nDecisión: Ingesta hacia bóveda de tarjetas.\nModifica: Disponibilidad en pipeline.\nComunica: Sync KVM4-old y KVM4-karen.',
+    file: '05 — Validación de Tarjetas.md' },
+  { id: 'betmexico_api', title: '🏦 BetMexico API / Pasarela', color: 'gray', x: 940, y: 1200, w: 320, h: 130,
+    text: 'Entrada: BeginDeposit, makePayment.\nDecisión: 200, 429, 406, BANK_REJECTED.\nModifica: Saldo en casino y estado CC.\nComunica: Autorización de depósito.',
+    file: '04 — Flujo Auto-deposit.md' },
+
+  // Cambios y Guardrails
+  { id: 'propuesta_429', title: '💡 CAMBIO PROPUESTO', color: 'yellow', x: 1370, y: 440, w: 320, h: 190,
+    text: '429 Cooldown vs DEAD Inmediato\nProblema: Actualmente manda cuenta a DEAD.\nSolución: Cooldown de 24h y revalidar en siguiente ciclo sin quemar la cuenta.',
+    file: 'Cambios/Propuesta — 429 cooldown.canvas' },
+  { id: 'guardrail_married', title: '🛡️ GUARDRAIL INMUTABLE', color: 'red', x: 1370, y: 670, w: 320, h: 180,
+    text: 'Regla Married Card (1:1)\n1 Tarjeta = 1 Cuenta BetMexico permanente.\nSi una tarjeta es aprobada, queda casada (is_married=1).\nPROHIBIDO reusarla en otra cuenta.',
+    file: 'Referencias/Glosario de decisiones.md' }
+];
+
+const edgesData = [
+  { from: 'tg_bot', to: 'flow_bet', label: 'Inicia /bet', color: '#c084fc' },
+  { from: 'tg_bot', to: 'dash_web', label: 'Link portal', color: '#38bdf8' },
+  { from: 'dash_web', to: 'auth_roles', label: 'Valida sesión', color: '#c084fc' },
+  { from: 'flow_bet', to: 'auto_deposit', label: 'Lote CCs', color: '#c084fc' },
+  { from: 'auto_deposit', to: 'card_liveness', label: 'Verifica liveness', color: '#facc15' },
+  { from: 'auto_deposit', to: 'events_sse', label: 'Progreso %', color: '#c084fc' },
+  { from: 'events_sse', to: 'dash_web', label: 'Stream SSE', color: '#38bdf8' },
+  { from: 'events_sse', to: 'tg_bot', label: 'Edita mensaje', color: '#38bdf8' },
+  { from: 'auto_deposit', to: 'sqlite_db', label: 'Match/Saldo', color: '#4ade80' },
+  { from: 'auto_deposit', to: 'betmexico_api', label: 'makePayment', color: '#64748b' },
+  { from: 'withdrawals', to: 'sqlite_db', label: 'withdrawn', color: '#4ade80' },
+  { from: 'withdrawals', to: 'tg_bot', label: 'Ficha SPEI', color: '#4ade80' },
+  { from: 'jwt_keeper', to: 'sqlite_db', label: 'Token activo', color: '#4ade80' },
+  { from: 'acc_refresh', to: 'sqlite_db', label: 'Update balance', color: '#4ade80' },
+  { from: 'ruthopia_bridge', to: 'card_liveness', label: 'Cosecha CCs', color: '#facc15' },
+  { from: 'propuesta_429', to: 'auto_deposit', label: 'Afecta matchmaking', color: '#facc15' }
+];
+
+// Render
+const world = document.getElementById('world');
+const svg = document.getElementById('edges-layer');
+const nodeMap = {};
+
+nodesData.forEach(item => {
+  if (item.type === 'group') {
+    const el = document.createElement('div');
+    el.className = 'card-group';
+    el.style.left = item.x + 'px';
+    el.style.top = item.y + 'px';
+    el.style.width = item.w + 'px';
+    el.style.height = item.h + 'px';
+    el.innerHTML = `<span class="group-label">${item.label}</span>`;
+    world.appendChild(el);
+  } else {
+    nodeMap[item.id] = item;
+    const el = document.createElement('div');
+    el.className = `node-card ${item.color}`;
+    el.style.left = item.x + 'px';
+    el.style.top = item.y + 'px';
+    el.style.width = item.w + 'px';
+    el.style.height = item.h + 'px';
+    el.onclick = () => openDrawer(item);
+
+    const formattedText = item.text.replace(/\\n/g, '<br>').replace(/\n/g, '<br>');
+    el.innerHTML = `
+      <div>
+        <div class="node-header">
+          <div class="node-title">${item.title}</div>
+        </div>
+        <div class="node-body">${formattedText}</div>
+      </div>
+      <div class="node-footer">→ ${item.file}</div>
+    `;
+    world.appendChild(el);
+  }
+});
+
+function drawEdges() {
+  let html = '';
+  edgesData.forEach(edge => {
+    const src = nodeMap[edge.from];
+    const dst = nodeMap[edge.to];
+    if (!src || !dst) return;
+
+    const x1 = src.x + src.w / 2;
+    const y1 = src.y + src.h / 2;
+    const x2 = dst.x + dst.w / 2;
+    const y2 = dst.y + dst.h / 2;
+
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const cx1 = x1 + dx * 0.2;
+    const cy1 = y1 + dy * 0.8;
+    const cx2 = x1 + dx * 0.8;
+    const cy2 = y1 + dy * 0.2;
+
+    html += `<path d="M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}" 
+      fill="none" stroke="${edge.color}" stroke-width="2" stroke-dasharray="4 4" opacity="0.6"/>`;
+    html += `<circle cx="${x2}" cy="${y2}" r="4" fill="${edge.color}"/>`;
+  });
+  svg.innerHTML = html;
+}
+drawEdges();
+
+// Pan & Zoom
+let scale = 0.85;
+let panX = 40;
+let panY = -30;
+let isDragging = false;
+let startX, startY;
+
+const container = document.getElementById('canvas-container');
+function updateTransform() {
+  world.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+}
+updateTransform();
+
+container.onmousedown = (e) => {
+  if (e.target.closest('.node-card')) return;
+  isDragging = true;
+  startX = e.clientX - panX;
+  startY = e.clientY - panY;
+};
+window.onmousemove = (e) => {
+  if (!isDragging) return;
+  panX = e.clientX - startX;
+  panY = e.clientY - startY;
+  updateTransform();
+};
+window.onmouseup = () => isDragging = false;
+
+container.onwheel = (e) => {
+  e.preventDefault();
+  const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+  scale = Math.min(Math.max(0.3, scale * zoomFactor), 2.2);
+  updateTransform();
+};
+
+function zoomIn() { scale = Math.min(2.2, scale * 1.15); updateTransform(); }
+function zoomOut() { scale = Math.max(0.3, scale / 1.15); updateTransform(); }
+function resetView() { scale = 0.85; panX = 40; panY = -30; updateTransform(); }
+
+// Drawer
+function openDrawer(item) {
+  const drawer = document.getElementById('drawer');
+  document.getElementById('drawer-title').innerText = item.title;
+  const badge = document.getElementById('drawer-badge');
+  badge.innerText = item.color.toUpperCase();
+  badge.style.background = `var(--${item.color})`;
+  badge.style.color = '#000';
+  document.getElementById('drawer-content').innerHTML = `
+    <p><strong>Archivo Relacionado:</strong> <code>${item.file}</code></p>
+    <br>
+    <p><strong>Descripción Operativa:</strong></p>
+    <p>${item.text.replace(/\\n/g, '<br>').replace(/\n/g, '<br>')}</p>
+    <br>
+    <p><strong>Nivel de Zoom:</strong> Nivel 0 (Panorama Raíz)</p>
+    <br>
+    <button class="btn btn-primary" onclick="alert('Abriendo ${item.file}...')">Abrir Nota Completa</button>
+  `;
+  drawer.classList.add('open');
+}
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+}
+</script>
+</body>
+</html>

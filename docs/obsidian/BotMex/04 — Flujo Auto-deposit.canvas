@@ -1,0 +1,239 @@
+{
+  "nodes": [
+    {
+      "id": "ad_group_pipeline",
+      "type": "group",
+      "label": "PIPELINE MATCHMAKING & INTENTOS",
+      "x": -500,
+      "y": -450,
+      "width": 1750,
+      "height": 380,
+      "color": "6"
+    },
+    {
+      "id": "ad_group_results",
+      "type": "group",
+      "label": "CLASIFICACIÓN DE RESPUESTAS & ESTADOS TERMINALES",
+      "x": -500,
+      "y": -30,
+      "width": 1750,
+      "height": 320,
+      "color": "3"
+    },
+    {
+      "id": "step_start",
+      "type": "text",
+      "x": -460,
+      "y": -400,
+      "width": 260,
+      "height": 140,
+      "color": "5",
+      "text": "### 🚀 1. run_auto_mission\n**Entrada:** Lote de CCs crudas.\n**Acción:** Inicia temporizadores, genera `mission_id` y emite `mission_started` por SSE.\n→ Archivo: `auto_deposit.py:77`"
+    },
+    {
+      "id": "step_fase1",
+      "type": "text",
+      "x": -160,
+      "y": -400,
+      "width": 280,
+      "height": 140,
+      "color": "6",
+      "text": "### 🎯 2. Matchmaking\n**Función:** `select_accounts_for_auto`\n**Lógica:** Cuotas Tier 40% Tier A / 40% Tier B / 20% Tier C para rotar cuentas sanas.\n→ Archivo: `auto_deposit.py:120`"
+    },
+    {
+      "id": "step_exclusiones",
+      "type": "text",
+      "x": 160,
+      "y": -400,
+      "width": 280,
+      "height": 140,
+      "color": "3",
+      "text": "### 🚫 3. Exclusiones Duras\n- `DEAD` o `rate_limited` (429)\n- Casadas (`is_married=1`)\n- Cuentas 'hot' (saldo real >$50)\n- Retiro activo <48h\n→ Reglas de seguridad"
+    },
+    {
+      "id": "step_jwt_tie",
+      "type": "text",
+      "x": 480,
+      "y": -400,
+      "width": 260,
+      "height": 140,
+      "color": "4",
+      "text": "### 🔑 4. Tie-Break JWT\nDentro de tier LOW, preferir cuentas con JWT-vivo antes del grade para no gastar captchas de Login.\n→ Optimización de costes"
+    },
+    {
+      "id": "step_cap",
+      "type": "text",
+      "x": 780,
+      "y": -400,
+      "width": 240,
+      "height": 140,
+      "color": "2",
+      "text": "### ⏱️ 5. Tope & Anti-Huella\n- **Tope duro:** Máx 10 cuentas/corrida\n- **Piso anti-huella:** 45-60s delay en `status: preparing` (sin cifras visibles)"
+    },
+    {
+      "id": "step_fase2",
+      "type": "text",
+      "x": 480,
+      "y": -220,
+      "width": 280,
+      "height": 120,
+      "color": "6",
+      "text": "### ⚙️ 6. Intento de Depósito\n**Módulo:** `deposits.py`\n- Cooldown 60s entre tarjetas\n- Egress vía `call_with_proxy_failover`\n- ReCAPTCHA v2 gentil"
+    },
+    {
+      "id": "step_classify",
+      "type": "text",
+      "x": 160,
+      "y": -220,
+      "width": 280,
+      "height": 120,
+      "color": "6",
+      "text": "### ⚖️ 7. classify_deposit_status\nEvalúa respuesta HTTP y códigos de pasarela:\n¿Aprobado, rechazado, lock, transitorio o 429?"
+    },
+    {
+      "id": "res_approved",
+      "type": "text",
+      "x": -460,
+      "y": 20,
+      "width": 260,
+      "height": 220,
+      "color": "4",
+      "text": "### ✅ APPROVED\n- Casar tarjeta: `is_married = 1` permanente con esta cuenta.\n- Actualiza balance en BD.\n- Misión completada para esta cuenta.\n- Emite ficha SPEI al bot."
+    },
+    {
+      "id": "res_rejected",
+      "type": "text",
+      "x": -160,
+      "y": 20,
+      "width": 260,
+      "height": 220,
+      "color": "2",
+      "text": "### ⚠️ REJECTED / BANK_REJECTED\n- Banco declinó la tarjeta.\n- Jubilar tarjeta inmediatamente.\n- Cuenta queda limpia para la siguiente tarjeta.\n- NO volver a reintentar esta tarjeta."
+    },
+    {
+      "id": "res_locked",
+      "type": "text",
+      "x": 140,
+      "y": 20,
+      "width": 260,
+      "height": 220,
+      "color": "1",
+      "text": "### 🛑 CARD_LOCKED\n- Tarjeta detectada en otra cuenta de BetMexico.\n- Jubilación inmediata de la tarjeta sin reintentos.\n- Previene bloqueo en cascada."
+    },
+    {
+      "id": "res_transient",
+      "type": "text",
+      "x": 440,
+      "y": 20,
+      "width": 260,
+      "height": 220,
+      "color": "3",
+      "text": "### 🔄 TRANSITORIO\n- Timeout de red o Gateway 5xx.\n- Reintentos hasta `MATCH_TRANSIENT_RETRIES = 4`.\n- Gap de 25s entre intentos.\n- No quema la tarjeta si es transitorio."
+    },
+    {
+      "id": "res_429",
+      "type": "text",
+      "x": 740,
+      "y": 20,
+      "width": 280,
+      "height": 220,
+      "color": "1",
+      "text": "### 🚨 429 RATE LIMIT\n- **Actual:** Cuenta marcada a `DEAD` (pérdida total).\n- **Propuesta:** Cooldown 24h (`rate_limited_cooldown`) y despertar en el siguiente ciclo sin gastar intentos.\n→ Ver: [[Cambios/Propuesta — 429 cooldown]]"
+    }
+  ],
+  "edges": [
+    {
+      "id": "ad_e1",
+      "fromNode": "step_start",
+      "fromSide": "right",
+      "toNode": "step_fase1",
+      "toSide": "left",
+      "color": "5"
+    },
+    {
+      "id": "ad_e2",
+      "fromNode": "step_fase1",
+      "fromSide": "right",
+      "toNode": "step_exclusiones",
+      "toSide": "left",
+      "color": "6"
+    },
+    {
+      "id": "ad_e3",
+      "fromNode": "step_exclusiones",
+      "fromSide": "right",
+      "toNode": "step_jwt_tie",
+      "toSide": "left",
+      "color": "3"
+    },
+    {
+      "id": "ad_e4",
+      "fromNode": "step_jwt_tie",
+      "fromSide": "right",
+      "toNode": "step_cap",
+      "toSide": "left",
+      "color": "4"
+    },
+    {
+      "id": "ad_e5",
+      "fromNode": "step_cap",
+      "fromSide": "bottom",
+      "toNode": "step_fase2",
+      "toSide": "right",
+      "color": "2"
+    },
+    {
+      "id": "ad_e6",
+      "fromNode": "step_fase2",
+      "fromSide": "left",
+      "toNode": "step_classify",
+      "toSide": "right",
+      "color": "6"
+    },
+    {
+      "id": "ad_e_app",
+      "fromNode": "step_classify",
+      "fromSide": "bottom",
+      "toNode": "res_approved",
+      "toSide": "top",
+      "color": "4",
+      "label": "Aprobado"
+    },
+    {
+      "id": "ad_e_rej",
+      "fromNode": "step_classify",
+      "fromSide": "bottom",
+      "toNode": "res_rejected",
+      "toSide": "top",
+      "color": "2",
+      "label": "Rechazo"
+    },
+    {
+      "id": "ad_e_lock",
+      "fromNode": "step_classify",
+      "fromSide": "bottom",
+      "toNode": "res_locked",
+      "toSide": "top",
+      "color": "1",
+      "label": "Locked"
+    },
+    {
+      "id": "ad_e_tran",
+      "fromNode": "step_classify",
+      "fromSide": "bottom",
+      "toNode": "res_transient",
+      "toSide": "top",
+      "color": "3",
+      "label": "Transitorio"
+    },
+    {
+      "id": "ad_e_429",
+      "fromNode": "step_classify",
+      "fromSide": "bottom",
+      "toNode": "res_429",
+      "toSide": "top",
+      "color": "1",
+      "label": "429 RateLimit"
+    }
+  ]
+}

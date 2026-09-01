@@ -294,6 +294,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c443558` | docs(meta): actualizacion de NEXT-SESSION, .gitignore y mapa logico de flujos |
 | `0ffc28d` | fix(deposits): regla canónica anti-mezcla de tarjetas sobre saldo fresco (<24h / >=100) |
 | `f45b9c4` | fix(deposits): eliminacion del gate artificial de saldo >= 100 y visibilidad de errores en UI |
 | `eda7bd5` | fix(pool): blindaje 429 sin bajas a DEAD, circuit breaker y verdad en logs |
@@ -305,7 +306,6 @@ prewarm.py (router)
 | `85bbe1a` | fix(prewarm): wire make_pool to CaptchaHub and execute direct test_login on stale JWT |
 | `89fe1ed` | feat(refresh): live on-demand refresh via CaptchaHub auto-login, remove balance blocks, add UI refresh |
 | `73052ed` | fix(identity): prevent jwt username from poisoning fullname and protect curp/phone in merge |
-| `8013b21` | fix(api): deteccion estricta de JWT caducado (401/redirectLogin) y auto-recovery con login fresco para evitar sobreescribir balances reales con 0.00 |
 <!-- GEN:end:recientes -->
 
 ---
