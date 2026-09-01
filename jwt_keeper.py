@@ -125,8 +125,17 @@ def select_refresh_candidates(
         # Cooldown aplica SIEMPRE, incluso a hot — evita el bucle de quema
         # (medido 2026-07-11: una hot quemada debe descansar como cualquier otra).
         cd = r.get("cooldown_until")
-        if cd not in (None, "") and int(cd) > now:
-            continue
+        if cd not in (None, ""):
+            try:
+                if isinstance(cd, str) and ("-" in cd or ":" in cd):
+                    from datetime import datetime
+                    cd_epoch = datetime.fromisoformat(cd.replace("Z", "+00:00")).timestamp()
+                else:
+                    cd_epoch = float(cd)
+                if cd_epoch > now:
+                    continue
+            except Exception:
+                pass
         exp = _exp_int(r.get("jwt_expires_at"))
         if exp > now + refresh_ahead_sec:
             continue  # todavía tiene margen → no re-loguear

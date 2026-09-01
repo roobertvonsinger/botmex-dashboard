@@ -158,10 +158,19 @@ async def audit_single_account(email: str, password: str, checker, pool) -> dict
         logger.warning(f"🔴 [{email}] DEAD -> {err_msg}")
 
     elif status == "BAN":
-        err = "RATE_LIMITED_TEMP (429 en saneador — reintento posterior)"
+        err = "RATE_LIMITED_TEMP (429 en saneador — aislada del pool)"
+        conn = get_db(write=True)
+        with conn:
+            conn.execute("""
+                UPDATE accounts SET 
+                    published_to_pool = 0,
+                    last_checked_at = datetime('now')
+                WHERE email = ?
+            """, (email,))
+        conn.close()
         result["status"] = "RATE_LIMITED"
         result["error"] = err
-        logger.warning(f"⚠️ [{email}] BAN/429 transitorio -> Se omite ciclo sin marcar DEAD")
+        logger.warning(f"⚠️ [{email}] BAN/429 transitorio -> Auto-sacada del pool (published_to_pool=0) para no estorbar en /bet")
 
     return result
 

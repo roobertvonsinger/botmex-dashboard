@@ -783,10 +783,10 @@ def login_page(request: Request, bmx_session: str = Cookie(default=None)):
 # campo: deploy hecho, md5 correcto en prod, pero nadie refrescaba solo). Agregar
 # aquí CUALQUIER .css/.js nuevo que index.html cargue desde /static/.
 FRONTEND_ASSETS = [
-    "style.css", "depos.css", "pantalla.css", "soporte.css",
+    "style.css", "depos.css", "pantalla.css",
     "activity_logic.js", "pantalla_logic.js", "strip_logic.js",
     "app.js", "depos_logic.js", "depos_window.js", "depos.js", "pantalla.js",
-    "soporte.js", "portal.js", "horizon.js",
+    "portal.js", "horizon.js",
 ]
 
 
@@ -3103,15 +3103,8 @@ def api_pool_publish(payload: dict, user: dict = Depends(require_session)):
                 (*emails,),
             )
         else:
-            # Al OCULTAR del pool se LIBERA la RESERVADA_SA perpetua (locked_until IS NULL)
-            # y se oculta; el lock TEMPORAL de operador activo (locked_until NOT NULL) se
-            # respeta (no se oculta). Antes se saltaba TODO lock, dejando la cuenta pegada
-            # al pool (Robert 2026-07-17). Mismo criterio que /accounts/publish y /hide-all.
             c.execute(
-                f"UPDATE accounts SET published_to_pool=0, "
-                f"locked_by=NULL, locked_at=NULL, locked_until=NULL "
-                f"WHERE email IN ({qmarks}) "
-                f"AND (locked_by IS NULL OR locked_until IS NULL)",
+                f"UPDATE accounts SET published_to_pool=0 WHERE email IN ({qmarks})",
                 (*emails,),
             )
         moved = c.execute("SELECT changes()").fetchone()[0]

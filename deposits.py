@@ -73,7 +73,10 @@ def _cooldown_active(cooldown_until, now=None) -> bool:
     if now is None:
         now = int(time.time())
     try:
-        return int(cooldown_until) > int(now)
+        if isinstance(cooldown_until, str) and ("-" in cooldown_until or ":" in cooldown_until):
+            from datetime import datetime
+            return datetime.fromisoformat(cooldown_until.replace("Z", "+00:00")).timestamp() > float(now)
+        return float(cooldown_until) > float(now)
     except (TypeError, ValueError):
         return False
 
@@ -737,37 +740,49 @@ def _record_attempt(
     # endpoints, la tarjeta no quedaba ligada a la cuenta y el operador tenía que
     # volverla a pegar manualmente. Fix 2026-05-25: persistimos aquí (idempotente
     # por UNIQUE card_number — INSERT OR IGNORE).
-    # ── 2. Persistir tarjeta en account_cards si APPROVED ──────
-    # Regla operativa (Robert 2026-08-25): solo APPROVED real cuenta. 3DS_REQUIRED
-    # o THREEDS no guarda porque la tarjeta no se acreditó con fondos y se preserva
-    # para certificar otras cuentas o usarse sin quemarse.
-    if status == "approved" and card_pipe:
+    # ── 2. Persistir tarjeta en account_cards si APPROVED & Auto-sacar del pool ──
+    # Regla operativa Soberana (Robert 2026-08-31): En cuanto una cuenta recibe
+    # depósito APPROVED con fondos, sale en automático del pool (published_to_pool=0)
+    # para no recibir depósitos no deseados hasta reactivación manual.
+    if status == "approved":
         try:
-            cc_num, cc_exp, cc_cvv = _parse_pipe(card_pipe)
-            from betmexico_db import db as _bot_db
-            # Buscar password de la cuenta (la firma de register_card_to_account
-            # requiere el marriage completo email+password).
             from app import db as _dash_db
-            with _dash_db() as c:
-                acc_row = c.execute(
-                    "SELECT password FROM accounts WHERE email=?", (email,)
-                ).fetchone()
-            password = acc_row["password"] if acc_row else ""
-            # registered_by_name: resolver del roster por telegram_id (con casing original)
-            from web_auth import WEB_USERS_RAW as _USERS_RAW
-            op_name = ""
-            for uname, u in _USERS_RAW.items():
-                if u.get("telegram_id") == operator_id:
-                    op_name = uname
-                    break
-            _bot_db.register_card_to_account(
-                cc_num, cc_exp, cc_cvv,
-                email, password,
-                int(operator_id) if operator_id else 0,
-                op_name,
-            )
+            with _dash_db(write=True) as c:
+                c.execute(
+                    "UPDATE accounts SET published_to_pool=0, last_deposit_amount=?, last_deposit_date=datetime('now') WHERE email=?",
+                    (float(amount or 0.0), email)
+                )
+            logger.info(f"[Deposits] 🛡️ {email} fondeada (${amount}) -> Auto-sacada del pool (published_to_pool=0)")
         except Exception as e:
-            logger.warning(f"[Deposits] _record_attempt register_card_to_account error: {e}")
+            logger.warning(f"[Deposits] _record_attempt auto-unpublish error: {e}")
+
+        if card_pipe:
+            try:
+                cc_num, cc_exp, cc_cvv = _parse_pipe(card_pipe)
+                from betmexico_db import db as _bot_db
+                # Buscar password de la cuenta (la firma de register_card_to_account
+                # requiere el marriage completo email+password).
+                from app import db as _dash_db
+                with _dash_db() as c:
+                    acc_row = c.execute(
+                        "SELECT password FROM accounts WHERE email=?", (email,)
+                    ).fetchone()
+                password = acc_row["password"] if acc_row else ""
+                # registered_by_name: resolver del roster por telegram_id (con casing original)
+                from web_auth import WEB_USERS_RAW as _USERS_RAW
+                op_name = ""
+                for uname, u in _USERS_RAW.items():
+                    if u.get("telegram_id") == operator_id:
+                        op_name = uname
+                        break
+                _bot_db.register_card_to_account(
+                    cc_num, cc_exp, cc_cvv,
+                    email, password,
+                    int(operator_id) if operator_id else 0,
+                    op_name,
+                )
+            except Exception as e:
+                logger.warning(f"[Deposits] _record_attempt register_card_to_account error: {e}")
 
     # ── 3. Recalcular grade (BD viva) ──────────────────────────
     try:
@@ -1075,7 +1090,7 @@ async def _acquire_session_and_begin(
                 # y no vuelve a ser candidata (status != LIVE).
                 # Robert 2026-08-05: el operador NO debe ver "rate-limit" — es
                 # pedo interno del backend. Copy neutro.
-                if (login_res.code in ("AUTOEXCLUSION", "LOGIN_DENIED") or login_res.account_dead) and login_res.code not in ("RATE_LIMITED", "BAN", "LOGIN_RETRY_LATER"):
+                if (login_res.code in ("AUTOEXCLUSION", "LOGIN_DENIED") or getattr(login_res, "account_dead", False)) and login_res.code not in ("RATE_LIMITED", "BAN", "LOGIN_RETRY_LATER"):
                     _mark_rate_limited_dead(email)
                     msg = (f"Cuenta dada de baja automáticamente — credenciales o autoexclusión.")
                     rc = login_res.code or "DEAD"

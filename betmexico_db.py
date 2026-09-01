@@ -431,8 +431,27 @@ class BetmexicoDB:
                 PRIMARY KEY (bin, gateway_name)
             )
         """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_bin_stats_status ON bin_stats(status)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_bin_stats_last_used ON bin_stats(last_used_at DESC)")
+        for col, col_type in [
+            ("status", "TEXT NOT NULL DEFAULT 'unknown'"),
+            ("last_used_at", "TEXT"),
+            ("last_approved_at", "TEXT"),
+            ("last_rejected_at", "TEXT"),
+            ("notes", "TEXT"),
+            ("gateway_name", "TEXT NOT NULL DEFAULT 'default'"),
+            ("updated_at", "TEXT NOT NULL DEFAULT (datetime('now'))")
+        ]:
+            try:
+                cursor.execute(f"SELECT {col} FROM bin_stats LIMIT 1")
+            except sqlite3.OperationalError:
+                try:
+                    cursor.execute(f"ALTER TABLE bin_stats ADD COLUMN {col} {col_type}")
+                except Exception:
+                    pass
+        try:
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_bin_stats_status ON bin_stats(status)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_bin_stats_last_used ON bin_stats(last_used_at DESC)")
+        except Exception:
+            pass
 
         # Bloque G — process_log
         cursor.execute("""

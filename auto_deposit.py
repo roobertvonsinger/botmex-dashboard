@@ -306,24 +306,9 @@ def select_accounts_for_auto(
         if r.get("withdrawal_ready") in (1, "1", True):
             continue
 
-        locked_by = r.get("locked_by")
-        is_sa_owned = str(locked_by).lower() in sa if locked_by is not None else False
-        # RESERVADA_SA (pool=0 + locked_by del SA) → candidata.
-        is_sa_reserved = not r.get("published_to_pool") and is_sa_owned
-        if not is_sa_reserved:
-            if not r.get("published_to_pool"):
-                continue
-            if locked_by is not None and not is_sa_owned:
-                # Comprobar si el lock de otro operador ya expiró
-                locked_until = r.get("locked_until")
-                locked_at = r.get("locked_at")
-                is_stale = False
-                if locked_until:
-                    is_stale = str(locked_until) < datetime.now(timezone.utc).isoformat()
-                elif locked_at:
-                    is_stale = True  # lock huérfano sin fecha límite
-                if not is_stale:
-                    continue
+        # Gate Soberano: Solo cuentas explícitamente dentro del pool
+        if not r.get("published_to_pool"):
+            continue
 
         if _cd_active(r.get("cooldown_until"), now):
             continue
@@ -502,22 +487,18 @@ def plan_auto_mission(
     con = sqlite3.connect(str(db_path))
     con.row_factory = sqlite3.Row
     try:
-        try:
-            con.execute(
-                "UPDATE accounts SET locked_by=NULL, locked_until=NULL "
-                "WHERE locked_by IS NOT NULL AND ("
-                "  (locked_until IS NOT NULL AND locked_until < datetime('now')) OR "
-                "  (locked_at IS NOT NULL AND locked_at < datetime('now', '-4 hours'))"
-                ")"
-            )
-            con.commit()
-        except Exception:
-            pass
+        cols = [c[1] for c in con.execute("PRAGMA table_info(accounts)").fetchall()]
+        has_dead = "dead_reason" in cols
+        has_dead_at = "dead_at" in cols
+        where_extra = ""
+        if has_dead:
+            where_extra += " AND (dead_reason IS NULL OR dead_reason='')"
+        if has_dead_at:
+            where_extra += " AND (dead_at IS NULL OR dead_at='')"
         rows = [
             dict(r) for r in con.execute(
-                "SELECT * FROM accounts WHERE status='LIVE' AND COALESCE(grade, '') != 'D' "
-                "AND (published_to_pool=1 OR (locked_by IS NOT NULL AND lower(locked_by) IN ('1341812706', 'robertvs', 'ruth_operator', 'superadmin'))) "
-                "AND (dead_reason IS NULL OR dead_reason='') AND (dead_at IS NULL OR dead_at='')"
+                f"SELECT * FROM accounts WHERE status='LIVE' AND COALESCE(grade, '') != 'D' "
+                f"AND published_to_pool=1{where_extra}"
             ).fetchall()
         ]
         window_map: Dict[str, Dict[str, Any]] = {}

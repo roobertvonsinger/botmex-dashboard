@@ -32,6 +32,7 @@ const state = {
   lockHours: 2,
   filterInUse: false,
   filterJwt: '',  // '' | 'alive' | 'expired' — filtro SA-only por estado de sesión JWT
+  filterPool: '', // '' | 'in' | 'out' — filtro por estado en Pool de /bet
   cardsOnly: false,  // filter: solo cuentas con al menos 1 tarjeta
   truncated: false,  // P2: true si el fetch tocó ACCOUNTS_FETCH_LIMIT (hay más cuentas que las traídas)
 };
@@ -419,6 +420,9 @@ function getVisible() {
   if (searchQuery) return state.rows;  // búsqueda dominante: sin filtros locales
   let rows = state.rows;
   if (state.filterInUse) rows = rows.filter(r => r.locked_by);
+  // Filtro por estado en Pool (in / out)
+  if (state.filterPool === 'in') rows = rows.filter(r => r.published_to_pool === 1 || r.published_to_pool === '1' || r.published_to_pool === true);
+  else if (state.filterPool === 'out') rows = rows.filter(r => !r.published_to_pool || r.published_to_pool === 0 || r.published_to_pool === '0');
   // Filtro SA-only por sesión JWT (jwt_alive solo viene a superadmin).
   if (state.filterJwt === 'alive') rows = rows.filter(r => r.jwt_alive === true);
   else if (state.filterJwt === 'expired') rows = rows.filter(r => r.jwt_alive === false);
@@ -642,17 +646,21 @@ function renderTable() {
     const ariaSort = on ? (_sortDir === 1 ? 'ascending' : 'descending') : 'none';
     return `<th class="th-sort${on ? ' sort-on' : ''} ${cls}" data-sort="${col}" tabindex="0" role="columnheader button" aria-sort="${ariaSort}" title="Ordenar por ${label}">${label}${ic}</th>`;
   };
+  const allVisibleSelected = visible.length > 0 && visible.every(r => selectedIds.has(r.id));
+  const someVisibleSelected = visible.some(r => selectedIds.has(r.id));
+  const masterCheckHtml = `<button type="button" class="btn-sel-master ${allVisibleSelected ? 'on' : (someVisibleSelected ? 'partial' : '')}" id="btnMasterSelect" title="${allVisibleSelected ? 'Deseleccionar visibles (Esc)' : 'Seleccionar todas las cuentas visibles en esta página'}">${allVisibleSelected ? '☑' : (someVisibleSelected ? '⊟' : '☐')}</button>`;
+
   const cols = state.view === 'simple'
     ? `<tr>
         <th class="grade-bar-th"></th>
-        <th class="sel-cell"></th>
+        <th class="sel-cell" title="Seleccionar visibles">${masterCheckHtml}</th>
         ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
         ${_th('last_deposit_date','Últ. depósito')}
         <th class="ic-col-th" aria-label="Acciones"></th>
       </tr>`
     : `<tr>
         <th class="grade-bar-th"></th>
-        <th class="sel-cell"></th>
+        <th class="sel-cell" title="Seleccionar visibles">${masterCheckHtml}</th>
         ${_th('balance_total','Saldo','num')}${_th('email','Cuenta')}
         ${_th('last_deposit_date','Últ. depósito')}
         ${_th('last_updated_at','Últ. update')}
@@ -660,14 +668,26 @@ function renderTable() {
       </tr>`;
   const thead = t.querySelector('thead');
   thead.innerHTML = cols;
+
+  thead.querySelector('#btnMasterSelect')?.addEventListener('click', ev => {
+    ev.stopPropagation();
+    const paged = getPaged();
+    const visibleRows = paged.rows;
+    const allSelected = visibleRows.length > 0 && visibleRows.every(r => selectedIds.has(r.id));
+    if (allSelected) {
+      visibleRows.forEach(r => selectedIds.delete(r.id));
+    } else {
+      visibleRows.forEach(r => selectedIds.add(r.id));
+    }
+    renderTable();
+  });
+
   // Listeners directos en cada th-sort (evita problemas de delegation)
   thead.querySelectorAll('th.th-sort').forEach(th => {
     th.addEventListener('click', ev => {
       ev.stopPropagation();
       sortRows(th.dataset.sort);
     });
-    // Ordenar solo con mouse era un bloqueo real para teclado/lector de pantalla
-    // (P2 auditoría UX 2026-07-28) — mismo control, ruta de teclado equivalente.
     th.addEventListener('keydown', ev => {
       if (ev.key === 'Enter' || ev.key === ' ') {
         ev.preventDefault();
@@ -733,8 +753,11 @@ function renderTable() {
     const cellNota =
       `<button class="row-ic ic-add" data-id="${r.id}" data-email="${esc(r.email)}" title="Añadir nota rápida">+ Nota</button>` +
       (hasNotes ? `<button class="row-ic ic-notes" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.notes_count} nota${r.notes_count>1?'s':''}">📝<sup>${r.notes_count}</sup></button>` : '');
+    const isPoolOn = r.published_to_pool === 1 || r.published_to_pool === '1' || r.published_to_pool === true;
+    const poolSwitchBtn = `<button type="button" class="pool-switch ${isPoolOn ? 'on' : 'off'}" data-pool-email="${esc(r.email)}" data-pool-val="${isPoolOn ? '1' : '0'}" title="${isPoolOn ? '🟢 En Pool (/bet activo) — Click para pasar a Privada' : '🔒 Privada (Fuera de /bet) — Click para meter al Pool'}">${isPoolOn ? '🟢 POOL' : '🔒 PRIVADA'}</button>`;
+
     const cellCards = hasCards
-      ? `<button class="row-ic ic-cards" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.cards_count} tarjeta${r.cards_count>1?'s':''}">💳<sup>${r.cards_count}</sup></button>`
+      ? `<button class="row-ic ic-cards card-count-badge" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.cards_count} tarjeta${r.cards_count>1?'s':''} vinculada${r.cards_count>1?'s':''}">💳 ${r.cards_count}</button>`
       : '';
     const cellPin = `<button class="row-ic ic-mark${isMarked?' on':''}" data-mark-email="${esc(r.email)}" title="${isMarked?'Quitar marca':'Fijar para después'}">📌</button>`;
 
@@ -743,25 +766,24 @@ function renderTable() {
 
     // Botón ↻ por fila — actualiza SOLO esta cuenta al instante
     const refreshOneBtn = `<button class="row-refresh-one" data-id="${r.id}" title="Actualizar SOLO esta cuenta (login fresh + fetch live)">↻</button>`;
-    // Auditoría 2026-07-18 — carga cognitiva: nota/tarjetas/pin en 1 celda
-    // (antes 3 columnas), últ.check+checks en 1 celda (antes 2). Mismos botones,
-    // misma info, menos columnas compitiendo por atención (Cowan 4±1).
     const cellAcciones = `<td class="ic-col acciones-col">${cellNota}${cellCards}${cellPin}</td>`;
+    const isSel = selectedIds.has(r.id);
+    const selCellHtml = `<td class="sel-cell" data-id="${r.id}" title="Click para seleccionar"><span class="row-checkbox ${isSel ? 'on' : ''}">${isSel ? '☑' : '☐'}</span></td>`;
     if (state.view === 'simple') {
       return `<tr class="${trClasses}" data-id="${r.id}"${selDrag} title="${trTitle || ''}">
         <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
-        <td class="sel-cell"></td>
+        ${selCellHtml}
         <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-        <td class="combo" title="Click: ver detalle · Ctrl/Shift+Click: seleccionar">${jwtBadge}${newBadge}<b class="combo-txt d-copy" data-copy="${esc(combo)}" title="Click: copiar combo">${esc(combo)}</b>${lockChip}</td>
+        <td class="combo" title="Click: ver detalle · Ctrl/Shift+Click: seleccionar">${jwtBadge}${newBadge}${poolSwitchBtn}<b class="combo-txt d-copy" data-copy="${esc(combo)}" title="Click: copiar combo">${esc(combo)}</b>${lockChip}</td>
         <td class="dep" title="Último depósito hecho">${dep}</td>
         ${cellAcciones}
       </tr>`;
     }
     return `<tr class="${trClasses}" data-id="${r.id}"${selDrag} title="${trTitle || ''}">
       <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
-      <td class="sel-cell"></td>
+      ${selCellHtml}
       <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-      <td class="combo" title="Click: ver detalle · Ctrl/Shift+Click: seleccionar">${jwtBadge}${newBadge}<b class="combo-txt d-copy" data-copy="${esc(combo)}" title="Click: copiar combo">${esc(combo)}</b></td>
+      <td class="combo" title="Click: ver detalle · Ctrl/Shift+Click: seleccionar">${jwtBadge}${newBadge}${poolSwitchBtn}<b class="combo-txt d-copy" data-copy="${esc(combo)}" title="Click: copiar combo">${esc(combo)}</b></td>
       <td class="dep" title="Último depósito hecho">${dep}</td>
       <td class="dep dim check-cell" title="Última actualización real · total de checks">${fmtAgo(r.last_updated_at || r.last_checked_at)}<span class="check-cnt">· ${r.check_count || 0}</span></td>
       ${cellAcciones}
@@ -814,12 +836,31 @@ function renderPagination(paged) {
   c.innerHTML = html;
 }
 
+function updateFilterBadges(allRows, stats) {
+  if (!allRows) return;
+  const liveCount = allRows.filter(r => (r.status || '').toUpperCase() === 'LIVE').length;
+  const deadCount = allRows.filter(r => (r.status || '').toUpperCase() === 'DEAD').length;
+  const totalCount = allRows.length;
+  
+  const inPoolCount = allRows.filter(r => r.published_to_pool === 1 || r.published_to_pool === '1' || r.published_to_pool === true).length;
+  const outPoolCount = totalCount - inPoolCount;
+  const cardsCount = allRows.filter(r => (r.cards_count || 0) > 0).length;
+
+  const elLive = $('#cntLive'); if (elLive) elLive.textContent = stats?.live != null ? stats.live : liveCount;
+  const elAll = $('#cntAll'); if (elAll) elAll.textContent = stats?.total != null ? stats.total : totalCount;
+  const elDead = $('#cntDead'); if (elDead) elDead.textContent = stats?.dead != null ? stats.dead : deadCount;
+  const elInPool = $('#cntInPool'); if (elInPool) elInPool.textContent = inPoolCount;
+  const elOutPool = $('#cntOutPool'); if (elOutPool) elOutPool.textContent = outPoolCount;
+  const elCards = $('#cntCards'); if (elCards) elCards.textContent = cardsCount;
+}
+
 function renderStats(s) {
   if (!s) return;
   const visible = getVisible();
   $('#navCount').textContent = s.live;
   $('#countLabel').textContent = `${visible.length} / ${s.live.toLocaleString()}`;
   $('#stInUse').textContent = s.inUse;
+  updateFilterBadges(state.rows, s);
 }
 
 // ─── command bar ───
@@ -856,17 +897,17 @@ function updateCmdBar() {
   depBtn.innerHTML = `<span class="i">💳</span>Depositar${n > 1 ? ` (${n})` : ''}`;
 
   // Label dinámico Pool: claro qué hace según estado de la selección
-  const tBtn = $('#cmdTrastienda');
-  if (tBtn && tBtn.style.display !== 'none') {
-    const someHidden = selRows.some(r => r.published_to_pool === 0);
+  const ptBtn = $('#cmdPoolToggle');
+  if (ptBtn) {
+    const someHidden = selRows.some(r => !r.published_to_pool || r.published_to_pool === 0);
     if (someHidden) {
-      tBtn.innerHTML = '<span class="i">🌐</span>Publicar a Pool';
-      tBtn.title = 'Soltar al pool común — visibles para TODOS los operadores';
-      tBtn.classList.add('cmd-btn-hl');
+      ptBtn.innerHTML = '<span class="i">🌐</span>Mandar al Pool';
+      ptBtn.title = 'Mandar cuentas seleccionadas al Pool de /bet';
+      ptBtn.classList.add('cmd-btn-hl');
     } else {
-      tBtn.innerHTML = '<span class="i">📥</span>Quitar de Pool';
-      tBtn.title = 'Recoger del pool — ocultarlas de la vista de operadores';
-      tBtn.classList.remove('cmd-btn-hl');
+      ptBtn.innerHTML = '<span class="i">🔒</span>Sacar del Pool';
+      ptBtn.title = 'Mover cuentas seleccionadas a Privadas (fuera de /bet)';
+      ptBtn.classList.remove('cmd-btn-hl');
     }
   }
 }
@@ -2949,26 +2990,26 @@ function _clearSearch() {
   reload();
   si?.focus();   // el foco se queda en la interacción activa (la búsqueda)
 }
-$('#searchInput').addEventListener('input', e => {
+$('#searchInput')?.addEventListener('input', e => {
   searchQuery = e.target.value.trim();
   state.page = 1;
   _reflectSearchUI();
   if (_searchTimer) clearTimeout(_searchTimer);
   _searchTimer = setTimeout(() => reload(), 300);
 });
-$('#searchInput').addEventListener('keydown', e => {
+$('#searchInput')?.addEventListener('keydown', e => {
   if (e.key === 'Escape' && e.target.value) { e.preventDefault(); _clearSearch(); }
 });
 $('#searchClear')?.addEventListener('click', _clearSearch);
 
 // Pagination handlers
-$('#pageSize').addEventListener('change', e => {
+$('#pageSize')?.addEventListener('change', e => {
   state.pageSize = parseInt(e.target.value);
   state.page = 1;
   renderTable();
   _saveAcctState();   // P8
 });
-$('#pbPages').addEventListener('click', e => {
+$('#pbPages')?.addEventListener('click', e => {
   const btn = e.target.closest('.pg-btn');
   if (!btn || btn.disabled) return;
   const v = btn.dataset.pg;
@@ -2979,13 +3020,15 @@ $('#pbPages').addEventListener('click', e => {
   renderTable();
   _saveAcctState();   // P8
 });
-$('#btnRefreshVisible').addEventListener('click', refreshVisible);
+$('#btnRefreshVisible')?.addEventListener('click', () => refreshVisible());
 function _isFiltersDefault() {
   return state.status === 'LIVE'
       && state.grade === ''
       && !searchQuery
       && !state.filterInUse
       && state.filterJwt === ''
+      && !state.filterPool
+      && !state.cardsOnly
       && _sortCol === null;
 }
 function _updateResetBtn() {
@@ -3004,12 +3047,14 @@ $('#btnResetFilters')?.addEventListener('click', () => {
   searchQuery = '';
   state.filterInUse = false;
   state.filterJwt = '';
+  state.filterPool = '';
   state.cardsOnly = false;
   state.page = 1;
   _sortCol = null;
   _sortDir = -1;
   // UI segments back to default
   document.querySelectorAll('.seg[data-seg="status"] button').forEach(b => b.classList.toggle('on', b.dataset.v === 'LIVE'));
+  document.querySelectorAll('.seg[data-seg="pool"] button').forEach(b => b.classList.toggle('on', b.dataset.v === ''));
   document.querySelectorAll('.seg[data-seg="grade"] button').forEach(b => b.classList.toggle('on', b.dataset.v === ''));
   document.querySelectorAll('.seg[data-seg="jwt"] button').forEach(b => b.classList.toggle('on', b.dataset.v === ''));
   $('#searchInput').value = '';
@@ -3423,6 +3468,66 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && selectedIds.size > 0) deselectAll();
 });
 
+// Toggle Pool en lote desde la barra inferior
+$('#cmdPoolToggle')?.addEventListener('click', async () => {
+  if (selectedIds.size === 0) return;
+  const selRows = state.rows.filter(r => selectedIds.has(r.id));
+  const someHidden = selRows.some(r => !r.published_to_pool || r.published_to_pool === 0);
+  const publish = someHidden;
+  const emails = selRows.map(r => r.email);
+  try {
+    const r = await fetch('/api/pool/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emails, publish }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    selRows.forEach(r => { r.published_to_pool = publish ? 1 : 0; });
+    toast(publish ? `🟢 ${data.moved} cuentas añadidas al Pool` : `🔒 ${data.moved} cuentas pasadas a Privadas`, 'success');
+    renderTable();
+    updateFilterBadges(state.rows);
+  } catch (e) {
+    toast(humanizeApiError(e), 'error');
+  }
+});
+
+// Switch de pool 1-click por fila (delegación en accTable)
+$('#accTable')?.addEventListener('click', async e => {
+  const pBtn = e.target.closest('.pool-switch');
+  if (pBtn) {
+    e.stopPropagation();
+    const email = pBtn.dataset.poolEmail;
+    const currentVal = pBtn.dataset.poolVal === '1';
+    const nextVal = !currentVal;
+    
+    pBtn.dataset.poolVal = nextVal ? '1' : '0';
+    pBtn.className = `pool-switch ${nextVal ? 'on' : 'off'}`;
+    pBtn.innerHTML = nextVal ? '🟢 POOL' : '🔒 PRIVADA';
+    
+    const row = (state.rows || []).find(r => r.email === email);
+    if (row) row.published_to_pool = nextVal ? 1 : 0;
+    
+    try {
+      const r = await fetch('/api/pool/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emails: [email], publish: nextVal }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      toast(nextVal ? `🟢 ${email} en Pool (/bet)` : `🔒 ${email} en Privadas`, 'success');
+      updateFilterBadges(state.rows);
+      _updateResetBtn();
+    } catch (err) {
+      pBtn.dataset.poolVal = currentVal ? '1' : '0';
+      pBtn.className = `pool-switch ${currentVal ? 'on' : 'off'}`;
+      pBtn.innerHTML = currentVal ? '🟢 POOL' : '🔒 PRIVADA';
+      if (row) row.published_to_pool = currentVal ? 1 : 0;
+      toast(`Error: ${humanizeApiError(err)}`, 'error');
+    }
+  }
+});
+
 $$('.seg').forEach(seg => {
   const key = seg.dataset.seg;
   seg.querySelectorAll('button').forEach(btn => {
@@ -3442,6 +3547,20 @@ $$('.seg').forEach(seg => {
       if (key === 'loglevel') {
         _logsLevel = btn.dataset.v || 'ALL';
         return reloadLogs();
+      }
+      if (key === 'pool') {
+        state.filterPool = btn.dataset.v;
+        state.page = 1;
+        renderTable();
+        _updateResetBtn();
+        return;
+      }
+      if (key === 'jwt') {
+        state.filterJwt = btn.dataset.v;
+        state.page = 1;
+        renderTable();
+        _updateResetBtn();
+        return;
       }
       state[key] = btn.dataset.v;
       state.page = 1;
@@ -3852,7 +3971,7 @@ $$('.seg').forEach(seg => {
 })();
 
 // Activity table — clicks interactivos
-$('#actTable').addEventListener('click', e => {
+$('#actTable')?.addEventListener('click', e => {
   // Línea humanizada → abre detalle de cuenta
   const line = e.target.closest('.act-line[data-open-email]');
   if (line && line.dataset.openEmail) {
@@ -4036,7 +4155,7 @@ async function _quickAddNote(accId, email) {
 }
 
 // ─── Tabla: click en checkbox, click en combo (copia), click en fila (detalle) ───
-$('#accTable').addEventListener('click', e => {
+$('#accTable')?.addEventListener('click', e => {
   // Marquee: si el click viene de soltar un arrastre de selección, ignorarlo
   // (si no, abriría La Pantalla de la última fila tocada al soltar).
   if (_marqueeSuppress) { _marqueeSuppress = false; return; }
@@ -4099,19 +4218,48 @@ $('#accTable').addEventListener('click', e => {
   const tr = e.target.closest('tr[data-id]');
   if (tr && tr.dataset.id) {
     const id = parseInt(tr.dataset.id);
+    const isSelCell = !!e.target.closest('.sel-cell');
     if (e.shiftKey) {
       _selectRange(id);
-    } else if (e.ctrlKey || e.metaKey) {
+    } else if (e.ctrlKey || e.metaKey || isSelCell) {
       if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
       tr.classList.toggle('row-sel', selectedIds.has(id));
       tr.draggable = selectedIds.has(id);      // fila seleccionada = arrastrable al panel
+      const chk = tr.querySelector('.row-checkbox');
+      if (chk) {
+        chk.classList.toggle('on', selectedIds.has(id));
+        chk.textContent = selectedIds.has(id) ? '☑' : '☐';
+      }
       _lastClickedId = id;
       updateCmdBar();
+      // Refleja estado en el botón maestro del thead
+      const visibleRows = getPaged().rows;
+      const allSelected = visibleRows.length > 0 && visibleRows.every(r => selectedIds.has(r.id));
+      const someSelected = visibleRows.some(r => selectedIds.has(r.id));
+      const masterBtn = document.querySelector('#btnMasterSelect');
+      if (masterBtn) {
+        masterBtn.className = `btn-sel-master ${allSelected ? 'on' : (someSelected ? 'partial' : '')}`;
+        masterBtn.textContent = allSelected ? '☑' : (someSelected ? '⊟' : '☐');
+      }
     } else if (window.Pantalla) {
       closeDetailModal();                 // exclusión mutua: cierra el acordeón viejo si estaba abierto
       window.Pantalla.open(id, 'detail');
     }
   }
+});
+
+// Botón de selección rápida de visibles en la cabecera
+$('#btnSelectVisibleTop')?.addEventListener('click', () => {
+  const visibleRows = getPaged().rows;
+  const allSelected = visibleRows.length > 0 && visibleRows.every(r => selectedIds.has(r.id));
+  if (allSelected) {
+    visibleRows.forEach(r => selectedIds.delete(r.id));
+    toast('Selección de visibles limpiada', 'info');
+  } else {
+    visibleRows.forEach(r => selectedIds.add(r.id));
+    toast(`✓ ${visibleRows.length} cuentas visibles seleccionadas`, 'success');
+  }
+  renderTable();
 });
 
 // Fase B — Selección de RANGO (Shift+Click), estilo Excel. Selecciona todas las
@@ -4139,7 +4287,7 @@ function _selectRange(id) {
 }
 
 // Modal de detalle: botón "Validar CURP en gob.mx"
-$('#detModalBody').addEventListener('click', async e => {
+$('#detModalBody')?.addEventListener('click', async e => {
   const vBtn = e.target.closest('.curp-validate-btn');
   if (vBtn?.dataset.accId) {
     e.preventDefault();
@@ -4254,7 +4402,7 @@ async function openCurpValidator(accId) {
 // (capture). Aquí: Depositar, toggle "En uso", agregar/borrar nota,
 // agregar tarjeta, ver más/menos movimientos.
 // ════════════════════════════════════════════════════════════════════════
-$('#accTable').addEventListener('click', async e => {
+$('#accTable')?.addEventListener('click', async e => {
   // No interceptar si el click fue dentro de la tabla normal (no del panel).
   const panel = e.target.closest('.acc-detail');
   if (!panel) return;
@@ -4459,7 +4607,7 @@ async function _submitInlineAddForm(form) {
 }
 
 // Modal de detalle: botón "Depositar en esta cuenta"
-$('#detModalBody').addEventListener('click', e => {
+$('#detModalBody')?.addEventListener('click', e => {
   const btn = e.target.closest('.d-deposit-btn');
   if (!btn) return;
   e.preventDefault();
@@ -4471,7 +4619,7 @@ $('#detModalBody').addEventListener('click', e => {
 });
 
 // Modal de detalle: botón "Seleccionar" — toggle multi-selección sin cerrar el panel
-$('#detModalBody').addEventListener('click', e => {
+$('#detModalBody')?.addEventListener('click', e => {
   const btn = e.target.closest('.d-select-btn');
   if (!btn) return;
   e.preventDefault();
@@ -4493,7 +4641,7 @@ $('#detModalBody').addEventListener('click', e => {
 });
 
 // Modal de detalle: form de notas (submit + delete)
-$('#detModalBody').addEventListener('submit', async e => {
+$('#detModalBody')?.addEventListener('submit', async e => {
   const form = e.target.closest('.d-note-form');
   if (!form) return;
   e.preventDefault();
@@ -4520,23 +4668,23 @@ $('#detModalBody').addEventListener('submit', async e => {
       ${isSA ? `<button class="d-note-del" data-note-id="${data.id}" title="Borrar (SA)">✕</button>` : ''}
     </div>
     <div class="d-note-body">${esc(text)}</div>`;
-    list.insertBefore(li, list.firstChild);
+    list?.insertBefore(li, list.firstChild);
     const cnt = $('#dNotesCount');
-    if (cnt) cnt.textContent = list.children.length;
+    if (cnt) cnt.textContent = list?.children.length || 0;
   } catch (err) {
     toast(humanizeApiError(err), 'error');
   } finally {
     btn.disabled = false;
   }
 });
-$('#detModalBody').addEventListener('click', async e => {
+$('#detModalBody')?.addEventListener('click', async e => {
   const del = e.target.closest('.d-note-del');
   if (!del) return;
   e.preventDefault();
   e.stopPropagation();
   const noteId = parseInt(del.dataset.noteId);
   const li = del.closest('li[data-note-id]');
-  const form = $('#detModalBody').querySelector('.d-note-form');
+  const form = $('#detModalBody')?.querySelector('.d-note-form');
   const accId = form ? parseInt(form.dataset.accId) : null;
   if (!accId || !noteId) return;
   if (!confirm('¿Borrar esta nota?')) return;
@@ -4550,8 +4698,8 @@ $('#detModalBody').addEventListener('click', async e => {
 });
 
 // Cerrar modal detalle: X, click fuera, Escape
-$('#detModalClose').addEventListener('click', closeDetailModal);
-$('#detModalOverlay').addEventListener('click', e => {
+$('#detModalClose')?.addEventListener('click', closeDetailModal);
+$('#detModalOverlay')?.addEventListener('click', e => {
   if (e.target.id === 'detModalOverlay') closeDetailModal();
 });
 document.addEventListener('keydown', e => {
@@ -6734,7 +6882,7 @@ function _renderPostMatchOffer() {
     <button class="dep-post-match-btn" id="btnPostMatchSchedule">⏰ Programar</button>
   `;
   view.appendChild(div);
-  $('#btnPostMatchSchedule').addEventListener('click', () => {
+  $('#btnPostMatchSchedule')?.addEventListener('click', () => {
     // Cambia a modo schedule con la primera cuenta+tarjeta
     const [email, info] = matched[0];
     const accId = info.id;
@@ -6783,7 +6931,7 @@ async function cancelScheduled() {
 }
 
 // ── Wire-up ──
-$('#depDrawerClose').addEventListener('click', closeDepositModal);
+$('#depDrawerClose')?.addEventListener('click', closeDepositModal);
 
 // ── Collapse / expand del drawer (rail mode) ──
 // Persistente en localStorage. Cuando colapsado, el drawer queda a 36px y
@@ -6793,7 +6941,7 @@ let _depDrawerCollapsed = localStorage.getItem(_DEP_COLLAPSE_KEY) === '1';
 function _applyDepCollapsed() {
   const d = $('#depDrawer');
   const btn = $('#depDrawerCollapseBtn');
-  d.classList.toggle('dep-drawer-collapsed', _depDrawerCollapsed);
+  d?.classList.toggle('dep-drawer-collapsed', _depDrawerCollapsed);
   document.body.classList.toggle('dep-drawer-collapsed', _depDrawerCollapsed);
   if (btn) {
     btn.textContent = _depDrawerCollapsed ? '«' : '»';
@@ -6811,45 +6959,49 @@ $('#depDrawerCollapseBtn')?.addEventListener('click', () => _toggleDepCollapsed(
 _applyDepCollapsed();  // restore al cargar
 
 // Mini-pill reabre el drawer sin tocar el state (la misión sigue activa).
-$('#depMissionPill').addEventListener('click', e => {
+$('#depMissionPill')?.addEventListener('click', e => {
   // Ignorar clicks que ya manejó el botón interno (evita doble open).
   if (e.target.id === 'depPillReopen') return;
   _depPillReopen();
 });
-$('#depPillReopen').addEventListener('click', _depPillReopen);
-$('#depModeSeg').addEventListener('click', e => {
+$('#depPillReopen')?.addEventListener('click', _depPillReopen);
+$('#depModeSeg')?.addEventListener('click', e => {
   const btn = e.target.closest('.dep-drawer-tab');
   if (!btn) return;
   if (_depBusy) { toast('Espera a que termine', 'error'); return; }
   setDepMode(btn.dataset.mode);
 });
-$('#depAmounts').addEventListener('click', e => {
+$('#depAmounts')?.addEventListener('click', e => {
   const btn = e.target.closest('.dep-amt');
   if (!btn) return;
   $$('#depAmounts .dep-amt').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
   _depAmount = btn.dataset.v === 'custom' ? 'custom' : parseFloat(btn.dataset.v);
   const cust = $('#depCustomAmount');
-  if (btn.dataset.v === 'custom') { cust.classList.remove('hidden'); setTimeout(() => cust.focus(), 30); }
-  else cust.classList.add('hidden');
+  if (btn.dataset.v === 'custom') { cust?.classList.remove('hidden'); setTimeout(() => cust?.focus(), 30); }
+  else cust?.classList.add('hidden');
 });
-$('#depExec').addEventListener('click', executeDeposit);
-$('#depCancel').addEventListener('click', cancelMatchmaker);
+$('#depExec')?.addEventListener('click', executeDeposit);
+$('#depCancel')?.addEventListener('click', cancelMatchmaker);
 $('#depSchedCancel')?.addEventListener('click', cancelScheduled);
-$('#depCardPipe').addEventListener('input', () => {
-  $('#depCardErr').classList.add('hidden');
+$('#depCardPipe')?.addEventListener('input', () => {
+  $('#depCardErr')?.classList.add('hidden');
 });
-$('#depCardChips').addEventListener('click', e => {
+$('#depCardChips')?.addEventListener('click', e => {
   const chip = e.target.closest('.dep-chip');
   if (!chip) return;
-  $('#depCardPipe').value = chip.dataset.pipe;
-  $('#depCardPipe').focus();
+  const cp = $('#depCardPipe');
+  if (cp) {
+    cp.value = chip.dataset.pipe;
+    cp.focus();
+  }
 });
-$('#depMultiPool').addEventListener('input', () => {
+$('#depMultiPool')?.addEventListener('input', () => {
   const lines = $('#depMultiPool').value.split('\n').map(l => l.trim()).filter(Boolean);
-  $('#depPoolCount').textContent = `${lines.length} tarjeta${lines.length !== 1 ? 's' : ''}`;
+  const pc = $('#depPoolCount');
+  if (pc) pc.textContent = `${lines.length} tarjeta${lines.length !== 1 ? 's' : ''}`;
 });
-$('#depMultiList').addEventListener('click', e => {
+$('#depMultiList')?.addEventListener('click', e => {
   const rm = e.target.closest('.dep-multi-rm');
   if (!rm) return;
   const id = parseInt(rm.dataset.id);
@@ -6865,7 +7017,8 @@ document.querySelector('#depScheduleBlock')?.addEventListener('click', e => {
   if (!btn) return;
   const d = parseInt(btn.dataset.d);
   _depReps = Math.max(1, Math.min(20, _depReps + d));
-  $('#depRepsVal').textContent = String(_depReps);
+  const rv = $('#depRepsVal');
+  if (rv) rv.textContent = String(_depReps);
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && _depDrawerOpen) closeDepositModal();
@@ -6875,7 +7028,7 @@ document.addEventListener('keydown', e => {
 });
 
 // Botón cmdBar — abre el modal con TODAS las seleccionadas
-$('#cmdDeposit').addEventListener('click', () => {
+$('#cmdDeposit')?.addEventListener('click', () => {
   // P4: toggle — si el panel de depósitos ya está abierto, el mismo botón lo cierra
   if (_depDrawerOpen) { closeDepositModal(); return; }
   if (selectedIds.size === 0) { toast('Selecciona al menos 1 cuenta', 'error'); return; }
@@ -6884,16 +7037,16 @@ $('#cmdDeposit').addEventListener('click', () => {
 });
 
 // Botón Modo Auto — abre el drawer de depósitos en modo automático (solo SA)
-$('#cmdAutoDeposit').addEventListener('click', () => {
+$('#cmdAutoDeposit')?.addEventListener('click', () => {
   if (state.user?.role !== 'superadmin') { toast('Solo superadmin', 'error'); return; }
   openDepos({ mode: 'auto' });
 });
 
 $('#cmdCopy')?.addEventListener('click', copySelectedCombos);
 $('#cmdTrastienda')?.addEventListener('click', bulkTrastienda);
-$('#cmdLock').addEventListener('click', bulkLock);
+$('#cmdLock')?.addEventListener('click', bulkLock);
 $('#cmdUnlock')?.addEventListener('click', bulkUnlock);
-$('#cmdDeselect').addEventListener('click', deselectAll);
+$('#cmdDeselect')?.addEventListener('click', deselectAll);
 $('#cmdCopyCombos')?.addEventListener('click', copySelectedCombos);
 $('#cmdRefreshSelected')?.addEventListener('click', refreshSelectedAccounts);
 
@@ -6963,7 +7116,7 @@ $('#lpOps')?.addEventListener('click', e => {
   activityFilter.who = uid;
   showSection('activity');
 });
-$('#btnClearNotif').addEventListener('click', () => { notifications = []; renderNotifs(); renderNotifBadge(); });
+$('#btnClearNotif')?.addEventListener('click', () => { notifications = []; renderNotifs(); renderNotifBadge(); });
 
 $$('.sb-user .ico-btn:not(#btnMyPortal), .ico-btn[title="Salir"], .power').forEach(btn => {
   btn.addEventListener('click', async () => {
