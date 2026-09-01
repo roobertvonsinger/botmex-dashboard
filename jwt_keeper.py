@@ -349,16 +349,13 @@ async def run_keepalive_cycle(
                 logger.debug(f"[jwt_keeper] {email} JWT fresco ✓ (grade {r.get('grade')})")
             elif res.code == "RATE_LIMITED" or "RATE_LIMITED" in str(res.error or "") or "429" in str(res.error or ""):
                 stats["rate_limited"] += 1
-                stats["dead"] += 1
                 try:
-                    from prewarm import _db_mark_dead
-                    await asyncio.to_thread(
-                        _db_mark_dead, email,
-                        "RATE_LIMITED_PERMANENT (429 — BetMexico bloqueó la cuenta)")
+                    from deposits import _mark_rate_limited_dead
+                    await asyncio.to_thread(_mark_rate_limited_dead, email)
                 except Exception as e:  # pragma: no cover
-                    logger.warning(f"[jwt_keeper] no pude marcar DEAD {email}: {e}")
+                    logger.warning(f"[jwt_keeper] no pude aislar del pool a {email}: {e}")
                 logger.warning(
-                    f"[jwt_keeper] {email} RATE_LIMITED (429) → DEAD INMEDIATO (bloqueo terminal BetMexico)")
+                    f"[jwt_keeper] {email} RATE_LIMITED (429) → AISLADA DEL POOL (published_to_pool=0)")
             elif res.account_dead:
                 stats["dead"] += 1
                 # Cuarentena (forense 2026-07-11): persistir DEAD, no solo contar.

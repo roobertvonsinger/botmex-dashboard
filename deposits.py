@@ -133,18 +133,24 @@ def _set_account_cooldown(email: str, minutes: int = RATE_LIMIT_COOLDOWN_MIN) ->
 
 
 def _mark_rate_limited_dead(email: str) -> None:
-    """Robert 2026-08-06: el 429/BAN ya no enfría-y-reintenta — a la primera
-    la cuenta se declara DEAD. Censo mostró 145 cuentas grado A/B reintentadas
-    a diario, gentil y espaciado (tal como se diseñó el 2026-08-05), que JAMÁS
-    sanaron — el 429 es bloqueo real de BetMexico por cuenta, no ráfaga de
-    concurrencia nuestra. Reintentar solo gasta captcha/proxy y ensucia el
-    pool con cuentas zombie. Se van al cementerio; revisión manual si acaso.
-    No-throws (best-effort), mismo patrón que jwt_keeper._db_mark_dead."""
+    """Aislar cuenta por 429 rate limit: NO pasa a DEAD.
+    Mantiene status='LIVE', saldos y plásticos intactos en la BD.
+    Sale de la pool (published_to_pool=0) para que ningún proceso automático
+    (/bet en Telegram o auto_deposit) la vuelva a tocar.
+    """
     try:
-        from prewarm import _db_mark_dead
-        _db_mark_dead(email, "RATE_LIMITED_INSTANT (429 — fuera al primer golpe, Robert 2026-08-06)")
+        from app import db
+        with db(write=True) as c:
+            c.execute(
+                "UPDATE accounts SET published_to_pool=0, "
+                "dead_reason='RATE_LIMITED_429', "
+                "locked_by=NULL, locked_until=NULL "
+                "WHERE email=?",
+                (email,),
+            )
+        logger.warning(f"[RateLimit] {email} AISLADA DEL POOL (published_to_pool=0, dead_reason=RATE_LIMITED_429)")
     except Exception as e:
-        logger.warning(f"[cooldown] no pude marcar DEAD por rate-limit {email}: {e}")
+        logger.warning(f"[RateLimit] no pude aislar del pool por rate-limit {email}: {e}")
 
 
 def _cooldown_remaining_min(cooldown_until, now=None) -> int:

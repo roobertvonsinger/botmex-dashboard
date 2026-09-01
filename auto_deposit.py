@@ -1124,11 +1124,14 @@ async def run_auto_mission(
                     logger.info(
                         f"🔐 [3DS CHALLENGE] CUENTA A+ DETECTADA (SIN FONDOS) | {email} | Pipe: {pipe} | Code: {code} | Duration: {duration}ms"
                     )
-                elif code == "RATE_LIMITED":
-                    # Robert 2026-08-05: el rate-limit es pedo interno del backend,
-                    # se resuelve en silencio (cooldown en deposits). El operador
-                    # no debe verlo en el log de misión.
-                    logger.debug(f"🛡️ cuenta en pausa (retry automático) | {email}")
+                elif code == "RATE_LIMITED" or "rate" in str(code or "").lower() or "429" in str(reason or ""):
+                    logger.warning(
+                        f"🛡️ [RATE LIMIT] LOGIN 429 (NO TOCÓ BANCO) | {email} | Pipe: {pipe} | Code: {code} | Motivo: {reason}"
+                    )
+                elif code in ("LOGIN_FAILED", "LOGIN_DENIED") or "login" in str(reason or "").lower():
+                    logger.warning(
+                        f"🔑 [FALLO DE LOGIN] NO TOCÓ BANCO | {email} | Pipe: {pipe} | Code: {code} | Motivo: {reason}"
+                    )
                 elif code in _d.MM_DEAD_RC:
                     logger.error(
                         f"💀 [CUENTA MUERTA] | {email} | Pipe: {pipe} | Code: {code}"
@@ -1250,6 +1253,7 @@ async def run_auto_mission(
 
             last_account_id = None
             backup_checked = False
+            consecutive_rate_limits = 0
             _loop = asyncio.get_event_loop()
             _clock_offset = 0.0
 
@@ -1428,6 +1432,7 @@ async def run_auto_mission(
                     dep._mm_session_update(sessions, email, r)
 
                     if ok:
+                        consecutive_rate_limits = 0
                         deposited += PROBE_AMOUNT
                         approved += 1
                         _retire_card(pipe, reason=f"MATCH APROBADO en {email}")
@@ -1553,7 +1558,20 @@ async def run_auto_mission(
                     ):
                         if code == "RATE_LIMITED" or "RATE_LIMITED" in str(r.get("error") or "") or "429" in str(r.get("error") or ""):
                             dep._mark_rate_limited_dead(email)
+                            consecutive_rate_limits += 1
+                            if consecutive_rate_limits >= 2:
+                                logger.error(f"🛑 [CIRCUIT BREAKER] 2 cuentas consecutivas con 429 RATE LIMIT ({email}) — abortando misión para evitar quema de captchas.")
+                                _broadcast_mission(
+                                    mission_id,
+                                    "aborted",
+                                    user,
+                                    on_progress=on_progress,
+                                    reason="circuit_breaker_rate_limited",
+                                    phase_detail="Abortado por 429 rate limits consecutivos",
+                                )
+                                break
                         elif code == "KYC_PENDING":
+                            consecutive_rate_limits = 0
                             try:
                                 from app import db as _dash_db
                                 with _dash_db(write=True) as c:
@@ -1564,6 +1582,7 @@ async def run_auto_mission(
                             except Exception as e:
                                 logger.warning(f"[Auto {mission_id}] No se pudo marcar dead_reason para {email}: {e}")
                         else:
+                            consecutive_rate_limits = 0
                             try:
                                 from app import db as _appdb
                                 with _appdb(write=True) as cdb:

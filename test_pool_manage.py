@@ -40,3 +40,25 @@ def test_hide_releases_sa_lock_but_protects_operator_lock(make_client):
     with app.db() as c:
         row = c.execute("SELECT published_to_pool FROM accounts WHERE email='b@test.com'").fetchone()
     assert row[0] == 0  # oculta fuera del pool
+
+
+def test_mark_rate_limited_isolates_pool_not_dead(make_client):
+    """Verifica que _mark_rate_limited_dead retire la cuenta de la pool (published_to_pool=0)
+    pero preserve status='LIVE'."""
+    import app
+    import deposits
+
+    # Preparar cuenta LIVE dentro de la pool
+    with app.db(write=True) as c:
+        c.execute("UPDATE accounts SET status='LIVE', published_to_pool=1, dead_reason=NULL WHERE email='a@test.com'")
+
+    # Simular detección de 429
+    deposits._mark_rate_limited_dead("a@test.com")
+
+    # Verificar que NO se marcó DEAD, pero SÍ salió del pool
+    with app.db() as c:
+        row = c.execute("SELECT status, published_to_pool, dead_reason FROM accounts WHERE email='a@test.com'").fetchone()
+    assert row[0] == "LIVE"  # NO pasa a DEAD
+    assert row[1] == 0       # Sale de la pool
+    assert row[2] == "RATE_LIMITED_429"
+

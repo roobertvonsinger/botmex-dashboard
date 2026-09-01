@@ -236,7 +236,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_unlock` | def | L955–L964 |
 | `_broadcast_mission` | def | L967–L996 |
 | `_stop_pool` | def | L999–L1006 |
-| `run_auto_mission` | def | L1010–L1949 |
+| `run_auto_mission` | def | L1010–L1968 |
 
 ### `autoexclusion.py`
 
@@ -455,45 +455,45 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_cooldown_active` | def | L69–L81 |
 | `_save_txns_via_app_db` | def | L84–L116 |
 | `_set_account_cooldown` | def | L119–L132 |
-| `_mark_rate_limited_dead` | def | L135–L147 |
-| `_cooldown_remaining_min` | def | L150–L156 |
-| `_is_transient_gateway_error` | def | L159–L169 |
-| `_drain_stale_tokens` | def | L199–L231 |
-| `_ensure_fresh_captcha` | def | L234–L258 |
-| `_record_bin_3ds` | def | L266–L294 |
-| `_bin_3ds_stats` | def | L297–L319 |
-| `bin_check` | def | L323–L333 |
-| `bin_recommendations` | def | L337–L341 |
-| `bin_stats_overview` | def | L345–L414 |
-| `_auto_lock_for_deposit` | def | L417–L473 |
-| `_window_status` | def | L476–L518 |
-| `_check_caps` | def | L521–L537 |
-| `_load_deps` | def | L540–L551 |
-| `_parse_pipe` | def | L554–L575 |
-| `_check_card_velocity` | def | L595–L642 |
-| `_has_recent_approved_deposit` | def | L645–L661 |
-| `_record_attempt` | def | L664–L860 |
-| `_safe_phase` | def | L870–L877 |
-| `_now_mx_str` | def | L885–L894 |
-| `_deposit_step_payload` | def | L903–L911 |
-| `_wrap_deposit_step` | def | L914–L933 |
-| `_build_admin_proxy_url` | def | L936–L940 |
-| `_refresh_account_after_deposit` | def | L943–L1002 |
-| `_should_relogin_after_401` | def | L1005–L1009 |
-| `_acquire_session_and_begin` | def | L1012–L1347 |
-| `_run_deposit_with_phases` | def | L1350–L1701 |
-| `deposit_execute_stream` | def | L1705–L1907 |
-| `cap_status` | def | L1911–L1923 |
-| `_mm_is_real_decline` | def | L1963–L1969 |
-| `_mm_is_ambiguous_charge` | def | L1972–L1982 |
-| `classify_deposit_status` | def | L1985–L2016 |
-| `_mm_session_get` | def | L2059–L2063 |
-| `_mm_session_update` | def | L2066–L2075 |
-| `multi_stream` | def | L2079–L2602 |
-| `multi_cancel` | def | L2606–L2611 |
-| `scheduled_create` | def | L2624–L2988 |
-| `scheduled_list` | def | L2992–L3014 |
-| `scheduled_cancel` | def | L3018–L3026 |
+| `_mark_rate_limited_dead` | def | L135–L153 |
+| `_cooldown_remaining_min` | def | L156–L162 |
+| `_is_transient_gateway_error` | def | L165–L175 |
+| `_drain_stale_tokens` | def | L205–L237 |
+| `_ensure_fresh_captcha` | def | L240–L264 |
+| `_record_bin_3ds` | def | L272–L300 |
+| `_bin_3ds_stats` | def | L303–L325 |
+| `bin_check` | def | L329–L339 |
+| `bin_recommendations` | def | L343–L347 |
+| `bin_stats_overview` | def | L351–L420 |
+| `_auto_lock_for_deposit` | def | L423–L479 |
+| `_window_status` | def | L482–L524 |
+| `_check_caps` | def | L527–L543 |
+| `_load_deps` | def | L546–L557 |
+| `_parse_pipe` | def | L560–L581 |
+| `_check_card_velocity` | def | L601–L648 |
+| `_has_recent_approved_deposit` | def | L651–L667 |
+| `_record_attempt` | def | L670–L866 |
+| `_safe_phase` | def | L876–L883 |
+| `_now_mx_str` | def | L891–L900 |
+| `_deposit_step_payload` | def | L909–L917 |
+| `_wrap_deposit_step` | def | L920–L939 |
+| `_build_admin_proxy_url` | def | L942–L946 |
+| `_refresh_account_after_deposit` | def | L949–L1008 |
+| `_should_relogin_after_401` | def | L1011–L1015 |
+| `_acquire_session_and_begin` | def | L1018–L1353 |
+| `_run_deposit_with_phases` | def | L1356–L1707 |
+| `deposit_execute_stream` | def | L1711–L1913 |
+| `cap_status` | def | L1917–L1929 |
+| `_mm_is_real_decline` | def | L1969–L1975 |
+| `_mm_is_ambiguous_charge` | def | L1978–L1988 |
+| `classify_deposit_status` | def | L1991–L2022 |
+| `_mm_session_get` | def | L2065–L2069 |
+| `_mm_session_update` | def | L2072–L2081 |
+| `multi_stream` | def | L2085–L2608 |
+| `multi_cancel` | def | L2612–L2617 |
+| `scheduled_create` | def | L2630–L2994 |
+| `scheduled_list` | def | L2998–L3020 |
+| `scheduled_cancel` | def | L3024–L3032 |
 
 ### `jwt_keeper.py`
 
@@ -507,8 +507,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_set_cooldown` | def | L244–L251 |
 | `_bump_rl_streak` | def | L254–L268 |
 | `_reset_rl_streak` | def | L271–L278 |
-| `run_keepalive_cycle` | def | L282–L382 |
-| `run_keepalive_cycle_from_env` | def | L385–L392 |
+| `run_keepalive_cycle` | def | L282–L379 |
+| `run_keepalive_cycle_from_env` | def | L382–L389 |
 
 ### `login_orchestrator.py`
 
@@ -999,6 +999,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `test_publish_moves_accounts` | def | L9–L22 |
 | `test_publish_forbidden_for_operator` | def | L24–L26 |
 | `test_hide_releases_sa_lock_but_protects_operator_lock` | def | L29–L42 |
+| `test_mark_rate_limited_isolates_pool_not_dead` | def | L45–L63 |
 
 ### `test_refresh_single_guard.py`
 

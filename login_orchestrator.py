@@ -177,12 +177,12 @@ async def gentle_login(
                         raw_result=res,
                     )
                 elif status == "BAN":
-                    logger.warning(f"[login] {email} 429 BAN transitorio (proxy/rate-limit) → RETRY_LATER")
+                    logger.warning(f"[login] {email} 429 BAN (rate-limit en BetMexico) → RATE_LIMITED")
                     return LoginResult(
                         ok=False,
-                        code="LOGIN_RETRY_LATER",
+                        code="RATE_LIMITED",
                         account_dead=False,
-                        error="RATE_LIMITED_TEMP (429)",
+                        error="RATE_LIMITED (429)",
                         attempts=attempt,
                         raw_result=res,
                     )
