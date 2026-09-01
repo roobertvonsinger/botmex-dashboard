@@ -1191,55 +1191,6 @@ async def _acquire_session_and_begin(
                     "duration_ms": int((time.time() - t_total) * 1000),
                 }}
 
-        # ── Gate de Saldo Activo (Robert: cuenta con >= $100 no puede depositar) ──
-        bal_real = None
-        bal_bonos = 0.0
-        if getattr(login_res, "details", None):
-            bal_real = login_res.details.get("balance_real")
-            bal_bonos = login_res.details.get("balance_bonos") or 0.0
-        elif login_result and isinstance(login_result, dict):
-            acct_details = login_result.get("account_details") or {}
-            bal_real = acct_details.get("balance_real")
-            bal_bonos = acct_details.get("balance_bonos") or 0.0
-
-        if bal_real is None:
-            try:
-                from app import db as _dash_db
-                with _dash_db() as _c:
-                    _row = _c.execute(
-                        "SELECT balance_real, balance_bonos, balance_total FROM accounts WHERE email=?",
-                        (email,),
-                    ).fetchone()
-                    if _row:
-                        bal_real = _row["balance_real"] if _row["balance_real"] is not None else _row["balance_total"]
-                        bal_bonos = _row["balance_bonos"] or 0.0
-            except Exception:
-                pass
-
-        if bal_real is not None:
-            try:
-                bal_f = float(bal_real or 0.0)
-                bal_tot = bal_f + float(bal_bonos or 0.0)
-                if bal_f >= 100.0 or bal_tot >= 100.0:
-                    msg = (
-                        f"Cuenta con saldo activo (${bal_f:.2f}) — "
-                        f"BetMexico no permite depositar a cuentas con >= $100."
-                    )
-                    logger.warning(
-                        f"[Deposits/phases] {email} SALDO ACTIVO (${bal_f:.2f} >= $100) — "
-                        f"abortando depósito sin quemar captcha ni tarjeta"
-                    )
-                    await _safe_phase(phase_cb, "done", {
-                        "success": False, "result_code": "BALANCE_LIMIT_EXCEEDED", "error": msg,
-                    })
-                    return {"fail": {
-                        "success": False, "result_code": "BALANCE_LIMIT_EXCEEDED", "error": msg,
-                        "balance_real": bal_f,
-                        "duration_ms": int((time.time() - t_total) * 1000),
-                    }}
-            except (ValueError, TypeError):
-                pass
-
         # ── Abrir client + begin_deposit (retry ante 50x/timeout transitorios) ──
         # Pre-cobro → reintentar es seguro (no duplica cargos).
         client_kwargs = {"timeout": 30.0, "verify": False}

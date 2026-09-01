@@ -559,9 +559,9 @@ def test_mission_balance_limit_exceeded_preserves_card_and_skips_account(H):
     assert matches[0]["email"] == "acc2@x.com"
 
 
-def test_mission_db_balance_over_100_skipped_pre_attempt(H, monkeypatch):
-    """Verifica que si la BD ya sabe que la cuenta tiene balance >= $100,
-    se salta inmediatamente sin siquiera ejecutar _attempt."""
+def test_mission_db_balance_allowed_for_deposits(H, monkeypatch):
+    """Verifica que una cuenta con saldo activo en BD (ej. $116.91)
+    NO sea bloqueada artificialmente y pueda recibir depósitos si tiene cupo 24h."""
     def fake_fetch(aid):
         if aid == 1:
             return {"id": 1, "email": "acc1@x.com", "password": "pw", "balance_real": 116.91}
@@ -575,11 +575,8 @@ def test_mission_db_balance_over_100_skipped_pre_attempt(H, monkeypatch):
         ]
     }
     run(H, pl)
-    # acc1 nunca llamó a _run_deposit_with_phases
+    # acc1 sí corre y recibe el depósito normalmente
     acc1_calls = [c for c in H.run_calls if c["email"] == "acc1@x.com"]
-    assert acc1_calls == []
-    # acc2 sí corrió y completó match
-    acc2_probes = [c for c in H.run_calls if c["email"] == "acc2@x.com" and c["amount"] == ad.PROBE_AMOUNT]
-    assert len(acc2_probes) == 1
+    assert len(acc1_calls) >= 1
 
 

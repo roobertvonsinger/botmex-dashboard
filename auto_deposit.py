@@ -1387,18 +1387,6 @@ async def run_auto_mission(
                             _unlock(account_id)
                             locked_ids.discard(account_id)
                         continue
-                    bal_db = fresh_acct.get("balance_real") if fresh_acct.get("balance_real") is not None else fresh_acct.get("balance_total")
-                    try:
-                        if bal_db is not None and float(bal_db) >= 100.0:
-                            logger.info(f"💰 CUENTA CON SALDO EN BD (${float(bal_db):.2f} >= $100) | {email} — saltada del plan")
-                            target["done"] = True
-                            target["candidates"] = []
-                            if target["locked"]:
-                                _unlock(account_id)
-                                locked_ids.discard(account_id)
-                            continue
-                    except (ValueError, TypeError):
-                        pass
                     acct = fresh_acct
                     target["acct"] = fresh_acct
 

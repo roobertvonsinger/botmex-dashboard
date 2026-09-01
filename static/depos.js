@@ -509,7 +509,7 @@
           } else {
             setScene('login');
             if (isRealRejection(ev.result_code)) { setSub(humanError(ev.result_code)); movSetState('wait', 'no aplicado'); }
-            else { setSub('No se pudo, reintenta'); movRemoveLast(); } // error nuestro: invisible
+            else { setSub(ev.error || humanError(ev.result_code) || 'No se pudo, reintenta'); movRemoveLast(); }
           }
         } else if (ev.type === 'fatal') {
           gotDone = true; setSub('Algo falló, reintenta'); movRemoveLast();
