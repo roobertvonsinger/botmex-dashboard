@@ -294,6 +294,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `7a9bb1e` | docs(session): sync NEXT-SESSION with latest deposit unlock and UI transparency fixes |
 | `9cbb7af` | fix(deposits): unlock non-approved cards, bypass SA velocity check and surface real error details in UI |
 | `73888f2` | docs(vault): reubicar mapas Canvas en la raíz del vault BotMex |
 | `60c797e` | docs(canvas): agregar arquitectura visual soberana BotMex (Canvas N0, N1, Cambios e HTML interactivo) |
@@ -305,7 +306,6 @@ prewarm.py (router)
 | `89db512` | fix(saneador): eliminar baja automatica por 429 y Grado D, preservar cuentas operativas |
 | `50565b8` | fix(saneador): blindaje estricto contra reactivacion de cuentas Grado D y 429 |
 | `343b73d` | fix(matchmaker): purga definitiva de cuentas rate-limited/degradadas y exclusion estricta en pool |
-| `d8406d7` | refactor: eliminate gentle_login over-engineering and captcha caching bugs, enable crisp direct login and instant balance refresh |
 <!-- GEN:end:recientes -->
 
 ---
