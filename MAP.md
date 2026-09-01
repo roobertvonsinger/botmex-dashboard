@@ -120,6 +120,7 @@ prewarm.py (router)
 | `prewarm.py` | 918 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 389 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_validator.py` | 154 | `betmexico.renapo_validator` | _[completar]_ |
+| `saneador_daemon.py` | 303 | `saneador` | _[completar]_ |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/migrate_status_no_banco.py` | 80 | `—` | _[completar]_ |
@@ -293,6 +294,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `343b73d` | fix(matchmaker): purga definitiva de cuentas rate-limited/degradadas y exclusion estricta en pool |
 | `d8406d7` | refactor: eliminate gentle_login over-engineering and captcha caching bugs, enable crisp direct login and instant balance refresh |
 | `85bbe1a` | fix(prewarm): wire make_pool to CaptchaHub and execute direct test_login on stale JWT |
 | `89fe1ed` | feat(refresh): live on-demand refresh via CaptchaHub auto-login, remove balance blocks, add UI refresh |
@@ -304,7 +306,6 @@ prewarm.py (router)
 | `05e226e` | fix(selector): priorizar recencia de login/sesion activa y penalizar cuentas fosiles sin verificar |
 | `a4f4a33` | fix(matchmaker): exclusion estricta de cuentas 429/rate_limited a DEAD y purga de zombies en BD |
 | `6990675` | fix(depos): limpiar #wdStatus en mountCompact y forzar version 20260826c |
-| `56e4707` | fix(pantalla): descartar status de retiro si no tiene transactionId o es idle |
 <!-- GEN:end:recientes -->
 
 ---

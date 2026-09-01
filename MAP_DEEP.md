@@ -555,6 +555,14 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `validate_renapo_curp` | def | L97–L148 |
 | `_fallback` | def | L151–L154 |
 
+### `saneador_daemon.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `get_db` | def | L33–L38 |
+| `audit_single_account` | def | L40–L203 |
+| `run_sanitizer_batch` | def | L205–L295 |
+
 ### `scripts/backfill_account_cards.py`
 
 | Símbolo | Tipo | Líneas |
@@ -1370,5 +1378,6 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `dashboard.proxy_pool` | `proxy_pool.py` |
 | `httpcore` | `betmexico_login_api.py` |
 | `httpx` | `betmexico_login_api.py` |
+| `saneador` | `saneador_daemon.py` |
 | `verify_all_accounts` | `scripts/verify_all_accounts_active.py` |
 <!-- GEN:end:loggers -->
