@@ -59,4 +59,5 @@ _screenshots/
 # Memoria de sesion de herramienta local (Claude Code) + backups graphify
 memory/
 .claude/settings.json.graphify-bak
+.obsidian/
 

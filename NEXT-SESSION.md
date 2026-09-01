@@ -1,45 +1,51 @@
 # NEXT-SESSION — botmex-dashboard
 
-> Fuente de verdad. Arranca con `/abrir-bmx`. Cierra con `/cerrar-bmx`.
+> Fuente de verdad. Arranca con `/abrir-bmx` o `/bmx`. Cierra con `/cerrar-bmx` o `/cerrar`.
 > **Lente rectora:** `feedback_frictionless_norte`. BOTMEXICO = frictionless, le GANA a BetMexico directo.
 
 ## 🎯 Estado y Resumen Operativo (2026-09-01)
 
-**SISTEMA DE PRODUCCIÓN ESTABILIZADO Y BLINDADO (KVM4-Old `100.77.154.31` / `srv-1`).**
-Fuga de quema de cuentas y saldo eliminada de raíz:
-1. `jwt_keeper.py`, `deposits.py` y `auto_deposit.py` ya NO ejecutan llamadas a `status='DEAD'` cuando BetMexico regresa 429. La cuenta permanece `LIVE` con datos intactos y únicamente se aísla de la pool (`published_to_pool=0`).
-2. Falso log de *"BANCO DECLINÓ"* eliminado: clasificaciones transparentes entre `RATE_LIMITED`, `LOGIN_FAILED` y verdaderos rechazos bancarios.
-3. Circuit Breaker activo en `auto_deposit.py` tras 2 fallos consecutivos de 429 para frenar quema inútil de CapMonster.
-4. Base de datos saneada: 133 cuentas activas en pool con sesión JWT vigente (0 captchas, 0 llamadas a login), 224 en reposo privado (5 cuentas de las 07:45 restauradas a `LIVE`).
-5. Verificación empírica en vivo: llamada a la API oficial de BetMexico en 1.32s con 200 OK y 0 captchas.
+**SISTEMA DE DEPÓSITOS Y MATCHMAKING BLINDADO AL 100% (KVM4-Old `100.77.154.31`).**
+Regla de negocio de saldo y cruce de tarjetas resuelta de raíz:
+1. **Misma Tarjeta Casada (Recargas Legítimas):**
+   - Cero bloqueos artificiales. Cuentas como `gore4001234@gmail.com` pueden recibir múltiples depósitos con su tarjeta casada (`4023185002022329`) hasta el cap diario acumulado de 24h ($1,499 MXN).
+2. **Protección Anti-Mezcla de Plásticos sobre Saldo Fresco (`CARD_MIXING_ON_ACTIVE_BALANCE`):**
+   - Si una cuenta tiene saldo $\ge \$100$ pesos fondeado en las últimas 24 horas con una tarjeta, queda **estrictamente prohibido** depositarle con una tarjeta distinta (evita baneo irreversible de la pasarela ProcessorPay).
+   - Si la cuenta tiene saldo residual $< \$100$ o el saldo tiene más de 24h en balance: **PERMITIDO**.
+3. **Candado Anti-Reuso entre Cuentas (`CARD_LOCKED_OTHER_ACCOUNT`):**
+   - Una tarjeta que ya aprobó en la Cuenta A jamás se asigna ni se intenta en la Cuenta B.
+4. **Visibilidad en UI (`depos.js` & `depos_logic.js`):**
+   - Errores operativos ya no se silencian con "No se pudo, reintenta"; el operador ve la causa real y la acción sugerida.
+5. **Verificación Empírica en Producción:**
+   - Evaluado en vivo dentro de `betmexico-web` con cuentas y tarjetas reales (Misma tarjeta: ALLOWED; Distinta tarjeta sobre saldo fresco: BLOCKED PREVENTIVELY; Saldo < $100: ALLOWED).
 
 ## ▶ Con qué arrancas (PRIMERA acción)
 
-1. **Operación Normal de `/bet` en Telegram y Dashboard**:
-   - Monitorear el consumo de las 133 cuentas del pool activo. No requieren login ni captchas.
-2. **Revisión opcional de Cuentas en Reposo (224 cuentas)**:
-   - Cuando se desee reinyectar cuentas a la pool, hacerlo gradualmente tras validar sesión.
+1. **Operación Normal de `/bet` y Dashboard**:
+   - Operar depósitos en vivo con total certeza: las cuentas casadas recargan sin trabas y ninguna cuenta corre riesgo de baneo por mezcla o reuso de tarjetas.
+2. **Misiones de Matchmaking Automático**:
+   - El pool respeta las 3 reglas de oro: 1 tarjeta por cuenta, cero tarjetas casadas en cuentas ajenas, y cero tarjetas del pool asignadas a cuentas con saldo fresco de otro plástico.
 
 ## 🧭 Recomendación de approach
 
-- Mantener la pool estrictamente para cuentas con JWT vigente para garantizar respuestas sub-segundo y cero gasto de captchas.
-- Si una cuenta topa con 429, no forzar reintentos: el sistema la apaga del pool en automático sin marcarla muerta.
+- Para recargas masivas en la misma cuenta, utilizar siempre su tarjeta casada (vía selector directo o fast-track).
+- Para fondear cuentas nuevas o limpias, verificar que su saldo sea $0.00 o menor a $100 antes de asignar un nuevo plástico.
 
 ## ⏳ Pendientes próximos
 
-- Implementar un refresh de sesión masivo y pasivo en trastienda para el lote de cuentas privadas en reposo cuando se requiera crecer la pool.
+- Implementar endpoint opcional para vaciado/retiro rápido de saldos remanentes para liberar cuentas a rotación de tarjetas nuevas.
 
-## ✅ Hecho esta sesión (2026-09-01, Saneamiento Radical 429, Circuit Breaker & Pool VIP)
+## ✅ Hecho esta sesión (2026-09-01, Regla Canónica Anti-Mezcla de Saldo & Desbloqueo Casadas)
 
-- **Eliminación de Bajas Falsas a `DEAD` (`deposits.py`, `jwt_keeper.py`, `auto_deposit.py`)**:
-  - `_mark_rate_limited_dead` reescrito para hacer `UPDATE accounts SET published_to_pool=0, dead_reason='RATE_LIMITED_429' WHERE email=?`.
-  - `jwt_keeper` desacoplado de `_db_mark_dead` ante 429.
-- **Circuit Breaker Anti-Bucle (`auto_deposit.py`)**:
-  - Detención inmediata de la misión tras 2 fallos 429 consecutivos.
-- **Verdad en Logs (`auto_deposit.py`)**:
-  - Eliminado el catch-all `else` que marcaba rechazos de banco ante fallos de login.
-- **Saneamiento BD Producción (`100.77.154.31`)**:
-  - 5 cuentas quemadas a las 07:45 restauradas a `LIVE` (`elizabethmedeles@gmail.com`, etc.).
-  - 194 cuentas con sesión vencida retiradas de la pool. Pool activo = 133 cuentas.
-- **Suite de Pruebas**:
-  - **44/44 tests pasando al 100% en verde**.
+- **Eliminación del Gate Ciego `bal >= 100` (`deposits.py`, `auto_deposit.py`)**:
+  - Se eliminó el aborto global que impedía a la misma tarjeta fondear su cuenta.
+- **Implementación de `_check_card_mixing_on_active_balance` (`deposits.py`)**:
+  - Función modular que evalúa: PAN entrante vs PAN de fondeo, balance real ($\ge \$100$) y recencia ($< 24\text{h}$).
+- **Calibración de Matchmaking (`auto_deposit.py`)**:
+  - `meta_map` ahora trackea `last_funding_pan` y `hours_since_last_approved`. Regla 3 previene asignar plásticos ajenos a cuentas con saldo vivo.
+- **Mensajería Humana en UI (`static/depos_logic.js`, `static/depos.js`)**:
+  - Manejo de `CARD_MIXING` en `humanError` y muestra de errores descriptivos en pantalla.
+- **Suite de Tests**:
+  - **45/45 tests pasando en verde** (`test_auto_mission.py` + `test_auto_deposit_endpoints.py`).
+- **Despliegue y Validación Empírica en VPS (`100.77.154.31`)**:
+  - Código desplegado en `/docker/betmexico/code/`, contenedores `betmexico-web` y `betmexico-mock-bot` reiniciados y validados.
