@@ -32,7 +32,7 @@ from pathlib import Path
 
 def test_legacy_modules_archived():
     """Los 7 módulos muertos están en _legacy/, no en la raíz."""
-    root = Path(__file__).resolve().parent
+    root = Path(__file__).resolve().parent.parent
     for m in ("web_routes_deposits.py", "web_routes_missions.py",
               "web_routes_prewarm.py", "web_watchdog.py",
               "web_routes_cards.py", "web_routes_logs.py",
@@ -43,7 +43,7 @@ def test_legacy_modules_archived():
 def test_no_live_import_of_legacy():
     """Ningún módulo vivo (en raíz) importa los legacy."""
     import re
-    root = Path(__file__).resolve().parent
+    root = Path(__file__).resolve().parent.parent
     pat = re.compile(r"^\s*(from|import)\s+(web_routes_deposits|web_routes_missions|"
                      r"web_routes_prewarm|web_watchdog|web_routes_cards|web_routes_logs|"
                      r"web_routes_notifications)\b", re.M)

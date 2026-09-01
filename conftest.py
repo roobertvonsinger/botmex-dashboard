@@ -1,6 +1,11 @@
 # conftest.py
-import sqlite3, tempfile, os, pytest
+import sqlite3, tempfile, os, sys, pytest
 from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 from fastapi.testclient import TestClient
 import httpx
 

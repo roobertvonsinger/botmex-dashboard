@@ -48,7 +48,7 @@
       "width": 280,
       "height": 140,
       "color": "3",
-      "text": "### 🚫 3. Exclusiones Duras\n- `DEAD` o `rate_limited` (429)\n- Casadas (`is_married=1`)\n- Cuentas 'hot' (saldo real >$50)\n- Retiro activo <48h\n→ Reglas de seguridad"
+      "text": "### 🚫 3. Exclusiones & Anti-Mezcla\n- `DEAD` o `cooldown_until` (429)\n- `locked_by` (tomada por otro operador)\n- Anti-Mezcla: Saldo ≥$100 fondeado <24h PROHÍBE tarjeta ajena\n- Casadas: Misma tarjeta casada SÍ puede recargar (hasta cap 24h)\n→ Reglas de pasarela"
     },
     {
       "id": "step_jwt_tie",

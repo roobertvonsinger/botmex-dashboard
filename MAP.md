@@ -112,7 +112,7 @@ prewarm.py (router)
 | `bin_intelligence.py` | 670 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
 | `card_checker.py` | 614 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
-| `conftest.py` | 213 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
+| `conftest.py` | 218 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
 | `deposits.py` | 3072 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 389 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
@@ -128,41 +128,6 @@ prewarm.py (router)
 | `scripts/update_proxy001_list.py` | 35 | `—` | _[completar]_ |
 | `scripts/verify_all_accounts_active.py` | 140 | `verify_all_accounts` | _[completar]_ |
 | `shared/betmexico_payment_analyzer.py` | 592 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
-| `test_a1_estados.py` | 305 | `—` | _[completar]_ |
-| `test_a21_visibilidad.py` | 57 | `—` | _[completar]_ |
-| `test_account_refresh.py` | 470 | `—` | _[completar]_ |
-| `test_account_touch.py` | 51 | `—` | _[completar]_ |
-| `test_account_touch_isolated.py` | 138 | `—` | _[completar]_ |
-| `test_activity_scoped.py` | 30 | `—` | _[completar]_ |
-| `test_anti_rate_limit.py` | 278 | `—` | _[completar]_ |
-| `test_at_hand.py` | 73 | `—` | _[completar]_ |
-| `test_auto_deposit_selection.py` | 321 | `—` | _[completar]_ |
-| `test_auto_missions_migrate.py` | 120 | `—` | _[completar]_ |
-| `test_balance_only_real_zero_preserved.py` | 89 | `—` | _[completar]_ |
-| `test_bet_live_plan.py` | 524 | `—` | _[completar]_ |
-| `test_bin_stats_feedback.py` | 118 | `—` | _[completar]_ |
-| `test_card_touch_log.py` | 61 | `—` | _[completar]_ |
-| `test_curp_utils.py` | 28 | `—` | _[completar]_ |
-| `test_deposit_status_classify.py` | 95 | `—` | _[completar]_ |
-| `test_deposit_step.py` | 132 | `—` | _[completar]_ |
-| `test_grading_a_plus_m7.py` | 184 | `—` | _[completar]_ |
-| `test_jwt_keeper.py` | 201 | `—` | _[completar]_ |
-| `test_maintenance_mode.py` | 39 | `—` | _[completar]_ |
-| `test_marks.py` | 32 | `—` | _[completar]_ |
-| `test_migrate_status_no_banco.py` | 103 | `—` | _[completar]_ |
-| `test_mission_sem_leak.py` | 97 | `—` | _[completar]_ |
-| `test_pool_manage.py` | 64 | `—` | _[completar]_ |
-| `test_refresh_single_guard.py` | 77 | `—` | _[completar]_ |
-| `test_renapo_validator.py` | 110 | `—` | _[completar]_ |
-| `test_scheduled_deposit_3ds_logging.py` | 93 | `—` | _[completar]_ |
-| `test_scheduled_deposit_card_locked.py` | 80 | `—` | _[completar]_ |
-| `test_search.py` | 70 | `—` | _[completar]_ |
-| `test_sse_visibility.py` | 88 | `—` | _[completar]_ |
-| `test_unificacion_sp1.py` | 52 | `—` | _[completar]_ |
-| `test_unificacion_sp2.py` | 71 | `—` | _[completar]_ |
-| `test_withdrawals.py` | 950 | `—` | _[completar]_ |
-| `test_withdrawals_endpoints.py` | 627 | `—` | _[completar]_ |
-| `test_withdrawals_migrate.py` | 46 | `—` | _[completar]_ |
 | `web_auth.py` | 159 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
 | `web_grading.py` | 197 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
 | `web_utils.py` | 265 | `betmexico.web.utils` | Helpers compartidos: _friendly_error, _normalize_ccexp, _build_proxy_url |
@@ -257,14 +222,6 @@ prewarm.py (router)
 | `C_DEEP_REST_DAYS` | `90` | `shared/betmexico_payment_analyzer.py` |
 | `SCORE_FLOOR` | `{"A": 80, "B": 60, "C": 40, "D": 0}` | `shared/betmexico_payment_analyzer.py` |
 | `SCORE_CEIL` | `{"A": 100, "B": 79, "C": 59, "D": 39}` | `shared/betmexico_payment_analyzer.py` |
-| `SCHEMA` | `"""` | `test_a1_estados.py` |
-| `NOW` | `1_800_000_000` | `test_account_refresh.py` |
-| `NOW_ISO` | `"2026-08-04T12:00:00+00:00"` | `test_account_refresh.py` |
-| `OP_A` | `{"role": "user", "telegram_id": 555, "display": "Lau"}` | `test_account_touch.py` |
-| `OP_B` | `{"role": "user", "telegram_id": 777, "display": "Otro"}` | `test_account_touch.py` |
-| `NOW` | `1_800_000_000` | `test_jwt_keeper.py` |
-| `AHEAD` | `24 * H` | `test_jwt_keeper.py` |
-| `PIPE` | `"4111111111111111|12|30|123"` | `test_unificacion_sp1.py` |
 | `PAYMENTS_API` | `"https://paymentsapi.betmexico.mx"` | `withdrawals.py` |
 | `TRANSACTIONS_BY_USER_PAGE_SIZE` | `50` | `withdrawals.py` |
 | `DEFAULT_BATCH_AMOUNT` | `200.0` | `withdrawals.py` |
@@ -294,6 +251,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `92ed3a1` | skills: suite oficial obsidian instalada en botmex-dashboard |
 | `7a9bb1e` | docs(session): sync NEXT-SESSION with latest deposit unlock and UI transparency fixes |
 | `9cbb7af` | fix(deposits): unlock non-approved cards, bypass SA velocity check and surface real error details in UI |
 | `73888f2` | docs(vault): reubicar mapas Canvas en la raíz del vault BotMex |
@@ -305,7 +263,6 @@ prewarm.py (router)
 | `f3f7f69` | feat(sovereign): modo soberano, pool binario, seleccion tactil y blindaje de errores en KVM4-Old |
 | `89db512` | fix(saneador): eliminar baja automatica por 429 y Grado D, preservar cuentas operativas |
 | `50565b8` | fix(saneador): blindaje estricto contra reactivacion de cuentas Grado D y 429 |
-| `343b73d` | fix(matchmaker): purga definitiva de cuentas rate-limited/degradadas y exclusion estricta en pool |
 <!-- GEN:end:recientes -->
 
 ---

@@ -18,10 +18,11 @@ import sqlite3
 from datetime import datetime, timedelta
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.abspath(os.path.join(_HERE, ".."))
 
 
 def _load(path, name):
-    spec = importlib.util.spec_from_file_location(name, os.path.join(_HERE, path))
+    spec = importlib.util.spec_from_file_location(name, os.path.join(_REPO_ROOT, path))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
