@@ -1,0 +1,62 @@
+{
+  "nodes": [
+    {
+      "id": "db_g",
+      "type": "group",
+      "label": "ARQUITECTURA DASHBOARD FASTAPI",
+      "x": -400,
+      "y": -300,
+      "width": 900,
+      "height": 450,
+      "color": "5"
+    },
+    {
+      "id": "db_routes",
+      "type": "text",
+      "x": -360,
+      "y": -240,
+      "width": 260,
+      "height": 140,
+      "color": "5",
+      "text": "### 1. Rutas Principales\n- `/` Formulario Login\n- `/dashboard` Vista SA\n- `/user/{tg_id}` Portal Operador\n- `/api/stream` SSE Event stream"
+    },
+    {
+      "id": "db_viewas",
+      "type": "text",
+      "x": -50,
+      "y": -240,
+      "width": 260,
+      "height": 140,
+      "color": "6",
+      "text": "### 2. Soporte ?view_as=\nSuperadmin puede degradar su sesión visual para ver exactamente lo que ve un operador sin mutar datos."
+    },
+    {
+      "id": "db_grid",
+      "type": "text",
+      "x": 260,
+      "y": -240,
+      "width": 200,
+      "height": 140,
+      "color": "4",
+      "text": "### 3. Grid Mis Cuentas\nFiltra cuentas 100% retiradas y muestra balance real con 1-click CLABE copy."
+    }
+  ],
+  "edges": [
+    {
+      "id": "dbe1",
+      "fromNode": "db_routes",
+      "fromSide": "right",
+      "toNode": "db_viewas",
+      "toSide": "left",
+      "color": "5"
+    },
+    {
+      "id": "dbe2",
+      "fromNode": "db_viewas",
+      "fromSide": "right",
+      "toNode": "db_grid",
+      "toSide": "left",
+      "color": "6"
+    }
+  ]
+}

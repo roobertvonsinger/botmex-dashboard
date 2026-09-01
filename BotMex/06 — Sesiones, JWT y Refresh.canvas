@@ -1,0 +1,62 @@
+{
+  "nodes": [
+    {
+      "id": "se_g",
+      "type": "group",
+      "label": "SESIONES, JWT Y REFRESH",
+      "x": -400,
+      "y": -300,
+      "width": 900,
+      "height": 450,
+      "color": "4"
+    },
+    {
+      "id": "se_loop",
+      "type": "text",
+      "x": -360,
+      "y": -240,
+      "width": 250,
+      "height": 140,
+      "color": "6",
+      "text": "### 1. Loop 5 Minutos\n`account_refresh.py` ejecuta ciclo de fondo cada 300s buscando cuentas con JWT vigente."
+    },
+    {
+      "id": "se_hot",
+      "type": "text",
+      "x": -60,
+      "y": -240,
+      "width": 250,
+      "height": 140,
+      "color": "4",
+      "text": "### 2. Prioridad Cuentas Hot\nCuentas con saldo >$50 o retiro pendiente se refrescan primero sin pasar por login/captcha."
+    },
+    {
+      "id": "se_keeper",
+      "type": "text",
+      "x": 240,
+      "y": -240,
+      "width": 220,
+      "height": 140,
+      "color": "4",
+      "text": "### 3. JWT Keeper\nRenueva el token silenciosamente antes de que expire para tenerlas listas para depósito."
+    }
+  ],
+  "edges": [
+    {
+      "id": "see1",
+      "fromNode": "se_loop",
+      "fromSide": "right",
+      "toNode": "se_hot",
+      "toSide": "left",
+      "color": "6"
+    },
+    {
+      "id": "see2",
+      "fromNode": "se_hot",
+      "fromSide": "right",
+      "toNode": "se_keeper",
+      "toSide": "left",
+      "color": "4"
+    }
+  ]
+}

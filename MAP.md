@@ -294,6 +294,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `60c797e` | docs(canvas): agregar arquitectura visual soberana BotMex (Canvas N0, N1, Cambios e HTML interactivo) |
 | `c443558` | docs(meta): actualizacion de NEXT-SESSION, .gitignore y mapa logico de flujos |
 | `0ffc28d` | fix(deposits): regla canónica anti-mezcla de tarjetas sobre saldo fresco (<24h / >=100) |
 | `f45b9c4` | fix(deposits): eliminacion del gate artificial de saldo >= 100 y visibilidad de errores en UI |
@@ -305,7 +306,6 @@ prewarm.py (router)
 | `d8406d7` | refactor: eliminate gentle_login over-engineering and captcha caching bugs, enable crisp direct login and instant balance refresh |
 | `85bbe1a` | fix(prewarm): wire make_pool to CaptchaHub and execute direct test_login on stale JWT |
 | `89fe1ed` | feat(refresh): live on-demand refresh via CaptchaHub auto-login, remove balance blocks, add UI refresh |
-| `73052ed` | fix(identity): prevent jwt username from poisoning fullname and protect curp/phone in merge |
 <!-- GEN:end:recientes -->
 
 ---

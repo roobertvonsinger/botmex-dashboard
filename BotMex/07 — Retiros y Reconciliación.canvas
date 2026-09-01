@@ -1,0 +1,62 @@
+{
+  "nodes": [
+    {
+      "id": "wd_g",
+      "type": "group",
+      "label": "FLUJO DE RETIROS Y SPEI",
+      "x": -400,
+      "y": -300,
+      "width": 900,
+      "height": 450,
+      "color": "4"
+    },
+    {
+      "id": "wd_detect",
+      "type": "text",
+      "x": -360,
+      "y": -240,
+      "width": 240,
+      "height": 140,
+      "color": "6",
+      "text": "### 1. Detección de Balance\nRefresco detecta balance acreditable > $0 y sin bloqueo de autolock."
+    },
+    {
+      "id": "wd_clabe",
+      "type": "text",
+      "x": -70,
+      "y": -240,
+      "width": 240,
+      "height": 140,
+      "color": "4",
+      "text": "### 2. Validación STP / CLABE\nVerifica CLABE de 18 dígitos y CURP del titular asociado a la cuenta."
+    },
+    {
+      "id": "wd_disperse",
+      "type": "text",
+      "x": 220,
+      "y": -240,
+      "width": 240,
+      "height": 140,
+      "color": "4",
+      "text": "### 3. Dispersión y Ficha\nActualiza cuenta a `withdrawn`, resta saldo y genera ficha 1-tap copy al bot."
+    }
+  ],
+  "edges": [
+    {
+      "id": "wde1",
+      "fromNode": "wd_detect",
+      "fromSide": "right",
+      "toNode": "wd_clabe",
+      "toSide": "left",
+      "color": "6"
+    },
+    {
+      "id": "wde2",
+      "fromNode": "wd_clabe",
+      "fromSide": "right",
+      "toNode": "wd_disperse",
+      "toSide": "left",
+      "color": "4"
+    }
+  ]
+}

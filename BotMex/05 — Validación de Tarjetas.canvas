@@ -1,0 +1,62 @@
+{
+  "nodes": [
+    {
+      "id": "cd_g",
+      "type": "group",
+      "label": "VALIDACIÓN Y CICLO DE TARJETAS",
+      "x": -400,
+      "y": -300,
+      "width": 900,
+      "height": 450,
+      "color": "3"
+    },
+    {
+      "id": "cd_ingest",
+      "type": "text",
+      "x": -360,
+      "y": -240,
+      "width": 240,
+      "height": 140,
+      "color": "5",
+      "text": "### 1. Ingesta de Tarjetas\n- Desde comando `/check`\n- Cosechadas desde Ruthopia Bridge (`vault_cards.db`)"
+    },
+    {
+      "id": "cd_bin",
+      "type": "text",
+      "x": -70,
+      "y": -240,
+      "width": 240,
+      "height": 140,
+      "color": "3",
+      "text": "### 2. BIN Intelligence\nClasificación por banco emisor, nivel de riesgo y pasarela preferida (V10)."
+    },
+    {
+      "id": "cd_states",
+      "type": "text",
+      "x": 220,
+      "y": -240,
+      "width": 240,
+      "height": 140,
+      "color": "4",
+      "text": "### 3. Estados de Tarjeta\n- `available`: Lista para match\n- `burned`: Rechazada por banco\n- `married`: Casada 1:1 con cuenta"
+    }
+  ],
+  "edges": [
+    {
+      "id": "cde1",
+      "fromNode": "cd_ingest",
+      "fromSide": "right",
+      "toNode": "cd_bin",
+      "toSide": "left",
+      "color": "5"
+    },
+    {
+      "id": "cde2",
+      "fromNode": "cd_bin",
+      "fromSide": "right",
+      "toNode": "cd_states",
+      "toSide": "left",
+      "color": "3"
+    }
+  ]
+}

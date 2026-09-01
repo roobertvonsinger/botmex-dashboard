@@ -1,0 +1,82 @@
+{
+  "nodes": [
+    {
+      "id": "tg_g",
+      "type": "group",
+      "label": "FLUJO TELEGRAM BOT",
+      "x": -400,
+      "y": -300,
+      "width": 900,
+      "height": 450,
+      "color": "5"
+    },
+    {
+      "id": "tg_cmd",
+      "type": "text",
+      "x": -360,
+      "y": -240,
+      "width": 260,
+      "height": 140,
+      "color": "5",
+      "text": "### 1. Comandos de Entrada\n- `/start` Menú principal\n- `/bet` Inicia misión con pipes\n- `/check` Precheck de tarjetas\n- `/adduser` Alta de operador"
+    },
+    {
+      "id": "tg_gate",
+      "type": "text",
+      "x": -50,
+      "y": -240,
+      "width": 260,
+      "height": 140,
+      "color": "6",
+      "text": "### 2. Confirm Gate\n¿Operador confirma misión?\n- **Sí:** Encola misión y dispara motor.\n- **No:** Cancela y regresa al menú."
+    },
+    {
+      "id": "tg_live",
+      "type": "text",
+      "x": 260,
+      "y": -240,
+      "width": 200,
+      "height": 140,
+      "color": "5",
+      "text": "### 3. Mensaje en Vivo\nEdita el mensaje en Telegram vía callbacks/SSE con porcentaje de progreso."
+    },
+    {
+      "id": "tg_spei",
+      "type": "text",
+      "x": -50,
+      "y": -40,
+      "width": 260,
+      "height": 140,
+      "color": "4",
+      "text": "### 4. Ficha SPEI Final\nAl completar retiro con éxito, genera tarjeta visual con CURP + CLABE STP para copiar en 1 tap."
+    }
+  ],
+  "edges": [
+    {
+      "id": "tge1",
+      "fromNode": "tg_cmd",
+      "fromSide": "right",
+      "toNode": "tg_gate",
+      "toSide": "left",
+      "color": "5"
+    },
+    {
+      "id": "tge2",
+      "fromNode": "tg_gate",
+      "fromSide": "right",
+      "toNode": "tg_live",
+      "toSide": "left",
+      "color": "6",
+      "label": "Confirmado"
+    },
+    {
+      "id": "tge3",
+      "fromNode": "tg_live",
+      "fromSide": "bottom",
+      "toNode": "tg_spei",
+      "toSide": "right",
+      "color": "4",
+      "label": "Éxito"
+    }
+  ]
+}

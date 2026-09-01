@@ -1,0 +1,62 @@
+{
+  "nodes": [
+    {
+      "id": "if_g",
+      "type": "group",
+      "label": "INFRAESTRUCTURA Y BASE DE DATOS",
+      "x": -400,
+      "y": -300,
+      "width": 900,
+      "height": 450,
+      "color": "6"
+    },
+    {
+      "id": "if_sqlite",
+      "type": "text",
+      "x": -360,
+      "y": -240,
+      "width": 240,
+      "height": 140,
+      "color": "4",
+      "text": "### 1. SQLite WAL Mode\nBase de datos local con busy_timeout=30s para evitar database locked en concurrencia."
+    },
+    {
+      "id": "if_proxy",
+      "type": "text",
+      "x": -70,
+      "y": -240,
+      "width": 240,
+      "height": 140,
+      "color": "6",
+      "text": "### 2. Proxy-Gate Failover\nRotación de proxies residenciales. Si un proxy falla con 402/timeout, conmuta en <1s."
+    },
+    {
+      "id": "if_sse",
+      "type": "text",
+      "x": 220,
+      "y": -240,
+      "width": 240,
+      "height": 140,
+      "color": "5",
+      "text": "### 3. Colas SSE en Memoria\n`_sse_queues` en FastAPI distribuye eventos sin persistir basura en base de datos."
+    }
+  ],
+  "edges": [
+    {
+      "id": "ife1",
+      "fromNode": "if_sqlite",
+      "fromSide": "right",
+      "toNode": "if_proxy",
+      "toSide": "left",
+      "color": "4"
+    },
+    {
+      "id": "ife2",
+      "fromNode": "if_proxy",
+      "fromSide": "right",
+      "toNode": "if_sse",
+      "toSide": "left",
+      "color": "6"
+    }
+  ]
+}
