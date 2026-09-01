@@ -1418,7 +1418,7 @@ async def _run_deposit_with_phases(
         from app import db as _dash_db
         with _dash_db() as _c:
             _locked = _c.execute(
-                "SELECT account_email FROM account_cards WHERE card_number=? AND account_email!=?",
+                "SELECT account_email FROM account_cards WHERE card_number=? AND account_email!=? AND total_approved > 0",
                 (cc_num, email),
             ).fetchone()
             if not _locked:
@@ -1806,7 +1806,7 @@ async def deposit_execute_stream(request: Request, user: dict = Depends(require_
     if cap_err:
         raise HTTPException(400, cap_err)
 
-    if not (force and is_sa):
+    if not is_sa:
         vel = _check_card_velocity(card_pipe, email)
         if vel:
             raise HTTPException(409, {"detail": vel["message"], "velocity": vel})
@@ -2715,7 +2715,7 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
     if cap_err:
         raise HTTPException(400, cap_err)
 
-    if not (force and is_sa):
+    if not is_sa:
         vel = _check_card_velocity(card_pipe, email)
         if vel:
             raise HTTPException(409, {"detail": vel["message"], "velocity": vel})

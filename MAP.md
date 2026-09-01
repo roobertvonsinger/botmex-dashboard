@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 592 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5528 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 2008 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 2011 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `betmexico_config.py` | 183 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2960 | `—` | _[completar]_ |
@@ -294,6 +294,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `73888f2` | docs(vault): reubicar mapas Canvas en la raíz del vault BotMex |
 | `60c797e` | docs(canvas): agregar arquitectura visual soberana BotMex (Canvas N0, N1, Cambios e HTML interactivo) |
 | `c443558` | docs(meta): actualizacion de NEXT-SESSION, .gitignore y mapa logico de flujos |
 | `0ffc28d` | fix(deposits): regla canónica anti-mezcla de tarjetas sobre saldo fresco (<24h / >=100) |
@@ -305,7 +306,6 @@ prewarm.py (router)
 | `343b73d` | fix(matchmaker): purga definitiva de cuentas rate-limited/degradadas y exclusion estricta en pool |
 | `d8406d7` | refactor: eliminate gentle_login over-engineering and captcha caching bugs, enable crisp direct login and instant balance refresh |
 | `85bbe1a` | fix(prewarm): wire make_pool to CaptchaHub and execute direct test_login on stale JWT |
-| `89fe1ed` | feat(refresh): live on-demand refresh via CaptchaHub auto-login, remove balance blocks, add UI refresh |
 <!-- GEN:end:recientes -->
 
 ---

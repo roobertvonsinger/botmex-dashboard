@@ -491,7 +491,13 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ account_id: acc.id, card_pipe: pipe, amount }),
       });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
+      if (!r.ok) {
+        const errData = await r.json().catch(() => ({}));
+        const errMsg = (errData.detail && errData.detail.message) || errData.detail || errData.message || ('HTTP ' + r.status);
+        setSub(typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg));
+        movRemoveLast();
+        return;
+      }
       await consumeStream(r, (ev) => {
         if (ev.type === 'phase') {
           setScene(D.mapPhaseToScene(ev.name));
@@ -508,8 +514,9 @@
             movSetState('ok');
           } else {
             setScene('login');
-            if (isRealRejection(ev.result_code)) { setSub(humanError(ev.result_code)); movSetState('wait', 'no aplicado'); }
-            else { setSub(ev.error || humanError(ev.result_code) || 'No se pudo, reintenta'); movRemoveLast(); }
+            setSub(ev.error || humanError(ev.result_code) || 'Rechazado');
+            if (isRealRejection(ev.result_code)) { movSetState('wait', 'no aplicado'); }
+            else { movRemoveLast(); }
           }
         } else if (ev.type === 'fatal') {
           gotDone = true; setSub('Algo falló, reintenta'); movRemoveLast();
@@ -568,7 +575,13 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ account_id: acc.id, card_pipe: pipe, amount, repetitions: reps }),
       });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
+      if (!r.ok) {
+        const errData = await r.json().catch(() => ({}));
+        const errMsg = (errData.detail && errData.detail.message) || errData.detail || errData.message || ('HTTP ' + r.status);
+        setSub(typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg));
+        _dx.running = false; _dx.sched = null; journeyEnd(); busClose();
+        return;
+      }
       const data = await r.json();
       _dx.sched.sched_id = data.sched_id;
       _dx.sched.total = data.total || reps;

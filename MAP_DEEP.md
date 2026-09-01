@@ -223,20 +223,20 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_parse_card_pipe` | def | L134–L167 |
 | `_normalize_pipe_to_3part` | def | L170–L172 |
 | `_get_married_card_owners` | def | L175–L209 |
-| `select_accounts_for_auto` | def | L218–L430 |
-| `_max_accounts_for_cards` | def | L439–L447 |
-| `plan_auto_mission` | def | L450–L874 |
-| `_fake_progress_pct` | def | L915–L946 |
-| `_iso` | def | L950–L951 |
-| `_m_load` | def | L954–L962 |
-| `_m_status` | def | L965–L967 |
-| `_m_update` | def | L970–L980 |
-| `_fetch_account` | def | L983–L990 |
-| `_is_account_dead` | def | L993–L1004 |
-| `_unlock` | def | L1007–L1016 |
-| `_broadcast_mission` | def | L1019–L1048 |
-| `_stop_pool` | def | L1051–L1058 |
-| `run_auto_mission` | def | L1062–L2008 |
+| `select_accounts_for_auto` | def | L218–L433 |
+| `_max_accounts_for_cards` | def | L442–L450 |
+| `plan_auto_mission` | def | L453–L877 |
+| `_fake_progress_pct` | def | L918–L949 |
+| `_iso` | def | L953–L954 |
+| `_m_load` | def | L957–L965 |
+| `_m_status` | def | L968–L970 |
+| `_m_update` | def | L973–L983 |
+| `_fetch_account` | def | L986–L993 |
+| `_is_account_dead` | def | L996–L1007 |
+| `_unlock` | def | L1010–L1019 |
+| `_broadcast_mission` | def | L1022–L1051 |
+| `_stop_pool` | def | L1054–L1061 |
+| `run_auto_mission` | def | L1065–L2011 |
 
 ### `autoexclusion.py`
 

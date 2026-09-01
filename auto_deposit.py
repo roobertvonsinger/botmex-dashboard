@@ -310,6 +310,9 @@ def select_accounts_for_auto(
         if not r.get("published_to_pool"):
             continue
 
+        if r.get("locked_by") is not None and str(r.get("locked_by")) not in sa:
+            continue
+
         if _cd_active(r.get("cooldown_until"), now):
             continue
 
