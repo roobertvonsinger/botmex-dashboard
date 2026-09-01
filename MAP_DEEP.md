@@ -480,20 +480,20 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_build_admin_proxy_url` | def | L921–L925 |
 | `_refresh_account_after_deposit` | def | L928–L987 |
 | `_should_relogin_after_401` | def | L990–L994 |
-| `_acquire_session_and_begin` | def | L997–L1333 |
-| `_run_deposit_with_phases` | def | L1336–L1687 |
-| `deposit_execute_stream` | def | L1691–L1893 |
-| `cap_status` | def | L1897–L1909 |
-| `_mm_is_real_decline` | def | L1949–L1955 |
-| `_mm_is_ambiguous_charge` | def | L1958–L1968 |
-| `classify_deposit_status` | def | L1971–L2002 |
-| `_mm_session_get` | def | L2045–L2049 |
-| `_mm_session_update` | def | L2052–L2061 |
-| `multi_stream` | def | L2065–L2588 |
-| `multi_cancel` | def | L2592–L2597 |
-| `scheduled_create` | def | L2610–L2974 |
-| `scheduled_list` | def | L2978–L3000 |
-| `scheduled_cancel` | def | L3004–L3012 |
+| `_acquire_session_and_begin` | def | L997–L1332 |
+| `_run_deposit_with_phases` | def | L1335–L1686 |
+| `deposit_execute_stream` | def | L1690–L1892 |
+| `cap_status` | def | L1896–L1908 |
+| `_mm_is_real_decline` | def | L1948–L1954 |
+| `_mm_is_ambiguous_charge` | def | L1957–L1967 |
+| `classify_deposit_status` | def | L1970–L2001 |
+| `_mm_session_get` | def | L2044–L2048 |
+| `_mm_session_update` | def | L2051–L2060 |
+| `multi_stream` | def | L2064–L2587 |
+| `multi_cancel` | def | L2591–L2596 |
+| `scheduled_create` | def | L2609–L2973 |
+| `scheduled_list` | def | L2977–L2999 |
+| `scheduled_cancel` | def | L3003–L3011 |
 
 ### `jwt_keeper.py`
 
@@ -518,7 +518,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `LoginResult` | class | L28–L42 |
 | `StickySessionManager` | class | L45–L56 |
 | `_classify_dead` | def | L59–L70 |
-| `gentle_login` | def | L73–L217 |
+| `gentle_login` | def | L73–L207 |
 
 ### `prewarm.py`
 
@@ -560,8 +560,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
 | `get_db` | def | L33–L38 |
-| `audit_single_account` | def | L40–L203 |
-| `run_sanitizer_batch` | def | L205–L295 |
+| `audit_single_account` | def | L40–L166 |
+| `run_sanitizer_batch` | def | L168–L258 |
 
 ### `scripts/backfill_account_cards.py`
 

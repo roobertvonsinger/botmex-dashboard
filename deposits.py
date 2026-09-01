@@ -1075,11 +1075,10 @@ async def _acquire_session_and_begin(
                 # y no vuelve a ser candidata (status != LIVE).
                 # Robert 2026-08-05: el operador NO debe ver "rate-limit" — es
                 # pedo interno del backend. Copy neutro.
-                if login_res.code in ("RATE_LIMITED", "DEAD", "BAN") or login_res.account_dead:
+                if (login_res.code in ("AUTOEXCLUSION", "LOGIN_DENIED") or login_res.account_dead) and login_res.code not in ("RATE_LIMITED", "BAN", "LOGIN_RETRY_LATER"):
                     _mark_rate_limited_dead(email)
-                    msg = (f"Cuenta dada de baja automáticamente — no vuelve "
-                           f"a intentarse.")
-                    rc = "RATE_LIMITED" if login_res.code == "RATE_LIMITED" else (login_res.code or "DEAD")
+                    msg = (f"Cuenta dada de baja automáticamente — credenciales o autoexclusión.")
+                    rc = login_res.code or "DEAD"
                     await _safe_phase(phase_cb, "done", {
                         "success": False, "result_code": rc, "error": msg,
                     })

@@ -177,22 +177,12 @@ async def gentle_login(
                         raw_result=res,
                     )
                 elif status == "BAN":
-                    try:
-                        from betmexico_db import db as bmx_db
-                        with bmx_db._lock:
-                            bmx_db.conn.cursor().execute(
-                                "UPDATE accounts SET status='DEAD', dead_reason=?, dead_at=datetime('now') WHERE email=? COLLATE NOCASE",
-                                ("RATE_LIMITED_PERMANENT (429)", email)
-                            )
-                            bmx_db.conn.commit()
-                    except Exception:
-                        pass
-                    logger.warning(f"[login] {email} 429 BAN → DEAD")
+                    logger.warning(f"[login] {email} 429 BAN transitorio (proxy/rate-limit) → RETRY_LATER")
                     return LoginResult(
                         ok=False,
-                        code="DEAD",
-                        account_dead=True,
-                        error="RATE_LIMITED_PERMANENT (429)",
+                        code="LOGIN_RETRY_LATER",
+                        account_dead=False,
+                        error="RATE_LIMITED_TEMP (429)",
                         attempts=attempt,
                         raw_result=res,
                     )

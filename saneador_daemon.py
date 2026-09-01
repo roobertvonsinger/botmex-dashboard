@@ -110,47 +110,25 @@ async def audit_single_account(email: str, password: str, checker, pool) -> dict
             new_grade = (sc["grade"] if sc else "A").upper()
             new_score = sc["score"] if sc else 100
             
-            if new_grade == "D":
-                # Blindaje Robert: Grado D no se mantiene LIVE en pool
-                conn.execute("""
-                    UPDATE accounts SET 
-                        status = 'DEAD',
-                        dead_reason = 'DEGRADED_GRADE_D (Saneador degradó a Grado D)',
-                        dead_at = COALESCE(dead_at, datetime('now')),
-                        published_to_pool = 0,
-                        locked_by = NULL,
-                        locked_until = NULL,
-                        balance_real = ?,
-                        balance_bonos = ?,
-                        balance_total = ?,
-                        grade = 'D',
-                        grade_score = ?,
-                        last_checked_at = datetime('now')
-                    WHERE email = ?
-                """, (bal_real, bal_bonos, bal_real + bal_bonos, new_score, email))
-                result["status"] = "DEAD"
-                result["error"] = "DEGRADED_GRADE_D"
-                logger.warning(f"🔴 [{email}] DEGRADADA A GRADO D -> Marcada DEAD fuera del pool")
-            else:
-                conn.execute("""
-                    UPDATE accounts SET 
-                        status = 'LIVE',
-                        dead_reason = NULL,
-                        dead_at = NULL,
-                        published_to_pool = 1,
-                        locked_by = NULL,
-                        locked_until = NULL,
-                        balance_real = ?,
-                        balance_bonos = ?,
-                        balance_total = ?,
-                        jwt_token = ?,
-                        jwt_expires_at = ?,
-                        grade = ?,
-                        grade_score = ?,
-                        last_checked_at = datetime('now')
-                    WHERE email = ?
-                """, (bal_real, bal_bonos, bal_real + bal_bonos, jwt, exp_epoch, new_grade, new_score, email))
-                logger.info(f"🟢 [{email}] OPERABLE | Bal: ${bal_real} | Grade: {new_grade} ({new_score})")
+            conn.execute("""
+                UPDATE accounts SET 
+                    status = 'LIVE',
+                    dead_reason = NULL,
+                    dead_at = NULL,
+                    published_to_pool = 1,
+                    locked_by = NULL,
+                    locked_until = NULL,
+                    balance_real = ?,
+                    balance_bonos = ?,
+                    balance_total = ?,
+                    jwt_token = ?,
+                    jwt_expires_at = ?,
+                    grade = ?,
+                    grade_score = ?,
+                    last_checked_at = datetime('now')
+                WHERE email = ?
+            """, (bal_real, bal_bonos, bal_real + bal_bonos, jwt, exp_epoch, new_grade, new_score, email))
+            logger.info(f"🟢 [{email}] OPERABLE | Bal: ${bal_real} | Grade: {new_grade} ({new_score})")
             
         conn.close()
         result.update({
@@ -180,25 +158,10 @@ async def audit_single_account(email: str, password: str, checker, pool) -> dict
         logger.warning(f"🔴 [{email}] DEAD -> {err_msg}")
 
     elif status == "BAN":
-        # Blindaje Robert: 429/BAN es muerte permanente, cero enfriamiento de 2 horas
-        err = "RATE_LIMITED_PERMANENT (429 en saneador)"
-        conn = get_db(write=True)
-        with conn:
-            conn.execute("""
-                UPDATE accounts SET 
-                    status = 'DEAD',
-                    dead_reason = ?,
-                    dead_at = COALESCE(dead_at, datetime('now')),
-                    published_to_pool = 0,
-                    locked_by = NULL,
-                    locked_until = NULL,
-                    last_checked_at = datetime('now')
-                WHERE email = ?
-            """, (err, email))
-        conn.close()
-        result["status"] = "DEAD"
+        err = "RATE_LIMITED_TEMP (429 en saneador — reintento posterior)"
+        result["status"] = "RATE_LIMITED"
         result["error"] = err
-        logger.warning(f"🔴 [{email}] BAN/429 -> Marcada DEAD fuera del pool")
+        logger.warning(f"⚠️ [{email}] BAN/429 transitorio -> Se omite ciclo sin marcar DEAD")
 
     return result
 
