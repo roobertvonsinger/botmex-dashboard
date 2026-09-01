@@ -648,6 +648,46 @@ def plan_auto_mission(
                 (email,),
             ).fetchone()["n"]
 
+            # Tarjeta que fondeó el saldo actual (anti-mezcla de plásticos)
+            last_funding_pan = None
+            hours_since_app = 999.0
+            try:
+                last_app = con.execute(
+                    "SELECT card_pipe, created_at FROM deposit_attempts "
+                    "WHERE account_email=? AND UPPER(status)='APPROVED' "
+                    "ORDER BY created_at DESC LIMIT 1",
+                    (email,),
+                ).fetchone()
+                if last_app and last_app["card_pipe"]:
+                    last_funding_pan = str(last_app["card_pipe"]).split("|")[0].strip().replace(" ", "")
+                    if last_app["created_at"]:
+                        try:
+                            _dt = datetime.fromisoformat(str(last_app["created_at"]).replace(" ", "T").replace("Z", "+00:00"))
+                            if _dt.tzinfo is None:
+                                _dt = _dt.replace(tzinfo=timezone.utc)
+                            hours_since_app = (now_dt - _dt).total_seconds() / 3600.0
+                        except Exception:
+                            hours_since_app = 0.0
+                else:
+                    ac_fund = con.execute(
+                        "SELECT card_number, registered_at FROM account_cards "
+                        "WHERE account_email=? AND status='ACTIVE' "
+                        "ORDER BY id DESC LIMIT 1",
+                        (email,),
+                    ).fetchone()
+                    if ac_fund and ac_fund["card_number"]:
+                        last_funding_pan = str(ac_fund["card_number"]).strip().replace(" ", "")
+                        if ac_fund["registered_at"]:
+                            try:
+                                _dt = datetime.fromisoformat(str(ac_fund["registered_at"]).replace(" ", "T").replace("Z", "+00:00"))
+                                if _dt.tzinfo is None:
+                                    _dt = _dt.replace(tzinfo=timezone.utc)
+                                hours_since_app = (now_dt - _dt).total_seconds() / 3600.0
+                            except Exception:
+                                hours_since_app = 0.0
+            except Exception:
+                pass
+
             # RF5: recencia de actividad / login para mover la cuenta en la lista
             last_act = None
             try:
@@ -691,6 +731,8 @@ def plan_auto_mission(
                 "mins_since_last_attempt": mins_since,
                 "cards_count": int(cards_n or 0),
                 "last_activity_epoch": last_activity_epoch,
+                "last_funding_pan": last_funding_pan,
+                "hours_since_last_approved": hours_since_app,
             }
 
         try:
@@ -784,6 +826,16 @@ def plan_auto_mission(
                     # REGLA 2: Si la tarjeta ya pagó / casada con otra cuenta -> PROHIBIDA
                     married_to = married_owners.get(cand_pan)
                     if married_to and married_to != email_lower:
+                        continue
+
+                    # REGLA 3: Anti-Mezcla sobre saldo activo (Robert 2026-09-01)
+                    # Si la cuenta tiene saldo >= $100 pesos Y fue fondeada en las últimas 24h,
+                    # PROHIBIDO asignarle una tarjeta distinta (la pasarela BetMexico veta la cuenta si detecta mezcla fresca).
+                    # Si tiene < $100 O el saldo tiene > 24h, se permite.
+                    acct_bal = float(r.get("balance_real") or r.get("balance_total") or 0.0)
+                    last_fund_pan = meta.get("last_funding_pan")
+                    hours_ago = meta.get("hours_since_last_approved", 999.0)
+                    if acct_bal >= 100.0 and hours_ago < 24.0 and last_fund_pan and cand_pan != last_fund_pan:
                         continue
 
                     # Cooldown 30d del BIN: Si el BIN aprobó con OTRO pipe en los últimos 30d en esta cuenta -> omitir

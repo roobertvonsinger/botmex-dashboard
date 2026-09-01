@@ -103,7 +103,7 @@
   // ¿el resultado es un rechazo REAL de BetMexico (visible al operador, L2) o un error
   // NUESTRO de infraestructura (invisible/humanizado, L3)?
   function isRealRejection(code) {
-    return /BANK_REJECTED|3DS|INSUF|EXPIRED|AUTOEXCLUS|KYC|LOGIN_DENIED|PENDING_NOT_APPLIED|CARD_LOCKED/.test((code || '').toUpperCase());
+    return /BANK_REJECTED|3DS|INSUF|EXPIRED|AUTOEXCLUS|KYC|LOGIN_DENIED|PENDING_NOT_APPLIED|CARD_LOCKED|CARD_MIXING/.test((code || '').toUpperCase());
   }
   // Mensaje humano para el operador — NUNCA expone el result_code crudo (L3).
   function humanError(code) {
@@ -116,6 +116,7 @@
     if (c.indexOf('KYC') >= 0) return 'Cuenta requiere KYC';
     if (c.indexOf('LOGIN_DENIED') >= 0) return 'Credenciales inválidas';
     if (c.indexOf('CARD_LOCKED') >= 0) return 'Tarjeta ya aprobada en otra cuenta — bloqueada';
+    if (c.indexOf('CARD_MIXING') >= 0) return 'Cuenta con saldo activo: prohibido mezclar tarjetas distintas';
     return 'No se pudo completar, intenta de nuevo'; // error nuestro: humanizado, sin tripas
   }
 

@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 592 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5528 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 1956 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 2008 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `betmexico_config.py` | 183 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2960 | `—` | _[completar]_ |
@@ -114,7 +114,7 @@ prewarm.py (router)
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 213 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
-| `deposits.py` | 2983 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 3072 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 389 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 207 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 918 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -294,6 +294,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `f45b9c4` | fix(deposits): eliminacion del gate artificial de saldo >= 100 y visibilidad de errores en UI |
 | `eda7bd5` | fix(pool): blindaje 429 sin bajas a DEAD, circuit breaker y verdad en logs |
 | `f3f7f69` | feat(sovereign): modo soberano, pool binario, seleccion tactil y blindaje de errores en KVM4-Old |
 | `89db512` | fix(saneador): eliminar baja automatica por 429 y Grado D, preservar cuentas operativas |
@@ -305,7 +306,6 @@ prewarm.py (router)
 | `73052ed` | fix(identity): prevent jwt username from poisoning fullname and protect curp/phone in merge |
 | `8013b21` | fix(api): deteccion estricta de JWT caducado (401/redirectLogin) y auto-recovery con login fresco para evitar sobreescribir balances reales con 0.00 |
 | `2947399` | fix(withdrawals): auto-reconciliar retiros historicos a status 6 y limpiar alertas de retiros terminados en el panel de deposito |
-| `6368d20` | fix(ui): remover bloqueo pointer-events en input de monto y limpiar alertas persistentes de retiros historicos |
 <!-- GEN:end:recientes -->
 
 ---

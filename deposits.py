@@ -543,6 +543,82 @@ def _check_caps(email: str, amount: float, projected_extra: float = 0.0, is_sa: 
     return None
 
 
+def _check_card_mixing_on_active_balance(email: str, cc_num: str) -> Optional[str]:
+    """Protección contra baneo de pasarela por mezcla de tarjetas sobre saldo activo.
+    
+    Regla de Dominio (Robert 2026-09-01):
+    1. Si se va a hacer con la MISMA TARJETA que ya depositó / casada -> PERMITIDO (cero bloqueo).
+    2. Si es una tarjeta DISTINTA:
+       - Si la cuenta tiene < $100 pesos O más de 24h con el saldo en el balance -> PERMITIDO.
+       - Si la cuenta tiene >= $100 pesos Y el saldo es fresco (< 24h) -> BLOQUEO PREVENTIVO DURO.
+         (Intentar con tarjeta distinta bajo saldo fresco causa baneo de pasarela y quema de tarjeta).
+    """
+    try:
+        from app import db as _dash_db
+        with _dash_db() as _c:
+            _acc_row = _c.execute(
+                "SELECT balance_real, balance_total FROM accounts WHERE email=?",
+                (email,),
+            ).fetchone()
+            if not _acc_row:
+                return None
+            _bal = float(_acc_row["balance_real"] if _acc_row["balance_real"] is not None else (_acc_row["balance_total"] or 0.0))
+            # Solo evaluamos restricción si el saldo es >= $100 (si tiene < $100, se permite)
+            if _bal < 100.0:
+                return None
+
+            _last_app = _c.execute("""
+                SELECT card_pipe, created_at FROM deposit_attempts 
+                WHERE account_email=? AND UPPER(status)='APPROVED' 
+                ORDER BY created_at DESC LIMIT 1
+            """, (email,)).fetchone()
+            
+            _funding_pan = None
+            _hours_ago = 999.0
+            if _last_app and _last_app["card_pipe"]:
+                _funding_pan = str(_last_app["card_pipe"]).split("|")[0].strip().replace(" ", "")
+                if _last_app["created_at"]:
+                    try:
+                        _dt = datetime.fromisoformat(str(_last_app["created_at"]).replace(" ", "T").replace("Z", "+00:00"))
+                        if _dt.tzinfo is None:
+                            _dt = _dt.replace(tzinfo=timezone.utc)
+                        _hours_ago = (datetime.now(timezone.utc) - _dt).total_seconds() / 3600.0
+                    except Exception:
+                        _hours_ago = 0.0
+            else:
+                _ac_row = _c.execute("""
+                    SELECT card_number, registered_at FROM account_cards 
+                    WHERE account_email=? AND status='ACTIVE' 
+                    ORDER BY id DESC LIMIT 1
+                """, (email,)).fetchone()
+                if _ac_row and _ac_row["card_number"]:
+                    _funding_pan = str(_ac_row["card_number"]).strip().replace(" ", "")
+                    if _ac_row["registered_at"]:
+                        try:
+                            _dt = datetime.fromisoformat(str(_ac_row["registered_at"]).replace(" ", "T").replace("Z", "+00:00"))
+                            if _dt.tzinfo is None:
+                                _dt = _dt.replace(tzinfo=timezone.utc)
+                            _hours_ago = (datetime.now(timezone.utc) - _dt).total_seconds() / 3600.0
+                        except Exception:
+                            _hours_ago = 0.0
+
+            _clean_cc = cc_num.strip().replace(" ", "")
+            # Si es la MISMA tarjeta -> PERMITIDO (recarga legítima de la tarjeta casada)
+            # Si ya pasaron más de 24 horas -> PERMITIDO (la pasarela resetea la ventana de riesgo)
+            if _funding_pan and _funding_pan != _clean_cc and _hours_ago < 24.0:
+                _f_tail = _funding_pan[-4:] if len(_funding_pan) >= 4 else _funding_pan
+                _inc_tail = _clean_cc[-4:] if len(_clean_cc) >= 4 else _clean_cc
+                return (
+                    f"Bloqueo preventivo anti-baneo: La cuenta tiene saldo fresco (${_bal:.2f}, fondeado hace {_hours_ago:.1f}h) "
+                    f"con tarjeta ····{_f_tail}. "
+                    f"Prohibido mezclar con tarjeta distinta (····{_inc_tail}) hasta agotar el saldo o cumplir 24h "
+                    f"(evita baneo irreversible de la pasarela)."
+                )
+    except Exception as e:
+        logger.error(f"[_check_card_mixing] error en {email}: {e}")
+    return None
+
+
 def _load_deps():
     """Reusa el make_pool del bot ya cargado eager en app.py (evita circular
     imports). Retorna el callable make_pool o None si las deps del bot no están.
@@ -1365,6 +1441,19 @@ async def _run_deposit_with_phases(
         # Degradar sin bloquear: un fallo de infra en el candado no debe tumbar
         # el flujo de depósito completo — pero SÍ queda en logs para revisar.
         logger.error(f"[Deposits/phases] candado tarjeta-cuenta falló, degradando: {e}")
+
+    # ── Candado Anti-Mezcla de Tarjetas sobre Saldo Activo (Robert 2026-09-01) ──
+    mix_err = _check_card_mixing_on_active_balance(email, cc_num)
+    if mix_err:
+        logger.warning(f"[Deposits/phases] {email} {mix_err}")
+        await _safe_phase(phase_cb, "done", {
+            "success": False, "result_code": "CARD_MIXING_ON_ACTIVE_BALANCE", "error": mix_err,
+        })
+        return {
+            "success": False, "result_code": "CARD_MIXING_ON_ACTIVE_BALANCE",
+            "error": mix_err, "duration_ms": 0,
+        }
+
 
     try:
         # Login lo maneja gentle_login (importa get_jwt internamente). Aquí solo
