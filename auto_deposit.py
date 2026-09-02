@@ -209,9 +209,28 @@ def _get_married_card_owners(db_path: Optional[str] = None) -> Dict[str, str]:
     return owners
 
 
+def _has_card_deposit_24h(email: str) -> bool:
+    """Verifica si la cuenta ya tuvo un depósito aprobado con tarjeta en las últimas 24h."""
+    if not email:
+        return False
+    try:
+        from app import db as _adb
+        with _adb() as c:
+            row = c.execute(
+                "SELECT COUNT(*) AS n FROM deposit_attempts "
+                "WHERE account_email=? AND UPPER(status)='APPROVED' "
+                "AND card_pipe IS NOT NULL "
+                "AND (created_at >= datetime('now', '-24 hours') OR (julianday('now') - julianday(created_at)) <= 1.0)",
+                (email,),
+            ).fetchone()
+            return bool(row and row["n"] > 0)
+    except Exception:
+        return False
+
+
 # ── B1 — selección de cuentas (pura) ─────────────────────────────────────────
 MM_ACCOUNT_RECENT_DECLINE_LIMIT = (
-    2  # >= N declines en 12h → cuenta fuera de selección (Robert 2026-07-28)
+    2  # >= N declines en 1h → cuenta en reposo de selección (Robert 2026-09-02)
 )
 
 
@@ -521,7 +540,7 @@ def plan_auto_mission(
             declines = con.execute(
                 "SELECT COUNT(*) AS n FROM deposit_attempts "
                 "WHERE account_email=? AND UPPER(status)='REJECTED' "
-                "AND created_at >= datetime('now','-12 hours')",
+                "AND (created_at >= datetime('now','-1 hours') OR (julianday('now') - julianday(created_at)) <= 0.04166)",
                 (email,),
             ).fetchone()["n"]
             decline_map[email] = int(declines or 0)
@@ -817,7 +836,19 @@ def plan_auto_mission(
             # ni una tarjeta que ya haya pagado o esté casada con otra cuenta.
             pipe = None
             if pool:
-                for cand in pool:
+                import bin_intelligence as _bi
+                acct_grade = (r.get("grade") or "").upper()
+                def _affinity_sort_key(c_item):
+                    p_str = _pipe_str(c_item)
+                    b6 = p_str[:6] if len(p_str) >= 6 else ""
+                    c_tier = _bi.get_bin_compatibility_tier(b6, db_path)
+                    if acct_grade == "A+":
+                        return (0 if c_tier == "CORONA" else (1 if c_tier == "TESTING" else 2), _rank_key(c_item, bin_stats_map))
+                    else:
+                        return (0 if c_tier in ("TESTING", "THREEDS") else (1 if c_tier == "CORONA" else 2), _rank_key(c_item, bin_stats_map))
+
+                pool_sorted = sorted(pool, key=_affinity_sort_key)
+                for cand in pool_sorted:
                     cand_pipe_str = _pipe_str(cand)
                     cand_pan = _extract_card_number(cand_pipe_str)
                     cand_bin = cand_pipe_str[:6] if len(cand_pipe_str) >= 6 else ""
@@ -913,6 +944,8 @@ MATCH_TRANSIENT_RETRIES = 4  # = MM_MAX_PAIR_TRANSIENT (nuestro lado, no quema t
 #    (independiente del límite histórico de 12h aplicado en la selección).
 MM_CROSS_ACCOUNT_GAP = 5
 MM_MAX_ACCOUNT_DECLINES_PER_RUN = 2
+MM_CARD_MAX_DECLINES = 3  # Regla Robert: 3 rechazos en 3 cuentas distintas para jubilar tarjeta
+MM_ACCOUNT_MAX_DECLINES_1H = 2  # Regla Robert: Máximo 2 declines en 1 hora por cuenta (reposo, no muerte)
 
 
 def _fake_progress_pct(status: str, extra: dict) -> int:
@@ -1232,6 +1265,7 @@ async def run_auto_mission(
             retired_card_numbers: set = set()
             card_attempts_map: Dict[str, int] = {}
             card_declines_map: Dict[str, int] = {}
+            card_tried_accounts: Dict[str, set] = {}
 
             def _card_key(p: str) -> str:
                 return _extract_card_number(p) or _normalize_pipe_to_3part(p) or str(p).strip()
@@ -1411,6 +1445,18 @@ async def run_auto_mission(
                 ready = [a for a in active if a["cooldown_until"] <= now]
 
                 if not ready:
+                    # Purgar cuentas que ya no tengan candidatas o llegaron a su tope de declines
+                    for a in active:
+                        if not a.get("candidates") or a.get("declines", 0) >= MM_MAX_ACCOUNT_DECLINES_PER_RUN:
+                            a["done"] = True
+                            if a["locked"] and not a["matched"]:
+                                _unlock(a["id"])
+                                locked_ids.discard(a["id"])
+
+                    active = [a for a in accounts_state if not a["done"]]
+                    if not active:
+                        break
+
                     # Todas las cuentas activas están en cooldown: esperar el tiempo mínimo restante
                     min_wait = min(a["cooldown_until"] - now for a in active)
                     min_wait = max(0.1, min_wait)
@@ -1442,6 +1488,25 @@ async def run_auto_mission(
                             _unlock(account_id)
                             locked_ids.discard(account_id)
                         continue
+
+                    # Guard de Saldo en Vivo: Si la cuenta ya tiene saldo >= 10.0 Y ya tuvo depósito con tarjeta hoy
+                    bal = float(fresh_acct.get("balance_real") or fresh_acct.get("balance") or fresh_acct.get("balance_total") or 0.0)
+                    if bal >= 10.0 and _has_card_deposit_24h(email):
+                        logger.info(f"💰 Cuenta {email} tiene saldo activo (${bal}) fondeado hoy con tarjeta — protegida para retiro sin quemar tarjeta")
+                        target["done"] = True
+                        # Re-encolar tarjetas restantes de target a otras cuentas activas si no las tenían
+                        for c_rem in list(target.get("candidates", [])):
+                            if not _is_card_retired(c_rem):
+                                for other in accounts_state:
+                                    if not other["done"] and other["id"] != account_id and c_rem not in other["candidates"]:
+                                        other["candidates"].append(c_rem)
+                                        break
+                        target["candidates"] = []
+                        if target["locked"] and not target["matched"]:
+                            _unlock(account_id)
+                            locked_ids.discard(account_id)
+                        continue
+
                     acct = fresh_acct
                     target["acct"] = fresh_acct
 
@@ -1570,18 +1635,22 @@ async def run_auto_mission(
 
                         k = _card_key(pipe)
                         card_attempts_map[k] = card_attempts_map.get(k, 0) + 1
+                        card_tried_accounts.setdefault(k, set()).add(account_id)
 
-                        # Regla Robert 2026-08-25: 3DS NO casa la tarjeta en BD ni la quema inmediatamente.
-                        # Permite hasta 2 intentos por corrida para certificar más cuentas A+.
-                        if card_attempts_map[k] >= 2:
-                            _retire_card(pipe, reason=f"Límite de 2 intentos alcanzado tras 3DS en {email}")
+                        # Regla Robert: Hasta 3 cuentas distintas para certificar cuentas A+
+                        if card_attempts_map[k] >= MM_CARD_MAX_DECLINES:
+                            _retire_card(pipe, reason=f"Límite de {MM_CARD_MAX_DECLINES} intentos alcanzado tras 3DS en {email}")
                             logger.info(
-                                f"🛡️ Tarjeta {pipe} completó 2 intentos en misión tras 3DS — retirada del resto de la corrida"
+                                f"🛡️ Tarjeta {pipe} completó {MM_CARD_MAX_DECLINES} intentos en misión tras 3DS — retirada del resto de la corrida"
                             )
                         else:
                             logger.info(
-                                f"🔐 3DS en {email} — Cuenta A+ detectada. Tarjeta {pipe} disponible para 1 intento adicional en otra cuenta"
+                                f"🔐 3DS en {email} — Cuenta A+ detectada. Tarjeta {pipe} disponible para intento adicional en otra cuenta"
                             )
+                            for other in accounts_state:
+                                if not other["done"] and other["id"] not in card_tried_accounts[k] and pipe not in other["candidates"] and not _is_card_retired(pipe):
+                                    other["candidates"].append(pipe)
+                                    break
 
                         target["cooldown_until"] = _get_now() + dep.MM_COOLDOWN
                         if not target["candidates"]:
@@ -1660,24 +1729,37 @@ async def run_auto_mission(
                         k = _card_key(pipe)
                         card_declines_map[k] = card_declines_map.get(k, 0) + 1
                         card_attempts_map[k] = card_attempts_map.get(k, 0) + 1
+                        card_tried_accounts.setdefault(k, set()).add(account_id)
 
-                        # Regla Robert 2026-08-25: Jubilar tarjeta si saca 2 declinaciones o 2 intentos en la corrida
-                        if card_declines_map[k] >= 2 or card_attempts_map[k] >= 2:
-                            _retire_card(pipe, reason=f"{card_declines_map[k]} declinaciones / {card_attempts_map[k]} intentos en misión")
+                        # Regla Robert: 3 rechazos en cuentas distintas para jubilar tarjeta de la misión
+                        if card_declines_map[k] >= MM_CARD_MAX_DECLINES or card_attempts_map[k] >= MM_CARD_MAX_DECLINES:
+                            _retire_card(pipe, reason=f"{card_declines_map[k]} declinaciones en cuentas distintas")
                             logger.warning(
-                                f"🚫 TARJETA JUBILADA EN MISIÓN ({card_declines_map[k]} rechazos) | {pipe}"
+                                f"🚫 TARJETA JUBILADA EN MISIÓN ({card_declines_map[k]} rechazos en cuentas distintas) | {pipe}"
                             )
                         else:
                             logger.info(
-                                f"⚠️ Primer rechazo bancario para tarjeta en {email} — aún tiene 1 intento disponible en otra cuenta | {pipe}"
+                                f"⚠️ Rechazo bancario #{card_declines_map[k]}/{MM_CARD_MAX_DECLINES} para tarjeta en {email} — encolando para intento en cuenta distinta | {pipe}"
                             )
+                            # Re-encolar inmediatamente la tarjeta en OTRA cuenta activa que no la haya probado
+                            re_enqueued = False
+                            for other in accounts_state:
+                                if not other["done"] and other["id"] not in card_tried_accounts[k] and pipe not in other["candidates"] and not _is_card_retired(pipe):
+                                    other["candidates"].append(pipe)
+                                    re_enqueued = True
+                                    break
+                            if not re_enqueued:
+                                logger.info(f"ℹ️ Tarjeta {pipe} pendiente de relevo dinámico (esperando cuenta disponible distinta)")
 
-                        target["cooldown_until"] = _get_now() + dep.MM_COOLDOWN
+                        # Regla Robert: Máximo 2 declines por cuenta en 1h / corrida
                         if target["declines"] >= MM_MAX_ACCOUNT_DECLINES_PER_RUN or not target["candidates"]:
                             target["done"] = True
+                            logger.info(f"🛡️ Cuenta {email} completó su tope de rechazos — en reposo para proteger pasarela")
                             if target["locked"] and not target["matched"]:
                                 _unlock(account_id)
                                 locked_ids.discard(account_id)
+                        else:
+                            target["cooldown_until"] = _get_now() + dep.MM_COOLDOWN
                         break
 
                     if code == "CARD_LOCKED_OTHER_ACCOUNT":

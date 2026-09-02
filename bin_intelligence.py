@@ -668,3 +668,34 @@ def format_telegram_operator_stats(stats: Dict[str, Any], nickname: str) -> str:
     lines.append("\n🔒 <i>Tus estadísticas son personales y privadas.</i>")
     return "\n".join(lines)
 
+
+def get_bin_compatibility_tier(bin6: str, conn_or_path: Any = None) -> str:
+    """Retorna el tier operativo de compatibilidad para emparejamiento con cuentas:
+    'CORONA': BIN con aprobaciones comprobadas (alta afinidad con cuentas A+).
+    'THREEDS': BIN con historial de retos 3DS.
+    'DEAD': BIN con declines consistentes.
+    'TESTING': BIN en pruebas / poco kilometraje.
+    """
+    if not bin6 or len(str(bin6)) < 6:
+        return "TESTING"
+    bin6_str = str(bin6)[:6]
+    summary = get_bin_intelligence_summary(conn_or_path)
+    for b in summary.get("corona", []):
+        if str(b.get("bin")) == bin6_str:
+            return "CORONA"
+    for b in summary.get("threeds", []):
+        if str(b.get("bin")) == bin6_str:
+            return "THREEDS"
+    for b in summary.get("dead", []):
+        if str(b.get("bin")) == bin6_str:
+            return "DEAD"
+
+    # Fallback por catálogo: si es débito de banco principal (Santander/BBVA/Banorte) sin rechazos
+    meta = lookup_bin_metadata(bin6_str)
+    bank_upper = (meta.get("bank") or "").upper()
+    is_debit = "DEB" in (meta.get("type") or "").upper()
+    if is_debit and any(k in bank_upper for k in ("SANTANDER", "BBVA", "BANORTE", "CITIBANAMEX")):
+        return "CORONA"
+
+    return "TESTING"
+

@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 592 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5528 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 2011 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 2093 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `betmexico_config.py` | 183 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2960 | `—` | _[completar]_ |
@@ -109,7 +109,7 @@ prewarm.py (router)
 | `betmexico_login_service.py` | 144 | `betmexico.login_service` | _[completar]_ |
 | `betmexico_payment_analyzer.py` | 492 | `—` | _[completar]_ |
 | `betmexico_utils.py` | 1159 | `—` | _[completar]_ |
-| `bin_intelligence.py` | 670 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
+| `bin_intelligence.py` | 701 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
 | `card_checker.py` | 614 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 218 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
@@ -151,6 +151,8 @@ prewarm.py (router)
 | `MATCH_TRANSIENT_RETRIES` | `4` | `auto_deposit.py` |
 | `MM_CROSS_ACCOUNT_GAP` | `5` | `auto_deposit.py` |
 | `MM_MAX_ACCOUNT_DECLINES_PER_RUN` | `2` | `auto_deposit.py` |
+| `MM_CARD_MAX_DECLINES` | `3` | `auto_deposit.py` |
+| `MM_ACCOUNT_MAX_DECLINES_1H` | `2` | `auto_deposit.py` |
 | `MAX_TEXT_COMBOS` | `100` | `betmexico_config.py` |
 | `HUMAN_COOLDOWN` | `60` | `betmexico_config.py` |
 | `MAX_COMBOS` | `5000` | `betmexico_config.py` |
@@ -251,6 +253,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `16afd94` | chore(reorg): mover 35 tests a tests/, purgar DBs fantasma y alinear canvas |
 | `92ed3a1` | skills: suite oficial obsidian instalada en botmex-dashboard |
 | `7a9bb1e` | docs(session): sync NEXT-SESSION with latest deposit unlock and UI transparency fixes |
 | `9cbb7af` | fix(deposits): unlock non-approved cards, bypass SA velocity check and surface real error details in UI |
@@ -262,7 +265,6 @@ prewarm.py (router)
 | `eda7bd5` | fix(pool): blindaje 429 sin bajas a DEAD, circuit breaker y verdad en logs |
 | `f3f7f69` | feat(sovereign): modo soberano, pool binario, seleccion tactil y blindaje de errores en KVM4-Old |
 | `89db512` | fix(saneador): eliminar baja automatica por 429 y Grado D, preservar cuentas operativas |
-| `50565b8` | fix(saneador): blindaje estricto contra reactivacion de cuentas Grado D y 429 |
 <!-- GEN:end:recientes -->
 
 ---

@@ -21,3 +21,11 @@ Rules:
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+
+## 🛡️ Suite Canónica Obligatoria para `/bet` (Innegociable — Robert 2026-09-02)
+Todo cambio en el flujo de auto-depósito o matchmaking debe ejecutar y pasar al 100%:
+```powershell
+python tools/verify_bet_suite.py
+# o: pytest tests/test_bet_canonical_suite.py -v
+```
+Verifica las 9 invariantes canónicas: scoring continuo, ventana móvil 1h, afinidad BIN Corona x A+, protocolo 3 strikes de tarjeta, anti-taladro de cuenta, guard de saldo fondeado hoy con tarjeta, certificación 3DS, gap de 5s y casadas 1:1.

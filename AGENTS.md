@@ -30,3 +30,21 @@ Tres containers `betmexico:*` en KVM4, todos montando `/docker/betmexico/code �
 2. **El auto-depósito NO corre en el legacy.** El legacy (`betmexico_bot.py`) no importa `auto_deposit` ni `app` — las misiones corren con la copia `/app/web`. La copia raíz `/app/auto_deposit.py` es una versión vieja (580+ diffs) que **no se toca**.
 3. **No interfiere en nada.** Su log vive en `/data/logs/telegram_bot.log` (vista "main" del dashboard). Los tracebacks sin timestamp de ese archivo ya no corrompen la vista (fix `_reloadBotLog`/`_tail_log_file`, commit `d0e2814`). Sus `NetworkError: Bad Gateway` de `get_updates` son red intermitente de Telegram — no son bugs del mock ni del dashboard.
 4. **`support_routes.py` NO existe** en el repo — el warning `[support] router no cargado` en cada arranque es INTENCIONAL (módulo opcional, ver `docs/AGENTE_SOPORTE.md`). No "arreglarlo".
+
+## 🛡️ Suite Canónica de Pruebas Funcionales para `/bet` (Innegociable — Robert 2026-09-02)
+
+CADA CAMBIO que reciba `botmex-dashboard` en adelante debe verificar al 100% las 9 invariantes de `/bet`:
+```powershell
+python tools/verify_bet_suite.py
+# o: pytest tests/test_bet_canonical_suite.py -v
+```
+**Invariantes auditadas:**
+1. Selección y Scoring Continuo (KYC verificado, LIVE, ventanas 24h, sin drops binarios arbitrarios).
+2. Ventana Móvil de Declines de 1 Hora (Tope 2 en 60 min = reposo temporal, NO muerte).
+3. Afinidad BIN Corona x Cuenta A+ (Corona a A+; plásticos de prueba como radar 3DS a neutras A/B).
+4. Protocolo 3 Strikes de Tarjeta (Rota hasta 3 cuentas distintas antes de retirarse; jamás veto permanente).
+5. Protección Anti-Taladro de Cuenta (Máx 2 declines en la corrida, reposo y desbloqueo limpio).
+6. Guard de Saldo en Caliente & Anti-Mezcla (Si tiene fondos con tarjeta hoy, se protege para retiro).
+7. Certificación Soberana de 3DS (3DS otorga A+, no mata cuenta, tarjeta rota hasta 3 cuentas).
+8. Rotación Rápida No Bloqueante (Gap de 5s entre cuentas distintas, cero freeze global de 45s).
+9. Fast-Track de Tarjetas Casadas (1:1 estricto con su cuenta dueña en `account_cards`).
