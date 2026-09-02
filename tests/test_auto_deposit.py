@@ -259,11 +259,11 @@ def _add_rejected_attempt(db_path, email, hours_ago=1):
 
 
 def test_plan_excludes_accounts_with_recent_declines(seed_db):
-    """Regla Robert: cuenta con 2 declines en las últimas 12h NO entra al plan
+    """Regla Robert: cuenta con 2 declines en la última 1h NO entra al plan
     aunque cumpla el resto de filtros (no taladrar cuentas ya quemadas)."""
     _add_account(seed_db, "burned@t.com")
-    _add_rejected_attempt(seed_db, "burned@t.com", hours_ago=1)
-    _add_rejected_attempt(seed_db, "burned@t.com", hours_ago=2)
+    _add_rejected_attempt(seed_db, "burned@t.com", hours_ago=0.2)
+    _add_rejected_attempt(seed_db, "burned@t.com", hours_ago=0.5)
     plan = plan_auto_mission(seed_db, ["4999999999999999|0130|999"], amount=150, target_count=9)
     assert "burned@t.com" not in [r["email"] for r in plan["accounts"]]
     assert plan["accounts"]  # b@ del seed sigue entrando (sin declines)

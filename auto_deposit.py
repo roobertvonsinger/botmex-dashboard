@@ -321,9 +321,19 @@ def select_accounts_for_auto(
                 except (ValueError, TypeError):
                     pass
 
-        # 2. Cuenta en ciclo de retiro o marcada para retiro -> EXCLUIDA
+        # 2. Cuenta en ciclo de retiro activo (con saldo a retirar >= $10.0) -> EXCLUIDA
+        # withdrawal_ready=1 indica CLABE/banco configurado en BetMexico; solo debe excluirse
+        # si la cuenta realmente tiene saldo activo para retirar (>= $10.0). Si está vacía (< $10.0),
+        # es ideal para fondearla ya que tiene canal de retiro listo.
         if r.get("withdrawal_ready") in (1, "1", True):
-            continue
+            bal_chk = r.get("balance_real")
+            if bal_chk is None:
+                bal_chk = r.get("balance") or r.get("balance_total") or 0.0
+            try:
+                if float(bal_chk) >= 10.0:
+                    continue
+            except (ValueError, TypeError):
+                continue
 
         # Gate Soberano: Solo cuentas explícitamente dentro del pool
         if not r.get("published_to_pool"):

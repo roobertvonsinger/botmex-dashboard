@@ -191,9 +191,9 @@ def test_accounts_with_real_funds_excluded(tmp_path):
 
 
 def test_accounts_withdrawal_ready_or_grade_d_excluded(tmp_path):
-    """Cuentas con withdrawal_ready=1 o grado D quedan TOTALMENTE EXCLUIDAS."""
+    """Cuentas con withdrawal_ready=1 con saldo activo (>= $10) o grado D quedan TOTALMENTE EXCLUIDAS."""
     rows = [
-        {"id": 1, "email": "with_acc@test.com", "status": "LIVE", "published_to_pool": 1, "withdrawal_ready": 1, "grade": "A", "kyc_verified": 1},
+        {"id": 1, "email": "with_acc@test.com", "status": "LIVE", "published_to_pool": 1, "withdrawal_ready": 1, "balance_real": 250.0, "grade": "A", "kyc_verified": 1},
         {"id": 2, "email": "grade_d@test.com", "status": "LIVE", "published_to_pool": 1, "grade": "D", "kyc_verified": 1},
         {"id": 3, "email": "ok_acc@test.com", "status": "LIVE", "published_to_pool": 1, "grade": "A", "kyc_verified": 1},
     ]
@@ -203,6 +203,17 @@ def test_accounts_withdrawal_ready_or_grade_d_excluded(tmp_path):
     assert "with_acc@test.com" not in sel_emails
     assert "grade_d@test.com" not in sel_emails
     assert "ok_acc@test.com" in sel_emails
+
+
+def test_accounts_withdrawal_ready_zero_balance_is_eligible(tmp_path):
+    """Cuentas con withdrawal_ready=1 pero saldo $0.0 son elegibles para depósito (canal de retiro ya listo)."""
+    rows = [
+        {"id": 1, "email": "clabe_ready@test.com", "status": "LIVE", "published_to_pool": 1, "withdrawal_ready": 1, "balance_real": 0.0, "grade": "A", "kyc_verified": 1},
+    ]
+    win = {r["email"]: {"available": 2000.0} for r in rows}
+    sel = ad.select_accounts_for_auto(rows, 150, 1, win)
+    sel_emails = [r["email"] for r in sel]
+    assert "clabe_ready@test.com" in sel_emails
 
 
 def test_boost_3ds_recent_to_top(tmp_path):
