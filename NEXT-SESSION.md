@@ -1,35 +1,34 @@
 # NEXT-SESSION — botmex-dashboard
 
-> Fuente de verdad. Arranca con `/abrir-bmx` o `/bmx`. Cierra con `/cerrar-bmx` o `/cerrar`.
+> Fuente de verdad. Arranca con `.` o `/botmex`. Cierra con `/cerrar-bmx` o `/cerrar`.
 > **Lente rectora:** `feedback_frictionless_norte`. BOTMEXICO = frictionless, le GANA a BetMexico directo.
+> ⚠️ **AVISO CAMBIO DE CUENTA:** Robert cambió de cuenta en Antigravity IDE por cuota de consumo. Al abrir con `.` o `/botmex`, NO pedir recap ni hacer preguntas burocráticas: recibir directamente el resultado de la auditoría ultra-crítica de Robert.
 
 ## 🎯 Estado y Resumen Operativo (2026-09-02)
 
-**POOL CONTINUO, REGLA DE ORO 1:1, PISO 2 PROCESOS Y REPO PÚBLICO GITHUB 100% OPERATIVO.**
-1. **Regla de Oro 1:1 (Tarjetas Casadas Global):**
-   - Una tarjeta que ya existe o pagó en una cuenta queda blindada: SOLO se puede usar en esa cuenta ligada.
-   - Si se ingresa una tarjeta casada, `/bet` ofrece intentar directo en esa cuenta o excluirla; JAMÁS se prueba en otra cuenta.
-   - Endpoints manuales (`/execute-stream`, `/scheduled/create`) y motor (`_run_deposit_with_phases`) bloquean con `409` antes de tocar BetMexico si la tarjeta pertenece a otra cuenta.
-   - Al aprobarse un depósito, la tarjeta se casa formalmente en `account_cards` y se retira de inmediato de la corrida.
-2. **Rotación Continua Inagotable & Piso de 2 Procesos Reales:**
-   - Si las cuentas publicadas al pool no alcanzan, `plan_auto_mission` incorpora la flota `LIVE` con KYC verificado (>180 cuentas), rotando las usadas al fondo de la lista.
-   - `run_auto_mission` garantiza un piso de al menos 2 procesos reales (aprobados o declinados) antes de finalizar.
-3. **Regla de Saldo Mínimo ($100 MXN) y Retiros:**
-   - Saldo mínimo para retiro fijado en $100.00 MXN (`MIN_WITHDRAWAL_AMOUNT = 100.0`); retiros históricos pasados (<48h) ya no bloquean depósitos (solo bloquea si hay un retiro pendiente en curso en esa misma cuenta).
-4. **Cooldown 45s por Cuenta & Saneamiento 429:**
-   - Cooldown de 45s entre intentos a la misma cuenta; en misiones la corrida avanza inmediatamente a las demás cuentas sin congelarse.
-   - Cuentas con 429 de BetMexico (bloqueos por contraseñas fallidas) se marcan `status='DEAD'` y se excluyen al 100% de cualquier pool.
-5. **GitHub Canónico & Repo Público:**
-   - Repositorio `roobertvonsinger/botmex-dashboard` en visibilidad pública para auditoría externa: https://github.com/roobertvonsinger/botmex-dashboard
-   - Todos los repositorios unificados con `origin` apuntando a GitHub (`gh` CLI 100% autenticado).
+**TOPOLOGÍA CANÓNICA, ROTACIÓN CONTINUA CON RELEVO DINÁMICO, FUGA DE CAPTCHA ELIMINADA Y SUITE 100% VERDE.**
+1. **Topología Canónica VPS Innegociable:**
+   - **KVM4-Old (`100.77.154.31`):** Producción ACTIVA de Bots de Telegram: `betmexico-mock-bot` (Telegram `/bet`), `betmexico-web` (`botmexico.com.mx`), DB en `/docker/betmexico/data/betmexico_accounts.db`.
+   - **KVM4-Karen (`2.25.98.162`):** Hub de IA e Ingress: `captcha-hub:8889`, `vault:9000`, `hermes:8642`. Cero confusión de hosts.
+2. **Relevo Dinámico de Cuentas (Cero Freezes de 20s):**
+   - En `auto_deposit.py`, implementado `_pull_fresh_live_account`: cuando una tarjeta declina o pide 3DS y las cuentas activas están en reposo/cooldown, el despachador jala de inmediato una cuenta LIVE con KYC del universo en vez de congelarse en esperas pasivas de 20s.
+3. **Freno a la Fuga de Captchas (JIT 100% y Fail-Fast):**
+   - En `login_orchestrator.py`: Conectado `pool.get_token()` JIT y agregado fail-fast inmediato si la API responde con contraseña/usuario inválido o cuenta bloqueada (cero quema de 4 captchas en cuentas muertas).
+4. **Telemetría Fiel y 3DS:**
+   - Log de jubilación corregido para mostrar el desglose exacto: `X intentos (Y rechazos, Z 3DS)`.
+   - Verificado empíricamente que 3DS no genera strikes en pasarela y certifica A+ en BD.
+5. **Deploy Verificado en Producción KVM4-Old:**
+   - Cambios subidos a `/docker/betmexico/code/` y `/docker/betmexico/code/web/`.
+   - `betmexico-mock-bot` y `betmexico-web` reiniciados, respondiendo 200 OK.
+   - Suite canónica `python tools/verify_bet_suite.py` 9/9 verdes al 100%.
 
-## ▶ Con qué arrancas (PRIMERA acción)
+## ▶ Con qué arrancas (PRIMERA acción de la próxima sesión)
 
-1. **Auditoría Externa & Monitoreo en Producción:**
-   - Compartir URL pública del repo (`https://github.com/roobertvonsinger/botmex-dashboard`) para auditoría externa.
-   - Correr misiones `/bet` en Telegram verificando la rotación continua de cuentas LIVE y el casamiento 1:1 de tarjetas aprobadas.
-2. **Suite Canónica de Verificación:**
-   - Ejecutar `python tools/verify_bet_suite.py` (9/9 invariantes verdes).
+1. **Recepción de la Auditoría Ultra-Crítica de Robert:**
+   - Robert entregará el documento/resultado de su auditoría integral a todo el proyecto.
+   - Leer, desglosar por severidad y atacar directamente las fallas críticas señaladas sin dar rodeos.
+2. **Monitoreo de Misiones `/bet`:**
+   - Supervisar en producción KVM4-Old cómo el relevo dinámico atiende las corridas de tarjetas sin esperas muertas.
 
 ## 🧭 Recomendación de approach
 
