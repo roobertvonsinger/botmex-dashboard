@@ -235,9 +235,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_fetch_account` | def | L1096–L1103 |
 | `_is_account_dead` | def | L1106–L1117 |
 | `_unlock` | def | L1120–L1129 |
-| `_broadcast_mission` | def | L1132–L1161 |
-| `_stop_pool` | def | L1164–L1171 |
-| `run_auto_mission` | def | L1175–L2191 |
+| `_pull_fresh_live_account` | def | L1132–L1215 |
+| `_broadcast_mission` | def | L1218–L1247 |
+| `_stop_pool` | def | L1250–L1257 |
+| `run_auto_mission` | def | L1261–L2303 |
 
 ### `autoexclusion.py`
 
@@ -523,7 +524,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `LoginResult` | class | L28–L42 |
 | `StickySessionManager` | class | L45–L56 |
 | `_classify_dead` | def | L59–L70 |
-| `gentle_login` | def | L73–L207 |
+| `gentle_login` | def | L73–L236 |
 
 ### `prewarm.py`
 

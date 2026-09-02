@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 592 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5528 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 2191 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 2303 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `betmexico_config.py` | 183 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2960 | `—` | _[completar]_ |
@@ -116,7 +116,7 @@ prewarm.py (router)
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
 | `deposits.py` | 3154 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 389 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
-| `login_orchestrator.py` | 207 | `betmexico.dashboard.login_orch` | _[completar]_ |
+| `login_orchestrator.py` | 236 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 918 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 389 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_validator.py` | 154 | `betmexico.renapo_validator` | _[completar]_ |
@@ -255,6 +255,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `330d60a` | docs: ritual de cierre soberano, mapa y estado operativo actualizado |
 | `592945d` | feat: regla de oro 1:1 de tarjetas casadas, cooldown 45s por cuenta y saneamiento cuentas 429 DEAD |
 | `71e866c` | fix(auto_deposit): rotacion continua de flota LIVE, piso 2 procesos reales y umbral retiro 100 pesos |
 | `45587c2` | fix(auto_deposit): desbloquear cuentas con withdrawal_ready=1 si saldo <  y ajustar ventana 1h en tests |
@@ -266,7 +267,6 @@ prewarm.py (router)
 | `73888f2` | docs(vault): reubicar mapas Canvas en la raíz del vault BotMex |
 | `60c797e` | docs(canvas): agregar arquitectura visual soberana BotMex (Canvas N0, N1, Cambios e HTML interactivo) |
 | `c443558` | docs(meta): actualizacion de NEXT-SESSION, .gitignore y mapa logico de flujos |
-| `0ffc28d` | fix(deposits): regla canónica anti-mezcla de tarjetas sobre saldo fresco (<24h / >=100) |
 <!-- GEN:end:recientes -->
 
 ---

@@ -130,10 +130,25 @@ async def gentle_login(
     last_res = None
     for attempt in range(1, max(2, max_login_retries + 1)):
         proxy = (sticky_session.proxy_url if sticky_session else None) or build_admin_proxy_url()
+        captcha_token = None
+        captcha_task_id = None
+        if pool is not None and hasattr(pool, "get_token"):
+            try:
+                c_res = await pool.get_token(timeout=min(30.0, attempt_timeout))
+                if c_res and isinstance(c_res, tuple) and len(c_res) >= 2:
+                    captcha_token, captcha_task_id = c_res[0], c_res[1]
+            except Exception as ex_p:
+                logger.debug(f"[login] pool.get_token: {ex_p}")
+
         try:
             async with BetmexicoApiChecker(proxy=proxy) as checker:
                 res = await asyncio.wait_for(
-                    checker.test_login(email, password),
+                    checker.test_login(
+                        email,
+                        password,
+                        captcha_token=captcha_token,
+                        captcha_task_id=captcha_task_id,
+                    ),
                     timeout=attempt_timeout,
                 )
                 last_res = res
@@ -191,6 +206,20 @@ async def gentle_login(
                     continue
                 else:
                     last_error = res.get("error") or status
+                    api_data = res.get("api") or {}
+                    api_msg = str(api_data.get("message") or res.get("error") or "").upper()
+                    # Fail-fast ante credenciales inválidas o bloqueo definitivo: no quemar más captchas
+                    if any(k in api_msg for k in ("CONTRASEÑA", "PASSWORD", "CREDENCIAL", "NO EXISTE", "BLOQUEAD", "AUTOEXCLU", "VALIDACION")):
+                        code = _classify_dead(res)
+                        logger.warning(f"[login] {email} credenciales o cuenta no viable ({api_msg}) → fail-fast (cero retries de captcha)")
+                        return LoginResult(
+                            ok=False,
+                            code=code,
+                            account_dead=True,
+                            error=api_msg or "Credenciales inválidas",
+                            attempts=attempt,
+                            raw_result=res,
+                        )
                     continue
         except Exception as e:
             logger.error(f"[login] {email} intento {attempt} error: {e}")

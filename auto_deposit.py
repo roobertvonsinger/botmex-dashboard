@@ -1129,6 +1129,92 @@ def _unlock(account_id: int) -> None:
         )
 
 
+def _pull_fresh_live_account(
+    db_path,
+    already_checked: set,
+    married_owners: dict,
+    for_card: str = "",
+) -> Optional[Dict[str, Any]]:
+    """Obtiene una cuenta fresca LIVE con KYC de la BD para rotación continua sin freezes."""
+    import sqlite3
+    if not db_path:
+        return None
+    try:
+        con = sqlite3.connect(str(db_path))
+        con.row_factory = sqlite3.Row
+        try:
+            cand_pan = _extract_card_number(for_card) if for_card else ""
+            cand_bin = for_card[:6] if len(for_card) >= 6 else ""
+
+            sql = (
+                "SELECT * FROM accounts "
+                "WHERE status='LIVE' AND COALESCE(kyc_verified, 0)=1 "
+                "AND COALESCE(grade, '') != 'D' "
+                f"AND (balance_real IS NULL OR balance_real < {MIN_WITHDRAWAL_AMOUNT}) "
+                "AND (dead_reason IS NULL OR dead_reason='') "
+                "AND (dead_at IS NULL OR dead_at='') "
+                "ORDER BY "
+                "  (CASE WHEN grade='A+' THEN 0 WHEN grade='A' THEN 1 WHEN grade='B' THEN 2 ELSE 3 END), "
+                "  COALESCE(last_checked_at, '') ASC LIMIT 25"
+            )
+            rows = con.execute(sql).fetchall()
+            for r in rows:
+                r_dict = dict(r)
+                email = (r_dict.get("email") or "").strip()
+                email_lower = email.lower()
+                aid = r_dict.get("id")
+                if not email or email in already_checked or email_lower in already_checked:
+                    continue
+
+                dec_1h = con.execute(
+                    "SELECT COUNT(*) AS n FROM deposit_attempts "
+                    "WHERE account_email=? AND UPPER(status)='REJECTED' "
+                    "AND (created_at >= datetime('now','-1 hours') OR (julianday('now') - julianday(created_at)) <= 0.04166)",
+                    (email,),
+                ).fetchone()["n"]
+                if (dec_1h or 0) >= MM_ACCOUNT_MAX_DECLINES_1H:
+                    continue
+
+                if cand_pan:
+                    m_owner = married_owners.get(cand_pan)
+                    if m_owner and m_owner != email_lower:
+                        continue
+
+                if cand_bin:
+                    bin_dup = con.execute(
+                        "SELECT card_pipe FROM deposit_attempts "
+                        "WHERE account_email=? AND UPPER(status)='APPROVED' AND card_pipe IS NOT NULL "
+                        "AND created_at >= datetime('now','-30 days')",
+                        (email,),
+                    ).fetchall()
+                    bin_conflict = False
+                    for b_row in bin_dup:
+                        p_norm = _normalize_pipe_to_3part(str(b_row["card_pipe"]))
+                        if p_norm[:6] == cand_bin and p_norm != _normalize_pipe_to_3part(for_card):
+                            bin_conflict = True
+                            break
+                    if bin_conflict:
+                        continue
+
+                return {
+                    "id": aid,
+                    "email": email,
+                    "acct": r_dict,
+                    "grade": r_dict.get("grade") or "A",
+                    "candidates": [for_card] if for_card else [],
+                    "declines": 0,
+                    "cooldown_until": 0.0,
+                    "locked": False,
+                    "matched": False,
+                    "done": False,
+                }
+        finally:
+            con.close()
+    except Exception as e:
+        logger.debug(f"[_pull_fresh_live_account] {e}")
+    return None
+
+
 def _broadcast_mission(
     mission_id: str,
     status: str,
@@ -1742,10 +1828,22 @@ async def run_auto_mission(
                             logger.info(
                                 f"🔐 3DS en {email} — Cuenta A+ detectada. Tarjeta {pipe} disponible para intento adicional en otra cuenta"
                             )
+                            re_enqueued_3ds = False
                             for other in accounts_state:
                                 if not other["done"] and other["id"] not in card_tried_accounts[k] and pipe not in other["candidates"] and not _is_card_retired(pipe):
                                     other["candidates"].append(pipe)
+                                    re_enqueued_3ds = True
                                     break
+                            if not re_enqueued_3ds and len(accounts_state) < MAX_ACCOUNTS_HARD_CAP:
+                                try:
+                                    from app import DB_PATH
+                                    fresh_acc = _pull_fresh_live_account(DB_PATH, already_checked_emails, married_card_owners, pipe)
+                                    if fresh_acc:
+                                        already_checked_emails.add(fresh_acc["email"])
+                                        accounts_state.append(fresh_acc)
+                                        logger.info(f"➕ CUENTA DE RELEVO DINÁMICO AÑADIDA TRAS 3DS | {fresh_acc['email']} para tarjeta {pipe}")
+                                except Exception as ex_fresh:
+                                    logger.debug(f"No se pudo jalar cuenta fresca tras 3DS: {ex_fresh}")
 
                         target["cooldown_until"] = _get_now() + dep.MM_COOLDOWN
                         if not target["candidates"]:
@@ -1828,9 +1926,12 @@ async def run_auto_mission(
 
                         # Regla Robert: 3 rechazos en cuentas distintas para jubilar tarjeta de la misión
                         if card_declines_map[k] >= MM_CARD_MAX_DECLINES or card_attempts_map[k] >= MM_CARD_MAX_DECLINES:
-                            _retire_card(pipe, reason=f"{card_declines_map[k]} declinaciones en cuentas distintas")
+                            tot_att = card_attempts_map.get(k, 0)
+                            tot_dec = card_declines_map.get(k, 0)
+                            reason_jub = f"{tot_att} intentos ({tot_dec} rechazos, {tot_att - tot_dec} 3DS) en cuentas distintas"
+                            _retire_card(pipe, reason=reason_jub)
                             logger.warning(
-                                f"🚫 TARJETA JUBILADA EN MISIÓN ({card_declines_map[k]} rechazos en cuentas distintas) | {pipe}"
+                                f"🚫 TARJETA JUBILADA EN MISIÓN ({reason_jub}) | {pipe}"
                             )
                         else:
                             logger.info(
@@ -1843,6 +1944,17 @@ async def run_auto_mission(
                                     other["candidates"].append(pipe)
                                     re_enqueued = True
                                     break
+                            if not re_enqueued and len(accounts_state) < MAX_ACCOUNTS_HARD_CAP:
+                                try:
+                                    from app import DB_PATH
+                                    fresh_acc = _pull_fresh_live_account(DB_PATH, already_checked_emails, married_card_owners, pipe)
+                                    if fresh_acc:
+                                        already_checked_emails.add(fresh_acc["email"])
+                                        accounts_state.append(fresh_acc)
+                                        re_enqueued = True
+                                        logger.info(f"➕ CUENTA DE RELEVO DINÁMICO AÑADIDA | {fresh_acc['email']} para tarjeta {pipe}")
+                                except Exception as ex_fresh:
+                                    logger.debug(f"No se pudo jalar cuenta fresca: {ex_fresh}")
                             if not re_enqueued:
                                 logger.info(f"ℹ️ Tarjeta {pipe} pendiente de relevo dinámico (esperando cuenta disponible distinta)")
 
