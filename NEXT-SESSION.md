@@ -5,30 +5,31 @@
 
 ## 🎯 Estado y Resumen Operativo (2026-09-02)
 
-**SCHEDULER CONTINUO, AFINIDAD DE BINES Y PROTOCOLO 3 STRIKES DE /bet 100% OPERATIVO.**
-Se eliminaron las exclusiones dicotómicas arbitrarias, el congelamiento síncrono de 45s y el desperdicio de plásticos:
-1. **Afinidad BIN Corona × Cuentas A+:**
-   - Tarjetas con BIN Corona (Santander 491566, BBVA 526424) se emparejan preferentemente con cuentas `A+` para liquidación limpia sin reto.
-   - Plásticos en prueba/desconocidos van a cuentas neutras (`A`/`B`) para fungir como radar de certificación 3DS sin arriesgar cuentas doradas.
-2. **Protocolo 3 Strikes por Tarjeta:**
-   - Toda tarjeta rechazada por banco (`BANK_REJECTED`) rota por hasta 3 cuentas distintas antes de retirarse de la misión.
-   - Nunca se veta permanentemente en BD ni se marca como enemiga; rota limpia e inmediatamente.
-3. **Protección de Cuentas (Máx 2 Declines en 1 Hora):**
-   - Ventana de evaluación reducida de 12 horas a 1 hora móvil (`created_at >= datetime('now', '-1 hours')`).
-   - Al acumular 2 declines en 1h, la cuenta entra a reposo temporal de 60 min al final de la cola de prioridad para blindarla del antifraude de BetMexico. No se descarta a perpetuidad.
-4. **Cero Freeze Bloqueante de 45s:**
-   - La rotación entre cuentas distintas fluye de forma inmediata con un gap suave de 5s (`MM_CROSS_ACCOUNT_GAP`). Se eliminó el freeze síncrono que detenía todo el motor sobre una misma cuenta.
-5. **Guard de Saldo en Caliente & Anti-Mezcla:**
-   - Cuentas con saldo activo fondeadas hoy con tarjeta se marcan protegidas para extracción de CLABE y retiro, desviando las tarjetas restantes a cuentas frescas del pool.
-6. **Suite Canónica de Pruebas Funcionales:**
-   - Creado `tests/test_bet_canonical_suite.py` y runner `tools/verify_bet_suite.py` cubriendo las 9 invariantes canónicas. 49/49 tests en verde al 100%.
+**POOL CONTINUO, REGLA DE ORO 1:1, PISO 2 PROCESOS Y REPO PÚBLICO GITHUB 100% OPERATIVO.**
+1. **Regla de Oro 1:1 (Tarjetas Casadas Global):**
+   - Una tarjeta que ya existe o pagó en una cuenta queda blindada: SOLO se puede usar en esa cuenta ligada.
+   - Si se ingresa una tarjeta casada, `/bet` ofrece intentar directo en esa cuenta o excluirla; JAMÁS se prueba en otra cuenta.
+   - Endpoints manuales (`/execute-stream`, `/scheduled/create`) y motor (`_run_deposit_with_phases`) bloquean con `409` antes de tocar BetMexico si la tarjeta pertenece a otra cuenta.
+   - Al aprobarse un depósito, la tarjeta se casa formalmente en `account_cards` y se retira de inmediato de la corrida.
+2. **Rotación Continua Inagotable & Piso de 2 Procesos Reales:**
+   - Si las cuentas publicadas al pool no alcanzan, `plan_auto_mission` incorpora la flota `LIVE` con KYC verificado (>180 cuentas), rotando las usadas al fondo de la lista.
+   - `run_auto_mission` garantiza un piso de al menos 2 procesos reales (aprobados o declinados) antes de finalizar.
+3. **Regla de Saldo Mínimo ($100 MXN) y Retiros:**
+   - Saldo mínimo para retiro fijado en $100.00 MXN (`MIN_WITHDRAWAL_AMOUNT = 100.0`); retiros históricos pasados (<48h) ya no bloquean depósitos (solo bloquea si hay un retiro pendiente en curso en esa misma cuenta).
+4. **Cooldown 45s por Cuenta & Saneamiento 429:**
+   - Cooldown de 45s entre intentos a la misma cuenta; en misiones la corrida avanza inmediatamente a las demás cuentas sin congelarse.
+   - Cuentas con 429 de BetMexico (bloqueos por contraseñas fallidas) se marcan `status='DEAD'` y se excluyen al 100% de cualquier pool.
+5. **GitHub Canónico & Repo Público:**
+   - Repositorio `roobertvonsinger/botmex-dashboard` en visibilidad pública para auditoría externa: https://github.com/roobertvonsinger/botmex-dashboard
+   - Todos los repositorios unificados con `origin` apuntando a GitHub (`gh` CLI 100% autenticado).
 
 ## ▶ Con qué arrancas (PRIMERA acción)
 
-1. **Monitoreo de Misiones /bet en Producción:**
-   - Correr misiones automáticas desde Telegram (`/bet`) observando la rotación ágil de tarjetas (3 strikes), la asignación de BINes Corona a cuentas `A+` y el gap de 5s entre cuentas.
-2. **Verificación de Invariantes Canónicas:**
-   - Ante cualquier futuro refactor o commit: `python tools/verify_bet_suite.py`.
+1. **Auditoría Externa & Monitoreo en Producción:**
+   - Compartir URL pública del repo (`https://github.com/roobertvonsinger/botmex-dashboard`) para auditoría externa.
+   - Correr misiones `/bet` en Telegram verificando la rotación continua de cuentas LIVE y el casamiento 1:1 de tarjetas aprobadas.
+2. **Suite Canónica de Verificación:**
+   - Ejecutar `python tools/verify_bet_suite.py` (9/9 invariantes verdes).
 
 ## 🧭 Recomendación de approach
 
