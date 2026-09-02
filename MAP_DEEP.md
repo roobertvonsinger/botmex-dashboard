@@ -237,7 +237,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_unlock` | def | L1120–L1129 |
 | `_broadcast_mission` | def | L1132–L1161 |
 | `_stop_pool` | def | L1164–L1171 |
-| `run_auto_mission` | def | L1175–L2162 |
+| `run_auto_mission` | def | L1175–L2191 |
 
 ### `autoexclusion.py`
 
@@ -409,8 +409,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `perform_wabox_liveness_check` | def | L241–L367 |
 | `get_card_declines_24h` | def | L370–L404 |
 | `_get_app_db` | def | L407–L425 |
-| `precheck_card_liveness` | def | L428–L568 |
-| `format_ruthopia_liveness_summary` | def | L571–L614 |
+| `precheck_card_liveness` | def | L428–L552 |
+| `format_ruthopia_liveness_summary` | def | L555–L598 |
 
 ### `clabe_fetch.py`
 
@@ -458,45 +458,47 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_save_txns_via_app_db` | def | L84–L116 |
 | `_set_account_cooldown` | def | L119–L132 |
 | `_mark_rate_limited_dead` | def | L135–L153 |
-| `_cooldown_remaining_min` | def | L156–L162 |
-| `_is_transient_gateway_error` | def | L165–L175 |
-| `_drain_stale_tokens` | def | L205–L237 |
-| `_ensure_fresh_captcha` | def | L240–L264 |
-| `_record_bin_3ds` | def | L272–L300 |
-| `_bin_3ds_stats` | def | L303–L325 |
-| `bin_check` | def | L329–L339 |
-| `bin_recommendations` | def | L343–L347 |
-| `bin_stats_overview` | def | L351–L420 |
-| `_auto_lock_for_deposit` | def | L423–L479 |
-| `_window_status` | def | L482–L524 |
-| `_check_caps` | def | L527–L543 |
-| `_check_card_mixing_on_active_balance` | def | L546–L619 |
-| `_load_deps` | def | L622–L633 |
-| `_parse_pipe` | def | L636–L657 |
-| `_check_card_velocity` | def | L677–L724 |
-| `_has_recent_approved_deposit` | def | L727–L743 |
-| `_record_attempt` | def | L746–L942 |
-| `_safe_phase` | def | L952–L959 |
-| `_now_mx_str` | def | L967–L976 |
-| `_deposit_step_payload` | def | L985–L993 |
-| `_wrap_deposit_step` | def | L996–L1015 |
-| `_build_admin_proxy_url` | def | L1018–L1022 |
-| `_refresh_account_after_deposit` | def | L1025–L1084 |
-| `_should_relogin_after_401` | def | L1087–L1091 |
-| `_acquire_session_and_begin` | def | L1094–L1380 |
-| `_run_deposit_with_phases` | def | L1383–L1747 |
-| `deposit_execute_stream` | def | L1751–L1953 |
-| `cap_status` | def | L1957–L1969 |
-| `_mm_is_real_decline` | def | L2009–L2015 |
-| `_mm_is_ambiguous_charge` | def | L2018–L2028 |
-| `classify_deposit_status` | def | L2031–L2062 |
-| `_mm_session_get` | def | L2105–L2109 |
-| `_mm_session_update` | def | L2112–L2121 |
-| `multi_stream` | def | L2125–L2648 |
-| `multi_cancel` | def | L2652–L2657 |
-| `scheduled_create` | def | L2670–L3034 |
-| `scheduled_list` | def | L3038–L3060 |
-| `scheduled_cancel` | def | L3064–L3072 |
+| `get_married_card_owner` | def | L156–L197 |
+| `_check_account_recent_attempt` | def | L200–L230 |
+| `_cooldown_remaining_min` | def | L233–L239 |
+| `_is_transient_gateway_error` | def | L242–L252 |
+| `_drain_stale_tokens` | def | L282–L314 |
+| `_ensure_fresh_captcha` | def | L317–L341 |
+| `_record_bin_3ds` | def | L349–L377 |
+| `_bin_3ds_stats` | def | L380–L402 |
+| `bin_check` | def | L406–L416 |
+| `bin_recommendations` | def | L420–L424 |
+| `bin_stats_overview` | def | L428–L497 |
+| `_auto_lock_for_deposit` | def | L500–L556 |
+| `_window_status` | def | L559–L601 |
+| `_check_caps` | def | L604–L620 |
+| `_check_card_mixing_on_active_balance` | def | L623–L696 |
+| `_load_deps` | def | L699–L710 |
+| `_parse_pipe` | def | L713–L734 |
+| `_check_card_velocity` | def | L754–L801 |
+| `_has_recent_approved_deposit` | def | L804–L820 |
+| `_record_attempt` | def | L823–L1019 |
+| `_safe_phase` | def | L1029–L1036 |
+| `_now_mx_str` | def | L1044–L1053 |
+| `_deposit_step_payload` | def | L1062–L1070 |
+| `_wrap_deposit_step` | def | L1073–L1092 |
+| `_build_admin_proxy_url` | def | L1095–L1099 |
+| `_refresh_account_after_deposit` | def | L1102–L1161 |
+| `_should_relogin_after_401` | def | L1164–L1168 |
+| `_acquire_session_and_begin` | def | L1171–L1457 |
+| `_run_deposit_with_phases` | def | L1460–L1805 |
+| `deposit_execute_stream` | def | L1809–L2026 |
+| `cap_status` | def | L2030–L2042 |
+| `_mm_is_real_decline` | def | L2082–L2088 |
+| `_mm_is_ambiguous_charge` | def | L2091–L2101 |
+| `classify_deposit_status` | def | L2104–L2135 |
+| `_mm_session_get` | def | L2178–L2182 |
+| `_mm_session_update` | def | L2185–L2194 |
+| `multi_stream` | def | L2198–L2721 |
+| `multi_cancel` | def | L2725–L2730 |
+| `scheduled_create` | def | L2743–L3116 |
+| `scheduled_list` | def | L3120–L3142 |
+| `scheduled_cancel` | def | L3146–L3154 |
 
 ### `jwt_keeper.py`
 

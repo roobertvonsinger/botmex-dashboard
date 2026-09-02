@@ -211,3 +211,58 @@ def test_bin_affinity_corona_prefers_a_plus(tmp_path, monkeypatch):
     # aplus@test.com debió recibir p_corona por afinidad
     assert "aplus@test.com" in accs
     assert accs["aplus@test.com"].startswith("491566")
+
+
+def test_regla_de_oro_married_card_blocked_across_accounts(monkeypatch):
+    """Regla de Oro (Robert 2026-09-02):
+    Una tarjeta que ya existe en una cuenta JAMÁS debe ser utilizada por otra cuenta.
+    En deposits.py, get_married_card_owner y _run_deposit_with_phases bloquean de tajo."""
+    from deposits import get_married_card_owner, _run_deposit_with_phases
+    from app import db
+
+    # Insertar tarjeta ligada a cuenta A
+    with db(write=True) as c:
+        c.execute("INSERT OR REPLACE INTO accounts (id, email, password, status, first_checked_at, last_checked_at) VALUES (901, 'duena@test.com', 'p', 'LIVE', '2026-07-01', '2026-07-01')")
+        c.execute("INSERT OR REPLACE INTO accounts (id, email, password, status, first_checked_at, last_checked_at) VALUES (902, 'otra@test.com', 'p', 'LIVE', '2026-07-01', '2026-07-01')")
+        c.execute("INSERT OR REPLACE INTO account_cards (card_number, card_expiry, card_cvv, account_email, account_password, registered_by, registered_at, status) VALUES ('4111222233334444', '1228', '123', 'duena@test.com', 'p', 1, '2026-07-01', 'ACTIVE')")
+
+    # 1. get_married_card_owner detecta al dueño
+    owner = get_married_card_owner("4111222233334444")
+    assert owner == "duena@test.com"
+
+    # 2. _run_deposit_with_phases rechaza inmediatamente si se intenta usar en otra@test.com
+    res = asyncio.run(_run_deposit_with_phases(
+        email="otra@test.com",
+        password="p",
+        cc_num="4111222233334444",
+        cc_exp="1228",
+        cc_cvv="123",
+        amount=50.0,
+        user={"telegram_id": 999},
+        pool=None,
+        phase_cb=None,
+    ))
+    assert res["success"] is False
+    assert res["result_code"] == "CARD_LOCKED_OTHER_ACCOUNT"
+    assert "duena@test.com" in res["error"]
+
+
+def test_cooldown_45s_enforced_for_same_account():
+    """Regla Robert: Cooldown mínimo de 45 segundos para reintentar la misma cuenta."""
+    from deposits import _check_account_recent_attempt
+    from app import db
+
+    with db(write=True) as c:
+        c.execute("INSERT OR REPLACE INTO accounts (id, email, password, status, first_checked_at, last_checked_at) VALUES (903, 'cooldown_test@test.com', 'p', 'LIVE', '2026-07-01', '2026-07-01')")
+        c.execute(
+            "INSERT INTO deposit_attempts (attempt_id, account_email, card_pipe, amount, status, operator_id, source, created_at) "
+            "VALUES ('att_cool_1', 'cooldown_test@test.com', '4111111111111111|1228|111', 50, 'rejected', 1, 'test', datetime('now', '-10 seconds'))"
+        )
+
+    # Intento hace 10s -> debe bloquear con cooldown < 45s
+    check = _check_account_recent_attempt("cooldown_test@test.com", min_gap_sec=45)
+    assert check is not None
+    assert check["blocked"] is True
+    assert check["wait_sec"] > 0
+    assert "Espera al menos" in check["message"]
+

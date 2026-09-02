@@ -133,24 +133,101 @@ def _set_account_cooldown(email: str, minutes: int = RATE_LIMIT_COOLDOWN_MIN) ->
 
 
 def _mark_rate_limited_dead(email: str) -> None:
-    """Aislar cuenta por 429 rate limit: NO pasa a DEAD.
-    Mantiene status='LIVE', saldos y plásticos intactos en la BD.
-    Sale de la pool (published_to_pool=0) para que ningún proceso automático
-    (/bet en Telegram o auto_deposit) la vuelva a tocar.
+    """Aislar cuenta por 429 rate limit de BetMexico:
+    Robert (2026-09-02): El 429 es un bloqueo por contraseñas fallidas (Claude Code).
+    No permite login y están 99% muertas e irrecuperables. Pasa a status='DEAD',
+    dead_reason='RATE_LIMITED_429' para que no estorben en ningún pool.
     """
     try:
         from app import db
         with db(write=True) as c:
             c.execute(
-                "UPDATE accounts SET published_to_pool=0, "
-                "dead_reason='RATE_LIMITED_429', "
+                "UPDATE accounts SET status='DEAD', published_to_pool=0, "
+                "dead_reason='RATE_LIMITED_429', dead_at=datetime('now'), "
                 "locked_by=NULL, locked_until=NULL "
                 "WHERE email=?",
                 (email,),
             )
-        logger.warning(f"[RateLimit] {email} AISLADA DEL POOL (published_to_pool=0, dead_reason=RATE_LIMITED_429)")
+        logger.warning(f"[RateLimit] {email} MARCADA DEAD (429 BetMexico Password Lock - status=DEAD, published_to_pool=0)")
     except Exception as e:
-        logger.warning(f"[RateLimit] no pude aislar del pool por rate-limit {email}: {e}")
+        logger.warning(f"[RateLimit] no pude marcar DEAD por rate-limit {email}: {e}")
+
+
+def get_married_card_owner(card_pipe_or_num: str) -> Optional[str]:
+    """Regla de Oro (Robert 2026-09-02):
+    Retorna el email de la cuenta con la que esta tarjeta está casada (en account_cards
+    o por depósito APPROVED previo en deposit_attempts), o None si la tarjeta está libre.
+    Una tarjeta que ya existe en una cuenta JAMÁS debe ser utilizada por otra cuenta."""
+    if not card_pipe_or_num:
+        return None
+    token = str(card_pipe_or_num).split("|")[0].strip().replace(" ", "").replace("-", "")
+    c_num = "".join(ch for ch in token if ch.isdigit())
+    if not c_num:
+        return None
+    try:
+        from app import db
+        with db() as c:
+            # 1. En account_cards
+            cols = [col[1] for col in c.execute("PRAGMA table_info(account_cards)").fetchall()]
+            num_col = "card_number" if "card_number" in cols else "number" if "number" in cols else None
+            if num_col:
+                r = c.execute(
+                    f"SELECT account_email FROM account_cards "
+                    f"WHERE (REPLACE({num_col}, ' ', '') = ? OR {num_col} = ?) "
+                    f"AND account_email IS NOT NULL AND account_email != '' LIMIT 1",
+                    (c_num, c_num),
+                ).fetchone()
+                if r and r[0]:
+                    return str(r[0]).strip().lower()
+
+            # 2. En deposit_attempts con status='approved'
+            try:
+                r2 = c.execute(
+                    "SELECT account_email FROM deposit_attempts "
+                    "WHERE UPPER(status) = 'APPROVED' AND account_email IS NOT NULL "
+                    "AND (REPLACE(SUBSTR(card_pipe, 1, INSTR(card_pipe || '|', '|') - 1), ' ', '') = ? OR card_pipe LIKE ?) LIMIT 1",
+                    (c_num, f"{c_num}%"),
+                ).fetchone()
+                if r2 and r2[0]:
+                    return str(r2[0]).strip().lower()
+            except Exception:
+                pass
+    except Exception as e:
+        logger.debug(f"[get_married_card_owner] error checking {c_num}: {e}")
+    return None
+
+
+def _check_account_recent_attempt(account_email: str, min_gap_sec: int = 45) -> Optional[dict]:
+    """Regla de Oro (Robert 2026-09-02):
+    No deja depositar dos veces seguidas en menos de 45 segundos en la misma cuenta.
+    Retorna dict descriptivo si la cuenta está en cooldown o None si está lista."""
+    if not account_email:
+        return None
+    try:
+        from app import db
+        with db() as c:
+            r = c.execute(
+                "SELECT created_at, (strftime('%s','now') - strftime('%s', created_at)) AS elapsed_sec "
+                "FROM deposit_attempts WHERE account_email=? "
+                "ORDER BY created_at DESC LIMIT 1",
+                (account_email,),
+            ).fetchone()
+            if r and r["elapsed_sec"] is not None:
+                elapsed = int(r["elapsed_sec"])
+                if 0 <= elapsed < min_gap_sec:
+                    wait_sec = min_gap_sec - elapsed
+                    return {
+                        "blocked": True,
+                        "elapsed_sec": elapsed,
+                        "wait_sec": wait_sec,
+                        "message": (
+                            f"Cuenta intentada hace {elapsed}s. Espera al menos {wait_sec}s "
+                            f"antes de reintentar (cooldown de seguridad: {min_gap_sec}s)."
+                        ),
+                    }
+    except Exception as e:
+        logger.debug(f"[_check_account_recent_attempt] error checking {account_email}: {e}")
+    return None
 
 
 def _cooldown_remaining_min(cooldown_until, now=None) -> int:
@@ -1405,31 +1482,14 @@ async def _run_deposit_with_phases(
       {"success": bool, "result_code": str, "error": str|None, "duration_ms": int,
        "jwt": str|None, "used_proxy": str|None}  # jwt/used_proxy: para reuso de sesión
     """
-    # Candado anti-reuso de tarjeta entre cuentas (Robert 2026-07-28, campo: "jamás
-    # reutilizar una tarjeta guardada previamente para depositar en otra cuenta...
-    # si ya se aprobó en una cuenta una tarjeta debe haber un freno ahí"). Causa
-    # raíz del hueco: account_cards.card_number es UNIQUE, pero _record_attempt
-    # (más abajo en este archivo) solo hace INSERT OR IGNORE DESPUÉS de un depósito
-    # ya aprobado — si la tarjeta ya estaba ligada a otra cuenta, el INSERT se
-    # ignora en silencio pero el depósito YA SE COBRÓ en la cuenta equivocada. Este
-    # freno corta ANTES de tocar a BetMexico (login/begin_deposit/submit_card),
-    # no después del hecho.
+    # Regla de Oro (Robert 2026-09-02):
+    # UNA TARJETA QUE YA EXISTE EN UNA CUENTA, JAMÁS DEBE SER UTILIZADA POR OTRA CUENTA.
+    # Al detectarse debe descartarse inmediatamente antes de tocar a BetMexico.
     try:
-        from app import db as _dash_db
-        with _dash_db() as _c:
-            _locked = _c.execute(
-                "SELECT account_email FROM account_cards WHERE card_number=? AND account_email!=? AND total_approved > 0",
-                (cc_num, email),
-            ).fetchone()
-            if not _locked:
-                _cols = [col[1] for col in _c.execute("PRAGMA table_info(deposit_attempts)").fetchall()]
-                if "card_pipe" in _cols:
-                    _locked = _c.execute(
-                        "SELECT account_email FROM deposit_attempts WHERE card_pipe LIKE ? AND account_email!=? AND UPPER(status)='APPROVED' LIMIT 1",
-                        (f"{cc_num}%", email),
-                    ).fetchone()
-        if _locked:
-            _msg = f"Tarjeta ya aprobada en {_locked['account_email']} — bloqueada para otras cuentas"
+        married_owner = get_married_card_owner(cc_num)
+        if married_owner and married_owner.lower() != email.strip().lower():
+            _msg = f"Regla de Oro: Tarjeta ya registrada o aprobada en {married_owner} — bloqueada para otras cuentas"
+            logger.warning(f"🛑 [REGLA DE ORO] Tarjeta {cc_num[:6]}··· casada con {married_owner} — BLOQUEADA en {email}")
             await _safe_phase(phase_cb, "done", {
                 "success": False, "result_code": "CARD_LOCKED_OTHER_ACCOUNT", "error": _msg,
             })
@@ -1438,9 +1498,7 @@ async def _run_deposit_with_phases(
                 "error": _msg, "duration_ms": 0,
             }
     except Exception as e:
-        # Degradar sin bloquear: un fallo de infra en el candado no debe tumbar
-        # el flujo de depósito completo — pero SÍ queda en logs para revisar.
-        logger.error(f"[Deposits/phases] candado tarjeta-cuenta falló, degradando: {e}")
+        logger.error(f"[Deposits/phases] candado tarjeta-cuenta falló: {e}")
 
     # ── Candado Anti-Mezcla de Tarjetas sobre Saldo Activo (Robert 2026-09-01) ──
     mix_err = _check_card_mixing_on_active_balance(email, cc_num)
@@ -1800,6 +1858,21 @@ async def deposit_execute_stream(request: Request, user: dict = Depends(require_
     # Velocity check (saltarse con force=true, solo SA) — mismo orden que /execute
     force = bool(body.get("force"))
     is_sa = (user.get("role") == "superadmin")
+
+    # Regla de Oro (Robert 2026-09-02): Tarjeta que ya existe en una cuenta JAMÁS debe usarse en otra
+    married_owner = get_married_card_owner(cc_num)
+    if married_owner and married_owner != email.strip().lower():
+        raise HTTPException(
+            409,
+            f"Regla de Oro: La tarjeta ya está registrada o aprobada en otra cuenta ({married_owner}). "
+            f"Solo se permite usarla en la cuenta a la que está ligada."
+        )
+
+    # Cooldown de 45s por cuenta: no permitir dos depósitos en menos de 45s en la misma cuenta
+    if not force:
+        acct_cooldown = _check_account_recent_attempt(email, min_gap_sec=45)
+        if acct_cooldown:
+            raise HTTPException(429, acct_cooldown["message"])
 
     # Cap check (SA omite cap 24h $1,499)
     cap_err = _check_caps(email, amount, is_sa=is_sa)
@@ -2706,6 +2779,15 @@ async def scheduled_create(request: Request, user: dict = Depends(require_sessio
     # no dispara velocity, solo si la tarjeta se usó en OTRA cuenta hace <60s).
     force = bool(body.get("force"))
     is_sa = (user.get("role") == "superadmin")
+
+    # Regla de Oro (Robert 2026-09-02): Tarjeta que ya existe en una cuenta JAMÁS debe usarse en otra
+    married_owner = get_married_card_owner(cc_num)
+    if married_owner and married_owner != email.strip().lower():
+        raise HTTPException(
+            409,
+            f"Regla de Oro: La tarjeta ya está registrada o aprobada en otra cuenta ({married_owner}). "
+            f"Solo se permite programar depósitos en la cuenta a la que está ligada."
+        )
 
     # M1 (fix 2026-07-02): el cap agregado 24h (DEP_MAX_24H) NO se validaba en
     # scheduled — solo el por-txn (arriba). Una misión de N reps × monto podía

@@ -1128,14 +1128,15 @@ async def process_bet_input(
     context.user_data["pending_bet_pipes"] = valid_pipes
     context.user_data["pending_married_pairs"] = married_pairs
 
-    # Caso Robert (SuperAdmin) con tarjetas casadas reconocidas
-    if is_sa and married_pairs:
+    # Regla de Oro (Robert 2026-09-02): Tarjetas casadas reconocidas
+    if married_pairs:
         married_details = "\n".join([f"• <code>···{p['card_pipe'].split('|')[0][-4:]}</code> ➔ Cuenta: <code>{p['email']}</code>" for p in married_pairs])
         married_prompt = (
             f"{HEADER}\n\n"
             f"{summary_text}\n\n"
-            f"💍 <b>TARJETA(S) CASADA(S) RECONOCIDA(S) (SuperAdmin):</b>\n"
+            f"💍 <b>TARJETA(S) CASADA(S) RECONOCIDA(S) (Regla de Oro 1:1):</b>\n"
             f"{married_details}\n\n"
+            f"<i>Estas tarjetas solo pueden intentarse en su cuenta ligada o ser excluidas.</i>\n"
             f"¿Cómo deseas proceder?"
         )
         m_buttons = []

@@ -460,31 +460,15 @@ def precheck_card_liveness(card_pipe: str, operator_id: Optional[int] = None) ->
             logger = logging.getLogger("betmexico.dashboard.card_checker")
             logger.warning(f"[CARD_MARRIED] Tarjeta {card_num[:6]}··· ya asociada a cuenta {email}")
 
-            if is_superadmin:
-                # Robert (SuperAdmin): Habilitar Tiro Directo a la cuenta casada
-                parsed["is_married_eligible"] = True
-                parsed["liveness_kind"] = "married"
-                parsed["is_live"] = True
-                status_label = f"💍 MARRIED (Asociada a {email})"
-                parsed["liveness_label"] = status_label
-                return True, status_label, parsed
-
-            # Para operadores regulares -> rechazo y broadcast
-            try:
-                from app import _broadcast
-                _broadcast({
-                    "type": "activity",
-                    "kind": "alert",
-                    "level": "warning",
-                    "title": "CARD_MARRIED",
-                    "message": f"⚠️ Tarjeta {card_num[:6]}··· ya está asociada a la cuenta {email}. No se puede asociar a otra cuenta.",
-                    "target": email,
-                    "card_num": card_num
-                })
-            except Exception as _b_err:
-                logger.debug(f"No se pudo emitir broadcast para CARD_MARRIED: {_b_err}")
-
-            return False, f"🔴 MARRIED - <i>Tarjeta ya asociada a {email}</i>", parsed
+            # Regla de Oro (Robert 2026-09-02):
+            # Solo si las tarjetas ingresadas ya están en una cuenta, ahí se ofrece intentar el depósito
+            # en esa cuenta en la que está ligada. Si no, se tiene que excluir del proceso y NO debe de pasar en otra cuenta.
+            parsed["is_married_eligible"] = True
+            parsed["liveness_kind"] = "married"
+            parsed["is_live"] = True
+            status_label = f"💍 MARRIED (Ligada a {email})"
+            parsed["liveness_label"] = status_label
+            return True, status_label, parsed
 
         # 1b. Detección de plásticos con alto rechazo en 24h (>= 4 declines)
         declines_24h = get_card_declines_24h(card_num, db_conn=c)

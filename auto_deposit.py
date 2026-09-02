@@ -1676,6 +1676,32 @@ async def run_auto_mission(
                         )
                         target["matched"] = True
                         target["done"] = True
+
+                        # Regla de Oro (Robert 2026-09-02): Casar tarjeta 1:1 formalmente y retirarla de la misión
+                        _retire_card(pipe, reason=f"Aprobada y casada con {email}")
+                        for other in accounts_state:
+                            if pipe in other.get("candidates", []):
+                                other["candidates"].remove(pipe)
+
+                        try:
+                            from app import db as _adb
+                            cc_parts = [p.strip() for p in pipe.split("|")]
+                            cc_num = cc_parts[0] if len(cc_parts) > 0 else ""
+                            cc_exp = cc_parts[1] if len(cc_parts) > 1 else ""
+                            cc_cvv = cc_parts[2] if len(cc_parts) > 2 else ""
+                            with _adb(write=True) as cdb:
+                                cdb.execute(
+                                    "INSERT OR IGNORE INTO account_cards "
+                                    "(card_number, card_expiry, card_cvv, account_email, registered_at, status) "
+                                    "VALUES (?, ?, ?, ?, datetime('now'), 'ACTIVE')",
+                                    (cc_num, cc_exp, cc_cvv, email),
+                                )
+                                cdb.execute(
+                                    "UPDATE accounts SET published_to_pool=0 WHERE email=?", (email,)
+                                )
+                            logger.info(f"💍 [REGLA DE ORO] Tarjeta {cc_num[:6]}··· CASADA formalmente con {email} (retirada para demás cuentas)")
+                        except Exception as ex_m:
+                            logger.warning(f"Error casando tarjeta con {email}: {ex_m}")
                         break
 
                     if code == "BALANCE_LIMIT_EXCEEDED":
@@ -1831,9 +1857,12 @@ async def run_auto_mission(
                             target["cooldown_until"] = _get_now() + dep.MM_COOLDOWN
                         break
 
-                    if code == "CARD_LOCKED_OTHER_ACCOUNT":
+                    if code == "CARD_LOCKED_OTHER_ACCOUNT" or "otra cuenta" in str(r.get("error") or "").lower() or "cardalreadyassociated" in str(r.get("error") or "").lower():
                         _retire_card(pipe, reason=f"CARD_LOCKED_OTHER_ACCOUNT en {email}")
-                        logger.info(f"🚫 TARJETA JUBILADA (CARD_LOCKED_OTHER_ACCOUNT) | {pipe}")
+                        logger.warning(f"🚫 TARJETA JUBILADA (Detectada en otra cuenta al liveness/intento) | {pipe}")
+                        for other in accounts_state:
+                            if pipe in other.get("candidates", []):
+                                other["candidates"].remove(pipe)
                         failed += 1
                         target["cooldown_until"] = _get_now() + MM_CROSS_ACCOUNT_GAP
                         break
