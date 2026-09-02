@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 592 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5528 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 2103 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 2162 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `betmexico_config.py` | 183 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2960 | `—` | _[completar]_ |
@@ -147,6 +147,7 @@ prewarm.py (router)
 | `PERSISTENT_USERS` | `{"robertvs"}` | `auth.py` |
 | `PERSISTENT_TTL` | `60 * 60 * 24 * 365 * 10` | `auth.py` |
 | `THREEDS_RECENT_H` | `24` | `auto_deposit.py` |
+| `MIN_WITHDRAWAL_AMOUNT` | `100.0` | `auto_deposit.py` |
 | `PROBE_AMOUNT` | `10.0` | `auto_deposit.py` |
 | `MATCH_TRANSIENT_RETRIES` | `4` | `auto_deposit.py` |
 | `MM_CROSS_ACCOUNT_GAP` | `5` | `auto_deposit.py` |
@@ -253,6 +254,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `45587c2` | fix(auto_deposit): desbloquear cuentas con withdrawal_ready=1 si saldo <  y ajustar ventana 1h en tests |
 | `e778a69` | feat(auto_deposit): scheduler continuo, afinidad bin corona y suite canonica bet |
 | `16afd94` | chore(reorg): mover 35 tests a tests/, purgar DBs fantasma y alinear canvas |
 | `92ed3a1` | skills: suite oficial obsidian instalada en botmex-dashboard |
@@ -264,7 +266,6 @@ prewarm.py (router)
 | `0ffc28d` | fix(deposits): regla canónica anti-mezcla de tarjetas sobre saldo fresco (<24h / >=100) |
 | `f45b9c4` | fix(deposits): eliminacion del gate artificial de saldo >= 100 y visibilidad de errores en UI |
 | `eda7bd5` | fix(pool): blindaje 429 sin bajas a DEAD, circuit breaker y verdad en logs |
-| `f3f7f69` | feat(sovereign): modo soberano, pool binario, seleccion tactil y blindaje de errores en KVM4-Old |
 <!-- GEN:end:recientes -->
 
 ---

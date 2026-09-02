@@ -234,6 +234,9 @@ MM_ACCOUNT_RECENT_DECLINE_LIMIT = (
 )
 
 
+MIN_WITHDRAWAL_AMOUNT = 100.0  # Regla Robert (2026-09-02): el saldo mínimo a retirar en BetMexico son $100 pesos
+
+
 def select_accounts_for_auto(
     rows: List[Dict[str, Any]],
     amount: float,
@@ -253,9 +256,10 @@ def select_accounts_for_auto(
       4. cooldown_until no activo
       5. Cooldown de 48h por depósito APROBADO en el dashboard
       6. window_map[email]["available"] >= amount * count
-      7. decline_map[email] < MM_ACCOUNT_RECENT_DECLINE_LIMIT (2 declines en 12h)
+      7. decline_map[email] < MM_ACCOUNT_RECENT_DECLINE_LIMIT (2 declines en 1h)
       8. Cero IsUserInValidationProcess o DEAD reciente en meta_map
       9. Cero racha de declinaciones terminales (a_plus_decline_streak < 2)
+      10. Cero proceso activo de retiro pendiente en la misma cuenta
 
     Estratificación Inteligente Backend:
       - Tier TOP: 3DS reciente (<24h), Grade A+ con sesión activa 🟢 o alta afinidad de conversión.
@@ -272,6 +276,8 @@ def select_accounts_for_auto(
     sa = _sa_tokens()
     out: List[Dict[str, Any]] = []
     meta_map = meta_map or {}
+    pool_count = sum(1 for r in rows if r.get("published_to_pool"))
+    has_enough_pool = pool_count >= count
 
     for r in rows:
         email = r.get("email")
@@ -303,12 +309,13 @@ def select_accounts_for_auto(
         if (r.get("a_plus_decline_streak") or 0) >= 2:
             continue
 
-        # 1. Cuenta con saldo real / dinero significativo (balance_real >= $10.0) -> EXCLUIDA
-        # El auto-depósito /bet es para fondear cuentas vacías; jamás tocar cuentas con fondos en uso.
+        # 1. Cuenta con saldo real / dinero significativo para retirar (balance_real >= $100.0) -> EXCLUIDA
+        # Regla Robert (2026-09-02): El saldo mínimo a retirar en BetMexico son $100 pesos.
+        # Cuentas con saldo < $100 pesos no pueden ser retiradas y deben poder recibir depósitos sin trabas.
         bal_real = r.get("balance_real")
         if bal_real is not None:
             try:
-                if float(bal_real) >= 10.0:
+                if float(bal_real) >= MIN_WITHDRAWAL_AMOUNT:
                     continue
             except (ValueError, TypeError):
                 pass
@@ -316,27 +323,31 @@ def select_accounts_for_auto(
             bal_fallback = r.get("balance") or r.get("balance_total")
             if bal_fallback is not None:
                 try:
-                    if float(bal_fallback) >= 10.0:
+                    if float(bal_fallback) >= MIN_WITHDRAWAL_AMOUNT:
                         continue
                 except (ValueError, TypeError):
                     pass
 
-        # 2. Cuenta en ciclo de retiro activo (con saldo a retirar >= $10.0) -> EXCLUIDA
-        # withdrawal_ready=1 indica CLABE/banco configurado en BetMexico; solo debe excluirse
-        # si la cuenta realmente tiene saldo activo para retirar (>= $10.0). Si está vacía (< $10.0),
-        # es ideal para fondearla ya que tiene canal de retiro listo.
+        # 2. Retiro activo / pendiente en esta misma cuenta -> EXCLUIDA
+        # Regla Robert (2026-09-02): Los retiros NO deben bloquear un depósito a menos que sea
+        # en la misma cuenta y esté en proceso activo de retiro (retiro pendiente).
+        # withdrawal_ready=1 indica CLABE configurada; si no hay retiro pendiente ni saldo >= $100, se permite.
+        meta = meta_map.get(email) or {}
+        if r.get("has_pending_withdrawal") or meta.get("has_pending_withdrawal"):
+            continue
         if r.get("withdrawal_ready") in (1, "1", True):
             bal_chk = r.get("balance_real")
             if bal_chk is None:
                 bal_chk = r.get("balance") or r.get("balance_total") or 0.0
             try:
-                if float(bal_chk) >= 10.0:
+                if float(bal_chk) >= MIN_WITHDRAWAL_AMOUNT:
                     continue
             except (ValueError, TypeError):
                 continue
 
-        # Gate Soberano: Solo cuentas explícitamente dentro del pool
-        if not r.get("published_to_pool"):
+        # Gate Soberano: Priorizar cuentas dentro del pool. Si no alcanzan para count, rota la flota LIVE.
+        # Regla Robert: "el bet jamás debe no tener cuentas para operar, solo rota la lista".
+        if has_enough_pool and not r.get("published_to_pool"):
             continue
 
         if r.get("locked_by") is not None and str(r.get("locked_by")) not in sa:
@@ -350,8 +361,9 @@ def select_accounts_for_auto(
         if meta.get("has_dashboard_approved_48h"):
             continue
 
-        # 4. Cuenta en uso activa: depósitos SPEI o retiros recientes (<48h) en account_transactions
-        if meta.get("has_spei_48h") or meta.get("has_withdrawal_48h") or meta.get("has_recent_activity_48h"):
+        # 4. Cuenta en uso activa: depósitos SPEI recientes (<48h) o retiro pendiente en curso
+        # Regla Robert: retiros completados pasados NO bloquean depósito.
+        if meta.get("has_spei_48h") or meta.get("has_pending_withdrawal"):
             continue
 
         # 5. Errores de validación, Rate Limit o DEAD
@@ -405,6 +417,8 @@ def select_accounts_for_auto(
     def sort_key(r):
         email = r.get("email")
         meta = meta_map.get(email) or {}
+        # 0. Cuentas explícitamente en el pool primero
+        pool_first = 0 if r.get("published_to_pool") else 1
         # 1. Sesión activa 🟢 (0 captcha) SIEMPRE antes que cuentas sin sesión 🔑
         jwt_first = 0 if r.get("_jwt_alive") else 1
         # 2. 3DS reciente eleva prioridad
@@ -421,6 +435,7 @@ def select_accounts_for_auto(
         days_since_active = (now - act_epoch) / 86400.0 if act_epoch > 0 else 999.0
         is_stale_fossil = 1 if days_since_active > 30 else 0
         return (
+            pool_first,
             jwt_first,
             has_3ds,
             recently_tried,
@@ -527,12 +542,40 @@ def plan_auto_mission(
             where_extra += " AND (dead_reason IS NULL OR dead_reason='')"
         if has_dead_at:
             where_extra += " AND (dead_at IS NULL OR dead_at='')"
+        # Cuentas primarias: publicadas al pool con grade != 'D'
         rows = [
             dict(r) for r in con.execute(
                 f"SELECT * FROM accounts WHERE status='LIVE' AND COALESCE(grade, '') != 'D' "
                 f"AND published_to_pool=1{where_extra}"
             ).fetchall()
         ]
+
+        # Regla Robert (2026-09-02): "el bet jamás debe no tener cuentas para operar,
+        # solo rota la lista y la debe ir reacomodando conforme se corren misiones".
+        # Si el pool tiene menos cuentas que las requeridas, incorporar la flota LIVE con KYC
+        # del sistema para rotación continua (sin parar el bet).
+        min_pool_needed = max(max_accounts, len(card_pipes or []), 2)
+        if len(rows) < min_pool_needed:
+            seen_ids = {r["id"] for r in rows}
+            fb_sql = (
+                f"SELECT * FROM accounts WHERE status='LIVE' AND COALESCE(kyc_verified, 0)=1 "
+                f"AND (balance_real IS NULL OR balance_real < {MIN_WITHDRAWAL_AMOUNT}) "
+                f"{where_extra} "
+                f"ORDER BY "
+                f"  (CASE WHEN grade='A+' THEN 0 WHEN grade='A' THEN 1 WHEN grade='B' THEN 2 ELSE 3 END), "
+                f"  COALESCE(last_checked_at, '') ASC LIMIT ?"
+            )
+            try:
+                for fb_r in con.execute(fb_sql, (min_pool_needed * 4,)).fetchall():
+                    fb_dict = dict(fb_r)
+                    if fb_dict["id"] not in seen_ids:
+                        rows.append(fb_dict)
+                        seen_ids.add(fb_dict["id"])
+                        if len(rows) >= min_pool_needed * 4:
+                            break
+            except Exception as ex_fb:
+                logger.warning(f"[plan_auto_mission] fallback rows error: {ex_fb}")
+
         window_map: Dict[str, Dict[str, Any]] = {}
         decline_map: Dict[str, int] = {}
         meta_map: Dict[str, Dict[str, Any]] = {}
@@ -577,15 +620,38 @@ def plan_auto_mission(
                 )
             """, (email,)).fetchone()["n"]
 
-            # 2b. Retiros recientes (<48h) en account_transactions (txn_type=2)
-            with_48h = con.execute("""
-                SELECT COUNT(*) AS n FROM account_transactions 
-                WHERE account_email=? AND txn_type=2 
-                AND (
-                    (julianday('now') - julianday(REPLACE(txn_date, 'T', ' '))) <= 2.0
-                    OR txn_date >= datetime('now','-48 hours')
-                )
-            """, (email,)).fetchone()["n"]
+            # 2b. Retiro activo / pendiente en esta misma cuenta (Regla Robert 2026-09-02):
+            # Solo un retiro en proceso activo (pendiente) bloquea nuevos depósitos en esta cuenta.
+            # Retiros completados (históricos) NO bloquean.
+            pending_with = 0
+            try:
+                cols_aw = [c[1] for c in con.execute("PRAGMA table_info(account_withdrawals)").fetchall()]
+                if "status_api" in cols_aw:
+                    pw_row = con.execute("""
+                        SELECT COUNT(*) AS n FROM account_withdrawals
+                        WHERE account_email=?
+                        AND (status_api IS NULL OR status_api IN (-1, 1, 2))
+                        AND (
+                            (julianday('now') - julianday(REPLACE(created_at, 'T', ' '))) <= 1.0
+                            OR created_at >= datetime('now','-24 hours')
+                        )
+                    """, (email,)).fetchone()
+                    pending_with += pw_row["n"] if pw_row else 0
+            except Exception:
+                pass
+
+            try:
+                pw_txn = con.execute("""
+                    SELECT COUNT(*) AS n FROM account_transactions 
+                    WHERE account_email=? AND txn_type=2 AND status IN (-1, 1, 2)
+                    AND (
+                        (julianday('now') - julianday(REPLACE(txn_date, 'T', ' '))) <= 1.0
+                        OR txn_date >= datetime('now','-24 hours')
+                    )
+                """, (email,)).fetchone()
+                pending_with += pw_txn["n"] if pw_txn else 0
+            except Exception:
+                pass
 
             # 3. Evento 3DS_REQUIRED reciente (<24h)
             threeds_24h = con.execute(
@@ -752,8 +818,9 @@ def plan_auto_mission(
             meta_map[email] = {
                 "has_dashboard_approved_48h": bool(app_48h),
                 "has_spei_48h": bool(spei_48h),
-                "has_withdrawal_48h": bool(with_48h),
-                "has_recent_activity_48h": bool(spei_48h or with_48h),
+                "has_pending_withdrawal": bool(pending_with > 0),
+                "has_withdrawal_48h": False,  # Regla Robert: retiros pasados NO bloquean depósito
+                "has_recent_activity_48h": bool(spei_48h or pending_with > 0),
                 "has_3ds_24h": bool(threeds_24h),
                 "total_fails": int(tot_fails or 0),
                 "is_validation_blocked": bool(val_blocked),
@@ -1145,23 +1212,6 @@ async def run_auto_mission(
         target_count = int(mission.get("target_count") or 9)
         try:
             card_pipes = json.loads(mission.get("card_pipes") or "[]")
-            # Filtrar tarjetas ya procesadas (fallidas/declinadas en las últimas 24h)
-            if card_pipes:
-                try:
-                    from app import DB_PATH
-                    con = sqlite3.connect(str(DB_PATH))
-                    try:
-                        failed_cards = set(r[0] for r in con.execute("""
-                            SELECT DISTINCT card_pipe FROM deposit_attempts
-                            WHERE card_pipe IN ({seq})
-                              AND status = 'rejected'
-                              AND created_at >= datetime('now', '-24 hours')
-                        """.format(seq=','.join(['?']*len(card_pipes))), card_pipes).fetchall() if r[0])
-                        card_pipes = [p for p in card_pipes if p not in failed_cards]
-                    finally:
-                        con.close()
-                except Exception:
-                    pass
         except Exception:
             card_pipes = []
 
@@ -1177,6 +1227,7 @@ async def run_auto_mission(
         deposited = 0.0
         approved = 0
         failed = 0
+        total_real_processes = 0
         cancelled = False
 
         def _cancelled() -> bool:
@@ -1185,6 +1236,7 @@ async def run_auto_mission(
         async def _attempt(email, password, pipe, amt, sj, sp):
             """Un intento de depósito + persistencia (regla 8). Retorna (r, ok, code)."""
             import deposits as _d
+            nonlocal total_real_processes
 
             num, exp, cvv = _d._parse_pipe(pipe)
             t0 = asyncio.get_event_loop().time()
@@ -1206,6 +1258,7 @@ async def run_auto_mission(
                 session_proxy=sp,
                 persist_login_data=(sj is None),
             )
+            total_real_processes += 1
             ok = bool(r.get("success"))
             code = r.get("result_code", "UNKNOWN")
             reason = r.get("error") or code
@@ -1384,13 +1437,19 @@ async def run_auto_mission(
 
                 active = [a for a in accounts_state if not a["done"]]
 
-                # Si no quedan cuentas activas y no hay matches, buscar cuentas de respaldo
+                # Si no quedan cuentas activas y no hay matches o faltan procesos reales:
+                # Regla Robert: "el bet no debe detenerse sin siquiera haber pasado realmente
+                # por mínimo 2 procesos reales independientemente si sean rejected o approved...
+                # no debe detenerse si no ha procesado nada".
                 if not active:
-                    if not matches and not backup_checked and not _cancelled():
+                    if (not matches or total_real_processes < 2) and not backup_checked and not _cancelled():
                         backup_checked = True
                         try:
                             from app import DB_PATH
                             active_cards = [p for p in card_pipes if not _is_card_retired(p)]
+                            if not active_cards and card_pipes:
+                                # Tarjetas con menos de 3 declines pueden reintentar para cumplir el piso de procesos
+                                active_cards = [p for p in card_pipes if card_attempts_map.get(_card_key(p), 0) < MM_CARD_MAX_DECLINES]
                             if active_cards:
                                 remaining = MAX_ACCOUNTS_HARD_CAP - len(accounts_state)
                                 if remaining > 0:
@@ -1407,7 +1466,7 @@ async def run_auto_mission(
                                              if not is_kyc_ok or _is_account_dead(b_acc) or _is_account_dead(b_acct) or b_email in already_checked_emails:
                                                  logger.info(f"➖ CUENTA DE RESPALDO SALTADA (kyc≠1 o dead) | {b_email}")
                                                  continue
-                                             is_quality = (b_acc.get("grade") or b_acct.get("grade") or "").upper() in ("A+", "A", "B")
+                                             is_quality = (b_acc.get("grade") or b_acct.get("grade") or "").upper() != "D"
                                              if not is_quality:
                                                  continue
                                              b_cands = [p for p in [b_acc.get("card_pipe"), *card_pipes] if p]
@@ -1499,9 +1558,9 @@ async def run_auto_mission(
                             locked_ids.discard(account_id)
                         continue
 
-                    # Guard de Saldo en Vivo: Si la cuenta ya tiene saldo >= 10.0 Y ya tuvo depósito con tarjeta hoy
+                    # Guard de Saldo en Vivo: Si la cuenta ya tiene saldo >= $100.0 Y ya tuvo depósito con tarjeta hoy
                     bal = float(fresh_acct.get("balance_real") or fresh_acct.get("balance") or fresh_acct.get("balance_total") or 0.0)
-                    if bal >= 10.0 and _has_card_deposit_24h(email):
+                    if bal >= MIN_WITHDRAWAL_AMOUNT and _has_card_deposit_24h(email):
                         logger.info(f"💰 Cuenta {email} tiene saldo activo (${bal}) fondeado hoy con tarjeta — protegida para retiro sin quemar tarjeta")
                         target["done"] = True
                         # Re-encolar tarjetas restantes de target a otras cuentas activas si no las tenían

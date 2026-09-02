@@ -145,7 +145,7 @@ def test_account_not_drilled_consecutively_after_decline(monkeypatch):
 
 
 def test_live_balance_guard_skips_deposit(monkeypatch):
-    """Regla Robert: Si una cuenta tiene balance_real >= 10.0 en BD o se actualiza en vivo,
+    """Regla Robert: Si una cuenta tiene balance_real >= $100.0 (mínimo de retiro) en BD o se actualiza en vivo,
     el scheduler no le mete otra tarjeta a depositar; la salta protegiendo la cuenta."""
     h = MockHarness()
     _setup_ad_mocks(monkeypatch, h)
@@ -157,10 +157,10 @@ def test_live_balance_guard_skips_deposit(monkeypatch):
             {"id": 1, "email": "acc_funded@test.com", "grade": "A", "card_pipe": p1},
         ]
     }
-    # Cuenta con saldo activo en BD
+    # Cuenta con saldo activo para retiro en BD (>= $100.0)
     h.accounts_db[1] = {
         "id": 1, "email": "acc_funded@test.com", "password": "pass",
-        "status": "LIVE", "grade": "A", "kyc_verified": 1, "balance_real": 10.12
+        "status": "LIVE", "grade": "A", "kyc_verified": 1, "balance_real": 150.00
     }
 
     asyncio.run(ad.run_auto_mission("m_bal_guard", plan, {"role": "superadmin", "telegram_id": 999}))

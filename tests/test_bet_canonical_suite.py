@@ -250,7 +250,7 @@ def test_canonical_05_account_anti_drill_and_two_strike_cap(monkeypatch):
 # 6. GUARD DE SALDO EN CALIENTE & ANTI-MEZCLA
 # ─────────────────────────────────────────────────────────────────────────────
 def test_canonical_06_live_balance_anti_mixture_guard(monkeypatch):
-    """Invariante 6: Si una cuenta tiene saldo real >= 10.0 y ya depositó hoy con tarjeta,
+    """Invariante 6: Si una cuenta tiene saldo real >= $100.0 (mínimo de retiro) y ya depositó hoy con tarjeta,
     el scheduler no le mete otro plástico hoy; la salta protegiendo la cuenta para retiro."""
     h = CanonicalHarness()
     _setup_canonical_mocks(monkeypatch, h)
@@ -258,7 +258,7 @@ def test_canonical_06_live_balance_anti_mixture_guard(monkeypatch):
 
     p1 = "4111111111111111|1228|111"
     plan = {"accounts": [{"id": 1, "email": "has_funds_card@test.com", "grade": "A", "card_pipe": p1}]}
-    h.accounts_db[1] = {"id": 1, "email": "has_funds_card@test.com", "status": "LIVE", "grade": "A", "kyc_verified": 1, "balance_real": 10.12}
+    h.accounts_db[1] = {"id": 1, "email": "has_funds_card@test.com", "status": "LIVE", "grade": "A", "kyc_verified": 1, "balance_real": 150.00}
 
     asyncio.run(ad.run_auto_mission("m_canon_funds", plan, {"role": "superadmin", "telegram_id": 999}))
 
