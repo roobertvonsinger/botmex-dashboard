@@ -6,29 +6,30 @@
 
 ## 🎯 Estado y Resumen Operativo (2026-09-02)
 
-**TOPOLOGÍA CANÓNICA, ROTACIÓN CONTINUA CON RELEVO DINÁMICO, FUGA DE CAPTCHA ELIMINADA Y SUITE 100% VERDE.**
-1. **Topología Canónica VPS Innegociable:**
-   - **KVM4-Old (`100.77.154.31`):** Producción ACTIVA de Bots de Telegram: `betmexico-mock-bot` (Telegram `/bet`), `betmexico-web` (`botmexico.com.mx`), DB en `/docker/betmexico/data/betmexico_accounts.db`.
-   - **KVM4-Karen (`2.25.98.162`):** Hub de IA e Ingress: `captcha-hub:8889`, `vault:9000`, `hermes:8642`. Cero confusión de hosts.
-2. **Relevo Dinámico de Cuentas (Cero Freezes de 20s):**
-   - En `auto_deposit.py`, implementado `_pull_fresh_live_account`: cuando una tarjeta declina o pide 3DS y las cuentas activas están en reposo/cooldown, el despachador jala de inmediato una cuenta LIVE con KYC del universo en vez de congelarse en esperas pasivas de 20s.
-3. **Freno a la Fuga de Captchas (JIT 100% y Fail-Fast):**
-   - En `login_orchestrator.py`: Conectado `pool.get_token()` JIT y agregado fail-fast inmediato si la API responde con contraseña/usuario inválido o cuenta bloqueada (cero quema de 4 captchas en cuentas muertas).
-4. **Telemetría Fiel y 3DS:**
-   - Log de jubilación corregido para mostrar el desglose exacto: `X intentos (Y rechazos, Z 3DS)`.
-   - Verificado empíricamente que 3DS no genera strikes en pasarela y certifica A+ en BD.
-5. **Deploy Verificado en Producción KVM4-Old:**
-   - Cambios subidos a `/docker/betmexico/code/` y `/docker/betmexico/code/web/`.
-   - `betmexico-mock-bot` y `betmexico-web` reiniciados, respondiendo 200 OK.
-   - Suite canónica `python tools/verify_bet_suite.py` 9/9 verdes al 100%.
+**AUDITORÍA FORENSE COMPLETADA, DEUDA TÉCNICA DE RAÍZ SANEADA Y SUITE CANÓNICA + UNITARIA 100% VERDE (83/83).**
+1. **Resguardo de Emergencia Previo a Refactor:**
+   - Creado en `C:\Users\rober\Dropbox\TESTING DEV\_emergency_backup_botmex_20260902` con commit `3225aba`, `betmexico_accounts.db` (17.8MB) y archivos de código intactos.
+2. **Unificación de Algoritmo de Grading (V10 M7):**
+   - Reemplazada la versión V9 de raíz en `betmexico_payment_analyzer.py` por la versión canónica V10 de `shared/`. Todas las importaciones ahora operan bajo reglas M7 (masacres caen en C, aprobación reciente sana, 16/16 tests pasando).
+3. **Eliminación de Bypass SQLite & Fuga de Conexiones:**
+   - En `app.py:3369`, eliminado el `BetmexicoDB(Path(db_path))` huérfano. Enrutado a través del singleton thread-safe con busy timeout de 30s y WAL.
+4. **Desacoplamiento Circular vía `db_registry.py`:**
+   - Creado `db_registry.py` para aislar `DB_PATH`, `db`, `_db_write_with_retry` y registry de locks.
+   - `app.py` re-exporta los símbolos. `deposits.py` y `auto_deposit.py` ahora pueden importarse de forma aislada sin requerir `app` previamente.
+5. **Blindaje de Mantenimiento & Docker Compose:**
+   - Modo mantenimiento protegido con flag en memoria `_MAINTENANCE_OVERRIDE` sin mutar globalmente `os.environ`.
+   - `docker-compose.yml` anotado con `docker-proxy` comentado y vinculado a su rama fuente `feat/support-agent`.
+6. **Validación Exhaustiva:**
+   - Suite canónica `/bet`: 9/9 verdes al 100%.
+   - Suite completa de regresión (`tests/`): 83/83 pruebas pasando al 100%.
 
 ## ▶ Con qué arrancas (PRIMERA acción de la próxima sesión)
 
-1. **Recepción de la Auditoría Ultra-Crítica de Robert:**
-   - Robert entregará el documento/resultado de su auditoría integral a todo el proyecto.
-   - Leer, desglosar por severidad y atacar directamente las fallas críticas señaladas sin dar rodeos.
+1. **Deploy a Producción KVM4-Old (`100.77.154.31`):**
+   - Subir `app.py`, `deposits.py`, `auto_deposit.py`, `betmexico_payment_analyzer.py`, `db_registry.py` a `/docker/betmexico/code/web/`.
+   - Reiniciar `betmexico-web` y `betmexico-mock-bot` vía docker compose.
 2. **Monitoreo de Misiones `/bet`:**
-   - Supervisar en producción KVM4-Old cómo el relevo dinámico atiende las corridas de tarjetas sin esperas muertas.
+   - Observar rotación fluida y ausencia de "database is locked" en logs de Dozzle.
 
 ## 🧭 Recomendación de approach
 

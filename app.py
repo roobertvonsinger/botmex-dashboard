@@ -153,111 +153,14 @@ if _env_file.exists():
         _k, _v = _s.split("=", 1)
         os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
 
-# La BD vive donde corre el bot. Local: usa ENV BETMEX_DB. VPS: /opt/betmexico/bot/betmexico_accounts.db
-DB_PATH = Path(os.environ.get("BETMEX_DB", str(ROOT.parent / "betmexico_accounts.db")))
-
-
-# Instrumentación temporal (Robert, campo 2026-07-25: 2 retiros reales chocaron con
-# "database is locked" sostenido en <20min, "no debe pasar" — necesitamos la causa
-# raíz, no otro parche). Registro de writes activos + stack de apertura: si un write
-# tarda de más o choca con lock, logueamos QUIÉN más estaba escribiendo al mismo
-# tiempo y desde dónde. Costo ínfimo (dict + lock), quitar cuando se identifique
-# y arregle el culpable real.
-_db_write_registry: dict = {}
-_db_write_registry_lock = threading.Lock()
-_db_write_counter = 0
-
-
-@contextmanager
-def db(write: bool = False):
-    global _db_write_counter
-    db_file = os.environ.get("BETMEX_DB", str(DB_PATH))
-    conn = sqlite3.connect(str(db_file), timeout=10)
-    conn.row_factory = sqlite3.Row
-    entry_id = None
-    stack = None
-    t0 = time.time()
-    if write:
-        with _db_write_registry_lock:
-            _db_write_counter += 1
-            entry_id = _db_write_counter
-            stack = "".join(traceback.format_stack()[:-1])
-            _db_write_registry[entry_id] = (t0, stack)
-        conn.execute("PRAGMA journal_mode=WAL")
-    try:
-        yield conn
-        if write:
-            conn.commit()
-    except Exception as e:
-        if write:
-            conn.rollback()
-            if isinstance(e, sqlite3.OperationalError) and "locked" in str(e):
-                with _db_write_registry_lock:
-                    others = {k: v for k, v in _db_write_registry.items() if k != entry_id}
-                _dblg = _logging.getLogger("betmexico.dashboard.db")
-                if others:
-                    held = "\n---\n".join(
-                        f"[write#{k} abierto hace {time.time() - t:.1f}s, origen:]\n{s}"
-                        for k, (t, s) in others.items()
-                    )
-                    _dblg.error(f"[db] LOCK — {len(others)} write(s) activos simultáneos AHORA:\n{held}")
-                else:
-                    # En arquitectura multicontainer (web + mock-bot comparten la
-                    # misma BD SQLite en /data), "sin otro write en ESTE proceso"
-                    # es casi siempre el otro container migrando/arrancando a la
-                    # vez — contención esperada, no un bug. Se loguea warning con
-                    # stack para diagnóstico; el caso con writes simultáneos del
-                    # MISMO proceso (arriba) sí es error real.
-                    _dblg.warning(
-                        f"[db] LOCK sin otro write registrado en este proceso — el lock viene de "
-                        f"fuera del registro (conexión huérfana o proceso externo). Origen de este write:\n{stack}"
-                    )
-        raise
-    finally:
-        dt = time.time() - t0
-        if write:
-            with _db_write_registry_lock:
-                _db_write_registry.pop(entry_id, None)
-            if dt > 2.0:
-                _logging.getLogger("betmexico.dashboard.db").warning(
-                    f"[db] write#{entry_id} tardó {dt:.1f}s sosteniendo el writer global de SQLite — origen:\n{stack}"
-                )
-        conn.close()
-
-
-def _db_write_with_retry(fn, *, attempts: int = 3, base_delay: float = 0.2):
-    """Ejecuta `fn(conn)` dentro de `db(write=True)` con retry ante `database is locked`.
-
-    Robert, campo 2026-07-25: los writes triviales (UPDATE de cooldown / rl_streak /
-    locked_by) mueren al primer lock sostenido y, por contención bot↔web + jwt_keeper
-    corriendo su ciclo horario, tumbaban el depósito del operador. En vez de N copias
-    del loop (revolvedero), UN helper.
-
-    Backoff corto (no el de 5×10s del retiro — ese es para dinero real). Aquí 3 intentos
-    con delays 0.2/0.5/1.0s: cada `db(write=True)` ya tiene su `timeout=10` interno, así
-    que el primer intento espera hasta 10s; si aún así choca, un segundo intento rápido
-    suele entrar en el gap que dejó el writer anterior. Si los 3 fallan, relanza — el
-    caller decide (best-effort lo traga, crítico lo propaga).
-
-    `fn` recibe la conexión y devuelve lo que quiera (rowcount, fila, None).
-    """
-    _lg = _logging.getLogger("betmexico.dashboard.db")
-    last = None
-    for attempt in range(1, attempts + 1):
-        try:
-            with db(write=True) as c:
-                return fn(c)
-        except sqlite3.OperationalError as e:
-            last = e
-            if "locked" not in str(e) or attempt == attempts:
-                raise
-            delay = base_delay * attempt  # 0.2, 0.4, 0.6…
-            _lg.warning(
-                f"[db] write retry {attempt}/{attempts} chocó con lock, "
-                f"reintentando en {delay:.1f}s"
-            )
-            time.sleep(delay)
-    raise last  # inalcanzable (attempt==attempts ya relanzó arriba)
+# Registro desacoplado de SQLite (elimina ciclos de importación con deposits y auto_deposit)
+from db_registry import (
+    DB_PATH,
+    db,
+    _db_write_with_retry,
+    _db_write_registry,
+    _db_write_registry_lock,
+)
 
 
 def _migrate():
@@ -693,8 +596,11 @@ app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
 _MAINTENANCE_FLAG_FILE = Path("/data/maintenance.flag")
+_MAINTENANCE_OVERRIDE: Optional[bool] = None
 
 def _is_maintenance_active() -> bool:
+    if _MAINTENANCE_OVERRIDE is not None:
+        return _MAINTENANCE_OVERRIDE
     if os.environ.get("BMX_MAINTENANCE", "").strip() in ("1", "true", "True"):
         return True
     return _MAINTENANCE_FLAG_FILE.exists()
@@ -3366,8 +3272,7 @@ async def account_refresh_api(account_id: int, _user: dict = Depends(require_ses
     except Exception:
         actor_id = 999999
 
-    from betmexico_db import BetmexicoDB
-    bldb = BetmexicoDB(Path(db_path))
+    from betmexico_db import db as bldb
     bldb.upsert_account(fresh_data, checked_by=actor_id)
 
     # Broadcast SSE
@@ -4404,7 +4309,9 @@ class MaintenanceToggleRequest(BaseModel):
 def admin_maintenance_toggle(req: MaintenanceToggleRequest, user: dict = Depends(require_session)):
     if user.get("role") != "superadmin":
         raise HTTPException(403, "Solo superadmin")
+    global _MAINTENANCE_OVERRIDE
     enabled = req.enabled
+    _MAINTENANCE_OVERRIDE = enabled
     os.environ["BMX_MAINTENANCE"] = "1" if enabled else "0"
     try:
         if enabled:

@@ -255,7 +255,7 @@ def test_cooldown_45s_enforced_for_same_account():
     with db(write=True) as c:
         c.execute("INSERT OR REPLACE INTO accounts (id, email, password, status, first_checked_at, last_checked_at) VALUES (903, 'cooldown_test@test.com', 'p', 'LIVE', '2026-07-01', '2026-07-01')")
         c.execute(
-            "INSERT INTO deposit_attempts (attempt_id, account_email, card_pipe, amount, status, operator_id, source, created_at) "
+            "INSERT OR REPLACE INTO deposit_attempts (attempt_id, account_email, card_pipe, amount, status, operator_id, source, created_at) "
             "VALUES ('att_cool_1', 'cooldown_test@test.com', '4111111111111111|1228|111', 50, 'rejected', 1, 'test', datetime('now', '-10 seconds'))"
         )
 

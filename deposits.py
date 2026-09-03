@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from auth import require_session
+from db_registry import DB_PATH, db, _db_write_with_retry
 
 logger = logging.getLogger("betmexico.dashboard.deposits")
 router = APIRouter(prefix="/api/deposits", tags=["deposits"])

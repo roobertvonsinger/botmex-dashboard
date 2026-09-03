@@ -19,6 +19,7 @@ import sqlite3
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Dict, List, Optional
+from db_registry import DB_PATH, db, _db_write_with_retry
 
 THREEDS_RECENT_H = 24  # 3DS en las últimas N horas → BIN penalizado
 

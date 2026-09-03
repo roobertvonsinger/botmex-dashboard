@@ -55,6 +55,7 @@ def H(monkeypatch):
                         lambda aid: {"id": aid, "email": f"acc{aid}@x.com", "password": "pw"})
     monkeypatch.setattr(ad, "_unlock", lambda aid: h.unlocked.append(aid))
     monkeypatch.setattr(ad, "_broadcast_mission", lambda *a, **k: None)
+    monkeypatch.setattr(ad, "_pull_fresh_live_account", lambda *a, **k: None)
 
     def _make_pool(cap_key, size=1, workers=1):
         p = FakePool()

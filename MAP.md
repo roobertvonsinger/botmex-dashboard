@@ -98,23 +98,24 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 592 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5528 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 5435 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 2303 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 2304 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `betmexico_config.py` | 183 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2960 | `—` | _[completar]_ |
 | `betmexico_deposit.py` | 958 | `—` | _[completar]_ |
 | `betmexico_login_api.py` | 1138 | `httpx` | _[completar]_ |
 | `betmexico_login_service.py` | 144 | `betmexico.login_service` | _[completar]_ |
-| `betmexico_payment_analyzer.py` | 492 | `—` | _[completar]_ |
+| `betmexico_payment_analyzer.py` | 592 | `—` | _[completar]_ |
 | `betmexico_utils.py` | 1159 | `—` | _[completar]_ |
 | `bin_intelligence.py` | 701 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
 | `card_checker.py` | 598 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 218 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
-| `deposits.py` | 3154 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `db_registry.py` | 110 | `betmexico.dashboard.db` | _[completar]_ |
+| `deposits.py` | 3155 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 389 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 236 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 918 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -179,6 +180,14 @@ prewarm.py (router)
 | `TXN_STATUS_FAILED` | `-4` | `betmexico_payment_analyzer.py` |
 | `TXN_TYPE_DEPOSIT` | `1` | `betmexico_payment_analyzer.py` |
 | `GATEWAY_CARD` | `1` | `betmexico_payment_analyzer.py` |
+| `A_NO_FAIL_DAYS_MIN` | `60` | `betmexico_payment_analyzer.py` |
+| `A_MAX_TOTAL_FAILS` | `3` | `betmexico_payment_analyzer.py` |
+| `A_MAX_BIGFAIL_SESS` | `0` | `betmexico_payment_analyzer.py` |
+| `D_RECENT_FAIL_DAYS` | `14` | `betmexico_payment_analyzer.py` |
+| `D_MASSACRE_COUNT` | `3` | `betmexico_payment_analyzer.py` |
+| `C_DEEP_REST_DAYS` | `90` | `betmexico_payment_analyzer.py` |
+| `SCORE_FLOOR` | `{"A": 80, "B": 60, "C": 40, "D": 0}` | `betmexico_payment_analyzer.py` |
+| `SCORE_CEIL` | `{"A": 100, "B": 79, "C": 59, "D": 39}` | `betmexico_payment_analyzer.py` |
 | `TXN_TYPE_MAP` | `{0: "⬇️", 1: "⬆️"}` | `betmexico_utils.py` |
 | `WABOX_STRIPE_PK` | `"pk_live_WQNz0qa1BmBu47grZwTpj8BR"` | `card_checker.py` |
 | `UTOPIA_CACHE_TTL_SEC` | `1800` | `card_checker.py` |
@@ -255,6 +264,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `3225aba` | docs: actualizar NEXT-SESSION con relevo dinamico, aviso cambio de cuenta y auditoria entrante |
 | `046cf69` | fix(bet): rotacion continua con relevo dinamico sin freezes, fail-fast en login y pool JIT |
 | `330d60a` | docs: ritual de cierre soberano, mapa y estado operativo actualizado |
 | `592945d` | feat: regla de oro 1:1 de tarjetas casadas, cooldown 45s por cuenta y saneamiento cuentas 429 DEAD |
@@ -266,7 +276,6 @@ prewarm.py (router)
 | `7a9bb1e` | docs(session): sync NEXT-SESSION with latest deposit unlock and UI transparency fixes |
 | `9cbb7af` | fix(deposits): unlock non-approved cards, bypass SA velocity check and surface real error details in UI |
 | `73888f2` | docs(vault): reubicar mapas Canvas en la raíz del vault BotMex |
-| `60c797e` | docs(canvas): agregar arquitectura visual soberana BotMex (Canvas N0, N1, Cambios e HTML interactivo) |
 <!-- GEN:end:recientes -->
 
 ---

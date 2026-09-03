@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-BetMexico Payment Analyzer — Algoritmo V7
-Pregunta central: ¿está baneada la pasarela de TARJETA en BetMexico?
+BetMexico Payment Analyzer — Algoritmo V10 (2026-05-22)
+Pregunta central: ¿está QUEMADA la pasarela de TARJETA en BetMexico?
 
-Reglas clave V7:
-- Solo transacciones de tarjeta (gateway=1, type/txn_type=1) afectan el score
-- SPEI, OXXO, retiros IGNORADOS completamente
-- Agrupa en sesiones de 60 min: fallo+éxito en misma sesión = problema de tarjeta (NO baneo)
-- Time decay ajustado: fallo 30-90 días es más severo (-30/40 pts)
-- Penalización por intensidad: si una sesión tiene >4 fallos, se castiga extra (metrallado)
-- Escala: A (70-100), B (40-69), C (0-39)
+V10 (canónico en repos/botmex-dashboard/shared/):
+- A: pasarela SANA — sin rechazos recientes y sin patrones de masacre.
+     Max 2 fails juntos en ventana de 2h, total ≤3 fails, último fail >60d
+     (o VIRGIN_CARD sin historial de tarjeta).
+- B: reparándose con el tiempo — tuvo fails pero ya descansó algo.
+- C: masacrada históricamente pero ya descansó >90d. Recovery incierto.
+- D: actualmente quemada (fail <14d) o crónicamente masacrada (≥3 sesiones
+     con 3+ fails en <60min).
+
+Notas:
+- Solo txns de tarjeta (gateway=1, type/txn_type=1) afectan grade
+- SPEI/OXXO/retiros IGNORADOS
+- Sesiones de 60 min: fail+éxito en misma = problema puntual, NO baneo
+- Success reciente NO es requisito para A (pasarela limpia puede no tener
+  intentos de tarjeta — sigue siendo sana)
 """
 
 import logging
@@ -30,23 +38,26 @@ TXN_STATUS_FAILED = -4
 TXN_TYPE_DEPOSIT = 1   # type=1 (API) / txn_type=1 (BD) → depósito
 GATEWAY_CARD = 1       # gateway=1 → tarjeta de crédito/débito
 
-# ── Grades V6 (sin D ni F) ────────────────────────────────────────
+# ── Grades V8 (escala A/B/C/D) ────────────────────────────────────
 GRADE_THRESHOLDS = [
-    (70, "A"),   # 70-100 — pasarela sana
-    (40, "B"),   # 40-69  — incierta / pocos datos
-    (0,  "C"),   # 0-39   — probablemente baneada (ROJO)
+    (80, "A"),   # 80-100 — pasarela sana, ideal
+    (60, "B"),   # 60-79  — buena, alta probabilidad de éxito
+    (40, "C"),   # 40-59  — cuidado, señales mixtas
+    (0,  "D"),   # 0-39   — pasarela probablemente quemada
 ]
 
 GRADE_EMOJI = {
     "A": "🟢",
-    "B": "🟡",
-    "C": "🔴",
+    "B": "🔵",
+    "C": "🟡",
+    "D": "🔴",
 }
 
 GRADE_LABEL = {
     "A": "Pasarela sana — ideal para testing",
-    "B": "Incierta — proceder con cuidado",
-    "C": "Pasarela probablemente baneada",
+    "B": "Buena — alta probabilidad de éxito",
+    "C": "Cuidado — señales mixtas",
+    "D": "Pasarela probablemente quemada",
 }
 
 
@@ -59,26 +70,48 @@ def _get_grade(score: int) -> str:
     return "C"
 
 
-def _activity_suffix(days_since: int) -> str:
-    """Sufijo basado en días desde última transacción de CUALQUIER tipo."""
-    if days_since < 2:
+def _activity_suffix(hours_since: float) -> str:
+    """Sufijo basado en horas desde última transacción de CUALQUIER tipo.
+    `!`  = caliente (<1h)  → ojo, no atropellar
+    `-`  = fresca (<24h)
+    `''` = normal (1-7d)
+    `+`  = vieja (8-30d)
+    `++` = muy vieja (>30d)
+    """
+    if hours_since < 1:
+        return "!"
+    if hours_since < 24:
         return "-"
-    elif days_since <= 7:
+    days = hours_since / 24
+    if days <= 7:
         return ""
-    elif days_since <= 30:
+    elif days <= 30:
         return "+"
     else:
         return "++"
 
 
 def _parse_txn_date(date_str: str) -> Optional[datetime]:
-    """Parsea fecha de transacción en varios formatos."""
+    """Parsea fecha de transacción en varios formatos.
+    V10: tolerante a microsegundos de cualquier longitud (BD tiene `.94907` con 5 dígitos
+    que rompe fromisoformat en Python <3.11)."""
     if not date_str:
         return None
+    s = date_str.strip().replace("Z", "+00:00")
     try:
-        return datetime.fromisoformat(date_str.replace("Z", "+00:00")).replace(tzinfo=None)
+        return datetime.fromisoformat(s).replace(tzinfo=None)
     except Exception:
         pass
+    # Normalizar microsegundos a 6 dígitos exactos
+    import re
+    m = re.match(r"^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})\.(\d+)(.*)$", s)
+    if m:
+        head, micro, tail = m.group(1), m.group(2), m.group(3)
+        micro = (micro + "000000")[:6]  # pad o truncar a 6 dígitos
+        try:
+            return datetime.fromisoformat(f"{head}.{micro}{tail}").replace(tzinfo=None)
+        except Exception:
+            pass
     for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d"]:
         try:
             return datetime.strptime(date_str.strip(), fmt)
@@ -126,13 +159,13 @@ def _is_card_deposit(t: Dict) -> bool:
 def _group_into_sessions(card_items: List[Dict], now: datetime) -> List[Dict]:
     """
     Agrupa transacciones de tarjeta en sesiones de 60 minutos.
-    Una sesión es un conjunto de transacciones dentro de una ventana de 60 min.
+    Resolución horaria (no diaria) — distingue 1h de 23h.
 
-    Retorna lista de sesiones ordenadas de más reciente a más antigua.
-    Cada sesión: {days_ago, has_success, has_fail, size}
+    Cada sesión: {hours_ago, days_ago, has_success, has_fail, size,
+                  fail_count, span_minutes}
+    span_minutes = duración de la ráfaga (para detectar metrallado fino).
     """
-    # Parsear y ordenar newest-first
-    dated: List[Tuple[datetime, int]] = []  # (dt, status)
+    dated: List[Tuple[datetime, int]] = []
     for item in card_items:
         dt, _, _, status = _get_txn_fields(item)
         if dt is not None:
@@ -141,31 +174,35 @@ def _group_into_sessions(card_items: List[Dict], now: datetime) -> List[Dict]:
         return []
     dated.sort(key=lambda x: x[0], reverse=True)
 
+    def _close_session(anchor_dt, oldest_dt, statuses):
+        hours_ago = max(0.0, (now - anchor_dt).total_seconds() / 3600)
+        span = max(0.0, (anchor_dt - oldest_dt).total_seconds() / 60)
+        return {
+            "hours_ago": hours_ago,
+            "days_ago": int(hours_ago // 24),
+            "has_success": TXN_STATUS_SUCCESS in statuses,
+            "has_fail": TXN_STATUS_FAILED in statuses,
+            "fail_count": sum(1 for s in statuses if s == TXN_STATUS_FAILED),
+            "size": len(statuses),
+            "span_minutes": span,
+        }
+
     sessions = []
-    anchor_dt, _ = dated[0]
+    anchor_dt, _ = dated[0]   # más reciente de la sesión actual
+    oldest_dt = anchor_dt
     sess_statuses = [dated[0][1]]
 
     for dt, status in dated[1:]:
-        diff_min = (anchor_dt - dt).total_seconds() / 60
-        if diff_min <= 60:
-            # Mismo bloque temporal → misma sesión
+        if (anchor_dt - dt).total_seconds() / 60 <= 60:
             sess_statuses.append(status)
+            oldest_dt = dt
         else:
-            sessions.append({
-                "days_ago": max(0, (now - anchor_dt).days),
-                "has_success": TXN_STATUS_SUCCESS in sess_statuses,
-                "has_fail": TXN_STATUS_FAILED in sess_statuses,
-                "size": len(sess_statuses),
-            })
+            sessions.append(_close_session(anchor_dt, oldest_dt, sess_statuses))
             anchor_dt = dt
+            oldest_dt = dt
             sess_statuses = [status]
 
-    sessions.append({
-        "days_ago": max(0, (now - anchor_dt).days),
-        "has_success": TXN_STATUS_SUCCESS in sess_statuses,
-        "has_fail": TXN_STATUS_FAILED in sess_statuses,
-        "size": len(sess_statuses),
-    })
+    sessions.append(_close_session(anchor_dt, oldest_dt, sess_statuses))
     return sessions
 
 
@@ -174,24 +211,48 @@ def _group_into_sessions(card_items: List[Dict], now: datetime) -> List[Dict]:
 #  Filosofía: detectar baneo silencioso de pasarela de tarjeta
 # ═══════════════════════════════════════════════════════════════════
 
+def _pure_fail_penalty(hours_ago: float, is_most_recent: bool) -> float:
+    """Penalty por sesión pure-fail (usado para SCORE numérico, informativo).
+    El grade real V10 se decide por reglas explícitas, no por score."""
+    if hours_ago < 6:        base = 14
+    elif hours_ago < 24:     base = 12
+    elif hours_ago < 72:     base = 10
+    elif hours_ago < 168:    base = 8
+    elif hours_ago < 720:    base = 6
+    elif hours_ago < 2160:   base = 4
+    else:                    base = 2
+    return base if is_most_recent else base * 0.6
+
+
+def _last_success_bonus(hours_ago: float) -> int:
+    """Bonus informativo para score (no decide grade en V10)."""
+    if hours_ago < 168:      return 30
+    if hours_ago < 720:      return 25
+    if hours_ago < 2160:     return 10
+    if hours_ago < 8760:     return 5
+    return 2
+
+
+# === V10 thresholds (regla canónica del grade) ============================
+A_NO_FAIL_DAYS_MIN = 60      # A: último fail debe estar a ≥60 días
+A_MAX_TOTAL_FAILS  = 3       # A: total de fails de tarjeta históricos ≤ 3
+A_MAX_BIGFAIL_SESS = 0       # A: 0 sesiones con 3+ fails (max 2 juntos)
+D_RECENT_FAIL_DAYS = 14      # D: fail en últimos 14 días → quemada AHORA
+D_MASSACRE_COUNT   = 3       # D: ≥3 sesiones machine-gun → crónicamente quemada
+C_DEEP_REST_DAYS   = 90      # C: pasaron ≥90 días desde último fail (+ historial malo)
+SCORE_FLOOR = {"A": 80, "B": 60, "C": 40, "D": 0}
+SCORE_CEIL  = {"A": 100, "B": 79, "C": 59, "D": 39}
+
+
 def score_payment_readiness(details: Dict) -> Optional[Dict]:
     """
-    Algoritmo V6: evalúa salud de la pasarela de TARJETA de una cuenta.
-
-    Args:
-        details: Dict con key "transactions" → {fetched, items, total_rows}
-                 Soporta items del API crudo (key "type") o de BD (key "txn_type")
-
-    Returns:
-        Dict con score, grade, activity_suffix, grade_display, flags, breakdown
-        None si no hay datos de transacciones disponibles
+    Algoritmo V8: evalúa salud de la PASARELA de tarjeta.
+    Filosofía: que el operador no pierda tiempo en pasarelas quemadas.
     """
     if "transactions" not in details:
         return None
 
     txn_data = details["transactions"]
-
-    # fetched=False = el fetch de API falló. Si no está seteado, asumimos válido.
     if txn_data.get("fetched") is False:
         return None
 
@@ -199,19 +260,19 @@ def score_payment_readiness(details: Dict) -> Optional[Dict]:
     total_rows = txn_data.get("total_rows", len(items))
     now = datetime.now()
 
-    # ── Sufijo de actividad (cualquier tipo de txn) ───────────────
+    # ── Sufijo de actividad: usa la última txn de cualquier tipo ──
     last_activity_dt: Optional[datetime] = None
     for item in items:
         dt = _parse_txn_date(item.get("date") or item.get("txn_date") or "")
         if dt and (last_activity_dt is None or dt > last_activity_dt):
             last_activity_dt = dt
-    days_since_activity = (now - last_activity_dt).days if last_activity_dt else 999
-    suffix = _activity_suffix(days_since_activity)
+    hours_since_activity = (now - last_activity_dt).total_seconds() / 3600 if last_activity_dt else 999_999.0
+    suffix = _activity_suffix(hours_since_activity)
 
-    # ── Filtrar solo transacciones de tarjeta ─────────────────────
+    # ── Filtrar solo depósitos con tarjeta ────────────────────────
     card_items = [t for t in items if _is_card_deposit(t)]
 
-    # Cuenta virgen de tarjeta → A (pasarela desconocida pero sin historial negativo)
+    # Cuenta virgen de tarjeta → A (pasarela sin historial negativo)
     if not card_items:
         return {
             "score": 100,
@@ -225,94 +286,132 @@ def score_payment_readiness(details: Dict) -> Optional[Dict]:
                 "card_sessions": 0,
                 "pure_fail_sessions": 0,
                 "success_sessions": 0,
-                "days_since_last_activity": days_since_activity,
-                "days_since_last_success": 999,
+                "hours_since_last_activity": round(hours_since_activity, 1),
+                "hours_since_last_success": None,
             },
         }
 
-    # ── Agrupar en sesiones de 60 min ─────────────────────────────
+    # ── Agrupar en sesiones (resolución horaria) ──────────────────
     sessions = _group_into_sessions(card_items, now)
 
     success_sessions = [s for s in sessions if s["has_success"]]
     pure_fail_sessions = [s for s in sessions if not s["has_success"] and s["has_fail"]]
     mixed_sessions = [s for s in sessions if s["has_success"] and s["has_fail"]]
 
-    score = 100
+    score = 100.0
     flags: List[str] = []
 
-    # ── 1. Penalizaciones: SOLO sesiones puras de fallo ───────────
-    #    Fallo + éxito en misma sesión = problema de tarjeta (no baneo)
-    pure_fail_by_recency = sorted(pure_fail_sessions, key=lambda s: s["days_ago"])
+    # ── 1. Penalty suave por sesiones pure-fail (recientes pesan más) ──
+    pure_fail_by_recency = sorted(pure_fail_sessions, key=lambda s: s["hours_ago"])
     for i, sess in enumerate(pure_fail_by_recency):
-        days = sess["days_ago"]
+        h = sess["hours_ago"]
+        penalty = _pure_fail_penalty(h, i == 0)
+
+        # Metrallado fino (sentido común):
+        # - 2 fails en <5min  → +5 penalty extra
+        # - 3+ fails en <60min → +10 penalty extra
         size = sess.get("size", 1)
-        
-        # Penalización base por recencia
-        if days <= 7:
-            base = 50
-        elif days <= 30:
-            base = 40
-        elif days <= 90:
-            base = 32 # "Mitad" entre 15 y 50 approx
-        elif days <= 365:
-            base = 10
-        else:
-            base = 5
+        span = sess.get("span_minutes", 0)
+        fc = sess.get("fail_count", size)
+        if fc >= 3 and span <= 60:
+            penalty += 10
+            flags.append(f"MACHINE_GUN_3x60m")
+        elif fc >= 2 and span <= 5:
+            penalty += 0
+            flags.append(f"MACHINE_GUN_2x5m")
 
-        # Penalización por intensidad (Metrallado)
-        # Si tiene > 4 fallos en una sesión, castigar extra
-        intensity_extra = 0
-        if size > 4:
-            intensity_extra = min((size - 4) * 2, 40)
-            flags.append(f"MACHINE_GUN_{size}x")
-
-        # La sesión más reciente paga el 100%, las demás el 50%
-        penalty = (base + intensity_extra) if i == 0 else (base + intensity_extra) * 0.5
         score -= penalty
-        flags.append(f"PURE_FAIL_{days}d")
+        flags.append(f"PURE_FAIL_{int(h)}h")
 
-    # ── 2. Penalización mínima: sesiones mixtas ───────────────────
-    mixed_penalty = min(len(mixed_sessions) * 10, 25)
-    if mixed_penalty > 0:
-        score -= mixed_penalty
-        flags.append("MIXED_SESSIONS")
+    # ── 2. Mixed sessions ─────────────────────────────────────────
+    # Si la más reciente es mixed con éxito → es señal de recovery, NO penaliza.
+    # Mixed antiguas → leve penalty (-3 c/u, max -10)
+    if mixed_sessions:
+        # ¿la más reciente es mixed?
+        most_recent_is_mixed = sessions[0]["has_success"] and sessions[0]["has_fail"]
+        old_mixed = len(mixed_sessions) - (1 if most_recent_is_mixed else 0)
+        if old_mixed > 0:
+            mp = min(old_mixed * 3, 10)
+            score -= mp
+            flags.append(f"MIXED_OLD_{old_mixed}")
 
-    # ── 3. Bonos: sesiones exitosas ───────────────────────────────
-    days_since_last_success = 999
+    # ── 3. Bono dominante: última transacción de tarjeta = ÉXITO ──
+    # Esta es la señal clave: si lo último fue OK, la pasarela sigue jugando.
+    hours_since_last_success: Optional[float] = None
     if success_sessions:
-        days_since_last_success = min(s["days_ago"] for s in success_sessions)
-        if days_since_last_success <= 7:
-            score += 25
-            flags.append("SUCCESS_7D")
-        elif days_since_last_success <= 30:
-            score += 15
-            flags.append("SUCCESS_30D")
-        elif days_since_last_success <= 90:
-            score += 5
-            flags.append("SUCCESS_90D")
-
-    # Bono recovery: la sesión más reciente de tarjeta fue exitosa
-    # (después de haber tenido sesiones puras de fallo en el pasado)
-    if sessions and sessions[0]["has_success"] and pure_fail_sessions:
-        score += 15
-        flags.append("RECOVERY_CONFIRMED")
+        hours_since_last_success = min(s["hours_ago"] for s in success_sessions)
+        # ¿La sesión más reciente fue exitosa (incluye mixed)?
+        if sessions[0]["has_success"]:
+            bonus = _last_success_bonus(sessions[0]["hours_ago"])
+            score += bonus
+            flags.append(f"LAST_TXN_OK")
+        else:
+            # Hay éxitos pero no en la sesión más reciente — bono parcial
+            bonus = _last_success_bonus(hours_since_last_success) // 2
+            score += bonus
+            flags.append(f"PAST_SUCCESS")
 
     # Bono historial: múltiples sesiones exitosas
     if len(success_sessions) >= 3:
         score += 5
         flags.append("MULTI_SUCCESS")
 
-    # ── 4. Cap: datos insuficientes → máximo B ────────────────────
-    if len(sessions) < 2:
-        score = min(score, 69)
-        flags.append("INSUFFICIENT_DATA")
+    # Score numérico (informativo). El GRADE V10 se decide abajo por reglas.
+    score_int = max(0, min(100, int(round(score))))
 
-    # Clamp y grade
-    score = max(0, min(100, int(score)))
-    grade = _get_grade(score)
+    # ────────────────────────────────────────────────────────────────
+    # V10: GRADE por reglas explícitas sobre el estado de la pasarela
+    # ────────────────────────────────────────────────────────────────
+    days_since_last_fail = None
+    if pure_fail_sessions:
+        days_since_last_fail = min(s["hours_ago"] for s in pure_fail_sessions) / 24
+
+    total_card_fails = sum(s.get("fail_count", 0) for s in pure_fail_sessions)
+    bigfail_session_count = sum(
+        1 for s in pure_fail_sessions if s.get("fail_count", 0) >= 3
+    )
+    massacre_60m_count = sum(
+        1 for s in pure_fail_sessions
+        if s.get("fail_count", 0) >= 3 and s.get("span_minutes", 0) <= 60
+    )
+
+    # ¿Lo MÁS RECIENTE con tarjeta fue una aprobación limpia? (la última sesión de
+    # tarjeta es éxito puro, sin fail). Señal DOMINANTE de recuperación: la pasarela
+    # está demostrando que FUNCIONA AHORA. Robert 2026-07-09: "cada depósito aprobado
+    # con tarjeta (en el dashboard o detectado de BetMexico) sana la percepción; si
+    # las 1-2 txns más recientes son aprobadas, empuja a A" — por encima de fails
+    # viejos. Una sesión = ventana de 60min, así que cubre "1 o 2 aprobados seguidos".
+    recent_pure_success = bool(
+        sessions and sessions[0]["has_success"] and not sessions[0]["has_fail"]
+    )
+
+    if recent_pure_success:
+        grade, _reason = "A", "RECUPERADA_APROBACION_RECIENTE"
+    elif days_since_last_fail is None:
+        # Sin pure-fail sessions (puede tener fails mezclados con éxito en misma sesión = ok)
+        grade, _reason = "A", "NO_PURE_FAILS"
+    elif days_since_last_fail < D_RECENT_FAIL_DAYS:
+        grade, _reason = "D", f"FAIL_RECIENTE_{int(days_since_last_fail)}D"
+    elif massacre_60m_count >= D_MASSACRE_COUNT:
+        grade, _reason = "D", f"CRONICAMENTE_MASACRADA_{massacre_60m_count}x"
+    elif (days_since_last_fail >= A_NO_FAIL_DAYS_MIN
+          and total_card_fails <= A_MAX_TOTAL_FAILS
+          and bigfail_session_count <= A_MAX_BIGFAIL_SESS):
+        grade, _reason = "A", f"SANA_{int(days_since_last_fail)}D"
+    elif bigfail_session_count >= 1 or total_card_fails >= 5:
+        # M7: masacre (3+ fails en sesión) o ≥5 fails totales → SIEMPRE C.
+        # No sube a B por paso del tiempo: una masacre es señal permanente de daño.
+        tag = "DESCANSADA" if days_since_last_fail >= C_DEEP_REST_DAYS else "RECIENTE"
+        grade, _reason = "C", f"MASACRADA_{tag}_{int(days_since_last_fail)}D"
+    else:
+        grade, _reason = "B", "REPARANDOSE"
+
+    flags.append(f"V10_{_reason}")
+    # Ajustar score al rango del grade decidido (UI muestra grade + score)
+    score_int = max(SCORE_FLOOR[grade], min(SCORE_CEIL[grade], score_int))
 
     return {
-        "score": score,
+        "score": score_int,
         "grade": grade,
         "activity_suffix": suffix,
         "grade_display": grade + suffix,
@@ -323,8 +422,9 @@ def score_payment_readiness(details: Dict) -> Optional[Dict]:
             "card_sessions": len(sessions),
             "pure_fail_sessions": len(pure_fail_sessions),
             "success_sessions": len(success_sessions),
-            "days_since_last_activity": days_since_activity,
-            "days_since_last_success": days_since_last_success,
+            "mixed_sessions": len(mixed_sessions),
+            "hours_since_last_activity": round(hours_since_activity, 1),
+            "hours_since_last_success": round(hours_since_last_success, 1) if hours_since_last_success is not None else None,
         },
     }
 
