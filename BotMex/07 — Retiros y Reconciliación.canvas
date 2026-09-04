@@ -1,62 +1,149 @@
 {
-  "nodes": [
-    {
-      "id": "wd_g",
-      "type": "group",
-      "label": "FLUJO DE RETIROS Y SPEI",
-      "x": -400,
-      "y": -300,
-      "width": 900,
-      "height": 450,
-      "color": "4"
-    },
-    {
-      "id": "wd_detect",
-      "type": "text",
-      "x": -360,
-      "y": -240,
-      "width": 240,
-      "height": 140,
-      "color": "6",
-      "text": "### 1. Detección de Balance\nRefresco detecta balance acreditable > $0 y sin bloqueo de autolock."
-    },
-    {
-      "id": "wd_clabe",
-      "type": "text",
-      "x": -70,
-      "y": -240,
-      "width": 240,
-      "height": 140,
-      "color": "4",
-      "text": "### 2. Validación STP / CLABE\nVerifica CLABE de 18 dígitos y CURP del titular asociado a la cuenta."
-    },
-    {
-      "id": "wd_disperse",
-      "type": "text",
-      "x": 220,
-      "y": -240,
-      "width": 240,
-      "height": 140,
-      "color": "4",
-      "text": "### 3. Dispersión y Ficha\nActualiza cuenta a `withdrawn`, resta saldo y genera ficha 1-tap copy al bot."
-    }
-  ],
-  "edges": [
-    {
-      "id": "wde1",
-      "fromNode": "wd_detect",
-      "fromSide": "right",
-      "toNode": "wd_clabe",
-      "toSide": "left",
-      "color": "6"
-    },
-    {
-      "id": "wde2",
-      "fromNode": "wd_clabe",
-      "fromSide": "right",
-      "toNode": "wd_disperse",
-      "toSide": "left",
-      "color": "4"
-    }
-  ]
+	"nodes": [
+		{
+			"id": "wd_g_exec",
+			"type": "group",
+			"label": "1. TRIGGER Y EJECUCIÓN DEL RETIRO",
+			"x": -700,
+			"y": -350,
+			"width": 640,
+			"height": 450,
+			"color": "6"
+		},
+		{
+			"id": "wd_g_recon",
+			"type": "group",
+			"label": "2. RECONCILIACIÓN (60s) Y FICHA SPEI FINAL",
+			"x": 0,
+			"y": -350,
+			"width": 950,
+			"height": 450,
+			"color": "4"
+		},
+		{
+			"id": "wd_trigger",
+			"type": "text",
+			"x": -660,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "5",
+			"text": "### 💰 1. Detección de Balance\nCuenta con saldo acreditable > $0. Trigger manual desde web o Telegram."
+		},
+		{
+			"id": "wd_lock",
+			"type": "text",
+			"x": -660,
+			"y": -90,
+			"width": 260,
+			"height": 160,
+			"color": "6",
+			"text": "### 🔒 2. Bloqueo Atómico\n`auto_lock_for_deposit` previene condiciones de carrera con nuevos depósitos."
+		},
+		{
+			"id": "wd_clabe",
+			"type": "text",
+			"x": -360,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "3",
+			"text": "### 🏦 3. Validación CLABE STP\nVerifica 18 dígitos bancarios y correspondencia con la CURP del titular registrado."
+		},
+		{
+			"id": "wd_exec",
+			"type": "text",
+			"x": -360,
+			"y": -90,
+			"width": 260,
+			"height": 160,
+			"color": "6",
+			"text": "### ⚡ 4. Ejecución en Pasarela\nLlama a BetMexico API y persiste la institución bancaria devuelta en la respuesta."
+		},
+		{
+			"id": "wd_loop",
+			"type": "text",
+			"x": 40,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "6",
+			"text": "### 🔄 5. Loop Reconciliador (60s)\n`_withdrawal_resolution_loop` consulta el estado de retiros pendientes en el servidor."
+		},
+		{
+			"id": "wd_sse",
+			"type": "text",
+			"x": 340,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "5",
+			"text": "### 📡 6. Broadcast SSE\nEmite evento `withdrawal` actualizando el grid del operador en tiempo real."
+		},
+		{
+			"id": "wd_spei",
+			"type": "text",
+			"x": 640,
+			"y": -300,
+			"width": 270,
+			"height": 180,
+			"color": "4",
+			"text": "### 📱 7. Ficha SPEI 1-Tap Copy\nGenera la tarjeta visual con CURP + CLABE STP para copiar en 1 solo tap desde el celular."
+		}
+	],
+	"edges": [
+		{
+			"id": "wde_trig_lock",
+			"fromNode": "wd_trigger",
+			"fromSide": "bottom",
+			"toNode": "wd_lock",
+			"toSide": "top",
+			"color": "6"
+		},
+		{
+			"id": "wde_lock_clabe",
+			"fromNode": "wd_lock",
+			"fromSide": "right",
+			"toNode": "wd_clabe",
+			"toSide": "bottom",
+			"color": "3"
+		},
+		{
+			"id": "wde_clabe_exec",
+			"fromNode": "wd_clabe",
+			"fromSide": "bottom",
+			"toNode": "wd_exec",
+			"toSide": "top",
+			"color": "6"
+		},
+		{
+			"id": "wde_exec_loop",
+			"fromNode": "wd_exec",
+			"fromSide": "right",
+			"toNode": "wd_loop",
+			"toSide": "bottom",
+			"color": "6"
+		},
+		{
+			"id": "wde_loop_sse",
+			"fromNode": "wd_loop",
+			"fromSide": "right",
+			"toNode": "wd_sse",
+			"toSide": "left",
+			"color": "5"
+		},
+		{
+			"id": "wde_sse_spei",
+			"fromNode": "wd_sse",
+			"fromSide": "right",
+			"toNode": "wd_spei",
+			"toSide": "left",
+			"color": "4",
+			"label": "Aprobado"
+		}
+	],
+	"metadata": {
+		"version": "1.0-1.0",
+		"frontmatter": {}
+	}
 }

@@ -264,6 +264,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `2ce5a83` | feat(api): endpoint publico /api/health/ping para healthchecks y watchdogs |
 | `e0e8961` | refactor(core): saneamiento integral de deuda tecnica, unificacion V10 y desacoplamiento sqlite |
 | `3225aba` | docs: actualizar NEXT-SESSION con relevo dinamico, aviso cambio de cuenta y auditoria entrante |
 | `046cf69` | fix(bet): rotacion continua con relevo dinamico sin freezes, fail-fast en login y pool JIT |
@@ -275,7 +276,6 @@ prewarm.py (router)
 | `16afd94` | chore(reorg): mover 35 tests a tests/, purgar DBs fantasma y alinear canvas |
 | `92ed3a1` | skills: suite oficial obsidian instalada en botmex-dashboard |
 | `7a9bb1e` | docs(session): sync NEXT-SESSION with latest deposit unlock and UI transparency fixes |
-| `9cbb7af` | fix(deposits): unlock non-approved cards, bypass SA velocity check and surface real error details in UI |
 <!-- GEN:end:recientes -->
 
 ---

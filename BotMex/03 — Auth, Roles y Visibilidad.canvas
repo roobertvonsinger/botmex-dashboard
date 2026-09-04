@@ -1,63 +1,153 @@
 {
-  "nodes": [
-    {
-      "id": "au_g",
-      "type": "group",
-      "label": "CONTROL DE ACCESO Y ROLES",
-      "x": -400,
-      "y": -300,
-      "width": 850,
-      "height": 400,
-      "color": "6"
-    },
-    {
-      "id": "au_sess",
-      "type": "text",
-      "x": -360,
-      "y": -240,
-      "width": 240,
-      "height": 140,
-      "color": "6",
-      "text": "### 1. Sesión HTTP\nCookie HMAC / JWT firmada. Valida en cada request vía dependencias FastAPI."
-    },
-    {
-      "id": "au_role",
-      "type": "text",
-      "x": -70,
-      "y": -240,
-      "width": 240,
-      "height": 140,
-      "color": "3",
-      "text": "### 2. Evaluación de Rol\n- `is_superadmin == 1` → Acceso total\n- Operador normal → Filtrado estricto por `telegram_id`."
-    },
-    {
-      "id": "au_guard",
-      "type": "text",
-      "x": 220,
-      "y": -240,
-      "width": 200,
-      "height": 140,
-      "color": "1",
-      "text": "### 3. Guardrail 403\nCualquier intento de cruzar cuentas de otro operador emite 403 Forbidden y alerta de auditoría."
-    }
-  ],
-  "edges": [
-    {
-      "id": "aue1",
-      "fromNode": "au_sess",
-      "fromSide": "right",
-      "toNode": "au_role",
-      "toSide": "left",
-      "color": "6"
-    },
-    {
-      "id": "aue2",
-      "fromNode": "au_role",
-      "fromSide": "right",
-      "toNode": "au_guard",
-      "toSide": "left",
-      "color": "1",
-      "label": "Violación"
-    }
-  ]
+	"nodes": [
+		{
+			"id": "g_auth_flow",
+			"type": "group",
+			"label": "1. FLUJO DE AUTENTICACIÓN Y AUTORIZACIÓN",
+			"x": -700,
+			"y": -350,
+			"width": 640,
+			"height": 450,
+			"color": "6"
+		},
+		{
+			"id": "g_guards",
+			"type": "group",
+			"label": "2. MATRIZ DE AISLAMIENTO Y GUARDRAILS",
+			"x": 0,
+			"y": -350,
+			"width": 950,
+			"height": 450,
+			"color": "3"
+		},
+		{
+			"id": "au_req",
+			"type": "text",
+			"x": -660,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "5",
+			"text": "### 🌐 1. Petición HTTP\nPetición entrante a endpoints protegidos del dashboard o API."
+		},
+		{
+			"id": "au_sess",
+			"type": "text",
+			"x": -660,
+			"y": -90,
+			"width": 260,
+			"height": 160,
+			"color": "6",
+			"text": "### 🔐 2. Cookie HMAC\n`web_auth.py` verifica la firma y vigencia de la cookie de sesión."
+		},
+		{
+			"id": "au_eval",
+			"type": "text",
+			"x": -360,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "3",
+			"text": "### ⚖️ 3. Clasificador de Rol\nDetermina privilegios:\n- ¿`is_superadmin == 1`?\n- ¿Operador normal autenticado?"
+		},
+		{
+			"id": "au_login_redir",
+			"type": "text",
+			"x": -360,
+			"y": -90,
+			"width": 260,
+			"height": 160,
+			"color": "2",
+			"text": "### 🚪 4. Redirigir `/login`\nSi la cookie expiró o no existe, redirige con 302 hacia el formulario de acceso."
+		},
+		{
+			"id": "au_sa_pass",
+			"type": "text",
+			"x": 40,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "4",
+			"text": "### 👑 5. Acceso Superadmin\nVisibilidad completa sobre cuentas globales, visor de logs y degradación con `?view_as=`."
+		},
+		{
+			"id": "au_op_pass",
+			"type": "text",
+			"x": 340,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "4",
+			"text": "### 👤 6. Aislamiento Operador\nFiltra estrictamente `WHERE operator_id = user.id`. Prohibido cruce de datos."
+		},
+		{
+			"id": "au_forbid",
+			"type": "text",
+			"x": 640,
+			"y": -300,
+			"width": 270,
+			"height": 180,
+			"color": "1",
+			"text": "### 🛑 7. Guardrail 403\nSi un operador intenta consultar o manipular cuentas ajenas:\n- Emite HTTP 403 Forbidden.\n- Escribe log de auditoría inmediato."
+		}
+	],
+	"edges": [
+		{
+			"id": "aue_req_sess",
+			"fromNode": "au_req",
+			"fromSide": "bottom",
+			"toNode": "au_sess",
+			"toSide": "top",
+			"color": "5"
+		},
+		{
+			"id": "aue_sess_eval",
+			"fromNode": "au_sess",
+			"fromSide": "right",
+			"toNode": "au_eval",
+			"toSide": "bottom",
+			"color": "6",
+			"label": "Válida"
+		},
+		{
+			"id": "aue_sess_login",
+			"fromNode": "au_sess",
+			"fromSide": "right",
+			"toNode": "au_login_redir",
+			"toSide": "left",
+			"color": "2",
+			"label": "Inválida"
+		},
+		{
+			"id": "aue_eval_sa",
+			"fromNode": "au_eval",
+			"fromSide": "right",
+			"toNode": "au_sa_pass",
+			"toSide": "left",
+			"color": "4",
+			"label": "Superadmin"
+		},
+		{
+			"id": "aue_eval_op",
+			"fromNode": "au_eval",
+			"fromSide": "right",
+			"toNode": "au_op_pass",
+			"toSide": "left",
+			"color": "4",
+			"label": "Operador"
+		},
+		{
+			"id": "aue_op_forbid",
+			"fromNode": "au_op_pass",
+			"fromSide": "right",
+			"toNode": "au_forbid",
+			"toSide": "left",
+			"color": "1",
+			"label": "Intento ajeno"
+		}
+	],
+	"metadata": {
+		"version": "1.0-1.0",
+		"frontmatter": {}
+	}
 }

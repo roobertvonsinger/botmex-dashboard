@@ -1,384 +1,51 @@
 {
-  "nodes": [
-    {
-      "id": "g_canales",
-      "type": "group",
-      "label": "ENTRADAS / CANALES",
-      "x": -640,
-      "y": -700,
-      "width": 1260,
-      "height": 220,
-      "color": "5"
-    },
-    {
-      "id": "g_control",
-      "type": "group",
-      "label": "CAPA DE CONTROL Y EVENTOS",
-      "x": -640,
-      "y": -450,
-      "width": 1260,
-      "height": 210,
-      "color": "6"
-    },
-    {
-      "id": "g_motor",
-      "type": "group",
-      "label": "MOTOR DE NEGOCIO",
-      "x": -640,
-      "y": -210,
-      "width": 1260,
-      "height": 270,
-      "color": "6"
-    },
-    {
-      "id": "g_servicios",
-      "type": "group",
-      "label": "SERVICIOS Y ESTADO",
-      "x": -640,
-      "y": 90,
-      "width": 1260,
-      "height": 220,
-      "color": "4"
-    },
-    {
-      "id": "g_integraciones",
-      "type": "group",
-      "label": "INTEGRACIONES EXTERNAS / INFRAESTRUCTURA",
-      "x": -640,
-      "y": 340,
-      "width": 1260,
-      "height": 210
-    },
-    {
-      "id": "g_cambios",
-      "type": "group",
-      "label": "ÁREA DE CAMBIOS Y GUARDRAILS",
-      "x": 660,
-      "y": -450,
-      "width": 380,
-      "height": 450,
-      "color": "3"
-    },
-    {
-      "id": "n_tg_bot",
-      "type": "text",
-      "x": -590,
-      "y": -660,
-      "width": 540,
-      "height": 150,
-      "color": "5",
-      "text": "### 📱 Telegram Bot\n**Entrada:** Comandos `/start`, `/bet`, `/check`, `/adduser`.\n**Decisión central:** `confirm_gate` y roles de operador.\n**Modifica:** Mensaje de misión en vivo en Telegram.\n**Comunica:** Alertas terminales y ficha SPEI con STP.\n→ Abrir Canvas Detalle: [[01 — Telegram Bot.canvas]]"
-    },
-    {
-      "id": "n_dash_web",
-      "type": "text",
-      "x": 40,
-      "y": -660,
-      "width": 540,
-      "height": 150,
-      "color": "5",
-      "text": "### 🖥️ Dashboard / Portal Web\n**Entrada:** Navegador de operadores (`/user/{id}`) y SA (`/dashboard`).\n**Decisión central:** Rol y degradación `?view_as=`.\n**Modifica:** Cuentas activas, triggers manuales.\n**Comunica:** SSE en vivo y log console.\n→ Abrir Canvas Detalle: [[02 — Dashboard y Portal.canvas]]"
-    },
-    {
-      "id": "n_auth_roles",
-      "type": "text",
-      "x": -590,
-      "y": -410,
-      "width": 540,
-      "height": 140,
-      "color": "6",
-      "text": "### 🔐 Auth, Roles y Visibilidad\n**Entrada:** Cookies de sesión y headers en FastAPI.\n**Decisión central:** Aislar cuentas por operador; SA ve todo.\n**Modifica:** Contexto del usuario autenticado.\n**Comunica:** Redirige a `/login` o 403 Forbidden.\n→ Abrir Canvas Detalle: [[03 — Auth, Roles y Visibilidad.canvas]]"
-    },
-    {
-      "id": "n_events_sse",
-      "type": "text",
-      "x": 40,
-      "y": -410,
-      "width": 540,
-      "height": 140,
-      "color": "6",
-      "text": "### 📡 Eventos SSE / Broadcast\n**Entrada:** Eventos de progreso, refresco y logs.\n**Decisión central:** Distribución en tiempo real por `telegram_id`.\n**Modifica:** Colas en memoria `_sse_queues` en `app.py`.\n**Comunica:** Streams `/api/stream` hacia web y bot.\n→ Abrir Canvas Detalle: [[08 — BD, Eventos e Infraestructura.canvas]]"
-    },
-    {
-      "id": "n_flow_bet",
-      "type": "text",
-      "x": -590,
-      "y": -170,
-      "width": 260,
-      "height": 190,
-      "color": "6",
-      "text": "### 💳 Flujo /bet\n**Entrada:** Lote de CCs (`pipes`).\n**Decisión:** Valida lote, genera `mission_id` y encola cuentas.\n**Modifica:** Estado de misión.\n**Comunica:** Progreso % en vivo.\n→ Abrir: [[04 — Flujo Auto-deposit.canvas]]"
-    },
-    {
-      "id": "n_auto_deposit",
-      "type": "text",
-      "x": -290,
-      "y": -170,
-      "width": 320,
-      "height": 190,
-      "color": "6",
-      "text": "### ⚙️ Auto-deposit / Matchmaker\n**Entrada:** `/bet` confirmado + tarjetas.\n**Decisión:** Cuotas Tier 40/40/20 + exclusiones.\n**Modifica:** Intentos, saldo y estado de cuenta.\n**Comunica:** Evento SSE de match y cobro.\n→ Abrir Canvas Detalle: [[04 — Flujo Auto-deposit.canvas]]"
-    },
-    {
-      "id": "n_card_liveness",
-      "type": "text",
-      "x": 60,
-      "y": -170,
-      "width": 240,
-      "height": 190,
-      "color": "3",
-      "text": "### 🔍 Cards & Liveness\n**Entrada:** CCs crudas / Ruthopia.\n**Decisión:** BIN check + liveness previo.\n**Modifica:** Marca tarjeta (Válida/Burned).\n**Comunica:** Estatus de pasarela.\n→ Abrir Canvas Detalle: [[05 — Validación de Tarjetas.canvas]]"
-    },
-    {
-      "id": "n_withdrawals",
-      "type": "text",
-      "x": 330,
-      "y": -170,
-      "width": 250,
-      "height": 190,
-      "color": "4",
-      "text": "### 💸 Retiros & STP\n**Entrada:** Cuentas con saldo > $0.\n**Decisión:** Match STP/CLABE + CURP titular.\n**Modifica:** Retiro en pasarela y saldo BD.\n**Comunica:** Ficha SPEI 1-tap copy.\n→ Abrir Canvas Detalle: [[07 — Retiros y Reconciliación.canvas]]"
-    },
-    {
-      "id": "n_jwt_keeper",
-      "type": "text",
-      "x": -590,
-      "y": 130,
-      "width": 360,
-      "height": 140,
-      "color": "4",
-      "text": "### 🔑 JWT Keeper\n**Entrada:** Cuentas con sesión activa.\n**Decisión:** Renovar JWT antes de expirar.\n**Modifica:** Token en SQLite.\n**Comunica:** Cuentas calientes sin nuevo captcha.\n→ Abrir Canvas Detalle: [[06 — Sesiones, JWT y Refresh.canvas]]"
-    },
-    {
-      "id": "n_acc_refresh",
-      "type": "text",
-      "x": -190,
-      "y": 130,
-      "width": 360,
-      "height": 140,
-      "color": "6",
-      "text": "### 🔄 Account Refresh / Prewarm\n**Entrada:** Daemon 5min o `/prewarm`.\n**Decisión:** Priorizar cuentas con saldo >$50.\n**Modifica:** Balance real y movimientos.\n**Comunica:** Alertas de saldo listo para cobro.\n→ Abrir Canvas Detalle: [[06 — Sesiones, JWT y Refresh.canvas]]"
-    },
-    {
-      "id": "n_sqlite_db",
-      "type": "text",
-      "x": 210,
-      "y": 130,
-      "width": 370,
-      "height": 140,
-      "color": "4",
-      "text": "### 🗃️ SQLite (betmexico_accounts.db)\n**Entrada:** Escrituras de bot, dashboard y daemons.\n**Decisión:** Modo WAL y bloqueos cortos.\n**Modifica:** Tablas `accounts`, `missions`, `cards`.\n**Comunica:** Persistencia única compartida.\n→ Abrir: [[Referencias/Tablas y estado]]"
-    },
-    {
-      "id": "n_proxy_pool",
-      "type": "text",
-      "x": -590,
-      "y": 380,
-      "width": 360,
-      "height": 140,
-      "text": "### 🌐 Proxy Pool (Proxy-Gate)\n**Entrada:** Tráfico HTTP hacia BetMexico.\n**Decisión:** Rotación con failover (`call_with_proxy_failover`).\n**Modifica:** Blacklist de proxies con 402/fallos.\n**Comunica:** Túnel IP residencial transparente.\n→ Abrir: [[08 — BD, Eventos e Infraestructura]]"
-    },
-    {
-      "id": "n_ruthopia_bridge",
-      "type": "text",
-      "x": -190,
-      "y": 380,
-      "width": 360,
-      "height": 140,
-      "text": "### 🤖 Ruthopia Bridge\n**Entrada:** Tarjetas validadas en Ruthopia.\n**Decisión:** Ingesta selectiva a bóveda.\n**Modifica:** Disponibilidad de tarjetas.\n**Comunica:** Sync VPS1 y VPS2.\n→ Abrir: [[05 — Validación de Tarjetas]]"
-    },
-    {
-      "id": "n_betmexico_api",
-      "type": "text",
-      "x": 210,
-      "y": 380,
-      "width": 370,
-      "height": 140,
-      "text": "### 🏦 BetMexico API / Pasarela\n**Entrada:** BeginDeposit, makePayment.\n**Decisión:** 200, 429, 406, BANK_REJECTED.\n**Modifica:** Saldo en casino y estado de tarjeta.\n**Comunica:** Autorización de depósito.\n→ Abrir: [[04 — Flujo Auto-deposit]]"
-    },
-    {
-      "id": "n_propuesta_429",
-      "type": "text",
-      "x": 690,
-      "y": -400,
-      "width": 320,
-      "height": 180,
-      "color": "3",
-      "text": "### 💡 CAMBIO PROPUESTO\n**429 Cooldown vs DEAD Inmediato**\n- **Problema:** El 429 manda la cuenta a `DEAD` sin tolerancia.\n- **Solución:** Aplicar cooldown de 24h (`rate_limited_cooldown`) y revalidar en siguiente ciclo.\n→ Abrir Canvas: [[Cambios/Propuesta — 429 cooldown.canvas]]"
-    },
-    {
-      "id": "n_guardrail_married",
-      "type": "text",
-      "x": 690,
-      "y": -180,
-      "width": 320,
-      "height": 170,
-      "color": "1",
-      "text": "### 🛡️ GUARDRAIL INMUTABLE\n**Regla Married Card (1:1)**\n- **1 Tarjeta = 1 Cuenta BetMexico permanente.**\n- Si una tarjeta es aprobada, queda casada (`is_married=1`).\n- PROHIBIDO reutilizarla en otra cuenta.\n→ Abrir Canvas: [[Cambios/Propuesta — Nueva regla married card.canvas]]"
-    }
-  ],
-  "edges": [
-    {
-      "id": "e_tg_bet",
-      "fromNode": "n_tg_bot",
-      "fromSide": "bottom",
-      "toNode": "n_flow_bet",
-      "toSide": "top",
-      "color": "6",
-      "label": "Inicia /bet"
-    },
-    {
-      "id": "e_tg_web",
-      "fromNode": "n_tg_bot",
-      "fromSide": "right",
-      "toNode": "n_dash_web",
-      "toSide": "left",
-      "color": "5",
-      "label": "Link al portal"
-    },
-    {
-      "id": "e_web_auth",
-      "fromNode": "n_dash_web",
-      "fromSide": "bottom",
-      "toNode": "n_auth_roles",
-      "toSide": "top",
-      "color": "6",
-      "label": "Valida sesión"
-    },
-    {
-      "id": "e_auth_web",
-      "fromNode": "n_auth_roles",
-      "fromSide": "top",
-      "toNode": "n_dash_web",
-      "toSide": "bottom",
-      "color": "4",
-      "label": "Permisos OK"
-    },
-    {
-      "id": "e_bet_auto",
-      "fromNode": "n_flow_bet",
-      "fromSide": "right",
-      "toNode": "n_auto_deposit",
-      "toSide": "left",
-      "color": "6",
-      "label": "Lote CCs"
-    },
-    {
-      "id": "e_auto_card",
-      "fromNode": "n_auto_deposit",
-      "fromSide": "right",
-      "toNode": "n_card_liveness",
-      "toSide": "left",
-      "color": "3",
-      "label": "Verifica liveness"
-    },
-    {
-      "id": "e_auto_sse",
-      "fromNode": "n_auto_deposit",
-      "fromSide": "top",
-      "toNode": "n_events_sse",
-      "toSide": "bottom",
-      "color": "6",
-      "label": "Broadcast progreso"
-    },
-    {
-      "id": "e_sse_web",
-      "fromNode": "n_events_sse",
-      "fromSide": "top",
-      "toNode": "n_dash_web",
-      "toSide": "bottom",
-      "color": "5",
-      "label": "Stream SSE"
-    },
-    {
-      "id": "e_sse_tg",
-      "fromNode": "n_events_sse",
-      "fromSide": "left",
-      "toNode": "n_tg_bot",
-      "toSide": "bottom",
-      "color": "5",
-      "label": "Edita mensaje"
-    },
-    {
-      "id": "e_auto_db",
-      "fromNode": "n_auto_deposit",
-      "fromSide": "bottom",
-      "toNode": "n_sqlite_db",
-      "toSide": "top",
-      "color": "4",
-      "label": "Guarda match / saldo"
-    },
-    {
-      "id": "e_auto_api",
-      "fromNode": "n_auto_deposit",
-      "fromSide": "bottom",
-      "toNode": "n_betmexico_api",
-      "toSide": "top",
-      "color": "6",
-      "label": "makePayment"
-    },
-    {
-      "id": "e_auto_proxy",
-      "fromNode": "n_auto_deposit",
-      "fromSide": "bottom",
-      "toNode": "n_proxy_pool",
-      "toSide": "top",
-      "color": "5",
-      "label": "Tráfico residencial"
-    },
-    {
-      "id": "e_ret_db",
-      "fromNode": "n_withdrawals",
-      "fromSide": "bottom",
-      "toNode": "n_sqlite_db",
-      "toSide": "top",
-      "color": "4",
-      "label": "withdrawn"
-    },
-    {
-      "id": "e_ret_tg",
-      "fromNode": "n_withdrawals",
-      "fromSide": "top",
-      "toNode": "n_tg_bot",
-      "toSide": "bottom",
-      "color": "4",
-      "label": "Ficha SPEI"
-    },
-    {
-      "id": "e_jwt_db",
-      "fromNode": "n_jwt_keeper",
-      "fromSide": "bottom",
-      "toNode": "n_sqlite_db",
-      "toSide": "left",
-      "color": "4",
-      "label": "Token activo"
-    },
-    {
-      "id": "e_acc_db",
-      "fromNode": "n_acc_refresh",
-      "fromSide": "bottom",
-      "toNode": "n_sqlite_db",
-      "toSide": "top",
-      "color": "4",
-      "label": "Update balance"
-    },
-    {
-      "id": "e_ruth_card",
-      "fromNode": "n_ruthopia_bridge",
-      "fromSide": "top",
-      "toNode": "n_card_liveness",
-      "toSide": "bottom",
-      "color": "3",
-      "label": "Cosecha CCs"
-    },
-    {
-      "id": "e_prop_auto",
-      "fromNode": "n_propuesta_429",
-      "fromSide": "left",
-      "toNode": "n_auto_deposit",
-      "toSide": "right",
-      "color": "3",
-      "label": "Afecta matchmaking"
-    }
-  ]
+	"nodes":[
+		{"id":"g_canales","type":"group","label":"1. ENTRADAS / CANALES","x":-640,"y":-700,"width":1260,"height":220,"color":"5"},
+		{"id":"g_control","type":"group","label":"2. CAPA DE CONTROL, EVENTOS Y SOPORTE","x":-640,"y":-450,"width":1260,"height":210,"color":"6"},
+		{"id":"g_motor","type":"group","label":"3. MOTOR DE NEGOCIO (ESTACIONES DE EJECUCIÓN)","x":-640,"y":-210,"width":1260,"height":270,"color":"6"},
+		{"id":"g_servicios","type":"group","label":"4. SERVICIOS DE FONDO Y PERSISTENCIA","x":-640,"y":90,"width":1260,"height":220,"color":"4"},
+		{"id":"g_integraciones","type":"group","label":"5. INTEGRACIONES EXTERNAS E INFRAESTRUCTURA","x":-640,"y":340,"width":1260,"height":210},
+		{"id":"g_metodo_agente","type":"group","label":"METODOLOGÍA & GUARDRAILS","x":660,"y":-450,"width":380,"height":450,"color":"3"},
+		{"id":"n_tg_bot","type":"text","x":-590,"y":-660,"width":540,"height":150,"color":"5","text":"### 📱 Telegram Bot\n**Entrada:** Comandos `/start`, `/bet`, `/check`, `/adduser`.\n**Decisión central:** `confirm_gate` y roles de operador.\n**Modifica:** Mensaje de misión en vivo en Telegram.\n**Comunica:** Alertas terminales y ficha SPEI con STP.\n→ Abrir Canvas Detalle: [[01 — Telegram Bot.canvas]]"},
+		{"id":"n_dash_web","type":"text","x":40,"y":-660,"width":540,"height":150,"color":"5","text":"### 🖥️ Dashboard / Portal Web\n**Entrada:** Navegador de operadores (`/user/{id}`) y SA (`/dashboard`).\n**Decisión central:** Rol y degradación `?view_as=`.\n**Modifica:** Cuentas activas, triggers manuales.\n**Comunica:** SSE en vivo y consola de logs (`/data/logs/dashboard.log`).\n→ Abrir Canvas Detalle: [[02 — Dashboard y Portal.canvas]]"},
+		{"id":"n_auth_roles","type":"text","x":-590,"y":-410,"width":360,"height":140,"color":"6","text":"### 🔐 Auth, Roles y Visibilidad\n**Entrada:** Cookies de sesión y headers en FastAPI.\n**Decisión:** Aislar cuentas por operador; SA ve todo.\n**Modifica:** Contexto del usuario autenticado.\n**Comunica:** 403 Forbidden o redirect `/login`.\n→ Abrir: [[03 — Auth, Roles y Visibilidad.canvas]]"},
+		{"id":"n_events_sse","type":"text","x":-190,"y":-410,"width":360,"height":140,"color":"5","text":"### 📡 Eventos SSE / Broadcast\n**Entrada:** Eventos de progreso, refresco y logs.\n**Decisión:** Broadcast centralizado `_broadcast()`.\n**Modifica:** Colas en memoria `_sse_queues` en `app.py`.\n**Comunica:** Stream `/api/stream` hacia web y bot.\n→ Abrir: [[08 — BD, Eventos e Infraestructura.canvas]]"},
+		{"id":"n_support_agent","type":"text","x":210,"y":-410,"width":370,"height":140,"color":"3","text":"### 🤖 Agente de Soporte IA\n**Entrada:** Consultas y auditorías operativas.\n**Decisión:** Herramientas `support_tools.py` con fallback.\n**Modifica:** Diagnósticos y alertas en tiempo real.\n**Comunica:** Mensajes explicativos al dashboard.\n→ Ver: `docs/AGENTE_SOPORTE.md`"},
+		{"id":"n_flow_bet","type":"text","x":-590,"y":-170,"width":260,"height":190,"color":"6","text":"### 💳 Flujo /bet (Router)\n**Entrada:** Lote de CCs (`pipes`).\n**Decisión:** Valida lote, genera `mission_id` y selecciona modo (single, multi, sched).\n**Modifica:** Estado de misión.\n**Comunica:** Progreso % en vivo.\n→ Abrir: [[04 — Flujo Auto-deposit.canvas]]"},
+		{"id":"n_auto_deposit","type":"text","x":-290,"y":-170,"width":320,"height":190,"color":"6","text":"### ⚙️ deposits.py (Motor Core)\n**Entrada:** `/bet` confirmado + tarjetas.\n**Decisión:** Cuotas Tier 40/40/20 + anti-mezcla.\n**Modifica:** Intentos, saldo y estado de cuenta.\n**Comunica:** Evento SSE de match y cobro.\n→ Abrir Canvas Detalle: [[04 — Flujo Auto-deposit.canvas]]"},
+		{"id":"n_card_liveness","type":"text","x":60,"y":-170,"width":240,"height":190,"color":"3","text":"### 🔍 Algoritmo V10 & BINs\n**Entrada:** CCs crudas / Ruthopia.\n**Decisión:** Scoring V10 + BIN intelligence.\n**Modifica:** Marca tarjeta (Válida/Burned/Locked).\n**Comunica:** Estatus de pasarela.\n→ Abrir Canvas Detalle: [[05 — Validación de Tarjetas.canvas]]"},
+		{"id":"n_withdrawals","type":"text","x":330,"y":-170,"width":250,"height":190,"color":"4","text":"### 💸 Retiros & STP\n**Entrada:** Cuentas con saldo > $0.\n**Decisión:** Match STP/CLABE + CURP titular.\n**Modifica:** Retiro en pasarela y saldo BD.\n**Comunica:** Ficha SPEI 1-tap copy.\n→ Abrir Canvas Detalle: [[07 — Retiros y Reconciliación.canvas]]"},
+		{"id":"n_jwt_keeper","type":"text","x":-590,"y":130,"width":360,"height":140,"color":"4","text":"### 🔑 JWT Keeper\n**Entrada:** Cuentas con sesión activa.\n**Decisión:** Renovar JWT antes de expirar.\n**Modifica:** Token en SQLite.\n**Comunica:** Cuentas calientes sin nuevo captcha.\n→ Abrir Canvas Detalle: [[06 — Sesiones, JWT y Refresh.canvas]]"},
+		{"id":"n_acc_refresh","type":"text","x":-190,"y":130,"width":360,"height":140,"color":"6","text":"### 🔄 Account Refresh (Loop 5m)\n**Entrada:** Daemon 5min o `/prewarm`.\n**Decisión:** Priorizar cuentas 'hot' (saldo >$50).\n**Modifica:** Balance real y movimientos.\n**Comunica:** Alertas de saldo listo para cobro.\n→ Abrir Canvas Detalle: [[06 — Sesiones, JWT y Refresh.canvas]]"},
+		{"id":"n_sqlite_db","type":"text","x":210,"y":130,"width":370,"height":140,"color":"4","text":"### 🗃️ SQLite WAL Mode\n**Entrada:** Escrituras concurrentes.\n**Decisión:** Modo WAL y busy_timeout=30s.\n**Modifica:** Tablas `accounts`, `missions`, `cards`, `deposits`.\n**Comunica:** Persistencia atómica compartida.\n→ Abrir: [[08 — BD, Eventos e Infraestructura.canvas]]"},
+		{"id":"n_proxy_pool","type":"text","x":-590,"y":380,"width":360,"height":140,"color":"2","text":"### 🌐 Proxy Pool Failover\n**Entrada:** Tráfico HTTP hacia BetMexico.\n**Decisión:** `call_with_proxy_failover` (<1s).\n**Modifica:** Exclusión temporal (402 IPRoyal / LitPort).\n**Comunica:** Túnel IP residencial transparente.\n→ Abrir: [[08 — BD, Eventos e Infraestructura.canvas]]"},
+		{"id":"n_ruthopia_bridge","type":"text","x":-190,"y":380,"width":360,"height":140,"text":"### 🤖 Ruthopia Bridge (:8787)\n**Entrada:** Tarjetas validadas en Ruthopia.\n**Decisión:** Ingesta selectiva a `vault_cards.db`.\n**Modifica:** Disponibilidad de tarjetas.\n**Comunica:** Sync VPS1 y KVM4.\n→ Abrir: [[05 — Validación de Tarjetas.canvas]]"},
+		{"id":"n_betmexico_api","type":"text","x":210,"y":380,"width":370,"height":140,"text":"### 🏦 BetMexico API / Gateway\n**Entrada:** BeginDeposit, makePayment.\n**Decisión:** 200, 429, 406, BANK_REJECTED.\n**Modifica:** Saldo en casino y estado de tarjeta.\n**Comunica:** Autorización de depósito.\n→ Abrir: [[04 — Flujo Auto-deposit.canvas]]"},
+		{"id":"n_kitchen_model","type":"text","x":690,"y":-400,"width":320,"height":180,"color":"6","text":"### 🍳 MODELO DE LA COCINA\n**Arquitectura de Nodos (Video 2026)**\n- Cada paso es una estación independiente.\n- **Auto-healing:** Si la papa se quema (`BANK_REJECTED`), la cuenta se salva.\n- Cooldown 24h ante 429/406 sin matar la cuenta.\n→ Abrir: [[09 — Arquitectura de Grafo de Agentes (Cocina).canvas]]"},
+		{"id":"n_guardrail_married","type":"text","x":690,"y":-180,"width":320,"height":170,"color":"1","text":"### 🛡️ GUARDRAIL INMUTABLE\n**Regla Married Card (1:1)**\n- **1 Tarjeta = 1 Cuenta BetMexico permanente.**\n- Si una tarjeta es aprobada, queda casada (`is_married=1`).\n- PROHIBIDO reutilizarla en otra cuenta.\n→ Invariante de seguridad del sistema."}
+	],
+	"edges":[
+		{"id":"e_tg_bet","fromNode":"n_tg_bot","fromSide":"bottom","toNode":"n_flow_bet","toSide":"top","color":"6","label":"Inicia /bet"},
+		{"id":"e_tg_web","fromNode":"n_tg_bot","fromSide":"right","toNode":"n_dash_web","toSide":"left","color":"5","label":"Link al portal"},
+		{"id":"e_web_auth","fromNode":"n_dash_web","fromSide":"bottom","toNode":"n_auth_roles","toSide":"top","color":"6","label":"Valida sesión"},
+		{"id":"e_auth_web","fromNode":"n_auth_roles","fromSide":"top","toNode":"n_dash_web","toSide":"bottom","color":"4","label":"Permisos OK"},
+		{"id":"e_bet_auto","fromNode":"n_flow_bet","fromSide":"right","toNode":"n_auto_deposit","toSide":"left","color":"6","label":"Lote CCs"},
+		{"id":"e_auto_card","fromNode":"n_auto_deposit","fromSide":"right","toNode":"n_card_liveness","toSide":"left","color":"3","label":"Scoring V10"},
+		{"id":"e_auto_sse","fromNode":"n_auto_deposit","fromSide":"top","toNode":"n_events_sse","toSide":"bottom","color":"6","label":"Broadcast progreso"},
+		{"id":"e_sse_web","fromNode":"n_events_sse","fromSide":"top","toNode":"n_dash_web","toSide":"bottom","color":"5","label":"Stream SSE"},
+		{"id":"e_sse_tg","fromNode":"n_events_sse","fromSide":"left","toNode":"n_tg_bot","toSide":"bottom","color":"5","label":"Edita mensaje"},
+		{"id":"e_auto_db","fromNode":"n_auto_deposit","fromSide":"bottom","toNode":"n_sqlite_db","toSide":"top","color":"4","label":"Guarda match / saldo"},
+		{"id":"e_auto_api","fromNode":"n_auto_deposit","fromSide":"bottom","toNode":"n_betmexico_api","toSide":"top","color":"6","label":"makePayment"},
+		{"id":"e_auto_proxy","fromNode":"n_auto_deposit","fromSide":"bottom","toNode":"n_proxy_pool","toSide":"top","color":"5","label":"Tráfico residencial"},
+		{"id":"e_ret_db","fromNode":"n_withdrawals","fromSide":"bottom","toNode":"n_sqlite_db","toSide":"top","color":"4","label":"withdrawn"},
+		{"id":"e_ret_tg","fromNode":"n_withdrawals","fromSide":"top","toNode":"n_tg_bot","toSide":"bottom","color":"4","label":"Ficha SPEI"},
+		{"id":"e_jwt_db","fromNode":"n_jwt_keeper","fromSide":"bottom","toNode":"n_sqlite_db","toSide":"left","color":"4","label":"Token activo"},
+		{"id":"e_acc_db","fromNode":"n_acc_refresh","fromSide":"bottom","toNode":"n_sqlite_db","toSide":"top","color":"4","label":"Update balance"},
+		{"id":"e_ruth_card","fromNode":"n_ruthopia_bridge","fromSide":"top","toNode":"n_card_liveness","toSide":"bottom","color":"3","label":"Cosecha CCs"},
+		{"id":"e_kitchen_auto","fromNode":"n_kitchen_model","fromSide":"left","toNode":"n_auto_deposit","toSide":"right","color":"6","label":"Auto-healing de estaciones"}
+	],
+	"metadata":{
+		"version":"1.0-1.0",
+		"frontmatter":{}
+	}
 }

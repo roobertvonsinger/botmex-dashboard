@@ -1,45 +1,14 @@
 {
-  "nodes": [
-    {
-      "id": "mc_g",
-      "type": "group",
-      "label": "GUARDRAIL: REGLA MARRIED CARD (1:1)",
-      "x": -400,
-      "y": -300,
-      "width": 850,
-      "height": 400,
-      "color": "1"
-    },
-    {
-      "id": "mc_rule",
-      "type": "text",
-      "x": -360,
-      "y": -240,
-      "width": 340,
-      "height": 150,
-      "color": "1",
-      "text": "### 🛑 Regla Inmutable (1 Tarjeta = 1 Cuenta)\nUna tarjeta aprobada queda vinculada permanentemente con su cuenta (`is_married=1`).\nPROHIBIDO utilizar la misma tarjeta en una segunda cuenta."
-    },
-    {
-      "id": "mc_risk",
-      "type": "text",
-      "x": 30,
-      "y": -240,
-      "width": 340,
-      "height": 150,
-      "color": "1",
-      "text": "### ⚠️ Riesgo Operativo de Violación\nSi el casino detecta la misma tarjeta en dos cuentas distintas:\n1. Baneo fulminante de ambas cuentas.\n2. Retención total de fondos.\n3. Quema del BIN completo."
-    }
-  ],
-  "edges": [
-    {
-      "id": "mce1",
-      "fromNode": "mc_rule",
-      "fromSide": "right",
-      "toNode": "mc_risk",
-      "toSide": "left",
-      "color": "1",
-      "label": "Consecuencia"
-    }
-  ]
+	"nodes":[
+		{"id":"mc_g","type":"group","label":"GUARDRAIL: REGLA MARRIED CARD (1:1)","x":-400,"y":-300,"width":850,"height":400,"color":"1"},
+		{"id":"mc_rule","type":"text","x":-360,"y":-240,"width":340,"height":150,"color":"1","text":"### 🛑 Regla Inmutable (1 Tarjeta = 1 Cuenta)\nUna tarjeta aprobada queda vinculada permanentemente con su cuenta (`is_married=1`).\nPROHIBIDO utilizar la misma tarjeta en una segunda cuenta."},
+		{"id":"mc_risk","type":"text","x":30,"y":-240,"width":340,"height":150,"color":"1","text":"### ⚠️ Riesgo Operativo de Violación\nSi el casino detecta la misma tarjeta en dos cuentas distintas:\n1. Baneo fulminante de ambas cuentas.\n2. Retención total de fondos.\n3. Quema del BIN completo."}
+	],
+	"edges":[
+		{"id":"mce1","fromNode":"mc_rule","fromSide":"right","toNode":"mc_risk","toSide":"left","color":"1","label":"Consecuencia"}
+	],
+	"metadata":{
+		"version":"1.0-1.0",
+		"frontmatter":{}
+	}
 }

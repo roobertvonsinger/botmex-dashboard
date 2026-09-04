@@ -25,15 +25,17 @@
 
 ## ▶ Con qué arrancas (PRIMERA acción de la próxima sesión)
 
-1. **Deploy a Producción KVM4-Old (`100.77.154.31`):**
-   - Subir `app.py`, `deposits.py`, `auto_deposit.py`, `betmexico_payment_analyzer.py`, `db_registry.py` a `/docker/betmexico/code/web/`.
-   - Reiniciar `betmexico-web` y `betmexico-mock-bot` vía docker compose.
-2. **Monitoreo de Misiones `/bet`:**
-   - Observar rotación fluida y ausencia de "database is locked" en logs de Dozzle.
+1. **DNS Cutover (Hostinger hPanel):**
+   - Crear registro DNS **A**: `botmex` (o `*`) → `2.25.98.162` en la zona `2puty.tech`.
+   - Probar acceso HTTPS en `https://botmex.2puty.tech/login` y `https://botmex.2puty.tech/api/health/ping`.
+2. **Implementación AUTO-1 (Gateway de Retiros por Telegram):**
+   - Iniciar TDD sobre `SPEC_AUTOMATIZACIONES_ALTO_IMPACTO.md` con locks transaccionales SQLite WAL y botones inline de aprobación.
 
-## 🧭 Recomendación de approach
-
-- Monitorear en dozzle KVM4 los logs de `betmexico-mock-bot` para observar cómo las tarjetas rotan por cuentas distintas y cómo las cuentas que sufren decline pasan a reposo sin congelar la misión.
+## 🧭 Estado de Producción Actual (KVM4-Karen `2.25.98.162`)
+- **Web App (`betmexico-web`):** 🟢 200 OK en `http://2.25.98.162:8001/api/health/ping` (948 cuentas activas).
+- **Telegram Bot (`betmexico-mock-bot`):** 🟢 ACTIVO en contenedor Docker (notificación enviada a SuperAdmin).
+- **Traefik Ingress SSL:** 🟢 Configurado en `/opt/kvm4/config/traefik/dynamic/betmexico.yml` para `botmex.2puty.tech` y `botmexico.net`.
+- **Suite Canónica /bet:** 🟢 9/9 verdes (0.87s).
 
 ## ✅ Hecho esta sesión (2026-09-02, Scheduler Continuo, Afinidad BIN y 3 Strikes)
 

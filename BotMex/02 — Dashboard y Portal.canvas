@@ -1,62 +1,196 @@
 {
-  "nodes": [
-    {
-      "id": "db_g",
-      "type": "group",
-      "label": "ARQUITECTURA DASHBOARD FASTAPI",
-      "x": -400,
-      "y": -300,
-      "width": 900,
-      "height": 450,
-      "color": "5"
-    },
-    {
-      "id": "db_routes",
-      "type": "text",
-      "x": -360,
-      "y": -240,
-      "width": 260,
-      "height": 140,
-      "color": "5",
-      "text": "### 1. Rutas Principales\n- `/` Formulario Login\n- `/dashboard` Vista SA\n- `/user/{tg_id}` Portal Operador\n- `/api/stream` SSE Event stream"
-    },
-    {
-      "id": "db_viewas",
-      "type": "text",
-      "x": -50,
-      "y": -240,
-      "width": 260,
-      "height": 140,
-      "color": "6",
-      "text": "### 2. Soporte ?view_as=\nSuperadmin puede degradar su sesión visual para ver exactamente lo que ve un operador sin mutar datos."
-    },
-    {
-      "id": "db_grid",
-      "type": "text",
-      "x": 260,
-      "y": -240,
-      "width": 200,
-      "height": 140,
-      "color": "4",
-      "text": "### 3. Grid Mis Cuentas\nFiltra cuentas 100% retiradas y muestra balance real con 1-click CLABE copy."
-    }
-  ],
-  "edges": [
-    {
-      "id": "dbe1",
-      "fromNode": "db_routes",
-      "fromSide": "right",
-      "toNode": "db_viewas",
-      "toSide": "left",
-      "color": "5"
-    },
-    {
-      "id": "dbe2",
-      "fromNode": "db_viewas",
-      "fromSide": "right",
-      "toNode": "db_grid",
-      "toSide": "left",
-      "color": "6"
-    }
-  ]
+	"nodes": [
+		{
+			"id": "g_routes",
+			"type": "group",
+			"label": "1. RUTAS Y CONTROL DE SESIÓN WEB",
+			"x": -700,
+			"y": -350,
+			"width": 640,
+			"height": 450,
+			"color": "6"
+		},
+		{
+			"id": "g_features",
+			"type": "group",
+			"label": "2. VISTAS Y COMPONENTES OPERATIVOS",
+			"x": 0,
+			"y": -350,
+			"width": 950,
+			"height": 450,
+			"color": "5"
+		},
+		{
+			"id": "w_root",
+			"type": "text",
+			"x": -660,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "6",
+			"text": "### 🚪 1. Gate de Sesión (`/`)\nEvalúa cookie de autenticación:\n- **Sin sesión:** Redirige a `/login`\n- **Rol Superadmin:** Redirige a `/dashboard`\n- **Rol Operador:** Redirige a `/user/{tg_id}`"
+		},
+		{
+			"id": "w_login",
+			"type": "text",
+			"x": -660,
+			"y": -90,
+			"width": 260,
+			"height": 160,
+			"color": "5",
+			"text": "### 🔑 2. Login (`/login`)\nValida credenciales con hash seguro y emite cookie de sesión HMAC."
+		},
+		{
+			"id": "w_sa",
+			"type": "text",
+			"x": -360,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "5",
+			"text": "### 👑 3. Vista SA (`/dashboard`)\nPanel central con KPIs globales, cuentas de todos los operadores y acceso a consola de logs."
+		},
+		{
+			"id": "w_viewas",
+			"type": "text",
+			"x": -360,
+			"y": -90,
+			"width": 260,
+			"height": 160,
+			"color": "3",
+			"text": "### 🕶️ 4. Soporte `?view_as=`\nDegrada visualmente la sesión del SA al rol de operador para auditar sin tocar permisos."
+		},
+		{
+			"id": "w_portal",
+			"type": "text",
+			"x": 40,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "5",
+			"text": "### 👤 5. Portal Operador (`/user/{id}`)\nVista acotada a las cuentas asignadas al operador; aísla totalmente los datos ajenos."
+		},
+		{
+			"id": "w_grid",
+			"type": "text",
+			"x": 340,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "4",
+			"text": "### 📊 6. Grid 'Mis Cuentas'\nLista reactiva que oculta automáticamente cuentas 100% retiradas y muestra saldo disponible."
+		},
+		{
+			"id": "w_clabe",
+			"type": "text",
+			"x": 640,
+			"y": -300,
+			"width": 270,
+			"height": 180,
+			"color": "4",
+			"text": "### 💳 7. Chip CLABE 1-Click\nCopia inmediata de CLABE STP y CURP del titular para dispersiones sin errores de tipeo."
+		},
+		{
+			"id": "w_mission",
+			"type": "text",
+			"x": 340,
+			"y": -90,
+			"width": 260,
+			"height": 160,
+			"color": "6",
+			"text": "### 📡 8. Monitor Misión SSE\nProgreso en tiempo real con matches, cuentas preparándose y cuenta regresiva anti-huella."
+		},
+		{
+			"id": "w_logs",
+			"type": "text",
+			"x": 640,
+			"y": -90,
+			"width": 270,
+			"height": 160,
+			"color": "5",
+			"text": "### 📜 9. Consola de Logs\nVisor en vivo de `/data/logs/dashboard.log` con filtrado por categoría y enlaces a cuentas."
+		}
+	],
+	"edges": [
+		{
+			"id": "we_root_login",
+			"fromNode": "w_root",
+			"fromSide": "bottom",
+			"toNode": "w_login",
+			"toSide": "top",
+			"color": "5",
+			"label": "Sin sesión"
+		},
+		{
+			"id": "we_root_sa",
+			"fromNode": "w_root",
+			"fromSide": "right",
+			"toNode": "w_sa",
+			"toSide": "left",
+			"color": "6",
+			"label": "Superadmin"
+		},
+		{
+			"id": "we_sa_viewas",
+			"fromNode": "w_sa",
+			"fromSide": "bottom",
+			"toNode": "w_viewas",
+			"toSide": "top",
+			"color": "3"
+		},
+		{
+			"id": "we_viewas_portal",
+			"fromNode": "w_viewas",
+			"fromSide": "right",
+			"toNode": "w_portal",
+			"toSide": "left",
+			"color": "3",
+			"label": "Degradar"
+		},
+		{
+			"id": "we_root_portal",
+			"fromNode": "w_root",
+			"fromSide": "right",
+			"toNode": "w_portal",
+			"toSide": "left",
+			"color": "5",
+			"label": "Operador"
+		},
+		{
+			"id": "we_portal_grid",
+			"fromNode": "w_portal",
+			"fromSide": "right",
+			"toNode": "w_grid",
+			"toSide": "left",
+			"color": "4"
+		},
+		{
+			"id": "we_grid_clabe",
+			"fromNode": "w_grid",
+			"fromSide": "right",
+			"toNode": "w_clabe",
+			"toSide": "left",
+			"color": "4"
+		},
+		{
+			"id": "we_portal_mission",
+			"fromNode": "w_portal",
+			"fromSide": "bottom",
+			"toNode": "w_mission",
+			"toSide": "top",
+			"color": "6"
+		},
+		{
+			"id": "we_sa_logs",
+			"fromNode": "w_sa",
+			"fromSide": "bottom",
+			"toNode": "w_logs",
+			"toSide": "left",
+			"color": "5"
+		}
+	],
+	"metadata": {
+		"version": "1.0-1.0",
+		"frontmatter": {}
+	}
 }

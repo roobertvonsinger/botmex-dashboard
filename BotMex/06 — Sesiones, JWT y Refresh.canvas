@@ -1,62 +1,152 @@
 {
-  "nodes": [
-    {
-      "id": "se_g",
-      "type": "group",
-      "label": "SESIONES, JWT Y REFRESH",
-      "x": -400,
-      "y": -300,
-      "width": 900,
-      "height": 450,
-      "color": "4"
-    },
-    {
-      "id": "se_loop",
-      "type": "text",
-      "x": -360,
-      "y": -240,
-      "width": 250,
-      "height": 140,
-      "color": "6",
-      "text": "### 1. Loop 5 Minutos\n`account_refresh.py` ejecuta ciclo de fondo cada 300s buscando cuentas con JWT vigente."
-    },
-    {
-      "id": "se_hot",
-      "type": "text",
-      "x": -60,
-      "y": -240,
-      "width": 250,
-      "height": 140,
-      "color": "4",
-      "text": "### 2. Prioridad Cuentas Hot\nCuentas con saldo >$50 o retiro pendiente se refrescan primero sin pasar por login/captcha."
-    },
-    {
-      "id": "se_keeper",
-      "type": "text",
-      "x": 240,
-      "y": -240,
-      "width": 220,
-      "height": 140,
-      "color": "4",
-      "text": "### 3. JWT Keeper\nRenueva el token silenciosamente antes de que expire para tenerlas listas para depósito."
-    }
-  ],
-  "edges": [
-    {
-      "id": "see1",
-      "fromNode": "se_loop",
-      "fromSide": "right",
-      "toNode": "se_hot",
-      "toSide": "left",
-      "color": "6"
-    },
-    {
-      "id": "see2",
-      "fromNode": "se_hot",
-      "fromSide": "right",
-      "toNode": "se_keeper",
-      "toSide": "left",
-      "color": "4"
-    }
-  ]
+	"nodes": [
+		{
+			"id": "se_g_refresh",
+			"type": "group",
+			"label": "1. LOOP DE REFRESCO Y CUENTAS HOT (CADA 5 MIN)",
+			"x": -700,
+			"y": -350,
+			"width": 640,
+			"height": 450,
+			"color": "6"
+		},
+		{
+			"id": "se_g_keeper",
+			"type": "group",
+			"label": "2. RENOVACIÓN SILENCIOSA Y PREWARM",
+			"x": 0,
+			"y": -350,
+			"width": 950,
+			"height": 450,
+			"color": "4"
+		},
+		{
+			"id": "se_loop",
+			"type": "text",
+			"x": -660,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "6",
+			"text": "### 🔄 1. Loop 5 Minutos\n`account_refresh.py` ejecuta ciclo continuo cada 300s consultando cuentas con JWT vigente."
+		},
+		{
+			"id": "se_hot",
+			"type": "text",
+			"x": -660,
+			"y": -90,
+			"width": 260,
+			"height": 160,
+			"color": "3",
+			"text": "### 🔥 2. Evaluador Hot\n¿Saldo > $50, autolock activo o retiro pendiente?\n- **Sí:** Fast-track prioritario.\n- **No:** Cola ordinaria."
+		},
+		{
+			"id": "se_hot_fast",
+			"type": "text",
+			"x": -360,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "4",
+			"text": "### ⚡ 3. Fast-Track Hot\nBypassea restricciones de pool y grado para asegurar saldo listo para retiro inmediato."
+		},
+		{
+			"id": "se_balance",
+			"type": "text",
+			"x": -360,
+			"y": -90,
+			"width": 260,
+			"height": 160,
+			"color": "4",
+			"text": "### 💾 4. Balance Real SQLite\nPersiste saldo confirmado en `accounts` sin gastar captchas ni llamadas pesadas."
+		},
+		{
+			"id": "se_wake",
+			"type": "text",
+			"x": 40,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "2",
+			"text": "### ⏰ 5. Evento `_wake_jwt_keeper`\nSi se detecta un JWT vencido, despierta al keeper con debounce de 5m para prevenir tormentas de login."
+		},
+		{
+			"id": "se_keeper",
+			"type": "text",
+			"x": 340,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "6",
+			"text": "### 🔑 6. JWT Keeper (Lote 50)\nRenueva tokens silenciosamente con login gentil (anti-ráfaga y jitter) evitando 406 de captcha."
+		},
+		{
+			"id": "se_prewarm",
+			"type": "text",
+			"x": 640,
+			"y": -300,
+			"width": 270,
+			"height": 180,
+			"color": "5",
+			"text": "### 🌡️ 7. Router Prewarm\nEndpoint `/prewarm` bajo demanda (tope 30 req/10m por operador) para alistar cuentas antes de una misión."
+		}
+	],
+	"edges": [
+		{
+			"id": "see_loop_hot",
+			"fromNode": "se_loop",
+			"fromSide": "bottom",
+			"toNode": "se_hot",
+			"toSide": "top",
+			"color": "6"
+		},
+		{
+			"id": "see_hot_fast",
+			"fromNode": "se_hot",
+			"fromSide": "right",
+			"toNode": "se_hot_fast",
+			"toSide": "left",
+			"color": "4",
+			"label": "Hot"
+		},
+		{
+			"id": "see_hot_bal",
+			"fromNode": "se_hot",
+			"fromSide": "right",
+			"toNode": "se_balance",
+			"toSide": "left",
+			"color": "4",
+			"label": "Ordinario"
+		},
+		{
+			"id": "see_loop_wake",
+			"fromNode": "se_loop",
+			"fromSide": "right",
+			"toNode": "se_wake",
+			"toSide": "left",
+			"color": "2",
+			"label": "JWT muerto"
+		},
+		{
+			"id": "see_wake_keeper",
+			"fromNode": "se_wake",
+			"fromSide": "right",
+			"toNode": "se_keeper",
+			"toSide": "left",
+			"color": "6"
+		},
+		{
+			"id": "see_prewarm_keeper",
+			"fromNode": "se_prewarm",
+			"fromSide": "left",
+			"toNode": "se_keeper",
+			"toSide": "right",
+			"color": "5",
+			"label": "Demanda"
+		}
+	],
+	"metadata": {
+		"version": "1.0-1.0",
+		"frontmatter": {}
+	}
 }

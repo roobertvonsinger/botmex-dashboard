@@ -1,62 +1,170 @@
 {
-  "nodes": [
-    {
-      "id": "cd_g",
-      "type": "group",
-      "label": "VALIDACIÓN Y CICLO DE TARJETAS",
-      "x": -400,
-      "y": -300,
-      "width": 900,
-      "height": 450,
-      "color": "3"
-    },
-    {
-      "id": "cd_ingest",
-      "type": "text",
-      "x": -360,
-      "y": -240,
-      "width": 240,
-      "height": 140,
-      "color": "5",
-      "text": "### 1. Ingesta de Tarjetas\n- Desde comando `/check`\n- Cosechadas desde Ruthopia Bridge (`vault_cards.db`)"
-    },
-    {
-      "id": "cd_bin",
-      "type": "text",
-      "x": -70,
-      "y": -240,
-      "width": 240,
-      "height": 140,
-      "color": "3",
-      "text": "### 2. BIN Intelligence\nClasificación por banco emisor, nivel de riesgo y pasarela preferida (V10)."
-    },
-    {
-      "id": "cd_states",
-      "type": "text",
-      "x": 220,
-      "y": -240,
-      "width": 240,
-      "height": 140,
-      "color": "4",
-      "text": "### 3. Estados de Tarjeta\n- `available`: Lista para match\n- `burned`: Rechazada por banco\n- `married`: Casada 1:1 con cuenta"
-    }
-  ],
-  "edges": [
-    {
-      "id": "cde1",
-      "fromNode": "cd_ingest",
-      "fromSide": "right",
-      "toNode": "cd_bin",
-      "toSide": "left",
-      "color": "5"
-    },
-    {
-      "id": "cde2",
-      "fromNode": "cd_bin",
-      "fromSide": "right",
-      "toNode": "cd_states",
-      "toSide": "left",
-      "color": "3"
-    }
-  ]
+	"nodes": [
+		{
+			"id": "cd_g_prep",
+			"type": "group",
+			"label": "1. INGESTA, SCORING Y LIVENESS (PRE-CHECK)",
+			"x": -700,
+			"y": -350,
+			"width": 640,
+			"height": 450,
+			"color": "3"
+		},
+		{
+			"id": "cd_g_states",
+			"type": "group",
+			"label": "2. MÁQUINA DE ESTADOS Y DESTINO FINAL",
+			"x": 0,
+			"y": -350,
+			"width": 950,
+			"height": 450,
+			"color": "6"
+		},
+		{
+			"id": "cd_ingest",
+			"type": "text",
+			"x": -660,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "5",
+			"text": "### 📥 1. Ingesta de Tarjetas\n- Comando `/check` en Telegram.\n- Cosecha automática desde Ruthopia Bridge hacia `vault_cards.db`."
+		},
+		{
+			"id": "cd_bin",
+			"type": "text",
+			"x": -660,
+			"y": -90,
+			"width": 260,
+			"height": 160,
+			"color": "3",
+			"text": "### 🧠 2. BIN Intelligence & V10\nIdentifica emisor, tipo (débito/crédito), pasarela preferida y riesgo de 3DS."
+		},
+		{
+			"id": "cd_bridge",
+			"type": "text",
+			"x": -360,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "6",
+			"text": "### 🛰️ 3. Ruthopia Bridge (:8787)\nEjecuta pre-check HTTP contra el bridge de liveness sin impactar pasarelas de casino."
+		},
+		{
+			"id": "cd_kind",
+			"type": "text",
+			"x": -360,
+			"y": -90,
+			"width": 260,
+			"height": 160,
+			"color": "3",
+			"text": "### ⚖️ 4. Evaluador de Liveness\nClasifica el resultado:\n- `live` o `tol_bin` → Aceptada\n- `dead` → Descarte inmediato"
+		},
+		{
+			"id": "cd_avail",
+			"type": "text",
+			"x": 40,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "4",
+			"text": "### 🟢 5. Estado: `available`\nTarjeta lista en el pool para ser asignada en la siguiente misión de depósito."
+		},
+		{
+			"id": "cd_married",
+			"type": "text",
+			"x": 340,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "4",
+			"text": "### 💍 6. Estado: `married`\nAsociada 1:1 de por vida a una cuenta BetMex. Prohibido transferirla a otra cuenta."
+		},
+		{
+			"id": "cd_burned",
+			"type": "text",
+			"x": 640,
+			"y": -300,
+			"width": 270,
+			"height": 180,
+			"color": "2",
+			"text": "### 🥔 7. Estado: `burned`\nRechazada por el banco emisor. Se retira del pool; la cuenta de casino se preserva limpia."
+		},
+		{
+			"id": "cd_locked",
+			"type": "text",
+			"x": 340,
+			"y": -90,
+			"width": 260,
+			"height": 160,
+			"color": "1",
+			"text": "### 🛑 8. Estado: `locked`\nDetectada en otra cuenta de BetMexico. Jubilada inmediatamente sin reintentos."
+		}
+	],
+	"edges": [
+		{
+			"id": "cde_ingest_bin",
+			"fromNode": "cd_ingest",
+			"fromSide": "bottom",
+			"toNode": "cd_bin",
+			"toSide": "top",
+			"color": "5"
+		},
+		{
+			"id": "cde_ingest_bridge",
+			"fromNode": "cd_ingest",
+			"fromSide": "right",
+			"toNode": "cd_bridge",
+			"toSide": "left",
+			"color": "6"
+		},
+		{
+			"id": "cde_bridge_kind",
+			"fromNode": "cd_bridge",
+			"fromSide": "bottom",
+			"toNode": "cd_kind",
+			"toSide": "top",
+			"color": "3"
+		},
+		{
+			"id": "cde_kind_avail",
+			"fromNode": "cd_kind",
+			"fromSide": "right",
+			"toNode": "cd_avail",
+			"toSide": "left",
+			"color": "4",
+			"label": "Live"
+		},
+		{
+			"id": "cde_avail_married",
+			"fromNode": "cd_avail",
+			"fromSide": "right",
+			"toNode": "cd_married",
+			"toSide": "left",
+			"color": "4",
+			"label": "Depósito OK"
+		},
+		{
+			"id": "cde_avail_burned",
+			"fromNode": "cd_avail",
+			"fromSide": "right",
+			"toNode": "cd_burned",
+			"toSide": "left",
+			"color": "2",
+			"label": "Declinada"
+		},
+		{
+			"id": "cde_avail_locked",
+			"fromNode": "cd_avail",
+			"fromSide": "bottom",
+			"toNode": "cd_locked",
+			"toSide": "left",
+			"color": "1",
+			"label": "Card locked"
+		}
+	],
+	"metadata": {
+		"version": "1.0-1.0",
+		"frontmatter": {}
+	}
 }

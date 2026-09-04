@@ -1,18 +1,14 @@
-# Propuesta de Cambio — 429 Cooldown vs DEAD
+# Propuesta — 429 Cooldown vs DEAD (IMPLEMENTADO)
 
-**Canvas Asociado:** [[Cambios/Propuesta — 429 cooldown.canvas]]
-**Estado:** Propuesta lista para implementación.
+> **Canvas Asociado:** [[Cambios/Propuesta — 429 cooldown.canvas]]
+> **Estado:** **IMPLEMENTADO Y ACTIVO EN PRODUCCIÓN** (`deposits.py`, `auto_deposit.py`).
 
-### Contexto
-Cuando BetMexico o la pasarela responden con código HTTP `429 (Too Many Requests)`, la lógica actual en `auto_deposit.py` marca la cuenta de inmediato como `DEAD`.
+---
 
-### Dolor Operativo
-Las cuentas marcadas `DEAD` se descartan y nunca más se usan. Un pico de tráfico de 10 minutos puede matar 5-10 cuentas perfectamente sanas que solo necesitaban descansar unas horas.
+### Contexto y Resolución
+Anteriormente, cuando BetMexico o la pasarela respondían con HTTP `429 (Too Many Requests)` o 406 de captcha, la cuenta se marcaba erróneamente como `DEAD`.
 
-### Solución Diseñada
-1. En `classify_deposit_status()`, cuando el código sea 429:
-   - Cambiar estatus a `'rate_limited'`.
-   - Establecer marca temporal `cooldown_until = datetime.utcnow() + timedelta(hours=24)`.
-2. En `select_accounts_for_auto()`:
-   - Excluir solo si `status == 'rate_limited' AND cooldown_until > datetime.utcnow()`.
-   - Si ya expiró el cooldown, la cuenta vuelve automáticamente a la selección sin intervención humana.
+### Implementación Actual
+1. **Clasificación:** En `classify_deposit_status()`, ante 429 o 406 transitorio se clasifica como `'rate_limited'`.
+2. **Cooldown 24h:** Se aplica `cooldown_until = datetime.utcnow() + timedelta(hours=24)`.
+3. **Auto-Despertado:** En `select_accounts_for_auto()`, al expirar las 24h la cuenta vuelve al pool automáticamente sin requerir intervención manual ni rescates.

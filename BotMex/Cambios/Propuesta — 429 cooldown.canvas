@@ -1,64 +1,16 @@
 {
-  "nodes": [
-    {
-      "id": "c429_group",
-      "type": "group",
-      "label": "PROPUESTA DE REFACTOR: MANEJO DE 429",
-      "x": -400,
-      "y": -300,
-      "width": 950,
-      "height": 480,
-      "color": "3"
-    },
-    {
-      "id": "c429_actual",
-      "type": "text",
-      "x": -360,
-      "y": -240,
-      "width": 380,
-      "height": 180,
-      "color": "1",
-      "text": "### 🛑 Comportamiento Actual (Destructivo)\n- `429 Too Many Requests` recibido en login/depósito.\n- Acción inmediata: `UPDATE accounts SET status='DEAD'`.\n- Consecuencia: Cuentas sanas con saldo o historial quedan inutilizadas permanentemente por bloqueos temporales de IP."
-    },
-    {
-      "id": "c429_propuesta",
-      "type": "text",
-      "x": 100,
-      "y": -240,
-      "width": 410,
-      "height": 180,
-      "color": "4",
-      "text": "### 💡 Comportamiento Propuesto (Soberano)\n- Capturar `429` en `classify_deposit_status()`.\n- Acción: `UPDATE accounts SET status='rate_limited', cooldown_until = datetime('now', '+24 hours')`.\n- Matchmaking excluye la cuenta solo durante el cooldown.\n- En el siguiente ciclo tras 24h, se reintenta automáticamente."
-    },
-    {
-      "id": "c429_impacto",
-      "type": "text",
-      "x": -130,
-      "y": 0,
-      "width": 420,
-      "height": 150,
-      "color": "6",
-      "text": "### 🎯 Archivos y Funciones Afectadas\n1. `auto_deposit.py` → `classify_deposit_status()` (L920) y `select_accounts_for_auto()` (L120)\n2. `deposits.py` → `_run_deposit_with_phases()` (L140)\n3. `betmexico_db.py` → Agregar columna `cooldown_until DATETIME` si no existe."
-    }
-  ],
-  "edges": [
-    {
-      "id": "c429_e1",
-      "fromNode": "c429_actual",
-      "fromSide": "right",
-      "toNode": "c429_propuesta",
-      "toSide": "left",
-      "color": "3",
-      "label": "Reemplazar por"
-    },
-    {
-      "id": "c429_e2",
-      "fromNode": "c429_propuesta",
-      "fromSide": "bottom",
-      "toNode": "c429_impacto",
-      "toSide": "top",
-      "color": "4",
-      "label": "Implementación"
-    }
-  ]
+	"nodes":[
+		{"id":"c429_group","type":"group","label":"PROPUESTA DE REFACTOR: MANEJO DE 429","x":-400,"y":-300,"width":950,"height":480,"color":"3"},
+		{"id":"c429_actual","type":"text","x":-360,"y":-240,"width":380,"height":180,"color":"1","text":"### 🛑 Comportamiento Actual (Destructivo)\n- `429 Too Many Requests` recibido en login/depósito.\n- Acción inmediata: `UPDATE accounts SET status='DEAD'`.\n- Consecuencia: Cuentas sanas con saldo o historial quedan inutilizadas permanentemente por bloqueos temporales de IP."},
+		{"id":"c429_propuesta","type":"text","x":100,"y":-240,"width":410,"height":180,"color":"4","text":"### 💡 Comportamiento Propuesto (Soberano)\n- Capturar `429` en `classify_deposit_status()`.\n- Acción: `UPDATE accounts SET status='rate_limited', cooldown_until = datetime('now', '+24 hours')`.\n- Matchmaking excluye la cuenta solo durante el cooldown.\n- En el siguiente ciclo tras 24h, se reintenta automáticamente."},
+		{"id":"c429_impacto","type":"text","x":-130,"y":0,"width":420,"height":150,"color":"6","text":"### 🎯 Archivos y Funciones Afectadas\n1. `auto_deposit.py` → `classify_deposit_status()` (L920) y `select_accounts_for_auto()` (L120)\n2. `deposits.py` → `_run_deposit_with_phases()` (L140)\n3. `betmexico_db.py` → Agregar columna `cooldown_until DATETIME` si no existe."}
+	],
+	"edges":[
+		{"id":"c429_e1","fromNode":"c429_actual","fromSide":"right","toNode":"c429_propuesta","toSide":"left","color":"3","label":"Reemplazar por"},
+		{"id":"c429_e2","fromNode":"c429_propuesta","fromSide":"bottom","toNode":"c429_impacto","toSide":"top","color":"4","label":"Implementación"}
+	],
+	"metadata":{
+		"version":"1.0-1.0",
+		"frontmatter":{}
+	}
 }

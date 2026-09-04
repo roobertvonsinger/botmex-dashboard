@@ -1,62 +1,142 @@
 {
-  "nodes": [
-    {
-      "id": "if_g",
-      "type": "group",
-      "label": "INFRAESTRUCTURA Y BASE DE DATOS",
-      "x": -400,
-      "y": -300,
-      "width": 900,
-      "height": 450,
-      "color": "6"
-    },
-    {
-      "id": "if_sqlite",
-      "type": "text",
-      "x": -360,
-      "y": -240,
-      "width": 240,
-      "height": 140,
-      "color": "4",
-      "text": "### 1. SQLite WAL Mode\nBase de datos local con busy_timeout=30s para evitar database locked en concurrencia."
-    },
-    {
-      "id": "if_proxy",
-      "type": "text",
-      "x": -70,
-      "y": -240,
-      "width": 240,
-      "height": 140,
-      "color": "6",
-      "text": "### 2. Proxy-Gate Failover\nRotación de proxies residenciales. Si un proxy falla con 402/timeout, conmuta en <1s."
-    },
-    {
-      "id": "if_sse",
-      "type": "text",
-      "x": 220,
-      "y": -240,
-      "width": 240,
-      "height": 140,
-      "color": "5",
-      "text": "### 3. Colas SSE en Memoria\n`_sse_queues` en FastAPI distribuye eventos sin persistir basura en base de datos."
-    }
-  ],
-  "edges": [
-    {
-      "id": "ife1",
-      "fromNode": "if_sqlite",
-      "fromSide": "right",
-      "toNode": "if_proxy",
-      "toSide": "left",
-      "color": "4"
-    },
-    {
-      "id": "ife2",
-      "fromNode": "if_proxy",
-      "fromSide": "right",
-      "toNode": "if_sse",
-      "toSide": "left",
-      "color": "6"
-    }
-  ]
+	"nodes": [
+		{
+			"id": "if_g_core",
+			"type": "group",
+			"label": "1. PERSISTENCIA Y BUS DE EVENTOS (CORE STATE)",
+			"x": -700,
+			"y": -350,
+			"width": 640,
+			"height": 450,
+			"color": "4"
+		},
+		{
+			"id": "if_g_egress",
+			"type": "group",
+			"label": "2. EGRESS RESIDENCIAL Y TOPOLOGÍA DOCKER",
+			"x": 0,
+			"y": -350,
+			"width": 950,
+			"height": 450,
+			"color": "6"
+		},
+		{
+			"id": "if_sqlite",
+			"type": "text",
+			"x": -660,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "4",
+			"text": "### 🗃️ 1. SQLite WAL Mode\nBase de datos local con `busy_timeout=30s` y modo WAL para lecturas concurrentes ilimitadas."
+		},
+		{
+			"id": "if_tables",
+			"type": "text",
+			"x": -660,
+			"y": -90,
+			"width": 260,
+			"height": 160,
+			"color": "4",
+			"text": "### 📋 2. Tablas Maestras\n`accounts`, `missions`, `cards`, `deposits`, `withdrawals`, `bin_stats`."
+		},
+		{
+			"id": "if_sse",
+			"type": "text",
+			"x": -360,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "5",
+			"text": "### 📡 3. Colas SSE en Memoria\n`_sse_queues` en FastAPI distribuye eventos sin basura en disco ni locks en base de datos."
+		},
+		{
+			"id": "if_stream",
+			"type": "text",
+			"x": -360,
+			"y": -90,
+			"width": 260,
+			"height": 160,
+			"color": "5",
+			"text": "### 🌐 4. Endpoint `/api/stream`\nCanal unidireccional de baja latencia consumido por navegadores y bot de Telegram."
+		},
+		{
+			"id": "if_proxy",
+			"type": "text",
+			"x": 40,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "2",
+			"text": "### 🛡️ 5. Proxy Pool Failover\n`call_with_proxy_failover`: Conmutación en <1s si una IP residencial responde lento o con error."
+		},
+		{
+			"id": "if_excl",
+			"type": "text",
+			"x": 340,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "1",
+			"text": "### 🛑 6. Filtro Anti-402\nExclusión inmediata de IPRoyal sin saldo (402) y LitPort. Tráfico exclusivo para JSON."
+		},
+		{
+			"id": "if_docker",
+			"type": "text",
+			"x": 640,
+			"y": -300,
+			"width": 270,
+			"height": 180,
+			"color": "6",
+			"text": "### 🐳 7. Docker KVM4\nContenedor `betmexico-web` en servidor KVM4 con volumen persistente en `/data`."
+		}
+	],
+	"edges": [
+		{
+			"id": "ife_sql_tab",
+			"fromNode": "if_sqlite",
+			"fromSide": "bottom",
+			"toNode": "if_tables",
+			"toSide": "top",
+			"color": "4"
+		},
+		{
+			"id": "ife_sql_sse",
+			"fromNode": "if_sqlite",
+			"fromSide": "right",
+			"toNode": "if_sse",
+			"toSide": "left",
+			"color": "5",
+			"label": "Emite cambio"
+		},
+		{
+			"id": "ife_sse_stream",
+			"fromNode": "if_sse",
+			"fromSide": "bottom",
+			"toNode": "if_stream",
+			"toSide": "top",
+			"color": "5"
+		},
+		{
+			"id": "ife_proxy_excl",
+			"fromNode": "if_proxy",
+			"fromSide": "right",
+			"toNode": "if_excl",
+			"toSide": "left",
+			"color": "1",
+			"label": "402/Fallo"
+		},
+		{
+			"id": "ife_excl_docker",
+			"fromNode": "if_excl",
+			"fromSide": "right",
+			"toNode": "if_docker",
+			"toSide": "left",
+			"color": "6"
+		}
+	],
+	"metadata": {
+		"version": "1.0-1.0",
+		"frontmatter": {}
+	}
 }

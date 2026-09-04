@@ -1,82 +1,191 @@
 {
-  "nodes": [
-    {
-      "id": "tg_g",
-      "type": "group",
-      "label": "FLUJO TELEGRAM BOT",
-      "x": -400,
-      "y": -300,
-      "width": 900,
-      "height": 450,
-      "color": "5"
-    },
-    {
-      "id": "tg_cmd",
-      "type": "text",
-      "x": -360,
-      "y": -240,
-      "width": 260,
-      "height": 140,
-      "color": "5",
-      "text": "### 1. Comandos de Entrada\n- `/start` Menú principal\n- `/bet` Inicia misión con pipes\n- `/check` Precheck de tarjetas\n- `/adduser` Alta de operador"
-    },
-    {
-      "id": "tg_gate",
-      "type": "text",
-      "x": -50,
-      "y": -240,
-      "width": 260,
-      "height": 140,
-      "color": "6",
-      "text": "### 2. Confirm Gate\n¿Operador confirma misión?\n- **Sí:** Encola misión y dispara motor.\n- **No:** Cancela y regresa al menú."
-    },
-    {
-      "id": "tg_live",
-      "type": "text",
-      "x": 260,
-      "y": -240,
-      "width": 200,
-      "height": 140,
-      "color": "5",
-      "text": "### 3. Mensaje en Vivo\nEdita el mensaje en Telegram vía callbacks/SSE con porcentaje de progreso."
-    },
-    {
-      "id": "tg_spei",
-      "type": "text",
-      "x": -50,
-      "y": -40,
-      "width": 260,
-      "height": 140,
-      "color": "4",
-      "text": "### 4. Ficha SPEI Final\nAl completar retiro con éxito, genera tarjeta visual con CURP + CLABE STP para copiar en 1 tap."
-    }
-  ],
-  "edges": [
-    {
-      "id": "tge1",
-      "fromNode": "tg_cmd",
-      "fromSide": "right",
-      "toNode": "tg_gate",
-      "toSide": "left",
-      "color": "5"
-    },
-    {
-      "id": "tge2",
-      "fromNode": "tg_gate",
-      "fromSide": "right",
-      "toNode": "tg_live",
-      "toSide": "left",
-      "color": "6",
-      "label": "Confirmado"
-    },
-    {
-      "id": "tge3",
-      "fromNode": "tg_live",
-      "fromSide": "bottom",
-      "toNode": "tg_spei",
-      "toSide": "right",
-      "color": "4",
-      "label": "Éxito"
-    }
-  ]
+	"nodes": [
+		{
+			"id": "tg_g_intake",
+			"type": "group",
+			"label": "1. INGESTA DE COMANDOS Y AUTORIZACIÓN",
+			"x": -700,
+			"y": -350,
+			"width": 640,
+			"height": 450,
+			"color": "5"
+		},
+		{
+			"id": "tg_g_mission",
+			"type": "group",
+			"label": "2. TELEMETRÍA EN VIVO Y ESTADOS TERMINALES",
+			"x": 0,
+			"y": -350,
+			"width": 950,
+			"height": 450,
+			"color": "6"
+		},
+		{
+			"id": "tg_cmd",
+			"type": "text",
+			"x": -660,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "5",
+			"text": "### 📱 1. Comandos de Entrada\n- `/start`: Menú principal y balance.\n- `/bet`: Inicia misión inyectando pipes.\n- `/check`: Precheck de tarjetas.\n- `/adduser`: Alta de operadores (SA)."
+		},
+		{
+			"id": "tg_auth",
+			"type": "text",
+			"x": -660,
+			"y": -90,
+			"width": 260,
+			"height": 160,
+			"color": "6",
+			"text": "### 🔐 2. Permisos y Roles\n- **Superadmin:** Tarjetas ilimitadas y 4 visores de logs.\n- **Operador:** Limitado a sus cuentas asignadas."
+		},
+		{
+			"id": "tg_gate",
+			"type": "text",
+			"x": -360,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "3",
+			"text": "### ⚖️ 3. Confirm Gate\n¿Operador confirma inicio de misión?\n- **Sí:** Encola misión y dispara motor.\n- **No:** Cancela y regresa al menú de inicio sin tocar recursos."
+		},
+		{
+			"id": "tg_live",
+			"type": "text",
+			"x": 40,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "5",
+			"text": "### 📡 4. Mensaje Misión en Vivo\nEdita el mensaje en Telegram vía callbacks/SSE mostrando progreso %, cuenta activa y saldo acumulado."
+		},
+		{
+			"id": "tg_fallback",
+			"type": "text",
+			"x": 40,
+			"y": -90,
+			"width": 260,
+			"height": 160,
+			"color": "2",
+			"text": "### 🩹 5. Fallback de Edición\nSi la API de Telegram falla con `MessageNotModified` o rate limit, emite un mensaje nuevo sin perder el hilo."
+		},
+		{
+			"id": "tg_term",
+			"type": "text",
+			"x": 340,
+			"y": -300,
+			"width": 260,
+			"height": 180,
+			"color": "3",
+			"text": "### 🚦 6. Clasificador Terminal\nEvalúa cómo concluyó la misión:\n- `completed` (fondeo exitoso)\n- `stopped_by_user` (paro de emergencia)\n- `failed` (rechazo total)"
+		},
+		{
+			"id": "tg_spei",
+			"type": "text",
+			"x": 640,
+			"y": -300,
+			"width": 270,
+			"height": 180,
+			"color": "4",
+			"text": "### 💸 7. Ficha SPEI Final\nAl completar retiro con éxito, genera tarjeta con CURP + CLABE STP en formato monoespaciado para copiar en 1 solo tap."
+		},
+		{
+			"id": "tg_stop",
+			"type": "text",
+			"x": 640,
+			"y": -90,
+			"width": 270,
+			"height": 160,
+			"color": "1",
+			"text": "### 🛑 8. Misión Detenida\nEmite alerta de paro, libera bloqueos de cuentas en SQLite y regresa al menú principal."
+		},
+		{
+			"id": "tg_link",
+			"type": "text",
+			"x": 340,
+			"y": -90,
+			"width": 260,
+			"height": 160,
+			"color": "5",
+			"text": "### 🔗 9. Enlace Web Portal\nBotón interactivo que abre `/user/{tg_id}` en el navegador para monitoreo visual completo."
+		}
+	],
+	"edges": [
+		{
+			"id": "tge_cmd_auth",
+			"fromNode": "tg_cmd",
+			"fromSide": "bottom",
+			"toNode": "tg_auth",
+			"toSide": "top",
+			"color": "5"
+		},
+		{
+			"id": "tge_cmd_gate",
+			"fromNode": "tg_cmd",
+			"fromSide": "right",
+			"toNode": "tg_gate",
+			"toSide": "left",
+			"color": "5",
+			"label": "/bet"
+		},
+		{
+			"id": "tge_gate_live",
+			"fromNode": "tg_gate",
+			"fromSide": "right",
+			"toNode": "tg_live",
+			"toSide": "left",
+			"color": "6",
+			"label": "Confirmado"
+		},
+		{
+			"id": "tge_live_fb",
+			"fromNode": "tg_live",
+			"fromSide": "bottom",
+			"toNode": "tg_fallback",
+			"toSide": "top",
+			"color": "2",
+			"label": "Edit falla"
+		},
+		{
+			"id": "tge_live_term",
+			"fromNode": "tg_live",
+			"fromSide": "right",
+			"toNode": "tg_term",
+			"toSide": "left",
+			"color": "6",
+			"label": "Fin misión"
+		},
+		{
+			"id": "tge_term_spei",
+			"fromNode": "tg_term",
+			"fromSide": "right",
+			"toNode": "tg_spei",
+			"toSide": "left",
+			"color": "4",
+			"label": "completed"
+		},
+		{
+			"id": "tge_term_stop",
+			"fromNode": "tg_term",
+			"fromSide": "bottom",
+			"toNode": "tg_stop",
+			"toSide": "top",
+			"color": "1",
+			"label": "stopped"
+		},
+		{
+			"id": "tge_live_link",
+			"fromNode": "tg_live",
+			"fromSide": "bottom",
+			"toNode": "tg_link",
+			"toSide": "top",
+			"color": "5",
+			"label": "Ver en vivo"
+		}
+	],
+	"metadata": {
+		"version": "1.0-1.0",
+		"frontmatter": {}
+	}
 }

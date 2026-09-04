@@ -1,0 +1,211 @@
+{
+	"nodes": [
+		{
+			"id": "g_kitchen_flow",
+			"type": "group",
+			"label": "FLUJO PRINCIPAL DE ESTACIONES (CANAL LINEAL)",
+			"x": -940,
+			"y": -310,
+			"width": 1720,
+			"height": 330,
+			"color": "6"
+		},
+		{
+			"id": "g_self_healing",
+			"type": "group",
+			"label": "ESTACIONES DE RECUPERACIÓN LOCAL (SELF-HEALING — 'BURNED POTATOES')",
+			"x": -600,
+			"y": 70,
+			"width": 1040,
+			"height": 260,
+			"color": "2"
+		},
+		{
+			"id": "g_legend",
+			"type": "group",
+			"label": "GUÍA MENTAL TDAH",
+			"x": -940,
+			"y": 70,
+			"width": 320,
+			"height": 260,
+			"color": "5"
+		},
+		{
+			"id": "n_maitre_d",
+			"type": "text",
+			"x": -900,
+			"y": -260,
+			"width": 280,
+			"height": 230,
+			"color": "5",
+			"text": "### 1. 📋 Maitre d' (Router & Intake)\n**Rol:** Receptor de órdenes.\n**Input:** Telegram `/bet`, Web UI, batch pipes.\n**Decisión:** \n- Valida formato de tarjeta (Luhn, expiración).\n- Asigna `mission_id` único.\n- Rutea a single, multi-batch o programado.\n**Output:** Lote sanitizado y listo para preparación."
+		},
+		{
+			"id": "n_prep_station",
+			"type": "text",
+			"x": -560,
+			"y": -260,
+			"width": 280,
+			"height": 230,
+			"color": "6",
+			"text": "### 2. 🥗 Prep Station (Normalizer & Pre-check)\n**Rol:** Selección de ingredientes limpios.\n**Input:** Lote de CCs + pool de cuentas.\n**Decisión:**\n- Matchmaking Cuotas Tier 40/40/20.\n- Pre-check Ruthopia Bridge (`:8787`).\n- Prefetch CapMonster tokens (expiran 55s).\n- Piso anti-huella (45-60s jitter).\n**Output:** Par óptimo `(cuenta, tarjeta)`."
+		},
+		{
+			"id": "n_line_cook",
+			"type": "text",
+			"x": -220,
+			"y": -260,
+			"width": 280,
+			"height": 230,
+			"color": "6",
+			"text": "### 3. 🔥 Line Cook (Motor de Ejecución)\n**Rol:** Ejecución sin titubeos.\n**Input:** Par preparado + token captcha.\n**Acción:**\n- Lanza `deposits.py` con `call_with_proxy_failover`.\n- `BeginDeposit` → `makePayment`.\n- ReCAPTCHA v2 gentil con jitter.\n**Output:** Respuesta cruda HTTP / Gateway."
+		},
+		{
+			"id": "n_taste_tester",
+			"type": "text",
+			"x": 120,
+			"y": -260,
+			"width": 280,
+			"height": 230,
+			"color": "3",
+			"text": "### 4. 👨‍🍳 Taste Tester (Quality Checker)\n**Rol:** Auditoría estricta de calidad.\n**Función:** `classify_deposit_status` + V10.\n**Decisión:**\n- ¿Saldo acreditado en cuenta? → Éxito.\n- ¿Declinación bancaria? → Papa quemada.\n- ¿Rate limit 429 / 406? → Cuarentena.\n- ¿Gateway 5xx? → Transitorio."
+		},
+		{
+			"id": "n_plating",
+			"type": "text",
+			"x": 460,
+			"y": -260,
+			"width": 280,
+			"height": 230,
+			"color": "4",
+			"text": "### 5. 🍽️ Plating & Delivery (Entrega Final)\n**Rol:** Emplatado perfecto y cobro.\n**Acción:**\n- Casar tarjeta 1:1 permanente (`is_married=1`).\n- Registrar en SQLite WAL sin bloqueo.\n- Emitir evento SSE `/api/stream`.\n- Generar Ficha SPEI con CURP + STP (1-tap).\n**Estado:** MISIÓN CUMPLIDA."
+		},
+		{
+			"id": "n_burn_station",
+			"type": "text",
+			"x": -220,
+			"y": 110,
+			"width": 280,
+			"height": 180,
+			"color": "2",
+			"text": "### 🥔 Cesto: Burned Potatoes\n**Principio Clave del Video:**\nSi el banco declina (`BANK_REJECTED`):\n1. La tarjeta se jubila (`burned`).\n2. **LA CUENTA SE SALVA:** Permanece limpia en pool.\n3. Se solicita la siguiente tarjeta del lote.\n→ **CERO pánico, CERO matar la cuenta.**"
+		},
+		{
+			"id": "n_cooldown_station",
+			"type": "text",
+			"x": 120,
+			"y": 110,
+			"width": 280,
+			"height": 180,
+			"color": "3",
+			"text": "### ⏳ Estación de Cuarentena (429/406)\n**Principio de Auto-Healing:**\nSi la pasarela emite 429 o captcha da 406:\n- **NUNCA marcar DEAD.**\n- Asignar cooldown 24h (`rate_limited_cooldown`).\n- Despertar silenciosamente en el siguiente ciclo.\n- El resto del lote continúa operando."
+		},
+		{
+			"id": "n_proxy_failover",
+			"type": "text",
+			"x": -560,
+			"y": 110,
+			"width": 280,
+			"height": 180,
+			"color": "2",
+			"text": "### 🔄 Failover Inmediato de Proxies\n**Auto-recuperación de red:**\n- Si un proxy devuelve 402 (sin saldo) o timeout:\n- Conmuta a la siguiente IP residencial en <1s.\n- Excluye el host temporalmente.\n- La misión no se interrumpe."
+		},
+		{
+			"id": "n_legend_rules",
+			"type": "text",
+			"x": -900,
+			"y": 110,
+			"width": 240,
+			"height": 180,
+			"color": "5",
+			"text": "### 🧠 Reglas de Oro TDAH\n1. **1 Nodo = 1 Sola Responsabilidad.**\n2. **Los fallos son locales, no globales.**\n3. **El estado fluye hacia adelante; los errores bajan a recuperación.**\n4. **Si te confundes, mira el nodo actual, no todo el bosque.**"
+		}
+	],
+	"edges": [
+		{
+			"id": "e_flow_1",
+			"fromNode": "n_maitre_d",
+			"fromSide": "right",
+			"toNode": "n_prep_station",
+			"toSide": "left",
+			"color": "5",
+			"label": "Orden limpia"
+		},
+		{
+			"id": "e_flow_2",
+			"fromNode": "n_prep_station",
+			"fromSide": "right",
+			"toNode": "n_line_cook",
+			"toSide": "left",
+			"color": "6",
+			"label": "Par cuenta+tarjeta"
+		},
+		{
+			"id": "e_flow_3",
+			"fromNode": "n_line_cook",
+			"fromSide": "right",
+			"toNode": "n_taste_tester",
+			"toSide": "left",
+			"color": "6",
+			"label": "Respuesta pasarela"
+		},
+		{
+			"id": "e_flow_4",
+			"fromNode": "n_taste_tester",
+			"fromSide": "right",
+			"toNode": "n_plating",
+			"toSide": "left",
+			"color": "4",
+			"label": "Aprobado (Depósito OK)"
+		},
+		{
+			"id": "e_heal_burn",
+			"fromNode": "n_taste_tester",
+			"fromSide": "bottom",
+			"toNode": "n_burn_station",
+			"toSide": "top",
+			"color": "2",
+			"label": "Rechazo banco"
+		},
+		{
+			"id": "e_heal_cooldown",
+			"fromNode": "n_taste_tester",
+			"fromSide": "bottom",
+			"toNode": "n_cooldown_station",
+			"toSide": "top",
+			"color": "3",
+			"label": "429 / 406"
+		},
+		{
+			"id": "e_heal_proxy",
+			"fromNode": "n_line_cook",
+			"fromSide": "bottom",
+			"toNode": "n_proxy_failover",
+			"toSide": "top",
+			"color": "2",
+			"label": "Fallo de conexión/IP"
+		},
+		{
+			"id": "e_proxy_retry",
+			"fromNode": "n_proxy_failover",
+			"fromSide": "right",
+			"toNode": "n_line_cook",
+			"toSide": "left",
+			"color": "6",
+			"label": "Reintento con IP limpia"
+		},
+		{
+			"id": "e_burn_retry",
+			"fromNode": "n_burn_station",
+			"fromSide": "left",
+			"toNode": "n_prep_station",
+			"toSide": "bottom",
+			"color": "5",
+			"label": "Cuenta sana pide nueva CC"
+		}
+	],
+	"metadata": {
+		"version": "1.0-1.0",
+		"frontmatter": {}
+	}
+}
