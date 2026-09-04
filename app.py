@@ -939,6 +939,19 @@ def auth_me(user: dict = Depends(require_session)):
     }
 
 
+# ── API — pública / healthcheck ────────────────────────────────────────────────
+
+@app.get("/api/health/ping")
+def health_ping():
+    """Healthcheck público y ultraligero para watchdogs y balanceadores de carga."""
+    try:
+        with db() as c:
+            n = c.execute("SELECT COUNT(*) FROM accounts").fetchone()[0]
+        return {"ok": True, "db": str(DB_PATH), "accounts": n}
+    except Exception as e:
+        return JSONResponse({"ok": False, "db": str(DB_PATH), "error": str(e)}, status_code=500)
+
+
 # ── API — protegida con sesión ─────────────────────────────────────────────────
 
 @app.get("/api/health")
