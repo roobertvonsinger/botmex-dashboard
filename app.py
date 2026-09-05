@@ -980,9 +980,11 @@ def health(user: dict = Depends(require_session)):
     try:
         with db() as c:
             n = c.execute("SELECT COUNT(*) FROM accounts").fetchone()[0]
-        return {"ok": True, "db": str(DB_PATH), "accounts": n}
+        db_file = str(os.environ.get("BETMEX_DB", str(DB_PATH)))
+        return {"ok": True, "db": db_file, "accounts": n}
     except Exception as e:
-        return JSONResponse({"ok": False, "db": str(DB_PATH), "error": str(e)}, status_code=500)
+        db_file = str(os.environ.get("BETMEX_DB", str(DB_PATH)))
+        return JSONResponse({"ok": False, "db": db_file, "error": str(e)}, status_code=500)
 
 
 def _build_search_clause(q):
@@ -1046,8 +1048,6 @@ def list_accounts(
     where, params = [], []
     if status != "all":
         where.append("a.status = ?"); params.append(status)
-        if status == "LIVE":
-            where.append("COALESCE(a.kyc_verified, 0) = 1")
     if grade:
         where.append("a.grade = ?"); params.append(grade)
     # Filtro: solo cuentas con al menos 1 tarjeta (en account_cards o account_notes con card)

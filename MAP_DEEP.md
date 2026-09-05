@@ -64,9 +64,9 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `auth_logout` | def | L942–L946 |
 | `auth_me` | def | L950–L960 |
 | `health_ping` | def | L966–L973 |
-| `health` | def | L979–L985 |
-| `_build_search_clause` | def | L988–L1032 |
-| `list_accounts` | def | L1036–L1184 |
+| `health` | def | L979–L987 |
+| `_build_search_clause` | def | L990–L1034 |
+| `list_accounts` | def | L1038–L1184 |
 | `list_users` | def | L1190–L1198 |
 | `list_assignments` | def | L1202–L1223 |
 | `AssignRequest` | class | L1226–L1228 |
@@ -651,10 +651,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_signal_handler` | def | L92–L95 |
 | `get_prioritized_candidates` | def | L98–L136 |
 | `check_single_account` | def | L141–L245 |
-| `apply_single_update` | def | L248–L333 |
-| `run_organic_cycle` | def | L337–L397 |
-| `daemon_loop` | def | L400–L436 |
-| `main` | def | L439–L456 |
+| `apply_single_update` | def | L248–L342 |
+| `run_organic_cycle` | def | L346–L406 |
+| `daemon_loop` | def | L409–L445 |
+| `main` | def | L448–L465 |
 
 ### `scripts/verify_all_accounts_active.py`
 

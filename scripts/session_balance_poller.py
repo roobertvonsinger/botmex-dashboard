@@ -305,15 +305,17 @@ def apply_single_update(res: Dict[str, Any]):
                     )
                     txns_inserted += 1
 
+            con.commit()
+            con.close()
+            con = None
+
             if txns_inserted > 0:
                 logger.info(f"[{email}] +{txns_inserted} movimientos nuevos sincronizados de BetMexico (hueco cerrado)")
                 try:
                     from web_grading import recalc_grade_from_db
                     recalc_grade_from_db(email)
-                except Exception:
-                    pass
-
-            con.commit()
+                except Exception as ex:
+                    logger.debug(f"[{email}] recalc_grade_from_db: {ex}")
 
         elif res.get("expired"):
             cur.execute(
@@ -326,11 +328,18 @@ def apply_single_update(res: Dict[str, Any]):
                 (acc_id,),
             )
             con.commit()
+            con.close()
+            con = None
             logger.info(f"[{email}] Sesión expirada (401) -> jwt_expires_at=0 ($0 captcha, sin marcar DEAD)")
 
-        con.close()
     except Exception as e:
         logger.warning(f"[{email}] Error guardando balance/txns en BD: {e}")
+    finally:
+        if con is not None:
+            try:
+                con.close()
+            except Exception:
+                pass
 
 
 

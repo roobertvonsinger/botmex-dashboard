@@ -129,7 +129,7 @@ prewarm.py (router)
 | `scripts/recalc_grades.py` | 136 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `scripts/reconcile_macro_fleet.py` | 142 | `macro_reconcile` | _[completar]_ |
 | `scripts/refresh_recent_fleet.py` | 124 | `fleet_refresh` | _[completar]_ |
-| `scripts/session_balance_poller.py` | 460 | `balance_poller` | _[completar]_ |
+| `scripts/session_balance_poller.py` | 469 | `balance_poller` | _[completar]_ |
 | `scripts/update_429.py` | 11 | `—` | _[completar]_ |
 | `scripts/update_proxy001_list.py` | 35 | `—` | _[completar]_ |
 | `scripts/verify_all_accounts_active.py` | 140 | `verify_all_accounts` | _[completar]_ |
@@ -283,6 +283,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b0940e1` | fix(sqlite): eliminate journal_mode lock contention, malformed false-positives and consolidate startup migrations |
 | `40ccf33` | fix(fleet): blindaje macro de 3 ductos, aislamiento 429 sin DEAD y preservacion de identidad |
 | `ba596f5` | feat(infra): consolidar migracion a KVM4-Karen botmex.2puty.tech, mapas actualizados y V10 |
 | `2ce5a83` | feat(api): endpoint publico /api/health/ping para healthchecks y watchdogs |
@@ -294,7 +295,6 @@ prewarm.py (router)
 | `71e866c` | fix(auto_deposit): rotacion continua de flota LIVE, piso 2 procesos reales y umbral retiro 100 pesos |
 | `45587c2` | fix(auto_deposit): desbloquear cuentas con withdrawal_ready=1 si saldo <  y ajustar ventana 1h en tests |
 | `e778a69` | feat(auto_deposit): scheduler continuo, afinidad bin corona y suite canonica bet |
-| `16afd94` | chore(reorg): mover 35 tests a tests/, purgar DBs fantasma y alinear canvas |
 <!-- GEN:end:recientes -->
 
 ---
