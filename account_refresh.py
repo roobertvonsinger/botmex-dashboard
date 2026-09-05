@@ -168,6 +168,8 @@ def is_hot_account(row: Dict[str, Any], now_iso: str) -> bool:
     `locked_until` compara lexicográficamente contra `now_iso`: ambos son
     ISO8601 en UTC, mismo formato, el orden lexicográfico coincide con el
     cronológico."""
+    if row.get("dead_reason") and "429" in str(row.get("dead_reason")):
+        return False
     balance = float(row.get("balance_real") or 0)
     if balance > 50:
         return True
@@ -217,7 +219,8 @@ def _load_candidate_rows() -> List[Dict[str, Any]]:
         cur = conn.execute(
             f"SELECT {', '.join(_SELECT_COLS)}, "
             f"{_PENDING_WD_EXISTS_SQL} AS has_pending_withdrawal "
-            "FROM accounts WHERE status='LIVE'"
+            "FROM accounts WHERE status='LIVE' "
+            "AND (dead_reason IS NULL OR dead_reason NOT LIKE '%429%')"
         )
         rows = [dict(row) for row in cur.fetchall()]
     for r in rows:

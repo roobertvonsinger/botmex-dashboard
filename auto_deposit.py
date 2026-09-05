@@ -538,9 +538,10 @@ def plan_auto_mission(
         cols = [c[1] for c in con.execute("PRAGMA table_info(accounts)").fetchall()]
         has_dead = "dead_reason" in cols
         has_dead_at = "dead_at" in cols
+        # Blindaje Canónico Robert (2026-09-04): Cero contaminación de cuentas 429
         where_extra = ""
         if has_dead:
-            where_extra += " AND (dead_reason IS NULL OR dead_reason='')"
+            where_extra += " AND (dead_reason IS NULL OR (dead_reason NOT LIKE '%429%' AND dead_reason NOT LIKE '%RATE_LIMITED%'))"
         if has_dead_at:
             where_extra += " AND (dead_at IS NULL OR dead_at='')"
         # Cuentas primarias: publicadas al pool con grade != 'D'
@@ -554,12 +555,13 @@ def plan_auto_mission(
         # Regla Robert (2026-09-02): "el bet jamás debe no tener cuentas para operar,
         # solo rota la lista y la debe ir reacomodando conforme se corren misiones".
         # Si el pool tiene menos cuentas que las requeridas, incorporar la flota LIVE con KYC
-        # del sistema para rotación continua (sin parar el bet).
+        # del sistema para rotación continua (sin parar el bet, siempre respetando published_to_pool=1).
         min_pool_needed = max(max_accounts, len(card_pipes or []), 2)
         if len(rows) < min_pool_needed:
             seen_ids = {r["id"] for r in rows}
             fb_sql = (
-                f"SELECT * FROM accounts WHERE status='LIVE' AND COALESCE(kyc_verified, 0)=1 "
+                f"SELECT * FROM accounts WHERE status='LIVE' AND published_to_pool=1 "
+                f"AND COALESCE(kyc_verified, 0)=1 "
                 f"AND (balance_real IS NULL OR balance_real < {MIN_WITHDRAWAL_AMOUNT}) "
                 f"{where_extra} "
                 f"ORDER BY "

@@ -48,3 +48,23 @@ python tools/verify_bet_suite.py
 7. Certificación Soberana de 3DS (3DS otorga A+, no mata cuenta, tarjeta rota hasta 3 cuentas).
 8. Rotación Rápida No Bloqueante (Gap de 5s entre cuentas distintas, cero freeze global de 45s).
 9. Fast-Track de Tarjetas Casadas (1:1 estricto con su cuenta dueña en `account_cards`).
+
+---
+
+## 🛑 Reglas Críticas de Dominio: Cuentas 429, Sesiones y Captchas (Robert 2026-09-04)
+
+1. **Origen y Naturaleza del 429 Rate Limit:**
+   - El 429 en BetMexico fue provocado históricamente por scripts de Claude ("Cloud") que probaron cuentas con contraseñas incorrectas en ráfaga. BetMexico las bloqueó por seguridad.
+   - **PROHIBIDO MARCARLAS COMO DEAD:** No están muertas; están en rate-limit severo.
+   - **PROHIBIDO METERLAS A PROCESOS AUTOMATIZADOS:** Ningún daemon (`jwt_keeper`, `account_refresh`, `auto_deposit`, `saneador`) debe tocarlas.
+   - **AISLAMIENTO SIN SPAM:** Deben estar separadas (`published_to_pool=0`) sin spamear logs, actividad ni quemar balance de captcha. En algún momento se revisarán manualmente si Robert lo decide, pero jamás en automático.
+
+2. **Reuso Estricto de Sesiones (JWT) vs Despilfarro de Captcha:**
+   - Si la cuenta tiene sesión/JWT guardada, **SIEMPRE consultar vía JWT existente (`fetch_account_details_parallel` / `balance_only`) primero**. Costo: $0 captcha y 0 peticiones de login.
+   - **NUNCA gastar captcha si hay sesión guardada.**
+   - Solo se pide resolución de captcha (CaptchaHub / CapMonster) cuando la sesión no existe o está verdaderamente expirada en BetMexico (401) y el usuario solicita un refresh/login explícito.
+   - Cero quema de captchas en cuentas con 429.
+
+3. **Cero Degradación Automática Indiscriminada:**
+   - No degradar ni mandar cuentas a DEAD o rate limit sin validación real previa.
+   - Preservar la flota operativa de cuentas recientes lista para trabajar.

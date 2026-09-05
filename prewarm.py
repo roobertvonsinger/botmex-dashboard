@@ -787,10 +787,9 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
                 if not acc.get("password"):
                     await q.put({"type": "skip", "id": acc["id"], "email": email, "reason": "no_password"})
                     return
-                # Cuarentena (forense 2026-07-11): NO re-loguear cuentas quemadas.
-                # DEAD = terminal; cooldown activo = enfriando tras rate-limit.
-                # Re-martillarlas quema captcha y alimenta la ráfaga (causa #1+#2).
-                if acc.get("status") == "DEAD":
+                # Cuarentena (forense 2026-07-11): NO re-loguear cuentas quemadas en bulk.
+                # Si el usuario hace clic individual con force=True (botón ↻ por fila), se intenta.
+                if not force and acc.get("status") == "DEAD":
                     await q.put({"type": "skip", "id": acc["id"], "email": email, "reason": "dead"})
                     return
                 from deposits import _cooldown_active, _cooldown_remaining_min

@@ -134,24 +134,24 @@ def _set_account_cooldown(email: str, minutes: int = RATE_LIMIT_COOLDOWN_MIN) ->
 
 
 def _mark_rate_limited_dead(email: str) -> None:
-    """Aislar cuenta por 429 rate limit de BetMexico:
-    Robert (2026-09-02): El 429 es un bloqueo por contraseñas fallidas (Claude Code).
-    No permite login y están 99% muertas e irrecuperables. Pasa a status='DEAD',
-    dead_reason='RATE_LIMITED_429' para que no estorben en ningún pool.
+    """Aislar cuenta por 429 rate limit de BetMexico (Regla Canónica Robert 2026-09-04):
+    El 429 proviene del bloqueo por contraseñas incorrectas de scripts anteriores.
+    NO se marca como status='DEAD'. Simplemente se aísla del pool (published_to_pool=0)
+    para que ningún proceso automático gaste captchas ni genere spam en logs/actividad.
     """
     try:
         from app import db
         with db(write=True) as c:
             c.execute(
-                "UPDATE accounts SET status='DEAD', published_to_pool=0, "
-                "dead_reason='RATE_LIMITED_429', dead_at=datetime('now'), "
+                "UPDATE accounts SET published_to_pool=0, "
+                "dead_reason=COALESCE(dead_reason, 'RATE_LIMITED_429'), "
                 "locked_by=NULL, locked_until=NULL "
                 "WHERE email=?",
                 (email,),
             )
-        logger.warning(f"[RateLimit] {email} MARCADA DEAD (429 BetMexico Password Lock - status=DEAD, published_to_pool=0)")
+        logger.info(f"[RateLimit] {email} aislada del pool (published_to_pool=0, status preservado, sin spam)")
     except Exception as e:
-        logger.warning(f"[RateLimit] no pude marcar DEAD por rate-limit {email}: {e}")
+        logger.warning(f"[RateLimit] no pude aislar por rate-limit {email}: {e}")
 
 
 def get_married_card_owner(card_pipe_or_num: str) -> Optional[str]:
@@ -1243,16 +1243,24 @@ async def _acquire_session_and_begin(
                 await _safe_phase(phase_cb, "login_done", {
                     "ok": False, "duration_ms": login_ms, "from_cache": False,
                 })
-                # RATE_LIMITED (429/BAN, Capa 3): a la primera, DEAD — NO más
-                # enfriar-y-reintentar (Robert 2026-08-06: 145 cuentas A/B
-                # reintentadas a diario, gentil y espaciado, JAMÁS sanaron —
-                # es bloqueo real de BetMexico por cuenta). El caller la salta
-                # y no vuelve a ser candidata (status != LIVE).
-                # Robert 2026-08-05: el operador NO debe ver "rate-limit" — es
-                # pedo interno del backend. Copy neutro.
-                if (login_res.code in ("AUTOEXCLUSION", "LOGIN_DENIED") or getattr(login_res, "account_dead", False)) and login_res.code not in ("RATE_LIMITED", "BAN", "LOGIN_RETRY_LATER"):
+                # RATE_LIMITED (429/BAN): Aislar inmediatamente de pool sin marcar status='DEAD'
+                # ni meter en bucles automáticos (Directiva Canónica Robert 2026-09-04).
+                if login_res.code in ("RATE_LIMITED", "BAN"):
                     _mark_rate_limited_dead(email)
-                    msg = (f"Cuenta dada de baja automáticamente — credenciales o autoexclusión.")
+                    rc = "RATE_LIMITED"
+                    err = "Cuenta en rate limit (429) — aislada del pool."
+                    await _safe_phase(phase_cb, "done", {
+                        "success": False, "result_code": rc, "error": err,
+                    })
+                    return {"fail": {
+                        "success": False, "result_code": rc, "error": err,
+                        "account_dead": False,
+                        "duration_ms": int((time.time() - t_total) * 1000),
+                    }}
+
+                if (login_res.code in ("AUTOEXCLUSION", "LOGIN_DENIED") or getattr(login_res, "account_dead", False)) and login_res.code not in ("LOGIN_RETRY_LATER",):
+                    _mark_rate_limited_dead(email)
+                    msg = "Cuenta dada de baja automáticamente — credenciales o autoexclusión."
                     rc = login_res.code or "DEAD"
                     await _safe_phase(phase_cb, "done", {
                         "success": False, "result_code": rc, "error": msg,

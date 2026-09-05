@@ -22,15 +22,15 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `cfg` | def | L80–L95 |
 | `select_refresh_candidates_healthy` | def | L99–L150 |
 | `_exp_int` | def | L153–L159 |
-| `is_hot_account` | def | L162–L179 |
-| `_load_candidate_rows` | def | L202–L226 |
-| `_db_get_withdrawal_ready` | def | L229–L236 |
-| `_db_set_withdrawal_ready` | def | L239–L248 |
-| `run_refresh_cycle` | def | L252–L448 |
-| `run_refresh_cycle_from_env` | def | L451–L458 |
-| `_load_pending_withdrawals` | def | L473–L482 |
-| `_resolve_pending_withdrawals` | def | L485–L573 |
-| `_withdrawal_resolution_loop` | def | L576–L592 |
+| `is_hot_account` | def | L162–L181 |
+| `_load_candidate_rows` | def | L204–L229 |
+| `_db_get_withdrawal_ready` | def | L232–L239 |
+| `_db_set_withdrawal_ready` | def | L242–L251 |
+| `run_refresh_cycle` | def | L255–L451 |
+| `run_refresh_cycle_from_env` | def | L454–L461 |
+| `_load_pending_withdrawals` | def | L476–L485 |
+| `_resolve_pending_withdrawals` | def | L488–L576 |
+| `_withdrawal_resolution_loop` | def | L579–L595 |
 
 ### `app.py`
 
@@ -225,19 +225,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_has_card_deposit_24h` | def | L213–L229 |
 | `select_accounts_for_auto` | def | L241–L478 |
 | `_max_accounts_for_cards` | def | L487–L495 |
-| `plan_auto_mission` | def | L498–L986 |
-| `_fake_progress_pct` | def | L1029–L1060 |
-| `_iso` | def | L1064–L1065 |
-| `_m_load` | def | L1068–L1076 |
-| `_m_status` | def | L1079–L1081 |
-| `_m_update` | def | L1084–L1094 |
-| `_fetch_account` | def | L1097–L1104 |
-| `_is_account_dead` | def | L1107–L1118 |
-| `_unlock` | def | L1121–L1130 |
-| `_pull_fresh_live_account` | def | L1133–L1216 |
-| `_broadcast_mission` | def | L1219–L1248 |
-| `_stop_pool` | def | L1251–L1258 |
-| `run_auto_mission` | def | L1262–L2304 |
+| `plan_auto_mission` | def | L498–L988 |
+| `_fake_progress_pct` | def | L1031–L1062 |
+| `_iso` | def | L1066–L1067 |
+| `_m_load` | def | L1070–L1078 |
+| `_m_status` | def | L1081–L1083 |
+| `_m_update` | def | L1086–L1096 |
+| `_fetch_account` | def | L1099–L1106 |
+| `_is_account_dead` | def | L1109–L1120 |
+| `_unlock` | def | L1123–L1132 |
+| `_pull_fresh_live_account` | def | L1135–L1218 |
+| `_broadcast_mission` | def | L1221–L1250 |
+| `_stop_pool` | def | L1253–L1260 |
+| `run_auto_mission` | def | L1264–L2306 |
 
 ### `autoexclusion.py`
 
@@ -494,20 +494,20 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_build_admin_proxy_url` | def | L1096–L1100 |
 | `_refresh_account_after_deposit` | def | L1103–L1162 |
 | `_should_relogin_after_401` | def | L1165–L1169 |
-| `_acquire_session_and_begin` | def | L1172–L1458 |
-| `_run_deposit_with_phases` | def | L1461–L1806 |
-| `deposit_execute_stream` | def | L1810–L2027 |
-| `cap_status` | def | L2031–L2043 |
-| `_mm_is_real_decline` | def | L2083–L2089 |
-| `_mm_is_ambiguous_charge` | def | L2092–L2102 |
-| `classify_deposit_status` | def | L2105–L2136 |
-| `_mm_session_get` | def | L2179–L2183 |
-| `_mm_session_update` | def | L2186–L2195 |
-| `multi_stream` | def | L2199–L2722 |
-| `multi_cancel` | def | L2726–L2731 |
-| `scheduled_create` | def | L2744–L3117 |
-| `scheduled_list` | def | L3121–L3143 |
-| `scheduled_cancel` | def | L3147–L3155 |
+| `_acquire_session_and_begin` | def | L1172–L1466 |
+| `_run_deposit_with_phases` | def | L1469–L1814 |
+| `deposit_execute_stream` | def | L1818–L2035 |
+| `cap_status` | def | L2039–L2051 |
+| `_mm_is_real_decline` | def | L2091–L2097 |
+| `_mm_is_ambiguous_charge` | def | L2100–L2110 |
+| `classify_deposit_status` | def | L2113–L2144 |
+| `_mm_session_get` | def | L2187–L2191 |
+| `_mm_session_update` | def | L2194–L2203 |
+| `multi_stream` | def | L2207–L2730 |
+| `multi_cancel` | def | L2734–L2739 |
+| `scheduled_create` | def | L2752–L3125 |
+| `scheduled_list` | def | L3129–L3151 |
+| `scheduled_cancel` | def | L3155–L3163 |
 
 ### `jwt_keeper.py`
 
@@ -517,12 +517,12 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `cfg` | def | L45–L87 |
 | `select_refresh_candidates` | def | L91–L172 |
 | `_exp_int` | def | L175–L181 |
-| `_load_candidate_rows` | def | L199–L241 |
-| `_set_cooldown` | def | L244–L251 |
-| `_bump_rl_streak` | def | L254–L268 |
-| `_reset_rl_streak` | def | L271–L278 |
-| `run_keepalive_cycle` | def | L282–L379 |
-| `run_keepalive_cycle_from_env` | def | L382–L389 |
+| `_load_candidate_rows` | def | L199–L243 |
+| `_set_cooldown` | def | L246–L253 |
+| `_bump_rl_streak` | def | L256–L270 |
+| `_reset_rl_streak` | def | L273–L280 |
+| `run_keepalive_cycle` | def | L284–L381 |
+| `run_keepalive_cycle_from_env` | def | L384–L391 |
 
 ### `login_orchestrator.py`
 
@@ -557,7 +557,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `prewarm_select` | def | L604–L688 |
 | `prewarm_cancel` | def | L692–L702 |
 | `prewarm_status` | def | L706–L721 |
-| `prewarm_refresh_stream` | def | L727–L918 |
+| `prewarm_refresh_stream` | def | L727–L917 |
 
 ### `renapo_validator.py`
 
@@ -620,6 +620,22 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 |---------|------|--------|
 | `_import_analyzer` | def | L21–L40 |
 | `main` | def | L43–L132 |
+
+### `scripts/reconcile_macro_fleet.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `get_target_accounts` | def | L34–L57 |
+| `process_account` | def | L59–L115 |
+| `main` | def | L117–L139 |
+
+### `scripts/refresh_recent_fleet.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `get_target_accounts` | def | L30–L44 |
+| `process_account` | def | L46–L97 |
+| `main` | def | L99–L121 |
 
 ### `scripts/verify_all_accounts_active.py`
 
@@ -850,8 +866,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `betmexico.web.grading` | `web_grading.py` |
 | `betmexico.web.utils` | `web_utils.py` |
 | `dashboard.proxy_pool` | `proxy_pool.py` |
+| `fleet_refresh` | `scripts/refresh_recent_fleet.py` |
 | `httpcore` | `betmexico_login_api.py` |
 | `httpx` | `betmexico_login_api.py` |
+| `macro_reconcile` | `scripts/reconcile_macro_fleet.py` |
 | `saneador` | `saneador_daemon.py` |
 | `verify_all_accounts` | `scripts/verify_all_accounts_active.py` |
 <!-- GEN:end:loggers -->

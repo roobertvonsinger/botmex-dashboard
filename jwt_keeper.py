@@ -224,6 +224,7 @@ def _load_candidate_rows() -> List[Dict[str, Any]]:
                 f"SELECT {', '.join(_SELECT_COLS)}, "
                 f"{_PENDING_WD_EXISTS_SQL} AS has_pending_withdrawal "
                 "FROM accounts WHERE status='LIVE' "
+                "AND (dead_reason IS NULL OR dead_reason NOT LIKE '%429%') "
                 f"AND (published_to_pool=1 "
                 f"OR (published_to_pool=0 AND lower(locked_by) IN ({placeholders})))",
                 [t.lower() for t in sa_tokens],
@@ -232,7 +233,8 @@ def _load_candidate_rows() -> List[Dict[str, Any]]:
             cur = conn.execute(
                 f"SELECT {', '.join(_SELECT_COLS)}, "
                 f"{_PENDING_WD_EXISTS_SQL} AS has_pending_withdrawal "
-                "FROM accounts WHERE status='LIVE' AND published_to_pool=1"
+                "FROM accounts WHERE status='LIVE' AND published_to_pool=1 "
+                "AND (dead_reason IS NULL OR dead_reason NOT LIKE '%429%')"
             )
         rows = [dict(row) for row in cur.fetchall()]
     for r in rows:
