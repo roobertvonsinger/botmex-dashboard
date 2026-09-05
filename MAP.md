@@ -98,12 +98,12 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 595 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5448 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 5469 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 2306 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `betmexico_config.py` | 183 | `betmexico` | _[completar]_ |
-| `betmexico_db.py` | 2960 | `—` | _[completar]_ |
+| `betmexico_db.py` | 2959 | `—` | _[completar]_ |
 | `betmexico_deposit.py` | 958 | `—` | _[completar]_ |
 | `betmexico_login_api.py` | 1138 | `httpx` | _[completar]_ |
 | `betmexico_login_service.py` | 144 | `betmexico.login_service` | _[completar]_ |
@@ -111,10 +111,10 @@ prewarm.py (router)
 | `betmexico_utils.py` | 1159 | `—` | _[completar]_ |
 | `bin_intelligence.py` | 701 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
 | `card_checker.py` | 598 | `betmexico.dashboard.card_checker` | _[completar]_ |
-| `clabe_fetch.py` | 188 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
+| `clabe_fetch.py` | 189 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 218 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
-| `db_registry.py` | 110 | `betmexico.dashboard.db` | _[completar]_ |
+| `db_registry.py` | 112 | `betmexico.dashboard.db` | _[completar]_ |
 | `deposits.py` | 3163 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 391 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 236 | `betmexico.dashboard.login_orch` | _[completar]_ |
@@ -124,16 +124,18 @@ prewarm.py (router)
 | `saneador_daemon.py` | 275 | `saneador` | _[completar]_ |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
+| `scripts/kvm4_local_backup.py` | 75 | `—` | _[completar]_ |
 | `scripts/migrate_status_no_banco.py` | 80 | `—` | _[completar]_ |
 | `scripts/recalc_grades.py` | 136 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `scripts/reconcile_macro_fleet.py` | 142 | `macro_reconcile` | _[completar]_ |
 | `scripts/refresh_recent_fleet.py` | 124 | `fleet_refresh` | _[completar]_ |
+| `scripts/session_balance_poller.py` | 460 | `balance_poller` | _[completar]_ |
 | `scripts/update_429.py` | 11 | `—` | _[completar]_ |
 | `scripts/update_proxy001_list.py` | 35 | `—` | _[completar]_ |
 | `scripts/verify_all_accounts_active.py` | 140 | `verify_all_accounts` | _[completar]_ |
 | `shared/betmexico_payment_analyzer.py` | 592 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
 | `web_auth.py` | 159 | `betmexico.web.auth` | Endpoints HTTP de auth: login, logout, me, cambio de password |
-| `web_grading.py` | 197 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
+| `web_grading.py` | 173 | `betmexico.web.grading` | Recalcula `grade` y `grade_score` de una cuenta desde BD (usa analyzer V10) |
 | `web_utils.py` | 265 | `betmexico.web.utils` | Helpers compartidos: _friendly_error, _normalize_ccexp, _build_proxy_url |
 | `withdrawals.py` | 999 | `betmexico.dashboard.withdrawals` | Retiro automático vía API BetMexico (5 pasos). `execute_withdrawal` orquesta PASO0-3. `_refresh_account_after_withdrawal` refresca saldo post-retiro reusando JWT |
 <!-- GEN:end:modulos -->
@@ -224,10 +226,21 @@ prewarm.py (router)
 | `TASK_TIMEOUT_SEC` | `25` | `prewarm.py` |
 | `INITIAL_MAP` | `"""\` | `scripts/gen_map.py` |
 | `INITIAL_MAP_DEEP` | `"""\` | `scripts/gen_map.py` |
+| `DB_PATH` | `"/opt/kvm4/apps/betmexico/data/betmexico_accounts.db"` | `scripts/kvm4_local_backup.py` |
+| `BACKUPS_DIR` | `"/opt/kvm4/apps/betmexico/data/backups"` | `scripts/kvm4_local_backup.py` |
+| `LOG_FILE` | `"/opt/kvm4/apps/betmexico/data/logs/backup.log"` | `scripts/kvm4_local_backup.py` |
+| `RETENTION_COUNT` | `14` | `scripts/kvm4_local_backup.py` |
 | `LOG_FILE` | `'/data/logs/reconcile_macro_fleet.log'` | `scripts/reconcile_macro_fleet.py` |
 | `DB_PATH` | `'/data/betmexico_accounts.db'` | `scripts/reconcile_macro_fleet.py` |
 | `LOG_FILE` | `'/data/logs/manual_refresh_fleet.log'` | `scripts/refresh_recent_fleet.py` |
 | `DB_PATH` | `'/data/betmexico_accounts.db'` | `scripts/refresh_recent_fleet.py` |
+| `PID_FILE` | `"/data/session_balance_poller.pid"` | `scripts/session_balance_poller.py` |
+| `WALLET_URL` | `"https://paymentsapi.betmexico.mx/api/Wallet/Total/Amount/ByAccountTyp` | `scripts/session_balance_poller.py` |
+| `REQUEST_TIMEOUT_SEC` | `9.0` | `scripts/session_balance_poller.py` |
+| `DEFAULT_CYCLE_INTERVAL_SEC` | `300` | `scripts/session_balance_poller.py` |
+| `MIN_PACING_GAP_SEC` | `2.0` | `scripts/session_balance_poller.py` |
+| `MAX_PACING_GAP_SEC` | `4.5` | `scripts/session_balance_poller.py` |
+| `TXN_URL` | `"https://paymentsapi.betmexico.mx/api/Wallet/Transactions/ByUser/"` | `scripts/session_balance_poller.py` |
 | `TXN_STATUS_SUCCESS` | `6` | `shared/betmexico_payment_analyzer.py` |
 | `TXN_STATUS_PENDING` | `0` | `shared/betmexico_payment_analyzer.py` |
 | `TXN_STATUS_FAILED` | `-4` | `shared/betmexico_payment_analyzer.py` |
@@ -270,6 +283,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `40ccf33` | fix(fleet): blindaje macro de 3 ductos, aislamiento 429 sin DEAD y preservacion de identidad |
 | `ba596f5` | feat(infra): consolidar migracion a KVM4-Karen botmex.2puty.tech, mapas actualizados y V10 |
 | `2ce5a83` | feat(api): endpoint publico /api/health/ping para healthchecks y watchdogs |
 | `e0e8961` | refactor(core): saneamiento integral de deuda tecnica, unificacion V10 y desacoplamiento sqlite |
@@ -281,7 +295,6 @@ prewarm.py (router)
 | `45587c2` | fix(auto_deposit): desbloquear cuentas con withdrawal_ready=1 si saldo <  y ajustar ventana 1h en tests |
 | `e778a69` | feat(auto_deposit): scheduler continuo, afinidad bin corona y suite canonica bet |
 | `16afd94` | chore(reorg): mover 35 tests a tests/, purgar DBs fantasma y alinear canvas |
-| `92ed3a1` | skills: suite oficial obsidian instalada en botmex-dashboard |
 <!-- GEN:end:recientes -->
 
 ---

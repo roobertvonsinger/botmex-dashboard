@@ -163,9 +163,23 @@ from db_registry import (
 )
 
 
+_MIGRATED = False
+
+
 def _migrate():
     """Aditivo: locked_until + published_to_pool (default 1 = pool)."""
-    for col, ddl in [
+    global _MIGRATED
+    if _MIGRATED:
+        return
+    _MIGRATED = True
+
+    try:
+        with db() as r:
+            existing_acct_cols = {row["name"] for row in r.execute("PRAGMA table_info(accounts)").fetchall()}
+    except Exception:
+        existing_acct_cols = set()
+
+    column_ddls = [
         ("locked_until", "ALTER TABLE accounts ADD COLUMN locked_until TEXT"),
         ("published_to_pool", "ALTER TABLE accounts ADD COLUMN published_to_pool INTEGER DEFAULT 1"),
         ("dead_reason", "ALTER TABLE accounts ADD COLUMN dead_reason TEXT"),
@@ -217,13 +231,20 @@ def _migrate():
         # _db_touch_last_checked) — para que la tabla muestre "Últ. update" real.
         # Lo escribe prewarm._db_upsert_balance. Aditiva.
         ("last_updated_at", "ALTER TABLE accounts ADD COLUMN last_updated_at TEXT"),
-    ]:
+    ]
+
+    needed = [(col, ddl) for col, ddl in column_ddls if col not in existing_acct_cols]
+    if needed:
         try:
             with db(write=True) as c:
-                c.execute(ddl)
-        except sqlite3.OperationalError as e:
-            if "duplicate column name" not in str(e) and "no such table" not in str(e):
-                raise
+                for col, ddl in needed:
+                    try:
+                        c.execute(ddl)
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column name" not in str(e) and "no such table" not in str(e):
+                            raise
+        except Exception as e:
+            _lg.warning(f"[_migrate columns] {e}")
     # Marcador privado por usuario (spec 2026-06-29): apartar una cuenta para
     # trabajarla luego. NO bloquea, NO cambia visibilidad. Privado por user_key.
     try:
@@ -3387,12 +3408,12 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
         except sqlite3.OperationalError:
             result["cards"] = []
 
-        # Transacciones recientes
+        # Transacciones recientes (ampliado a 150 para evitar huecos temporales en cuentas activas)
         try:
             rows = c.execute(
                 "SELECT id, txn_date, amount, status, txn_type, gateway, fetched_at "
                 "FROM account_transactions WHERE account_email=? "
-                "ORDER BY txn_date DESC LIMIT 30",
+                "ORDER BY txn_date DESC LIMIT 150",
                 (acc["email"],),
             ).fetchall()
             result["transactions"] = [dict(r) for r in rows]
@@ -3405,7 +3426,7 @@ def account_details(account_id: int, _user: dict = Depends(require_session)):
                 "SELECT attempt_id, amount, status, rejection_reason, card_pipe, "
                 "       duration_ms, operator_id, created_at "
                 "FROM deposit_attempts WHERE account_email=? "
-                "ORDER BY id DESC LIMIT 30",
+                "ORDER BY id DESC LIMIT 100",
                 (acc["email"],),
             ).fetchall()
             result["deposit_attempts"] = [dict(r) for r in rows]

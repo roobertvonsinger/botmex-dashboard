@@ -107,10 +107,11 @@ def _persist_clabes(db_path: str, account_id: int, email: str, data: dict) -> in
     """
     accounts = data.get("accounts") or []
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    con = sqlite3.connect(db_path, timeout=10)
+    con = sqlite3.connect(db_path, timeout=30.0)
     con.row_factory = sqlite3.Row
     try:
-        con.execute("PRAGMA journal_mode=WAL")
+        con.execute("PRAGMA busy_timeout = 30000")
+        con.execute("PRAGMA synchronous = NORMAL")
         con.execute("DELETE FROM account_deposit_clabes WHERE account_id=?", (account_id,))
         for a in accounts:
             clabe = a.get("account")

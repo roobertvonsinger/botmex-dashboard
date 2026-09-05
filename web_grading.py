@@ -63,43 +63,34 @@ def recalc_grade_from_db(email: str, db_path: str = "/data/betmexico_accounts.db
     # (solo docker restart lo liberaba). Cada depósito que fallaba fugaba otra.
     # Fix: try/finally garantiza close (que rollbackea la transacción pendiente) +
     # timeout=10 para coincidir con el context manager `db()` de app.py.
-    conn = None
     try:
-        conn = sqlite3.connect(db_path, timeout=10)
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            "SELECT txn_date, status, txn_type, gateway, amount "
-            "FROM account_transactions WHERE LOWER(account_email)=LOWER(?) "
-            "ORDER BY txn_date DESC",
-            (email,),
-        ).fetchall()
-        if not rows:
-            return None
-        details = {"transactions": {
-            "fetched": True,
-            "items": [dict(r) for r in rows],
-            "total_rows": len(rows),
-        }}
-        sc = score_payment_readiness(details)
-        if not sc:
-            return None
-        # A+ es un override manual (3DS detectado por el matchmaker, no lo calcula
-        # el analyzer V10) — un recalc de rutina (login/check/depósito/prewarm) NUNCA
-        # lo pisa. La ÚNICA vía de salida de A+ es `note_a_plus_outcome` (abajo): 2
-        # rechazos REALES de banco consecutivos → B. Por eso el UPDATE excluye A+.
-        conn.execute(
-            "UPDATE accounts SET grade=?, grade_score=? "
-            "WHERE LOWER(email)=LOWER(?) AND COALESCE(grade,'') != 'A+'",
-            (sc["grade"], sc["score"], email),
-        )
-        conn.commit()
-        return sc
+        from db_registry import db
+        with db(write=True, db_path=db_path) as conn:
+            rows = conn.execute(
+                "SELECT txn_date, status, txn_type, gateway, amount "
+                "FROM account_transactions WHERE LOWER(account_email)=LOWER(?) "
+                "ORDER BY txn_date DESC",
+                (email,),
+            ).fetchall()
+            if not rows:
+                return None
+            details = {"transactions": {
+                "fetched": True,
+                "items": [dict(r) for r in rows],
+                "total_rows": len(rows),
+            }}
+            sc = score_payment_readiness(details)
+            if not sc:
+                return None
+            conn.execute(
+                "UPDATE accounts SET grade=?, grade_score=? "
+                "WHERE LOWER(email)=LOWER(?) AND COALESCE(grade,'') != 'A+'",
+                (sc["grade"], sc["score"], email),
+            )
+            return sc
     except Exception as e:
         logger.warning(f"[grading] recalc failed para {email}: {e}")
         return None
-    finally:
-        if conn is not None:
-            conn.close()
 
 
 def recalc_grade_from_details(email: str, details: dict, db_path: str = "/data/betmexico_accounts.db") -> Optional[dict]:
@@ -113,27 +104,18 @@ def recalc_grade_from_details(email: str, details: dict, db_path: str = "/data/b
     sc = score_payment_readiness(details)
     if not sc:
         return None
-    # Mismo fix de fuga que recalc_grade_from_db (ver nota ahí): try/finally garantiza
-    # close + timeout=10. El except anterior NO cerraba conn → transacción abierta
-    # sostenía el writer lock indefinidamente bajo contención.
-    conn = None
     try:
-        # Ver nota en recalc_grade_from_db: un recalc de rutina no pisa A+; solo
-        # note_a_plus_outcome (2 declines de banco consecutivas) lo baja a B.
-        conn = sqlite3.connect(db_path, timeout=10)
-        conn.execute(
-            "UPDATE accounts SET grade=?, grade_score=? "
-            "WHERE LOWER(email)=LOWER(?) AND COALESCE(grade,'') != 'A+'",
-            (sc["grade"], sc["score"], email),
-        )
-        conn.commit()
-        return sc
+        from db_registry import db
+        with db(write=True, db_path=db_path) as conn:
+            conn.execute(
+                "UPDATE accounts SET grade=?, grade_score=? "
+                "WHERE LOWER(email)=LOWER(?) AND COALESCE(grade,'') != 'A+'",
+                (sc["grade"], sc["score"], email),
+            )
+            return sc
     except Exception as e:
         logger.warning(f"[grading] recalc_from_details failed para {email}: {e}")
         return None
-    finally:
-        if conn is not None:
-            conn.close()
 
 
 def note_a_plus_outcome(email: str, status: str, db_path: str = "/data/betmexico_accounts.db") -> None:
@@ -157,41 +139,35 @@ def note_a_plus_outcome(email: str, status: str, db_path: str = "/data/betmexico
     """
     if status not in ("approved", "rejected"):
         return  # no-banco / 3DS → ni incrementa ni resetea el streak
-    # Mismo fix de fuga que recalc_grade_from_db: try/finally + timeout=10.
-    conn = None
     try:
-        conn = sqlite3.connect(db_path, timeout=10)
-        conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT COALESCE(grade,'') AS grade, COALESCE(a_plus_decline_streak,0) AS streak "
-            "FROM accounts WHERE LOWER(email)=LOWER(?)",
-            (email,),
-        ).fetchone()
-        if not row or row["grade"] != "A+":
-            return
-        if status == "approved":
-            conn.execute(
-                "UPDATE accounts SET a_plus_decline_streak=0 WHERE LOWER(email)=LOWER(?)",
+        from db_registry import db
+        with db(write=True, db_path=db_path) as conn:
+            row = conn.execute(
+                "SELECT COALESCE(grade,'') AS grade, COALESCE(a_plus_decline_streak,0) AS streak "
+                "FROM accounts WHERE LOWER(email)=LOWER(?)",
                 (email,),
-            )
-        else:  # "rejected" = rechazo real de banco
-            new_streak = int(row["streak"]) + 1
-            if new_streak >= 2:
-                b_score = _ANALYZER.SCORE_FLOOR.get("B", 60) if _ANALYZER else 60
+            ).fetchone()
+            if not row or row["grade"] != "A+":
+                return
+            if status == "approved":
                 conn.execute(
-                    "UPDATE accounts SET grade='B', grade_score=?, a_plus_decline_streak=0 "
-                    "WHERE LOWER(email)=LOWER(?)",
-                    (b_score, email),
+                    "UPDATE accounts SET a_plus_decline_streak=0 WHERE LOWER(email)=LOWER(?)",
+                    (email,),
                 )
-                logger.info(f"[grading] {email}: A+ → B (3 rechazos de banco consecutivos)")
-            else:
-                conn.execute(
-                    "UPDATE accounts SET a_plus_decline_streak=? WHERE LOWER(email)=LOWER(?)",
-                    (new_streak, email),
-                )
-        conn.commit()
+            else:  # "rejected" = rechazo real de banco
+                new_streak = int(row["streak"]) + 1
+                if new_streak >= 2:
+                    b_score = _ANALYZER.SCORE_FLOOR.get("B", 60) if _ANALYZER else 60
+                    conn.execute(
+                        "UPDATE accounts SET grade='B', grade_score=?, a_plus_decline_streak=0 "
+                        "WHERE LOWER(email)=LOWER(?)",
+                        (b_score, email),
+                    )
+                    logger.info(f"[grading] {email}: A+ → B (3 rechazos de banco consecutivos)")
+                else:
+                    conn.execute(
+                        "UPDATE accounts SET a_plus_decline_streak=? WHERE LOWER(email)=LOWER(?)",
+                        (new_streak, email),
+                    )
     except Exception as e:
         logger.warning(f"[grading] note_a_plus_outcome failed para {email}: {e}")
-    finally:
-        if conn is not None:
-            conn.close()

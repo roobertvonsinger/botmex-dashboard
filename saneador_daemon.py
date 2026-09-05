@@ -31,10 +31,10 @@ logger = logging.getLogger("saneador")
 DB_PATH = os.environ.get("BETMEX_DB", "/data/betmexico_accounts.db")
 
 def get_db(write: bool = False):
-    conn = sqlite3.connect(DB_PATH, timeout=20.0)
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
     conn.row_factory = sqlite3.Row
-    if write:
-        conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA busy_timeout = 30000;")
+    conn.execute("PRAGMA synchronous = NORMAL;")
     return conn
 
 async def audit_single_account(email: str, password: str, checker, pool) -> dict:

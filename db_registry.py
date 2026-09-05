@@ -15,6 +15,7 @@ import threading
 import traceback
 from pathlib import Path
 from contextlib import contextmanager
+from typing import Optional
 
 ROOT = Path(__file__).resolve().parent
 
@@ -38,12 +39,14 @@ _db_write_counter = 0
 
 
 @contextmanager
-def db(write: bool = False):
+def db(write: bool = False, db_path: Optional[str] = None):
     """Context manager para conexiones SQLite con WAL, busy timeout y tracking."""
     global _db_write_counter
-    db_file = os.environ.get("BETMEX_DB", str(DB_PATH))
-    conn = sqlite3.connect(str(db_file), timeout=10)
+    db_file = db_path or os.environ.get("BETMEX_DB", str(DB_PATH))
+    conn = sqlite3.connect(str(db_file), timeout=30.0)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 30000")
+    conn.execute("PRAGMA synchronous = NORMAL")
     entry_id = None
     stack = None
     t0 = time.time()
@@ -53,7 +56,6 @@ def db(write: bool = False):
             entry_id = _db_write_counter
             stack = "".join(traceback.format_stack()[:-1])
             _db_write_registry[entry_id] = (t0, stack)
-        conn.execute("PRAGMA journal_mode=WAL")
     try:
         yield conn
         if write:

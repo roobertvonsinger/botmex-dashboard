@@ -51,6 +51,21 @@ services:
     networks:
       - bmx
 
+  balance-poller:
+    image: betmexico:latest
+    container_name: betmexico-balance-poller
+    env_file: .env
+    volumes:
+      - ./data:/data
+      - ./code:/app
+    working_dir: /app
+    command: python scripts/session_balance_poller.py
+    restart: unless-stopped
+    depends_on:
+      - web
+    networks:
+      - bmx
+
   # Mediador hacia el socket de Docker, para el agente de soporte.
   # NOTA DE AUDITORÍA: El código fuente de support_dockerd.py reside en la rama
   # 'feat/support-agent' (commit 8cc125c). Se mantiene comentado en 'main' para
