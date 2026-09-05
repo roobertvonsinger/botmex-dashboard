@@ -249,8 +249,9 @@ def test_precheck_card_liveness_superadmin_married(monkeypatch):
     assert data_sa["liveness_kind"] == "married"
     assert data_sa["married_account"] == "married_user@gmail.com"
 
-    # Regular Operator (12345)
+    # Operator (12345) — Regla de Oro 2026-09-02: eligible para su cuenta casada
     ok_reg, reason_reg, data_reg = cc.precheck_card_liveness("4111111111111111|1230|123", operator_id=12345)
-    assert ok_reg is False
+    assert ok_reg is True
+    assert data_reg["is_married_eligible"] is True
     assert "MARRIED" in reason_reg
 

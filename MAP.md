@@ -110,7 +110,7 @@ prewarm.py (router)
 | `betmexico_payment_analyzer.py` | 592 | `—` | _[completar]_ |
 | `betmexico_utils.py` | 1159 | `—` | _[completar]_ |
 | `bin_intelligence.py` | 701 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
-| `card_checker.py` | 598 | `betmexico.dashboard.card_checker` | _[completar]_ |
+| `card_checker.py` | 611 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 189 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 218 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
@@ -283,6 +283,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `7a39482` | fix(dashboard): restore visibility for all LIVE accounts and resolve poller self-lock |
 | `b0940e1` | fix(sqlite): eliminate journal_mode lock contention, malformed false-positives and consolidate startup migrations |
 | `40ccf33` | fix(fleet): blindaje macro de 3 ductos, aislamiento 429 sin DEAD y preservacion de identidad |
 | `ba596f5` | feat(infra): consolidar migracion a KVM4-Karen botmex.2puty.tech, mapas actualizados y V10 |
@@ -294,7 +295,6 @@ prewarm.py (router)
 | `592945d` | feat: regla de oro 1:1 de tarjetas casadas, cooldown 45s por cuenta y saneamiento cuentas 429 DEAD |
 | `71e866c` | fix(auto_deposit): rotacion continua de flota LIVE, piso 2 procesos reales y umbral retiro 100 pesos |
 | `45587c2` | fix(auto_deposit): desbloquear cuentas con withdrawal_ready=1 si saldo <  y ajustar ventana 1h en tests |
-| `e778a69` | feat(auto_deposit): scheduler continuo, afinidad bin corona y suite canonica bet |
 <!-- GEN:end:recientes -->
 
 ---

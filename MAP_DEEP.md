@@ -407,12 +407,12 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `ruthopia_bridge_check` | def | L69–L106 |
 | `check_luhn` | def | L109–L122 |
 | `parse_and_validate_card_pipe` | def | L125–L174 |
-| `check_ruthopia_db_liveness` | def | L182–L238 |
-| `perform_wabox_liveness_check` | def | L241–L367 |
-| `get_card_declines_24h` | def | L370–L404 |
-| `_get_app_db` | def | L407–L425 |
-| `precheck_card_liveness` | def | L428–L552 |
-| `format_ruthopia_liveness_summary` | def | L555–L598 |
+| `check_ruthopia_db_liveness` | def | L182–L240 |
+| `perform_wabox_liveness_check` | def | L243–L369 |
+| `get_card_declines_24h` | def | L372–L406 |
+| `_get_app_db` | def | L409–L427 |
+| `precheck_card_liveness` | def | L430–L565 |
+| `format_ruthopia_liveness_summary` | def | L568–L611 |
 
 ### `clabe_fetch.py`
 

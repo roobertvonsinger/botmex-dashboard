@@ -191,6 +191,8 @@ def check_ruthopia_db_liveness(card_number: str, max_age_hours: int = 24) -> Opt
     db_candidates = [
         "/data/ruthopia.db",
         "/app/ruthopia_data/ruthopia.db",
+        "/opt/kvm4/apps/ruthopia/data/ruthopia.db",
+        "/opt/kvm4/apps/ruthopia/ruthopia.db",
         "/docker/betmexico/data/ruthopia.db",
         "/docker/ruthopia/data/ruthopia.db",
         "/var/lib/docker/volumes/ruthopia_ruthopia-data/_data/ruthopia.db",
@@ -488,6 +490,16 @@ def precheck_card_liveness(card_pipe: str, operator_id: Optional[int] = None) ->
             if account_status and "RATE_LIMITED" in (account_status["dead_reason"] or ""):
                 return False, "🔴 RATE_LIMITED - Cuenta bloqueada permanentemente", None
 
+    # 0. Caché en memoria Utopía (TTL 30 min = 1800s) — Zero Overchecking inmediato
+    if card_num in _UTOPIA_LIVENESS_CACHE:
+        cached_ts, c_is_live, c_label, c_raw = _UTOPIA_LIVENESS_CACHE[card_num]
+        age_sec = time.time() - cached_ts
+        if age_sec < UTOPIA_CACHE_TTL_SEC and c_is_live:
+            parsed["liveness_kind"] = "live"
+            parsed["liveness_label"] = f"{c_label} <i>(Caché {int(age_sec/60)}m)</i>"
+            parsed["is_live"] = True
+            return True, parsed["liveness_label"], parsed
+
     # PASAPORTE RUTHOPIA DB (Zero Overchecking): Si ya fue aprobada en Ruthopia en las últimas 24h -> LIVE 0ms
     ruth_live = check_ruthopia_db_liveness(card_num)
     if ruth_live:
@@ -516,6 +528,7 @@ def precheck_card_liveness(card_pipe: str, operator_id: Optional[int] = None) ->
         status_label = f"🟢 LIVE (Auth OK) - <i>{msg[:50]}</i>"
         parsed["liveness_label"] = status_label
         parsed["is_live"] = True
+        _UTOPIA_LIVENESS_CACHE[card_num] = (time.time(), True, status_label, {"status": "Approved", "message": msg})
         return True, status_label, parsed
 
     # 2. Tolerancias bancarias (RF3): BINs exceptuados o mensajes bancarios conocidos
