@@ -7,7 +7,7 @@
 
 ## ▶ ARRANQUE INMEDIATO (2026-09-08) — Refactor `/bet` a nodos + operador inteligente
 
-**Rama activa:** `feat/bet-nodes-refactor` (pusheada, 1 commit `efab82b` sobre `main`).
+**Rama activa:** `feat/bet-nodes-refactor` (pusheada, HEAD `8879660`).
 **Plan completo:** `C:\Users\rober\.claude\plans\como-podriamos-hacer-un-dynamic-cupcake.md`
 **Estado vivo del refactor:** `docs/BET_POLICY.md`
 
@@ -15,38 +15,39 @@
 Descomponer `auto_deposit.py::run_auto_mission` (~1000 líneas) en un pipeline de nodos puros +
 extraer la lógica de retry a `bet_retry_policy.py` + centralizar las ~32 constantes en
 `bet_policy.BetPolicyConfig` + un advisor LLM (`bet_advisor.py`, 9router) para la pre-selección
-de cuentas (plan inicial + recálculo dinámico a mitad de misión). El LLM NUNCA en el hot path
-por-depósito. Robert quiere: "operador inteligente que en tiempo real recalcule la selección
-de cuentas"; retries y mecánica siguen deterministas.
+de cuentas. El LLM NUNCA en el hot path por-depósito.
 
-### Hecho — Fase 0 (commit `efab82b`)
-`tests/test_bet_retry_characterization.py` — 12 tests golden-master que fijan la secuencia
-exacta de efectos del `run_auto_mission` actual. Contrato de no-regresión para Fase 1.
-Verde: `verify_bet_suite` 13/13 · `test_auto_mission` 29/29 · caracterización 12/12.
+### Hecho
+- **Fase 0** (`efab82b`): `tests/test_bet_retry_characterization.py` — 12 golden-master.
+- **Fase 1a** (`28cb65d`): `bet_policy.BetPolicyConfig`+`DEFAULT` (10 escalares, defaults =
+  constantes vivas, `_LOCKED_FIELDS` protege inv. 4/5/7/10) + `bet_retry_policy.decide_next_action`
+  (función PURA, réplica del orden de ramas de FASE 1). 51 tests nuevos. `verify_bet_suite` "9"→"13".
+- **Fase 1** (`8879660`): cableado en el inner loop de FASE 1 matchmaking —
+  `_outcome_view/_account_view/_card_view/_mission_view` (pre-mutación) → `decide_next_action`
+  → `_apply_action` (helper del shell, efectos verbatim). Las 6 ramas `if code...` (~200 L) →
+  12 L. El `if ok:` de match sigue inline. **Cero cambio de conducta** (caracterización 12/12
+  SIN editar). Gate: `verify_bet_suite` 13/13 · `test_auto_mission` 29/29 · scheduler/selection/
+  endpoints verdes · 120 en la corrida agregada.
 
-### PRIMERA ACCIÓN próxima sesión → Fase 1
-1. `git checkout feat/bet-nodes-refactor` (ya existe local + remoto).
-2. Test primero: `tests/test_bet_retry_policy.py` — unit puro de `decide_next_action` por rama
-   (~30 casos). Ver la interfaz completa (`Action`, `OutcomeView`, `AccountRetryState`,
-   `CardRetryState`, `MissionRetryState`) en el plan §"Componentes e interfaces".
-3. Crear `bet_retry_policy.py` (tipos + función pura; importa solo helpers módulo-nivel de
-   `deposits`: `_mm_is_real_decline`, `_mm_is_ambiguous_charge`, `MM_DEAD_RC`, `MM_THREEDS_RC`).
-4. Crear `bet_policy.py` con `BetPolicyConfig` + `DEFAULT` **solo** (sin load de disco aún).
-   Defaults = valores EXACTOS actuales (leerlos del código, no de MAP.md — algunos difieren).
-5. Refactor del inner `while True` de FASE 1 matchmaking en `auto_deposit.py` (L1828–2147,
-   ~300 líneas) a `decide_next_action` + helper `_apply_action` **del shell** (efectos y su
-   orden idénticos) + `_outcome_view`/`_account_view`/`_card_view`/`_mission_view` construidos
-   ANTES de cualquier mutación. FASE 2 intacta (es Fase 1b).
-6. Gate: `test_bet_retry_policy.py` verde + `test_bet_retry_characterization.py` **sin editar y
-   verde** + `verify_bet_suite` 13/13 + `test_auto_mission` verde. Commit + push.
+### PRIMERA ACCIÓN próxima sesión → Fase 1b
+Extender `decide_next_action` a **FASE 2 (scheduled)** con `mission.phase="SCHEDULED"`.
+1. Caracterización extendida: nuevos tests golden-master de la FASE 2 en
+   `test_bet_retry_characterization.py` (hoy solo 3: nine-reps, decline-aborta, cancel).
+   Ramas de FASE 2 (`auto_deposit.py` ~L2322-2402): `ok`→progress (completed++, `sleep(60)`) /
+   terminal-para-esta-cuenta (rate/dead/3DS/decline/ambiguo/CARD_LOCKED/PENDING_NOT_APPLIED →
+   `failed++`, `break`) / transitorio (`retries` x4, `sleep(SCHED_RETRY_BACKOFF_SEC=25)`,
+   reset de `session_jwt` si "sesión rechazada"/"401"/"redirectlogin"). El fallback $190→$150
+   **se queda en el shell**. Sin rotación de tarjeta en scheduled.
+2. `decide_next_action` gana rama `if m.phase == "SCHEDULED"` → kinds `PROGRESS` / `ABORT_ACCOUNT`
+   + reusa `RETRY_SAME`. Config: `sched_max_transient_retries=4`, `sched_retry_backoff_s=25`
+   (= `dep.SCHED_MAX_TRANSIENT_RETRIES` / `dep.SCHED_RETRY_BACKOFF_SEC`) en `bet_policy`.
+3. `_apply_sched_action` (2º helper del shell) para FASE 2 — el shell de FASE 2 no tiene
+   `target`/`accounts_state`, usa el dict `m` y `retries`.
+4. Gate: caracterización (vieja + nueva) SIN editar la vieja + `verify_bet_suite` 13/13 +
+   `test_auto_mission` + `test_auto_deposit_scheduler`. Commit + push.
 
-Orden de fases: 0 ✅ → 1 → 1b → 2 → 3. `bet_tuner` (Fase 4) = ronda siguiente.
-
-### Ramas de detalle exacto del inner loop de FASE 1 (orden que `decide_next_action` debe replicar)
-`ok` → `BALANCE_LIMIT_EXCEEDED` → `code in MM_THREEDS_RC` (3DS→A+, 3 cuentas) → familia dead/429
-+ circuit breaker → `_mm_is_real_decline or _mm_is_ambiguous_charge` (3-strikes tarjeta / 2-strikes
-cuenta) → `CARD_LOCKED_OTHER_ACCOUNT` → transitorio (retry x4, `_sleep_step(25)`).
-Cross-account gap `_sleep_step(MM_CROSS_ACCOUNT_GAP=5)` al final si quedan otras cuentas activas.
+Orden de fases: 0 ✅ → 1a ✅ → 1 ✅ → **1b** → 2 (`load_policy()`+disco) → 3 (advisor OFF).
+`bet_tuner` (Fase 4) = ronda siguiente.
 
 ---
 

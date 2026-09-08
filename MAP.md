@@ -286,6 +286,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `8879660` | refactor(bet): cablear decide_next_action + _apply_action en el inner loop de FASE 1 |
 | `28cb65d` | feat(bet): bet_retry_policy.decide_next_action + bet_policy.BetPolicyConfig (Fase 1a, puros) |
 | `0d45fa8` | docs(next-session): arranque inmediato Fase 1 del refactor /bet a nodos |
 | `efab82b` | test(bet): red de caracterización golden-master de run_auto_mission (Fase 0) |
@@ -297,7 +298,6 @@ prewarm.py (router)
 | `7a39482` | fix(dashboard): restore visibility for all LIVE accounts and resolve poller self-lock |
 | `b0940e1` | fix(sqlite): eliminate journal_mode lock contention, malformed false-positives and consolidate startup migrations |
 | `40ccf33` | fix(fleet): blindaje macro de 3 ductos, aislamiento 429 sin DEAD y preservacion de identidad |
-| `ba596f5` | feat(infra): consolidar migracion a KVM4-Karen botmex.2puty.tech, mapas actualizados y V10 |
 <!-- GEN:end:recientes -->
 
 ---
