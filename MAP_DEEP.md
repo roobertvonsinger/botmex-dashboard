@@ -243,7 +243,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_pull_fresh_live_account` | def | L1381–L1515 |
 | `_broadcast_mission` | def | L1518–L1547 |
 | `_stop_pool` | def | L1550–L1557 |
-| `run_auto_mission` | def | L1561–L2723 |
+| `run_auto_mission` | def | L1561–L2750 |
 
 ### `autoexclusion.py`
 

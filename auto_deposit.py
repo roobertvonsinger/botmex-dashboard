@@ -2142,7 +2142,34 @@ async def run_auto_mission(
                             from app import DB_PATH
                             remaining = POLICY.max_accounts_hard_cap - len(accounts_state)
                             if remaining > 0:
-                                backup_plan = plan_auto_mission(DB_PATH, active_cards, amount, target_count, max_accounts=remaining)
+                                # Fase 3 — RECÁLCULO DINÁMICO del advisor (default OFF).
+                                # La expansión de respaldo es una pausa de re-plan que YA
+                                # existe: aquí cabe la latencia del LLM (techo 6 s). El
+                                # `_advisor_sink` sale del re-query fresco de `plan_auto_mission`
+                                # → contexto vivo redactado (solo campos whitelisted). Si
+                                # vuelve un hint, se re-planea el respaldo con `advisor_hint`.
+                                import bet_advisor as _badv
+                                _rc_sink = [] if _badv.enabled() else None
+                                backup_plan = plan_auto_mission(
+                                    DB_PATH, active_cards, amount, target_count,
+                                    max_accounts=remaining, _advisor_sink=_rc_sink,
+                                )
+                                if _rc_sink:
+                                    try:
+                                        _rc_hint = await _badv.advise_from_inputs(
+                                            _rc_sink[0], db_path=str(DB_PATH),
+                                            mission_id=mission_id, kind="recalc",
+                                        )
+                                    except Exception:
+                                        _rc_hint = None
+                                    if _rc_hint:
+                                        logger.info(
+                                            f"[Auto {mission_id}] advisor recalc → {len(_rc_hint)} boosts"
+                                        )
+                                        backup_plan = plan_auto_mission(
+                                            DB_PATH, active_cards, amount, target_count,
+                                            max_accounts=remaining, advisor_hint=_rc_hint,
+                                        )
                                 if backup_plan and backup_plan.get("feasible"):
                                     for b_acc in backup_plan.get("accounts", []):
                                          b_email = b_acc.get("email")

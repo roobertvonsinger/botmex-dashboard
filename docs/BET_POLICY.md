@@ -30,7 +30,7 @@ secundarios quedan exactamente donde están hoy.
 | 1 | Cableado en el inner loop de FASE 1 (`_*_view` → `decide_next_action` → `_apply_action`) | ✅ caracterización 12/12 sin editar · `verify_bet_suite` 13/13 · `test_auto_mission` 29/29 |
 | 1b | Extender `retry_policy` a FASE 2 (scheduled) — `decide_next_action(phase="SCHEDULED")` + `_apply_sched_action` | ✅ caracterización 20/20 (12 viejas sin editar + 8 FASE 2) · `test_bet_retry_policy` 70 · `verify_bet_suite` 13/13 |
 | 2 | `bet_policy.load_policy()` + override `/data/bet_policy.json` + `_SANE_BOUNDS` + `digest()` + CLI `apply()` + `POLICY` cableado en shell + migración `auto_missions.policy_digest` | ✅ `test_bet_policy` 14/14 · caracterización 28/28 sin editar · `verify_bet_suite` 13/13 |
-| 3 | `bet_advisor` (LLM plan-time + recálculo dinámico), default OFF (`BET_ADVISOR_ENABLED`) | 🟡 en curso — Commit A (vendor `support_llm.py`) ✅ · Commit B (`bet_advisor.py` + tests 24/24 + migración `bet_llm_calls`) ✅ · Commit C (cablear `advisor_boost`/`advisor_hint`/`_advisor_sink` + 3 entry points) ✅ · Commit D (recálculo dinámico + integración) 🔵 |
+| 3 | `bet_advisor` (LLM plan-time + recálculo dinámico), default OFF (`BET_ADVISOR_ENABLED`) | ✅ A (vendor `support_llm.py`) · B (`bet_advisor.py` + tests 24 + migración `bet_llm_calls`) · C (`advisor_boost`/`advisor_hint`/`_advisor_sink` + 3 entry points) · D (recálculo dinámico en `run_auto_mission` + `test_bet_advisor_integration.py` 3). Merge OFF; smoke con `BET_ADVISOR_ENABLED=1`. |
 | 4 | `bet_tuner` (ajuste offline de parámetros con diff aprobable) | 🔵 ronda siguiente |
 
 ## Fase 1a — módulos puros (hecho, sin cambio de conducta)
@@ -194,12 +194,30 @@ idéntica.** Gate: `verify_bet_suite` 13/13 · caracterización 28/28 sin editar
 `test_plan_*` + `test_bet_input_five_cards` rojos son **pre-existentes** (fixture sin
 JWT, idéntico en `014efe2`).
 
-### Commit D — recálculo dinámico + integración (🔵)
-En `run_auto_mission`, antes de la expansión de respaldo, `maybe_advise` con el
-estado vivo redactado → hint a la re-invocación de `plan_auto_mission`. Cachear
-`account_priority`/`avoid` en memoria para sesgar `_pull_fresh_live_account` sin
-llamadas nuevas. `tests/test_bet_advisor_integration.py` con `LLMClient` falso.
-Merge con advisor OFF; Robert pone `BET_ADVISOR_ENABLED=1` para el smoke real.
+### Commit D — recálculo dinámico + integración (✅)
+En `run_auto_mission`, dentro de `if need_backup and active_cards` (la expansión de
+respaldo, tras la reescritura de matchmaking continuo de `719111d`): mismo patrón
+que los entry points — `_rc_sink = [] if bet_advisor.enabled() else None` →
+`backup_plan = plan_auto_mission(active_cards, ..., _advisor_sink=_rc_sink)` (el
+re-query fresco = **estado vivo redactado**) → `await bet_advisor.advise_from_inputs(
+_rc_sink[0], kind="recalc")` → si vuelve hint, re-`plan_auto_mission(advisor_hint=...)`.
+Es una pausa de re-plan que **ya existía** → cabe el techo de 6 s del LLM.
+`kind="recalc"` en `bet_llm_calls`. **Advisor OFF → `_rc_sink=None` → conducta
+idéntica.**
+
+`tests/test_bet_advisor_integration.py` (3, `LLMClient` falso vía `httpx.MockTransport`):
+boost reordena la selección REAL de `plan_auto_mission`; boost a un ref inventado /
+a cuenta DEAD → `_sanitize_advice` lo descarta → plan determinista (la DEAD ni entra
+al set de refs elegibles); OFF → bundle ausente, orden idéntico.
+
+**Pendiente pos-merge** (no bloquea): pairings del advisor (desactivados esta ronda,
+`pairing_ok` rechaza todo); enriquecer `recent_history` con medias de probes reales
+(hoy 0.0 — necesita agregación de `deposit_attempts`); biasing de
+`_pull_fresh_live_account` con `avoid` cacheado en memoria.
+
+Merge con advisor OFF; Robert pone `BET_ADVISOR_ENABLED=1` + fija
+`BET_ADVISOR_MODEL_CHAIN` tras probar tool-calling contra el 9router vivo, para el
+smoke real.
 
 ## Fase 2 — centralización de config (hecho, sin cambio de conducta)
 
