@@ -283,6 +283,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `efab82b` | test(bet): red de caracterización golden-master de run_auto_mission (Fase 0) |
 | `29bf812` | fix(perf): resolve gateway timeout hang, polling storm, and enable concurrent updates |
 | `1453167` | fix(bet): eliminate 429 contamination, clean stale dead_at and enable concurrent updates |
 | `51992d0` | fix(logs): stateful since filtering and noise pattern filter for CancelledError |
@@ -294,7 +295,6 @@ prewarm.py (router)
 | `ba596f5` | feat(infra): consolidar migracion a KVM4-Karen botmex.2puty.tech, mapas actualizados y V10 |
 | `2ce5a83` | feat(api): endpoint publico /api/health/ping para healthchecks y watchdogs |
 | `e0e8961` | refactor(core): saneamiento integral de deuda tecnica, unificacion V10 y desacoplamiento sqlite |
-| `3225aba` | docs: actualizar NEXT-SESSION con relevo dinamico, aviso cambio de cuenta y auditoria entrante |
 <!-- GEN:end:recientes -->
 
 ---
