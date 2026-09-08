@@ -1220,9 +1220,11 @@ async def process_bet_input(
             except Exception:
                 _hint = None
             if _hint:
-                plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count,
-                                         tol_pipes=tol_pipes, married_pairs=married_pairs,
-                                         advisor_hint=_hint)
+                _boosted = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count,
+                                             tol_pipes=tol_pipes, married_pairs=married_pairs,
+                                             advisor_hint=_hint)
+                if bet_advisor.plan_not_worse(plan, _boosted):
+                    plan = _boosted
         if not plan.get("feasible"):
             fail_plan = (
                 f"{HEADER}\n\n"

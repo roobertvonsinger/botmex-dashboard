@@ -28,9 +28,9 @@ secundarios quedan exactamente donde están hoy.
 | 0 | Red de caracterización (golden-master) del `run_auto_mission` actual | ✅ `tests/test_bet_retry_characterization.py` (12 tests) |
 | 1a | `bet_retry_policy.decide_next_action` + `bet_policy.BetPolicyConfig` (módulos puros, sin cablear) | ✅ `tests/test_bet_retry_policy.py` (46) · `tests/test_bet_policy.py` (5) |
 | 1 | Cableado en el inner loop de FASE 1 (`_*_view` → `decide_next_action` → `_apply_action`) | ✅ caracterización 12/12 sin editar · `verify_bet_suite` 13/13 · `test_auto_mission` 29/29 |
-| 1b | Extender `retry_policy` a FASE 2 (scheduled) — `decide_next_action(phase="SCHEDULED")` + `_apply_sched_action` | ✅ caracterización 20/20 (12 viejas sin editar + 8 FASE 2) · `test_bet_retry_policy` 70 · `verify_bet_suite` 13/13 |
-| 2 | `bet_policy.load_policy()` + override `/data/bet_policy.json` + `_SANE_BOUNDS` + `digest()` + CLI `apply()` + `POLICY` cableado en shell + migración `auto_missions.policy_digest` | ✅ `test_bet_policy` 14/14 · caracterización 28/28 sin editar · `verify_bet_suite` 13/13 |
-| 3 | `bet_advisor` (LLM plan-time + recálculo dinámico), default OFF (`BET_ADVISOR_ENABLED`) | ✅ A (vendor `support_llm.py`) · B (`bet_advisor.py` + tests 24 + migración `bet_llm_calls`) · C (`advisor_boost`/`advisor_hint`/`_advisor_sink` + 3 entry points) · D (recálculo dinámico en `run_auto_mission` + `test_bet_advisor_integration.py` 3). Merge OFF; smoke con `BET_ADVISOR_ENABLED=1`. |
+| 1b | Extender `retry_policy` a FASE 2 (scheduled) — `decide_next_action(phase="SCHEDULED")` + `_apply_sched_action` | ✅ caracterización 20/20 (12 viejas sin editar + 8 FASE 2) · `test_bet_retry_policy` 66 · `verify_bet_suite` 13/13 |
+| 2 | `bet_policy.load_policy()` + override `/data/bet_policy.json` + `_SANE_BOUNDS` + `digest()` + CLI `apply()` + `POLICY` cableado en shell + migración `auto_missions.policy_digest` | ✅ `test_bet_policy` 14/14 · caracterización 20/20 sin editar · `verify_bet_suite` 13/13 |
+| 3 | `bet_advisor` (LLM plan-time + recálculo dinámico), default OFF (`BET_ADVISOR_ENABLED`) | ✅ A (vendor `support_llm.py`) · B (`bet_advisor.py` + tests 27 + migración `bet_llm_calls`) · C (`advisor_boost`/`advisor_hint`/`_advisor_sink` + 3 entry points) · D (recálculo dinámico en `run_auto_mission`) · **guardarraíl `plan_not_worse`** (Smartreview 2026-09-08) + `test_bet_advisor_integration.py` 5. Merge OFF; smoke con `BET_ADVISOR_ENABLED=1`. |
 | 4 | `bet_tuner` (ajuste offline de parámetros con diff aprobable) | 🔵 ronda siguiente |
 
 ## Fase 1a — módulos puros (hecho, sin cambio de conducta)
@@ -156,17 +156,19 @@ probar tool-calling contra el router vivo).
 **Migración:** `CREATE TABLE IF NOT EXISTS bet_llm_calls (...)` aditiva en
 `app.py::_migrate`. Ver `docs/ARCHITECTURE.md`.
 
-Gate: `tests/test_bet_advisor.py` 24/24 · `verify_bet_suite` 13/13 · caracterización
-28/28 **sin editar** · 199 en la corrida agregada.
+Gate: `tests/test_bet_advisor.py` 27/27 · `verify_bet_suite` 13/13 · caracterización
+20/20 **sin editar**.
 
 ### Commit C — cableado (✅ — el código quedó en `719111d`, junto con un cambio
 ### paralelo de otra sesión ("matchmaking continuo multi-tarjeta, filtrado 429/403");
-### este commit de docs es `a01ecc3`)
+### el commit de docs de este commit es `b525cb1`)
 - **`select_accounts_for_auto(..., advisor_boost: Optional[Dict[str,int]] = None)`** —
   `adv_boost = -int(advisor_boost.get(email, 0))` **prependido en posición 0 del
-  `sort_key`** (antes de `pool_first`). Puro desempate **dentro del tier**: el rango
-  `[-3,3]` no salta la separación de tiers (ya aplicada) ni un filtro de exclusión
-  dura. `None`/`{}` → orden **idéntico** (test `test_advisor_boost_none_is_identity`).
+  `sort_key`** (antes de `pool_first`). **Reordena dentro del tier** (no salta la
+  separación de tiers ni un filtro de exclusión dura), pero como es la 1ª clave
+  puede cambiar *qué* cuentas caen en `[:max_accounts]`, no solo su orden — por eso
+  el caller aplica el guardarraíl `plan_not_worse` (ver abajo). `None`/`{}` → orden
+  **idéntico** (test `test_advisor_boost_none_is_identity`).
 - **`plan_auto_mission(..., advisor_hint=None, _advisor_sink=None)`** — `advisor_hint`
   se pasa como `advisor_boost=`. Si el caller da `_advisor_sink` (list),
   `_build_advisor_bundle` arma `(bet_advisor.AdvisorInputs, ref2email)` **reusando
@@ -183,16 +185,31 @@ Gate: `tests/test_bet_advisor.py` 24/24 · `verify_bet_suite` 13/13 · caracteri
 - **3 entry points async** (`app.py::auto_deposit_create`, `app.py::bot_bet_create`,
   `telegram_bot_mock/bot.py::process_bet_input`): `mission_id` generado ANTES (para la
   fila de costo) → `_adv_sink = [] if bet_advisor.enabled() else None` →
-  `plan_auto_mission(_advisor_sink=_adv_sink)` → si hay sink,
+  `plan = plan_auto_mission(_advisor_sink=_adv_sink)` → si hay sink,
   `await bet_advisor.advise_from_inputs(...)` → si vuelve hint no vacío,
-  re-`plan_auto_mission(advisor_hint=hint)` (doble plan SOLO cuando el advisor
-  produce boosts; `plan_auto_mission` sobre SQLite local es ~ms).
+  `_boosted = plan_auto_mission(advisor_hint=hint)` y **`plan = _boosted` SOLO si
+  `bet_advisor.plan_not_worse(plan, _boosted)`** (doble plan SOLO cuando el advisor
+  produce boosts; `plan_auto_mission` sobre SQLite local es decenas de ms —
+  re-corre las queries por-cuenta, no un diff).
+
+### Guardarraíl `plan_not_worse` (Smartreview 2026-09-08, R1)
+`bet_advisor.plan_not_worse(base, boosted) -> bool` — función pura. El `boost` del
+advisor es la 1ª clave del `sort_key`, así que un `boost` (sobre todo **negativo**
+a una cuenta ya seleccionada) puede sacarla de `[:max_accounts]` y dejar entrar una
+cuenta de backfill determinista **sin tarjeta asignable** (cooldown-BIN-30d /
+married / anti-mezcla). El re-plan sale entonces con **menos cuentas** que el base
+o infactible. `plan_not_worse` devuelve `False` si el plan boosteado tiene menos
+`accounts` que el base, o si tumba un base factible → el caller **conserva el plan
+determinista** (regla Robert: "el bet jamás debe quedarse sin cuentas para operar").
+Aplica en los 3 entry points **y** en el recálculo dinámico de `run_auto_mission`
+(`_badv.plan_not_worse(backup_plan, _rc_boosted)`).
 
 **Advisor OFF (default) → `_adv_sink=None` → `advisor_boost=None` → conducta
-idéntica.** Gate: `verify_bet_suite` 13/13 · caracterización 28/28 sin editar ·
-`test_auto_deposit_selection` (+3) · `test_bet_advisor` (+3) · 219 passed · los 8
-`test_plan_*` + `test_bet_input_five_cards` rojos son **pre-existentes** (fixture sin
-JWT, idéntico en `014efe2`).
+idéntica.** Gate: `verify_bet_suite` 13/13 · caracterización 20/20 sin editar ·
+`test_bet_advisor_integration` 5/5 (incl. `test_plan_not_worse_guardrail` +
+`test_negative_boost_shrinks_plan_guardrail_keeps_base`) · `test_bet_advisor` 27/27 ·
+`test_auto_deposit_selection` verde. Los 8 `test_plan_*` + `test_bet_input_five_cards`
+rojos son **pre-existentes** (fixture sin JWT, idéntico en `014efe2` y `29bf812`).
 
 ### Commit D — recálculo dinámico + integración (✅)
 En `run_auto_mission`, dentro de `if need_backup and active_cards` (la expansión de
@@ -200,15 +217,17 @@ respaldo, tras la reescritura de matchmaking continuo de `719111d`): mismo patr�
 que los entry points — `_rc_sink = [] if bet_advisor.enabled() else None` →
 `backup_plan = plan_auto_mission(active_cards, ..., _advisor_sink=_rc_sink)` (el
 re-query fresco = **estado vivo redactado**) → `await bet_advisor.advise_from_inputs(
-_rc_sink[0], kind="recalc")` → si vuelve hint, re-`plan_auto_mission(advisor_hint=...)`.
-Es una pausa de re-plan que **ya existía** → cabe el techo de 6 s del LLM.
-`kind="recalc"` en `bet_llm_calls`. **Advisor OFF → `_rc_sink=None` → conducta
-idéntica.**
+_rc_sink[0], kind="recalc")` → si vuelve hint, `_rc_boosted = plan_auto_mission(
+advisor_hint=...)` y **`backup_plan = _rc_boosted` SOLO si
+`_badv.plan_not_worse(backup_plan, _rc_boosted)`**. Es una pausa de re-plan que **ya
+existía** → cabe el techo de 6 s del LLM. `kind="recalc"` en `bet_llm_calls`.
+**Advisor OFF → `_rc_sink=None` → conducta idéntica.**
 
-`tests/test_bet_advisor_integration.py` (3, `LLMClient` falso vía `httpx.MockTransport`):
+`tests/test_bet_advisor_integration.py` (5, `LLMClient` falso vía `httpx.MockTransport`):
 boost reordena la selección REAL de `plan_auto_mission`; boost a un ref inventado /
 a cuenta DEAD → `_sanitize_advice` lo descarta → plan determinista (la DEAD ni entra
-al set de refs elegibles); OFF → bundle ausente, orden idéntico.
+al set de refs elegibles); OFF → bundle ausente, orden idéntico; `plan_not_worse`
+como unidad; boost negativo que encoge el plan → guardarraíl conserva el base.
 
 **Pendiente pos-merge** (no bloquea): pairings del advisor (desactivados esta ronda,
 `pairing_ok` rechaza todo); enriquecer `recent_history` con medias de probes reales
@@ -259,7 +278,7 @@ tocó — su path scheduled legacy conserva sus propias constantes (no es matchm
 mete en el INSERT. En prod aún no existe `/data/bet_policy.json` → `load_policy()`
 == `DEFAULT` == conducta idéntica a Fase 1b.
 
-**Cero cambio de conducta:** `test_bet_retry_characterization.py` 28/28 **sin
+**Cero cambio de conducta:** `test_bet_retry_characterization.py` 20/20 **sin
 editarse**; `verify_bet_suite` 13/13; `test_auto_mission`/`test_auto_deposit_scheduler`
 verdes. (Pre-existentes rojos NO tocados: 8× `test_auto_deposit.py::test_plan_*`
 por JWT en fixture; `test_confirm_gate_in_auto_deposit` por contaminación cross-módulo

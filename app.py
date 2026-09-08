@@ -4557,8 +4557,10 @@ async def auto_deposit_create(request: Request,
         except Exception:
             _hint = None
         if _hint:
-            plan = plan_auto_mission(DB_PATH, card_pipes, amount, target_count,
-                                     advisor_hint=_hint)
+            _boosted = plan_auto_mission(DB_PATH, card_pipes, amount, target_count,
+                                         advisor_hint=_hint)
+            if bet_advisor.plan_not_worse(plan, _boosted):
+                plan = _boosted
     if not plan["feasible"]:
         raise HTTPException(409, plan["reason"])
     operator_id = user.get("telegram_id")                   # V2: modo open no tiene (S8)
@@ -5416,8 +5418,10 @@ async def bot_bet_create(request: Request, user: dict = Depends(require_session)
         except Exception:
             _hint = None
         if _hint:
-            plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count,
-                                     advisor_hint=_hint)
+            _boosted = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count,
+                                         advisor_hint=_hint)
+            if bet_advisor.plan_not_worse(plan, _boosted):
+                plan = _boosted
     if not plan["feasible"]:
         raise HTTPException(409, plan["reason"])
 

@@ -7,15 +7,32 @@
 
 ## ▶ ARRANQUE INMEDIATO (2026-09-08) — Refactor `/bet` a nodos + operador inteligente
 
-**Rama activa:** `feat/bet-nodes-refactor` (pusheada, tip `b525cb1`).
+**Rama activa:** `feat/bet-nodes-refactor` (pusheada, tip tras Smartreview).
 **Plan completo:** `C:\Users\rober\.claude\plans\como-podriamos-hacer-un-dynamic-cupcake.md`
 **Estado vivo del refactor:** `docs/BET_POLICY.md`
 
 ### Fase 3 COMPLETA (2026-09-08) — advisor OFF, mergeable · falta smoke de Robert
-Tip `8cd909f`. Commits A `c6f671c` · B `2267121` · C código `719111d` + docs `b525cb1`
-· D `8cd909f`. Gate: `verify_bet_suite` 13/13 · caracterización 28/28 **sin editar**
-· 251 passed. Pre-existentes rojos (fixture sin JWT, idénticos en `014efe2`, NO míos):
-8× `test_auto_deposit.py::test_plan_*` + `test_telegram_bot_mock.py::test_bet_input_five_cards`.
+Commits A `c6f671c` · B `2267121` · C código `719111d` + docs `b525cb1` · D `8cd909f`
+· **Smartreview 2026-09-08** (guardarraíl `plan_not_worse` + fix de números del doc).
+Gate: `verify_bet_suite` 13/13 · caracterización **20/20 sin editar** · 195 passed en
+las suites `/bet` relevantes. Pre-existentes rojos (fixture sin JWT, idénticos en
+`014efe2` y `29bf812`, NO míos): 8× `test_auto_deposit.py::test_plan_*` +
+`test_telegram_bot_mock.py::test_bet_input_five_cards`.
+
+### Smartreview de `docs/BET_POLICY.md` (2026-09-08) — Doble subagente
+- **Auditor Técnico:** código sano al 100% (cada símbolo/tabla/env var/entry point
+  existe). 3 discrepancias SOLO de documentación → corregidas: `28/28`→`20/20`
+  (caracterización), `test_bet_retry_policy 70`→`66`, commit docs de C `a01ecc3`
+  (dangling)→`b525cb1`.
+- **Red Team (R1, ROJO):** el `advisor_boost` es la 1ª clave del `sort_key` → un
+  boost (sobre todo **negativo** a una cuenta seleccionada) puede sacarla de
+  `[:max_accounts]` y dejar entrar una cuenta de backfill sin tarjeta asignable →
+  el re-plan sale con **menos cuentas** que el base / infactible → los 3 entry
+  points hacían `plan = plan_auto_mission(advisor_hint=…)` sin fallback → 409.
+  **Fix:** `bet_advisor.plan_not_worse(base, boosted)` (pura) — el caller adopta el
+  plan boosteado SOLO si no tiene menos cuentas ni tumba un base factible. Aplicado
+  en los 3 entry points + recálculo dinámico. Tests: `test_plan_not_worse_guardrail`
+  + `test_negative_boost_shrinks_plan_guardrail_keeps_base`.
 
 **Colisión multi-sesión resuelta:** otra de 5 sesiones commiteó `719111d` que
 absorbió mi Commit C + su propio cambio ("matchmaking continuo multi-tarjeta" —
@@ -45,7 +62,7 @@ de cuentas. El LLM NUNCA en el hot path por-depósito.
   `plan_auto_mission` devuelve `policy_digest` + `_persist_auto_mission` lo mete al
   INSERT). **Cero cambio de conducta**: sin `/data/bet_policy.json` en prod →
   `load_policy()`==`DEFAULT`. Gate: `test_bet_policy` 14/14 · caracterización
-  **28/28 sin editar** · `verify_bet_suite` 13/13 ·
+  **20/20 sin editar** · `verify_bet_suite` 13/13 ·
   `test_auto_mission`/`scheduler`/`selection`/`endpoints` verdes. Pre-existentes
   rojos NO tocados (8× `test_plan_*` JWT-fixture + `test_confirm_gate` contaminación
   cross-módulo — pasa aislado; ambos confirmados idénticos en `29fcd30` via stash).
@@ -66,8 +83,8 @@ de cuentas. El LLM NUNCA en el hot path por-depósito.
   `sched_max_transient_retries=4` / `sched_retry_backoff_s=25` / `sched_rep_gap_s=60`.
   El FASE 2 `while completed < target_count` (~95 L de ramas) → ~30 L de ruteo. **Cero cambio de
   conducta**: caracterización 20/20 (12 viejas SIN editar + 8 FASE 2 nuevas). Gate:
-  `verify_bet_suite` 13/13 · `test_bet_retry_policy` 70 · `test_auto_mission`/`test_auto_deposit_scheduler`
-  verdes · 128 en la corrida agregada. Los 8 `test_plan_*` de `test_auto_deposit.py` siguen rojos
+  `verify_bet_suite` 13/13 · `test_bet_retry_policy` 66 · `test_auto_mission`/`test_auto_deposit_scheduler`
+  verdes. Los 8 `test_plan_*` de `test_auto_deposit.py` siguen rojos
   (pre-existentes, JWT en fixture — ver más abajo).
 
 ### Fase 3 — advisor / operador inteligente (default OFF `BET_ADVISOR_ENABLED`)
@@ -77,10 +94,13 @@ de cuentas. El LLM NUNCA en el hot path por-depósito.
   `maybe_advise` OFF-by-default + `asyncio.wait_for(6s)`, `_record_llm_call`) +
   `tests/test_bet_advisor.py` (24) + migración aditiva `bet_llm_calls`.
 - **Commit C ✅ (código en `719111d`, docs en `b525cb1`)** — `select_accounts_for_auto(
-  ..., advisor_boost)` (prepend al `sort_key`, puro desempate) + `plan_auto_mission(
+  ..., advisor_boost)` (prepend al `sort_key`, reordena dentro del tier) + `plan_auto_mission(
   ..., advisor_hint, _advisor_sink)` + `_build_advisor_bundle`/`_advisor_recent_history`
   (read-only, cero query) + `bet_advisor.enabled()`/`advise_from_inputs` + 3 entry points
-  async. Advisor OFF → conducta idéntica. Gate 13/13 · caracterización 28/28 sin editar.
+  async. Advisor OFF → conducta idéntica. Gate 13/13 · caracterización 20/20 sin editar.
+- **Smartreview 2026-09-08 ✅** — guardarraíl `bet_advisor.plan_not_worse` en los 3
+  entry points + recálculo dinámico (el boost nunca produce un plan con menos
+  cuentas que el determinista); `test_bet_advisor.py` 27 · `test_bet_advisor_integration.py` 5.
 - **Commit D ✅ `8cd909f`** — recálculo dinámico en `run_auto_mission` dentro de
   `if need_backup and active_cards` (mismo patrón que los entry points: `_advisor_sink`
   sobre el `plan_auto_mission` de respaldo → `advise_from_inputs(kind="recalc")` →

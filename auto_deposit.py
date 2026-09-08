@@ -2166,10 +2166,12 @@ async def run_auto_mission(
                                         logger.info(
                                             f"[Auto {mission_id}] advisor recalc → {len(_rc_hint)} boosts"
                                         )
-                                        backup_plan = plan_auto_mission(
+                                        _rc_boosted = plan_auto_mission(
                                             DB_PATH, active_cards, amount, target_count,
                                             max_accounts=remaining, advisor_hint=_rc_hint,
                                         )
+                                        if _badv.plan_not_worse(backup_plan, _rc_boosted):
+                                            backup_plan = _rc_boosted
                                 if backup_plan and backup_plan.get("feasible"):
                                     for b_acc in backup_plan.get("accounts", []):
                                          b_email = b_acc.get("email")

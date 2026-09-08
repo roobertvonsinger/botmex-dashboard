@@ -417,6 +417,29 @@ async def advise_from_inputs(
     return bmap or None
 
 
+def plan_not_worse(base: dict, boosted: dict) -> bool:
+    """Guardarraíl del hint (Fase 3): el `boost` del advisor **reordena** dentro
+    del tier — NUNCA reduce la flota ni tumba un plan factible.
+
+    El `advisor_boost` es la 1ª clave del `sort_key`, así que un boost puede
+    cambiar *qué* cuentas caen dentro de la ventana `max_accounts` — no solo su
+    orden. Si esa cuenta boosteada no tiene tarjeta asignable (cooldown-BIN-30d,
+    married, anti-mezcla de saldo), el re-plan sale con menos cuentas o infactible.
+    En ese caso el caller descarta el plan boosteado y usa el determinista.
+
+    Devuelve `True` si el plan boosteado se puede adoptar sin regresión.
+    """
+    if not isinstance(base, dict) or not isinstance(boosted, dict):
+        return False
+    n_base = len(base.get("accounts") or [])
+    n_boost = len(boosted.get("accounts") or [])
+    if n_boost < n_base:
+        return False
+    if base.get("feasible") and not boosted.get("feasible"):
+        return False
+    return True
+
+
 def _cost_usd(model: str, tokens_out: Optional[int]) -> float:
     rate = _MODEL_COST_PER_1K.get(model or "", 0.0)
     return round(rate * (tokens_out or 0) / 1000.0, 6)

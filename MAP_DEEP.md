@@ -162,28 +162,28 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `admin_maintenance_state` | def | L4485–L4488 |
 | `MaintenanceToggleRequest` | class | L4491–L4492 |
 | `admin_maintenance_toggle` | def | L4496–L4519 |
-| `auto_deposit_create` | def | L4523–L4573 |
-| `auto_deposit_cancel` | def | L4577–L4603 |
-| `emergency_stop_all_deposits` | def | L4607–L4638 |
-| `operator_my_accounts` | def | L4642–L4732 |
-| `operator_release_account` | def | L4736–L4753 |
-| `operator_withdraw` | def | L4757–L4815 |
-| `operator_auto_withdraw` | def | L4819–L4855 |
-| `auto_deposit_confirm` | def | L4859–L4878 |
-| `operator_missions` | def | L4882–L4900 |
-| `operator_recent_ticker` | def | L4904–L5029 |
-| `auto_deposit_status` | def | L5033–L5044 |
-| `register_operator_strike` | def | L5047–L5080 |
-| `bot_start_info` | def | L5084–L5120 |
-| `bot_operator_info` | def | L5124–L5163 |
-| `bot_help_info` | def | L5167–L5181 |
-| `bot_pause_mission` | def | L5185–L5214 |
-| `bot_resume_mission` | def | L5218–L5236 |
-| `bot_cancel_mission` | def | L5241–L5276 |
-| `bot_bet_create` | def | L5280–L5463 |
-| `filter_and_sanitize_check_combos` | def | L5466–L5551 |
-| `BotCheckRequest` | class | L5554–L5558 |
-| `bot_check` | def | L5561–L5642 |
+| `auto_deposit_create` | def | L4523–L4575 |
+| `auto_deposit_cancel` | def | L4579–L4605 |
+| `emergency_stop_all_deposits` | def | L4609–L4640 |
+| `operator_my_accounts` | def | L4644–L4734 |
+| `operator_release_account` | def | L4738–L4755 |
+| `operator_withdraw` | def | L4759–L4817 |
+| `operator_auto_withdraw` | def | L4821–L4857 |
+| `auto_deposit_confirm` | def | L4861–L4880 |
+| `operator_missions` | def | L4884–L4902 |
+| `operator_recent_ticker` | def | L4906–L5031 |
+| `auto_deposit_status` | def | L5035–L5046 |
+| `register_operator_strike` | def | L5049–L5082 |
+| `bot_start_info` | def | L5086–L5122 |
+| `bot_operator_info` | def | L5126–L5165 |
+| `bot_help_info` | def | L5169–L5183 |
+| `bot_pause_mission` | def | L5187–L5216 |
+| `bot_resume_mission` | def | L5220–L5238 |
+| `bot_cancel_mission` | def | L5243–L5278 |
+| `bot_bet_create` | def | L5282–L5467 |
+| `filter_and_sanitize_check_combos` | def | L5470–L5555 |
+| `BotCheckRequest` | class | L5558–L5562 |
+| `bot_check` | def | L5565–L5646 |
 
 ### `auth.py`
 
@@ -243,7 +243,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_pull_fresh_live_account` | def | L1381–L1515 |
 | `_broadcast_mission` | def | L1518–L1547 |
 | `_stop_pool` | def | L1550–L1557 |
-| `run_auto_mission` | def | L1561–L2750 |
+| `run_auto_mission` | def | L1561–L2752 |
 
 ### `autoexclusion.py`
 
@@ -273,8 +273,9 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_run_llm` | def | L298–L321 |
 | `maybe_advise` | def | L326–L388 |
 | `advise_from_inputs` | def | L391–L417 |
-| `_cost_usd` | def | L420–L422 |
-| `_record_llm_call` | def | L425–L448 |
+| `plan_not_worse` | def | L420–L440 |
+| `_cost_usd` | def | L443–L445 |
+| `_record_llm_call` | def | L448–L471 |
 
 ### `bet_policy.py`
 
