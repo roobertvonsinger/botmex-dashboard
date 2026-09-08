@@ -7,9 +7,21 @@
 
 ## ▶ ARRANQUE INMEDIATO (2026-09-08) — Refactor `/bet` a nodos + operador inteligente
 
-**Rama activa:** `feat/bet-nodes-refactor` (pusheada).
+**Rama activa:** `feat/bet-nodes-refactor` (pusheada, tip `b525cb1`).
 **Plan completo:** `C:\Users\rober\.claude\plans\como-podriamos-hacer-un-dynamic-cupcake.md`
 **Estado vivo del refactor:** `docs/BET_POLICY.md`
+
+### ⚠️ COLISIÓN MULTI-SESIÓN (2026-09-08 ~10:00) — leer antes de tocar `auto_deposit.py`
+Había **5 sesiones Claude** sobre este mismo repo/dir. Otra sesión commiteó
+`719111d "matchmaking continuo multi-tarjeta, filtrado falso 429/403 y cableado
+bet_advisor"` que **absorbió TODO el código de mi Commit C** (advisor wiring) +
+un cambio propio de ~150 L a `run_auto_mission` (matchmaking continuo, 429/403,
+`backup_checked`) + `betmexico_login_api.py`/`login_orchestrator.py`. NO estaba en
+el plan de Fase 3 y no lo revisé. Mi commit `b525cb1` encima son **solo las docs**
+de Commit C. Gate verde sobre `b525cb1` (13/13 · 220 passed · 8 `test_plan_*` +
+`test_bet_input_five_cards` pre-existentes por fixture sin JWT). **Antes de Commit D
+(recálculo dinámico, toca `run_auto_mission` cerca de `backup_checked`): confirmar
+qué sesión es dueña de Fase 3 y revisar `719111d` a fondo — modifica la MISMA zona.**
 
 ### Qué es
 Descomponer `auto_deposit.py::run_auto_mission` (~1000 líneas) en un pipeline de nodos puros +
@@ -58,26 +70,25 @@ de cuentas. El LLM NUNCA en el hot path por-depósito.
   verdes · 128 en la corrida agregada. Los 8 `test_plan_*` de `test_auto_deposit.py` siguen rojos
   (pre-existentes, JWT en fixture — ver más abajo).
 
-### PRIMERA ACCIÓN próxima sesión → Fase 3 (advisor / operador inteligente, default OFF)
-1. Test primero: `tests/test_bet_advisor.py` — `_build_advisor_request` sin PII
-   (property test: filas con emails/PANs/jwt → ninguno aparece en el payload);
-   `_sanitize_advice` descarta refs no elegibles, clampa `boost∈[-3,3]`, rechaza
-   pairings casados/anti-mezcla; `maybe_advise` → `None` en timeout/JSON malo/env
-   OFF; fila de costo (`bet_llm_calls`) en TODO camino.
-2. `bet_advisor.py` + **vendoring de `support_llm.py`** en commit aislado
-   (`git show feat/support-agent:support_llm.py`, NO mergear la rama).
-   `plan_auto_mission` gana `advisor_hint`; `select_accounts_for_auto` gana
-   `advisor_boost: dict[email,int]` (1 elemento prependido al `sort_key`). Los 3
-   entry points async llaman `maybe_advise` concurrente con `telemetry_gatherer`.
-3. Recálculo dinámico: en `run_auto_mission`, antes de la expansión de respaldo
-   (`if not active:` / `backup_checked`), `maybe_advise` con estado vivo redactado
-   → hint a la re-invocación de `plan_auto_mission`. Cachear `account_priority`/
-   `avoid` en memoria para sesgar `_pull_fresh_live_account` sin llamadas nuevas.
-4. Migración aditiva `bet_llm_calls`. Gate: 4 suites verdes **con `BET_ADVISOR_ENABLED`
-   sin setear** (cero regresión) + `test_bet_advisor.py`. Merge OFF; Robert pone
-   `BET_ADVISOR_ENABLED=1` para el smoke real.
+### Fase 3 — advisor / operador inteligente (default OFF `BET_ADVISOR_ENABLED`)
+- **Commit A ✅ `c6f671c`** — vendor `support_llm.py` + `tests/test_support_llm.py` (10/10), aislado.
+- **Commit B ✅ `2267121`** — `bet_advisor.py` (módulo PURO: `AdvisorInputs`,
+  `_build_advisor_request` whitelist, `_assert_no_pii` fail-closed, `_sanitize_advice`,
+  `maybe_advise` OFF-by-default + `asyncio.wait_for(6s)`, `_record_llm_call`) +
+  `tests/test_bet_advisor.py` (24) + migración aditiva `bet_llm_calls`.
+- **Commit C ✅ (código en `719111d`, docs en `b525cb1`)** — `select_accounts_for_auto(
+  ..., advisor_boost)` (prepend al `sort_key`, puro desempate) + `plan_auto_mission(
+  ..., advisor_hint, _advisor_sink)` + `_build_advisor_bundle`/`_advisor_recent_history`
+  (read-only, cero query) + `bet_advisor.enabled()`/`advise_from_inputs` + 3 entry points
+  async. Advisor OFF → conducta idéntica. Gate 13/13 · caracterización 28/28 sin editar.
+- **Commit D 🔵 PENDIENTE** — recálculo dinámico: en `run_auto_mission`, antes de la
+  expansión de respaldo (`backup_checked`), `maybe_advise` con estado vivo redactado
+  → hint a la re-invocación de `plan_auto_mission`. Cachear `account_priority`/`avoid`
+  en memoria para sesgar `_pull_fresh_live_account`. `tests/test_bet_advisor_integration.py`
+  con `LLMClient` falso. **BLOQUEADO por la colisión de arriba — `719111d` reescribió
+  esa zona; revisar primero.** Merge OFF; Robert pone `BET_ADVISOR_ENABLED=1` para el smoke.
 
-Orden de fases: 0 ✅ → 1a ✅ → 1 ✅ → 1b ✅ → 2 ✅ → **3** (advisor OFF) → 4 (`bet_tuner`, diferido).
+Orden de fases: 0 ✅ → 1a ✅ → 1 ✅ → 1b ✅ → 2 ✅ → **3** (A/B/C ✅, D 🔵) → 4 (`bet_tuner`, diferido).
 
 ---
 
