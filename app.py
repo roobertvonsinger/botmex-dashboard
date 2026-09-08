@@ -4634,7 +4634,7 @@ def emergency_stop_all_deposits(user: dict = Depends(require_session)):
             pass
 
     _broadcast({"type": "emergency_stop", "ts": now, "cancelled_missions": cancelled_count, **_resolve_who(user.get("telegram_id"))})
-    logger.warning(f"🚨🚨 PARO DE EMERGENCIA EJECUTADO: {cancelled_count} misiones canceladas por {user.get('telegram_id')}")
+    print(f"🚨🚨 PARO DE EMERGENCIA EJECUTADO: {cancelled_count} misiones canceladas por {user.get('telegram_id')}", flush=True)
     return {"status": "ok", "emergency_stop": True, "cancelled_missions": cancelled_count}
 
 

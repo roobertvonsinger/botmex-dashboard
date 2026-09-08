@@ -284,6 +284,8 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a01ecc3` | feat(bet): cablear bet_advisor — advisor_boost/advisor_hint/_advisor_sink + 3 entry points (Fase 3, Commit C) |
+| `719111d` | feat(bet): matchmaking continuo multi-tarjeta, filtrado falso 429/403 y cableado bet_advisor |
 | `2267121` | feat(bet): bet_advisor.py — asesor LLM de pre-selección + migración bet_llm_calls (Fase 3, Commit B) |
 | `c6f671c` | chore(bet): vendor support_llm.py + su test desde feat/support-agent (Fase 3, aislado) |
 | `014efe2` | feat(bet): bet_policy.load_policy() + override disco + digest + POLICY cableado (Fase 2) |
@@ -294,8 +296,6 @@ prewarm.py (router)
 | `0d45fa8` | docs(next-session): arranque inmediato Fase 1 del refactor /bet a nodos |
 | `efab82b` | test(bet): red de caracterización golden-master de run_auto_mission (Fase 0) |
 | `29bf812` | fix(perf): resolve gateway timeout hang, polling storm, and enable concurrent updates |
-| `1453167` | fix(bet): eliminate 429 contamination, clean stale dead_at and enable concurrent updates |
-| `51992d0` | fix(logs): stateful since filtering and noise pattern filter for CancelledError |
 <!-- GEN:end:recientes -->
 
 ---

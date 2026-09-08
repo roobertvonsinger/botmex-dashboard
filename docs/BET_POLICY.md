@@ -30,7 +30,7 @@ secundarios quedan exactamente donde están hoy.
 | 1 | Cableado en el inner loop de FASE 1 (`_*_view` → `decide_next_action` → `_apply_action`) | ✅ caracterización 12/12 sin editar · `verify_bet_suite` 13/13 · `test_auto_mission` 29/29 |
 | 1b | Extender `retry_policy` a FASE 2 (scheduled) — `decide_next_action(phase="SCHEDULED")` + `_apply_sched_action` | ✅ caracterización 20/20 (12 viejas sin editar + 8 FASE 2) · `test_bet_retry_policy` 70 · `verify_bet_suite` 13/13 |
 | 2 | `bet_policy.load_policy()` + override `/data/bet_policy.json` + `_SANE_BOUNDS` + `digest()` + CLI `apply()` + `POLICY` cableado en shell + migración `auto_missions.policy_digest` | ✅ `test_bet_policy` 14/14 · caracterización 28/28 sin editar · `verify_bet_suite` 13/13 |
-| 3 | `bet_advisor` (LLM plan-time + recálculo dinámico), default OFF (`BET_ADVISOR_ENABLED`) | 🟡 en curso — Commit A (vendor `support_llm.py`) ✅ · Commit B (`bet_advisor.py` + `tests/test_bet_advisor.py` 24/24 + migración `bet_llm_calls`) ✅ · Commit C (cablear) 🔵 · Commit D (recálculo dinámico + integración) 🔵 |
+| 3 | `bet_advisor` (LLM plan-time + recálculo dinámico), default OFF (`BET_ADVISOR_ENABLED`) | 🟡 en curso — Commit A (vendor `support_llm.py`) ✅ · Commit B (`bet_advisor.py` + tests 24/24 + migración `bet_llm_calls`) ✅ · Commit C (cablear `advisor_boost`/`advisor_hint`/`_advisor_sink` + 3 entry points) ✅ · Commit D (recálculo dinámico + integración) 🔵 |
 | 4 | `bet_tuner` (ajuste offline de parámetros con diff aprobable) | 🔵 ronda siguiente |
 
 ## Fase 1a — módulos puros (hecho, sin cambio de conducta)
@@ -159,13 +159,40 @@ probar tool-calling contra el router vivo).
 Gate: `tests/test_bet_advisor.py` 24/24 · `verify_bet_suite` 13/13 · caracterización
 28/28 **sin editar** · 199 en la corrida agregada.
 
-### Commit C — cablear (🔵 siguiente)
-`select_accounts_for_auto` gana `advisor_boost: dict[email,int]` (1 elemento
-prependido en posición 0 del `sort_key`, antes de `pool_first` — puro desempate).
-`plan_auto_mission` gana `advisor_hint`. Los 3 entry points async
-(`process_bet_input`, `bot_bet_create`, `auto_deposit_create`) llaman `maybe_advise`
-concurrente con la telemetría. Gate: 4 suites verdes **con `BET_ADVISOR_ENABLED`
-sin setear** (cero regresión).
+### Commit C — cableado (✅ — el código quedó en `719111d`, junto con un cambio
+### paralelo de otra sesión ("matchmaking continuo multi-tarjeta, filtrado 429/403");
+### este commit de docs es `a01ecc3`)
+- **`select_accounts_for_auto(..., advisor_boost: Optional[Dict[str,int]] = None)`** —
+  `adv_boost = -int(advisor_boost.get(email, 0))` **prependido en posición 0 del
+  `sort_key`** (antes de `pool_first`). Puro desempate **dentro del tier**: el rango
+  `[-3,3]` no salta la separación de tiers (ya aplicada) ni un filtro de exclusión
+  dura. `None`/`{}` → orden **idéntico** (test `test_advisor_boost_none_is_identity`).
+- **`plan_auto_mission(..., advisor_hint=None, _advisor_sink=None)`** — `advisor_hint`
+  se pasa como `advisor_boost=`. Si el caller da `_advisor_sink` (list),
+  `_build_advisor_bundle` arma `(bet_advisor.AdvisorInputs, ref2email)` **reusando
+  `meta_map`/`bin_stats_map`/`selected` — CERO query extra** y lo deposita.
+- **`_build_advisor_bundle`** (module-level, `auto_deposit.py`) — read-only. Cuentas
+  por ref opaca `A0`/`A1` (+ email SOLO para traducir de vuelta), tarjetas `C0`/`C1`
+  con BIN(6). `tier_hint` re-derivado con la misma lógica del tiering. `recent_history`
+  sale de `bin_stats_map` (approval por tier de BIN; medias de probes en 0.0 — no vale
+  la query). `_advisor_recent_history` es el helper.
+- **`bet_advisor.enabled()`** (público) + **`bet_advisor.advise_from_inputs(bundle, *,
+  db_path, mission_id, kind, client)`** — recibe el `(AdvisorInputs, ref2email)` del
+  sink, llama `maybe_advise` con `pairing_ok=lambda a,c: False` (**pairings
+  desactivados esta ronda**), devuelve `{email: boost}` o `None`.
+- **3 entry points async** (`app.py::auto_deposit_create`, `app.py::bot_bet_create`,
+  `telegram_bot_mock/bot.py::process_bet_input`): `mission_id` generado ANTES (para la
+  fila de costo) → `_adv_sink = [] if bet_advisor.enabled() else None` →
+  `plan_auto_mission(_advisor_sink=_adv_sink)` → si hay sink,
+  `await bet_advisor.advise_from_inputs(...)` → si vuelve hint no vacío,
+  re-`plan_auto_mission(advisor_hint=hint)` (doble plan SOLO cuando el advisor
+  produce boosts; `plan_auto_mission` sobre SQLite local es ~ms).
+
+**Advisor OFF (default) → `_adv_sink=None` → `advisor_boost=None` → conducta
+idéntica.** Gate: `verify_bet_suite` 13/13 · caracterización 28/28 sin editar ·
+`test_auto_deposit_selection` (+3) · `test_bet_advisor` (+3) · 219 passed · los 8
+`test_plan_*` + `test_bet_input_five_cards` rojos son **pre-existentes** (fixture sin
+JWT, idéntico en `014efe2`).
 
 ### Commit D — recálculo dinámico + integración (🔵)
 En `run_auto_mission`, antes de la expansión de respaldo, `maybe_advise` con el
