@@ -2,58 +2,80 @@
 
 > Fuente de verdad. Arranca con `.` o `/botmex`. Cierra con `/cerrar-bmx` o `/cerrar`.
 > **Lente rectora:** `feedback_frictionless_norte`. BOTMEXICO = frictionless, le GANA a BetMexico directo.
-> ⚠️ **AVISO CAMBIO DE CUENTA:** Robert cambió de cuenta en Antigravity IDE por cuota de consumo. Al abrir con `.` o `/botmex`, NO pedir recap ni hacer preguntas burocráticas: recibir directamente el resultado de la auditoría ultra-crítica de Robert.
 
-## 🎯 Estado y Resumen Operativo (2026-09-02)
+---
 
-**AUDITORÍA FORENSE COMPLETADA, DEUDA TÉCNICA DE RAÍZ SANEADA Y SUITE CANÓNICA + UNITARIA 100% VERDE (83/83).**
-1. **Resguardo de Emergencia Previo a Refactor:**
-   - Creado en `C:\Users\rober\Dropbox\TESTING DEV\_emergency_backup_botmex_20260902` con commit `3225aba`, `betmexico_accounts.db` (17.8MB) y archivos de código intactos.
-2. **Unificación de Algoritmo de Grading (V10 M7):**
-   - Reemplazada la versión V9 de raíz en `betmexico_payment_analyzer.py` por la versión canónica V10 de `shared/`. Todas las importaciones ahora operan bajo reglas M7 (masacres caen en C, aprobación reciente sana, 16/16 tests pasando).
-3. **Eliminación de Bypass SQLite & Fuga de Conexiones:**
-   - En `app.py:3369`, eliminado el `BetmexicoDB(Path(db_path))` huérfano. Enrutado a través del singleton thread-safe con busy timeout de 30s y WAL.
-4. **Desacoplamiento Circular vía `db_registry.py`:**
-   - Creado `db_registry.py` para aislar `DB_PATH`, `db`, `_db_write_with_retry` y registry de locks.
-   - `app.py` re-exporta los símbolos. `deposits.py` y `auto_deposit.py` ahora pueden importarse de forma aislada sin requerir `app` previamente.
-5. **Blindaje de Mantenimiento & Docker Compose:**
-   - Modo mantenimiento protegido con flag en memoria `_MAINTENANCE_OVERRIDE` sin mutar globalmente `os.environ`.
-   - `docker-compose.yml` anotado con `docker-proxy` comentado y vinculado a su rama fuente `feat/support-agent`.
-6. **Validación Exhaustiva:**
-   - Suite canónica `/bet`: 9/9 verdes al 100%.
-   - Suite completa de regresión (`tests/`): 83/83 pruebas pasando al 100%.
+## ▶ ARRANQUE INMEDIATO (2026-09-08) — Refactor `/bet` a nodos + operador inteligente
 
-## ▶ Con qué arrancas (PRIMERA acción de la próxima sesión)
+**Rama activa:** `feat/bet-nodes-refactor` (pusheada, 1 commit `efab82b` sobre `main`).
+**Plan completo:** `C:\Users\rober\.claude\plans\como-podriamos-hacer-un-dynamic-cupcake.md`
+**Estado vivo del refactor:** `docs/BET_POLICY.md`
 
-1. **DNS Cutover (Hostinger hPanel):**
-   - Crear registro DNS **A**: `botmex` (o `*`) → `2.25.98.162` en la zona `2puty.tech`.
-   - Probar acceso HTTPS en `https://botmex.2puty.tech/login` y `https://botmex.2puty.tech/api/health/ping`.
-2. **Implementación AUTO-1 (Gateway de Retiros por Telegram):**
-   - Iniciar TDD sobre `SPEC_AUTOMATIZACIONES_ALTO_IMPACTO.md` con locks transaccionales SQLite WAL y botones inline de aprobación.
+### Qué es
+Descomponer `auto_deposit.py::run_auto_mission` (~1000 líneas) en un pipeline de nodos puros +
+extraer la lógica de retry a `bet_retry_policy.py` + centralizar las ~32 constantes en
+`bet_policy.BetPolicyConfig` + un advisor LLM (`bet_advisor.py`, 9router) para la pre-selección
+de cuentas (plan inicial + recálculo dinámico a mitad de misión). El LLM NUNCA en el hot path
+por-depósito. Robert quiere: "operador inteligente que en tiempo real recalcule la selección
+de cuentas"; retries y mecánica siguen deterministas.
 
-## 🧭 Estado de Producción Actual (KVM4-Karen `2.25.98.162`)
-- **Web App (`betmexico-web`):** 🟢 200 OK en `http://2.25.98.162:8001/api/health/ping` (948 cuentas activas).
-- **Telegram Bot (`betmexico-mock-bot`):** 🟢 ACTIVO en contenedor Docker (notificación enviada a SuperAdmin).
-- **Traefik Ingress SSL:** 🟢 Configurado en `/opt/kvm4/config/traefik/dynamic/betmexico.yml` para `botmex.2puty.tech` y `botmexico.net`.
-- **Suite Canónica /bet:** 🟢 9/9 verdes (0.87s).
+### Hecho — Fase 0 (commit `efab82b`)
+`tests/test_bet_retry_characterization.py` — 12 tests golden-master que fijan la secuencia
+exacta de efectos del `run_auto_mission` actual. Contrato de no-regresión para Fase 1.
+Verde: `verify_bet_suite` 13/13 · `test_auto_mission` 29/29 · caracterización 12/12.
 
-## ✅ Hecho esta sesión (2026-09-02, Scheduler Continuo, Afinidad BIN y 3 Strikes)
+### PRIMERA ACCIÓN próxima sesión → Fase 1
+1. `git checkout feat/bet-nodes-refactor` (ya existe local + remoto).
+2. Test primero: `tests/test_bet_retry_policy.py` — unit puro de `decide_next_action` por rama
+   (~30 casos). Ver la interfaz completa (`Action`, `OutcomeView`, `AccountRetryState`,
+   `CardRetryState`, `MissionRetryState`) en el plan §"Componentes e interfaces".
+3. Crear `bet_retry_policy.py` (tipos + función pura; importa solo helpers módulo-nivel de
+   `deposits`: `_mm_is_real_decline`, `_mm_is_ambiguous_charge`, `MM_DEAD_RC`, `MM_THREEDS_RC`).
+4. Crear `bet_policy.py` con `BetPolicyConfig` + `DEFAULT` **solo** (sin load de disco aún).
+   Defaults = valores EXACTOS actuales (leerlos del código, no de MAP.md — algunos difieren).
+5. Refactor del inner `while True` de FASE 1 matchmaking en `auto_deposit.py` (L1828–2147,
+   ~300 líneas) a `decide_next_action` + helper `_apply_action` **del shell** (efectos y su
+   orden idénticos) + `_outcome_view`/`_account_view`/`_card_view`/`_mission_view` construidos
+   ANTES de cualquier mutación. FASE 2 intacta (es Fase 1b).
+6. Gate: `test_bet_retry_policy.py` verde + `test_bet_retry_characterization.py` **sin editar y
+   verde** + `verify_bet_suite` 13/13 + `test_auto_mission` verde. Commit + push.
 
-- **`bin_intelligence.py`**:
-  - Implementado `get_bin_compatibility_tier` (CORONA, THREEDS, DEAD, TESTING) con fallback para débito Santander/BBVA/Banorte.
-- **`auto_deposit.py`**:
-  - Añadidas constantes `MM_CARD_MAX_DECLINES = 3` y `MM_ACCOUNT_MAX_DECLINES_1H = 2`.
-  - Ventana de declines ajustada a 1 hora en `plan_auto_mission`.
-  - Sorting por afinidad de BIN x Grado en selección de tarjetas de `plan_auto_mission`.
-  - Protocolo 3 strikes con `card_tried_accounts` y re-encolado dinámico a cuentas distintas.
-  - Implementado `_has_card_deposit_24h` y guard de saldo en vivo para evitar mezcla de plásticos.
-  - Eliminado el freeze síncrono de 45s en cuentas purgadas o en cooldown.
-  - Manejo de 3DS: certificación `A+` y reutilización de la tarjeta en hasta 3 cuentas.
-- **Tests & Auditoría**:
-  - Creado `tests/test_auto_deposit_scheduler.py` (4 tests TDD nuevos).
-  - Creado `tests/test_bet_canonical_suite.py` (9 invariantes funcionales canónicas).
-  - Creado runner `tools/verify_bet_suite.py`.
-  - Actualizados tests existentes en `test_auto_mission.py` y `test_auto_mission_edge_cases.py` para reflejar la regla de 3 strikes y 1h.
-  - **49/49 tests pasando al 100%**.
-- **Documentación & Reglas**:
-  - Declarada la Suite Canónica en `AGENTS.md` (botmex y workspace), `CLAUDE.md`, `/botmex` y `walkthrough.md`.
+Orden de fases: 0 ✅ → 1 → 1b → 2 → 3. `bet_tuner` (Fase 4) = ronda siguiente.
+
+### Ramas de detalle exacto del inner loop de FASE 1 (orden que `decide_next_action` debe replicar)
+`ok` → `BALANCE_LIMIT_EXCEEDED` → `code in MM_THREEDS_RC` (3DS→A+, 3 cuentas) → familia dead/429
++ circuit breaker → `_mm_is_real_decline or _mm_is_ambiguous_charge` (3-strikes tarjeta / 2-strikes
+cuenta) → `CARD_LOCKED_OTHER_ACCOUNT` → transitorio (retry x4, `_sleep_step(25)`).
+Cross-account gap `_sleep_step(MM_CROSS_ACCOUNT_GAP=5)` al final si quedan otras cuentas activas.
+
+---
+
+## 🐛 Bugs abiertos flagueados esta sesión (chips de spawn_task)
+
+1. **Circuit breaker de 429 no corta el outer loop** (`auto_deposit.py` ~L2018–2030): setea
+   `cancelled` local, pero `while not _cancelled()` lee status en BD → sigue procesando TODAS
+   las cuentas del plan en 429. `test_char_rate_limit_circuit_breaker_current_behavior` lo
+   documenta. Fix: escribir status terminal a BD en el breaker, o `while not _cancelled() and
+   not cancelled`.
+2. **8 tests `test_auto_deposit.py::test_plan_*` rotos en `main`**: fixture `seed_db`/`_add_account`
+   no siembra `jwt_token`/`jwt_expires_at` vigentes y `plan_auto_mission` ahora exige JWT vivo.
+   Modelo a copiar: `tests/test_bet_canonical_suite.py` (siembra `jwt_expires_at DEFAULT 2147483647`).
+
+---
+
+## 🧭 Estado de repos / infra
+
+- **Rama `main`:** 4 commits **sin pushear** a `origin/main` (`29bf812`, `1453167`, `51992d0`,
+  `7211c2e`) — NO son de esta sesión (posiblemente sesión paralela / cambio de cuenta Antigravity).
+  Verificar si están listos y pushear, o entender por qué se pararon. No los toqué.
+- **Remoto canónico:** `github.com/roobertvonsinger/botmex-dashboard` (ya no Forgejo).
+- **KVM4-Karen (`2.25.98.162`):** API `/bet` viva (`:8001` → 302). No se deployó nada esta sesión.
+- **9router:** `http://2.25.98.162:20128/v1` VIVO (requiere API key). Es el gateway para el
+  advisor de Fase 3. Cliente reutilizable: `git show feat/support-agent:support_llm.py`.
+
+## 📌 Pendientes previos (estado sin verificar esta sesión — cruzar con git log antes de re-ejecutar)
+- DNS Cutover Hostinger: `botmex` A → `2.25.98.162` en zona `2puty.tech`.
+- AUTO-1 (Gateway de Retiros por Telegram) sobre `SPEC_AUTOMATIZACIONES_ALTO_IMPACTO.md`.
+
+## 🛡️ Suite Canónica /bet (innegociable)
+Todo cambio en auto-depósito/matchmaking: `python tools/verify_bet_suite.py` → 13/13 antes de commit.
