@@ -39,8 +39,8 @@ AUTOLOCK_HOURS_SCHEDULED = 4  # más amplio porque corre N reps cada 1 min
 # begin_deposit es PRE-COBRO (paso 1, antes de submit_card) → reintentarlo NO
 # duplica cargos. Antes un 504 momentáneo del gateway de BetMexico abortaba la
 # misión programada entera (Robert 2026-05-29). Reintentamos in-situ.
-BEGIN_MAX_ATTEMPTS = 3
-BEGIN_RETRY_BACKOFF_SEC = 6
+BEGIN_MAX_ATTEMPTS = 2
+BEGIN_RETRY_BACKOFF_SEC = 2.0
 
 
 # ── Anti-rate-limit Capa 3 (spec 2026-06-28) — enfriar y saltar ──────────────
@@ -1171,7 +1171,7 @@ async def _refresh_account_after_deposit(
         async with BetmexicoApiChecker(proxy=used_proxy) as checker:
             details = await asyncio.wait_for(
                 checker.fetch_account_details_parallel(jwt, fetch_mode="full"),
-                timeout=15.0,
+                timeout=7.0,
             )
         if not details:
             return
@@ -1403,7 +1403,7 @@ async def _acquire_session_and_begin(
 
         # ── Abrir client + begin_deposit (retry ante 50x/timeout transitorios) ──
         # Pre-cobro → reintentar es seguro (no duplica cargos).
-        client_kwargs = {"timeout": 30.0, "verify": False}
+        client_kwargs = {"timeout": httpx.Timeout(12.0, connect=5.0), "verify": False}
         if used_proxy:
             client_kwargs["proxy"] = used_proxy
         client = httpx.AsyncClient(**client_kwargs)
@@ -1842,10 +1842,14 @@ async def _run_deposit_with_phases(
 
     # ── Refresh de cuenta post-depósito ───────────────────────────────────
     # Reusa el JWT del login (sin captcha) para traer balance + movimientos
-    # frescos y persistirlos, así el dashboard refleja el resultado del intento
-    # sin que el operador pique "Actualizar" (Robert 2026-05-29). No-throws.
-    await _refresh_account_after_deposit(
-        email, jwt, used_proxy, user.get("telegram_id", 0))
+    # frescos y persistirlos en segundo plano sin demorar la respuesta del depósito
+    # ni inflar artificialmente su duration_ms. Emite account_refreshed vía SSE.
+    try:
+        asyncio.create_task(_refresh_account_after_deposit(
+            email, jwt, used_proxy, user.get("telegram_id", 0)
+        ))
+    except Exception as _bg_err:
+        logger.warning(f"[Deposits/phases] No se pudo lanzar refresh en background {email}: {_bg_err}")
 
     return {
         "success": approved,

@@ -1933,6 +1933,35 @@ def _tail_log_file(log_file: Path, limit: int = 200, since: Optional[str] = None
     return lines
 
 
+_LOGS_CACHE: dict = {}
+_LOGS_CACHE_TTL = 1.0  # 1 segundo debounce / cache para proteger el worker de ráfagas
+
+
+def _get_cached_logs(key: str, producer_fn):
+    now = time.time()
+    cached = _LOGS_CACHE.get(key)
+    if cached and (now - cached[0] < _LOGS_CACHE_TTL):
+        return cached[1]
+    res = producer_fn()
+    _LOGS_CACHE[key] = (now, res)
+    if len(_LOGS_CACHE) > 50:
+        cutoff = now - 5.0
+        for k in list(_LOGS_CACHE.keys()):
+            if _LOGS_CACHE[k][0] < cutoff:
+                del _LOGS_CACHE[k]
+    return res
+
+
+_TELEGRAM_LOG_FILES = {
+    "main": Path("/data/logs/telegram_bot.log"),
+    "legacy": Path("/data/logs/telegram_bot.log"),
+    "mock": Path("/data/logs/telegram_mock_bot.log"),
+    "telegram": Path("/data/logs/telegram_mock_bot.log"),
+    "betmex": Path("/data/logs/telegram_mock_bot.log"),
+    "ruthopia": Path("/data/logs/ruthopia.log"),
+}
+
+
 @app.get("/api/logs")
 def get_logs(limit: int = 200, since: Optional[str] = None,
              level: Optional[str] = None,
@@ -1945,28 +1974,23 @@ def get_logs(limit: int = 200, since: Optional[str] = None,
     """
     if user.get("role") != "superadmin":
         raise HTTPException(403, "Solo superadmin")
-    try:
-        if source == "dashboard":
-            log_file = Path("/data/logs/dashboard.log")
-        elif source == "telegram":
-            log_file = _TELEGRAM_LOG_FILES.get(bot)
-            if not log_file:
-                return {"lines": [f"Bot no válido: {bot}"]}
-        else:
-            return {"lines": [f"Source no válido: {source}"]}
-        return {"lines": _tail_log_file(log_file, limit, since, level)}
-    except Exception as e:
-        return {"lines": [f"Error leyendo log: {e}"]}
+    cache_key = f"dash:{source}:{bot}:{limit}:{since}:{level}"
 
+    def _read():
+        try:
+            if source == "dashboard":
+                log_file = Path("/data/logs/dashboard.log")
+            elif source == "telegram":
+                log_file = _TELEGRAM_LOG_FILES.get(bot)
+                if not log_file:
+                    return {"lines": [f"Bot no válido: {bot}"]}
+            else:
+                return {"lines": [f"Source no válido: {source}"]}
+            return {"lines": _tail_log_file(log_file, limit, since, level)}
+        except Exception as e:
+            return {"lines": [f"Error leyendo log: {e}"]}
 
-_TELEGRAM_LOG_FILES = {
-    "main": Path("/data/logs/telegram_bot.log"),
-    "legacy": Path("/data/logs/telegram_bot.log"),
-    "mock": Path("/data/logs/telegram_mock_bot.log"),
-    "telegram": Path("/data/logs/telegram_mock_bot.log"),
-    "betmex": Path("/data/logs/telegram_mock_bot.log"),
-    "ruthopia": Path("/data/logs/ruthopia.log"),
-}
+    return _get_cached_logs(cache_key, _read)
 
 
 @app.get("/api/logs/telegram")
@@ -1980,43 +2004,47 @@ def get_logs_telegram(bot: str = "main", limit: int = 300, since: Optional[str] 
     """
     if user.get("role") != "superadmin":
         raise HTTPException(403, "Solo superadmin")
-    
-    # Manejo de Ruthopia (solo cuando se solicita explícitamente ruthopia)
-    if bot == "ruthopia":
-        ruth_candidates = [
-            Path("/data/logs/ruthopia.log"),
-            Path("/docker/ruthopia/ruthopia.log"),
-            Path("/app/ruthopia.log"),
-            Path("ruthopia.log"),
-        ]
-        for p in ruth_candidates:
-            if p.exists():
-                try:
-                    return {"lines": _tail_log_file(p, limit, since, level)}
-                except Exception:
-                    pass
-        # Fallback HTTP a Ruthopia API en KVM4
-        try:
-            import httpx
-            tok = os.environ.get("RUTHOPIA_DASHBOARD_TOKEN") or os.environ.get("DASHBOARD_TOKEN") or ""
-            headers = {"Authorization": f"Bearer {tok}"} if tok else {}
-            url = os.environ.get("RUTHOPIA_API_URL", "http://100.77.154.31:8787/api/logs")
-            resp = httpx.get(f"{url}?limit={limit}", headers=headers, timeout=2.5)
-            if resp.status_code == 200:
-                data = resp.json()
-                lines = data.get("lines", [])
-                if level:
-                    lvl = level.upper()
-                    lines = [ln for ln in lines if lvl in ln.upper()]
-                return {"lines": lines}
-        except Exception:
-            pass
+    cache_key = f"tg:{bot}:{limit}:{since}:{level}"
 
-    log_file = _TELEGRAM_LOG_FILES.get(bot, Path("/data/logs/telegram_mock_bot.log"))
-    try:
-        return {"lines": _tail_log_file(log_file, limit, since, level)}
-    except Exception as e:
-        return {"lines": [f"Error leyendo log: {e}"]}
+    def _read():
+        # Manejo de Ruthopia (solo cuando se solicita explícitamente ruthopia)
+        if bot == "ruthopia":
+            ruth_candidates = [
+                Path("/data/logs/ruthopia.log"),
+                Path("/docker/ruthopia/ruthopia.log"),
+                Path("/app/ruthopia.log"),
+                Path("ruthopia.log"),
+            ]
+            for p in ruth_candidates:
+                if p.exists():
+                    try:
+                        return {"lines": _tail_log_file(p, limit, since, level)}
+                    except Exception:
+                        pass
+            # Fallback HTTP a Ruthopia API en KVM4
+            try:
+                import httpx
+                tok = os.environ.get("RUTHOPIA_DASHBOARD_TOKEN") or os.environ.get("DASHBOARD_TOKEN") or ""
+                headers = {"Authorization": f"Bearer {tok}"} if tok else {}
+                url = os.environ.get("RUTHOPIA_API_URL", "http://100.77.154.31:8787/api/logs")
+                resp = httpx.get(f"{url}?limit={limit}", headers=headers, timeout=2.5)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    lines = data.get("lines", [])
+                    if level:
+                        lvl = level.upper()
+                        lines = [ln for ln in lines if lvl in ln.upper()]
+                    return {"lines": lines}
+            except Exception:
+                pass
+
+        log_file = _TELEGRAM_LOG_FILES.get(bot, Path("/data/logs/telegram_mock_bot.log"))
+        try:
+            return {"lines": _tail_log_file(log_file, limit, since, level)}
+        except Exception as e:
+            return {"lines": [f"Error leyendo log: {e}"]}
+
+    return _get_cached_logs(cache_key, _read)
 
 
 # ─── Health check ──────────────────────────────────────────────────────────────

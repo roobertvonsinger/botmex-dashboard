@@ -98,7 +98,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 595 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5562 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 5590 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 2456 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -115,7 +115,7 @@ prewarm.py (router)
 | `conftest.py` | 218 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
 | `db_registry.py` | 112 | `betmexico.dashboard.db` | _[completar]_ |
-| `deposits.py` | 3261 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 3265 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 391 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 236 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 922 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -202,8 +202,8 @@ prewarm.py (router)
 | `AUTOLOCK_HOURS_SINGLE` | `2` | `deposits.py` |
 | `AUTOLOCK_HOURS_MULTI` | `2` | `deposits.py` |
 | `AUTOLOCK_HOURS_SCHEDULED` | `4` | `deposits.py` |
-| `BEGIN_MAX_ATTEMPTS` | `3` | `deposits.py` |
-| `BEGIN_RETRY_BACKOFF_SEC` | `6` | `deposits.py` |
+| `BEGIN_MAX_ATTEMPTS` | `2` | `deposits.py` |
+| `BEGIN_RETRY_BACKOFF_SEC` | `2.0` | `deposits.py` |
 | `RATE_LIMIT_COOLDOWN_MIN` | `45` | `deposits.py` |
 | `SCHED_MAX_TRANSIENT_RETRIES` | `4` | `deposits.py` |
 | `SCHED_RETRY_BACKOFF_SEC` | `25` | `deposits.py` |
@@ -283,6 +283,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `1453167` | fix(bet): eliminate 429 contamination, clean stale dead_at and enable concurrent updates |
 | `51992d0` | fix(logs): stateful since filtering and noise pattern filter for CancelledError |
 | `7211c2e` | fix(logging): silence CancelledError and GatheringFuture spam and enforce Invariant 13 |
 | `cb57c20` | fix(cards): zero-overchecking cache en memoria y rutas kvm4 para pasaporte ruthopia |
@@ -294,7 +295,6 @@ prewarm.py (router)
 | `e0e8961` | refactor(core): saneamiento integral de deuda tecnica, unificacion V10 y desacoplamiento sqlite |
 | `3225aba` | docs: actualizar NEXT-SESSION con relevo dinamico, aviso cambio de cuenta y auditoria entrante |
 | `046cf69` | fix(bet): rotacion continua con relevo dinamico sin freezes, fail-fast en login y pool JIT |
-| `330d60a` | docs: ritual de cierre soberano, mapa y estado operativo actualizado |
 <!-- GEN:end:recientes -->
 
 ---

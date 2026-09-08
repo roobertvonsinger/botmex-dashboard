@@ -2696,9 +2696,13 @@ function _updateLogsFloatBtn() {
   }
 }
 
+let _logsInFlight = false;
+
 async function reloadLogs() {
+  if (_logsInFlight) return;
   const v = $('#logsView');
   if (!v) return;
+  _logsInFlight = true;
   try {
     const params = new URLSearchParams({ limit: '300', level: _logsLevel });
     if (_logsLastTs) params.set('since', _logsLastTs);
@@ -2719,6 +2723,8 @@ async function reloadLogs() {
     _appendLogLines(v, data.lines, { isFirstLoad: !_logsLastTs });
   } catch (e) {
     if (!_logsLastTs) v.textContent = humanizeApiError(e);
+  } finally {
+    _logsInFlight = false;
   }
 }
 // Detecta si el user scrolleó manualmente → desactiva auto-scroll temporal
@@ -2803,9 +2809,10 @@ function _updateBotFloatBtn(which) {
 async function _reloadBotLog(which) {
   const st = _botLogsState[which];
   const cfg = _LOGS_CONTAINERS[which];
-  if (!st || !cfg) return;
+  if (!st || !cfg || st.inFlight) return;
   const v = $(cfg.view);
   if (!v) return;
+  st.inFlight = true;
   try {
     const params = new URLSearchParams({ bot: which, limit: '300' });
     if (st.ts) params.set('since', st.ts);
@@ -2847,6 +2854,8 @@ async function _reloadBotLog(which) {
     }
   } catch (e) {
     if (!st.ts) v.textContent = humanizeApiError(e);
+  } finally {
+    st.inFlight = false;
   }
 }
 
@@ -2865,12 +2874,19 @@ function _attachBotScrollDetect(which) {
 }
 
 function reloadCurrentLog() {
+  if (document.hidden) return; // Detener polling si la pestaña está en segundo plano
   if (_logsMode === 'dashboard') {
     reloadLogs();
   } else if (_botLogsState[_logsMode]) {
     _reloadBotLog(_logsMode);
   }
 }
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && state.section === 'logs' && !_logsPaused) {
+    reloadCurrentLog();
+  }
+});
 
 function startLogsPolling() {
   stopLogsPolling();
