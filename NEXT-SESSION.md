@@ -7,46 +7,118 @@
 
 ## ▶ ARRANQUE INMEDIATO (2026-09-08) — Refactor `/bet` a nodos + operador inteligente
 
-**Rama activa:** `feat/bet-nodes-refactor` (pusheada, 1 commit `efab82b` sobre `main`).
+**Rama activa:** `feat/bet-nodes-refactor` (pusheada, tip tras Smartreview).
 **Plan completo:** `C:\Users\rober\.claude\plans\como-podriamos-hacer-un-dynamic-cupcake.md`
 **Estado vivo del refactor:** `docs/BET_POLICY.md`
+
+### Fase 3 COMPLETA (2026-09-08) — advisor OFF, mergeable · falta smoke de Robert
+Commits A `c6f671c` · B `2267121` · C código `719111d` + docs `b525cb1` · D `8cd909f`
+· **Smartreview 2026-09-08** (guardarraíl `plan_not_worse` + fix de números del doc).
+Gate: `verify_bet_suite` 13/13 · caracterización **20/20 sin editar** · 195 passed en
+las suites `/bet` relevantes. Pre-existentes rojos (fixture sin JWT, idénticos en
+`014efe2` y `29bf812`, NO míos): 8× `test_auto_deposit.py::test_plan_*` +
+`test_telegram_bot_mock.py::test_bet_input_five_cards`.
+
+### Smartreview de `docs/BET_POLICY.md` (2026-09-08) — Doble subagente
+- **Auditor Técnico:** código sano al 100% (cada símbolo/tabla/env var/entry point
+  existe). 3 discrepancias SOLO de documentación → corregidas: `28/28`→`20/20`
+  (caracterización), `test_bet_retry_policy 70`→`66`, commit docs de C `a01ecc3`
+  (dangling)→`b525cb1`.
+- **Red Team (R1, ROJO):** el `advisor_boost` es la 1ª clave del `sort_key` → un
+  boost (sobre todo **negativo** a una cuenta seleccionada) puede sacarla de
+  `[:max_accounts]` y dejar entrar una cuenta de backfill sin tarjeta asignable →
+  el re-plan sale con **menos cuentas** que el base / infactible → los 3 entry
+  points hacían `plan = plan_auto_mission(advisor_hint=…)` sin fallback → 409.
+  **Fix:** `bet_advisor.plan_not_worse(base, boosted)` (pura) — el caller adopta el
+  plan boosteado SOLO si no tiene menos cuentas ni tumba un base factible. Aplicado
+  en los 3 entry points + recálculo dinámico. Tests: `test_plan_not_worse_guardrail`
+  + `test_negative_boost_shrinks_plan_guardrail_keeps_base`.
+
+**Colisión multi-sesión resuelta:** otra de 5 sesiones commiteó `719111d` que
+absorbió mi Commit C + su propio cambio ("matchmaking continuo multi-tarjeta" —
+conducta INTENCIONAL por regla Robert, con test — + 403/429 desambiguados IP-vs-cuenta
++ retry cross-IP en `gentle_login`). **Revisado y sano**, documentado en `docs/AUDIT.md`
+(esa sesión saltó la bitácora). Lección → memoria `feedback_multi_sesion_mismo_dir_colision`.
 
 ### Qué es
 Descomponer `auto_deposit.py::run_auto_mission` (~1000 líneas) en un pipeline de nodos puros +
 extraer la lógica de retry a `bet_retry_policy.py` + centralizar las ~32 constantes en
 `bet_policy.BetPolicyConfig` + un advisor LLM (`bet_advisor.py`, 9router) para la pre-selección
-de cuentas (plan inicial + recálculo dinámico a mitad de misión). El LLM NUNCA en el hot path
-por-depósito. Robert quiere: "operador inteligente que en tiempo real recalcule la selección
-de cuentas"; retries y mecánica siguen deterministas.
+de cuentas. El LLM NUNCA en el hot path por-depósito.
 
-### Hecho — Fase 0 (commit `efab82b`)
-`tests/test_bet_retry_characterization.py` — 12 tests golden-master que fijan la secuencia
-exacta de efectos del `run_auto_mission` actual. Contrato de no-regresión para Fase 1.
-Verde: `verify_bet_suite` 13/13 · `test_auto_mission` 29/29 · caracterización 12/12.
+### Hecho
+- **Fase 2** (esta sesión): `bet_policy` gana `load_policy()` (override disco
+  `$BET_POLICY_FILE`\|`/data/bet_policy.json`, nunca lanza), `_SANE_BOUNDS` (bound
+  por campo tuneable), `digest()` (sha1[:12] estable), CLI `apply(<proposal.json>)`
+  (rechaza `_LOCKED`/out-of-bounds/desconocido, ASCII-only por consola Windows).
+  `POLICY_VERSION` 1→2 (+`sched_first_dep_floor_min_s/max_s`). `auto_deposit.py`:
+  `POLICY = load_policy()` snapshot congelado al inicio de `run_auto_mission` **y**
+  `plan_auto_mission`; shell + `_apply_action`/`_apply_sched_action` + los 2
+  call-sites de `decide_next_action` leen `POLICY.*` (antes `bet_policy.DEFAULT`);
+  las constantes de módulo quedan como alias `= bet_policy.DEFAULT.x`;
+  `random.uniform(45,60)` → `POLICY.sched_first_dep_floor_*`. **`deposits.py` NO se
+  tocó** (parada corta: su path scheduled legacy no es matchmaking `/bet`).
+  Migración aditiva `auto_missions.policy_digest` (`app.py::_migrate` +
+  `plan_auto_mission` devuelve `policy_digest` + `_persist_auto_mission` lo mete al
+  INSERT). **Cero cambio de conducta**: sin `/data/bet_policy.json` en prod →
+  `load_policy()`==`DEFAULT`. Gate: `test_bet_policy` 14/14 · caracterización
+  **20/20 sin editar** · `verify_bet_suite` 13/13 ·
+  `test_auto_mission`/`scheduler`/`selection`/`endpoints` verdes. Pre-existentes
+  rojos NO tocados (8× `test_plan_*` JWT-fixture + `test_confirm_gate` contaminación
+  cross-módulo — pasa aislado; ambos confirmados idénticos en `29fcd30` via stash).
+- **Fase 0** (`efab82b`): `tests/test_bet_retry_characterization.py` — 12 golden-master.
+- **Fase 1a** (`28cb65d`): `bet_policy.BetPolicyConfig`+`DEFAULT` (10 escalares, defaults =
+  constantes vivas, `_LOCKED_FIELDS` protege inv. 4/5/7/10) + `bet_retry_policy.decide_next_action`
+  (función PURA, réplica del orden de ramas de FASE 1). 51 tests nuevos. `verify_bet_suite` "9"→"13".
+- **Fase 1** (`8879660`): cableado en el inner loop de FASE 1 matchmaking —
+  `_outcome_view/_account_view/_card_view/_mission_view` (pre-mutación) → `decide_next_action`
+  → `_apply_action` (helper del shell, efectos verbatim). Las 6 ramas `if code...` (~200 L) →
+  12 L. El `if ok:` de match sigue inline. **Cero cambio de conducta** (caracterización 12/12
+  SIN editar).
+- **Fase 1b** (esta sesión): `decide_next_action` enruta `m.phase=="SCHEDULED"` → `_decide_scheduled`
+  (PROGRESS / ABORT_ACCOUNT terminal-con-broadcast / RETRY_SAME → ABORT_ACCOUNT sin broadcast).
+  `_apply_sched_action` (2º helper del shell) replica los efectos de BD de L2399-2447. `reset_session`
+  (`"401"`/`"redirectlogin"`/`"sesión rechazada"` + jwt vivo) lo aplica el shell ANTES del helper
+  (orden verbatim L2482). Fallback $190→$150 se queda en el shell. `bet_policy` gana
+  `sched_max_transient_retries=4` / `sched_retry_backoff_s=25` / `sched_rep_gap_s=60`.
+  El FASE 2 `while completed < target_count` (~95 L de ramas) → ~30 L de ruteo. **Cero cambio de
+  conducta**: caracterización 20/20 (12 viejas SIN editar + 8 FASE 2 nuevas). Gate:
+  `verify_bet_suite` 13/13 · `test_bet_retry_policy` 66 · `test_auto_mission`/`test_auto_deposit_scheduler`
+  verdes. Los 8 `test_plan_*` de `test_auto_deposit.py` siguen rojos
+  (pre-existentes, JWT en fixture — ver más abajo).
 
-### PRIMERA ACCIÓN próxima sesión → Fase 1
-1. `git checkout feat/bet-nodes-refactor` (ya existe local + remoto).
-2. Test primero: `tests/test_bet_retry_policy.py` — unit puro de `decide_next_action` por rama
-   (~30 casos). Ver la interfaz completa (`Action`, `OutcomeView`, `AccountRetryState`,
-   `CardRetryState`, `MissionRetryState`) en el plan §"Componentes e interfaces".
-3. Crear `bet_retry_policy.py` (tipos + función pura; importa solo helpers módulo-nivel de
-   `deposits`: `_mm_is_real_decline`, `_mm_is_ambiguous_charge`, `MM_DEAD_RC`, `MM_THREEDS_RC`).
-4. Crear `bet_policy.py` con `BetPolicyConfig` + `DEFAULT` **solo** (sin load de disco aún).
-   Defaults = valores EXACTOS actuales (leerlos del código, no de MAP.md — algunos difieren).
-5. Refactor del inner `while True` de FASE 1 matchmaking en `auto_deposit.py` (L1828–2147,
-   ~300 líneas) a `decide_next_action` + helper `_apply_action` **del shell** (efectos y su
-   orden idénticos) + `_outcome_view`/`_account_view`/`_card_view`/`_mission_view` construidos
-   ANTES de cualquier mutación. FASE 2 intacta (es Fase 1b).
-6. Gate: `test_bet_retry_policy.py` verde + `test_bet_retry_characterization.py` **sin editar y
-   verde** + `verify_bet_suite` 13/13 + `test_auto_mission` verde. Commit + push.
+### Fase 3 — advisor / operador inteligente (default OFF `BET_ADVISOR_ENABLED`)
+- **Commit A ✅ `c6f671c`** — vendor `support_llm.py` + `tests/test_support_llm.py` (10/10), aislado.
+- **Commit B ✅ `2267121`** — `bet_advisor.py` (módulo PURO: `AdvisorInputs`,
+  `_build_advisor_request` whitelist, `_assert_no_pii` fail-closed, `_sanitize_advice`,
+  `maybe_advise` OFF-by-default + `asyncio.wait_for(6s)`, `_record_llm_call`) +
+  `tests/test_bet_advisor.py` (24) + migración aditiva `bet_llm_calls`.
+- **Commit C ✅ (código en `719111d`, docs en `b525cb1`)** — `select_accounts_for_auto(
+  ..., advisor_boost)` (prepend al `sort_key`, reordena dentro del tier) + `plan_auto_mission(
+  ..., advisor_hint, _advisor_sink)` + `_build_advisor_bundle`/`_advisor_recent_history`
+  (read-only, cero query) + `bet_advisor.enabled()`/`advise_from_inputs` + 3 entry points
+  async. Advisor OFF → conducta idéntica. Gate 13/13 · caracterización 20/20 sin editar.
+- **Smartreview 2026-09-08 ✅** — guardarraíl `bet_advisor.plan_not_worse` en los 3
+  entry points + recálculo dinámico (el boost nunca produce un plan con menos
+  cuentas que el determinista); `test_bet_advisor.py` 27 · `test_bet_advisor_integration.py` 5.
+- **Commit D ✅ `8cd909f`** — recálculo dinámico en `run_auto_mission` dentro de
+  `if need_backup and active_cards` (mismo patrón que los entry points: `_advisor_sink`
+  sobre el `plan_auto_mission` de respaldo → `advise_from_inputs(kind="recalc")` →
+  re-plan con `advisor_hint`). Es una pausa de re-plan que YA existía. OFF → idéntico.
+  `tests/test_bet_advisor_integration.py` (3, `LLMClient` falso).
 
-Orden de fases: 0 ✅ → 1 → 1b → 2 → 3. `bet_tuner` (Fase 4) = ronda siguiente.
+Orden de fases: 0 ✅ → 1a ✅ → 1 ✅ → 1b ✅ → 2 ✅ → **3 ✅ (A/B/C/D)** → 4 (`bet_tuner`, diferido).
 
-### Ramas de detalle exacto del inner loop de FASE 1 (orden que `decide_next_action` debe replicar)
-`ok` → `BALANCE_LIMIT_EXCEEDED` → `code in MM_THREEDS_RC` (3DS→A+, 3 cuentas) → familia dead/429
-+ circuit breaker → `_mm_is_real_decline or _mm_is_ambiguous_charge` (3-strikes tarjeta / 2-strikes
-cuenta) → `CARD_LOCKED_OTHER_ACCOUNT` → transitorio (retry x4, `_sleep_step(25)`).
-Cross-account gap `_sleep_step(MM_CROSS_ACCOUNT_GAP=5)` al final si quedan otras cuentas activas.
+### PRIMERA ACCIÓN próxima sesión
+1. **Smoke de Fase 3** (Robert): mergear `feat/bet-nodes-refactor` a `main` (advisor
+   OFF, cero cambio) → deploy KVM4 → `export BET_ADVISOR_ENABLED=1` +
+   `BET_ADVISOR_MODEL_CHAIN=...` (fijar tras probar tool-calling contra 9router vivo
+   `:20128`) → lanzar un `/bet` real de 1 tarjeta / `target_count` bajo desde `@betmexbot`
+   → verificar en logs: (a) advisor respondió o cayó a fallback limpio, (b) fila en
+   `bet_llm_calls` con tokens medidos, (c) `deposit_attempts`/`auto_missions` consistentes,
+   (d) plan respetó KYC/pool/429. Ver `docs/BET_POLICY.md` §"Verificación e2e".
+2. **Fase 4** (`bet_tuner`, diferido) o pendientes pos-merge del advisor (pairings,
+   `recent_history` con probes reales, biasing de `_pull_fresh_live_account`).
 
 ---
 
@@ -65,9 +137,10 @@ Cross-account gap `_sleep_step(MM_CROSS_ACCOUNT_GAP=5)` al final si quedan otras
 
 ## 🧭 Estado de repos / infra
 
-- **Rama `main`:** 4 commits **sin pushear** a `origin/main` (`29bf812`, `1453167`, `51992d0`,
-  `7211c2e`) — NO son de esta sesión (posiblemente sesión paralela / cambio de cuenta Antigravity).
-  Verificar si están listos y pushear, o entender por qué se pararon. No los toqué.
+- **Rama `feat/bet-nodes-refactor`:** Fase 2 commiteada + pusheada. Sin mergear a `main`
+  todavía (checkpoint tras Fase 3 o cuando Robert lo pida).
+- **Rama `main`:** al día con `origin/main` (`29bf812 1453167 51992d0 7211c2e` YA están en
+  `origin/main`). Son ancestros de `feat/bet-nodes-refactor`.
 - **Remoto canónico:** `github.com/roobertvonsinger/botmex-dashboard` (ya no Forgejo).
 - **KVM4-Karen (`2.25.98.162`):** API `/bet` viva (`:8001` → 302). No se deployó nada esta sesión.
 - **9router:** `http://2.25.98.162:20128/v1` VIVO (requiere API key). Es el gateway para el

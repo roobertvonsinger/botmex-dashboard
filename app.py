@@ -425,6 +425,37 @@ def _migrate():
     except sqlite3.OperationalError:
         pass
 
+    # FASE 2 refactor `/bet`: digest (sha1[:12]) de la `bet_policy.BetPolicyConfig`
+    # con que se planeó/corrió la misión — une outcomes a la política exacta para
+    # el tuner (FASE 4). Aditiva. Ver docs/BET_POLICY.md.
+    try:
+        with db(write=True) as c:
+            c.execute("ALTER TABLE auto_missions ADD COLUMN policy_digest TEXT")
+    except sqlite3.OperationalError:
+        pass
+
+    # FASE 3 refactor `/bet`: tracking de costo del advisor LLM (`bet_advisor.py`).
+    # Una fila por llamada al 9router, incluso los fallos. Tokens medidos del
+    # evento `done` del stream. `outcome` ∈ {applied, rejected, timeout, error,
+    # no_candidates, no_advice}. Aditiva. Ver docs/BET_POLICY.md.
+    try:
+        with db(write=True) as c:
+            c.execute(
+                "CREATE TABLE IF NOT EXISTS bet_llm_calls ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "kind TEXT NOT NULL, "
+                "model TEXT, "
+                "tokens_in INTEGER, "
+                "tokens_out INTEGER, "
+                "cost_usd REAL DEFAULT 0, "
+                "latency_ms INTEGER, "
+                "mission_id TEXT, "
+                "outcome TEXT, "
+                "created_at TEXT NOT NULL)"
+            )
+    except sqlite3.OperationalError:
+        pass
+
     # Tabla de tracking de penalizaciones y strikes por operador para el Bot de Telegram
     try:
         with db(write=True) as c:
@@ -4428,8 +4459,8 @@ def _persist_auto_mission(mission_id, operator_id, card_pipes, amount,
         c.execute(
             "INSERT INTO auto_missions ("
             "mission_id, operator_id, card_pipes, amount, target_count, "
-            "accounts_selected, matches, status, created_at, updated_at"
-            ") VALUES (?,?,?,?,?,?,?,?,?,?)",
+            "accounts_selected, matches, status, created_at, updated_at, policy_digest"
+            ") VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (
                 mission_id,
                 operator_id,
@@ -4445,6 +4476,7 @@ def _persist_auto_mission(mission_id, operator_id, card_pipes, amount,
                 "pending",
                 now,
                 now,
+                plan.get("policy_digest"),
             ),
         )
 
@@ -4510,11 +4542,27 @@ async def auto_deposit_create(request: Request,
         raise HTTPException(429, "Misiones activas — intenta cuando terminen")
     # Lazy: planner + orquestador (run_auto_mission la implementa Task D)
     from auto_deposit import plan_auto_mission, run_auto_mission
-    plan = plan_auto_mission(DB_PATH, card_pipes, amount, target_count)
-    if not plan["feasible"]:
-        raise HTTPException(409, plan["reason"])
+    import bet_advisor
     from uuid import uuid4
     mission_id = str(uuid4())[:8]
+    # Fase 3 refactor `/bet`: operador LLM de pre-selección (default OFF). Sin
+    # `BET_ADVISOR_ENABLED` → `_adv_sink=None` → plan idéntico al de siempre.
+    _adv_sink = [] if bet_advisor.enabled() else None
+    plan = plan_auto_mission(DB_PATH, card_pipes, amount, target_count,
+                             _advisor_sink=_adv_sink)
+    if _adv_sink:
+        try:
+            _hint = await bet_advisor.advise_from_inputs(
+                _adv_sink[0], db_path=str(DB_PATH), mission_id=mission_id)
+        except Exception:
+            _hint = None
+        if _hint:
+            _boosted = plan_auto_mission(DB_PATH, card_pipes, amount, target_count,
+                                         advisor_hint=_hint)
+            if bet_advisor.plan_not_worse(plan, _boosted):
+                plan = _boosted
+    if not plan["feasible"]:
+        raise HTTPException(409, plan["reason"])
     operator_id = user.get("telegram_id")                   # V2: modo open no tiene (S8)
     _persist_auto_mission(mission_id, operator_id, card_pipes, amount,
                           target_count, plan)
@@ -4588,7 +4636,7 @@ def emergency_stop_all_deposits(user: dict = Depends(require_session)):
             pass
 
     _broadcast({"type": "emergency_stop", "ts": now, "cancelled_missions": cancelled_count, **_resolve_who(user.get("telegram_id"))})
-    logger.warning(f"🚨🚨 PARO DE EMERGENCIA EJECUTADO: {cancelled_count} misiones canceladas por {user.get('telegram_id')}")
+    print(f"🚨🚨 PARO DE EMERGENCIA EJECUTADO: {cancelled_count} misiones canceladas por {user.get('telegram_id')}", flush=True)
     return {"status": "ok", "emergency_stop": True, "cancelled_missions": cancelled_count}
 
 
@@ -5356,12 +5404,27 @@ async def bot_bet_create(request: Request, user: dict = Depends(require_session)
     if _mission_sem.locked():
         raise HTTPException(429, "Ya hay un intento de matchmaking activo en el sistema.")
 
-    plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count)
+    from uuid import uuid4
+    import bet_advisor
+    mission_id = str(uuid4())[:8]
+    # Fase 3 refactor `/bet`: operador LLM de pre-selección (default OFF).
+    _adv_sink = [] if bet_advisor.enabled() else None
+    plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count,
+                             _advisor_sink=_adv_sink)
+    if _adv_sink:
+        try:
+            _hint = await bet_advisor.advise_from_inputs(
+                _adv_sink[0], db_path=str(DB_PATH), mission_id=mission_id)
+        except Exception:
+            _hint = None
+        if _hint:
+            _boosted = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count,
+                                         advisor_hint=_hint)
+            if bet_advisor.plan_not_worse(plan, _boosted):
+                plan = _boosted
     if not plan["feasible"]:
         raise HTTPException(409, plan["reason"])
 
-    from uuid import uuid4
-    mission_id = str(uuid4())[:8]
     _persist_auto_mission(mission_id, operator_id, valid_pipes, amount, target_count, plan)
     asyncio.create_task(run_auto_mission(mission_id, plan, user))
 

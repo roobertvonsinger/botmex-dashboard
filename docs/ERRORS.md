@@ -2,6 +2,13 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## CLI de Python con glyphs unicode (`✓`/`✗`/`—`) crashea en consola Windows (`UnicodeEncodeError` cp1252) — 2026-09-08
+
+- **Síntoma**: `python -m bet_policy apply <proposal.json>` tronaba con `UnicodeEncodeError: 'charmap' codec can't encode character '✗'` al imprimir el reporte de rechazos. Los tests NO lo detectaron: pytest captura stdout en utf-8.
+- **Causa raíz**: la consola de Windows (Robert) usa codepage `cp1252` para stdout; cualquier `print()` con `✓`/`✗`/`—`/`→` revienta. Un CLI pensado para correr en su terminal debe imprimir ASCII puro.
+- **Fix**: `bet_policy.apply()` usa `[ok]` / `[x]` / `-` / `->` en vez de glyphs. Regla general: **CLIs = ASCII en `print()`**; los glyphs bonitos solo en logs (archivo utf-8) o en la web.
+- **Verificación**: smoke real en Git Bash sobre Windows — `apply` rechaza `_LOCKED`/out-of-bounds/desconocido, escribe el diff válido, `load_policy()` lo refleja.
+
 ## CAUSA RAÍZ del yoyo de proxies: `valida-curp.com` es NXDOMAIN y quemaba el pool desde el validador RENAPO (diagnosticado y fixeado 2026-08-13)
 
 - **Síntoma**: yoyo de exclusiones de proxies durante 36h (08-11 21:48 → 08-13 04:47). Primero se excluyó DataImpulse por "502 NO_HOST_CONNECTION masivos" (commits `55f346e`, `f023074`), se activó proxy001 que a su vez cayó (502/503, 11,103 ocurrencias en `dashboard.log.1`), luego IPRoyal/NodeMaven (504/407), y al final KVM4 quedó desplegado en `f023074` — el estado DONDE DataImpulse estaba excluido y los tres sustitutos caídos activos. Los `begin_deposit` fallaban con `502 Bad Gateway` → `BEGIN_ERROR`.

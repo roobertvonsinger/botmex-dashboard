@@ -581,3 +581,34 @@ def test_mission_db_balance_allowed_for_deposits(H, monkeypatch):
     assert len(acc1_calls) >= 1
 
 
+def test_mission_multiple_cards_matches_all_without_stopping_at_first(H):
+    """Regla Robert 2026-09-08: Cuando hay múltiples tarjetas y cuentas en la misión,
+    el matchmaking NO debe conformarse con un solo match; debe continuar con las demás
+    tarjetas y cuentas, aislando la tarjeta ya casada para que no toque otra cuenta."""
+    H.target_count = 2
+    H.card_pipes = [P1, P2]
+    pl = {
+        "accounts": [
+            {"id": 1, "email": "acc1@x.com", "grade": "A", "card_pipe": P1},
+            {"id": 2, "email": "acc2@x.com", "grade": "A", "card_pipe": P2},
+        ]
+    }
+    run(H, pl)
+
+    # Ambos matches se deben haber conseguido
+    match_updates = [u["matches"] for u in H.updates if "matches" in u]
+    assert match_updates, "Debe haber updates de matches"
+    final_matches = json.loads(match_updates[-1])
+    assert len(final_matches) == 2, f"Esperados 2 matches, obtenidos: {len(final_matches)}"
+
+    # Verificar que P1 se casó con acc1 y P2 con acc2
+    m1 = next(m for m in final_matches if m["email"] == "acc1@x.com")
+    m2 = next(m for m in final_matches if m["email"] == "acc2@x.com")
+    assert m1["card_pipe"] == P1
+    assert m2["card_pipe"] == P2
+
+    # Verificar que P1 jamás fue probada en acc2
+    acc2_p1_calls = [c for c in H.run_calls if c["email"] == "acc2@x.com" and c.get("card_pipe") == P1]
+    assert len(acc2_p1_calls) == 0, "P1 no debe haber sido probada en acc2"
+
+

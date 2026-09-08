@@ -1205,7 +1205,26 @@ async def process_bet_input(
 
         amount = 150.0
         target_count = 9
-        plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count, tol_pipes=tol_pipes, married_pairs=married_pairs)
+        from uuid import uuid4
+        import bet_advisor
+        mission_id = str(uuid4())[:8]
+        # Fase 3 refactor `/bet`: operador LLM de pre-selección (default OFF).
+        _adv_sink = [] if bet_advisor.enabled() else None
+        plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count,
+                                 tol_pipes=tol_pipes, married_pairs=married_pairs,
+                                 _advisor_sink=_adv_sink)
+        if _adv_sink:
+            try:
+                _hint = await bet_advisor.advise_from_inputs(
+                    _adv_sink[0], db_path=str(DB_PATH), mission_id=mission_id)
+            except Exception:
+                _hint = None
+            if _hint:
+                _boosted = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count,
+                                             tol_pipes=tol_pipes, married_pairs=married_pairs,
+                                             advisor_hint=_hint)
+                if bet_advisor.plan_not_worse(plan, _boosted):
+                    plan = _boosted
         if not plan.get("feasible"):
             fail_plan = (
                 f"{HEADER}\n\n"
@@ -1221,8 +1240,6 @@ async def process_bet_input(
                 await update.message.reply_text(fail_plan, parse_mode="HTML")
             return ConversationHandler.END
 
-        from uuid import uuid4
-        mission_id = str(uuid4())[:8]
         user_info = {
             "telegram_id": operator_id,
             "username": update.effective_user.username or "operator",
