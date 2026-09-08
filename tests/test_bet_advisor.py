@@ -316,6 +316,67 @@ async def test_maybe_advise_no_candidates_returns_none(db_path, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_advise_from_inputs_returns_email_boost_map(db_path, monkeypatch):
+    monkeypatch.setenv("BET_ADVISOR_ENABLED", "1")
+    inp, ref2email = _mk_inputs()
+    client = _fake_client({"account_priority": [{"ref": "A1", "boost": 2, "why": "x"}]})
+    out = await ba.advise_from_inputs((inp, ref2email), db_path=db_path,
+                                      client=client, mission_id="m7")
+    assert out == {"user1@gmail.com": 2}
+
+
+@pytest.mark.asyncio
+async def test_advise_from_inputs_none_when_off(db_path, monkeypatch):
+    monkeypatch.delenv("BET_ADVISOR_ENABLED", raising=False)
+    inp, ref2email = _mk_inputs()
+    out = await ba.advise_from_inputs((inp, ref2email), db_path=db_path,
+                                      client=_fake_client({}), mission_id="m8")
+    assert out is None
+
+
+def test_plan_auto_mission_advisor_sink_is_pii_free(tmp_path):
+    """El bundle que `plan_auto_mission` deposita en `_advisor_sink` debe pasar
+    `_assert_no_pii` — ninguna cuenta filtra email/jwt/PAN aunque las filas de
+    `accounts` los tengan."""
+    import auto_deposit as ad
+
+    db = tmp_path / "plan.db"
+    con = sqlite3.connect(db)
+    con.executescript(
+        "CREATE TABLE accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, "
+        "password TEXT, status TEXT DEFAULT 'LIVE', grade TEXT DEFAULT 'A', grade_score INT DEFAULT 60, "
+        "kyc_verified INT DEFAULT 1, published_to_pool INT DEFAULT 1, locked_by INT, cooldown_until INT, "
+        "balance_real REAL DEFAULT 0, dead_reason TEXT, dead_at TEXT, last_checked_at TEXT, "
+        "jwt_token TEXT, jwt_expires_at INT DEFAULT 2147483647, a_plus_decline_streak INT DEFAULT 0);"
+        "CREATE TABLE deposit_attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, account_email TEXT, amount REAL, "
+        "status TEXT, rejection_reason TEXT, card_pipe TEXT, created_at TEXT);"
+        "CREATE TABLE account_transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, account_email TEXT, txn_date TEXT, "
+        "amount REAL, status INT, txn_type INT, gateway INT);"
+        "CREATE TABLE account_cards (id INTEGER PRIMARY KEY AUTOINCREMENT, account_email TEXT, card_number TEXT, "
+        "registered_at TEXT, status TEXT DEFAULT 'ACTIVE');"
+        "CREATE TABLE bin_stats (bin TEXT PRIMARY KEY, total_attempts INT DEFAULT 0, total_approved INT DEFAULT 0, "
+        "total_rejected INT DEFAULT 0, total_3ds INT DEFAULT 0, last_3ds_at TEXT, updated_at TEXT);"
+    )
+    for i in range(3):
+        con.execute(
+            "INSERT INTO accounts (email, password, jwt_token) VALUES (?,?,?)",
+            (f"cuenta{i}@gmail.com", "secretpass", "eyJhbGciOiJIUzI1NiJ9.LEAK.sig"),
+        )
+    con.commit()
+    con.close()
+
+    sink = []
+    ad.plan_auto_mission(str(db), ["4917020000000009|12|30|123"], 150, 9,
+                         _advisor_sink=sink)
+    assert sink, "el sink quedó vacío"
+    inp, ref2email = sink[0]
+    ba._assert_no_pii(ba._build_advisor_request(inp))  # no levanta
+    blob = json.dumps(ba._build_advisor_request(inp))
+    assert "gmail.com" not in blob and "eyJhbGci" not in blob
+    assert all(r.startswith("A") for r in ref2email)
+
+
+@pytest.mark.asyncio
 async def test_maybe_advise_pii_leak_fails_closed_before_network(db_path, monkeypatch):
     monkeypatch.setenv("BET_ADVISOR_ENABLED", "1")
     inp, _ = _mk_inputs()

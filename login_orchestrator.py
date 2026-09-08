@@ -192,7 +192,12 @@ async def gentle_login(
                         raw_result=res,
                     )
                 elif status == "BAN":
-                    logger.warning(f"[login] {email} 429 BAN (rate-limit en BetMexico) → RATE_LIMITED")
+                    if attempt < max(2, max_login_retries):
+                        logger.warning(f"[login] {email} 429 BAN en intento {attempt} — reintentando con proxy fresco para descartar falso rate-limit por IP")
+                        sticky_session = None
+                        await asyncio.sleep(1.5)
+                        continue
+                    logger.warning(f"[login] {email} 429 BAN confirmado cross-IP (rate-limit en BetMexico) → RATE_LIMITED")
                     return LoginResult(
                         ok=False,
                         code="RATE_LIMITED",
@@ -201,6 +206,11 @@ async def gentle_login(
                         attempts=attempt,
                         raw_result=res,
                     )
+                elif status == "RETRY_PROXY":
+                    logger.info(f"[login] {email} fallo de WAF/IP ({res.get('error')}) en intento {attempt} — rotando a proxy fresco")
+                    sticky_session = None
+                    await asyncio.sleep(1.0)
+                    continue
                 elif status in ("RETRY_CAPTCHA", "CAPTCHA_TIMEOUT"):
                     last_error = status
                     continue

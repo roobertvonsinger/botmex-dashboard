@@ -70,6 +70,11 @@ def _enabled() -> bool:
     )
 
 
+def enabled() -> bool:
+    """Público: el caller decide si vale la pena armar el `_advisor_sink`."""
+    return _enabled()
+
+
 def _chain() -> list[str]:
     raw = os.environ.get("BET_ADVISOR_MODEL_CHAIN", "").strip()
     parsed = [m.strip() for m in raw.split(",") if m.strip()]
@@ -381,6 +386,35 @@ async def maybe_advise(
             db_path, kind, model, tin, tout,
             int((time.monotonic() - t0) * 1000), mission_id, outcome,
         )
+
+
+async def advise_from_inputs(
+    bundle,
+    *,
+    db_path: Optional[str] = None,
+    mission_id: Optional[str] = None,
+    kind: str = "plan",
+    client: Any = None,
+) -> Optional[dict]:
+    """Puente para los entry points: recibe el `(AdvisorInputs, ref2email)` que
+    `plan_auto_mission` depositó en su `_advisor_sink`, consulta al asesor, y
+    devuelve `{email: boost}` (o `None` → usa el plan determinista).
+
+    Pairings quedan **desactivados** en esta ronda (`pairing_ok` rechaza todo):
+    solo se aplican los `boost` de reordenamiento. `avoid` viaja en el log.
+    """
+    try:
+        inp, ref2email = bundle
+    except (TypeError, ValueError):
+        return None
+    advice = await maybe_advise(
+        inp, db_path=db_path, mission_id=mission_id, kind=kind, client=client,
+        pairing_ok=lambda _a, _c: False,
+    )
+    if advice is None:
+        return None
+    bmap = advice.boost_map(ref2email)
+    return bmap or None
 
 
 def _cost_usd(model: str, tokens_out: Optional[int]) -> float:

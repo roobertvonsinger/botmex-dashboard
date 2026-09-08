@@ -4542,11 +4542,25 @@ async def auto_deposit_create(request: Request,
         raise HTTPException(429, "Misiones activas — intenta cuando terminen")
     # Lazy: planner + orquestador (run_auto_mission la implementa Task D)
     from auto_deposit import plan_auto_mission, run_auto_mission
-    plan = plan_auto_mission(DB_PATH, card_pipes, amount, target_count)
-    if not plan["feasible"]:
-        raise HTTPException(409, plan["reason"])
+    import bet_advisor
     from uuid import uuid4
     mission_id = str(uuid4())[:8]
+    # Fase 3 refactor `/bet`: operador LLM de pre-selección (default OFF). Sin
+    # `BET_ADVISOR_ENABLED` → `_adv_sink=None` → plan idéntico al de siempre.
+    _adv_sink = [] if bet_advisor.enabled() else None
+    plan = plan_auto_mission(DB_PATH, card_pipes, amount, target_count,
+                             _advisor_sink=_adv_sink)
+    if _adv_sink:
+        try:
+            _hint = await bet_advisor.advise_from_inputs(
+                _adv_sink[0], db_path=str(DB_PATH), mission_id=mission_id)
+        except Exception:
+            _hint = None
+        if _hint:
+            plan = plan_auto_mission(DB_PATH, card_pipes, amount, target_count,
+                                     advisor_hint=_hint)
+    if not plan["feasible"]:
+        raise HTTPException(409, plan["reason"])
     operator_id = user.get("telegram_id")                   # V2: modo open no tiene (S8)
     _persist_auto_mission(mission_id, operator_id, card_pipes, amount,
                           target_count, plan)
@@ -5388,12 +5402,25 @@ async def bot_bet_create(request: Request, user: dict = Depends(require_session)
     if _mission_sem.locked():
         raise HTTPException(429, "Ya hay un intento de matchmaking activo en el sistema.")
 
-    plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count)
+    from uuid import uuid4
+    import bet_advisor
+    mission_id = str(uuid4())[:8]
+    # Fase 3 refactor `/bet`: operador LLM de pre-selección (default OFF).
+    _adv_sink = [] if bet_advisor.enabled() else None
+    plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count,
+                             _advisor_sink=_adv_sink)
+    if _adv_sink:
+        try:
+            _hint = await bet_advisor.advise_from_inputs(
+                _adv_sink[0], db_path=str(DB_PATH), mission_id=mission_id)
+        except Exception:
+            _hint = None
+        if _hint:
+            plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count,
+                                     advisor_hint=_hint)
     if not plan["feasible"]:
         raise HTTPException(409, plan["reason"])
 
-    from uuid import uuid4
-    mission_id = str(uuid4())[:8]
     _persist_auto_mission(mission_id, operator_id, valid_pipes, amount, target_count, plan)
     asyncio.create_task(run_auto_mission(mission_id, plan, user))
 

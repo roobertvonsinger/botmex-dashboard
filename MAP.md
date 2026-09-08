@@ -98,17 +98,17 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 595 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5622 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 5649 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 2551 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 2723 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
-| `bet_advisor.py` | 414 | `betmexico.dashboard.bet_advisor` | _[completar]_ |
+| `bet_advisor.py` | 448 | `betmexico.dashboard.bet_advisor` | _[completar]_ |
 | `bet_policy.py` | 221 | `—` | _[completar]_ |
 | `bet_retry_policy.py` | 388 | `—` | _[completar]_ |
 | `betmexico_config.py` | 183 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2959 | `—` | _[completar]_ |
 | `betmexico_deposit.py` | 958 | `—` | _[completar]_ |
-| `betmexico_login_api.py` | 1168 | `httpx` | _[completar]_ |
+| `betmexico_login_api.py` | 1185 | `httpx` | _[completar]_ |
 | `betmexico_login_service.py` | 144 | `betmexico.login_service` | _[completar]_ |
 | `betmexico_payment_analyzer.py` | 592 | `—` | _[completar]_ |
 | `betmexico_utils.py` | 1159 | `—` | _[completar]_ |
@@ -120,7 +120,7 @@ prewarm.py (router)
 | `db_registry.py` | 112 | `betmexico.dashboard.db` | _[completar]_ |
 | `deposits.py` | 3265 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 391 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
-| `login_orchestrator.py` | 236 | `betmexico.dashboard.login_orch` | _[completar]_ |
+| `login_orchestrator.py` | 246 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 922 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 389 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_validator.py` | 154 | `betmexico.renapo_validator` | _[completar]_ |
@@ -284,6 +284,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `2267121` | feat(bet): bet_advisor.py — asesor LLM de pre-selección + migración bet_llm_calls (Fase 3, Commit B) |
 | `c6f671c` | chore(bet): vendor support_llm.py + su test desde feat/support-agent (Fase 3, aislado) |
 | `014efe2` | feat(bet): bet_policy.load_policy() + override disco + digest + POLICY cableado (Fase 2) |
 | `29fcd30` | refactor(bet): decide_next_action(phase=SCHEDULED) + _apply_sched_action en FASE 2 (Fase 1b) |
@@ -295,7 +296,6 @@ prewarm.py (router)
 | `29bf812` | fix(perf): resolve gateway timeout hang, polling storm, and enable concurrent updates |
 | `1453167` | fix(bet): eliminate 429 contamination, clean stale dead_at and enable concurrent updates |
 | `51992d0` | fix(logs): stateful since filtering and noise pattern filter for CancelledError |
-| `7211c2e` | fix(logging): silence CancelledError and GatheringFuture spam and enforce Invariant 13 |
 <!-- GEN:end:recientes -->
 
 ---

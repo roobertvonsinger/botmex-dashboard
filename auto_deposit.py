@@ -256,6 +256,7 @@ def select_accounts_for_auto(
     window_map: Dict[str, Dict[str, Any]],
     decline_map: Optional[Dict[str, int]] = None,
     meta_map: Optional[Dict[str, Dict[str, Any]]] = None,
+    advisor_boost: Optional[Dict[str, int]] = None,
 ) -> List[Dict[str, Any]]:
     """Filtra + clasifica internamente (Top, Mid, Low) + limita cuentas candidatas al depósito auto.
 
@@ -288,6 +289,10 @@ def select_accounts_for_auto(
     sa = _sa_tokens()
     out: List[Dict[str, Any]] = []
     meta_map = meta_map or {}
+    # Fase 3 refactor `/bet`: hint del operador LLM (`bet_advisor`). boost ∈ [-3,3]
+    # por email; se prepende al `sort_key` como PURO DESEMPATE dentro del tier —
+    # nunca altera exclusiones ni la asignación de tier. None / vacío → orden idéntico.
+    advisor_boost = advisor_boost or {}
     pool_count = sum(1 for r in rows if r.get("published_to_pool"))
     has_enough_pool = pool_count >= count
 
@@ -428,6 +433,10 @@ def select_accounts_for_auto(
     def sort_key(r):
         email = r.get("email")
         meta = meta_map.get(email) or {}
+        # -1. Hint del advisor LLM (Fase 3): boost alto → primero. Desempate puro
+        #     dentro del tier; el rango [-3,3] no puede saltar la separación de tiers
+        #     (que ya se aplicó arriba) ni un filtro de exclusión dura.
+        adv_boost = -int(advisor_boost.get(email, 0) or 0)
         # 0. Cuentas explícitamente en el pool primero
         pool_first = 0 if r.get("published_to_pool") else 1
         # 1. Sesión activa 🟢 (0 captcha) SIEMPRE antes que cuentas sin sesión 🔑
@@ -449,6 +458,7 @@ def select_accounts_for_auto(
         days_since_active = (now - act_epoch) / 86400.0 if act_epoch > 0 else 999.0
         is_stale_fossil = 1 if days_since_active > 30 else 0
         return (
+            adv_boost,
             pool_first,
             jwt_first,
             has_3ds,
@@ -511,6 +521,130 @@ def _max_accounts_for_cards(num_cards: int, hard_cap: int = MAX_ACCOUNTS_HARD_CA
     return min(hard_cap, 3 + max(0, num_cards - 1))
 
 
+# ── Fase 3 refactor `/bet` — puente hacia `bet_advisor` (operador LLM) ────────
+def _advisor_recent_history(bin_stats_map: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """`recent_history` para el advisor. Derivado SOLO de `bin_stats_map` (sin
+    query): approval por tier de BIN. Las medias de probes se dejan en 0.0 —
+    necesitarían agregación de `deposit_attempts` que no vale la query aquí."""
+    by_tier: Dict[str, list] = {}
+    try:
+        import bin_intelligence as _bi
+        for st in (bin_stats_map or {}).values():
+            code = _bi.classify_bin_tier(
+                st.get("total_attempts"), st.get("total_approved"),
+                st.get("total_3ds"), st.get("total_rejected"),
+            )[0]
+            rate = _approval_rate(st)
+            by_tier.setdefault(code, []).append(rate)
+    except Exception:
+        pass
+    return {
+        "probes_per_match_avg": 0.0,
+        "top_tier_probe_approval": 0.0,
+        "mid_tier_probe_approval": 0.0,
+        "bin_tier_approval": {
+            k: round(sum(v) / len(v), 3) for k, v in by_tier.items() if v
+        },
+    }
+
+
+def _build_advisor_bundle(
+    selected, window_map, decline_map, meta_map, bin_stats_map,
+    card_pipes, amount, target_count, max_accounts, policy_digest,
+):
+    """Mapas ricos de `plan_auto_mission` → `(bet_advisor.AdvisorInputs, ref2email)`.
+    Read-only, CERO query — reusa lo ya computado. Cuentas por ref opaca `A0`/`A1`
+    (el email solo viaja para traducir el resultado de vuelta, el builder del
+    request lo descarta), tarjetas por `C0`/`C1` con BIN(6)."""
+    import bet_advisor
+    try:
+        import bin_intelligence as _bi
+    except Exception:
+        _bi = None
+
+    now = _now_epoch()
+    candidates: List[Dict[str, Any]] = []
+    ref2email: Dict[str, str] = {}
+    for i, r in enumerate(selected or []):
+        email = r.get("email")
+        ref = f"A{i}"
+        ref2email[ref] = email
+        meta = (meta_map or {}).get(email) or {}
+        win = (window_map or {}).get(email) or {}
+        session_alive = _exp_int(r.get("jwt_expires_at")) > now + 60
+        grade = (r.get("grade") or "?").upper()
+        approved_bins = sorted((meta.get("approved_bin_pipes") or {}).keys())
+        act_epoch = int(meta.get("last_activity_epoch") or 0)
+        last_days = (now - act_epoch) / 86400.0 if act_epoch > 0 else 999.0
+        if meta.get("has_3ds_24h") or (grade == "A+" and session_alive):
+            tier = "TOP"
+        elif grade in ("A+", "A") and session_alive:
+            tier = "MID"
+        elif grade == "B" and meta.get("approved_bin_pipes") and session_alive:
+            tier = "MID"
+        else:
+            tier = "LOW"
+        candidates.append({
+            "ref": ref,
+            "email": email,
+            "grade": grade,
+            "session_alive": bool(session_alive),
+            "tier_hint": tier,
+            "window_available": float(win.get("available") or 0.0),
+            "declines_1h": int((decline_map or {}).get(email) or 0),
+            "total_fails": int(meta.get("total_fails") or 0),
+            "has_3ds_24h": bool(meta.get("has_3ds_24h")),
+            "mins_since_last_attempt": int(meta.get("mins_since_last_attempt") or 99999),
+            "cards_count": int(meta.get("cards_count") or 0),
+            "approved_bins": [str(b)[:6] for b in approved_bins],
+            "last_activity_days": round(last_days, 1),
+            "hot_balance": bool(
+                meta.get("has_dashboard_approved_48h") or meta.get("has_spei_48h")
+            ),
+        })
+
+    cards: List[Dict[str, Any]] = []
+    seen_bins: set = set()
+    for p in card_pipes or []:
+        parsed = _parse_card_pipe(p)
+        if not parsed:
+            continue
+        b6 = _bin_of(parsed)
+        if not b6 or b6 in seen_bins:
+            continue
+        seen_bins.add(b6)
+        st = (bin_stats_map or {}).get(b6) or {}
+        tier_code = "?"
+        if _bi is not None:
+            try:
+                tier_code = _bi.classify_bin_tier(
+                    st.get("total_attempts"), st.get("total_approved"),
+                    st.get("total_3ds"), st.get("total_rejected"),
+                )[0]
+            except Exception:
+                tier_code = "?"
+        cards.append({
+            "ref": f"C{len(cards)}",
+            "bin": b6,
+            "bin_tier": tier_code,
+            "bin_approval_rate": _approval_rate(st),
+            "bin_threeds_recent": _threeds_recent(st),
+            "declines_24h": int(st.get("total_rejected") or 0),
+        })
+
+    mission_meta = {
+        "amount": float(amount),
+        "target_count": int(target_count),
+        "n_cards": len(cards),
+        "max_accounts": int(max_accounts or 0),
+        "policy_digest": str(policy_digest or ""),
+    }
+    inp = bet_advisor.AdvisorInputs(
+        candidates, cards, mission_meta, _advisor_recent_history(bin_stats_map),
+    )
+    return inp, ref2email
+
+
 def plan_auto_mission(
     db_path,
     card_pipes: List[str],
@@ -519,6 +653,8 @@ def plan_auto_mission(
     max_accounts: Optional[int] = None,
     tol_pipes: Optional[set] = None,
     married_pairs: Optional[List[Dict[str, str]]] = None,
+    advisor_hint: Optional[Dict[str, int]] = None,
+    _advisor_sink: Optional[list] = None,
 ) -> Dict[str, Any]:
     """Plan de misión auto: cuentas elegibles + tarjeta asignada a cada una.
 
@@ -929,7 +1065,23 @@ def plan_auto_mission(
             window_map,
             decline_map=decline_map,
             meta_map=meta_map,
+            advisor_boost=advisor_hint,
         )[:max_accounts]
+
+        # Fase 3 refactor `/bet`: si el caller pide los inputs del advisor, se
+        # arman AQUÍ (reusando `meta_map`/`bin_stats_map`/`selected` ya computados —
+        # cero query extra) y se depositan en el sink. El caller async llama a
+        # `bet_advisor.advise_from_inputs(...)` y, si vuelve un hint, re-invoca
+        # `plan_auto_mission(advisor_hint=...)`. Solo corre con el advisor ON.
+        if _advisor_sink is not None:
+            try:
+                _advisor_sink.append(_build_advisor_bundle(
+                    selected, window_map, decline_map, meta_map, bin_stats_map,
+                    card_pipes, amount, target_count, max_accounts,
+                    bet_policy.digest(POLICY),
+                ))
+            except Exception as _e:  # noqa: BLE001 — el advisor jamás tumba el plan
+                logger.warning("[plan_auto_mission] no pude armar advisor bundle: %s", _e)
 
         pool: List[Dict[str, Any]] = []
         seen_card_nums = set()
@@ -1760,6 +1912,15 @@ async def run_auto_mission(
                     return "break"
 
                 if action.kind is AK.ACCOUNT_DEAD:
+                    failed += 1
+                    tgt["declines"] += 1
+                    tgt["done"] = True
+                    tgt["candidates"] = []  # Eliminar inmediatamente todas las tarjetas restantes para esta cuenta
+                    card_tried_accounts.setdefault(k, set()).add(account_id)
+                    if tgt["locked"]:
+                        _unlock(account_id)
+                        locked_ids.discard(account_id)
+
                     if action.dead_kind == "rate_limited":
                         dep._mark_rate_limited_dead(email)
                         consecutive_rate_limits += 1
@@ -1799,13 +1960,6 @@ async def run_auto_mission(
                                 )
                         except Exception:
                             pass
-                    failed += 1
-                    tgt["declines"] += 1
-                    tgt["done"] = True
-                    tgt["candidates"] = []  # Eliminar inmediatamente todas las tarjetas restantes para esta cuenta
-                    if tgt["locked"]:
-                        _unlock(account_id)
-                        locked_ids.discard(account_id)
                     _rl_b = (code == "RATE_LIMITED" or "429" in str(r.get("error") or ""))
                     _broadcast_mission(
                         mission_id,
@@ -1955,78 +2109,96 @@ async def run_auto_mission(
 
                 active = [a for a in accounts_state if not a["done"]]
 
-                # Si no quedan cuentas activas y no hay matches o faltan procesos reales:
-                # Regla Robert: "el bet no debe detenerse sin siquiera haber pasado realmente
-                # por mínimo 2 procesos reales independientemente si sean rejected o approved...
-                # no debe detenerse si no ha procesado nada".
+                # Si ya se casaron todas las tarjetas disponibles de la misión:
+                if card_pipes and len(matches) >= len(card_pipes):
+                    break
+
+                # Si no quedan cuentas activas pero aún hay tarjetas activas sin match o faltan procesos reales:
+                # Regla Robert: No conformarse con un solo match; continuar con las demás tarjetas y demás
+                # cuentas (sin reutilizar la tarjeta ya casada). Garantizar además piso de 2 procesos reales.
                 if not active:
-                    if (not matches or total_real_processes < 2) and not backup_checked and not _cancelled():
+                    active_cards = [
+                        p for p in card_pipes
+                        if not _is_card_retired(p) and card_attempts_map.get(_card_key(p), 0) < POLICY.card_max_declines
+                    ]
+                    # Si no quedan tarjetas activas pero aún no se cumple el piso de 2 procesos reales,
+                    # permitir que tarjetas con menos de 3 rechazos reintenten para cumplir el piso.
+                    if not active_cards and card_pipes and total_real_processes < 2:
+                        active_cards = [
+                            p for p in card_pipes
+                            if card_attempts_map.get(_card_key(p), 0) < POLICY.card_max_declines
+                        ]
+
+                    need_backup = (
+                        (not matches or total_real_processes < 2 or (active_cards and len(matches) < target_count))
+                        and not backup_checked
+                        and not _cancelled()
+                        and not cancelled
+                    )
+
+                    if need_backup and active_cards:
                         backup_checked = True
                         try:
                             from app import DB_PATH
-                            active_cards = [p for p in card_pipes if not _is_card_retired(p)]
-                            if not active_cards and card_pipes:
-                                # Tarjetas con menos de 3 declines pueden reintentar para cumplir el piso de procesos
-                                active_cards = [p for p in card_pipes if card_attempts_map.get(_card_key(p), 0) < POLICY.card_max_declines]
-                            if active_cards:
-                                remaining = POLICY.max_accounts_hard_cap - len(accounts_state)
-                                if remaining > 0:
-                                    backup_plan = plan_auto_mission(DB_PATH, active_cards, amount, target_count, max_accounts=remaining)
-                                    if backup_plan and backup_plan.get("feasible"):
-                                        for b_acc in backup_plan.get("accounts", []):
-                                             b_email = b_acc.get("email")
-                                             b_id = b_acc.get("id")
-                                             b_acct = _fetch_account(b_id)
-                                             if not b_acct:
-                                                 continue
-                                             # Gate KYC y calidad obligatorio en respaldo dinámico
-                                             is_kyc_ok = b_acc.get("kyc_verified") in (1, "1", True) or b_acct.get("kyc_verified") in (1, "1", True)
-                                             if not is_kyc_ok or _is_account_dead(b_acc) or _is_account_dead(b_acct) or b_email in already_checked_emails:
-                                                 logger.info(f"➖ CUENTA DE RESPALDO SALTADA (kyc≠1 o dead) | {b_email}")
-                                                 continue
-                                             is_quality = (b_acc.get("grade") or b_acct.get("grade") or "").upper() != "D"
-                                             if not is_quality:
-                                                 continue
-                                             b_cands = [p for p in [b_acc.get("card_pipe"), *card_pipes] if p]
-                                             b_cands = [_normalize_pipe_to_3part(p) for p in b_cands]
-                                             b_cands = list(dict.fromkeys(b_cands))
-                                             b_email_lower = (b_email or "").strip().lower()
-                                             b_planned_pipe = _normalize_pipe_to_3part(b_acc.get("card_pipe")) if b_acc.get("card_pipe") else None
-                                             b_cands = [
-                                                 p for p in b_cands
-                                                 if not _is_card_retired(p) and (p == b_planned_pipe or married_card_owners.get(_extract_card_number(p), b_email_lower) == b_email_lower)
-                                             ]
-                                             if not b_cands:
-                                                 continue
-                                             already_checked_emails.add(b_email)
-                                             accounts_state.append({
-                                                 "id": b_id,
-                                                 "email": b_email,
-                                                 "acct": b_acct,
-                                                 "grade": b_acc.get("grade") or b_acct.get("grade"),
-                                                 "candidates": b_cands,
-                                                 "declines": 0,
-                                                 "cooldown_until": 0.0,
-                                                 "locked": False,
-                                                 "matched": False,
-                                                 "done": False,
-                                             })
-                                             logger.info(f"➕ CUENTA DE RESPALDO AÑADIDA DINÁMICAMENTE | {b_email}")
-                                             _broadcast_mission(
-                                                 mission_id,
-                                                 "matching",
-                                                 user,
-                                                 on_progress=on_progress,
-                                                 accounts=len(accounts_state),
-                                             )
-                                             if len(accounts_state) >= POLICY.max_accounts_hard_cap:
-                                                 break
+                            remaining = POLICY.max_accounts_hard_cap - len(accounts_state)
+                            if remaining > 0:
+                                backup_plan = plan_auto_mission(DB_PATH, active_cards, amount, target_count, max_accounts=remaining)
+                                if backup_plan and backup_plan.get("feasible"):
+                                    for b_acc in backup_plan.get("accounts", []):
+                                         b_email = b_acc.get("email")
+                                         b_id = b_acc.get("id")
+                                         b_acct = _fetch_account(b_id)
+                                         if not b_acct:
+                                             continue
+                                         # Gate KYC y calidad obligatorio en respaldo dinámico
+                                         is_kyc_ok = b_acc.get("kyc_verified") in (1, "1", True) or b_acct.get("kyc_verified") in (1, "1", True)
+                                         if not is_kyc_ok or _is_account_dead(b_acc) or _is_account_dead(b_acct) or b_email in already_checked_emails:
+                                             logger.info(f"➖ CUENTA DE RESPALDO SALTADA (kyc≠1 o dead) | {b_email}")
+                                             continue
+                                         is_quality = (b_acc.get("grade") or b_acct.get("grade") or "").upper() != "D"
+                                         if not is_quality:
+                                             continue
+                                         b_cands = [p for p in [b_acc.get("card_pipe"), *card_pipes] if p]
+                                         b_cands = [_normalize_pipe_to_3part(p) for p in b_cands]
+                                         b_cands = list(dict.fromkeys(b_cands))
+                                         b_email_lower = (b_email or "").strip().lower()
+                                         b_planned_pipe = _normalize_pipe_to_3part(b_acc.get("card_pipe")) if b_acc.get("card_pipe") else None
+                                         b_cands = [
+                                             p for p in b_cands
+                                             if not _is_card_retired(p) and (p == b_planned_pipe or married_card_owners.get(_extract_card_number(p), b_email_lower) == b_email_lower)
+                                         ]
+                                         if not b_cands:
+                                             continue
+                                         already_checked_emails.add(b_email)
+                                         accounts_state.append({
+                                             "id": b_id,
+                                             "email": b_email,
+                                             "acct": b_acct,
+                                             "grade": b_acc.get("grade") or b_acct.get("grade"),
+                                             "candidates": b_cands,
+                                             "declines": 0,
+                                             "cooldown_until": 0.0,
+                                             "locked": False,
+                                             "matched": False,
+                                             "done": False,
+                                         })
+                                         backup_found = True
+                                         logger.info(f"➕ CUENTA DE RESPALDO AÑADIDA DINÁMICAMENTE | {b_email}")
+                                         _broadcast_mission(
+                                             mission_id,
+                                             "matching",
+                                             user,
+                                             on_progress=on_progress,
+                                             accounts=len(accounts_state),
+                                         )
+                                         if len(accounts_state) >= POLICY.max_accounts_hard_cap:
+                                             break
                         except Exception as ex_backup:
                             logger.warning(f"[Auto {mission_id}] No se pudieron buscar cuentas de respaldo: {ex_backup}")
 
-                    active = [a for a in accounts_state if not a["done"]]
-                    if not active:
-                        break
+                active = [a for a in accounts_state if not a["done"]]
+                if not active:
+                    break
 
                 now = _get_now()
                 ready = [a for a in active if a["cooldown_until"] <= now]

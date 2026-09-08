@@ -330,3 +330,53 @@ def test_tier_proportion_2_2_1(tmp_path):
     assert sum(1 for e in emails if e.startswith("mid")) == 2
     assert sum(1 for e in emails if e == "low@test.com") == 1
 
+
+# ── Fase 3: advisor_boost — puro desempate dentro del tier ───────────────────
+def _adv_rows(*emails):
+    import time as _t
+    return [
+        {
+            "id": None, "email": e, "status": "LIVE", "grade": "A",
+            "grade_score": 50, "balance_real": 0.0, "published_to_pool": 1,
+            "kyc_verified": 1, "locked_by": None, "cooldown_until": None,
+            "jwt_expires_at": int(_t.time()) + 3600,
+        }
+        for e in emails
+    ]
+
+
+def _adv_win(*emails):
+    return {e: {"available": 5000.0} for e in emails}
+
+
+def test_advisor_boost_none_is_identity():
+    rows = _adv_rows("a@t.com", "b@t.com", "c@t.com")
+    base = ad.select_accounts_for_auto(rows, 150, 3, _adv_win("a@t.com", "b@t.com", "c@t.com"))
+    with_none = ad.select_accounts_for_auto(
+        rows, 150, 3, _adv_win("a@t.com", "b@t.com", "c@t.com"), advisor_boost=None
+    )
+    assert [r["email"] for r in base] == [r["email"] for r in with_none]
+
+
+def test_advisor_boost_reorders_within_tier():
+    emails = ["a@t.com", "b@t.com", "c@t.com"]
+    rows = _adv_rows(*emails)
+    base = [r["email"] for r in ad.select_accounts_for_auto(rows, 150, 3, _adv_win(*emails))]
+    # empujar la última de `base` al frente con un boost fuerte
+    boosted = ad.select_accounts_for_auto(
+        rows, 150, 3, _adv_win(*emails), advisor_boost={base[-1]: 3}
+    )
+    assert [r["email"] for r in boosted][0] == base[-1]
+
+
+def test_advisor_boost_cannot_pull_excluded_account():
+    rows = _adv_rows("live@t.com") + [
+        {"id": None, "email": "dead@t.com", "status": "DEAD", "grade": "A",
+         "published_to_pool": 1, "kyc_verified": 1, "jwt_expires_at": 9999999999}
+    ]
+    sel = ad.select_accounts_for_auto(
+        rows, 150, 9, _adv_win("live@t.com", "dead@t.com"),
+        advisor_boost={"dead@t.com": 3},
+    )
+    assert [r["email"] for r in sel] == ["live@t.com"]
+
