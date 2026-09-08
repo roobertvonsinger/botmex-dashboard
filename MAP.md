@@ -284,6 +284,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `8cd909f` | feat(bet): recálculo dinámico del advisor en run_auto_mission + test integración (Fase 3, Commit D) |
 | `050878e` | docs(next-session): Fase 3 A/B/C hechas + colisión multi-sesión con 719111d, Commit D bloqueado |
 | `b525cb1` | feat(bet): cablear bet_advisor — advisor_boost/advisor_hint/_advisor_sink + 3 entry points (Fase 3, Commit C) |
 | `719111d` | feat(bet): matchmaking continuo multi-tarjeta, filtrado falso 429/403 y cableado bet_advisor |
@@ -295,7 +296,6 @@ prewarm.py (router)
 | `8879660` | refactor(bet): cablear decide_next_action + _apply_action en el inner loop de FASE 1 |
 | `28cb65d` | feat(bet): bet_retry_policy.decide_next_action + bet_policy.BetPolicyConfig (Fase 1a, puros) |
 | `0d45fa8` | docs(next-session): arranque inmediato Fase 1 del refactor /bet a nodos |
-| `efab82b` | test(bet): red de caracterización golden-master de run_auto_mission (Fase 0) |
 <!-- GEN:end:recientes -->
 
 ---

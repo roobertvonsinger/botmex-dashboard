@@ -11,17 +11,17 @@
 **Plan completo:** `C:\Users\rober\.claude\plans\como-podriamos-hacer-un-dynamic-cupcake.md`
 **Estado vivo del refactor:** `docs/BET_POLICY.md`
 
-### ⚠️ COLISIÓN MULTI-SESIÓN (2026-09-08 ~10:00) — leer antes de tocar `auto_deposit.py`
-Había **5 sesiones Claude** sobre este mismo repo/dir. Otra sesión commiteó
-`719111d "matchmaking continuo multi-tarjeta, filtrado falso 429/403 y cableado
-bet_advisor"` que **absorbió TODO el código de mi Commit C** (advisor wiring) +
-un cambio propio de ~150 L a `run_auto_mission` (matchmaking continuo, 429/403,
-`backup_checked`) + `betmexico_login_api.py`/`login_orchestrator.py`. NO estaba en
-el plan de Fase 3 y no lo revisé. Mi commit `b525cb1` encima son **solo las docs**
-de Commit C. Gate verde sobre `b525cb1` (13/13 · 220 passed · 8 `test_plan_*` +
-`test_bet_input_five_cards` pre-existentes por fixture sin JWT). **Antes de Commit D
-(recálculo dinámico, toca `run_auto_mission` cerca de `backup_checked`): confirmar
-qué sesión es dueña de Fase 3 y revisar `719111d` a fondo — modifica la MISMA zona.**
+### Fase 3 COMPLETA (2026-09-08) — advisor OFF, mergeable · falta smoke de Robert
+Tip `8cd909f`. Commits A `c6f671c` · B `2267121` · C código `719111d` + docs `b525cb1`
+· D `8cd909f`. Gate: `verify_bet_suite` 13/13 · caracterización 28/28 **sin editar**
+· 251 passed. Pre-existentes rojos (fixture sin JWT, idénticos en `014efe2`, NO míos):
+8× `test_auto_deposit.py::test_plan_*` + `test_telegram_bot_mock.py::test_bet_input_five_cards`.
+
+**Colisión multi-sesión resuelta:** otra de 5 sesiones commiteó `719111d` que
+absorbió mi Commit C + su propio cambio ("matchmaking continuo multi-tarjeta" —
+conducta INTENCIONAL por regla Robert, con test — + 403/429 desambiguados IP-vs-cuenta
++ retry cross-IP en `gentle_login`). **Revisado y sano**, documentado en `docs/AUDIT.md`
+(esa sesión saltó la bitácora). Lección → memoria `feedback_multi_sesion_mismo_dir_colision`.
 
 ### Qué es
 Descomponer `auto_deposit.py::run_auto_mission` (~1000 líneas) en un pipeline de nodos puros +
@@ -81,14 +81,24 @@ de cuentas. El LLM NUNCA en el hot path por-depósito.
   ..., advisor_hint, _advisor_sink)` + `_build_advisor_bundle`/`_advisor_recent_history`
   (read-only, cero query) + `bet_advisor.enabled()`/`advise_from_inputs` + 3 entry points
   async. Advisor OFF → conducta idéntica. Gate 13/13 · caracterización 28/28 sin editar.
-- **Commit D 🔵 PENDIENTE** — recálculo dinámico: en `run_auto_mission`, antes de la
-  expansión de respaldo (`backup_checked`), `maybe_advise` con estado vivo redactado
-  → hint a la re-invocación de `plan_auto_mission`. Cachear `account_priority`/`avoid`
-  en memoria para sesgar `_pull_fresh_live_account`. `tests/test_bet_advisor_integration.py`
-  con `LLMClient` falso. **BLOQUEADO por la colisión de arriba — `719111d` reescribió
-  esa zona; revisar primero.** Merge OFF; Robert pone `BET_ADVISOR_ENABLED=1` para el smoke.
+- **Commit D ✅ `8cd909f`** — recálculo dinámico en `run_auto_mission` dentro de
+  `if need_backup and active_cards` (mismo patrón que los entry points: `_advisor_sink`
+  sobre el `plan_auto_mission` de respaldo → `advise_from_inputs(kind="recalc")` →
+  re-plan con `advisor_hint`). Es una pausa de re-plan que YA existía. OFF → idéntico.
+  `tests/test_bet_advisor_integration.py` (3, `LLMClient` falso).
 
-Orden de fases: 0 ✅ → 1a ✅ → 1 ✅ → 1b ✅ → 2 ✅ → **3** (A/B/C ✅, D 🔵) → 4 (`bet_tuner`, diferido).
+Orden de fases: 0 ✅ → 1a ✅ → 1 ✅ → 1b ✅ → 2 ✅ → **3 ✅ (A/B/C/D)** → 4 (`bet_tuner`, diferido).
+
+### PRIMERA ACCIÓN próxima sesión
+1. **Smoke de Fase 3** (Robert): mergear `feat/bet-nodes-refactor` a `main` (advisor
+   OFF, cero cambio) → deploy KVM4 → `export BET_ADVISOR_ENABLED=1` +
+   `BET_ADVISOR_MODEL_CHAIN=...` (fijar tras probar tool-calling contra 9router vivo
+   `:20128`) → lanzar un `/bet` real de 1 tarjeta / `target_count` bajo desde `@betmexbot`
+   → verificar en logs: (a) advisor respondió o cayó a fallback limpio, (b) fila en
+   `bet_llm_calls` con tokens medidos, (c) `deposit_attempts`/`auto_missions` consistentes,
+   (d) plan respetó KYC/pool/429. Ver `docs/BET_POLICY.md` §"Verificación e2e".
+2. **Fase 4** (`bet_tuner`, diferido) o pendientes pos-merge del advisor (pairings,
+   `recent_history` con probes reales, biasing de `_pull_fresh_live_account`).
 
 ---
 
