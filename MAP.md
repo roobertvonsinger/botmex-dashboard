@@ -284,18 +284,18 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
-| `16b3884` | docs(next-session): apuntar a Fase 1 del refactor /bet (rama feat/bet-nodes-refactor) |
-| `29bf812` | fix(perf): resolve gateway timeout hang, polling storm, and enable concurrent updates |
-| `1453167` | fix(bet): eliminate 429 contamination, clean stale dead_at and enable concurrent updates |
-| `51992d0` | fix(logs): stateful since filtering and noise pattern filter for CancelledError |
-| `7211c2e` | fix(logging): silence CancelledError and GatheringFuture spam and enforce Invariant 13 |
-| `cb57c20` | fix(cards): zero-overchecking cache en memoria y rutas kvm4 para pasaporte ruthopia |
-| `7a39482` | fix(dashboard): restore visibility for all LIVE accounts and resolve poller self-lock |
-| `b0940e1` | fix(sqlite): eliminate journal_mode lock contention, malformed false-positives and consolidate startup migrations |
-| `40ccf33` | fix(fleet): blindaje macro de 3 ductos, aislamiento 429 sin DEAD y preservacion de identidad |
-| `ba596f5` | feat(infra): consolidar migracion a KVM4-Karen botmex.2puty.tech, mapas actualizados y V10 |
-| `2ce5a83` | feat(api): endpoint publico /api/health/ping para healthchecks y watchdogs |
-| `e0e8961` | refactor(core): saneamiento integral de deuda tecnica, unificacion V10 y desacoplamiento sqlite |
+| `2175db7` | fix(bet): guardarraíl plan_not_worse del advisor + fix números BET_POLICY.md (Smartreview) |
+| `7821971` | docs(next-session): Fase 3 completa (A/B/C/D), 719111d revisado, siguiente = smoke de Robert |
+| `8cd909f` | feat(bet): recálculo dinámico del advisor en run_auto_mission + test integración (Fase 3, Commit D) |
+| `050878e` | docs(next-session): Fase 3 A/B/C hechas + colisión multi-sesión con 719111d, Commit D bloqueado |
+| `b525cb1` | feat(bet): cablear bet_advisor — advisor_boost/advisor_hint/_advisor_sink + 3 entry points (Fase 3, Commit C) |
+| `719111d` | feat(bet): matchmaking continuo multi-tarjeta, filtrado falso 429/403 y cableado bet_advisor |
+| `2267121` | feat(bet): bet_advisor.py — asesor LLM de pre-selección + migración bet_llm_calls (Fase 3, Commit B) |
+| `c6f671c` | chore(bet): vendor support_llm.py + su test desde feat/support-agent (Fase 3, aislado) |
+| `014efe2` | feat(bet): bet_policy.load_policy() + override disco + digest + POLICY cableado (Fase 2) |
+| `29fcd30` | refactor(bet): decide_next_action(phase=SCHEDULED) + _apply_sched_action en FASE 2 (Fase 1b) |
+| `1978a19` | docs(next-session): Fase 1 del refactor /bet hecha, arranque Fase 1b (FASE 2 scheduled) |
+| `8879660` | refactor(bet): cablear decide_next_action + _apply_action en el inner loop de FASE 1 |
 <!-- GEN:end:recientes -->
 
 ---

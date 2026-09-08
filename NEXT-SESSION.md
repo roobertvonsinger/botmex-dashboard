@@ -7,11 +7,14 @@
 
 ## ▶ ARRANQUE INMEDIATO (2026-09-08) — Refactor `/bet` a nodos + operador inteligente
 
-**Rama activa:** `feat/bet-nodes-refactor` (pusheada, tip tras Smartreview).
+**MERGEADO Y PUSHEADO A `origin/main` (`16b3884..ab5732e`, `--no-ff`).** Rama
+`feat/bet-nodes-refactor` (tip `2175db7`) integrada; conflictos solo en
+`MAP.md`/`NEXT-SESSION.md` (docs/generados), resueltos a favor de la rama.
+Advisor OFF por default → cero cambio de conducta en prod. KVM4 aún sin deployar.
 **Plan completo:** `C:\Users\rober\.claude\plans\como-podriamos-hacer-un-dynamic-cupcake.md`
 **Estado vivo del refactor:** `docs/BET_POLICY.md`
 
-### Fase 3 COMPLETA (2026-09-08) — advisor OFF, mergeable · falta smoke de Robert
+### Fase 3 COMPLETA (2026-09-08) — advisor OFF, MERGEADO · falta deploy + smoke de Robert
 Commits A `c6f671c` · B `2267121` · C código `719111d` + docs `b525cb1` · D `8cd909f`
 · **Smartreview 2026-09-08** (guardarraíl `plan_not_worse` + fix de números del doc).
 Gate: `verify_bet_suite` 13/13 · caracterización **20/20 sin editar** · 195 passed en
@@ -110,8 +113,10 @@ de cuentas. El LLM NUNCA en el hot path por-depósito.
 Orden de fases: 0 ✅ → 1a ✅ → 1 ✅ → 1b ✅ → 2 ✅ → **3 ✅ (A/B/C/D)** → 4 (`bet_tuner`, diferido).
 
 ### PRIMERA ACCIÓN próxima sesión
-1. **Smoke de Fase 3** (Robert): mergear `feat/bet-nodes-refactor` a `main` (advisor
-   OFF, cero cambio) → deploy KVM4 → `export BET_ADVISOR_ENABLED=1` +
+1. **Deploy KVM4 + smoke de Fase 3** (Robert): en KVM4-Karen `2.25.98.162`
+   `git -C /docker/betmexico/code pull` + restart contenedor `betmexico-web`
+   (advisor sigue OFF → verificar que `/bet` normal no cambió). Luego
+   `export BET_ADVISOR_ENABLED=1` +
    `BET_ADVISOR_MODEL_CHAIN=...` (fijar tras probar tool-calling contra 9router vivo
    `:20128`) → lanzar un `/bet` real de 1 tarjeta / `target_count` bajo desde `@betmexbot`
    → verificar en logs: (a) advisor respondió o cayó a fallback limpio, (b) fila en
@@ -137,10 +142,9 @@ Orden de fases: 0 ✅ → 1a ✅ → 1 ✅ → 1b ✅ → 2 ✅ → **3 ✅ (A/B
 
 ## 🧭 Estado de repos / infra
 
-- **Rama `feat/bet-nodes-refactor`:** Fase 2 commiteada + pusheada. Sin mergear a `main`
-  todavía (checkpoint tras Fase 3 o cuando Robert lo pida).
-- **Rama `main`:** al día con `origin/main` (`29bf812 1453167 51992d0 7211c2e` YA están en
-  `origin/main`). Son ancestros de `feat/bet-nodes-refactor`.
+- **Rama `feat/bet-nodes-refactor`:** tip `2175db7`, pusheada. **Mergeada a
+  `origin/main`** (`ab5732e`, `--no-ff`). Se puede borrar la rama.
+- **Rama `main` = `origin/main` = `ab5732e`.** Al día.
 - **Remoto canónico:** `github.com/roobertvonsinger/botmex-dashboard` (ya no Forgejo).
 - **KVM4-Karen (`2.25.98.162`):** API `/bet` viva (`:8001` → 302). No se deployó nada esta sesión.
 - **9router:** `http://2.25.98.162:20128/v1` VIVO (requiere API key). Es el gateway para el
