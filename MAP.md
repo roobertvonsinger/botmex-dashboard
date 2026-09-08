@@ -98,10 +98,11 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 595 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5600 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 5622 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 2551 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
+| `bet_advisor.py` | 414 | `betmexico.dashboard.bet_advisor` | _[completar]_ |
 | `bet_policy.py` | 221 | `—` | _[completar]_ |
 | `bet_retry_policy.py` | 388 | `—` | _[completar]_ |
 | `betmexico_config.py` | 183 | `betmexico` | _[completar]_ |
@@ -158,6 +159,7 @@ prewarm.py (router)
 | `THREEDS_RECENT_H` | `24` | `auto_deposit.py` |
 | `MIN_WITHDRAWAL_AMOUNT` | `100.0` | `auto_deposit.py` |
 | `MM_ACCOUNT_MAX_DECLINES_1H` | `2` | `auto_deposit.py` |
+| `ADVISOR_TIMEOUT_S` | `6.0` | `bet_advisor.py` |
 | `POLICY_VERSION` | `2` | `bet_policy.py` |
 | `MAX_TEXT_COMBOS` | `100` | `betmexico_config.py` |
 | `HUMAN_COOLDOWN` | `60` | `betmexico_config.py` |
@@ -282,6 +284,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c6f671c` | chore(bet): vendor support_llm.py + su test desde feat/support-agent (Fase 3, aislado) |
 | `014efe2` | feat(bet): bet_policy.load_policy() + override disco + digest + POLICY cableado (Fase 2) |
 | `29fcd30` | refactor(bet): decide_next_action(phase=SCHEDULED) + _apply_sched_action en FASE 2 (Fase 1b) |
 | `1978a19` | docs(next-session): Fase 1 del refactor /bet hecha, arranque Fase 1b (FASE 2 scheduled) |
@@ -293,7 +296,6 @@ prewarm.py (router)
 | `1453167` | fix(bet): eliminate 429 contamination, clean stale dead_at and enable concurrent updates |
 | `51992d0` | fix(logs): stateful since filtering and noise pattern filter for CancelledError |
 | `7211c2e` | fix(logging): silence CancelledError and GatheringFuture spam and enforce Invariant 13 |
-| `cb57c20` | fix(cards): zero-overchecking cache en memoria y rutas kvm4 para pasaporte ruthopia |
 <!-- GEN:end:recientes -->
 
 ---

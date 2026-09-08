@@ -434,6 +434,28 @@ def _migrate():
     except sqlite3.OperationalError:
         pass
 
+    # FASE 3 refactor `/bet`: tracking de costo del advisor LLM (`bet_advisor.py`).
+    # Una fila por llamada al 9router, incluso los fallos. Tokens medidos del
+    # evento `done` del stream. `outcome` ∈ {applied, rejected, timeout, error,
+    # no_candidates, no_advice}. Aditiva. Ver docs/BET_POLICY.md.
+    try:
+        with db(write=True) as c:
+            c.execute(
+                "CREATE TABLE IF NOT EXISTS bet_llm_calls ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "kind TEXT NOT NULL, "
+                "model TEXT, "
+                "tokens_in INTEGER, "
+                "tokens_out INTEGER, "
+                "cost_usd REAL DEFAULT 0, "
+                "latency_ms INTEGER, "
+                "mission_id TEXT, "
+                "outcome TEXT, "
+                "created_at TEXT NOT NULL)"
+            )
+    except sqlite3.OperationalError:
+        pass
+
     # Tabla de tracking de penalizaciones y strikes por operador para el Bot de Telegram
     try:
         with db(write=True) as c:

@@ -30,7 +30,7 @@ secundarios quedan exactamente donde están hoy.
 | 1 | Cableado en el inner loop de FASE 1 (`_*_view` → `decide_next_action` → `_apply_action`) | ✅ caracterización 12/12 sin editar · `verify_bet_suite` 13/13 · `test_auto_mission` 29/29 |
 | 1b | Extender `retry_policy` a FASE 2 (scheduled) — `decide_next_action(phase="SCHEDULED")` + `_apply_sched_action` | ✅ caracterización 20/20 (12 viejas sin editar + 8 FASE 2) · `test_bet_retry_policy` 70 · `verify_bet_suite` 13/13 |
 | 2 | `bet_policy.load_policy()` + override `/data/bet_policy.json` + `_SANE_BOUNDS` + `digest()` + CLI `apply()` + `POLICY` cableado en shell + migración `auto_missions.policy_digest` | ✅ `test_bet_policy` 14/14 · caracterización 28/28 sin editar · `verify_bet_suite` 13/13 |
-| 3 | `bet_advisor` (LLM plan-time + recálculo dinámico), default OFF (`BET_ADVISOR_ENABLED`) | 🔵 pendiente |
+| 3 | `bet_advisor` (LLM plan-time + recálculo dinámico), default OFF (`BET_ADVISOR_ENABLED`) | 🟡 en curso — Commit A (vendor `support_llm.py`) ✅ · Commit B (`bet_advisor.py` + `tests/test_bet_advisor.py` 24/24 + migración `bet_llm_calls`) ✅ · Commit C (cablear) 🔵 · Commit D (recálculo dinámico + integración) 🔵 |
 | 4 | `bet_tuner` (ajuste offline de parámetros con diff aprobable) | 🔵 ronda siguiente |
 
 ## Fase 1a — módulos puros (hecho, sin cambio de conducta)
@@ -104,6 +104,75 @@ resuelto antes de llamar a `decide_next_action`.
 Quirks del comportamiento actual **preservados** (documentados en la caracterización):
 doble-unlock `[1,2,1,2,3,3]` en el 3-strikes; circuit breaker de 429 que setea
 `cancelled` local pero NO corta el outer `while not _cancelled()`.
+
+## Fase 3 — advisor / operador inteligente (`bet_advisor.py`), default OFF 🟡
+
+**Qué es:** un asesor LLM (9router `:20128`) consultado en los puntos de
+**selección de cuentas** — plan inicial + recálculo dinámico a mitad de misión —
+**nunca** en el hot path por-depósito. Devuelve *hints* (`boost` por cuenta en
+`[-3, +3]`), no decisiones: `select_accounts_for_auto` / `bet_retry_policy` siguen
+siendo la autoridad. Fallback: `None` → plan determinista idéntico al de hoy.
+
+### Commit A — vendor `support_llm.py` (`c6f671c`, aislado)
+Copia **fiel** de `feat/support-agent:{support_llm.py, test_support_llm.py}` (este
+último → `tests/`). `LLMClient`: httpx crudo, streaming SSE, `tool_calls`
+fragmentados acumulados por `index`, cadena de fallback de modelos (solo mientras
+no se emitió texto). **No se mergea `feat/support-agent`**; si evoluciona, re-diff
+manual. Gate: `tests/test_support_llm.py` 10/10.
+
+### Commit B — `bet_advisor.py` + tests + migración `bet_llm_calls`
+Módulo **puro** (no toca BD salvo la fila de costo). Piezas:
+
+- **`AdvisorInputs`** (dataclass) — `candidates`/`cards`/`mission_meta`/`recent_history`
+  **YA redactados por el caller**. Cada candidato: `ref` opaco (`A0`/`A1`…) +
+  `email` (SOLO para traducir de vuelta) + ~13 campos whitelisted. Tarjetas: `ref`
+  (`C0`…) + BIN(6) + métricas de BIN.
+- **`_build_advisor_request(inp) -> dict`** — payload campo por campo, **jamás
+  `dict(row)`**. Campo `session_alive` (renombrado de `jwt_alive` del plan — la
+  subcadena "jwt" dispararía el detector de PII sobre una clave legítima).
+- **`_assert_no_pii(payload)`** — escaneo recursivo fail-closed. Lanza `ValueError`
+  **antes de cualquier request** ante: clave con subcadena sensible
+  (`password`/`jwt`/`token`/`cvv`/`card_number`/`email`/`curp`/`phone`/…), `@` en
+  un string, o corrida de **13-19 dígitos** (un BIN de 6 y el `sha1[:12]` pasan).
+- **`_sanitize_advice(raw, eligible_refs, card_refs, *, max_boosts, pairing_ok)`** —
+  clave top-level desconocida / no-dict / vacía → descarta **TODA** la advice;
+  `boost` clampeado `[-3,3]`; refs fuera del set elegible post-filtro descartadas;
+  `max_boosts = ceil(max_accounts/2)` (se queda con los |boost| mayores);
+  `pairing_ok(a,c)` corre los predicados del matcher sobre cada pairing.
+- **`CleanAdvice`** (frozen) — `boosts`/`pairings`/`avoid`/`rationale` +
+  `.boost_map(ref2email)` traduce ref opaco → email para `select_accounts_for_auto`.
+- **`maybe_advise(inp, *, db_path, mission_id, kind, client, pairing_ok)`** —
+  `async`. **OFF por default**: `BET_ADVISOR_ENABLED` ∉ {1,true,yes,on} → `None`
+  sin tocar red ni BD. `asyncio.wait_for(_run_llm(...), timeout=ADVISOR_TIMEOUT_S=6.0)`.
+  Timeout / JSON malo / router caído / claves raras → `None`.
+- **`_record_llm_call`** — fila en `bet_llm_calls` vía `db_registry.db(write=True)`
+  en **todo camino** salvo el early-return de OFF. NUNCA lanza (corre en `finally`).
+  `outcome` ∈ {`applied`, `rejected`, `timeout`, `error`, `no_candidates`, `no_advice`}.
+
+**Env:** `BET_ADVISOR_ENABLED` (OFF), `BET_ADVISOR_MODEL_CHAIN` (default
+`ag/gemini-3.8-flash-high,openrouter/openrouter/free` — ambos $0; se fija tras
+probar tool-calling contra el router vivo).
+
+**Migración:** `CREATE TABLE IF NOT EXISTS bet_llm_calls (...)` aditiva en
+`app.py::_migrate`. Ver `docs/ARCHITECTURE.md`.
+
+Gate: `tests/test_bet_advisor.py` 24/24 · `verify_bet_suite` 13/13 · caracterización
+28/28 **sin editar** · 199 en la corrida agregada.
+
+### Commit C — cablear (🔵 siguiente)
+`select_accounts_for_auto` gana `advisor_boost: dict[email,int]` (1 elemento
+prependido en posición 0 del `sort_key`, antes de `pool_first` — puro desempate).
+`plan_auto_mission` gana `advisor_hint`. Los 3 entry points async
+(`process_bet_input`, `bot_bet_create`, `auto_deposit_create`) llaman `maybe_advise`
+concurrente con la telemetría. Gate: 4 suites verdes **con `BET_ADVISOR_ENABLED`
+sin setear** (cero regresión).
+
+### Commit D — recálculo dinámico + integración (🔵)
+En `run_auto_mission`, antes de la expansión de respaldo, `maybe_advise` con el
+estado vivo redactado → hint a la re-invocación de `plan_auto_mission`. Cachear
+`account_priority`/`avoid` en memoria para sesgar `_pull_fresh_live_account` sin
+llamadas nuevas. `tests/test_bet_advisor_integration.py` con `LLMClient` falso.
+Merge con advisor OFF; Robert pone `BET_ADVISOR_ENABLED=1` para el smoke real.
 
 ## Fase 2 — centralización de config (hecho, sin cambio de conducta)
 
