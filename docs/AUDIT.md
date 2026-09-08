@@ -3,6 +3,22 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-09-08 (refactor /bet a nodos — Fase 1: retry_policy en el inner loop de FASE 1)
+
+**Motivo**: el inner `while True` de matchmaking de `run_auto_mission` (~300 líneas,
+7 ramas `if code ...` entrelazadas con efectos) no era observable ni testeable. Fase 1
+extrae la **decisión** a una función pura y deja los efectos en un helper del shell.
+Plan: `~/.claude/plans/como-podriamos-hacer-un-dynamic-cupcake.md`. Estado vivo: `docs/BET_POLICY.md`.
+
+| Función | Spec (2026-09-08) | Estado | Verificado |
+|---|---|---|---|
+| `bet_retry_policy.decide_next_action(outcome, account, card, mission, config)` | Función **pura** (sin BD/sleep/lock/log). Réplica del orden de ramas del inner loop de FASE 1: `ok → BALANCE_LIMIT_EXCEEDED → 3DS → dead/429 (+circuit breaker) → decline real/ambiguo → CARD_LOCKED_OTHER_ACCOUNT → transitorio`. Devuelve `Action` (frozen) con `kind` + flags de ruteo + deltas de contadores. Reusa la taxonomía de `deposits` (`MM_DEAD_RC`/`MM_THREEDS_RC`/`_mm_is_real_decline`/`_mm_is_ambiguous_charge`). | ✅ implementado | ✅ `tests/test_bet_retry_policy.py` (46) por rama |
+| `bet_policy.BetPolicyConfig` + `DEFAULT` | Frozen dataclass con los ~10 escalares del inner loop; **defaults = valores exactos actuales** (`probe_amount=10`, `mm_cooldown_s=45`, `transient_backoff_s=25`, `cross_account_gap_s=5`, `card_max_declines=3`, `account_max_declines_per_run=2`, `circuit_breaker_consecutive_429=2`, `match_transient_retries=4`, `max_accounts_hard_cap=10`). `_LOCKED_FIELDS` protege invariantes 4/5/7/10. `load_policy()`+disco = Fase 2. | ✅ implementado | ✅ `tests/test_bet_policy.py` (5) fija defaults == constantes vivas |
+| `run_auto_mission` inner loop de FASE 1 (matchmaking) | Las 6 ramas de retry/rotación (todo menos el `if ok:` de match, que sigue inline) pasan por `_outcome_view`/`_account_view`/`_card_view`/`_mission_view` (construidas ANTES de mutar) → `decide_next_action` → `_apply_action` (helper del shell, réplica verbatim de efectos y orden). **Cero cambio de conducta observable** — incluido el doble-unlock `[1,2,1,2,3,3]` en el 3-strikes y el circuit breaker que NO corta el outer loop. | ✅ implementado | ✅ `tests/test_bet_retry_characterization.py` 12/12 **sin editar** + `verify_bet_suite` 13/13 + `test_auto_mission` 29/29 + scheduler/selection/endpoints verdes |
+| `tools/verify_bet_suite.py` | String "9 invariantes" → "13 invariantes" (la suite canónica tiene 13 tests desde hace tiempo; el texto estaba desactualizado). | ✅ corregido | ✅ salida del runner |
+
+**Pendiente Fase 1b**: extender `decide_next_action` a FASE 2 (scheduled). **Fase 2**: `load_policy()` + override `/data/bet_policy.json`. **Fase 3**: `bet_advisor` (LLM, default OFF).
+
 ## Captura: 2026-08-13 (puente ruthopia en /bet — gate rw real por HTTP, reemplaza el bypass)
 
 **Motivo**: el `/bet` volvía `🟢 LIVE (Auth OK)` sin llamada HTTP (bypass `668ab62`). RF1 restaura el gate real: cada tarjeta pasa por `POST /api/rw/check` del `ruthopia-bot` (:8787, auth Bearer). Espec: `docs/superpowers/specs/2026-08-13-puente-ruthopia-bet-design.md`; plan: `docs/superpowers/plans/2026-08-13-puente-ruthopia-bet.md`.

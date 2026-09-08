@@ -27,7 +27,7 @@ secundarios quedan exactamente donde están hoy.
 |---|---|---|
 | 0 | Red de caracterización (golden-master) del `run_auto_mission` actual | ✅ `tests/test_bet_retry_characterization.py` (12 tests) |
 | 1a | `bet_retry_policy.decide_next_action` + `bet_policy.BetPolicyConfig` (módulos puros, sin cablear) | ✅ `tests/test_bet_retry_policy.py` (46) · `tests/test_bet_policy.py` (5) |
-| 1 | Cablear `decide_next_action` + `_apply_action` en el inner loop de FASE 1 | 🔵 en curso |
+| 1 | Cableado en el inner loop de FASE 1 (`_*_view` → `decide_next_action` → `_apply_action`) | ✅ caracterización 12/12 sin editar · `verify_bet_suite` 13/13 · `test_auto_mission` 29/29 |
 | 1b | Extender `retry_policy` a FASE 2 (scheduled) | 🔵 pendiente |
 | 2 | `bet_policy.BetPolicyConfig` + `load_policy()` + override en `/data/bet_policy.json` | 🔵 pendiente |
 | 3 | `bet_advisor` (LLM plan-time + recálculo dinámico), default OFF (`BET_ADVISOR_ENABLED`) | 🔵 pendiente |
@@ -50,9 +50,29 @@ inner `while True` de `auto_deposit.py` L1838-2141:
 `Action` (frozen) lleva `kind` + flags de efecto + deltas de contadores que el
 shell aplica (la policy nunca muta sus inputs).
 
-Aún NO está cableado en `run_auto_mission` — eso es Fase 1 (el shell construye 4
-`*_view` pre-mutación, llama `decide_next_action`, y `_apply_action` replica los
-efectos y su orden). El contrato de no-regresión lo da `test_bet_retry_characterization.py`.
+## Fase 1 — cableado en el inner loop de FASE 1 (hecho, sin cambio de conducta)
+
+`run_auto_mission` gana 5 helpers anidados (`auto_deposit.py`, justo antes del
+`while not _cancelled()` de matchmaking):
+
+- `_outcome_view` / `_account_view` / `_card_view` / `_mission_view` — construyen las
+  vistas inmutables **antes de cualquier mutación** (`account.remaining_candidates` =
+  candidatas de `target` tras el `pop(0)` del pipe en curso; `mission.transient_count`
+  = el contador `transient` del par pre-incremento).
+- `_apply_action(action, target, account_id, email, pipe, k, code, r) -> str` —
+  helper **del shell**: réplica verbatim de los efectos y su ORDEN de las 6 ramas de
+  retry/rotación de hoy (SKIP_ACCOUNT, THREEDS_CERT, ACCOUNT_DEAD, CARD_DECLINE,
+  RETIRE_CARD_LOCKED, GIVE_UP_PAIR). Los mutadores de estado (`_unlock`, `done`,
+  `cooldown_until`, `_retire_card`, DB writes, `_broadcast_mission`) leen estado vivo
+  igual que el monolito. Devuelve `'retry'` (RETRY_SAME → el shell hace `_sleep_step`
+  + `continue`) o `'break'`.
+
+El `if ok:` de match encontrado sigue **inline** (es finalización de match, no retry —
+nodo `card_marriage_writer`, se descompone en ronda futura).
+
+Quirks del comportamiento actual **preservados** (documentados en la caracterización):
+doble-unlock `[1,2,1,2,3,3]` en el 3-strikes; circuit breaker de 429 que setea
+`cancelled` local pero NO corta el outer `while not _cancelled()`.
 
 ## Fase 0 — caracterización (hecho)
 

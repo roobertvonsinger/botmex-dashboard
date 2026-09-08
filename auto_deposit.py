@@ -1402,6 +1402,8 @@ async def run_auto_mission(
     + Fase 3 (cierre). Lee amount/target_count/card_pipes de la fila de la misión
     (self-sufficient: no depende del shape exacto de `plan`)."""
     import deposits as dep
+    import bet_policy
+    import bet_retry_policy
 
     operator_id = user.get("telegram_id")
 
@@ -1638,6 +1640,231 @@ async def run_auto_mission(
                 t_after = _loop.time()
                 if t_after - t_before < seconds * 0.5:
                     _clock_offset += seconds
+
+            # ── retry_policy node (Fase 1) ────────────────────────────────────
+            # `decide_next_action` es PURA (bet_retry_policy). `_apply_action`
+            # replica los efectos y su ORDEN exactos del inner loop monolítico.
+            # Contrato de no-regresión: tests/test_bet_retry_characterization.py
+            # (debe pasar SIN editarse). Ver docs/BET_POLICY.md.
+            def _outcome_view(r, ok, code):
+                return bet_retry_policy.OutcomeView(
+                    ok=bool(ok),
+                    code=code or "",
+                    error=str(r.get("error") or ""),
+                    account_dead=bool(r.get("account_dead")),
+                )
+
+            def _account_view(tgt):
+                return bet_retry_policy.AccountRetryState(
+                    declines_this_run=tgt["declines"],
+                    remaining_candidates=len(tgt["candidates"]),
+                    is_locked=tgt["locked"],
+                    matched=tgt["matched"],
+                )
+
+            def _card_view(k):
+                return bet_retry_policy.CardRetryState(
+                    attempts=card_attempts_map.get(k, 0),
+                    declines=card_declines_map.get(k, 0),
+                )
+
+            def _mission_view(transient_ct):
+                return bet_retry_policy.MissionRetryState(
+                    phase="MATCHMAKING",
+                    consecutive_rate_limits=consecutive_rate_limits,
+                    transient_count=transient_ct,
+                )
+
+            def _apply_action(action, tgt, account_id, email, pipe, k, code, r) -> str:
+                """Aplica el `Action` con los MISMOS efectos y orden que el inner
+                loop monolítico de FASE 1. Devuelve 'retry' (RETRY_SAME) o 'break'.
+                Los flags/deltas del `Action` sólo enrutan; los mutadores de estado
+                (unlock, done, cooldown) leen estado vivo igual que el código de hoy."""
+                nonlocal failed, consecutive_rate_limits, backup_checked, cancelled
+                AK = bet_retry_policy.ActionKind
+
+                if action.kind is AK.SKIP_ACCOUNT:
+                    logger.warning(f"💰 CUENTA CON SALDO ACTIVO ({email}) — saltada del plan sin quemar tarjeta {pipe}")
+                    tgt["done"] = True
+                    tgt["candidates"] = []
+                    if tgt["locked"] and not tgt["matched"]:
+                        _unlock(account_id)
+                        locked_ids.discard(account_id)
+                    for other in accounts_state:
+                        if not other["done"] and pipe not in other["candidates"] and not _is_card_retired(pipe):
+                            other["candidates"].append(pipe)
+                    return "break"
+
+                if action.kind is AK.THREEDS_CERT:
+                    try:
+                        from app import db as _adb
+                        with _adb(write=True) as cdb:
+                            cdb.execute("UPDATE accounts SET grade='A+' WHERE email=?", (email,))
+                    except Exception as ex:
+                        logger.error(f"[Auto {mission_id}] no pude marcar A+ {email}: {ex}")
+
+                    card_attempts_map[k] = card_attempts_map.get(k, 0) + 1
+                    card_tried_accounts.setdefault(k, set()).add(account_id)
+
+                    if action.retire_card:
+                        _retire_card(pipe, reason=f"Límite de {MM_CARD_MAX_DECLINES} intentos alcanzado tras 3DS en {email}")
+                        logger.info(
+                            f"🛡️ Tarjeta {pipe} completó {MM_CARD_MAX_DECLINES} intentos en misión tras 3DS — retirada del resto de la corrida"
+                        )
+                    else:
+                        logger.info(
+                            f"🔐 3DS en {email} — Cuenta A+ detectada. Tarjeta {pipe} disponible para intento adicional en otra cuenta"
+                        )
+                        re_enqueued_3ds = False
+                        for other in accounts_state:
+                            if not other["done"] and other["id"] not in card_tried_accounts[k] and pipe not in other["candidates"] and not _is_card_retired(pipe):
+                                other["candidates"].append(pipe)
+                                re_enqueued_3ds = True
+                                break
+                        if not re_enqueued_3ds and len(accounts_state) < MAX_ACCOUNTS_HARD_CAP:
+                            try:
+                                from app import DB_PATH
+                                fresh_acc = _pull_fresh_live_account(DB_PATH, already_checked_emails, married_card_owners, pipe)
+                                if fresh_acc:
+                                    already_checked_emails.add(fresh_acc["email"])
+                                    accounts_state.append(fresh_acc)
+                                    logger.info(f"➕ CUENTA DE RELEVO DINÁMICO AÑADIDA TRAS 3DS | {fresh_acc['email']} para tarjeta {pipe}")
+                            except Exception as ex_fresh:
+                                logger.debug(f"No se pudo jalar cuenta fresca tras 3DS: {ex_fresh}")
+
+                    tgt["cooldown_until"] = _get_now() + dep.MM_COOLDOWN
+                    if not tgt["candidates"]:
+                        tgt["done"] = True
+                        if tgt["locked"] and not tgt["matched"]:
+                            _unlock(account_id)
+                            locked_ids.discard(account_id)
+                    return "break"
+
+                if action.kind is AK.ACCOUNT_DEAD:
+                    if action.dead_kind == "rate_limited":
+                        dep._mark_rate_limited_dead(email)
+                        consecutive_rate_limits += 1
+                        if action.circuit_breaker_hit:
+                            logger.error(f"🛑 [CIRCUIT BREAKER] 2 cuentas consecutivas con 429 RATE LIMIT ({email}) — abortando misión para evitar quema de captchas.")
+                            _broadcast_mission(
+                                mission_id,
+                                "aborted",
+                                user,
+                                on_progress=on_progress,
+                                reason="circuit_breaker_rate_limited",
+                                phase_detail="Abortado por 429 rate limits consecutivos",
+                            )
+                            backup_checked = True
+                            cancelled = True
+                            return "break"
+                    elif action.dead_kind == "kyc":
+                        consecutive_rate_limits = 0
+                        try:
+                            from app import db as _dash_db
+                            with _dash_db(write=True) as c:
+                                c.execute(
+                                    "UPDATE accounts SET status='DEAD', dead_reason='IsUserInValidationProcess', dead_at=datetime('now'), kyc_verified=0 WHERE email=?",
+                                    (email,),
+                                )
+                        except Exception as e:
+                            logger.warning(f"[Auto {mission_id}] No se pudo marcar dead_reason para {email}: {e}")
+                    else:
+                        consecutive_rate_limits = 0
+                        try:
+                            from app import db as _appdb
+                            with _appdb(write=True) as cdb:
+                                cdb.execute(
+                                    "UPDATE accounts SET status='DEAD', dead_reason=?, dead_at=datetime('now') "
+                                    "WHERE email=? AND status != 'DEAD'",
+                                    (action.dead_reason, email)
+                                )
+                        except Exception:
+                            pass
+                    failed += 1
+                    tgt["declines"] += 1
+                    tgt["done"] = True
+                    tgt["candidates"] = []  # Eliminar inmediatamente todas las tarjetas restantes para esta cuenta
+                    if tgt["locked"]:
+                        _unlock(account_id)
+                        locked_ids.discard(account_id)
+                    _rl_b = (code == "RATE_LIMITED" or "429" in str(r.get("error") or ""))
+                    _broadcast_mission(
+                        mission_id,
+                        "cooldown" if _rl_b else "scheduling",
+                        user,
+                        on_progress=on_progress,
+                        email=email,
+                        reason="rate_limited" if _rl_b else "dead_account",
+                        aborted=code,
+                    )
+                    return "break"
+
+                if action.kind is AK.CARD_DECLINE:
+                    failed += 1
+                    tgt["declines"] += 1
+                    card_declines_map[k] = card_declines_map.get(k, 0) + 1
+                    card_attempts_map[k] = card_attempts_map.get(k, 0) + 1
+                    card_tried_accounts.setdefault(k, set()).add(account_id)
+
+                    if action.retire_card:
+                        tot_att = card_attempts_map.get(k, 0)
+                        tot_dec = card_declines_map.get(k, 0)
+                        reason_jub = f"{tot_att} intentos ({tot_dec} rechazos, {tot_att - tot_dec} 3DS) en cuentas distintas"
+                        _retire_card(pipe, reason=reason_jub)
+                        logger.warning(
+                            f"🚫 TARJETA JUBILADA EN MISIÓN ({reason_jub}) | {pipe}"
+                        )
+                    else:
+                        logger.info(
+                            f"⚠️ Rechazo bancario #{card_declines_map[k]}/{MM_CARD_MAX_DECLINES} para tarjeta en {email} — encolando para intento en cuenta distinta | {pipe}"
+                        )
+                        re_enqueued = False
+                        for other in accounts_state:
+                            if not other["done"] and other["id"] not in card_tried_accounts[k] and pipe not in other["candidates"] and not _is_card_retired(pipe):
+                                other["candidates"].append(pipe)
+                                re_enqueued = True
+                                break
+                        if not re_enqueued and len(accounts_state) < MAX_ACCOUNTS_HARD_CAP:
+                            try:
+                                from app import DB_PATH
+                                fresh_acc = _pull_fresh_live_account(DB_PATH, already_checked_emails, married_card_owners, pipe)
+                                if fresh_acc:
+                                    already_checked_emails.add(fresh_acc["email"])
+                                    accounts_state.append(fresh_acc)
+                                    re_enqueued = True
+                                    logger.info(f"➕ CUENTA DE RELEVO DINÁMICO AÑADIDA | {fresh_acc['email']} para tarjeta {pipe}")
+                            except Exception as ex_fresh:
+                                logger.debug(f"No se pudo jalar cuenta fresca: {ex_fresh}")
+                        if not re_enqueued:
+                            logger.info(f"ℹ️ Tarjeta {pipe} pendiente de relevo dinámico (esperando cuenta disponible distinta)")
+
+                    if tgt["declines"] >= MM_MAX_ACCOUNT_DECLINES_PER_RUN or not tgt["candidates"]:
+                        tgt["done"] = True
+                        logger.info(f"🛡️ Cuenta {email} completó su tope de rechazos — en reposo para proteger pasarela")
+                        if tgt["locked"] and not tgt["matched"]:
+                            _unlock(account_id)
+                            locked_ids.discard(account_id)
+                    else:
+                        tgt["cooldown_until"] = _get_now() + dep.MM_COOLDOWN
+                    return "break"
+
+                if action.kind is AK.RETIRE_CARD_LOCKED:
+                    _retire_card(pipe, reason=f"CARD_LOCKED_OTHER_ACCOUNT en {email}")
+                    logger.warning(f"🚫 TARJETA JUBILADA (Detectada en otra cuenta al liveness/intento) | {pipe}")
+                    for other in accounts_state:
+                        if pipe in other.get("candidates", []):
+                            other["candidates"].remove(pipe)
+                    failed += 1
+                    tgt["cooldown_until"] = _get_now() + action.wait_s
+                    return "break"
+
+                if action.kind is AK.GIVE_UP_PAIR:
+                    failed += 1
+                    tgt["cooldown_until"] = _get_now() + action.wait_s
+                    return "break"
+
+                # RETRY_SAME — el shell hace el backoff y el `continue`
+                return "retry"
 
             while not _cancelled():
                 # Actualizar listas de candidatas filtrando tarjetas jubiladas
@@ -1941,204 +2168,23 @@ async def run_auto_mission(
                             logger.warning(f"Error casando tarjeta con {email}: {ex_m}")
                         break
 
-                    if code == "BALANCE_LIMIT_EXCEEDED":
-                        logger.warning(f"💰 CUENTA CON SALDO ACTIVO ({email}) — saltada del plan sin quemar tarjeta {pipe}")
-                        target["done"] = True
-                        target["candidates"] = []
-                        if target["locked"] and not target["matched"]:
-                            _unlock(account_id)
-                            locked_ids.discard(account_id)
-                        # Re-inyectar la tarjeta a otras cuentas activas si no la tenían
-                        for other in accounts_state:
-                            if not other["done"] and pipe not in other["candidates"] and not _is_card_retired(pipe):
-                                other["candidates"].append(pipe)
-                        break
-
-                    if code in dep.MM_THREEDS_RC:
-                        try:
-                            from app import db as _adb
-                            with _adb(write=True) as cdb:
-                                cdb.execute(
-                                    "UPDATE accounts SET grade='A+' WHERE email=?",
-                                    (email,),
-                                )
-                        except Exception as ex:
-                            logger.error(f"[Auto {mission_id}] no pude marcar A+ {email}: {ex}")
-
-                        k = _card_key(pipe)
-                        card_attempts_map[k] = card_attempts_map.get(k, 0) + 1
-                        card_tried_accounts.setdefault(k, set()).add(account_id)
-
-                        # Regla Robert: Hasta 3 cuentas distintas para certificar cuentas A+
-                        if card_attempts_map[k] >= MM_CARD_MAX_DECLINES:
-                            _retire_card(pipe, reason=f"Límite de {MM_CARD_MAX_DECLINES} intentos alcanzado tras 3DS en {email}")
-                            logger.info(
-                                f"🛡️ Tarjeta {pipe} completó {MM_CARD_MAX_DECLINES} intentos en misión tras 3DS — retirada del resto de la corrida"
-                            )
-                        else:
-                            logger.info(
-                                f"🔐 3DS en {email} — Cuenta A+ detectada. Tarjeta {pipe} disponible para intento adicional en otra cuenta"
-                            )
-                            re_enqueued_3ds = False
-                            for other in accounts_state:
-                                if not other["done"] and other["id"] not in card_tried_accounts[k] and pipe not in other["candidates"] and not _is_card_retired(pipe):
-                                    other["candidates"].append(pipe)
-                                    re_enqueued_3ds = True
-                                    break
-                            if not re_enqueued_3ds and len(accounts_state) < MAX_ACCOUNTS_HARD_CAP:
-                                try:
-                                    from app import DB_PATH
-                                    fresh_acc = _pull_fresh_live_account(DB_PATH, already_checked_emails, married_card_owners, pipe)
-                                    if fresh_acc:
-                                        already_checked_emails.add(fresh_acc["email"])
-                                        accounts_state.append(fresh_acc)
-                                        logger.info(f"➕ CUENTA DE RELEVO DINÁMICO AÑADIDA TRAS 3DS | {fresh_acc['email']} para tarjeta {pipe}")
-                                except Exception as ex_fresh:
-                                    logger.debug(f"No se pudo jalar cuenta fresca tras 3DS: {ex_fresh}")
-
-                        target["cooldown_until"] = _get_now() + dep.MM_COOLDOWN
-                        if not target["candidates"]:
-                            target["done"] = True
-                            if target["locked"] and not target["matched"]:
-                                _unlock(account_id)
-                                locked_ids.discard(account_id)
-                        break
-
-                    # RATE_LIMITED, DEAD, BAN, KYC_PENDING o cualquier código de cuenta muerta
-                    if (
-                        code in ("RATE_LIMITED", "DEAD", "BAN", "RATE_LIMITED_PERMANENT", "KYC_PENDING")
-                        or code in dep.MM_DEAD_RC
-                        or r.get("account_dead")
-                        or "RATE_LIMITED" in str(r.get("error") or "")
-                        or "429" in str(r.get("error") or "")
-                    ):
-                        if code == "RATE_LIMITED" or "RATE_LIMITED" in str(r.get("error") or "") or "429" in str(r.get("error") or ""):
-                            dep._mark_rate_limited_dead(email)
-                            consecutive_rate_limits += 1
-                            if consecutive_rate_limits >= 2:
-                                logger.error(f"🛑 [CIRCUIT BREAKER] 2 cuentas consecutivas con 429 RATE LIMIT ({email}) — abortando misión para evitar quema de captchas.")
-                                _broadcast_mission(
-                                    mission_id,
-                                    "aborted",
-                                    user,
-                                    on_progress=on_progress,
-                                    reason="circuit_breaker_rate_limited",
-                                    phase_detail="Abortado por 429 rate limits consecutivos",
-                                )
-                                backup_checked = True
-                                cancelled = True
-                                break
-                        elif code == "KYC_PENDING":
-                            consecutive_rate_limits = 0
-                            try:
-                                from app import db as _dash_db
-                                with _dash_db(write=True) as c:
-                                    c.execute(
-                                        "UPDATE accounts SET status='DEAD', dead_reason='IsUserInValidationProcess', dead_at=datetime('now'), kyc_verified=0 WHERE email=?",
-                                        (email,),
-                                    )
-                            except Exception as e:
-                                logger.warning(f"[Auto {mission_id}] No se pudo marcar dead_reason para {email}: {e}")
-                        else:
-                            consecutive_rate_limits = 0
-                            try:
-                                from app import db as _appdb
-                                with _appdb(write=True) as cdb:
-                                    cdb.execute(
-                                        "UPDATE accounts SET status='DEAD', dead_reason=?, dead_at=datetime('now') "
-                                        "WHERE email=? AND status != 'DEAD'",
-                                        (r.get("error") or code, email)
-                                    )
-                            except Exception:
-                                pass
-                        failed += 1
-                        target["declines"] += 1
-                        target["done"] = True
-                        target["candidates"] = []  # Eliminar inmediatamente todas las tarjetas restantes para esta cuenta
-                        if target["locked"]:
-                            _unlock(account_id)
-                            locked_ids.discard(account_id)
-                        _broadcast_mission(
-                            mission_id,
-                            "cooldown" if (code == "RATE_LIMITED" or "429" in str(r.get("error") or "")) else "scheduling",
-                            user,
-                            on_progress=on_progress,
-                            email=email,
-                            reason="rate_limited" if (code == "RATE_LIMITED" or "429" in str(r.get("error") or "")) else "dead_account",
-                            aborted=code,
-                        )
-                        break
-
-                    if dep._mm_is_real_decline(code) or dep._mm_is_ambiguous_charge(code):
-                        failed += 1
-                        target["declines"] += 1
-                        k = _card_key(pipe)
-                        card_declines_map[k] = card_declines_map.get(k, 0) + 1
-                        card_attempts_map[k] = card_attempts_map.get(k, 0) + 1
-                        card_tried_accounts.setdefault(k, set()).add(account_id)
-
-                        # Regla Robert: 3 rechazos en cuentas distintas para jubilar tarjeta de la misión
-                        if card_declines_map[k] >= MM_CARD_MAX_DECLINES or card_attempts_map[k] >= MM_CARD_MAX_DECLINES:
-                            tot_att = card_attempts_map.get(k, 0)
-                            tot_dec = card_declines_map.get(k, 0)
-                            reason_jub = f"{tot_att} intentos ({tot_dec} rechazos, {tot_att - tot_dec} 3DS) en cuentas distintas"
-                            _retire_card(pipe, reason=reason_jub)
-                            logger.warning(
-                                f"🚫 TARJETA JUBILADA EN MISIÓN ({reason_jub}) | {pipe}"
-                            )
-                        else:
-                            logger.info(
-                                f"⚠️ Rechazo bancario #{card_declines_map[k]}/{MM_CARD_MAX_DECLINES} para tarjeta en {email} — encolando para intento en cuenta distinta | {pipe}"
-                            )
-                            # Re-encolar inmediatamente la tarjeta en OTRA cuenta activa que no la haya probado
-                            re_enqueued = False
-                            for other in accounts_state:
-                                if not other["done"] and other["id"] not in card_tried_accounts[k] and pipe not in other["candidates"] and not _is_card_retired(pipe):
-                                    other["candidates"].append(pipe)
-                                    re_enqueued = True
-                                    break
-                            if not re_enqueued and len(accounts_state) < MAX_ACCOUNTS_HARD_CAP:
-                                try:
-                                    from app import DB_PATH
-                                    fresh_acc = _pull_fresh_live_account(DB_PATH, already_checked_emails, married_card_owners, pipe)
-                                    if fresh_acc:
-                                        already_checked_emails.add(fresh_acc["email"])
-                                        accounts_state.append(fresh_acc)
-                                        re_enqueued = True
-                                        logger.info(f"➕ CUENTA DE RELEVO DINÁMICO AÑADIDA | {fresh_acc['email']} para tarjeta {pipe}")
-                                except Exception as ex_fresh:
-                                    logger.debug(f"No se pudo jalar cuenta fresca: {ex_fresh}")
-                            if not re_enqueued:
-                                logger.info(f"ℹ️ Tarjeta {pipe} pendiente de relevo dinámico (esperando cuenta disponible distinta)")
-
-                        # Regla Robert: Máximo 2 declines por cuenta en 1h / corrida
-                        if target["declines"] >= MM_MAX_ACCOUNT_DECLINES_PER_RUN or not target["candidates"]:
-                            target["done"] = True
-                            logger.info(f"🛡️ Cuenta {email} completó su tope de rechazos — en reposo para proteger pasarela")
-                            if target["locked"] and not target["matched"]:
-                                _unlock(account_id)
-                                locked_ids.discard(account_id)
-                        else:
-                            target["cooldown_until"] = _get_now() + dep.MM_COOLDOWN
-                        break
-
-                    if code == "CARD_LOCKED_OTHER_ACCOUNT" or "otra cuenta" in str(r.get("error") or "").lower() or "cardalreadyassociated" in str(r.get("error") or "").lower():
-                        _retire_card(pipe, reason=f"CARD_LOCKED_OTHER_ACCOUNT en {email}")
-                        logger.warning(f"🚫 TARJETA JUBILADA (Detectada en otra cuenta al liveness/intento) | {pipe}")
-                        for other in accounts_state:
-                            if pipe in other.get("candidates", []):
-                                other["candidates"].remove(pipe)
-                        failed += 1
-                        target["cooldown_until"] = _get_now() + MM_CROSS_ACCOUNT_GAP
-                        break
-
-                    # TRANSITORIO (nuestro lado) → reintentar el par
-                    transient += 1
-                    if transient > MATCH_TRANSIENT_RETRIES:
-                        failed += 1
-                        target["cooldown_until"] = _get_now() + dep.MM_COOLDOWN
-                        break
-                    await _sleep_step(25)
+                    # ── ramas de retry/rotación → retry_policy node (Fase 1) ──
+                    # Vistas inmutables ANTES de cualquier mutación; decisión pura;
+                    # _apply_action replica los efectos y su orden exactos de hoy.
+                    k = _card_key(pipe)
+                    action = bet_retry_policy.decide_next_action(
+                        _outcome_view(r, ok, code),
+                        _account_view(target),
+                        _card_view(k),
+                        _mission_view(transient),
+                        bet_policy.DEFAULT,
+                    )
+                    disp = _apply_action(action, target, account_id, email, pipe, k, code, r)
+                    if disp == "retry":
+                        transient += 1
+                        await _sleep_step(action.wait_s)
+                        continue
+                    break
 
                 last_account_id = account_id
 

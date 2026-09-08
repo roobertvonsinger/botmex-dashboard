@@ -241,7 +241,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_pull_fresh_live_account` | def | L1214–L1348 |
 | `_broadcast_mission` | def | L1351–L1380 |
 | `_stop_pool` | def | L1383–L1390 |
-| `run_auto_mission` | def | L1394–L2456 |
+| `run_auto_mission` | def | L1394–L2502 |
 
 ### `autoexclusion.py`
 

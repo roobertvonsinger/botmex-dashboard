@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 595 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5590 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 2456 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 2502 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `bet_policy.py` | 57 | `—` | _[completar]_ |
 | `bet_retry_policy.py` | 292 | `—` | _[completar]_ |
@@ -286,6 +286,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `28cb65d` | feat(bet): bet_retry_policy.decide_next_action + bet_policy.BetPolicyConfig (Fase 1a, puros) |
 | `0d45fa8` | docs(next-session): arranque inmediato Fase 1 del refactor /bet a nodos |
 | `efab82b` | test(bet): red de caracterización golden-master de run_auto_mission (Fase 0) |
 | `29bf812` | fix(perf): resolve gateway timeout hang, polling storm, and enable concurrent updates |
@@ -297,7 +298,6 @@ prewarm.py (router)
 | `b0940e1` | fix(sqlite): eliminate journal_mode lock contention, malformed false-positives and consolidate startup migrations |
 | `40ccf33` | fix(fleet): blindaje macro de 3 ductos, aislamiento 429 sin DEAD y preservacion de identidad |
 | `ba596f5` | feat(infra): consolidar migracion a KVM4-Karen botmex.2puty.tech, mapas actualizados y V10 |
-| `2ce5a83` | feat(api): endpoint publico /api/health/ping para healthchecks y watchdogs |
 <!-- GEN:end:recientes -->
 
 ---
