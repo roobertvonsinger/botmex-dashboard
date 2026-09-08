@@ -370,7 +370,10 @@ def perform_wabox_liveness_check(card_data: Dict[str, str]) -> Tuple[bool, str, 
 
 
 def get_card_declines_24h(card_identifier: str, db_conn=None) -> int:
-    """Cuenta el número de rechazos bancarios de una tarjeta en deposit_attempts en las últimas 24 horas."""
+    """Cuenta el número de rechazos bancarios reales de una tarjeta en deposit_attempts en las últimas 24 horas.
+    Solo considera respuestas donde el banco/pasarela declinó la transacción (REJECTED, BANK_REJECTED, DECLINED).
+    EXCLUYE fallos de login (429, RATE_LIMITED), bloqueos por reglas de matrimonio (INCOMPLETE),
+    o cancelaciones, ya que la tarjeta nunca fue procesada por el banco."""
     if not card_identifier:
         return 0
     c_num = "".join(filter(str.isdigit, str(card_identifier).split("|")[0]))
@@ -383,10 +386,18 @@ def get_card_declines_24h(card_identifier: str, db_conn=None) -> int:
             return 0
         row = c.execute(
             "SELECT COUNT(*) AS cnt FROM deposit_attempts "
-            "WHERE card_pipe LIKE ? "
-            "AND UPPER(status) NOT IN ('APPROVED', 'THREEDS', '3DS_REQUIRED') "
+            "WHERE (REPLACE(SUBSTR(card_pipe, 1, INSTR(card_pipe || '|', '|') - 1), ' ', '') = ? OR card_pipe LIKE ?) "
+            "AND UPPER(status) IN ('REJECTED', 'GATEWAY_ERROR', 'BANK_REJECTED', 'DECLINED') "
+            "AND (rejection_reason IS NULL OR ("
+            "  rejection_reason NOT LIKE '%429%' "
+            "  AND rejection_reason NOT LIKE '%RATE%' "
+            "  AND rejection_reason NOT LIKE '%login%' "
+            "  AND rejection_reason NOT LIKE '%Regla de Oro%' "
+            "  AND rejection_reason NOT LIKE '%bloqueada para otras cuentas%' "
+            "  AND rejection_reason NOT LIKE '%casada%' "
+            ")) "
             "AND created_at >= datetime('now', '-24 hours')",
-            (f"{c_num}%",),
+            (c_num, f"{c_num}%"),
         ).fetchone()
         if row is None:
             return 0
@@ -440,20 +451,15 @@ def precheck_card_liveness(card_pipe: str, operator_id: Optional[int] = None) ->
     # Check temprano: ¿La tarjeta ya está asociada a alguna cuenta? O ¿la cuenta está RATE_LIMITED?
     card_num = parsed.get("card_number")
     with _get_app_db(write=False) as c:
-        # 1. Check de tarjetas asociadas/casadas en account_cards o deposit_attempts (APPROVED real)
-        existing = c.execute(
-            "SELECT account_email FROM account_cards WHERE card_number=?",
-            (card_num,)
-        ).fetchone()
-        if not existing:
-            cols = [col[1] for col in c.execute("PRAGMA table_info(deposit_attempts)").fetchall()]
-            if "card_pipe" in cols:
-                existing = c.execute(
-                    "SELECT account_email FROM deposit_attempts WHERE card_pipe LIKE ? AND UPPER(status)='APPROVED' LIMIT 1",
-                    (f"{card_num}%",)
-                ).fetchone()
-        if existing:
-            email = existing["account_email"]
+        # 1. Check canónico de tarjetas casadas (con regla de liberación Robert 2026-09-07)
+        try:
+            import deposits as dep
+            married_owner = dep.get_married_card_owner(card_num)
+        except Exception:
+            married_owner = None
+
+        if married_owner:
+            email = married_owner
             is_superadmin = (operator_id == 1341812706 or str(operator_id) == "1341812706")
             parsed["married_account"] = email
             parsed["is_married"] = True

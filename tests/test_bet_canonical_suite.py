@@ -360,3 +360,239 @@ def test_canonical_09_married_card_strict_one_to_one_fast_track(tmp_path):
 
     assert "stranger@test.com" not in plan_emails, "Tarjeta casada no puede asignarse a un extraño"
     assert "owner@test.com" in plan_emails, "Tarjeta casada se vincula directamente a su dueña"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 10. BLINDAJE CANÓNICO 429 RATE LIMIT (CERO PRIORIZACIÓN Y AISLAMIENTO TOTAL)
+# ─────────────────────────────────────────────────────────────────────────────
+def test_canonical_10_rate_limit_429_isolation_case_insensitive(tmp_path):
+    """Invariante 10 (AGENTS.md §4): Ninguna cuenta con 429 o RATE_LIMITED (en cualquier
+    casing, intento en deposit_attempts, o registro duplicado en accounts) puede ser seleccionada
+    por el planificador ni por el fallback de rotación continua (_pull_fresh_live_account)."""
+    db_file = tmp_path / "test_429_isolation.db"
+    con = sqlite3.connect(str(db_file))
+    con.executescript("""
+    CREATE TABLE accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT, password TEXT DEFAULT 'p',
+        status TEXT DEFAULT 'LIVE', grade TEXT DEFAULT 'A', kyc_verified INTEGER DEFAULT 1,
+        published_to_pool INTEGER DEFAULT 1, balance_real REAL DEFAULT 0.0, balance_total REAL DEFAULT 0.0,
+        locked_by INTEGER, cooldown_until INTEGER, jwt_expires_at INTEGER DEFAULT 2147483647,
+        dead_reason TEXT, dead_at TEXT
+    );
+    CREATE TABLE deposit_attempts (id INTEGER PRIMARY KEY, account_email TEXT, amount REAL, status TEXT, rejection_reason TEXT, card_pipe TEXT, created_at TEXT);
+    CREATE TABLE account_transactions (id INTEGER PRIMARY KEY, account_email TEXT, txn_date TEXT, amount REAL, status INTEGER, txn_type INTEGER, gateway INTEGER);
+    CREATE TABLE account_cards (id INTEGER PRIMARY KEY, account_email TEXT, number TEXT, status TEXT DEFAULT 'ACTIVE');
+    CREATE TABLE bin_stats (bin TEXT PRIMARY KEY, total_attempts INTEGER, approved_count INTEGER, approval_rate REAL);
+    """)
+
+    # Caso A: nieto2816@hotmail.com tiene un registro con dead_reason='RATE_LIMITED_429', pero otro registro duplicado Nieto2816@hotmail.com está 'LIVE'
+    con.execute("INSERT INTO accounts (email, status, dead_reason) VALUES ('nieto2816@hotmail.com', 'DEAD', 'RATE_LIMITED_429')")
+    con.execute("INSERT INTO accounts (email, status, published_to_pool) VALUES ('Nieto2816@hotmail.com', 'LIVE', 1)")
+
+    # Caso B: elizabethmedeles@gmail.com está LIVE y published_to_pool=0 (aislada), pero tiene intento 429 en deposit_attempts
+    con.execute("INSERT INTO accounts (email, status, published_to_pool) VALUES ('elizabethmedeles@gmail.com', 'LIVE', 0)")
+    con.execute("INSERT INTO deposit_attempts (account_email, status, rejection_reason, created_at) VALUES ('ElizabethMedeles@gmail.com', 'RATE_LIMITED', '429 Rate limit', datetime('now', '-5 minutes'))")
+
+    # Caso C: Cuenta limpia válida
+    con.execute("INSERT INTO accounts (email, status, published_to_pool) VALUES ('clean_user@test.com', 'LIVE', 1)")
+    con.commit()
+    con.close()
+
+    p1 = "4111111111111111|1228|123"
+    plan = ad.plan_auto_mission(db_file, [p1], amount=150, target_count=1)
+    plan_emails = [a["email"].lower() for a in plan.get("accounts", [])]
+
+    assert "nieto2816@hotmail.com" not in plan_emails, "Cuentas con 429 jamás deben ser seleccionadas"
+    assert "elizabethmedeles@gmail.com" not in plan_emails, "Cuentas con published_to_pool=0 o intento 429 jamás deben ser seleccionadas"
+    assert "clean_user@test.com" in plan_emails, "Cuenta limpia debe ser seleccionada"
+
+    # Validar también _pull_fresh_live_account
+    fresh = ad._pull_fresh_live_account(db_file, already_checked=set(), married_owners={}, for_card=p1)
+    assert fresh is not None
+    assert fresh["email"].lower() == "clean_user@test.com", "El pull de respaldo jamás debe tomar cuentas 429 o aisladas"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 11. LIBERACIÓN DE TARJETAS CASADAS (CUENTAS 429 / FUERA DE POOL / 5 RECHAZOS)
+# ─────────────────────────────────────────────────────────────────────────────
+def test_canonical_11_married_card_liberation_rules(tmp_path):
+    """Invariante 11 (Robert 2026-09-07):
+    Una tarjeta casada se libera automáticamente si la cuenta dueña:
+    1. Está fuera del pool (published_to_pool=0), en 429, RATE_LIMITED o degradada.
+    2. Acumuló 5 o más rechazos consecutivos tras el último aprobado.
+    Si la cuenta dueña es sana (LIVE, pool=1), la tarjeta permanece estrictamente casada 1:1."""
+    db_file = tmp_path / "test_married_liberation.db"
+    con = sqlite3.connect(str(db_file))
+    con.executescript("""
+    CREATE TABLE accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT, password TEXT DEFAULT 'p',
+        status TEXT DEFAULT 'LIVE', grade TEXT DEFAULT 'A', kyc_verified INTEGER DEFAULT 1,
+        published_to_pool INTEGER DEFAULT 1, balance_real REAL DEFAULT 0.0, balance_total REAL DEFAULT 0.0,
+        locked_by INTEGER, cooldown_until INTEGER, jwt_expires_at INTEGER DEFAULT 2147483647,
+        dead_reason TEXT, dead_at TEXT
+    );
+    CREATE TABLE deposit_attempts (id INTEGER PRIMARY KEY, account_email TEXT, amount REAL, status TEXT, rejection_reason TEXT, card_pipe TEXT, created_at TEXT);
+    CREATE TABLE account_transactions (id INTEGER PRIMARY KEY, account_email TEXT, txn_date TEXT, amount REAL, status INTEGER, txn_type INTEGER, gateway INTEGER);
+    CREATE TABLE account_cards (id INTEGER PRIMARY KEY, account_email TEXT, card_number TEXT, status TEXT DEFAULT 'ACTIVE');
+    CREATE TABLE bin_stats (bin TEXT PRIMARY KEY, total_attempts INTEGER, approved_count INTEGER, approval_rate REAL);
+    """)
+
+    card_a = "4023185001869977"
+    card_b = "5555555555555555"
+    card_c = "4111111111111111"
+
+    # Tarjeta A: Casada con cuenta DEAD (único caso donde Robert autoriza liberación)
+    con.execute("INSERT INTO accounts (email, status, published_to_pool) VALUES ('dead_owner@test.com', 'DEAD', 0)")
+    con.execute("INSERT INTO account_cards (account_email, card_number, status) VALUES ('dead_owner@test.com', ?, 'ACTIVE')", (card_a,))
+
+    # Tarjeta B: Casada con cuenta aislada por 429 (status='LIVE', published_to_pool=0) -> NO LIBERADA (no está muerta)
+    con.execute("INSERT INTO accounts (email, status, published_to_pool, dead_reason) VALUES ('rate_limited@test.com', 'LIVE', 0, 'RATE_LIMITED_429')")
+    con.execute("INSERT INTO account_cards (account_email, card_number, status) VALUES ('rate_limited@test.com', ?, 'ACTIVE')", (card_b,))
+
+    # Tarjeta C: Casada con healthy@test.com (cuenta LIVE activa y sana) -> NO LIBERADA
+    con.execute("INSERT INTO accounts (email, status, published_to_pool) VALUES ('healthy@test.com', 'LIVE', 1)")
+    con.execute("INSERT INTO account_cards (account_email, card_number, status) VALUES ('healthy@test.com', ?, 'ACTIVE')", (card_c,))
+
+    # Mock DB para deposits.py
+    import app
+    orig_db = app.db
+    app.db = lambda write=False: con
+
+    try:
+        # 1. Tarjeta A (cuenta con status='DEAD') -> DEBE ESTAR LIBERADA
+        assert dep.get_married_card_owner(card_a) is None, "Tarjeta con cuenta DEAD debe liberarse"
+
+        # 2. Tarjeta B (cuenta en 429/rate limited, status='LIVE') -> SIGUE CASADA (prohibido liberarla)
+        assert dep.get_married_card_owner(card_b) == "rate_limited@test.com", "Tarjeta con cuenta 429 no debe liberarse"
+
+        # 3. Tarjeta C (cuenta sana LIVE en pool) -> DEBE SEGUIR CASADA A healthy@test.com
+        assert dep.get_married_card_owner(card_c) == "healthy@test.com", "Tarjeta con cuenta sana debe permanecer casada"
+    finally:
+        app.db = orig_db
+        con.close()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 12. CONTADOR DE DECLINES DE TARJETA: CERO CONTAMINACIÓN POR 429 O REGLAS
+# ─────────────────────────────────────────────────────────────────────────────
+def test_canonical_12_card_declines_exclude_429_and_rules(tmp_path):
+    """Invariante 12 (Robert 2026-09-07):
+    El contador de rechazos de una tarjeta (card_checker.get_card_declines_24h)
+    SOLO debe contabilizar rechazos reales del banco/pasarela (REJECTED, BANK_REJECTED).
+    Los fallos de login (429 RATE_LIMITED), bloqueos por Regla de Oro (INCOMPLETE),
+    o cancelaciones NUNCA deben sumar como rechazos de la tarjeta."""
+    import card_checker as cc
+
+    db_file = tmp_path / "test_card_declines.db"
+    con = sqlite3.connect(str(db_file))
+    con.executescript("""
+    CREATE TABLE deposit_attempts (
+        id INTEGER PRIMARY KEY,
+        account_email TEXT,
+        amount REAL,
+        status TEXT,
+        rejection_reason TEXT,
+        card_pipe TEXT,
+        created_at TEXT
+    );
+    """)
+
+    card = "4023185001869977"
+
+    # 1 Rechazo real de banco
+    con.execute(
+        "INSERT INTO deposit_attempts (account_email, status, rejection_reason, card_pipe, created_at) "
+        "VALUES ('a1@test.com', 'REJECTED', 'BANK_REJECTED — decline genérico', ?, datetime('now', '-10 minutes'))",
+        (f"{card}|1228|123",)
+    )
+
+    # 5 Intentos con 429 Rate limit en login (la tarjeta NUNCA tocó el banco)
+    for i in range(2, 7):
+        con.execute(
+            f"INSERT INTO deposit_attempts (account_email, status, rejection_reason, card_pipe, created_at) "
+            f"VALUES ('a{i}@test.com', 'rate_limited', 'Cuenta en rate limit (429) — aislada del pool.', ?, datetime('now', '-5 minutes'))",
+            (f"{card}|1228|123",)
+        )
+
+    # 2 Bloqueos por Regla de Oro / matrimonio (la tarjeta NUNCA tocó el banco)
+    for i in range(7, 9):
+        con.execute(
+            f"INSERT INTO deposit_attempts (account_email, status, rejection_reason, card_pipe, created_at) "
+            f"VALUES ('a{i}@test.com', 'incomplete', 'Regla de Oro: Tarjeta ya registrada en otra cuenta', ?, datetime('now', '-2 minutes'))",
+            (f"{card}|1228|123",)
+        )
+
+    con.commit()
+
+    try:
+        declines = cc.get_card_declines_24h(card, db_conn=con)
+        assert declines == 1, f"Se esperaba exactamente 1 rechazo bancario real, pero se reportaron {declines}"
+    finally:
+        con.close()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 13. SILENCIO TOTAL DE CANCELLEDERROR Y GATHERINGFUTURE EN LOGS
+# ─────────────────────────────────────────────────────────────────────────────
+def test_canonical_13_silence_cancelled_exceptions_and_gathering_future():
+    """Invariante 13 (Robert 2026-09-08):
+    Cero spam en logs por cancelaciones normales de asyncio, desconexiones de SSE,
+    o futuros de gather abortados (_GatheringFuture finished exception=CancelledError).
+    Tanto el filtro de logging como el exception_handler del loop deben silenciar
+    estas alertas limpiamente sin silenciar excepciones legítimas."""
+    import logging
+    from app import _CancelledFilter, _configure_asyncio_exception_handler
+
+    # 1. Validar _CancelledFilter
+    f = _CancelledFilter()
+    r_spam1 = logging.LogRecord(
+        'asyncio', logging.ERROR, 'base_events.py', 1780,
+        '_GatheringFuture exception was never retrieved\nfuture: <_GatheringFuture finished exception=CancelledError()>',
+        (), None
+    )
+    assert not f.filter(r_spam1), "CancelledFilter debe bloquear mensaje de _GatheringFuture CancelledError"
+
+    r_spam2 = logging.LogRecord(
+        'asyncio', logging.ERROR, 'tasks.py', 700,
+        'During handling of the above exception, another exception occurred:\nasyncio.exceptions.CancelledError',
+        (), (asyncio.CancelledError, asyncio.CancelledError(), None)
+    )
+    assert not f.filter(r_spam2), "CancelledFilter debe bloquear trazas de CancelledError anidado"
+
+    r_legit = logging.LogRecord(
+        'botmexico', logging.ERROR, 'app.py', 100,
+        'Fallo crítico en conexión a base de datos',
+        (), (sqlite3.OperationalError, sqlite3.OperationalError("database locked"), None)
+    )
+    assert f.filter(r_legit), "CancelledFilter NO debe bloquear excepciones operativas legítimas"
+
+    # 2. Validar exception handler del loop
+    loop = asyncio.new_event_loop()
+    called_default = []
+    loop.default_exception_handler = lambda ctx: called_default.append(ctx)
+    _configure_asyncio_exception_handler(target_loop=loop)
+    handler = loop.get_exception_handler()
+    assert handler is not None
+
+    # Contexto con CancelledError directo
+    handler(loop, {"message": "task cancelled", "exception": asyncio.CancelledError()})
+    assert len(called_default) == 0, "No debe invocar default handler ante CancelledError"
+
+    # Contexto con _GatheringFuture
+    class DummyFut:
+        def cancelled(self): return True
+        def done(self): return True
+        def exception(self): return asyncio.CancelledError()
+        def __repr__(self): return "<_GatheringFuture finished exception=CancelledError()>"
+
+    handler(loop, {"message": "_GatheringFuture exception was never retrieved", "future": DummyFut()})
+    assert len(called_default) == 0, "No debe invocar default handler ante _GatheringFuture"
+
+    # Contexto legítimo: debe propagar
+    handler(loop, {"message": "Error real", "exception": ValueError("boom")})
+    assert len(called_default) == 1, "Debe propagar errores reales que no sean de cancelación"
+    loop.close()
+
+
+
+

@@ -176,32 +176,40 @@ def _normalize_pipe_to_3part(p: str) -> str:
 def _get_married_card_owners(db_path: Optional[str] = None) -> Dict[str, str]:
     """Carga el mapa de tarjetas casadas en BD: {card_number -> account_email}
     tanto de account_cards como de deposit_attempts con status='APPROVED'.
-    Si una tarjeta pagó en una cuenta, JAMÁS puede usarse en otra."""
+    Las tarjetas asociadas a cuentas en 429, muertas, fuera de pool o con 5+ rechazos se liberan."""
     owners: Dict[str, str] = {}
     try:
+        import deposits as dep
         from app import DB_PATH
         target_db = db_path or DB_PATH
         con = sqlite3.connect(str(target_db))
+        con.row_factory = sqlite3.Row
         # 1. De account_cards
         cols = [c[1] for c in con.execute("PRAGMA table_info(account_cards)").fetchall()]
         num_col = "card_number" if "card_number" in cols else "number" if "number" in cols else None
+        has_status = "status" in cols
+        status_filter = "AND (status IS NULL OR UPPER(status) NOT IN ('LIBERATED', 'UNLINKED', 'INACTIVE'))" if has_status else ""
         if num_col:
             for r in con.execute(
-                f"SELECT {num_col}, account_email FROM account_cards WHERE {num_col} IS NOT NULL AND {num_col} != ''"
+                f"SELECT {num_col}, account_email FROM account_cards WHERE {num_col} IS NOT NULL AND {num_col} != '' {status_filter}"
             ).fetchall():
                 c_num = _extract_card_number(str(r[0]))
                 if c_num and r[1]:
-                    owners[c_num] = str(r[1]).strip().lower()
+                    owner = str(r[1]).strip().lower()
+                    if not dep._is_card_liberated_for_owner(con, c_num, owner):
+                        owners[c_num] = owner
         # 2. De deposit_attempts con pago aprobado exclusivamente
         try:
             dep_cols = [c[1] for c in con.execute("PRAGMA table_info(deposit_attempts)").fetchall()]
             if "card_pipe" in dep_cols:
                 for r in con.execute(
-                    "SELECT card_pipe, account_email FROM deposit_attempts WHERE UPPER(status)='APPROVED' AND card_pipe IS NOT NULL AND account_email IS NOT NULL"
+                    "SELECT card_pipe, account_email FROM deposit_attempts WHERE UPPER(status)='APPROVED' AND card_pipe IS NOT NULL AND account_email IS NOT NULL ORDER BY id ASC"
                 ).fetchall():
                     c_num = _extract_card_number(str(r[0]))
                     if c_num and r[1]:
-                        owners[c_num] = str(r[1]).strip().lower()
+                        owner = str(r[1]).strip().lower()
+                        if not dep._is_card_liberated_for_owner(con, c_num, owner):
+                            owners[c_num] = owner
         except Exception:
             pass
         con.close()
@@ -346,9 +354,8 @@ def select_accounts_for_auto(
             except (ValueError, TypeError):
                 continue
 
-        # Gate Soberano: Priorizar cuentas dentro del pool. Si no alcanzan para count, rota la flota LIVE.
-        # Regla Robert: "el bet jamás debe no tener cuentas para operar, solo rota la lista".
-        if has_enough_pool and not r.get("published_to_pool"):
+        # Cuentas fuera del pool (published_to_pool=0 o falsy) jamás deben seleccionarse
+        if not r.get("published_to_pool"):
             continue
 
         if r.get("locked_by") is not None and str(r.get("locked_by")) not in sa:
@@ -424,6 +431,9 @@ def select_accounts_for_auto(
         jwt_first = 0 if r.get("_jwt_alive") else 1
         # 2. 3DS reciente eleva prioridad
         has_3ds = 0 if meta.get("has_3ds_24h") else 1
+        # 2b. Penalizar cuentas con rechazos previos (cuentas vírgenes o sin fallas primero)
+        total_fails = meta.get("total_fails", 0)
+        has_fails = 1 if total_fails > 0 else 0
         # 3. Cuentas ya intentadas (<60 min) al final
         mins = meta.get("mins_since_last_attempt", 99999)
         recently_tried = 1 if mins < 60 else 0
@@ -439,6 +449,7 @@ def select_accounts_for_auto(
             pool_first,
             jwt_first,
             has_3ds,
+            has_fails,
             recently_tried,
             cards_heavy,
             is_stale_fossil,
@@ -541,14 +552,45 @@ def plan_auto_mission(
         # Blindaje Canónico Robert (2026-09-04): Cero contaminación de cuentas 429
         where_extra = ""
         if has_dead:
-            where_extra += " AND (dead_reason IS NULL OR (dead_reason NOT LIKE '%429%' AND dead_reason NOT LIKE '%RATE_LIMITED%'))"
+            where_extra += " AND (dead_reason IS NULL OR dead_reason='')"
         if has_dead_at:
             where_extra += " AND (dead_at IS NULL OR dead_at='')"
-        # Cuentas primarias: publicadas al pool con grade != 'D'
+
+        has_dep_att = bool(con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='deposit_attempts'").fetchone())
+        if has_dep_att:
+            where_extra += (
+                " AND LOWER(email) NOT IN ("
+                "   SELECT DISTINCT LOWER(account_email) FROM deposit_attempts "
+                "   WHERE UPPER(status) LIKE '%RATE%' "
+                "      OR rejection_reason LIKE '%429%' "
+                "      OR rejection_reason LIKE '%RATE%' "
+                "      OR UPPER(status) IN ('ACCOUNT_DEAD', 'BAN', 'RATE_LIMITED', 'RATE_LIMITED_PERMANENT')"
+                " )"
+            )
+        where_dead_reason = "OR (dead_reason IS NOT NULL AND dead_reason != '')" if has_dead else ""
+        where_extra += (
+            " AND LOWER(email) NOT IN ("
+            "   SELECT DISTINCT LOWER(email) FROM accounts "
+            f"   WHERE status='DEAD' {where_dead_reason}"
+            " )"
+        )
+        has_lca = "last_checked_at" in cols
+        order_lca = "COALESCE(last_checked_at, '') DESC, id ASC" if has_lca else "id ASC"
+        has_jwt_cols = "jwt_token" in cols and "jwt_expires_at" in cols
+        jwt_order = (
+            "(CASE WHEN jwt_token IS NOT NULL AND length(jwt_token) > 20 "
+            "AND jwt_expires_at > (strftime('%s', 'now') + 60) THEN 0 ELSE 1 END), "
+            if has_jwt_cols else ""
+        )
+
+        # Cuentas primarias: publicadas al pool con grade != 'D' (sesión activa 🟢 primero)
         rows = [
             dict(r) for r in con.execute(
                 f"SELECT * FROM accounts WHERE status='LIVE' AND COALESCE(grade, '') != 'D' "
-                f"AND published_to_pool=1{where_extra}"
+                f"AND published_to_pool=1{where_extra} "
+                f"ORDER BY {jwt_order}"
+                f"  (CASE WHEN grade='A+' THEN 0 WHEN grade='A' THEN 1 WHEN grade='B' THEN 2 ELSE 3 END), "
+                f"  {order_lca}"
             ).fetchall()
         ]
 
@@ -564,9 +606,9 @@ def plan_auto_mission(
                 f"AND COALESCE(kyc_verified, 0)=1 "
                 f"AND (balance_real IS NULL OR balance_real < {MIN_WITHDRAWAL_AMOUNT}) "
                 f"{where_extra} "
-                f"ORDER BY "
+                f"ORDER BY {jwt_order}"
                 f"  (CASE WHEN grade='A+' THEN 0 WHEN grade='A' THEN 1 WHEN grade='B' THEN 2 ELSE 3 END), "
-                f"  COALESCE(last_checked_at, '') ASC LIMIT ?"
+                f"  {order_lca} LIMIT ?"
             )
             try:
                 for fb_r in con.execute(fb_sql, (min_pool_needed * 4,)).fetchall():
@@ -586,7 +628,7 @@ def plan_auto_mission(
             email = r.get("email")
             used = con.execute(
                 "SELECT COALESCE(SUM(amount),0) AS s FROM deposit_attempts "
-                "WHERE account_email=? AND UPPER(status)='APPROVED' "
+                "WHERE LOWER(account_email)=LOWER(?) AND UPPER(status)='APPROVED' "
                 "AND created_at >= datetime('now','-24 hours')",
                 (email,),
             ).fetchone()["s"]
@@ -595,7 +637,7 @@ def plan_auto_mission(
             }
             declines = con.execute(
                 "SELECT COUNT(*) AS n FROM deposit_attempts "
-                "WHERE account_email=? AND UPPER(status)='REJECTED' "
+                "WHERE LOWER(account_email)=LOWER(?) AND UPPER(status)='REJECTED' "
                 "AND (created_at >= datetime('now','-1 hours') OR (julianday('now') - julianday(created_at)) <= 0.04166)",
                 (email,),
             ).fetchone()["n"]
@@ -608,7 +650,7 @@ def plan_auto_mission(
             # Normalizar fechas SQLite sin formato UTC
             app_48h = con.execute(
                 "SELECT COUNT(*) AS n FROM deposit_attempts "
-                "WHERE account_email=? AND UPPER(status)='APPROVED' "
+                "WHERE LOWER(account_email)=LOWER(?) AND UPPER(status)='APPROVED' "
                 "AND (julianday('now') - julianday(created_at)) <= 2.0",
                 (email,),
             ).fetchone()["n"]
@@ -616,7 +658,7 @@ def plan_auto_mission(
             # 2. Depósitos por SPEI / externos recientes (<48h) en account_transactions (gateway=2 o status=6 o txn_type=1)
             spei_48h = con.execute("""
                 SELECT COUNT(*) AS n FROM account_transactions 
-                WHERE account_email=? AND (gateway=2 OR status=6) AND txn_type=1 
+                WHERE LOWER(account_email)=LOWER(?) AND (gateway=2 OR status=6) AND txn_type=1 
                 AND (
                     (julianday('now') - julianday(REPLACE(txn_date, 'T', ' '))) <= 2.0
                     OR txn_date >= datetime('now','-48 hours')
@@ -632,7 +674,7 @@ def plan_auto_mission(
                 if "status_api" in cols_aw:
                     pw_row = con.execute("""
                         SELECT COUNT(*) AS n FROM account_withdrawals
-                        WHERE account_email=?
+                        WHERE LOWER(account_email)=LOWER(?)
                         AND (status_api IS NULL OR status_api IN (-1, 1, 2))
                         AND (
                             (julianday('now') - julianday(REPLACE(created_at, 'T', ' '))) <= 1.0
@@ -646,7 +688,7 @@ def plan_auto_mission(
             try:
                 pw_txn = con.execute("""
                     SELECT COUNT(*) AS n FROM account_transactions 
-                    WHERE account_email=? AND txn_type=2 AND status IN (-1, 1, 2)
+                    WHERE LOWER(account_email)=LOWER(?) AND txn_type=2 AND status IN (-1, 1, 2)
                     AND (
                         (julianday('now') - julianday(REPLACE(txn_date, 'T', ' '))) <= 1.0
                         OR txn_date >= datetime('now','-24 hours')
@@ -659,7 +701,7 @@ def plan_auto_mission(
             # 3. Evento 3DS_REQUIRED reciente (<24h)
             threeds_24h = con.execute(
                 "SELECT COUNT(*) AS n FROM deposit_attempts "
-                "WHERE account_email=? AND UPPER(status) LIKE '%3DS%' "
+                "WHERE LOWER(account_email)=LOWER(?) AND UPPER(status) LIKE '%3DS%' "
                 "AND (julianday('now') - julianday(created_at)) <= 1.0",
                 (email,),
             ).fetchone()["n"]
@@ -667,20 +709,20 @@ def plan_auto_mission(
             # 4. Total rechazos históricos
             tot_fails = con.execute(
                 "SELECT COUNT(*) AS n FROM deposit_attempts "
-                "WHERE account_email=? AND UPPER(status) IN ('REJECTED', 'GATEWAY_ERROR')",
+                "WHERE LOWER(account_email)=LOWER(?) AND UPPER(status) IN ('REJECTED', 'GATEWAY_ERROR')",
                 (email,),
             ).fetchone()["n"]
 
             # 5. IsUserInValidationProcess, RATE_LIMITED o DEAD histórico/reciente
             val_blocked = con.execute(
                 "SELECT COUNT(*) AS n FROM deposit_attempts "
-                "WHERE account_email=? AND rejection_reason LIKE '%IsUserInValidationProcess%'",
+                "WHERE LOWER(account_email)=LOWER(?) AND rejection_reason LIKE '%IsUserInValidationProcess%'",
                 (email,),
             ).fetchone()["n"]
 
             dead_blocked = con.execute(
                 "SELECT COUNT(*) AS n FROM deposit_attempts "
-                "WHERE account_email=? AND ("
+                "WHERE LOWER(account_email)=LOWER(?) AND ("
                 "  rejection_reason LIKE '%DEAD%' "
                 "  OR rejection_reason LIKE '%UNAUTHORIZED%' "
                 "  OR rejection_reason LIKE '%RATE%' "
@@ -693,7 +735,7 @@ def plan_auto_mission(
 
             rate_limit_blocked = con.execute(
                 "SELECT COUNT(*) AS n FROM deposit_attempts "
-                "WHERE account_email=? AND ("
+                "WHERE LOWER(account_email)=LOWER(?) AND ("
                 "  UPPER(status) LIKE '%RATE%' "
                 "  OR rejection_reason LIKE '%429%' "
                 "  OR rejection_reason LIKE '%RATE%' "
@@ -702,12 +744,29 @@ def plan_auto_mission(
                 (email,),
             ).fetchone()["n"]
 
+            # Blindaje multi-casing en tabla accounts
+            try:
+                acct_dead_rl = con.execute(
+                    "SELECT COUNT(*) AS n FROM accounts "
+                    "WHERE LOWER(email)=LOWER(?) AND ("
+                    "  status='DEAD' "
+                    "  OR dead_reason LIKE '%429%' "
+                    "  OR dead_reason LIKE '%RATE%'"
+                    ")",
+                    (email,),
+                ).fetchone()["n"]
+                if acct_dead_rl:
+                    dead_blocked = (dead_blocked or 0) + acct_dead_rl
+                    rate_limit_blocked = (rate_limit_blocked or 0) + acct_dead_rl
+            except Exception:
+                pass
+
             # 6. Historial de BINs aprobados en los últimos 30 días para esta cuenta: {bin: set(card_pipes_aprobados)}
             approved_bin_pipes: Dict[str, set] = {}
             try:
                 bin_app_rows = con.execute(
                     "SELECT card_pipe FROM deposit_attempts "
-                    "WHERE account_email=? AND UPPER(status)='APPROVED' AND card_pipe IS NOT NULL "
+                    "WHERE LOWER(account_email)=LOWER(?) AND UPPER(status)='APPROVED' AND card_pipe IS NOT NULL "
                     "AND created_at >= datetime('now','-30 days')",
                     (email,),
                 ).fetchall()
@@ -726,7 +785,7 @@ def plan_auto_mission(
             # Minutos desde el último intento/movimiento
             last_att = con.execute(
                 "SELECT created_at FROM deposit_attempts "
-                "WHERE account_email=? ORDER BY created_at DESC LIMIT 1",
+                "WHERE LOWER(account_email)=LOWER(?) ORDER BY created_at DESC LIMIT 1",
                 (email,),
             ).fetchone()
             mins_since = 99999
@@ -745,7 +804,7 @@ def plan_auto_mission(
 
             # RF5: tarjetas asociadas en la cuenta (depriorización si >= 2)
             cards_n = con.execute(
-                "SELECT COUNT(*) AS n FROM account_cards WHERE account_email=?",
+                "SELECT COUNT(*) AS n FROM account_cards WHERE LOWER(account_email)=LOWER(?)",
                 (email,),
             ).fetchone()["n"]
 
@@ -755,7 +814,7 @@ def plan_auto_mission(
             try:
                 last_app = con.execute(
                     "SELECT card_pipe, created_at FROM deposit_attempts "
-                    "WHERE account_email=? AND UPPER(status)='APPROVED' "
+                    "WHERE LOWER(account_email)=LOWER(?) AND UPPER(status)='APPROVED' "
                     "ORDER BY created_at DESC LIMIT 1",
                     (email,),
                 ).fetchone()
@@ -772,7 +831,7 @@ def plan_auto_mission(
                 else:
                     ac_fund = con.execute(
                         "SELECT card_number, registered_at FROM account_cards "
-                        "WHERE account_email=? AND status='ACTIVE' "
+                        "WHERE LOWER(account_email)=LOWER(?) AND status='ACTIVE' "
                         "ORDER BY id DESC LIMIT 1",
                         (email,),
                     ).fetchone()
@@ -794,15 +853,15 @@ def plan_auto_mission(
             try:
                 last_act = con.execute(
                     "SELECT MAX(last) AS last FROM ("
-                    "  SELECT created_at AS last FROM deposit_attempts WHERE account_email=?"
-                    "  UNION ALL SELECT txn_date AS last FROM account_transactions WHERE account_email=?"
-                    "  UNION ALL SELECT last_checked_at AS last FROM accounts WHERE email=?"
+                    "  SELECT created_at AS last FROM deposit_attempts WHERE LOWER(account_email)=LOWER(?)"
+                    "  UNION ALL SELECT txn_date AS last FROM account_transactions WHERE LOWER(account_email)=LOWER(?)"
+                    "  UNION ALL SELECT last_checked_at AS last FROM accounts WHERE LOWER(email)=LOWER(?)"
                     ")"
                 , (email, email, email)).fetchone()["last"]
             except Exception:
                 try:
                     last_act = con.execute(
-                        "SELECT MAX(created_at) AS last FROM deposit_attempts WHERE account_email=?",
+                        "SELECT MAX(created_at) AS last FROM deposit_attempts WHERE LOWER(account_email)=LOWER(?)",
                         (email,)
                     ).fetchone()["last"]
                 except Exception:
@@ -1149,16 +1208,47 @@ def _pull_fresh_live_account(
             cand_pan = _extract_card_number(for_card) if for_card else ""
             cand_bin = for_card[:6] if len(for_card) >= 6 else ""
 
+            cols = [c[1] for c in con.execute("PRAGMA table_info(accounts)").fetchall()]
+            has_dead = "dead_reason" in cols
+            has_dead_at = "dead_at" in cols
+            has_dep_att = bool(con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='deposit_attempts'").fetchone())
+
+            dep_att_filter = ""
+            if has_dep_att:
+                dep_att_filter = (
+                    "AND LOWER(email) NOT IN ("
+                    "   SELECT DISTINCT LOWER(account_email) FROM deposit_attempts "
+                    "   WHERE UPPER(status) LIKE '%RATE%' "
+                    "      OR rejection_reason LIKE '%429%' "
+                    "      OR rejection_reason LIKE '%RATE%' "
+                    "      OR UPPER(status) IN ('ACCOUNT_DEAD', 'BAN', 'RATE_LIMITED', 'RATE_LIMITED_PERMANENT')"
+                    ") "
+                )
+
+            where_extra = ""
+            if has_dead:
+                where_extra += " AND (dead_reason IS NULL OR dead_reason='')"
+            if has_dead_at:
+                where_extra += " AND (dead_at IS NULL OR dead_at='')"
+
+            has_lca = "last_checked_at" in cols
+            order_lca_pull = "COALESCE(last_checked_at, '') DESC" if has_lca else "id DESC"
+            where_dead_reason_pull = "OR (dead_reason IS NOT NULL AND dead_reason != '')" if has_dead else ""
             sql = (
                 "SELECT * FROM accounts "
-                "WHERE status='LIVE' AND COALESCE(kyc_verified, 0)=1 "
+                "WHERE status='LIVE' AND published_to_pool=1 "
+                "AND COALESCE(kyc_verified, 0)=1 "
                 "AND COALESCE(grade, '') != 'D' "
                 f"AND (balance_real IS NULL OR balance_real < {MIN_WITHDRAWAL_AMOUNT}) "
-                "AND (dead_reason IS NULL OR dead_reason='') "
-                "AND (dead_at IS NULL OR dead_at='') "
+                f"{where_extra} "
+                f"{dep_att_filter}"
+                "AND LOWER(email) NOT IN ("
+                "   SELECT DISTINCT LOWER(email) FROM accounts "
+                f"   WHERE status='DEAD' {where_dead_reason_pull}"
+                ") "
                 "ORDER BY "
                 "  (CASE WHEN grade='A+' THEN 0 WHEN grade='A' THEN 1 WHEN grade='B' THEN 2 ELSE 3 END), "
-                "  COALESCE(last_checked_at, '') ASC LIMIT 25"
+                f"  {order_lca_pull} LIMIT 25"
             )
             rows = con.execute(sql).fetchall()
             for r in rows:
@@ -1169,24 +1259,38 @@ def _pull_fresh_live_account(
                 if not email or email in already_checked or email_lower in already_checked:
                     continue
 
-                dec_1h = con.execute(
-                    "SELECT COUNT(*) AS n FROM deposit_attempts "
-                    "WHERE account_email=? AND UPPER(status)='REJECTED' "
-                    "AND (created_at >= datetime('now','-1 hours') OR (julianday('now') - julianday(created_at)) <= 0.04166)",
-                    (email,),
-                ).fetchone()["n"]
-                if (dec_1h or 0) >= MM_ACCOUNT_MAX_DECLINES_1H:
-                    continue
+                if has_dep_att:
+                    rl_chk = con.execute(
+                        "SELECT COUNT(*) AS n FROM deposit_attempts "
+                        "WHERE LOWER(account_email)=LOWER(?) AND ("
+                        "  UPPER(status) LIKE '%RATE%' "
+                        "  OR rejection_reason LIKE '%429%' "
+                        "  OR rejection_reason LIKE '%RATE%' "
+                        "  OR UPPER(status) IN ('ACCOUNT_DEAD', 'BAN', 'RATE_LIMITED', 'RATE_LIMITED_PERMANENT')"
+                        ")",
+                        (email,),
+                    ).fetchone()["n"]
+                    if (rl_chk or 0) > 0:
+                        continue
+
+                    dec_1h = con.execute(
+                        "SELECT COUNT(*) AS n FROM deposit_attempts "
+                        "WHERE LOWER(account_email)=LOWER(?) AND UPPER(status)='REJECTED' "
+                        "AND (created_at >= datetime('now','-1 hours') OR (julianday('now') - julianday(created_at)) <= 0.04166)",
+                        (email,),
+                    ).fetchone()["n"]
+                    if (dec_1h or 0) >= MM_ACCOUNT_MAX_DECLINES_1H:
+                        continue
 
                 if cand_pan:
                     m_owner = married_owners.get(cand_pan)
                     if m_owner and m_owner != email_lower:
                         continue
 
-                if cand_bin:
+                if cand_bin and has_dep_att:
                     bin_dup = con.execute(
                         "SELECT card_pipe FROM deposit_attempts "
-                        "WHERE account_email=? AND UPPER(status)='APPROVED' AND card_pipe IS NOT NULL "
+                        "WHERE LOWER(account_email)=LOWER(?) AND UPPER(status)='APPROVED' AND card_pipe IS NOT NULL "
                         "AND created_at >= datetime('now','-30 days')",
                         (email,),
                     ).fetchall()
@@ -1779,12 +1883,22 @@ async def run_auto_mission(
                             cc_exp = cc_parts[1] if len(cc_parts) > 1 else ""
                             cc_cvv = cc_parts[2] if len(cc_parts) > 2 else ""
                             with _adb(write=True) as cdb:
-                                cdb.execute(
-                                    "INSERT OR IGNORE INTO account_cards "
-                                    "(card_number, card_expiry, card_cvv, account_email, registered_at, status) "
-                                    "VALUES (?, ?, ?, ?, datetime('now'), 'ACTIVE')",
-                                    (cc_num, cc_exp, cc_cvv, email),
-                                )
+                                existing = cdb.execute(
+                                    "SELECT id FROM account_cards WHERE (REPLACE(card_number, ' ', '') = ? OR card_number = ?)",
+                                    (cc_num, cc_num),
+                                ).fetchone()
+                                if existing:
+                                    cdb.execute(
+                                        "UPDATE account_cards SET account_email=?, card_expiry=?, card_cvv=?, registered_at=datetime('now'), status='ACTIVE' WHERE id=?",
+                                        (email, cc_exp, cc_cvv, existing[0]),
+                                    )
+                                else:
+                                    cdb.execute(
+                                        "INSERT INTO account_cards "
+                                        "(card_number, card_expiry, card_cvv, account_email, registered_at, status) "
+                                        "VALUES (?, ?, ?, ?, datetime('now'), 'ACTIVE')",
+                                        (cc_num, cc_exp, cc_cvv, email),
+                                    )
                                 cdb.execute(
                                     "UPDATE accounts SET published_to_pool=0 WHERE email=?", (email,)
                                 )

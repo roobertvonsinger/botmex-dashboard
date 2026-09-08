@@ -905,9 +905,14 @@ async def prewarm_refresh_stream(request: Request, user: dict = Depends(require_
                 if not t.done():
                     t.cancel()
             if tasks:
+                g_tasks = asyncio.gather(*tasks, return_exceptions=True)
                 try:
-                    await asyncio.gather(*tasks, return_exceptions=True)
-                except (asyncio.CancelledError, Exception):
+                    await g_tasks
+                except (asyncio.CancelledError, BaseException):
+                    pass
+                try:
+                    g_tasks.exception()
+                except (asyncio.CancelledError, BaseException):
                     pass
 
     return StreamingResponse(

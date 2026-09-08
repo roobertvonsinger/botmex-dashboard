@@ -98,27 +98,27 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 595 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5469 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 5549 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 2306 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 2420 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `betmexico_config.py` | 183 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2959 | `—` | _[completar]_ |
 | `betmexico_deposit.py` | 958 | `—` | _[completar]_ |
-| `betmexico_login_api.py` | 1138 | `httpx` | _[completar]_ |
+| `betmexico_login_api.py` | 1168 | `httpx` | _[completar]_ |
 | `betmexico_login_service.py` | 144 | `betmexico.login_service` | _[completar]_ |
 | `betmexico_payment_analyzer.py` | 592 | `—` | _[completar]_ |
 | `betmexico_utils.py` | 1159 | `—` | _[completar]_ |
 | `bin_intelligence.py` | 701 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
-| `card_checker.py` | 611 | `betmexico.dashboard.card_checker` | _[completar]_ |
+| `card_checker.py` | 617 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 189 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 218 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
 | `db_registry.py` | 112 | `betmexico.dashboard.db` | _[completar]_ |
-| `deposits.py` | 3163 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 3261 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 391 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 236 | `betmexico.dashboard.login_orch` | _[completar]_ |
-| `prewarm.py` | 917 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
+| `prewarm.py` | 922 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 389 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_validator.py` | 154 | `betmexico.renapo_validator` | _[completar]_ |
 | `saneador_daemon.py` | 275 | `saneador` | _[completar]_ |
@@ -283,6 +283,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `cb57c20` | fix(cards): zero-overchecking cache en memoria y rutas kvm4 para pasaporte ruthopia |
 | `7a39482` | fix(dashboard): restore visibility for all LIVE accounts and resolve poller self-lock |
 | `b0940e1` | fix(sqlite): eliminate journal_mode lock contention, malformed false-positives and consolidate startup migrations |
 | `40ccf33` | fix(fleet): blindaje macro de 3 ductos, aislamiento 429 sin DEAD y preservacion de identidad |
@@ -294,7 +295,6 @@ prewarm.py (router)
 | `330d60a` | docs: ritual de cierre soberano, mapa y estado operativo actualizado |
 | `592945d` | feat: regla de oro 1:1 de tarjetas casadas, cooldown 45s por cuenta y saneamiento cuentas 429 DEAD |
 | `71e866c` | fix(auto_deposit): rotacion continua de flota LIVE, piso 2 procesos reales y umbral retiro 100 pesos |
-| `45587c2` | fix(auto_deposit): desbloquear cuentas con withdrawal_ready=1 si saldo <  y ajustar ventana 1h en tests |
 <!-- GEN:end:recientes -->
 
 ---

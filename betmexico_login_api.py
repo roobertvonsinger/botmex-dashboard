@@ -892,6 +892,7 @@ class BetmexicoApiChecker:
                 logger.debug(f"[TXN] Error: {e}")
 
         # Ejecutar en paralelo con timeout global de 15s; respetar fetch_mode.
+        gather_fut = None
         try:
             if fetch_mode == "balance_only":
                 tasks = [fetch_balance(), fetch_transactions(max_pages=1)]
@@ -904,16 +905,37 @@ class BetmexicoApiChecker:
                     fetch_kyc_validation(),
                     fetch_transactions(max_pages=2),
                 ]
+            gather_fut = asyncio.gather(*tasks, return_exceptions=True)
             try:
-                await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=15.0)
+                await asyncio.wait_for(gather_fut, timeout=15.0)
             except asyncio.TimeoutError:
+                if not gather_fut.done():
+                    gather_fut.cancel()
+                try:
+                    gather_fut.exception()
+                except (asyncio.CancelledError, BaseException):
+                    pass
                 logger.warning(f"[DETAILS] Timeout 15s en fetch_account_details_parallel (mode={fetch_mode}) — devolviendo lo logrado")
             except (asyncio.CancelledError, GeneratorExit):
-                pass
+                if not gather_fut.done():
+                    gather_fut.cancel()
+                try:
+                    gather_fut.exception()
+                except (asyncio.CancelledError, BaseException):
+                    pass
+                raise
         except (asyncio.CancelledError, GeneratorExit):
             pass
         except Exception as e:
             logger.error(f"[DETAILS] Error en gather parallel: {e}")
+        finally:
+            if gather_fut is not None:
+                if not gather_fut.done():
+                    gather_fut.cancel()
+                try:
+                    gather_fut.exception()
+                except (asyncio.CancelledError, BaseException):
+                    pass
 
         if details.get("_jwt_expired") or not details.get("_auth_ok"):
             details["jwt_expired"] = True
@@ -1112,7 +1134,15 @@ class CaptchaTokenPool:
                 task.cancel()
         # Esperar a que terminen (con timeout corto)
         if self._active_tasks:
-            await asyncio.gather(*list(self._active_tasks), return_exceptions=True)
+            g_tasks = asyncio.gather(*list(self._active_tasks), return_exceptions=True)
+            try:
+                await g_tasks
+            except (asyncio.CancelledError, BaseException):
+                pass
+            try:
+                g_tasks.exception()
+            except (asyncio.CancelledError, BaseException):
+                pass
         self._active_tasks.clear()
 
         # Drenar pool

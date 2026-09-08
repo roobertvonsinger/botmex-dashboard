@@ -146,7 +146,7 @@ def _mark_rate_limited_dead(email: str) -> None:
                 "UPDATE accounts SET published_to_pool=0, "
                 "dead_reason=COALESCE(dead_reason, 'RATE_LIMITED_429'), "
                 "locked_by=NULL, locked_until=NULL "
-                "WHERE email=?",
+                "WHERE LOWER(email)=LOWER(?)",
                 (email,),
             )
         logger.info(f"[RateLimit] {email} aislada del pool (published_to_pool=0, status preservado, sin spam)")
@@ -154,11 +154,49 @@ def _mark_rate_limited_dead(email: str) -> None:
         logger.warning(f"[RateLimit] no pude aislar por rate-limit {email}: {e}")
 
 
+def _liberate_card_in_db(c, card_num: str, owner_email: str, reason: str):
+    """Marca la tarjeta como LIBERATED en account_cards si existe."""
+    try:
+        cols = [col[1] for col in c.execute("PRAGMA table_info(account_cards)").fetchall()]
+        num_col = "card_number" if "card_number" in cols else "number" if "number" in cols else None
+        if num_col and "status" in cols:
+            c.execute(
+                f"UPDATE account_cards SET status='LIBERATED' "
+                f"WHERE (REPLACE({num_col}, ' ', '') = ? OR {num_col} = ?) AND LOWER(account_email)=LOWER(?)",
+                (card_num, card_num, owner_email),
+            )
+        # Cero spam en logs durante bucles de validación
+    except Exception as e:
+        logger.debug(f"[_liberate_card_in_db] {e}")
+
+
+def _is_card_liberated_for_owner(c, card_num: str, owner_email: str) -> bool:
+    """Regla Robert canónica: Una tarjeta casada SOLO se libera si la cuenta
+    asociada está efectivamente MUERTA para nosotros (status == 'DEAD').
+    En ningún otro caso (ni 429, ni fuera de pool, ni temporal) se libera."""
+    if not owner_email:
+        return True
+    try:
+        acc = c.execute(
+            "SELECT status FROM accounts WHERE LOWER(email)=LOWER(?) LIMIT 1",
+            (owner_email,),
+        ).fetchone()
+        if acc:
+            st = str(acc[0] or "").upper()
+            if st == "DEAD":
+                _liberate_card_in_db(c, card_num, owner_email, f"cuenta {owner_email} status=DEAD")
+                return True
+    except Exception as e:
+        logger.debug(f"[_is_card_liberated_for_owner] {e}")
+    return False
+
+
 def get_married_card_owner(card_pipe_or_num: str) -> Optional[str]:
-    """Regla de Oro (Robert 2026-09-02):
+    """Regla de Oro (Robert 2026-09-02, liberaciones 2026-09-07):
     Retorna el email de la cuenta con la que esta tarjeta está casada (en account_cards
     o por depósito APPROVED previo en deposit_attempts), o None si la tarjeta está libre.
-    Una tarjeta que ya existe en una cuenta JAMÁS debe ser utilizada por otra cuenta."""
+    Una tarjeta casada solo se libera si la cuenta asociada está en 429, muerta, fuera
+    del pool o acumuló 5+ rechazos con esa tarjeta."""
     if not card_pipe_or_num:
         return None
     token = str(card_pipe_or_num).split("|")[0].strip().replace(" ", "").replace("-", "")
@@ -171,26 +209,36 @@ def get_married_card_owner(card_pipe_or_num: str) -> Optional[str]:
             # 1. En account_cards
             cols = [col[1] for col in c.execute("PRAGMA table_info(account_cards)").fetchall()]
             num_col = "card_number" if "card_number" in cols else "number" if "number" in cols else None
+            has_status = "status" in cols
+            status_filter = "AND (status IS NULL OR UPPER(status) NOT IN ('LIBERATED', 'UNLINKED', 'INACTIVE'))" if has_status else ""
             if num_col:
                 r = c.execute(
                     f"SELECT account_email FROM account_cards "
                     f"WHERE (REPLACE({num_col}, ' ', '') = ? OR {num_col} = ?) "
-                    f"AND account_email IS NOT NULL AND account_email != '' LIMIT 1",
+                    f"AND account_email IS NOT NULL AND account_email != '' "
+                    f"{status_filter} LIMIT 1",
                     (c_num, c_num),
                 ).fetchone()
                 if r and r[0]:
-                    return str(r[0]).strip().lower()
+                    owner_email = str(r[0]).strip().lower()
+                    if _is_card_liberated_for_owner(c, c_num, owner_email):
+                        return None
+                    return owner_email
 
             # 2. En deposit_attempts con status='approved'
             try:
                 r2 = c.execute(
                     "SELECT account_email FROM deposit_attempts "
                     "WHERE UPPER(status) = 'APPROVED' AND account_email IS NOT NULL "
-                    "AND (REPLACE(SUBSTR(card_pipe, 1, INSTR(card_pipe || '|', '|') - 1), ' ', '') = ? OR card_pipe LIKE ?) LIMIT 1",
+                    "AND (REPLACE(SUBSTR(card_pipe, 1, INSTR(card_pipe || '|', '|') - 1), ' ', '') = ? OR card_pipe LIKE ?) "
+                    "ORDER BY id DESC LIMIT 1",
                     (c_num, f"{c_num}%"),
                 ).fetchone()
                 if r2 and r2[0]:
-                    return str(r2[0]).strip().lower()
+                    owner_email = str(r2[0]).strip().lower()
+                    if _is_card_liberated_for_owner(c, c_num, owner_email):
+                        return None
+                    return owner_email
             except Exception:
                 pass
     except Exception as e:
@@ -2185,10 +2233,28 @@ _active_mm_runs: dict[str, asyncio.Event] = {}
 
 
 def _mm_session_get(sessions: dict, email: str) -> tuple[Optional[str], Optional[str]]:
-    """(jwt, proxy) cacheados para esta cuenta en el run del matchmaker, o (None, None).
-    Si hay sesión, _run_deposit_with_phases salta login+captcha (reuso por cuenta)."""
+    """(jwt, proxy) cacheados para esta cuenta en el run del matchmaker, o desde BD si está vigente.
+    Si hay sesión, _run_deposit_with_phases salta login+captcha ($0 captcha, 0 login 429, directo al banco)."""
     s = sessions.get(email)
-    return (s[0], s[1]) if s else (None, None)
+    if s:
+        return (s[0], s[1])
+    try:
+        from app import db as _dash_db
+        with _dash_db() as c:
+            row = c.execute(
+                "SELECT jwt_token, jwt_expires_at FROM accounts WHERE LOWER(email)=LOWER(?) LIMIT 1",
+                (email,),
+            ).fetchone()
+            if row and row[0]:
+                jwt = str(row[0])
+                exp = row[1]
+                exp_ts = int(exp) if exp and str(exp).isdigit() else 0
+                if exp_ts > (time.time() + 60):
+                    sessions[email] = (jwt, None)
+                    return (jwt, None)
+    except Exception as e:
+        logger.debug(f"[_mm_session_get] DB fallback error: {e}")
+    return (None, None)
 
 
 def _mm_session_update(sessions: dict, email: str, r: dict) -> None:
@@ -2520,26 +2586,39 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
                 # igual; no necesita wrap.
                 gather_task = asyncio.gather(*tasks, return_exceptions=True)
 
-                while not gather_task.done():
-                    try:
-                        ev = await asyncio.wait_for(phase_queue.get(), timeout=0.5)
-                        yield f"data: {json.dumps(ev)}\n\n"
-                    except asyncio.TimeoutError:
-                        # SSE comment heartbeat — keeps proxy connections alive
-                        # durante captcha solves largos (30s+). nginx/traefik
-                        # cierran conexiones sin tráfico ~60s.
-                        yield ": ping\n\n"
+                try:
+                    while not gather_task.done():
+                        try:
+                            ev = await asyncio.wait_for(phase_queue.get(), timeout=0.5)
+                            yield f"data: {json.dumps(ev)}\n\n"
+                        except asyncio.TimeoutError:
+                            # SSE comment heartbeat — keeps proxy connections alive
+                            # durante captcha solves largos (30s+). nginx/traefik
+                            # cierran conexiones sin tráfico ~60s.
+                            yield ": ping\n\n"
 
-                # Drena el remanente que pudo entrar entre la última lectura y
-                # gather_task.done() (events de la fase 'done' final, etc.)
-                while not phase_queue.empty():
-                    try:
-                        ev = phase_queue.get_nowait()
-                        yield f"data: {json.dumps(ev)}\n\n"
-                    except asyncio.QueueEmpty:
-                        break
+                    # Drena el remanente que pudo entrar entre la última lectura y
+                    # gather_task.done() (events de la fase 'done' final, etc.)
+                    while not phase_queue.empty():
+                        try:
+                            ev = phase_queue.get_nowait()
+                            yield f"data: {json.dumps(ev)}\n\n"
+                        except asyncio.QueueEmpty:
+                            break
 
-                results = await gather_task
+                    results = await gather_task
+                except (asyncio.CancelledError, GeneratorExit):
+                    if not gather_task.done():
+                        gather_task.cancel()
+                        try:
+                            await asyncio.shield(gather_task)
+                        except (asyncio.CancelledError, BaseException):
+                            pass
+                    try:
+                        gather_task.exception()
+                    except (asyncio.CancelledError, BaseException):
+                        pass
+                    raise
 
                 for (acc, card, n), res in zip(batch, results):
                     if isinstance(res, Exception):
@@ -2704,23 +2783,42 @@ async def multi_stream(request: Request, user: dict = Depends(require_session)):
             # las que seguían corriendo se quedan haciendo get_token() contra
             # un pool ya detenido y producen "Pool vacío" 90s después.
             try:
+                if 'gather_task' in locals() and gather_task is not None:
+                    if not gather_task.done():
+                        gather_task.cancel()
+                        try:
+                            await asyncio.shield(gather_task)
+                        except (asyncio.CancelledError, BaseException):
+                            pass
+                    try:
+                        gather_task.exception()
+                    except (asyncio.CancelledError, BaseException):
+                        pass
                 for t in list(_inflight_tasks):
                     if not t.done():
                         t.cancel()
                 if _inflight_tasks:
-                    await asyncio.gather(*_inflight_tasks, return_exceptions=True)
-            except Exception:
+                    _clean_gather = asyncio.gather(*_inflight_tasks, return_exceptions=True)
+                    try:
+                        await asyncio.shield(_clean_gather)
+                    except (asyncio.CancelledError, BaseException):
+                        pass
+                    try:
+                        _clean_gather.exception()
+                    except (asyncio.CancelledError, BaseException):
+                        pass
+            except (asyncio.CancelledError, BaseException):
                 pass
             if prefetch is not None and not prefetch.done():
                 prefetch.cancel()
                 try:
-                    await prefetch
-                except (asyncio.CancelledError, Exception):
+                    await asyncio.shield(prefetch)
+                except (asyncio.CancelledError, BaseException):
                     pass
             if pool is not None:
                 try:
-                    await pool.stop()
-                except Exception:
+                    await asyncio.shield(pool.stop())
+                except (asyncio.CancelledError, BaseException):
                     pass
             _active_mm_runs.pop(run_id, None)
             if acquired:

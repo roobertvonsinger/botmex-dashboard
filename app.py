@@ -85,6 +85,27 @@ try:
 except Exception as _e:
     print(f"[boot] file logger init failed: {_e}")
 
+class _CancelledFilter(_logging.Filter):
+    """Filtra silenciosamente cualquier log ruidoso de CancelledError / _GatheringFuture unretrieved."""
+    def filter(self, record: _logging.LogRecord) -> bool:
+        msg = str(record.getMessage() or "")
+        if "CancelledError" in msg or "finished exception=CancelledError" in msg or "_GatheringFuture" in msg:
+            return False
+        if record.exc_info:
+            exc_type = record.exc_info[0]
+            if exc_type and (
+                issubclass(exc_type, (asyncio.CancelledError, GeneratorExit))
+                or "CancelledError" in getattr(exc_type, "__name__", "")
+            ):
+                return False
+        return True
+
+_cancelled_filter = _CancelledFilter()
+_root_logger = _logging.getLogger()
+_root_logger.addFilter(_cancelled_filter)
+for _lg_name in ("asyncio", "uvicorn", "uvicorn.error", "uvicorn.access"):
+    _logging.getLogger(_lg_name).addFilter(_cancelled_filter)
+
 # Permitir importar módulos del bot (betmexico_db, betmexico_login_service, etc.)
 # que viven en el directorio padre cuando el VPS los tiene desplegados.
 _HERE = Path(__file__).parent
@@ -614,6 +635,64 @@ def _dequeue_blocking(q, timeout: float) -> str:
 
 app = FastAPI(title="Botmexico v2")
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
+
+
+def _configure_asyncio_exception_handler(target_loop=None):
+    try:
+        loop = target_loop or asyncio.get_running_loop()
+    except RuntimeError:
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            return
+    orig_handler = loop.get_exception_handler()
+
+    def _silence_cancelled_exceptions(loop, context):
+        exc = context.get("exception")
+        if isinstance(exc, (asyncio.CancelledError, GeneratorExit)):
+            return
+        if exc is not None and exc.__class__.__name__ in ("CancelledError", "GeneratorExit"):
+            return
+        if getattr(exc, "__cause__", None) and exc.__cause__.__class__.__name__ in ("CancelledError", "GeneratorExit"):
+            return
+        if getattr(exc, "__context__", None) and exc.__context__.__class__.__name__ in ("CancelledError", "GeneratorExit"):
+            return
+
+        fut = context.get("future") or context.get("task")
+        if fut is not None:
+            try:
+                if hasattr(fut, "cancelled") and fut.cancelled():
+                    return
+                if hasattr(fut, "done") and fut.done() and hasattr(fut, "exception"):
+                    fut_exc = fut.exception()
+                    if isinstance(fut_exc, (asyncio.CancelledError, GeneratorExit)) or (
+                        fut_exc and fut_exc.__class__.__name__ in ("CancelledError", "GeneratorExit")
+                    ):
+                        return
+            except (asyncio.CancelledError, BaseException):
+                return
+            if "CancelledError" in repr(fut):
+                return
+
+        msg = str(context.get("message") or "")
+        if "CancelledError" in msg or "Task was destroyed but it is pending" in msg:
+            return
+        if "_GatheringFuture" in msg and ("CancelledError" in str(context) or exc is None or isinstance(exc, asyncio.CancelledError)):
+            return
+        if "CancelledError" in str(context):
+            return
+
+        if orig_handler:
+            orig_handler(loop, context)
+        else:
+            loop.default_exception_handler(context)
+
+    loop.set_exception_handler(_silence_cancelled_exceptions)
+
+try:
+    _configure_asyncio_exception_handler()
+except Exception:
+    pass
 
 
 _MAINTENANCE_FLAG_FILE = Path("/data/maintenance.flag")
@@ -2442,16 +2521,16 @@ async def _health_loop():
 def _release_account(c, account_id, email, reason, prev_locked_by,
                      kind="unlock_auto", who="janitor"):
     """Liberador canónico ÚNICO (A1). Atómico y uniforme: limpia lock + notif_*,
-    SIEMPRE republica al pool (published_to_pool=1) y emite 1 solo broadcast.
-    Reemplaza las 3 variantes inconsistentes (janitor / window_watcher / release_watchdog)
-    que liberaban la misma cuenta desde 3 orígenes de tiempo distintos.
+    republica al pool (published_to_pool=1) EXCEPTO si la cuenta tiene rate limit (429)
+    o no está en estado LIVE.
     `c` = conexión abierta en modo write (el caller maneja el `with db(write=True)`).
     NO toca cuentas con locked_until NULL salvo que el caller lo decida: el guard
     `locked_until IS NOT NULL` vive en quien selecciona (janitor), no aquí."""
     c.execute(
         "UPDATE accounts SET locked_by=NULL, locked_at=NULL, locked_until=NULL, "
         "notif_pre24h_sent_at=NULL, notif_at24h_sent_at=NULL, notif_at24h10_sent_at=NULL, "
-        "published_to_pool=1 WHERE id=?",
+        "published_to_pool=(CASE WHEN status='LIVE' AND (dead_reason IS NULL OR (dead_reason NOT LIKE '%429%' AND dead_reason NOT LIKE '%RATE%')) THEN 1 ELSE 0 END) "
+        "WHERE id=?",
         (account_id,),
     )
     _broadcast({
@@ -2866,6 +2945,7 @@ async def _startup_telegram_notify():
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
     """Startup de background tasks — reemplaza el deprecado @app.on_event."""
+    _configure_asyncio_exception_handler()
     asyncio.create_task(_health_loop())
     asyncio.create_task(_janitor_loop())
     asyncio.create_task(_window_watcher_loop())
