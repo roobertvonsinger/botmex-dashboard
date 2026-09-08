@@ -29,7 +29,7 @@ secundarios quedan exactamente donde están hoy.
 | 1a | `bet_retry_policy.decide_next_action` + `bet_policy.BetPolicyConfig` (módulos puros, sin cablear) | ✅ `tests/test_bet_retry_policy.py` (46) · `tests/test_bet_policy.py` (5) |
 | 1 | Cableado en el inner loop de FASE 1 (`_*_view` → `decide_next_action` → `_apply_action`) | ✅ caracterización 12/12 sin editar · `verify_bet_suite` 13/13 · `test_auto_mission` 29/29 |
 | 1b | Extender `retry_policy` a FASE 2 (scheduled) — `decide_next_action(phase="SCHEDULED")` + `_apply_sched_action` | ✅ caracterización 20/20 (12 viejas sin editar + 8 FASE 2) · `test_bet_retry_policy` 70 · `verify_bet_suite` 13/13 |
-| 2 | `bet_policy.BetPolicyConfig` + `load_policy()` + override en `/data/bet_policy.json` | 🔵 pendiente |
+| 2 | `bet_policy.load_policy()` + override `/data/bet_policy.json` + `_SANE_BOUNDS` + `digest()` + CLI `apply()` + `POLICY` cableado en shell + migración `auto_missions.policy_digest` | ✅ `test_bet_policy` 14/14 · caracterización 28/28 sin editar · `verify_bet_suite` 13/13 |
 | 3 | `bet_advisor` (LLM plan-time + recálculo dinámico), default OFF (`BET_ADVISOR_ENABLED`) | 🔵 pendiente |
 | 4 | `bet_tuner` (ajuste offline de parámetros con diff aprobable) | 🔵 ronda siguiente |
 
@@ -105,6 +105,52 @@ Quirks del comportamiento actual **preservados** (documentados en la caracteriza
 doble-unlock `[1,2,1,2,3,3]` en el 3-strikes; circuit breaker de 429 que setea
 `cancelled` local pero NO corta el outer `while not _cancelled()`.
 
+## Fase 2 — centralización de config (hecho, sin cambio de conducta)
+
+`bet_policy.py` gana:
+
+- **`load_policy() -> BetPolicyConfig`** — funde un override de disco sobre `DEFAULT`.
+  Ruta: `$BET_POLICY_FILE` o `/data/bet_policy.json`. Formato:
+  `{"version": 2, "policy": {<campo>: <valor>, ...}}`. **Nunca lanza**: sin archivo,
+  JSON malo, `version` distinta de `POLICY_VERSION` (=2), o `policy` vacío tras
+  filtrar → `DEFAULT` horneado. Un campo fuera de `_SANE_BOUNDS`, `_LOCKED`, o
+  desconocido se descarta **sin tumbar** el resto del merge.
+- **`_SANE_BOUNDS`** — `(lo, hi)` inclusivo por campo TUNEABLE. Todo campo no
+  `_LOCKED` tiene una entrada (lo verifica `test_bet_policy.py`).
+- **`digest(cfg=None) -> str`** — `sha1[:12]` estable del dataclass (JSON
+  `sort_keys`). Mismo `cfg` → mismo digest. Va a `auto_missions.policy_digest`.
+- **CLI `apply(<proposal.json>)`** (`python -m bet_policy apply ...`) — valida el
+  diff contra `_SANE_BOUNDS` + `_LOCKED_FIELDS`, imprime cada rechazo, y si algo
+  queda aplicable lo escribe a `_policy_path()` en el formato que lee `load_policy()`.
+  RC 0 = escribió · 1 = nada aplicable · 2 = no pude leer el proposal.
+
+**Cableado (`auto_deposit.py`):** `POLICY = bet_policy.load_policy()` al inicio de
+`run_auto_mission` **y** `plan_auto_mission` (snapshot congelado por-misión — un
+diff aprobado se recoge en la SIGUIENTE misión, nunca a mitad de una viva). El
+shell y `_apply_action`/`_apply_sched_action` leen `POLICY.*`; los 2 call-sites de
+`decide_next_action` reciben `POLICY` (antes `bet_policy.DEFAULT`). Las constantes
+de módulo (`PROBE_AMOUNT`, `MM_CROSS_ACCOUNT_GAP`, `MM_CARD_MAX_DECLINES`,
+`MM_MAX_ACCOUNT_DECLINES_PER_RUN`, `MAX_ACCOUNTS_HARD_CAP`,
+`MATCH_TRANSIENT_RETRIES`) quedan como **alias `= bet_policy.DEFAULT.x`** para
+importadores externos y la red de caracterización. `random.uniform(45,60)` →
+`random.uniform(POLICY.sched_first_dep_floor_min_s, ...max_s)`. `deposits.py` NO se
+tocó — su path scheduled legacy conserva sus propias constantes (no es matchmaking
+`/bet`, no lo afina el tuner).
+
+**Nuevos campos** en `BetPolicyConfig` (`POLICY_VERSION` 1→2):
+`sched_first_dep_floor_min_s=45.0`, `sched_first_dep_floor_max_s=60.0`.
+
+**Migración:** `auto_missions.policy_digest TEXT` (aditiva, `app.py::_migrate`).
+`plan_auto_mission` devuelve `plan["policy_digest"]`; `_persist_auto_mission` lo
+mete en el INSERT. En prod aún no existe `/data/bet_policy.json` → `load_policy()`
+== `DEFAULT` == conducta idéntica a Fase 1b.
+
+**Cero cambio de conducta:** `test_bet_retry_characterization.py` 28/28 **sin
+editarse**; `verify_bet_suite` 13/13; `test_auto_mission`/`test_auto_deposit_scheduler`
+verdes. (Pre-existentes rojos NO tocados: 8× `test_auto_deposit.py::test_plan_*`
+por JWT en fixture; `test_confirm_gate_in_auto_deposit` por contaminación cross-módulo
+— pasa en aislamiento.)
+
 ## Fase 0 — caracterización (hecho)
 
 `tests/test_bet_retry_characterization.py` fija la **secuencia exacta** de efectos
@@ -122,6 +168,21 @@ Hallazgos documentados en los tests (comportamiento actual, no se toca en el ref
   sesión 2026-09-08): setea `cancelled` local, pero el outer `while not _cancelled()`
   lee status en BD → sigue procesando todas las cuentas del plan. Ver `docs/ERRORS.md`
   cuando se arregle.
+
+## `bet_policy.json` — override de disco (Fase 2)
+
+- **Ubicación:** `/data/bet_policy.json` en KVM4 (volumen montado, persiste entre
+  restarts). Local/test: `$BET_POLICY_FILE`.
+- **Se genera SOLO vía `python -m bet_policy apply <proposal.json>`** — nunca a mano.
+  El archivo se commitea al aprobar → historial + rollback por git (patrón del plan).
+- **No existe todavía en prod.** Sin él, `/bet` corre con `DEFAULT` (idéntico a hoy).
+- **Formato:**
+  ```json
+  { "version": 2, "policy": { "mm_cooldown_s": 55 }, "digest": "3c54f1359770" }
+  ```
+- **Campos `_LOCKED` (rechazados por `apply()` y `load_policy()`):**
+  `account_max_declines_per_run`, `card_max_declines`, `card_max_attempts`,
+  `circuit_breaker_consecutive_429` — protegen invariantes 4/5/7/10.
 
 ## Tests pre-existentes rotos (no bloquean el refactor)
 

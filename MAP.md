@@ -98,11 +98,11 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 595 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5590 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 5600 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 2532 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 2551 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
-| `bet_policy.py` | 62 | `—` | _[completar]_ |
+| `bet_policy.py` | 221 | `—` | _[completar]_ |
 | `bet_retry_policy.py` | 388 | `—` | _[completar]_ |
 | `betmexico_config.py` | 183 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2959 | `—` | _[completar]_ |
@@ -156,13 +156,8 @@ prewarm.py (router)
 | `PERSISTENT_TTL` | `60 * 60 * 24 * 365 * 10` | `auth.py` |
 | `THREEDS_RECENT_H` | `24` | `auto_deposit.py` |
 | `MIN_WITHDRAWAL_AMOUNT` | `100.0` | `auto_deposit.py` |
-| `PROBE_AMOUNT` | `10.0` | `auto_deposit.py` |
-| `MATCH_TRANSIENT_RETRIES` | `4` | `auto_deposit.py` |
-| `MM_CROSS_ACCOUNT_GAP` | `5` | `auto_deposit.py` |
-| `MM_MAX_ACCOUNT_DECLINES_PER_RUN` | `2` | `auto_deposit.py` |
-| `MM_CARD_MAX_DECLINES` | `3` | `auto_deposit.py` |
 | `MM_ACCOUNT_MAX_DECLINES_1H` | `2` | `auto_deposit.py` |
-| `POLICY_VERSION` | `1` | `bet_policy.py` |
+| `POLICY_VERSION` | `2` | `bet_policy.py` |
 | `MAX_TEXT_COMBOS` | `100` | `betmexico_config.py` |
 | `HUMAN_COOLDOWN` | `60` | `betmexico_config.py` |
 | `MAX_COMBOS` | `5000` | `betmexico_config.py` |
@@ -286,6 +281,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `29fcd30` | refactor(bet): decide_next_action(phase=SCHEDULED) + _apply_sched_action en FASE 2 (Fase 1b) |
 | `1978a19` | docs(next-session): Fase 1 del refactor /bet hecha, arranque Fase 1b (FASE 2 scheduled) |
 | `8879660` | refactor(bet): cablear decide_next_action + _apply_action en el inner loop de FASE 1 |
 | `28cb65d` | feat(bet): bet_retry_policy.decide_next_action + bet_policy.BetPolicyConfig (Fase 1a, puros) |
@@ -297,7 +293,6 @@ prewarm.py (router)
 | `7211c2e` | fix(logging): silence CancelledError and GatheringFuture spam and enforce Invariant 13 |
 | `cb57c20` | fix(cards): zero-overchecking cache en memoria y rutas kvm4 para pasaporte ruthopia |
 | `7a39482` | fix(dashboard): restore visibility for all LIVE accounts and resolve poller self-lock |
-| `b0940e1` | fix(sqlite): eliminate journal_mode lock contention, malformed false-positives and consolidate startup migrations |
 <!-- GEN:end:recientes -->
 
 ---

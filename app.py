@@ -425,6 +425,15 @@ def _migrate():
     except sqlite3.OperationalError:
         pass
 
+    # FASE 2 refactor `/bet`: digest (sha1[:12]) de la `bet_policy.BetPolicyConfig`
+    # con que se planeó/corrió la misión — une outcomes a la política exacta para
+    # el tuner (FASE 4). Aditiva. Ver docs/BET_POLICY.md.
+    try:
+        with db(write=True) as c:
+            c.execute("ALTER TABLE auto_missions ADD COLUMN policy_digest TEXT")
+    except sqlite3.OperationalError:
+        pass
+
     # Tabla de tracking de penalizaciones y strikes por operador para el Bot de Telegram
     try:
         with db(write=True) as c:
@@ -4428,8 +4437,8 @@ def _persist_auto_mission(mission_id, operator_id, card_pipes, amount,
         c.execute(
             "INSERT INTO auto_missions ("
             "mission_id, operator_id, card_pipes, amount, target_count, "
-            "accounts_selected, matches, status, created_at, updated_at"
-            ") VALUES (?,?,?,?,?,?,?,?,?,?)",
+            "accounts_selected, matches, status, created_at, updated_at, policy_digest"
+            ") VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (
                 mission_id,
                 operator_id,
@@ -4445,6 +4454,7 @@ def _persist_auto_mission(mission_id, operator_id, card_pipes, amount,
                 "pending",
                 now,
                 now,
+                plan.get("policy_digest"),
             ),
         )
 
