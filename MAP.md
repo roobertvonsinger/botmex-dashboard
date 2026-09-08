@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 595 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5562 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 2420 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 2456 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `betmexico_config.py` | 183 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2959 | `—` | _[completar]_ |
@@ -283,6 +283,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `51992d0` | fix(logs): stateful since filtering and noise pattern filter for CancelledError |
 | `7211c2e` | fix(logging): silence CancelledError and GatheringFuture spam and enforce Invariant 13 |
 | `cb57c20` | fix(cards): zero-overchecking cache en memoria y rutas kvm4 para pasaporte ruthopia |
 | `7a39482` | fix(dashboard): restore visibility for all LIVE accounts and resolve poller self-lock |
@@ -294,7 +295,6 @@ prewarm.py (router)
 | `3225aba` | docs: actualizar NEXT-SESSION con relevo dinamico, aviso cambio de cuenta y auditoria entrante |
 | `046cf69` | fix(bet): rotacion continua con relevo dinamico sin freezes, fail-fast en login y pool JIT |
 | `330d60a` | docs: ritual de cierre soberano, mapa y estado operativo actualizado |
-| `592945d` | feat: regla de oro 1:1 de tarjetas casadas, cooldown 45s por cuenta y saneamiento cuentas 429 DEAD |
 <!-- GEN:end:recientes -->
 
 ---

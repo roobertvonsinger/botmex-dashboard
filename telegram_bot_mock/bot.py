@@ -2490,6 +2490,7 @@ def build_app():
     app = (
         ApplicationBuilder()
         .token(MOCK_BOT_TOKEN)
+        .concurrent_updates(True)
         .request(req_config)
         .post_init(setup_bot_commands)
         .build()

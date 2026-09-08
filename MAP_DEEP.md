@@ -227,19 +227,20 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_has_card_deposit_24h` | def | L221–L237 |
 | `select_accounts_for_auto` | def | L249–L489 |
 | `_max_accounts_for_cards` | def | L498–L506 |
-| `plan_auto_mission` | def | L509–L1047 |
-| `_fake_progress_pct` | def | L1090–L1121 |
-| `_iso` | def | L1125–L1126 |
-| `_m_load` | def | L1129–L1137 |
-| `_m_status` | def | L1140–L1142 |
-| `_m_update` | def | L1145–L1155 |
-| `_fetch_account` | def | L1158–L1165 |
-| `_is_account_dead` | def | L1168–L1179 |
-| `_unlock` | def | L1182–L1191 |
-| `_pull_fresh_live_account` | def | L1194–L1322 |
-| `_broadcast_mission` | def | L1325–L1354 |
-| `_stop_pool` | def | L1357–L1364 |
-| `run_auto_mission` | def | L1368–L2420 |
+| `plan_auto_mission` | def | L509–L1055 |
+| `_fake_progress_pct` | def | L1098–L1129 |
+| `_iso` | def | L1133–L1134 |
+| `_m_load` | def | L1137–L1145 |
+| `_m_status` | def | L1148–L1150 |
+| `_m_update` | def | L1153–L1163 |
+| `_fetch_account` | def | L1166–L1173 |
+| `_is_account_dead` | def | L1176–L1190 |
+| `_is_account_rate_limited` | def | L1193–L1199 |
+| `_unlock` | def | L1202–L1211 |
+| `_pull_fresh_live_account` | def | L1214–L1348 |
+| `_broadcast_mission` | def | L1351–L1380 |
+| `_stop_pool` | def | L1383–L1390 |
+| `run_auto_mission` | def | L1394–L2456 |
 
 ### `autoexclusion.py`
 

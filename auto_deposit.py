@@ -554,7 +554,15 @@ def plan_auto_mission(
         if has_dead:
             where_extra += " AND (dead_reason IS NULL OR dead_reason='')"
         if has_dead_at:
-            where_extra += " AND (dead_at IS NULL OR dead_at='')"
+            where_extra += " AND (dead_at IS NULL OR dead_at='' OR status='LIVE')"
+
+        # Auto-deposit /bet requiere sesión JWT activa para evitar quemar captchas o chocar con 429
+        has_jwt_cols = "jwt_token" in cols and "jwt_expires_at" in cols
+        if has_jwt_cols:
+            where_extra += (
+                " AND jwt_token IS NOT NULL AND length(jwt_token) > 20 "
+                " AND jwt_expires_at > (strftime('%s', 'now') + 120)"
+            )
 
         has_dep_att = bool(con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='deposit_attempts'").fetchone())
         if has_dep_att:
@@ -1169,14 +1177,26 @@ def _is_account_dead(acct: Optional[Dict[str, Any]]) -> bool:
     if not acct:
         return False
     st = str(acct.get("status") or "").strip().upper()
-    if st in ("DEAD", "BAN", "RATE_LIMITED", "RATE_LIMITED_PERMANENT"):
+    if st in ("DEAD", "BAN"):
         return True
-    if acct.get("dead_reason") or acct.get("dead_at"):
-        return True
+    # RATE_LIMITED no es DEAD (Regla Canónica Robert): está aislada del pool, no muerta
+    if st in ("RATE_LIMITED", "RATE_LIMITED_PERMANENT"):
+        return False
     dr = str(acct.get("dead_reason") or "").upper()
     if "RATE_LIMIT" in dr or "429" in dr:
+        return False
+    if acct.get("dead_reason") or (acct.get("dead_at") and st != "LIVE"):
         return True
     return False
+
+
+def _is_account_rate_limited(acct: Optional[Dict[str, Any]]) -> bool:
+    """Verifica si la cuenta está en rate limit 429 de BetMexico (aislada del pool)."""
+    if not acct:
+        return False
+    st = str(acct.get("status") or "").strip().upper()
+    dr = str(acct.get("dead_reason") or "").upper()
+    return st in ("RATE_LIMITED", "RATE_LIMITED_PERMANENT") or "RATE_LIMIT" in dr or "429" in dr
 
 
 def _unlock(account_id: int) -> None:
@@ -1229,7 +1249,13 @@ def _pull_fresh_live_account(
             if has_dead:
                 where_extra += " AND (dead_reason IS NULL OR dead_reason='')"
             if has_dead_at:
-                where_extra += " AND (dead_at IS NULL OR dead_at='')"
+                where_extra += " AND (dead_at IS NULL OR dead_at='' OR status='LIVE')"
+
+            if "jwt_token" in cols and "jwt_expires_at" in cols:
+                where_extra += (
+                    " AND jwt_token IS NOT NULL AND length(jwt_token) > 20 "
+                    " AND jwt_expires_at > (strftime('%s', 'now') + 120)"
+                )
 
             has_lca = "last_checked_at" in cols
             order_lca_pull = "COALESCE(last_checked_at, '') DESC" if has_lca else "id DESC"
@@ -1742,6 +1768,14 @@ async def run_auto_mission(
                 # Verificación fresca en BD antes de tocar la cuenta (anti-race condition)
                 fresh_acct = _fetch_account(account_id)
                 if fresh_acct:
+                    if _is_account_rate_limited(fresh_acct):
+                        logger.info(f"🛡️ Cuenta en rate limit aislada | {email} — omitiendo sin tocar BD ni quemar captchas")
+                        target["done"] = True
+                        target["candidates"] = []
+                        if target["locked"]:
+                            _unlock(account_id)
+                            locked_ids.discard(account_id)
+                        continue
                     if _is_account_dead(fresh_acct):
                         logger.warning(f"💀 CUENTA DETECTADA DEAD EN BD | {email} — descartando de inmediato sin intentar")
                         target["done"] = True
@@ -1991,6 +2025,8 @@ async def run_auto_mission(
                                     reason="circuit_breaker_rate_limited",
                                     phase_detail="Abortado por 429 rate limits consecutivos",
                                 )
+                                backup_checked = True
+                                cancelled = True
                                 break
                         elif code == "KYC_PENDING":
                             consecutive_rate_limits = 0
