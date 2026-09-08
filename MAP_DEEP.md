@@ -720,6 +720,13 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `generate_payment_analysis_summary` | def | L513–L561 |
 | `generate_payment_ready_txt` | def | L564–L592 |
 
+### `support_llm.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `chain_from_env` | def | L44–L48 |
+| `LLMClient` | class | L51–L165 |
+
 ### `web_auth.py`
 
 | Símbolo | Tipo | Líneas |
