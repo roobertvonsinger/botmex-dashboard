@@ -61,3 +61,35 @@ memory/
 .claude/settings.json.graphify-bak
 .obsidian/
 
+# Bot legacy de Telegram (@betmexbot) — dueño: monorepo Proyectos/BetMexico/Telegram/.
+# En KVM4 el contenedor `betmexico-bot` corre `python betmexico_bot.py` desde este
+# mismo dir (bind-mount compartido con el dashboard). Estos módulos son copias
+# desplegadas del monorepo, NO codigo del dashboard: ignorarlos para que
+# `git status` en prod quede legible y un `git clean` no los borre.
+/betmexico_bot.py
+/betmexico_check.py
+/betmexico_amazon.py
+/betmexico_notes.py
+/betmexico_search.py
+/betmexico_reports.py
+/betmexico_payments.py
+/betmexico_withdrawals.py
+/magicbox_v*.py
+/wabox_v*.py
+/models_fancy.py
+/models_restored.py
+/portal.html
+/portal.js
+
+# Scripts de mantenimiento one-shot desplegados a KVM4 (no son del dashboard)
+/clean_and_check.py
+/debug_proxies.py
+/export_hunter*.py
+/migrate_grades.py
+/patch_capmonster.py
+/print_schema.py
+/scratch_inspect_max.py
+
+# Backups del deployer manual en KVM4
+*.bak-[0-9]*
+

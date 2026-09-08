@@ -284,6 +284,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `ada87e4` | docs(next-session): merge Fase 0-3 a main (ab5732e) — siguiente = deploy KVM4 + smoke |
 | `2175db7` | fix(bet): guardarraíl plan_not_worse del advisor + fix números BET_POLICY.md (Smartreview) |
 | `7821971` | docs(next-session): Fase 3 completa (A/B/C/D), 719111d revisado, siguiente = smoke de Robert |
 | `8cd909f` | feat(bet): recálculo dinámico del advisor en run_auto_mission + test integración (Fase 3, Commit D) |
@@ -295,7 +296,6 @@ prewarm.py (router)
 | `014efe2` | feat(bet): bet_policy.load_policy() + override disco + digest + POLICY cableado (Fase 2) |
 | `29fcd30` | refactor(bet): decide_next_action(phase=SCHEDULED) + _apply_sched_action en FASE 2 (Fase 1b) |
 | `1978a19` | docs(next-session): Fase 1 del refactor /bet hecha, arranque Fase 1b (FASE 2 scheduled) |
-| `8879660` | refactor(bet): cablear decide_next_action + _apply_action en el inner loop de FASE 1 |
 <!-- GEN:end:recientes -->
 
 ---

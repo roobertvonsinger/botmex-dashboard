@@ -2,6 +2,19 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## El checkout de prod en KVM4 quedó "frankenstein" por un deployer manual sin git ni bitácora (2026-09-08)
+
+- **Síntoma**: al ir a hacer el deploy de Fase 3 (`git pull` + restart, según `NEXT-SESSION.md`), el checkout de producción `/opt/kvm4/apps/betmexico/code` en KVM4-Karen estaba: HEAD en `cb57c20` (22 commits atrás de `origin/main` = `ada87e4`), 14 archivos tracked modificados sin commitear, ~20 `.bak-2026090X`, 38 `test_*.py` sueltos en la raíz, y ~25 módulos `.py` untracked. Un `git pull` habría explotado o borrado código vivo.
+- **Causa raíz**: el 2026-09-08 09:56–10:55 alguien (otra de las sesiones Claude paralelas) desplegó a mano — un script que hace `rsync`/`cp` de una copia de trabajo sobre prod, deja `*.bak-*_deploy`, reinicia contenedores, y **no toca git ni la bitácora**. Sincronizó hacia adelante 8 archivos tracked a `origin/main` byte a byte, pero dejó `app.py`/`auto_deposit.py`/`telegram_bot_mock/bot.py`/`bet_advisor.py` en una versión PRE-Smartreview — les faltaba el guardarraíl `bet_advisor.plan_not_worse` (`2175db7`) y el recálculo dinámico (`8cd909f`). **Runtime-irrelevante**: el advisor está OFF en prod (sin `BET_ADVISOR_ENABLED` en el env del contenedor), así que ese branch nunca se ejecuta.
+- **Auditoría (subagente, read-only)**: de todos los archivos prod-only, el ÚNICO cambio de código genuinamente único era `betmexico_bot.py:263` → `.concurrent_updates(True)` (mismo fix que `29bf812`/`1453167` para el mock-bot). Todo lo demás: ya en `origin/main` igual o mejor, o copia byte-idéntica del monorepo `Proyectos/BetMexico/Telegram/` (el bot legacy `@betmexbot` y sus handlers, co-ubicados en el mismo dir por bind-mount compartido), o basura (`portal.*` raíz, `scratch_inspect_max.py`, los `.bak`, 36 de 38 `test_*.py`).
+- **Fix**:
+  1. Restore point completo del checkout (`.git` + untracked + `.bak`, sin `__pycache__`) → `betmexico-code-PREREBASE-20260908_145100.tar.gz`, sha256 verificado en KVM4 `/root/restore-points/` y en la Bóveda `repos/Boveda/BetMexico/restore-points/`.
+  2. `betmexico_bot.py:263` portado al working tree del monorepo (ese repo está en rama `feat/web-v2-obsidian` sin `origin` — commit/deploy queda para su propia sesión).
+  3. `.gitignore` del dashboard ahora ignora el bot legacy + sus módulos + scripts de mantenimiento + `*.bak-[0-9]*` → `git status` en prod queda legible y un `git clean` futuro no borra el bot.
+  4. En prod: `git reset --hard origin/main` (restaura los tracked a canónico, con guardarraíl) + borrado selectivo de `.bak` + `test_*.py` de raíz + `portal.*` + `scratch_inspect_max.py` (**no** `git clean -fdx` ciego — habría tumbado `betmexico-bot`). Los untracked del bot legacy se dejan en su lugar (ya gitignoreados).
+  5. `docker restart betmexico-web` + health + smoke.
+- **Lección**: KVM4 se despliega SOLO vía `git` (`git fetch` + `reset --hard origin/main` o `pull` fast-forward) + `docker restart`. Nada de `rsync`/`cp` de copias de trabajo, nada de editar archivos en prod, nada de deploys sin commit+push previo. La ruta canónica del checkout es `/opt/kvm4/apps/betmexico/code` (bind-mount a `/app` de los 4 contenedores `betmexico-*`), NO el viejo `/docker/betmexico/code`. El bot legacy `betmexico-bot` corre `python betmexico_bot.py` desde ese mismo dir con código del monorepo — está a medio migrar al repo del dashboard.
+
 ## CLI de Python con glyphs unicode (`✓`/`✗`/`—`) crashea en consola Windows (`UnicodeEncodeError` cp1252) — 2026-09-08
 
 - **Síntoma**: `python -m bet_policy apply <proposal.json>` tronaba con `UnicodeEncodeError: 'charmap' codec can't encode character '✗'` al imprimir el reporte de rechazos. Los tests NO lo detectaron: pytest captura stdout en utf-8.
