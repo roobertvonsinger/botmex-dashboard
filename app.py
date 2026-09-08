@@ -1886,13 +1886,16 @@ _LOG_NOISE_PATTERNS: list[re.Pattern] = [
     re.compile(r'Traceback \(most recent call last\):'),
     re.compile(r'File ".*(?:python\d+\.\d+)?/?dist-packages/telegram/'),
     re.compile(r'raise exception$'),
+    # Silenciar ruido de cancelación normal asyncio y gathering futures
+    re.compile(r'CancelledError', re.IGNORECASE),
+    re.compile(r'_GatheringFuture', re.IGNORECASE),
 ]
 
 
 def _tail_log_file(log_file: Path, limit: int = 200, since: Optional[str] = None,
                     level: Optional[str] = None) -> list[str]:
     """Lee las últimas N líneas filtradas de un archivo de log rotado.
-    Filtra ruido (uvicorn requests, health checks, SSE heartbeats, imports).
+    Filtra ruido (uvicorn requests, health checks, SSE heartbeats, imports, CancelledError).
     Param `level`: ERROR | WARNING | WARN | CRITICAL | INFO | ALL (default ALL).
     Reusado por /api/logs (dashboard) y /api/logs/telegram (bots)."""
     if not log_file.exists():
@@ -1907,8 +1910,18 @@ def _tail_log_file(log_file: Path, limit: int = 200, since: Optional[str] = None
         data = f.read().decode("utf-8", errors="replace")
     lines = data.splitlines()[-n:]
     if since and re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", since[:19]):
-        lines = [ln for ln in lines if ln[:19] >= since[:19]]
-    # Filtrar ruido de uvicorn/health/SSE/imports
+        target_since = since[:19]
+        filtered_lines = []
+        current_in_range = False
+        ts_pattern = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
+        for ln in lines:
+            m = ts_pattern.match(ln)
+            if m:
+                current_in_range = (m.group(1) >= target_since)
+            if current_in_range:
+                filtered_lines.append(ln)
+        lines = filtered_lines
+    # Filtrar ruido de uvicorn/health/SSE/imports/CancelledError
     lines = [ln for ln in lines
              if not any(p.search(ln) for p in _LOG_NOISE_PATTERNS)]
     # Filtrar por nivel si se pide
