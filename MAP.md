@@ -102,6 +102,8 @@ prewarm.py (router)
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 2456 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
+| `bet_policy.py` | 57 | `—` | _[completar]_ |
+| `bet_retry_policy.py` | 292 | `—` | _[completar]_ |
 | `betmexico_config.py` | 183 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2959 | `—` | _[completar]_ |
 | `betmexico_deposit.py` | 958 | `—` | _[completar]_ |
@@ -160,6 +162,7 @@ prewarm.py (router)
 | `MM_MAX_ACCOUNT_DECLINES_PER_RUN` | `2` | `auto_deposit.py` |
 | `MM_CARD_MAX_DECLINES` | `3` | `auto_deposit.py` |
 | `MM_ACCOUNT_MAX_DECLINES_1H` | `2` | `auto_deposit.py` |
+| `POLICY_VERSION` | `1` | `bet_policy.py` |
 | `MAX_TEXT_COMBOS` | `100` | `betmexico_config.py` |
 | `HUMAN_COOLDOWN` | `60` | `betmexico_config.py` |
 | `MAX_COMBOS` | `5000` | `betmexico_config.py` |
@@ -283,6 +286,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `0d45fa8` | docs(next-session): arranque inmediato Fase 1 del refactor /bet a nodos |
 | `efab82b` | test(bet): red de caracterización golden-master de run_auto_mission (Fase 0) |
 | `29bf812` | fix(perf): resolve gateway timeout hang, polling storm, and enable concurrent updates |
 | `1453167` | fix(bet): eliminate 429 contamination, clean stale dead_at and enable concurrent updates |
@@ -294,7 +298,6 @@ prewarm.py (router)
 | `40ccf33` | fix(fleet): blindaje macro de 3 ductos, aislamiento 429 sin DEAD y preservacion de identidad |
 | `ba596f5` | feat(infra): consolidar migracion a KVM4-Karen botmex.2puty.tech, mapas actualizados y V10 |
 | `2ce5a83` | feat(api): endpoint publico /api/health/ping para healthchecks y watchdogs |
-| `e0e8961` | refactor(core): saneamiento integral de deuda tecnica, unificacion V10 y desacoplamiento sqlite |
 <!-- GEN:end:recientes -->
 
 ---

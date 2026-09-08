@@ -26,11 +26,33 @@ secundarios quedan exactamente donde están hoy.
 | Fase | Qué | Estado |
 |---|---|---|
 | 0 | Red de caracterización (golden-master) del `run_auto_mission` actual | ✅ `tests/test_bet_retry_characterization.py` (12 tests) |
-| 1 | `bet_retry_policy.decide_next_action` para FASE 1 (matchmaking) | 🔵 pendiente |
+| 1a | `bet_retry_policy.decide_next_action` + `bet_policy.BetPolicyConfig` (módulos puros, sin cablear) | ✅ `tests/test_bet_retry_policy.py` (46) · `tests/test_bet_policy.py` (5) |
+| 1 | Cablear `decide_next_action` + `_apply_action` en el inner loop de FASE 1 | 🔵 en curso |
 | 1b | Extender `retry_policy` a FASE 2 (scheduled) | 🔵 pendiente |
 | 2 | `bet_policy.BetPolicyConfig` + `load_policy()` + override en `/data/bet_policy.json` | 🔵 pendiente |
 | 3 | `bet_advisor` (LLM plan-time + recálculo dinámico), default OFF (`BET_ADVISOR_ENABLED`) | 🔵 pendiente |
 | 4 | `bet_tuner` (ajuste offline de parámetros con diff aprobable) | 🔵 ronda siguiente |
+
+## Fase 1a — módulos puros (hecho, sin cambio de conducta)
+
+`bet_policy.py` — `BetPolicyConfig` (frozen dataclass) + `DEFAULT`. Los ~10 escalares
+que el inner loop de FASE 1 usa hoy como constantes de módulo, con **defaults =
+valores exactos actuales**. Campos `_LOCKED_FIELDS` (`account_max_declines_per_run`,
+`card_max_declines`, `card_max_attempts`, `circuit_breaker_consecutive_429`) protegen
+las invariantes 4/5/7/10. `load_policy()` + override de disco = FASE 2.
+
+`bet_retry_policy.py` — `decide_next_action(outcome, account, card, mission, config)
+-> Action`. Función **pura** (sin BD/sleep/lock/log). Replica el orden de ramas del
+inner `while True` de `auto_deposit.py` L1838-2141:
+`ok → BALANCE_LIMIT_EXCEEDED → 3DS → dead/429 (+circuit breaker) → decline/ambiguo
+→ CARD_LOCKED_OTHER_ACCOUNT → transitorio`. Reusa la taxonomía de `deposits`
+(`MM_DEAD_RC`/`MM_THREEDS_RC`/`_mm_is_real_decline`/`_mm_is_ambiguous_charge`).
+`Action` (frozen) lleva `kind` + flags de efecto + deltas de contadores que el
+shell aplica (la policy nunca muta sus inputs).
+
+Aún NO está cableado en `run_auto_mission` — eso es Fase 1 (el shell construye 4
+`*_view` pre-mutación, llama `decide_next_action`, y `_apply_action` replica los
+efectos y su orden). El contrato de no-regresión lo da `test_bet_retry_characterization.py`.
 
 ## Fase 0 — caracterización (hecho)
 

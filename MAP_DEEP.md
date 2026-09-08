@@ -253,6 +253,27 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `autoexclusion_reason` | def | L137–L142 |
 | `mark_account_autoexcluded` | def | L145–L177 |
 
+### `bet_policy.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `BetPolicyConfig` | class | L23–L43 |
+
+### `bet_retry_policy.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `ActionKind` | class | L27–L35 |
+| `OutcomeView` | class | L40–L44 |
+| `AccountRetryState` | class | L48–L52 |
+| `CardRetryState` | class | L56–L58 |
+| `MissionRetryState` | class | L62–L65 |
+| `Action` | class | L69–L105 |
+| `_is_rate_limited` | def | L114–L116 |
+| `_is_dead_family` | def | L119–L127 |
+| `_is_card_locked` | def | L130–L136 |
+| `decide_next_action` | def | L139–L292 |
+
 ### `betmexico_config.py`
 
 | Símbolo | Tipo | Líneas |

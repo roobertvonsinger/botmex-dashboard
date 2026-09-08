@@ -2,7 +2,7 @@
 """Runner Canónico de Auditoría para /bet (BotMexico)
 =====================================================
 Ejecuta la suite de pruebas canónica de `/bet` para garantizar que ningún
-cambio rompa las 9 invariantes de selección, scoring, afinidad, 3 strikes y tiempos.
+cambio rompa las 13 invariantes de selección, scoring, afinidad, 3 strikes y tiempos.
 
 Uso:
     python tools/verify_bet_suite.py
@@ -24,7 +24,7 @@ def main():
 
     res = subprocess.run(cmd, cwd=str(root_dir))
     if res.returncode == 0:
-        print("\n✅ TODAS LAS 9 INVARIANTES CANÓNICAS DE /bet ESTÁN 100% OPERATIVAS Y VERIFICADAS.")
+        print("\n✅ TODAS LAS 13 INVARIANTES CANÓNICAS DE /bet ESTÁN 100% OPERATIVAS Y VERIFICADAS.")
         sys.exit(0)
     else:
         print("\n❌ FALLO CRÍTICO: La suite canónica de /bet ha detectado una regresión operativa.")
