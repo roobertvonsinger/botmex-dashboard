@@ -397,3 +397,162 @@ def test_action_is_frozen():
     a = decide(_outcome(ok=True, code="BANK_APPROVED"))
     with pytest.raises(Exception):
         a.kind = ActionKind.CARD_DECLINE
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# FASE 2 (scheduled) — `decide_next_action` con `mission.phase == "SCHEDULED"`.
+# Sin rotación de tarjeta/cuenta: PROGRESS / ABORT_ACCOUNT / RETRY_SAME.
+# Espejo de `auto_deposit.py` L2322-2448.
+# ═════════════════════════════════════════════════════════════════════════════
+def _sched(reps_completed=0, reps_target=9, transient_count=0, session_jwt_present=True):
+    return rp.MissionRetryState(
+        phase="SCHEDULED",
+        reps_completed=reps_completed,
+        reps_target=reps_target,
+        transient_count=transient_count,
+        session_jwt_present=session_jwt_present,
+    )
+
+
+def sdecide(outcome, mission=None):
+    return rp.decide_next_action(
+        outcome, _account(), _card(), mission or _sched(), CFG
+    )
+
+
+# ── ok → PROGRESS ───────────────────────────────────────────────────────────
+def test_sched_ok_progresses_and_gaps_60s_when_reps_remain():
+    a = sdecide(_outcome(ok=True, code="BANK_APPROVED"), _sched(reps_completed=0, reps_target=9))
+    assert a.kind is ActionKind.PROGRESS
+    assert a.d_approved == 1
+    assert a.d_failed == 0
+    assert a.wait_s == CFG.sched_rep_gap_s == 60
+
+
+def test_sched_ok_last_rep_has_no_gap():
+    a = sdecide(_outcome(ok=True, code="BANK_APPROVED"), _sched(reps_completed=8, reps_target=9))
+    assert a.kind is ActionKind.PROGRESS
+    assert a.wait_s == 0.0
+
+
+# ── terminal para la cuenta → ABORT_ACCOUNT (broadcast) ─────────────────────
+def test_sched_rate_limited_aborts_account_and_marks_dead():
+    a = sdecide(_outcome(code="RATE_LIMITED", error="429 rate limit"))
+    assert a.kind is ActionKind.ABORT_ACCOUNT
+    assert a.sched_abort_terminal is True
+    assert a.dead_kind == "rate_limited"
+    assert a.mark_rate_limited_dead is True
+    assert a.d_failed == 1
+
+
+def test_sched_error_string_429_aborts_account_and_marks_dead():
+    a = sdecide(_outcome(code="PAYMENT_ERROR", error="gateway said 429"))
+    assert a.kind is ActionKind.ABORT_ACCOUNT
+    assert a.dead_kind == "rate_limited"
+    assert a.mark_rate_limited_dead is True
+
+
+def test_sched_dead_family_aborts_account_without_rate_mark():
+    a = sdecide(_outcome(code="DEAD", error="cuenta baneada", account_dead=True))
+    assert a.kind is ActionKind.ABORT_ACCOUNT
+    assert a.sched_abort_terminal is True
+    assert a.dead_kind == "dead"
+    assert a.mark_rate_limited_dead is False
+    assert a.dead_reason == "cuenta baneada"
+    assert a.d_failed == 1
+
+
+def test_sched_kyc_pending_aborts_as_dead_family():
+    a = sdecide(_outcome(code="KYC_PENDING"))
+    assert a.kind is ActionKind.ABORT_ACCOUNT
+    assert a.dead_kind == "dead"          # KYC_PENDING ∈ MM_DEAD_RC → rama UPDATE DEAD
+
+
+@pytest.mark.parametrize("code,err", [
+    ("3DS_REQUIRED", "3ds challenge"),
+    ("BANK_REJECTED", "Fondos insuficientes"),
+    ("PENDING_NOT_APPLIED", "no aplicado"),
+    ("SUBMIT_ERROR", "excepción tras enviar"),
+    ("UNKNOWN_TXN_STATUS_7", ""),
+    ("CARD_LOCKED_OTHER_ACCOUNT", "ya aprobada en otra cuenta"),
+])
+def test_sched_terminal_codes_abort_without_db_side_writes(code, err):
+    a = sdecide(_outcome(code=code, error=err))
+    assert a.kind is ActionKind.ABORT_ACCOUNT
+    assert a.sched_abort_terminal is True
+    assert a.dead_kind == ""             # ni rate-limit ni dead-family → solo failed++
+    assert a.mark_rate_limited_dead is False
+    assert a.d_failed == 1
+
+
+# ── transitorio → RETRY_SAME / ABORT_ACCOUNT (sin broadcast) ────────────────
+def test_sched_transient_first_hit_retries_with_backoff():
+    a = sdecide(_outcome(code="BEGIN_ERROR", error="gateway 502"), _sched(transient_count=0))
+    assert a.kind is ActionKind.RETRY_SAME
+    assert a.wait_s == CFG.sched_retry_backoff_s == 25
+    assert a.d_transient == 1
+    assert a.d_failed == 0
+
+
+def test_sched_transient_retries_up_to_the_cap():
+    a = sdecide(
+        _outcome(code="TIMEOUT"),
+        _sched(transient_count=CFG.sched_max_transient_retries - 1),
+    )
+    assert a.kind is ActionKind.RETRY_SAME
+
+
+def test_sched_transient_gives_up_after_cap_aborts_account_no_broadcast():
+    a = sdecide(
+        _outcome(code="BEGIN_ERROR"),
+        _sched(transient_count=CFG.sched_max_transient_retries),
+    )
+    assert a.kind is ActionKind.ABORT_ACCOUNT
+    assert a.sched_abort_terminal is False   # transitorio agotado ≠ clasificación terminal
+    assert a.d_failed == 1
+
+
+def test_sched_login_failed_is_transient_not_terminal():
+    a = sdecide(_outcome(code="LOGIN_FAILED", error="captcha pool empty"))
+    assert a.kind is ActionKind.RETRY_SAME
+
+
+# ── reset de sesión stale ──────────────────────────────────────────────────
+@pytest.mark.parametrize("err", [
+    "redirectLogin", "HTTP 401 Unauthorized", "sesión rechazada por el servidor",
+])
+def test_sched_session_stale_marker_sets_reset_when_jwt_present(err):
+    a = sdecide(_outcome(code="PAYMENT_ERROR", error=err), _sched(session_jwt_present=True))
+    assert a.kind is ActionKind.RETRY_SAME
+    assert a.reset_session is True
+
+
+def test_sched_session_stale_marker_ignored_when_no_jwt():
+    a = sdecide(_outcome(code="PAYMENT_ERROR", error="401"), _sched(session_jwt_present=False))
+    assert a.reset_session is False
+
+
+def test_sched_session_reset_applies_even_when_giving_up():
+    a = sdecide(
+        _outcome(code="PAYMENT_ERROR", error="redirectLogin"),
+        _sched(transient_count=CFG.sched_max_transient_retries, session_jwt_present=True),
+    )
+    assert a.kind is ActionKind.ABORT_ACCOUNT
+    assert a.reset_session is True
+
+
+def test_sched_non_stale_transient_has_no_reset():
+    a = sdecide(_outcome(code="BEGIN_ERROR", error="gateway 502"))
+    assert a.reset_session is False
+
+
+# ── FASE 1 intacta: sin phase="SCHEDULED" nada cambia ──────────────────────
+def test_matchmaking_phase_still_routes_through_fase1_branches():
+    a = decide(_outcome(code="BANK_REJECTED", error="Fondos insuficientes"))
+    assert a.kind is ActionKind.CARD_DECLINE   # no PROGRESS/ABORT_ACCOUNT
+
+
+def test_sched_decide_does_not_mutate_inputs():
+    o, mis = _outcome(code="BEGIN_ERROR", error="401"), _sched(transient_count=2)
+    rp.decide_next_action(o, _account(), _card(), mis, CFG)
+    assert mis.transient_count == 2 and mis.reps_completed == 0

@@ -1866,6 +1866,59 @@ async def run_auto_mission(
                 # RETRY_SAME — el shell hace el backoff y el `continue`
                 return "retry"
 
+            def _apply_sched_action(action, email, code, r, retries_now) -> str:
+                """FASE 2 (scheduled). Aplica los efectos de BD + contadores del
+                `Action` con el MISMO orden que el monolito de hoy (L2399-2447).
+                Devuelve 'progress' | 'retry' | 'break'. El reset de sesión stale,
+                los sleeps, el conteo de dinero y la captura de JWT los hace el
+                shell (igual que `_apply_action` en FASE 1)."""
+                nonlocal failed
+                AK = bet_retry_policy.ActionKind
+
+                if action.kind is AK.PROGRESS:
+                    return "progress"
+
+                if action.kind is AK.ABORT_ACCOUNT:
+                    if action.sched_abort_terminal:
+                        if action.mark_rate_limited_dead:
+                            dep._mark_rate_limited_dead(email)
+                        elif action.dead_kind == "dead":
+                            try:
+                                from app import db as _appdb
+                                with _appdb(write=True) as cdb:
+                                    cdb.execute(
+                                        "UPDATE accounts SET status='DEAD', dead_reason=?, dead_at=datetime('now') "
+                                        "WHERE email=? AND status != 'DEAD'",
+                                        (r.get("error") or code, email)
+                                    )
+                            except Exception:
+                                pass
+                        failed += 1
+                        _m_update(
+                            mission_id,
+                            total_failed=failed,
+                            phase_detail=f"{email} abortada ({code})",
+                        )
+                        _broadcast_mission(
+                            mission_id,
+                            "scheduling",
+                            user,
+                            on_progress=on_progress,
+                            email=email,
+                            aborted=code,
+                        )
+                    else:
+                        failed += 1
+                        _m_update(
+                            mission_id,
+                            total_failed=failed,
+                            phase_detail=f"{email} sin éxito tras {retries_now} reintentos",
+                        )
+                    return "break"
+
+                # RETRY_SAME — el shell hace el reset de sesión + backoff + continue
+                return "retry"
+
             while not _cancelled():
                 # Actualizar listas de candidatas filtrando tarjetas jubiladas
                 for a in accounts_state:
@@ -2348,7 +2401,39 @@ async def run_auto_mission(
                         if ok:
                             curr_amt = 150.0
 
-                    if ok:
+                    # ── retry_policy node (Fase 1b) — decisión PURA + shell aplica ──
+                    # `decide_next_action(phase="SCHEDULED")` clasifica ok/terminal/
+                    # transitorio; `_apply_sched_action` replica los efectos de BD y
+                    # su ORDEN exactos de hoy. El reset de sesión stale, los sleeps,
+                    # el conteo de dinero y la captura de JWT se quedan en el shell.
+                    # Contrato de no-regresión: tests/test_bet_retry_characterization.py.
+                    action = bet_retry_policy.decide_next_action(
+                        _outcome_view(r, ok, code),
+                        bet_retry_policy.AccountRetryState(),
+                        bet_retry_policy.CardRetryState(),
+                        bet_retry_policy.MissionRetryState(
+                            phase="SCHEDULED",
+                            transient_count=retries,
+                            reps_completed=completed,
+                            reps_target=target_count,
+                            session_jwt_present=bool(session_jwt),
+                        ),
+                        bet_policy.DEFAULT,
+                    )
+
+                    # Reset de sesión stale ANTES de aplicar efectos/contadores
+                    # (orden verbatim del monolito L2482-2491): la policy lo marca
+                    # tanto en RETRY_SAME como en el transitorio agotado.
+                    if action.reset_session:
+                        session_jwt = session_proxy = None  # patrón :2594-2605
+                        if pool is None:
+                            pool = make_pool(cap_key, size=2, workers=1)
+                            await pool.start_factory()
+                            asyncio.create_task(pool.prefetch(1))
+
+                    disp = _apply_sched_action(action, email, code, r, retries)
+
+                    if disp == "progress":
                         completed += 1
                         retries = 0
                         deposited += curr_amt
@@ -2381,71 +2466,16 @@ async def run_auto_mission(
                             total=target_count,
                         )
                         if completed < target_count:
-                            await asyncio.sleep(60)
+                            await asyncio.sleep(action.wait_s)
                         continue
-                    # Terminal para ESTA cuenta (no las demás) — misma ley que scheduled
-                    if (
-                        code in ("RATE_LIMITED", "DEAD", "BAN", "RATE_LIMITED_PERMANENT")
-                        or code in dep.MM_THREEDS_RC
-                        or dep._mm_is_real_decline(code)
-                        or code in dep.MM_DEAD_RC
-                        or code == "PENDING_NOT_APPLIED"
-                        or code == "CARD_LOCKED_OTHER_ACCOUNT"
-                        or dep._mm_is_ambiguous_charge(code)
-                        or r.get("account_dead")
-                        or "RATE_LIMITED" in str(r.get("error") or "")
-                        or "429" in str(r.get("error") or "")
-                    ):
-                        if code == "RATE_LIMITED" or "RATE_LIMITED" in str(r.get("error") or "") or "429" in str(r.get("error") or ""):
-                            dep._mark_rate_limited_dead(email)
-                        elif code in dep.MM_DEAD_RC or code == "DEAD" or r.get("account_dead"):
-                            try:
-                                from app import db as _appdb
-                                with _appdb(write=True) as cdb:
-                                    cdb.execute(
-                                        "UPDATE accounts SET status='DEAD', dead_reason=?, dead_at=datetime('now') "
-                                        "WHERE email=? AND status != 'DEAD'",
-                                        (r.get("error") or code, email)
-                                    )
-                            except Exception:
-                                pass
-                        failed += 1
-                        _m_update(
-                            mission_id,
-                            total_failed=failed,
-                            phase_detail=f"{email} abortada ({code})",
-                        )
-                        _broadcast_mission(
-                            mission_id,
-                            "scheduling",
-                            user,
-                            on_progress=on_progress,
-                            email=email,
-                            aborted=code,
-                        )
-                        break
-                    # Transitorio → retry (SCHED_MAX_TRANSIENT_RETRIES=4, backoff 25s)
-                    low = str(r.get("error") or "").lower()
-                    if session_jwt and (
-                        "sesión rechazada" in low
-                        or "401" in low
-                        or "redirectlogin" in low
-                    ):
-                        session_jwt = session_proxy = None  # patrón :2594-2605
-                        if pool is None:
-                            pool = make_pool(cap_key, size=2, workers=1)
-                            await pool.start_factory()
-                            asyncio.create_task(pool.prefetch(1))
-                    retries += 1
-                    if retries > dep.SCHED_MAX_TRANSIENT_RETRIES:
-                        failed += 1
-                        _m_update(
-                            mission_id,
-                            total_failed=failed,
-                            phase_detail=f"{email} sin éxito tras {retries - 1} reintentos",
-                        )
-                        break
-                    await asyncio.sleep(dep.SCHED_RETRY_BACKOFF_SEC)
+
+                    if disp == "retry":
+                        retries += 1
+                        await asyncio.sleep(action.wait_s)
+                        continue
+
+                    # disp == "break" — terminal para la cuenta o transitorio agotado
+                    break
 
             # ── FASE 3 — CIERRE ──────────────────────────────────────────────
             final = "cancelled" if cancelled else "completed"

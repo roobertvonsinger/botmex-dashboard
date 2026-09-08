@@ -241,7 +241,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_pull_fresh_live_account` | def | L1214–L1348 |
 | `_broadcast_mission` | def | L1351–L1380 |
 | `_stop_pool` | def | L1383–L1390 |
-| `run_auto_mission` | def | L1394–L2502 |
+| `run_auto_mission` | def | L1394–L2532 |
 
 ### `autoexclusion.py`
 
@@ -257,22 +257,25 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `BetPolicyConfig` | class | L23–L43 |
+| `BetPolicyConfig` | class | L23–L48 |
 
 ### `bet_retry_policy.py`
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `ActionKind` | class | L27–L35 |
-| `OutcomeView` | class | L40–L44 |
-| `AccountRetryState` | class | L48–L52 |
-| `CardRetryState` | class | L56–L58 |
-| `MissionRetryState` | class | L62–L65 |
-| `Action` | class | L69–L105 |
-| `_is_rate_limited` | def | L114–L116 |
-| `_is_dead_family` | def | L119–L127 |
-| `_is_card_locked` | def | L130–L136 |
-| `decide_next_action` | def | L139–L292 |
+| `ActionKind` | class | L32–L43 |
+| `OutcomeView` | class | L48–L52 |
+| `AccountRetryState` | class | L56–L60 |
+| `CardRetryState` | class | L64–L66 |
+| `MissionRetryState` | class | L70–L77 |
+| `Action` | class | L81–L121 |
+| `_is_rate_limited` | def | L130–L132 |
+| `_is_dead_family` | def | L135–L143 |
+| `_is_card_locked` | def | L146–L152 |
+| `_is_session_stale` | def | L155–L158 |
+| `_sched_is_terminal` | def | L161–L170 |
+| `_decide_scheduled` | def | L173–L227 |
+| `decide_next_action` | def | L230–L388 |
 
 ### `betmexico_config.py`
 

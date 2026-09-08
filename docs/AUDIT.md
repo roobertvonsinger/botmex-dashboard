@@ -3,7 +3,7 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
-## Captura: 2026-09-08 (refactor /bet a nodos — Fase 1: retry_policy en el inner loop de FASE 1)
+## Captura: 2026-09-08 (refactor /bet a nodos — Fase 1 + 1b: retry_policy en FASE 1 matchmaking y FASE 2 scheduled)
 
 **Motivo**: el inner `while True` de matchmaking de `run_auto_mission` (~300 líneas,
 7 ramas `if code ...` entrelazadas con efectos) no era observable ni testeable. Fase 1
@@ -16,8 +16,9 @@ Plan: `~/.claude/plans/como-podriamos-hacer-un-dynamic-cupcake.md`. Estado vivo:
 | `bet_policy.BetPolicyConfig` + `DEFAULT` | Frozen dataclass con los ~10 escalares del inner loop; **defaults = valores exactos actuales** (`probe_amount=10`, `mm_cooldown_s=45`, `transient_backoff_s=25`, `cross_account_gap_s=5`, `card_max_declines=3`, `account_max_declines_per_run=2`, `circuit_breaker_consecutive_429=2`, `match_transient_retries=4`, `max_accounts_hard_cap=10`). `_LOCKED_FIELDS` protege invariantes 4/5/7/10. `load_policy()`+disco = Fase 2. | ✅ implementado | ✅ `tests/test_bet_policy.py` (5) fija defaults == constantes vivas |
 | `run_auto_mission` inner loop de FASE 1 (matchmaking) | Las 6 ramas de retry/rotación (todo menos el `if ok:` de match, que sigue inline) pasan por `_outcome_view`/`_account_view`/`_card_view`/`_mission_view` (construidas ANTES de mutar) → `decide_next_action` → `_apply_action` (helper del shell, réplica verbatim de efectos y orden). **Cero cambio de conducta observable** — incluido el doble-unlock `[1,2,1,2,3,3]` en el 3-strikes y el circuit breaker que NO corta el outer loop. | ✅ implementado | ✅ `tests/test_bet_retry_characterization.py` 12/12 **sin editar** + `verify_bet_suite` 13/13 + `test_auto_mission` 29/29 + scheduler/selection/endpoints verdes |
 | `tools/verify_bet_suite.py` | String "9 invariantes" → "13 invariantes" (la suite canónica tiene 13 tests desde hace tiempo; el texto estaba desactualizado). | ✅ corregido | ✅ salida del runner |
+| `bet_retry_policy._decide_scheduled` + `run_auto_mission` FASE 2 (Fase 1b) | `decide_next_action` enruta `m.phase=="SCHEDULED"` a `_decide_scheduled`: `PROGRESS` (rep ok, `wait_s`=60/0) / `ABORT_ACCOUNT` terminal (`_sched_is_terminal`: rate/dead/3DS/decline/ambiguo/CARD_LOCKED → `_mark_rate_limited_dead` \| `UPDATE DEAD` \| nada, luego `failed++`+broadcast) / `RETRY_SAME` transitorio (`sched_retry_backoff_s`=25 ×`sched_max_transient_retries`=4) → `ABORT_ACCOUNT` sin broadcast. `reset_session` (`"401"`/`"redirectlogin"`/`"sesión rechazada"` + jwt vivo) lo aplica el shell ANTES de `_apply_sched_action`. Fallback $190→$150 se queda en el shell. **Cero cambio de conducta.** | ✅ implementado | ✅ `tests/test_bet_retry_characterization.py` 20/20 (12 viejas **sin editar** + 8 FASE 2) + `tests/test_bet_retry_policy.py` 70 + `verify_bet_suite` 13/13 + `test_auto_mission`/`test_auto_deposit_scheduler` verdes |
 
-**Pendiente Fase 1b**: extender `decide_next_action` a FASE 2 (scheduled). **Fase 2**: `load_policy()` + override `/data/bet_policy.json`. **Fase 3**: `bet_advisor` (LLM, default OFF).
+**Pendiente Fase 2**: `load_policy()` + override `/data/bet_policy.json`. **Fase 3**: `bet_advisor` (LLM, default OFF).
 
 ## Captura: 2026-08-13 (puente ruthopia en /bet — gate rw real por HTTP, reemplaza el bypass)
 

@@ -351,3 +351,141 @@ def test_char_cancel_after_match_skips_phase_two(H):
     assert sched_calls(H) == []
     assert H.updates[-1]["status"] == "cancelled"
     assert 1 in H.unlocked
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# FASE 2 (scheduled) — caracterización extendida (Fase 1b del refactor).
+# Ramas de `auto_deposit.py` L2322-2448: ok→progress / terminal-para-esta-cuenta
+# (rate/dead/3DS/decline/ambiguo/CARD_LOCKED/PENDING_NOT_APPLIED) / transitorio
+# (retries x4, backoff 25s, reset de session_jwt en "sesión rechazada"/"401"/
+# "redirectlogin"). Estos tests deben pasar SIN EDITARSE tras cablear
+# `decide_next_action(phase="SCHEDULED")` + `_apply_sched_action`.
+# ═════════════════════════════════════════════════════════════════════════════
+def _sched_script(fail_on_rep, result):
+    """probe siempre aprueba; la rep número `fail_on_rep` devuelve `result`."""
+    n = {"i": 0}
+
+    def script(email, amount, kw):
+        if amount == ad.PROBE_AMOUNT:
+            return {"success": True, "result_code": "BANK_APPROVED", "jwt": "J", "used_proxy": "P"}
+        n["i"] += 1
+        if n["i"] == fail_on_rep:
+            return dict(result)
+        return {"success": True, "result_code": "BANK_APPROVED", "jwt": "J", "used_proxy": "P"}
+
+    return script
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 13. FASE 2 — RATE_LIMITED en una rep: _mark_rate_limited_dead + failed++, break
+# ─────────────────────────────────────────────────────────────────────────────
+def test_char_scheduled_rate_limited_marks_dead_and_breaks(H):
+    H.target_count = 9
+    H.script = _sched_script(2, {"success": False, "result_code": "RATE_LIMITED",
+                                 "error": "429 rate limit"})
+    run(H, plan(1))
+
+    assert len(sched_calls(H)) == 2                  # paró en la rep declinada
+    assert H.dead == ["acc1@x.com"]                  # _mark_rate_limited_dead
+    assert 25 not in H.sleeps                        # terminal, no backoff transitorio
+    assert H.sleeps[1:] == [60]                      # 1 gap tras la 1a rep OK
+    assert H.updates[-1]["status"] == "completed"
+    assert H.updates[-1]["total_failed"] == 1
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 14. FASE 2 — DEAD / account_dead: cuenta terminal, sin _mark_rate_limited_dead
+# ─────────────────────────────────────────────────────────────────────────────
+def test_char_scheduled_dead_code_breaks_without_rate_mark(H):
+    H.target_count = 9
+    H.script = _sched_script(2, {"success": False, "result_code": "DEAD",
+                                 "error": "cuenta baneada", "account_dead": True})
+    run(H, plan(1))
+
+    assert len(sched_calls(H)) == 2
+    assert H.dead == []                              # NO pasa por _mark_rate_limited_dead
+    assert 25 not in H.sleeps
+    assert H.updates[-1]["status"] == "completed"
+    assert H.updates[-1]["total_failed"] == 1
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 15. FASE 2 — 3DS_REQUIRED aborta la cuenta (sin certificar A+ ni rotar tarjeta)
+# ─────────────────────────────────────────────────────────────────────────────
+def test_char_scheduled_threeds_aborts_account(H):
+    H.target_count = 9
+    H.script = _sched_script(2, {"success": False, "result_code": "3DS_REQUIRED",
+                                 "error": "3ds challenge"})
+    run(H, plan(1))
+
+    assert len(sched_calls(H)) == 2
+    assert H.dead == []
+    assert 25 not in H.sleeps
+    assert H.updates[-1]["status"] == "completed"
+    assert H.updates[-1]["total_failed"] == 1
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 16. FASE 2 — PENDING_NOT_APPLIED y cargo ambiguo son terminales
+# ─────────────────────────────────────────────────────────────────────────────
+@pytest.mark.parametrize("code,err", [
+    ("PENDING_NOT_APPLIED", "no aplicado"),
+    ("SUBMIT_ERROR", "submit lanzó excepción tras enviar"),
+    ("CARD_LOCKED_OTHER_ACCOUNT", "Tarjeta ya aprobada en otro@x.com"),
+])
+def test_char_scheduled_ambiguous_and_pending_are_terminal(H, code, err):
+    H.target_count = 9
+    H.script = _sched_script(2, {"success": False, "result_code": code, "error": err})
+    run(H, plan(1))
+
+    assert len(sched_calls(H)) == 2
+    assert 25 not in H.sleeps
+    assert H.updates[-1]["status"] == "completed"
+    assert H.updates[-1]["total_failed"] == 1
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 17. FASE 2 — transitorio: 4 reintentos con backoff de 25s, luego abandona cuenta
+# ─────────────────────────────────────────────────────────────────────────────
+def test_char_scheduled_transient_four_retries_then_break(H):
+    H.target_count = 9
+    seen = {"probe": False}
+
+    def script(email, amount, kw):
+        if amount == ad.PROBE_AMOUNT:
+            return {"success": True, "result_code": "BANK_APPROVED", "jwt": "J", "used_proxy": "P"}
+        return {"success": False, "result_code": "BEGIN_ERROR", "error": "gateway 502"}
+    H.script = script
+    run(H, plan(1))
+
+    assert len(sched_calls(H)) == dep.SCHED_MAX_TRANSIENT_RETRIES + 1  # 1 inicial + 4 retries
+    assert H.sleeps.count(dep.SCHED_RETRY_BACKOFF_SEC) == dep.SCHED_MAX_TRANSIENT_RETRIES
+    assert H.updates[-1]["status"] == "completed"
+    assert H.updates[-1]["total_failed"] == 1
+    aborts = [u["phase_detail"] for u in H.updates if "sin éxito tras" in u.get("phase_detail", "")]
+    assert aborts == ["acc1@x.com sin éxito tras 4 reintentos"]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 18. FASE 2 — sesión stale ("401"/"redirectlogin"/"sesión rechazada") con jwt
+#     vivo → el siguiente intento arranca con session_jwt=None
+# ─────────────────────────────────────────────────────────────────────────────
+def test_char_scheduled_session_reset_on_stale_marker(H):
+    H.target_count = 9
+    reps = {"i": 0}
+
+    def script(email, amount, kw):
+        if amount == ad.PROBE_AMOUNT:
+            return {"success": True, "result_code": "BANK_APPROVED", "jwt": "J", "used_proxy": "P"}
+        reps["i"] += 1
+        if reps["i"] == 1:
+            return {"success": False, "result_code": "PAYMENT_ERROR",
+                    "error": "redirectLogin — sesión rechazada (401)"}
+        return {"success": True, "result_code": "BANK_APPROVED", "jwt": "J2", "used_proxy": "P2"}
+    H.script = script
+    run(H, plan(1))
+
+    jwts = [c["session_jwt"] for c in sched_calls(H)]
+    assert jwts[0] == "J"        # 1a rep reusa la sesión del match
+    assert jwts[1] is None       # tras el marcador stale, se fuerza re-login
+    assert H.sleeps.count(dep.SCHED_RETRY_BACKOFF_SEC) == 1  # 1 backoff transitorio

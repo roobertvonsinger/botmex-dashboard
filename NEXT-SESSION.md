@@ -7,7 +7,7 @@
 
 ## ▶ ARRANQUE INMEDIATO (2026-09-08) — Refactor `/bet` a nodos + operador inteligente
 
-**Rama activa:** `feat/bet-nodes-refactor` (pusheada, HEAD `8879660`).
+**Rama activa:** `feat/bet-nodes-refactor` (pusheada).
 **Plan completo:** `C:\Users\rober\.claude\plans\como-podriamos-hacer-un-dynamic-cupcake.md`
 **Estado vivo del refactor:** `docs/BET_POLICY.md`
 
@@ -26,27 +26,33 @@ de cuentas. El LLM NUNCA en el hot path por-depósito.
   `_outcome_view/_account_view/_card_view/_mission_view` (pre-mutación) → `decide_next_action`
   → `_apply_action` (helper del shell, efectos verbatim). Las 6 ramas `if code...` (~200 L) →
   12 L. El `if ok:` de match sigue inline. **Cero cambio de conducta** (caracterización 12/12
-  SIN editar). Gate: `verify_bet_suite` 13/13 · `test_auto_mission` 29/29 · scheduler/selection/
-  endpoints verdes · 120 en la corrida agregada.
+  SIN editar).
+- **Fase 1b** (esta sesión): `decide_next_action` enruta `m.phase=="SCHEDULED"` → `_decide_scheduled`
+  (PROGRESS / ABORT_ACCOUNT terminal-con-broadcast / RETRY_SAME → ABORT_ACCOUNT sin broadcast).
+  `_apply_sched_action` (2º helper del shell) replica los efectos de BD de L2399-2447. `reset_session`
+  (`"401"`/`"redirectlogin"`/`"sesión rechazada"` + jwt vivo) lo aplica el shell ANTES del helper
+  (orden verbatim L2482). Fallback $190→$150 se queda en el shell. `bet_policy` gana
+  `sched_max_transient_retries=4` / `sched_retry_backoff_s=25` / `sched_rep_gap_s=60`.
+  El FASE 2 `while completed < target_count` (~95 L de ramas) → ~30 L de ruteo. **Cero cambio de
+  conducta**: caracterización 20/20 (12 viejas SIN editar + 8 FASE 2 nuevas). Gate:
+  `verify_bet_suite` 13/13 · `test_bet_retry_policy` 70 · `test_auto_mission`/`test_auto_deposit_scheduler`
+  verdes · 128 en la corrida agregada. Los 8 `test_plan_*` de `test_auto_deposit.py` siguen rojos
+  (pre-existentes, JWT en fixture — ver más abajo).
 
-### PRIMERA ACCIÓN próxima sesión → Fase 1b
-Extender `decide_next_action` a **FASE 2 (scheduled)** con `mission.phase="SCHEDULED"`.
-1. Caracterización extendida: nuevos tests golden-master de la FASE 2 en
-   `test_bet_retry_characterization.py` (hoy solo 3: nine-reps, decline-aborta, cancel).
-   Ramas de FASE 2 (`auto_deposit.py` ~L2322-2402): `ok`→progress (completed++, `sleep(60)`) /
-   terminal-para-esta-cuenta (rate/dead/3DS/decline/ambiguo/CARD_LOCKED/PENDING_NOT_APPLIED →
-   `failed++`, `break`) / transitorio (`retries` x4, `sleep(SCHED_RETRY_BACKOFF_SEC=25)`,
-   reset de `session_jwt` si "sesión rechazada"/"401"/"redirectlogin"). El fallback $190→$150
-   **se queda en el shell**. Sin rotación de tarjeta en scheduled.
-2. `decide_next_action` gana rama `if m.phase == "SCHEDULED"` → kinds `PROGRESS` / `ABORT_ACCOUNT`
-   + reusa `RETRY_SAME`. Config: `sched_max_transient_retries=4`, `sched_retry_backoff_s=25`
-   (= `dep.SCHED_MAX_TRANSIENT_RETRIES` / `dep.SCHED_RETRY_BACKOFF_SEC`) en `bet_policy`.
-3. `_apply_sched_action` (2º helper del shell) para FASE 2 — el shell de FASE 2 no tiene
-   `target`/`accounts_state`, usa el dict `m` y `retries`.
-4. Gate: caracterización (vieja + nueva) SIN editar la vieja + `verify_bet_suite` 13/13 +
-   `test_auto_mission` + `test_auto_deposit_scheduler`. Commit + push.
+### PRIMERA ACCIÓN próxima sesión → Fase 2 (centralizar config)
+1. Test primero: extender `tests/test_bet_policy.py` — sin archivo→DEFAULT; merge válido;
+   versión mala→DEFAULT; fuera de `_SANE_BOUNDS`→campo cae a default; `_LOCKED` ignorado;
+   `digest()` (sha1[:12]) estable.
+2. `bet_policy.py` gana `load_policy()`, `_SANE_BOUNDS`, CLI `apply(<proposal.json>)`.
+   `auto_deposit.py`: `POLICY = bet_policy.load_policy()` al inicio de `run_auto_mission` y
+   `plan_auto_mission`; reemplazar las constantes de módulo por `POLICY.*` (incl.
+   `random.uniform(45,60)`, `asyncio.sleep(60)` → `POLICY.sched_rep_gap_s`, el `>=2` del CB).
+   Dejar las constantes viejas como alias `= bet_policy.DEFAULT.x` para importadores externos.
+3. Migración aditiva `auto_missions.policy_digest` en `app.py::_migrate` (estilo
+   `try/except OperationalError` existente).
+4. Gate: las 4 suites verdes (defaults idénticos → cero cambio) + `test_bet_policy.py`. Commit + push.
 
-Orden de fases: 0 ✅ → 1a ✅ → 1 ✅ → **1b** → 2 (`load_policy()`+disco) → 3 (advisor OFF).
+Orden de fases: 0 ✅ → 1a ✅ → 1 ✅ → 1b ✅ → **2** (`load_policy()`+disco) → 3 (advisor OFF).
 `bet_tuner` (Fase 4) = ronda siguiente.
 
 ---
@@ -66,9 +72,9 @@ Orden de fases: 0 ✅ → 1a ✅ → 1 ✅ → **1b** → 2 (`load_policy()`+dis
 
 ## 🧭 Estado de repos / infra
 
-- **Rama `main`:** 4 commits **sin pushear** a `origin/main` (`29bf812`, `1453167`, `51992d0`,
-  `7211c2e`) — NO son de esta sesión (posiblemente sesión paralela / cambio de cuenta Antigravity).
-  Verificar si están listos y pushear, o entender por qué se pararon. No los toqué.
+- **Rama `main`:** al día con `origin/main` (`29bf812 1453167 51992d0 7211c2e` YA están en
+  `origin/main` — el flag de "sin pushear" de la sesión previa quedó obsoleto). Son ancestros de
+  `feat/bet-nodes-refactor`.
 - **Remoto canónico:** `github.com/roobertvonsinger/botmex-dashboard` (ya no Forgejo).
 - **KVM4-Karen (`2.25.98.162`):** API `/bet` viva (`:8001` → 302). No se deployó nada esta sesión.
 - **9router:** `http://2.25.98.162:20128/v1` VIVO (requiere API key). Es el gateway para el

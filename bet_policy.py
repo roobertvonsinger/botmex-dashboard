@@ -29,6 +29,11 @@ class BetPolicyConfig:
     match_transient_retries: int = 4      # reintentos por PAR ante fallo transitorio (nuestro lado)
     transient_backoff_s: int = 25         # espera entre reintentos transitorios (enfría IP en 406)
 
+    # ── FASE 2 (scheduled) — retries por rep (= deposits.SCHED_*) ─────────────
+    sched_max_transient_retries: int = 4  # reintentos por REP ante fallo transitorio
+    sched_retry_backoff_s: int = 25       # espera entre reintentos de rep
+    sched_rep_gap_s: int = 60             # ritmo entre reps exitosas (N×amount/60s, SP-2)
+
     # ── ritmo anti-rafagueo ──────────────────────────────────────────────────
     mm_cooldown_s: int = 45               # piso entre reusos de la MISMA cuenta
     cross_account_gap_s: int = 5          # respiro entre cuentas DISTINTAS

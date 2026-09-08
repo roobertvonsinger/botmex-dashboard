@@ -28,7 +28,7 @@ secundarios quedan exactamente donde están hoy.
 | 0 | Red de caracterización (golden-master) del `run_auto_mission` actual | ✅ `tests/test_bet_retry_characterization.py` (12 tests) |
 | 1a | `bet_retry_policy.decide_next_action` + `bet_policy.BetPolicyConfig` (módulos puros, sin cablear) | ✅ `tests/test_bet_retry_policy.py` (46) · `tests/test_bet_policy.py` (5) |
 | 1 | Cableado en el inner loop de FASE 1 (`_*_view` → `decide_next_action` → `_apply_action`) | ✅ caracterización 12/12 sin editar · `verify_bet_suite` 13/13 · `test_auto_mission` 29/29 |
-| 1b | Extender `retry_policy` a FASE 2 (scheduled) | 🔵 pendiente |
+| 1b | Extender `retry_policy` a FASE 2 (scheduled) — `decide_next_action(phase="SCHEDULED")` + `_apply_sched_action` | ✅ caracterización 20/20 (12 viejas sin editar + 8 FASE 2) · `test_bet_retry_policy` 70 · `verify_bet_suite` 13/13 |
 | 2 | `bet_policy.BetPolicyConfig` + `load_policy()` + override en `/data/bet_policy.json` | 🔵 pendiente |
 | 3 | `bet_advisor` (LLM plan-time + recálculo dinámico), default OFF (`BET_ADVISOR_ENABLED`) | 🔵 pendiente |
 | 4 | `bet_tuner` (ajuste offline de parámetros con diff aprobable) | 🔵 ronda siguiente |
@@ -69,6 +69,37 @@ shell aplica (la policy nunca muta sus inputs).
 
 El `if ok:` de match encontrado sigue **inline** (es finalización de match, no retry —
 nodo `card_marriage_writer`, se descompone en ronda futura).
+
+## Fase 1b — cableado en el loop de FASE 2 scheduled (hecho, sin cambio de conducta)
+
+`decide_next_action` gana una rama corta arriba de todo: `if m.phase == "SCHEDULED":
+return _decide_scheduled(o, m, cfg)`. FASE 2 no rota tarjeta ni cuenta, así que
+`_decide_scheduled` sólo distingue 3 casos:
+
+- **`PROGRESS`** — `o.ok`: rep acreditada. `wait_s = sched_rep_gap_s` (60) si quedan
+  reps, si no 0. El shell hace `completed++/deposited+=curr_amt/approved++`, la
+  captura de JWT SP-2 y el `_m_update`/broadcast (igual que el `if ok:` inline de
+  FASE 1).
+- **`ABORT_ACCOUNT` + `sched_abort_terminal=True`** — `_sched_is_terminal(o)`:
+  rate-limit / dead-family / 3DS / decline real / cargo ambiguo / `CARD_LOCKED`.
+  `_apply_sched_action` replica L2399-2426: `_mark_rate_limited_dead` **o**
+  `UPDATE accounts DEAD` **o** nada, luego `failed++` + `_m_update(abortada)` +
+  `_broadcast_mission(aborted=code)`.
+- **`RETRY_SAME` / `ABORT_ACCOUNT` + `sched_abort_terminal=False`** — transitorio:
+  `RETRY_SAME` con `wait_s = sched_retry_backoff_s` (25) hasta
+  `sched_max_transient_retries` (4), luego `ABORT_ACCOUNT` sin broadcast
+  (`_m_update(f"sin éxito tras {retries} reintentos")`).
+
+`reset_session` (marcadores `"sesión rechazada"`/`"401"`/`"redirectlogin"` con
+`session_jwt` vivo) lo marca la policy y lo aplica el **shell** ANTES de
+`_apply_sched_action` (orden verbatim de L2482): pone `session_jwt=None` y
+recrea el pool si hacía falta. El fallback **$190→$150 se queda en el shell**,
+resuelto antes de llamar a `decide_next_action`.
+
+`MissionRetryState` gana `reps_completed` / `reps_target` / `session_jwt_present`
+(defaults preservan FASE 1). `bet_policy` gana `sched_max_transient_retries=4`,
+`sched_retry_backoff_s=25`, `sched_rep_gap_s=60` (= `deposits.SCHED_*` +
+`asyncio.sleep(60)`).
 
 Quirks del comportamiento actual **preservados** (documentados en la caracterización):
 doble-unlock `[1,2,1,2,3,3]` en el 3-strikes; circuit breaker de 429 que setea

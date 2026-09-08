@@ -32,6 +32,10 @@ def test_defaults_match_live_module_constants():
     assert d.max_accounts_hard_cap == ad.MAX_ACCOUNTS_HARD_CAP
     assert d.mm_cooldown_s == dep.MM_COOLDOWN
     assert d.transient_backoff_s == 25  # `_sleep_step(25)` hardcodeado en el inner loop
+    # FASE 2 (scheduled)
+    assert d.sched_max_transient_retries == dep.SCHED_MAX_TRANSIENT_RETRIES
+    assert d.sched_retry_backoff_s == dep.SCHED_RETRY_BACKOFF_SEC
+    assert d.sched_rep_gap_s == 60  # `asyncio.sleep(60)` hardcodeado entre reps
 
 
 def test_locked_fields_cover_the_canonical_invariants():
