@@ -284,6 +284,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `ea1ee77` | fix(logs): enlazar feed de logs de Ruthopia con KVM4-Karen :8002 y actualizar bridge |
 | `b91db43` | chore(infra): Fase 3 deployada a KVM4 + checkout de prod reconciliado |
 | `4fc99fa` | chore(infra): reconciliar checkout de prod KVM4 + protocolo de deploy git-only |
 | `ada87e4` | docs(next-session): merge Fase 0-3 a main (ab5732e) — siguiente = deploy KVM4 + smoke |
@@ -295,7 +296,6 @@ prewarm.py (router)
 | `719111d` | feat(bet): matchmaking continuo multi-tarjeta, filtrado falso 429/403 y cableado bet_advisor |
 | `2267121` | feat(bet): bet_advisor.py — asesor LLM de pre-selección + migración bet_llm_calls (Fase 3, Commit B) |
 | `c6f671c` | chore(bet): vendor support_llm.py + su test desde feat/support-agent (Fase 3, aislado) |
-| `014efe2` | feat(bet): bet_policy.load_policy() + override disco + digest + POLICY cableado (Fase 2) |
 <!-- GEN:end:recientes -->
 
 ---
