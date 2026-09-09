@@ -136,6 +136,10 @@ def seed_db(tmp_path, monkeypatch):
                 created_at TEXT NOT NULL
             )
         """)
+        # b@ es la cuenta LIVE sana (a@ lockeada, c@ DEAD). Desde el Blindaje Canónico
+        # 2026-09-04 plan_auto_mission exige JWT vivo → b@ lo trae para poder ser candidata.
+        con.execute("UPDATE accounts SET jwt_token='jwt_live_placeholder_0123456789', "
+                    "jwt_expires_at=strftime('%s','now')+86400 WHERE email='b@test.com'")
         # Seed A2.1: a@ asignada al operador 555; c@ lockeada por 555; b@ ajena (del SA)
         con.execute("INSERT INTO account_assignments (email,user_id,assigned_by,assigned_at) VALUES (?,?,?,?)",
                     ("a@test.com", 555, 1341812706, "2026-06-01 00:00:00"))

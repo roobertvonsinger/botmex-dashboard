@@ -157,10 +157,11 @@ def _add_account(db_path, email, grade="A", grade_score=50, balance=0.0, kyc_ver
     try:
         con.execute(
             "INSERT INTO accounts (email,password,balance_total,balance_real,status,grade,grade_score,"
-            "kyc_verified,published_to_pool,cooldown_until,jwt_expires_at,first_checked_at,last_checked_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "kyc_verified,published_to_pool,cooldown_until,jwt_token,jwt_expires_at,first_checked_at,last_checked_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (email, "x", balance, balance, "LIVE", grade, grade_score, kyc_verified, 1, None,
-             int(time.time()) + 3600, "2026-07-01 00:00:00", "2026-07-01 00:00:00"))
+             "jwt_live_placeholder_0123456789", int(time.time()) + 3600,
+             "2026-07-01 00:00:00", "2026-07-01 00:00:00"))
         con.commit()
     finally:
         con.close()
@@ -226,7 +227,7 @@ def test_plan_normalizes_4part_pool_cards(seed_db):
 
 
 def test_plan_feasibility_check(seed_db):
-    # seed base: a@ lockeada, c@ DEAD → solo b@ (LIVE, sin JWT) es candidata.
+    # seed base: a@ lockeada, c@ DEAD → solo b@ (LIVE, con JWT vivo del fixture) es candidata.
     plan = plan_auto_mission(seed_db, ["4555555555555555|1230|123"], amount=150, target_count=9)
     assert plan["feasible"] is True
     assert any(r["email"] == "b@test.com" for r in plan["accounts"])

@@ -115,7 +115,7 @@ prewarm.py (router)
 | `bin_intelligence.py` | 701 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
 | `card_checker.py` | 640 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 189 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
-| `conftest.py` | 218 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
+| `conftest.py` | 222 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
 | `db_registry.py` | 112 | `betmexico.dashboard.db` | _[completar]_ |
 | `deposits.py` | 3265 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
@@ -284,6 +284,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d6e69ad` | fix(bet): circuit breaker de 429 aborta la mision de verdad (outer loop chequea flag local) |
 | `5e8889b` | docs(plan): fix circuit breaker 429 + fixture JWT de test_plan_* (pre-smoke) |
 | `ea1ee77` | fix(logs): enlazar feed de logs de Ruthopia con KVM4-Karen :8002 y actualizar bridge |
 | `b91db43` | chore(infra): Fase 3 deployada a KVM4 + checkout de prod reconciliado |
@@ -295,7 +296,6 @@ prewarm.py (router)
 | `050878e` | docs(next-session): Fase 3 A/B/C hechas + colisión multi-sesión con 719111d, Commit D bloqueado |
 | `b525cb1` | feat(bet): cablear bet_advisor — advisor_boost/advisor_hint/_advisor_sink + 3 entry points (Fase 3, Commit C) |
 | `719111d` | feat(bet): matchmaking continuo multi-tarjeta, filtrado falso 429/403 y cableado bet_advisor |
-| `2267121` | feat(bet): bet_advisor.py — asesor LLM de pre-selección + migración bet_llm_calls (Fase 3, Commit B) |
 <!-- GEN:end:recientes -->
 
 ---

@@ -488,12 +488,12 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `seed_db` | def | L13–L154 |
-| `client` | def | L157–L161 |
-| `make_client` | def | L164–L176 |
-| `mock_bmx_transport` | def | L180–L190 |
-| `OutgoingNetworkBlockedError` | class | L197–L199 |
-| `guard_external_network` | def | L202–L217 |
+| `seed_db` | def | L13–L158 |
+| `client` | def | L161–L165 |
+| `make_client` | def | L168–L180 |
+| `mock_bmx_transport` | def | L184–L194 |
+| `OutgoingNetworkBlockedError` | class | L201–L203 |
+| `guard_external_network` | def | L206–L221 |
 
 ### `curp_utils.py`
 
