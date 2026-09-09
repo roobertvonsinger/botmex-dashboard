@@ -284,6 +284,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `5e8889b` | docs(plan): fix circuit breaker 429 + fixture JWT de test_plan_* (pre-smoke) |
 | `ea1ee77` | fix(logs): enlazar feed de logs de Ruthopia con KVM4-Karen :8002 y actualizar bridge |
 | `b91db43` | chore(infra): Fase 3 deployada a KVM4 + checkout de prod reconciliado |
 | `4fc99fa` | chore(infra): reconciliar checkout de prod KVM4 + protocolo de deploy git-only |
@@ -295,7 +296,6 @@ prewarm.py (router)
 | `b525cb1` | feat(bet): cablear bet_advisor — advisor_boost/advisor_hint/_advisor_sink + 3 entry points (Fase 3, Commit C) |
 | `719111d` | feat(bet): matchmaking continuo multi-tarjeta, filtrado falso 429/403 y cableado bet_advisor |
 | `2267121` | feat(bet): bet_advisor.py — asesor LLM de pre-selección + migración bet_llm_calls (Fase 3, Commit B) |
-| `c6f671c` | chore(bet): vendor support_llm.py + su test desde feat/support-agent (Fase 3, aislado) |
 <!-- GEN:end:recientes -->
 
 ---

@@ -2092,7 +2092,7 @@ async def run_auto_mission(
                 # RETRY_SAME — el shell hace el reset de sesión + backoff + continue
                 return "retry"
 
-            while not _cancelled():
+            while not _cancelled() and not cancelled:
                 # Actualizar listas de candidatas filtrando tarjetas jubiladas
                 for a in accounts_state:
                     if a["done"]:
@@ -2462,7 +2462,7 @@ async def run_auto_mission(
                 last_account_id = account_id
 
                 # Respiro entre cuentas si aún quedan otras cuentas activas por atender
-                if not _cancelled() and any(a["id"] != account_id and not a["done"] for a in accounts_state):
+                if not _cancelled() and not cancelled and any(a["id"] != account_id and not a["done"] for a in accounts_state):
                     await _sleep_step(POLICY.cross_account_gap_s)
 
             # Liberar cualquier lock de cuenta que no haya conseguido match

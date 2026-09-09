@@ -198,26 +198,25 @@ def test_char_account_anti_drill_caps_at_two_declines(H):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. RATE_LIMITED → circuit breaker
+# 5. RATE_LIMITED → circuit breaker ABORTA la misión
 #
-# OJO (comportamiento actual, posible bug — ver spawn_task de esta sesión):
-# el circuit breaker pone `cancelled = True` (variable LOCAL) + `break` del inner
-# loop, pero el outer `while not _cancelled()` chequea `_m_status()` (status en
-# BD), que sigue "matching". Así que el breaker NO detiene la misión: sigue
-# procesando acc3 y acc4, marcándolas dead también. Solo al final, `cancelled`
-# hace que el cierre sea `cancelled` en vez de `failed`.
+# Conducta correcta (fix 2026-09-09): al 2º 429 consecutivo el breaker dispara
+# (`circuit_breaker_consecutive_429 = 2`). `_apply_action` setea `cancelled = True`
+# y hace broadcast "aborted"; el outer loop de FASE 1 (`while not _cancelled()
+# and not cancelled`) sale de inmediato. acc3 y acc4 NUNCA se tocan — ése es el
+# punto del breaker: no quemar más captchas bajo rate-limit.
 # ─────────────────────────────────────────────────────────────────────────────
-def test_char_rate_limit_circuit_breaker_current_behavior(H):
+def test_char_rate_limit_circuit_breaker_aborts_mission(H):
     H.card_pipes = [P1]
     H.script = lambda email, amount, kw: {
         "success": False, "result_code": "RATE_LIMITED", "error": "429 rate limit"}
     run(H, plan(1, 2, 3, 4))
 
-    # el breaker "dispara" pero el outer loop igual recorre las 4 cuentas
-    assert H.dead == ["acc1@x.com", "acc2@x.com", "acc3@x.com", "acc4@x.com"]
-    assert probe_emails(H) == ["acc1@x.com", "acc2@x.com", "acc3@x.com", "acc4@x.com"]
+    # el breaker dispara al 2º 429 → la misión aborta sin tocar acc3/acc4
+    assert H.dead == ["acc1@x.com", "acc2@x.com"]
+    assert probe_emails(H) == ["acc1@x.com", "acc2@x.com"]
     assert 25 not in H.sleeps
-    assert statuses(H)[-1] == "cancelled"    # `cancelled=True` local gana en el cierre
+    assert statuses(H)[-1] == "cancelled"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
