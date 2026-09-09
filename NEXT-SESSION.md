@@ -24,8 +24,6 @@ copia en `~/.ssh/kvm4_hostinger`.)
 **Siguiente:** smoke de Robert — (1) `/bet` real normal advisor OFF → confirmar flujo idéntico,
 (2) advisor ON (`BET_ADVISOR_ENABLED=1` + `BET_ADVISOR_MODEL_CHAIN` contra 9router `:20128`).
 
-
-
 **Fases 0-3 DEPLOYADAS a KVM4-Karen (`4fc99fa`).** El checkout de prod estaba
 "frankenstein" (deployer manual sin git, 22 commits atrás, ~21 `.bak`, 38 tests
 sueltos) → reconciliado el 2026-09-09 vía `git reset --hard origin/main` con restore

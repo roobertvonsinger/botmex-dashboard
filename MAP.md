@@ -284,6 +284,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `9101529` | docs(next-session): fixes deployados y verificados en KVM4-Karen |
 | `ac2de08` | docs(next-session): fixes pusheados, deploy bloqueado por SSH key faltante |
 | `04dd184` | docs(bitacora): cerrar bugs circuit-breaker-429 + fixture-jwt (pre-smoke) |
 | `df4ae4a` | test(bet): sembrar jwt_token en fixtures de test_plan_* (gate JWT de plan_auto_mission) |
@@ -295,7 +296,6 @@ prewarm.py (router)
 | `ada87e4` | docs(next-session): merge Fase 0-3 a main (ab5732e) — siguiente = deploy KVM4 + smoke |
 | `2175db7` | fix(bet): guardarraíl plan_not_worse del advisor + fix números BET_POLICY.md (Smartreview) |
 | `7821971` | docs(next-session): Fase 3 completa (A/B/C/D), 719111d revisado, siguiente = smoke de Robert |
-| `8cd909f` | feat(bet): recálculo dinámico del advisor en run_auto_mission + test integración (Fase 3, Commit D) |
 <!-- GEN:end:recientes -->
 
 ---

@@ -1,141 +1,63 @@
-# DEPLOY — Protocolo declarado
+# DEPLOY — Protocolo declarado (Post-Migración Karen KVM4)
 
-> **VPS actual de producción**: **KVM4** (Tailscale `100.77.154.31` / pública `2.24.211.109`)
-> **VPS anterior**: ~~`187.77.207.90`~~ caído desde 2026-05-11 — migración forzada
-> **Forma de deploy**: Docker Compose en `/docker/betmexico/`
+> **DOCUMENTO CANÓNICO ACTUALIZADO**: Consulta [`docs/protocols/deploy-protocol.md`](docs/protocols/deploy-protocol.md).
+> **VPS actual de producción**: **Karen VPS** (`2.25.98.162` / alias `karen` en `~/.ssh/config` / Tailscale `100.87.56.127`)
+> **VPS anteriores**: 
+> - ~~`100.77.154.31`~~ / ~~`2.24.211.109`~~ (KVM4 vieja suspendida el 04-Sep-2026)
+> - ~~`187.77.207.90`~~ / ~~`76.13.113.195`~~ (legacy)
+> **Forma de deploy**: **Git-Only** a `/opt/kvm4/apps/betmexico/code` (bind-mount a `/app` en containers).
 
 ---
 
 ## ⚠️ AVISOS CRÍTICOS
 
-1. **Token Telegram único** — si el VPS viejo (`187.77.207.90`) vuelve a estar online, **NO arrancar el bot allí** o habrá conflicto de polling (Telegram solo entrega updates a UN consumer).
-2. **BD canónica vive en KVM4** — `/docker/betmexico/data/betmexico_accounts.db`. Si VPS viejo revive, su BD queda obsoleta. Plan: respaldar y descartar.
-3. **NO editar código en el monorepo (`Proyectos/BetMexico/Telegram/` o `Web/`)** — está marcado para migración a su propio repo. Si tocas ambos, creas bifurcaciones que destruyen trabajo.
+1. **Deploy EXCLUSIVO vía Git**: Prohibido hacer subidas sueltas por SCP/SFTP que dejen el checkout en estado "frankenstein". Todo deploy se hace con commit + push a `origin/main` y `git reset --hard origin/main` en el servidor.
+2. **BD canónica vive en Karen VPS**: `/opt/kvm4/apps/betmexico/data/betmexico_accounts.db`.
+3. **SSH Key**: `C:\Users\rober\Dropbox\TESTING DEV\SSH KEYS\kvm4_hostinger` (o `~/.ssh/kvm4_hostinger`).
 
 ---
 
-## Arquitectura en KVM4
+## Arquitectura en Karen VPS
 
 ```
-/docker/betmexico/
-├── Dockerfile           # imagen base Playwright + deps consolidadas
-├── docker-compose.yml   # 2 services: bot + web
+/opt/kvm4/apps/betmexico/
+├── Dockerfile           # imagen base
+├── docker-compose.yml   # services: web, bot, telegram-mock, balance-poller
 ├── .env                 # secretos (chmod 600, NO en git)
 ├── data/
 │   └── betmexico_accounts.db   # BD compartida (montada en /data dentro container)
-└── code/                # código fuente (montado en /app dentro container)
-    ├── betmexico_bot.py         # entry point bot Telegram
-    ├── betmexico_*.py           # módulos compartidos
-    ├── patch_capmonster.py
-    ├── requirements.txt
-    └── web/                     # dashboard FastAPI (este repo)
-        ├── app.py
-        ├── auth.py
-        ├── deposits.py
-        ├── prewarm.py
-        ├── requirements.txt
-        └── static/
+└── code/                # repo git (montado en /app dentro container)
+    ├── app.py           # entrypoint dashboard FastAPI
+    ├── betmexico_bot.py # entrypoint bot Telegram
+    ├── static/          # frontend assets
+    └── ...
 ```
 
 ### Servicios
 
 | Container | Imagen | Comando | Puerto host | Función |
 |---|---|---|---|---|
+| `betmexico-web` | `betmexico:latest` | `python app.py` | `8001:8080` | Dashboard FastAPI |
 | `betmexico-bot` | `betmexico:latest` | `python betmexico_bot.py` | — | Bot Telegram (polling) |
-| `betmexico-web` | `betmexico:latest` | `python web/app.py` | `8080` | Dashboard FastAPI |
-
-Ambos comparten:
-- Volumen `./data:/data` (BD SQLite)
-- Volumen `./code:/app` (código en caliente, sin rebuild)
-- `.env` (mismo file de secrets)
-- Red Docker `bmx` (bridge)
-
-### Acceso
-
-- **Dashboard (público)**: **`https://botmexico.com.mx`**, `https://www.botmexico.com.mx` y **`https://botmexico.net`** (alias operativo desde 2026-07-12, ver `docs/ERRORS.md` §"botmexico.com.mx inaccesible") — TLS automático vía Traefik + Let's Encrypt, cert con SAN combinado
-- **Dashboard (Tailscale, debug)**: containers NO exponen 8080 al host. Para debug interno: `docker exec betmexico-web curl http://localhost:8080/api/health` o `docker network inspect betmexico_bmx` y curl al IP interno.
-- **Bot Telegram**: `@betmx_bot` (token en `.env`)
-
-### Reverse proxy (Traefik en KVM4)
-
-Traefik corre como service vecino en `/docker/traefik/` (network `host`, entrypoints `:80`/`:443`, certresolver `letsencrypt` con HTTP-01 challenge). Auto-redirect HTTP→HTTPS configurado globalmente.
-
-Labels en `docker-compose.yml` del servicio `web`:
-```yaml
-labels:
-  - 'traefik.enable=true'
-  - 'traefik.http.routers.betmexico.rule=Host(`botmexico.com.mx`) || Host(`www.botmexico.com.mx`) || Host(`botmexico.net`)'
-  - 'traefik.http.routers.betmexico.entrypoints=websecure'
-  - 'traefik.http.routers.betmexico.tls.certresolver=letsencrypt'
-  - 'traefik.http.services.betmexico.loadbalancer.server.port=8080'
-```
-
-Para agregar un nuevo dominio: ampliar la regla `Host(...)` y propagar DNS A → `2.24.211.109`. Traefik emite cert en background.
+| `betmexico-mock-bot` | `betmexico:latest` | `python telegram_bot_mock/bot.py` | — | Mock Telegram |
+| `betmexico-balance-poller` | `betmexico:latest` | `python scripts/session_balance_poller.py` | — | Poller de saldos |
 
 ---
 
-## Flujo de deploy
-
-### 1. Cambios en código del dashboard (este repo)
+## Flujo Canónico de Deploy (Git-Only)
 
 ```bash
-KEY="C:\Users\rober\Dropbox\TESTING DEV\SSH KEYS\kvm4_hostinger"
-HOST="root@100.77.154.31"
+# 1. Local (repos/botmex-dashboard)
+git add <archivos>
+git commit -m "..."
+git push origin main
 
-# Subir archivo(s) modificado(s) — dashboard vive en code/web/
-scp -P 22 -o StrictHostKeyChecking=no -i "$KEY" \
-  prewarm.py "$HOST:/docker/betmexico/code/web/prewarm.py"
+# 2. En Karen VPS: pull limpio y restart
+ssh karen "cd /opt/kvm4/apps/betmexico/code && git fetch origin -q && git reset --hard origin/main && docker restart betmexico-web"
 
-scp -P 22 -o StrictHostKeyChecking=no -i "$KEY" \
-  static/app.js "$HOST:/docker/betmexico/code/web/static/app.js"
-
-scp -P 22 -o StrictHostKeyChecking=no -i "$KEY" \
-  static/style.css "$HOST:/docker/betmexico/code/web/static/style.css"
-
-# Restart (no rebuild — código montado como volumen)
-ssh -o StrictHostKeyChecking=no -i "$KEY" $HOST \
-  "docker compose -f /docker/betmexico/docker-compose.yml restart web"
-```
-
-> **Nota**: usar Tailscale IP `100.77.154.31` con la key `kvm4_hostinger`.
-> `pscp`/`plink` se cuelgan en bash (prompt interactivo sin TTY). Usar `scp`/`ssh` nativo.
-
-### 2. Cambios en bot Telegram (monorepo, `Proyectos/BetMexico/Telegram/`)
-
-> **NOTA**: el bot vive en el monorepo por ahora. Cuando migre a su propio repo, se actualizará este flujo.
-
-```bash
-KEY="C:\Users\rober\Dropbox\TESTING DEV\SSH KEYS\kvm4_hostinger"
-HOST="root@100.77.154.31"
-
-# Subir archivo(s) — bot vive en code/ raíz
-scp -P 22 -o StrictHostKeyChecking=no -i "$KEY" \
-  betmexico_X.py "$HOST:/docker/betmexico/code/betmexico_X.py"
-
-# Restart container bot
-ssh -o StrictHostKeyChecking=no -i "$KEY" $HOST \
-  "docker compose -f /docker/betmexico/docker-compose.yml restart bot"
-```
-
-### 3. Cambios en dependencias (requirements / Dockerfile)
-
-```bash
-KEY="C:\Users\rober\Dropbox\TESTING DEV\SSH KEYS\kvm4_hostinger"
-HOST="root@100.77.154.31"
-
-ssh -o StrictHostKeyChecking=no -i "$KEY" $HOST \
-  "cd /docker/betmexico && docker compose build && docker compose up -d"
-```
-
-### 4. Update de API keys (.env)
-
-```bash
-KEY="C:\Users\rober\Dropbox\TESTING DEV\SSH KEYS\kvm4_hostinger"
-HOST="root@100.77.154.31"
-
-ssh -o StrictHostKeyChecking=no -i "$KEY" $HOST \
-  "sed -i 's/OLD_KEY/NEW_KEY/g' /docker/betmexico/.env && \
-   docker compose -f /docker/betmexico/docker-compose.yml restart"
+# 3. Verificación
+ssh karen "docker exec betmexico-web curl -s http://localhost:8080/api/health/ping"
+ssh karen "docker logs --tail 30 betmexico-web"
 ```
 
 ---
