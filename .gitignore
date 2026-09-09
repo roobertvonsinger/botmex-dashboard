@@ -39,6 +39,7 @@ Thumbs.db
 
 # Visual companion (brainstorm mockups)
 .superpowers/
+.impeccable/
 
 # Dev / preview temporales (C1)
 .playwright-mcp/

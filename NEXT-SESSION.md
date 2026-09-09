@@ -5,12 +5,21 @@
 
 ---
 
-## ▶ ARRANQUE INMEDIATO (2026-09-08) — Refactor `/bet` a nodos + operador inteligente
+## ▶ ARRANQUE INMEDIATO (2026-09-09) — Fase 3 YA EN KVM4 · falta smoke advisor ON de Robert
 
-**MERGEADO Y PUSHEADO A `origin/main` (`16b3884..ab5732e`, `--no-ff`).** Rama
-`feat/bet-nodes-refactor` (tip `2175db7`) integrada; conflictos solo en
-`MAP.md`/`NEXT-SESSION.md` (docs/generados), resueltos a favor de la rama.
-Advisor OFF por default → cero cambio de conducta en prod. KVM4 aún sin deployar.
+**Fases 0-3 DEPLOYADAS a KVM4-Karen (`4fc99fa`).** El checkout de prod estaba
+"frankenstein" (deployer manual sin git, 22 commits atrás, ~21 `.bak`, 38 tests
+sueltos) → reconciliado el 2026-09-09 vía `git reset --hard origin/main` con restore
+point previo (`/root/restore-points/betmexico-code-PREREBASE-20260908_145100.tar.gz`
++ Bóveda, sha256 OK). Prod ahora `git status --porcelain` **vacío**. Detalle:
+`docs/ERRORS.md` (entrada 2026-09-08) + `docs/protocols/deploy-protocol.md` (reescrito:
+KVM4 se despliega SOLO vía git).
+
+**Verificado post-reset:** `betmexico-web` reiniciado, `StartedAt` > mtime de `app.py`,
+`/api/health/ping` → `{"ok":true,...,"accounts":948}`, startup sin Traceback/ImportError,
+`verify_bet_suite` **13/13** (local — el container no trae `pytest`). Advisor OFF por
+default → cero cambio de conducta.
+
 **Plan completo:** `C:\Users\rober\.claude\plans\como-podriamos-hacer-un-dynamic-cupcake.md`
 **Estado vivo del refactor:** `docs/BET_POLICY.md`
 
@@ -113,17 +122,23 @@ de cuentas. El LLM NUNCA en el hot path por-depósito.
 Orden de fases: 0 ✅ → 1a ✅ → 1 ✅ → 1b ✅ → 2 ✅ → **3 ✅ (A/B/C/D)** → 4 (`bet_tuner`, diferido).
 
 ### PRIMERA ACCIÓN próxima sesión
-1. **Deploy KVM4 + smoke de Fase 3** (Robert): en KVM4-Karen `2.25.98.162`
-   `git -C /docker/betmexico/code pull` + restart contenedor `betmexico-web`
-   (advisor sigue OFF → verificar que `/bet` normal no cambió). Luego
-   `export BET_ADVISOR_ENABLED=1` +
-   `BET_ADVISOR_MODEL_CHAIN=...` (fijar tras probar tool-calling contra 9router vivo
-   `:20128`) → lanzar un `/bet` real de 1 tarjeta / `target_count` bajo desde `@betmexbot`
-   → verificar en logs: (a) advisor respondió o cayó a fallback limpio, (b) fila en
-   `bet_llm_calls` con tokens medidos, (c) `deposit_attempts`/`auto_missions` consistentes,
-   (d) plan respetó KYC/pool/429. Ver `docs/BET_POLICY.md` §"Verificación e2e".
-2. **Fase 4** (`bet_tuner`, diferido) o pendientes pos-merge del advisor (pairings,
+1. **Smoke `/bet` con advisor OFF** (Robert): un `/bet` real normal desde `@betmexbot`
+   → confirmar que el flujo NO cambió respecto a antes del deploy (Fase 3 OFF = idéntico).
+2. **Smoke advisor ON** (Robert): en KVM4 `nano /opt/kvm4/apps/betmexico/.env` →
+   `BET_ADVISOR_ENABLED=1` + `BET_ADVISOR_MODEL_CHAIN=...` (fijar tras probar tool-calling
+   contra 9router vivo `:20128`) → `docker restart betmexico-web` → `/bet` real de 1 tarjeta
+   / `target_count` bajo → verificar en logs: (a) advisor respondió o cayó a fallback limpio,
+   (b) fila en `bet_llm_calls` con tokens medidos, (c) `deposit_attempts`/`auto_missions`
+   consistentes, (d) plan respetó KYC/pool/429. Ver `docs/BET_POLICY.md` §"Verificación e2e".
+3. **Fase 4** (`bet_tuner`, diferido) o pendientes pos-merge del advisor (pairings,
    `recent_history` con probes reales, biasing de `_pull_fresh_live_account`).
+
+### Pendiente menor de infra
+- `betmexico-web` no trae `pytest` → `verify_bet_suite.py` no corre dentro del container.
+  Opciones: agregar `pytest` a `infra/requirements*.txt` (implica rebuild) o dejarlo como
+  gate solo-local (que es como lo define `CLAUDE.md`). Sin decidir.
+- **Pregunta abierta a Robert:** ¿quién hacía deploys manuales a KVM4? El deployer sin
+  bitácora del 2026-09-08 09:56–10:55 dejó el checkout frankenstein.
 
 ---
 
@@ -142,11 +157,12 @@ Orden de fases: 0 ✅ → 1a ✅ → 1 ✅ → 1b ✅ → 2 ✅ → **3 ✅ (A/B
 
 ## 🧭 Estado de repos / infra
 
-- **Rama `feat/bet-nodes-refactor`:** tip `2175db7`, pusheada. **Mergeada a
-  `origin/main`** (`ab5732e`, `--no-ff`). Se puede borrar la rama.
-- **Rama `main` = `origin/main` = `ab5732e`.** Al día.
+- **Rama `main` = `origin/main` = `4fc99fa`.** Al día. Rama `feat/bet-nodes-refactor`
+  ya mergeada (`ab5732e`, `--no-ff`) — se puede borrar.
 - **Remoto canónico:** `github.com/roobertvonsinger/botmex-dashboard` (ya no Forgejo).
-- **KVM4-Karen (`2.25.98.162`):** API `/bet` viva (`:8001` → 302). No se deployó nada esta sesión.
+- **KVM4-Karen (`2.25.98.162`):** checkout `/opt/kvm4/apps/betmexico/code` en `4fc99fa`,
+  limpio. `betmexico-web` corriendo Fase 3 (advisor OFF). Deploy git-only en adelante
+  (ver `docs/protocols/deploy-protocol.md`). SSH: `ssh -i "<KEY>" root@2.25.98.162`.
 - **9router:** `http://2.25.98.162:20128/v1` VIVO (requiere API key). Es el gateway para el
   advisor de Fase 3. Cliente reutilizable: `git show feat/support-agent:support_llm.py`.
 
