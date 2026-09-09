@@ -284,6 +284,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `508706d` | fix(bet): JWT vivo prioriza, no excluye, en el planner de /bet |
 | `3f5b121` | docs: actualizar DEPLOY.md y NEXT-SESSION.md con SSH restaurado y Karen VPS |
 | `9101529` | docs(next-session): fixes deployados y verificados en KVM4-Karen |
 | `ac2de08` | docs(next-session): fixes pusheados, deploy bloqueado por SSH key faltante |
@@ -295,7 +296,6 @@ prewarm.py (router)
 | `b91db43` | chore(infra): Fase 3 deployada a KVM4 + checkout de prod reconciliado |
 | `4fc99fa` | chore(infra): reconciliar checkout de prod KVM4 + protocolo de deploy git-only |
 | `ada87e4` | docs(next-session): merge Fase 0-3 a main (ab5732e) — siguiente = deploy KVM4 + smoke |
-| `2175db7` | fix(bet): guardarraíl plan_not_worse del advisor + fix números BET_POLICY.md (Smartreview) |
 <!-- GEN:end:recientes -->
 
 ---

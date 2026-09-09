@@ -5,7 +5,24 @@
 
 ---
 
-## ▶ ARRANQUE INMEDIATO (2026-09-09) — 2 bugs pre-smoke CERRADOS · falta push+deploy+smoke
+## ▶ ARRANQUE INMEDIATO (2026-09-09 tarde·2) — `/bet` "sin cuentas elegibles" CERRADO
+
+**Bug live durante el smoke:** `/bet` real de Robert → `❌ sin cuentas elegibles` con 52
+cuentas operables en el pool. Causa raíz: `1453167` metió JWT vivo como **filtro DURO**
+en `plan_auto_mission` (primario + fallback); jwt_keeper no calienta el pool operable
+(solo 1 de 52 con JWT vivo). Fix `508706d` (**pusheado + deployado KVM4 + smoke live OK**:
+3 tarjetas → 3 cuentas, `feasible=True`): JWT vivo vuelve a PRIORIZAR (jwt_order en
+ORDER BY + tiering) sin excluir; fallback gana `grade != 'D'`. Test
+`test_plan_operates_without_live_jwt` RED→GREEN. Detalle: `docs/ERRORS.md` +
+`docs/AUDIT.md` (2026-09-09 tarde). **Robert puede re-correr `/bet`.**
+
+🔵 **Pendiente aparte (no bloquea `/bet`):** jwt_keeper mantiene solo 1 JWT vivo en el
+pool operable (grade!=D · kyc=1 · published_to_pool=1); 65 con JWT expirado >24h.
+Investigar por qué no calienta ese subconjunto.
+
+---
+
+## ARRANQUE previo (2026-09-09) — 2 bugs pre-smoke CERRADOS · falta push+deploy+smoke
 
 **Sesión 2026-09-09 (tarde):** cerrados los 2 bugs flagueados antes del smoke (ver
 "✅ Bugs cerrados" abajo). Gates verdes locales: `verify_bet_suite` 13/13, caracterización
