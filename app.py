@@ -2052,22 +2052,37 @@ def get_logs_telegram(bot: str = "main", limit: int = 300, since: Optional[str] 
                         return {"lines": _tail_log_file(p, limit, since, level)}
                     except Exception:
                         pass
-            # Fallback HTTP a Ruthopia API en KVM4
+            # Fallback HTTP a Ruthopia API en KVM4-Karen (:8002)
             try:
                 import httpx
-                tok = os.environ.get("RUTHOPIA_DASHBOARD_TOKEN") or os.environ.get("DASHBOARD_TOKEN") or ""
+                tok = (
+                    os.environ.get("RUTHOPIA_DASHBOARD_TOKEN")
+                    or os.environ.get("DASHBOARD_TOKEN")
+                    or "7111223a6266d069d91ef589bcc9b851e2954651fa78a666cb928c155edf2cab"
+                )
                 headers = {"Authorization": f"Bearer {tok}"} if tok else {}
-                url = os.environ.get("RUTHOPIA_API_URL", "http://100.77.154.31:8787/api/logs")
-                resp = httpx.get(f"{url}?limit={limit}", headers=headers, timeout=2.5)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    lines = data.get("lines", [])
-                    if level:
-                        lvl = level.upper()
-                        lines = [ln for ln in lines if lvl in ln.upper()]
-                    return {"lines": lines}
-            except Exception:
-                pass
+                candidates_urls = [
+                    os.environ.get("RUTHOPIA_API_URL"),
+                    "http://100.95.147.72:8002/api/logs",
+                    "http://172.17.0.1:8002/api/logs",
+                    "http://ruthopia:8787/api/logs",
+                ]
+                for target_url in [u for u in candidates_urls if u]:
+                    try:
+                        resp = httpx.get(f"{target_url}?limit={limit}&token={tok}", headers=headers, timeout=2.5)
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            lines = data.get("lines", [])
+                            if level:
+                                lvl = level.upper()
+                                lines = [ln for ln in lines if lvl in ln.upper()]
+                            return {"lines": lines}
+                    except Exception:
+                        continue
+            except Exception as e:
+                logger.warning(f"Error consultando logs de Ruthopia vía HTTP: {e}")
+
+            return {"lines": ["Esperando conexión con el feed de logs de Ruthopia (KVM4-Karen :8002)…"]}
 
         log_file = _TELEGRAM_LOG_FILES.get(bot, Path("/data/logs/telegram_mock_bot.log"))
         try:

@@ -19,8 +19,8 @@ DASHBOARD_DIR = Path(__file__).parent.resolve()
 # Configuración del gate Wabox (extracción de Ruthopia Bóveda)
 WABOX_STRIPE_PK = "pk_live_WQNz0qa1BmBu47grZwTpj8BR"
 
-# Configuración del bridge HTTP a Ruthopia (/api/rw/check en KVM4)
-_RUTHOPIA_API_URL = "http://172.16.3.1:8787"
+# Configuración del bridge HTTP a Ruthopia (/api/rw/check en KVM4-Karen)
+_RUTHOPIA_API_URL = "http://100.95.147.72:8002"
 _RUTHOPIA_BRIDGE_TIMEOUT = 60
 _RUTHOPIA_BRIDGE_RETRIES = 2  # Robert 2026-08-13: ≥2 reintentos solo por infra
 _RUTHOPIA_RETRYABLE_STATUS = {"Error"}  # no se reintenta un Declined/Approved real
@@ -63,7 +63,8 @@ def _load_ruthopia_dashboard_token() -> str:
             except Exception:
                 pass
 
-    return ""
+    # 4. Token canónico de Ruthopia en KVM4-Karen
+    return "7111223a6266d069d91ef589bcc9b851e2954651fa78a666cb928c155edf2cab"
 
 
 def ruthopia_bridge_check(pipe_4parts: str) -> Tuple[str, str]:
@@ -457,6 +458,28 @@ def precheck_card_liveness(card_pipe: str, operator_id: Optional[int] = None) ->
             married_owner = dep.get_married_card_owner(card_num)
         except Exception:
             married_owner = None
+
+        if not married_owner:
+            try:
+                m_row = c.execute(
+                    "SELECT account_email FROM account_cards WHERE card_number = ? LIMIT 1",
+                    (card_num,)
+                ).fetchone()
+                if not m_row:
+                    m_row = c.execute(
+                        "SELECT account_email FROM deposit_attempts WHERE card_pipe LIKE ? AND UPPER(status) = 'APPROVED' LIMIT 1",
+                        (f"{card_num}%",)
+                    ).fetchone()
+                if m_row:
+                    if isinstance(m_row, dict):
+                        married_owner = m_row.get("account_email")
+                    elif hasattr(m_row, "__getitem__"):
+                        try:
+                            married_owner = m_row["account_email"]
+                        except (KeyError, TypeError, IndexError):
+                            married_owner = m_row[0]
+            except Exception:
+                pass
 
         if married_owner:
             email = married_owner

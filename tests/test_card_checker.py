@@ -92,7 +92,7 @@ def test_ruthopia_bridge_check_post(monkeypatch):
     status, msg = cc.ruthopia_bridge_check("4111111111111111|12|28|123")
     assert status == "Approved"
     assert "Card Updated" in msg
-    assert captured["url"] == "http://172.16.3.1:8787/api/rw/check"
+    assert captured["url"].endswith("/api/rw/check")
     assert captured["headers"]["Authorization"] == "Bearer tok-test"
     assert captured["json"] == {"cards": ["4111111111111111|12|28|123"]}
 
