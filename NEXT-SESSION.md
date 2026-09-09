@@ -9,8 +9,20 @@
 
 **Sesión 2026-09-09 (tarde):** cerrados los 2 bugs flagueados antes del smoke (ver
 "✅ Bugs cerrados" abajo). Gates verdes locales: `verify_bet_suite` 13/13, caracterización
-20/20, `test_auto_deposit` 22/22, `test_bet_retry_policy` 66. **Falta:** Smartreview →
-push a `origin/main` → deploy git-only a KVM4 → smoke de Robert (`/bet` advisor OFF, luego ON).
+20/20, `test_auto_deposit` 22/22, `test_bet_retry_policy` 66. Smartreview (high, inline
+8 ángulos): **0 findings**. Auditoría de regresión: baseline `origin/main` 24 rojos →
+con fixes 15 rojos (subconjunto; −8 `test_plan_*` +0 nuevos). **Pusheado a `origin/main`
+(`04dd184`).**
+
+**🔴 DEPLOY BLOQUEADO:** la SSH key `kvm4_hostinger` referenciada por `~/.ssh/config` y
+`docs/protocols/deploy-protocol.md` **no existe en disco** (`C:\Users\rober\Dropbox\TESTING
+DEV\SSH KEYS\` no está). Robert: restaurar la key o dar la ruta correcta. Comandos de deploy
+git-only listos en el reporte de sesión / `deploy-protocol.md` §Comandos. Prod sigue en el
+código viejo hasta el deploy.
+
+**Siguiente:** (1) resolver SSH key → deploy `04dd184` a KVM4 (`git fetch && git reset --hard
+origin/main` en `/opt/kvm4/apps/betmexico/code` + `docker restart betmexico-web`), (2) smoke
+de Robert: `/bet` advisor OFF, luego advisor ON.
 
 
 
