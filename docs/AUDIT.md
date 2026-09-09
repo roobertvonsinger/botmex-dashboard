@@ -3,6 +3,17 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-09-09 tarde (`/bet` → "sin cuentas elegibles": JWT vivo era filtro DURO)
+
+**Motivo**: `/bet` real de Robert devolvía `❌ sin cuentas elegibles` con 52 cuentas
+operables en el pool pero solo 1 con JWT vivo (jwt_keeper no calienta el pool operable).
+Regresión de `1453167`. Detalle completo: `docs/ERRORS.md` (entrada 2026-09-09 tarde).
+
+| Función | Spec | Estado | Verificado |
+|---|---|---|---|
+| `plan_auto_mission` — elegibilidad de cuentas | JWT vivo **prioriza, no excluye**: `jwt_order` en el `ORDER BY` (primario + fallback) sube la sesión activa 🟢 al frente y `select_accounts_for_auto` la sube de tier, pero cuentas 🔑 (sin JWT / expirado) **entran** al plan y el flujo hace Login Full. `where_extra` ya NO lleva `AND jwt_token IS NOT NULL ... jwt_expires_at > now+120`. Alinea con el docstring de `select_accounts_for_auto` y la regla Robert 2026-09-02 ("el bet jamás debe no tener cuentas para operar"). | ✅ fix aplicado | ✅ `tests/test_auto_deposit.py::test_plan_operates_without_live_jwt` (RED→GREEN) + `test_auto_deposit.py` 23/23 + `verify_bet_suite` 13/13 + suites `/bet` 184 passed |
+| `plan_auto_mission` — fallback de rotación ("nunca sin cuentas") | Query de respaldo gana `AND COALESCE(grade, '') != 'D'` — antes rellenaba el presupuesto de backfill (`min_pool_needed*4`) con cuentas grade D que `select_accounts_for_auto` descarta igual → neto cero. | ✅ fix aplicado | ✅ mismo test (ruido grade D + `assert not any(e.startswith("dead_grade"))`) |
+
 ## Captura: 2026-09-08 (refactor /bet a nodos — Fase 1 + 1b: retry_policy en FASE 1 matchmaking y FASE 2 scheduled)
 
 **Motivo**: el inner `while True` de matchmaking de `run_auto_mission` (~300 líneas,

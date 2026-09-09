@@ -230,20 +230,20 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_max_accounts_for_cards` | def | L513–L521 |
 | `_advisor_recent_history` | def | L525–L548 |
 | `_build_advisor_bundle` | def | L551–L645 |
-| `plan_auto_mission` | def | L648–L1218 |
-| `_fake_progress_pct` | def | L1265–L1296 |
-| `_iso` | def | L1300–L1301 |
-| `_m_load` | def | L1304–L1312 |
-| `_m_status` | def | L1315–L1317 |
-| `_m_update` | def | L1320–L1330 |
-| `_fetch_account` | def | L1333–L1340 |
-| `_is_account_dead` | def | L1343–L1357 |
-| `_is_account_rate_limited` | def | L1360–L1366 |
-| `_unlock` | def | L1369–L1378 |
-| `_pull_fresh_live_account` | def | L1381–L1515 |
-| `_broadcast_mission` | def | L1518–L1547 |
-| `_stop_pool` | def | L1550–L1557 |
-| `run_auto_mission` | def | L1561–L2752 |
+| `plan_auto_mission` | def | L648–L1217 |
+| `_fake_progress_pct` | def | L1264–L1295 |
+| `_iso` | def | L1299–L1300 |
+| `_m_load` | def | L1303–L1311 |
+| `_m_status` | def | L1314–L1316 |
+| `_m_update` | def | L1319–L1329 |
+| `_fetch_account` | def | L1332–L1339 |
+| `_is_account_dead` | def | L1342–L1356 |
+| `_is_account_rate_limited` | def | L1359–L1365 |
+| `_unlock` | def | L1368–L1377 |
+| `_pull_fresh_live_account` | def | L1380–L1514 |
+| `_broadcast_mission` | def | L1517–L1546 |
+| `_stop_pool` | def | L1549–L1556 |
+| `run_auto_mission` | def | L1560–L2751 |
 
 ### `autoexclusion.py`
 

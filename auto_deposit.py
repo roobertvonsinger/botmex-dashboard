@@ -702,13 +702,11 @@ def plan_auto_mission(
         if has_dead_at:
             where_extra += " AND (dead_at IS NULL OR dead_at='' OR status='LIVE')"
 
-        # Auto-deposit /bet requiere sesión JWT activa para evitar quemar captchas o chocar con 429
-        has_jwt_cols = "jwt_token" in cols and "jwt_expires_at" in cols
-        if has_jwt_cols:
-            where_extra += (
-                " AND jwt_token IS NOT NULL AND length(jwt_token) > 20 "
-                " AND jwt_expires_at > (strftime('%s', 'now') + 120)"
-            )
+        # JWT vivo NO es exclusión dura (Robert 2026-09-02: "el bet jamás debe no
+        # tener cuentas para operar"). El planner PRIORIZA sesión activa 🟢 vía
+        # `jwt_order` en el ORDER BY y `select_accounts_for_auto` la sube de tier,
+        # pero si jwt_keeper se atrasa el matchmaker igual toma cuentas 🔑 y hace
+        # Login Full. Un gate duro aquí (regresión 1453167) colapsaba el pool a ~0.
 
         has_dep_att = bool(con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='deposit_attempts'").fetchone())
         if has_dep_att:
@@ -757,6 +755,7 @@ def plan_auto_mission(
             seen_ids = {r["id"] for r in rows}
             fb_sql = (
                 f"SELECT * FROM accounts WHERE status='LIVE' AND published_to_pool=1 "
+                f"AND COALESCE(grade, '') != 'D' "
                 f"AND COALESCE(kyc_verified, 0)=1 "
                 f"AND (balance_real IS NULL OR balance_real < {MIN_WITHDRAWAL_AMOUNT}) "
                 f"{where_extra} "

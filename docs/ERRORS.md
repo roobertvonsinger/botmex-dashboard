@@ -2,6 +2,18 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## `/bet` → "sin cuentas elegibles" con el pool lleno: JWT vivo se volvió filtro DURO en el planner (2026-09-09, tarde)
+
+- **Síntoma**: Robert corre `/bet` real desde `@betmexbot` y responde `❌ No fue posible armar el plan: sin cuentas elegibles`. En KVM4 el pool operable (LIVE · `published_to_pool=1` · `grade!=D` · `kyc=1` · sin `dead_reason`/429) tenía **52 cuentas**, pero solo **1** con JWT vivo (`jwt_expires_at > now+120`) — y esa era `kyc=0`. 65 cuentas del pool con JWT expirado hace >24h (jwt_keeper no calienta el pool operable).
+- **Causa raíz**: commit `1453167` (2026-09-08, "fix(bet): eliminate 429 contamination", del cluster multi-sesión) metió en `plan_auto_mission` (`auto_deposit.py`, `where_extra`) el filtro `AND jwt_token IS NOT NULL AND length(jwt_token) > 20 AND jwt_expires_at > (strftime('%s','now') + 120)` — aplicado al query primario **y** al fallback de rotación. Eso convierte "sesión activa 🟢" en **exclusión dura**, contradiciendo (a) el docstring de `select_accounts_for_auto` ("JWT vivo NO es exclusión dura... toma 🔑 sin JWT y hace Login Full"), y (b) la regla Robert 2026-09-02 literal en el comentario del fallback ("el bet jamás debe no tener cuentas para operar"). Cuando jwt_keeper se atrasa, el pool colapsa a ~0.
+  - Bug secundario: el query de fallback ("nunca sin cuentas") **no filtraba `grade != 'D'`** → rellenaba el presupuesto de backfill (`min_pool_needed*4`, tope 12) con cuentas grade D que `select_accounts_for_auto` rechaza igual → neto cero. En el diagnóstico live, 11 de 12 filas candidatas eran grade D.
+- **Fix** (`fix(bet): JWT vivo prioriza, no excluye, en el planner de /bet`):
+  - `auto_deposit.py` — eliminado el bloque del gate JWT de `where_extra`. La priorización de sesión activa 🟢 se mantiene intacta vía `jwt_order` en el `ORDER BY` (primario y fallback) y el tiering de `select_accounts_for_auto` (que ya sube 🟢 de tier y ordena `jwt_first`). Cuentas 🔑 entran y el flujo hace Login Full.
+  - `auto_deposit.py` — fallback de rotación gana `AND COALESCE(grade, '') != 'D'`.
+  - `conftest.py::seed_db` — comentario de `b@test.com` actualizado (ya no "exige JWT vivo"; lo trae para ejercer la ruta 🟢).
+- **Verificación**: RED `tests/test_auto_deposit.py::test_plan_operates_without_live_jwt` (cuentas con JWT expirado + sin JWT + ruido grade D → `assert 'stale_jwt@t.com' in ['b@test.com']` falla) → GREEN. `test_auto_deposit.py` 23/23 · `verify_bet_suite` 13/13 · suites `/bet` 184 passed. 3 rojos pre-existentes AJENOS idénticos con/sin el cambio (`git stash` confirmado): `test_bet_live_plan::test_confirm_gate_in_auto_deposit`, `test_bot_bet::{test_bot_bet_max_4_cards, test_bot_bet_no_passwords_in_response}`.
+- **Lección**: una condición de eficiencia/prioridad (sesión reutilizable = 0 captcha) no es una condición de elegibilidad. El mitigante real del 429 es el semáforo `LOGIN_MAX_CONCURRENCY=2` + cuarentena, no negarse a operar. La entrada previa de este mismo día ("Bug 2") atribuyó a "Robert 2026-09-04" que el gate JWT era conducta correcta y parcheó los fixtures en vez del planner — sin evidencia de que Robert lo pidiera, y contra sus reglas de 2026-08-05 y 2026-09-02.
+
 ## El circuit breaker de 429 en `/bet` matchmaking no abortaba la misión + fixtures de `test_plan_*` sin `jwt_token` (2026-09-09)
 
 - **Bug 1 — circuit breaker 429 ciego (real, hot path)**:

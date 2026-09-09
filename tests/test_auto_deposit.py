@@ -152,7 +152,10 @@ def test_select_ignores_decline_map_when_absent():
 
 
 # ── B3 — plan_auto_mission (BD temporal vía fixture seed_db) ─────────────────
-def _add_account(db_path, email, grade="A", grade_score=50, balance=0.0, kyc_verified=1):
+def _add_account(db_path, email, grade="A", grade_score=50, balance=0.0, kyc_verified=1,
+                 jwt_token="jwt_live_placeholder_0123456789", jwt_expires_at=None):
+    if jwt_expires_at is None:
+        jwt_expires_at = int(time.time()) + 3600
     con = sqlite3.connect(str(db_path))
     try:
         con.execute(
@@ -160,7 +163,7 @@ def _add_account(db_path, email, grade="A", grade_score=50, balance=0.0, kyc_ver
             "kyc_verified,published_to_pool,cooldown_until,jwt_token,jwt_expires_at,first_checked_at,last_checked_at) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (email, "x", balance, balance, "LIVE", grade, grade_score, kyc_verified, 1, None,
-             "jwt_live_placeholder_0123456789", int(time.time()) + 3600,
+             jwt_token, jwt_expires_at,
              "2026-07-01 00:00:00", "2026-07-01 00:00:00"))
         con.commit()
     finally:
@@ -231,6 +234,26 @@ def test_plan_feasibility_check(seed_db):
     plan = plan_auto_mission(seed_db, ["4555555555555555|1230|123"], amount=150, target_count=9)
     assert plan["feasible"] is True
     assert any(r["email"] == "b@test.com" for r in plan["accounts"])
+
+
+def test_plan_operates_without_live_jwt(seed_db):
+    """Regresión 1453167: el planner metió JWT vivo como filtro DURO en el SQL
+    (`where_extra`), y `/bet` dejó de armar plan cuando jwt_keeper se atrasa.
+    Robert 2026-09-02: '/bet jamás debe no tener cuentas para operar'. JWT vivo
+    PRIORIZA (jwt_order en el ORDER BY) pero NO excluye — el matchmaker toma
+    cuentas 🔑 (Login Full). El fallback tampoco debe rellenar con grade D."""
+    for i in range(3):
+        _add_account(seed_db, f"dead_grade{i}@t.com", grade="D", jwt_token=None)
+    _add_account(seed_db, "stale_jwt@t.com", jwt_token="x" * 40,
+                 jwt_expires_at=int(time.time()) - 86400)
+    _add_account(seed_db, "no_jwt@t.com", jwt_token=None)
+    cards = ["4333333333333333|0131|999", "4444444444444444|0131|998", "4555555555555555|0131|997"]
+    plan = plan_auto_mission(seed_db, cards, amount=150, target_count=9)
+    emails = [a["email"] for a in plan["accounts"]]
+    assert plan["feasible"] is True
+    assert "stale_jwt@t.com" in emails
+    assert "no_jwt@t.com" in emails
+    assert not any(e.startswith("dead_grade") for e in emails)
 
 
 def test_plan_estimates_total(seed_db):
