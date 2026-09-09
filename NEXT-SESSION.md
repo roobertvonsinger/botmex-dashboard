@@ -5,7 +5,14 @@
 
 ---
 
-## ▶ ARRANQUE INMEDIATO (2026-09-09) — Fase 3 YA EN KVM4 · falta smoke advisor ON de Robert
+## ▶ ARRANQUE INMEDIATO (2026-09-09) — 2 bugs pre-smoke CERRADOS · falta push+deploy+smoke
+
+**Sesión 2026-09-09 (tarde):** cerrados los 2 bugs flagueados antes del smoke (ver
+"✅ Bugs cerrados" abajo). Gates verdes locales: `verify_bet_suite` 13/13, caracterización
+20/20, `test_auto_deposit` 22/22, `test_bet_retry_policy` 66. **Falta:** Smartreview →
+push a `origin/main` → deploy git-only a KVM4 → smoke de Robert (`/bet` advisor OFF, luego ON).
+
+
 
 **Fases 0-3 DEPLOYADAS a KVM4-Karen (`4fc99fa`).** El checkout de prod estaba
 "frankenstein" (deployer manual sin git, 22 commits atrás, ~21 `.bak`, 38 tests
@@ -142,16 +149,21 @@ Orden de fases: 0 ✅ → 1a ✅ → 1 ✅ → 1b ✅ → 2 ✅ → **3 ✅ (A/B
 
 ---
 
-## 🐛 Bugs abiertos flagueados esta sesión (chips de spawn_task)
+## ✅ Bugs cerrados (2026-09-09)
 
-1. **Circuit breaker de 429 no corta el outer loop** (`auto_deposit.py` ~L2018–2030): setea
-   `cancelled` local, pero `while not _cancelled()` lee status en BD → sigue procesando TODAS
-   las cuentas del plan en 429. `test_char_rate_limit_circuit_breaker_current_behavior` lo
-   documenta. Fix: escribir status terminal a BD en el breaker, o `while not _cancelled() and
-   not cancelled`.
-2. **8 tests `test_auto_deposit.py::test_plan_*` rotos en `main`**: fixture `seed_db`/`_add_account`
-   no siembra `jwt_token`/`jwt_expires_at` vigentes y `plan_auto_mission` ahora exige JWT vivo.
-   Modelo a copiar: `tests/test_bet_canonical_suite.py` (siembra `jwt_expires_at DEFAULT 2147483647`).
+1. **Circuit breaker de 429 no cortaba el outer loop** — CERRADO. `auto_deposit.py:2095`
+   `while not _cancelled()` → `while not _cancelled() and not cancelled` (+ `and not cancelled`
+   en el `cross_account_gap` L2465). Test de caracterización reescrito a conducta correcta
+   (`test_char_rate_limit_circuit_breaker_aborts_mission`, 2 cuentas dead no 4). Detalle:
+   `docs/ERRORS.md` (entrada 2026-09-09). Commit `<pendiente push>`.
+2. **8 `test_auto_deposit.py::test_plan_*` rojos** — CERRADO. `_add_account` + `conftest.py::seed_db`
+   (b@test.com) siembran `jwt_token` placeholder de 30 chars. `plan_auto_mission` NO se tocó
+   (el gate JWT es conducta de prod correcta). `test_auto_deposit.py` 22/22.
+
+## 🐛 Rojos pre-existentes AJENOS (no tocar — confirmados idénticos con/sin los fixes de arriba)
+- `test_bet_live_plan.py::test_confirm_gate_in_auto_deposit` — `no such table: auto_missions` (contaminación cross-módulo; pasa aislado).
+- `test_bot_bet.py::{test_bot_bet_max_4_cards, test_bot_bet_no_passwords_in_response}` — mocks stale post-Fase-3 (`plan_auto_mission` ganó `_advisor_sink`).
+- `test_telegram_bot_mock.py::test_bet_input_five_cards`, `test_auto_missions_migrate.py` (×4), `test_anti_rate_limit.py` (×4), `test_a1_estados.py` (×2), `test_withdrawals.py::test_resolve_no_jwt_returns_idle` — contaminación `BMX_MAINTENANCE` cross-módulo (full-run da ~15 rojos; aislar por archivo antes de asumir).
 
 ---
 

@@ -284,6 +284,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `df4ae4a` | test(bet): sembrar jwt_token en fixtures de test_plan_* (gate JWT de plan_auto_mission) |
 | `d6e69ad` | fix(bet): circuit breaker de 429 aborta la mision de verdad (outer loop chequea flag local) |
 | `5e8889b` | docs(plan): fix circuit breaker 429 + fixture JWT de test_plan_* (pre-smoke) |
 | `ea1ee77` | fix(logs): enlazar feed de logs de Ruthopia con KVM4-Karen :8002 y actualizar bridge |
@@ -295,7 +296,6 @@ prewarm.py (router)
 | `8cd909f` | feat(bet): recálculo dinámico del advisor en run_auto_mission + test integración (Fase 3, Commit D) |
 | `050878e` | docs(next-session): Fase 3 A/B/C hechas + colisión multi-sesión con 719111d, Commit D bloqueado |
 | `b525cb1` | feat(bet): cablear bet_advisor — advisor_boost/advisor_hint/_advisor_sink + 3 entry points (Fase 3, Commit C) |
-| `719111d` | feat(bet): matchmaking continuo multi-tarjeta, filtrado falso 429/403 y cableado bet_advisor |
 <!-- GEN:end:recientes -->
 
 ---
