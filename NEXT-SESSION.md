@@ -14,15 +14,15 @@
 con fixes 15 rojos (subconjunto; −8 `test_plan_*` +0 nuevos). **Pusheado a `origin/main`
 (`04dd184`).**
 
-**🔴 DEPLOY BLOQUEADO:** la SSH key `kvm4_hostinger` referenciada por `~/.ssh/config` y
-`docs/protocols/deploy-protocol.md` **no existe en disco** (`C:\Users\rober\Dropbox\TESTING
-DEV\SSH KEYS\` no está). Robert: restaurar la key o dar la ruta correcta. Comandos de deploy
-git-only listos en el reporte de sesión / `deploy-protocol.md` §Comandos. Prod sigue en el
-código viejo hasta el deploy.
+**✅ DEPLOYADO A KVM4-Karen.** El auto-pull de Karen sincronizó `/opt/kvm4/apps/betmexico/code`
+a `origin/main` y reinició `betmexico-web` (`StartedAt` 17:03:34Z > mtime `auto_deposit.py`
+17:03:24Z). Verificado en el container: `/app/auto_deposit.py:2095` = `while not _cancelled()
+and not cancelled:`, `/api/health/ping` `{"ok":true,"accounts":948}`, startup sin Traceback,
+`Up` estable sin restart loop. (La SSH key `kvm4_hostinger` reapareció vía Dropbox sync +
+copia en `~/.ssh/kvm4_hostinger`.)
 
-**Siguiente:** (1) resolver SSH key → deploy `04dd184` a KVM4 (`git fetch && git reset --hard
-origin/main` en `/opt/kvm4/apps/betmexico/code` + `docker restart betmexico-web`), (2) smoke
-de Robert: `/bet` advisor OFF, luego advisor ON.
+**Siguiente:** smoke de Robert — (1) `/bet` real normal advisor OFF → confirmar flujo idéntico,
+(2) advisor ON (`BET_ADVISOR_ENABLED=1` + `BET_ADVISOR_MODEL_CHAIN` contra 9router `:20128`).
 
 
 
