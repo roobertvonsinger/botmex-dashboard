@@ -169,6 +169,10 @@ Gate: `tests/test_bet_advisor.py` 27/27 · `verify_bet_suite` 13/13 · caracteri
   puede cambiar *qué* cuentas caen en `[:max_accounts]`, no solo su orden — por eso
   el caller aplica el guardarraíl `plan_not_worse` (ver abajo). `None`/`{}` → orden
   **idéntico** (test `test_advisor_boost_none_is_identity`).
+  > Recalibración D (2026-09-10): el resto del `sort_key` tras `adv_boost`/`pool_first`
+  > es ahora `has_3ds → jwt_first → fails_rank(graduado) → cards_rank(graduado) →
+  > grade_rank → recently_tried → act_epoch_asc → has_bin_success → -grade_score`
+  > (3DS gana a grade; actividad más antigua primero). Detalle: `docs/AUDIT.md` captura 2026-09-10.
 - **`plan_auto_mission(..., advisor_hint=None, _advisor_sink=None)`** — `advisor_hint`
   se pasa como `advisor_boost=`. Si el caller da `_advisor_sink` (list),
   `_build_advisor_bundle` arma `(bet_advisor.AdvisorInputs, ref2email)` **reusando

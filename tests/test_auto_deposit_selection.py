@@ -331,6 +331,77 @@ def test_tier_proportion_2_2_1(tmp_path):
     assert sum(1 for e in emails if e == "low@test.com") == 1
 
 
+# ── Recalibración D (Robert 2026-09-10): sort_key graduado + orden B `5 3 1 2 4` ──
+#   Prioridad dentro de tier: 3DS <24h → JWT vivo → fails ASC (graduado) →
+#   cards ASC (graduado, 0<1<2) → grade (peso real) → actividad más antigua primero.
+def _dk(email, **over):
+    base = {
+        "id": None, "email": email, "status": "LIVE", "grade": "B",
+        "grade_score": 70, "balance_real": 0.0, "published_to_pool": 1,
+        "kyc_verified": 1, "locked_by": None, "cooldown_until": None,
+        "jwt_expires_at": 0,  # sin JWT vivo -> todas caen a tier_low (grade B)
+    }
+    base.update(over)
+    return base
+
+
+def _dwin(*emails):
+    return {e: {"available": 5000.0} for e in emails}
+
+
+def test_fails_graduated_not_binary():
+    """Criterio 3: menos fallas primero, GRADUADO (1 fail < 5 fails), no binario."""
+    rows = [_dk("f5@t.com"), _dk("f1@t.com")]  # f5 primero en el input
+    meta = {"f5@t.com": {"total_fails": 5}, "f1@t.com": {"total_fails": 1}}
+    sel = ad.select_accounts_for_auto(rows, 150, 2, _dwin("f5@t.com", "f1@t.com"), meta_map=meta)
+    order = [r["email"] for r in sel]
+    assert order.index("f1@t.com") < order.index("f5@t.com")
+
+
+def test_cards_graduated_zero_beats_one():
+    """Criterio 1: 0 tarjetas guardadas antes que 1 (graduado, no binario a >=2)."""
+    rows = [_dk("c1@t.com"), _dk("c0@t.com")]  # c1 primero en el input
+    meta = {"c1@t.com": {"cards_count": 1}, "c0@t.com": {"cards_count": 0}}
+    sel = ad.select_accounts_for_auto(rows, 150, 2, _dwin("c1@t.com", "c0@t.com"), meta_map=meta)
+    order = [r["email"] for r in sel]
+    assert order.index("c0@t.com") < order.index("c1@t.com")
+
+
+def test_oldest_activity_ranked_first():
+    """Criterio 5b: la cuenta cuya actividad más reciente es la más ANTIGUA va primero."""
+    import time as _t
+    now = int(_t.time())
+    rows = [_dk("recent@t.com"), _dk("rested@t.com")]  # recent primero en el input
+    meta = {
+        "recent@t.com": {"last_activity_epoch": now - 2 * 86400},
+        "rested@t.com": {"last_activity_epoch": now - 40 * 86400},
+    }
+    sel = ad.select_accounts_for_auto(rows, 150, 2, _dwin("recent@t.com", "rested@t.com"), meta_map=meta)
+    order = [r["email"] for r in sel]
+    assert order.index("rested@t.com") < order.index("recent@t.com")
+
+
+def test_grade_beats_bin_affinity():
+    """Criterio 2: grade es peso real — B sin afinidad BIN gana a C con afinidad BIN."""
+    rows = [_dk("c_bin@t.com", grade="C"), _dk("b_nobin@t.com", grade="B")]
+    meta = {
+        "c_bin@t.com": {"approved_bin_pipes": {"411111": {"411111xxxxxx1111|12|30|123"}}},
+        "b_nobin@t.com": {},
+    }
+    sel = ad.select_accounts_for_auto(rows, 150, 2, _dwin("c_bin@t.com", "b_nobin@t.com"), meta_map=meta)
+    order = [r["email"] for r in sel]
+    assert order.index("b_nobin@t.com") < order.index("c_bin@t.com")
+
+
+def test_threeds_beats_grade_within_selection():
+    """E-q1: el 3DS <24h gana a grade — ya comprobó lo que el grading intenta predecir."""
+    rows = [_dk("aplus_no3ds@t.com", grade="A+"), _dk("c_3ds@t.com", grade="C")]
+    meta = {"aplus_no3ds@t.com": {}, "c_3ds@t.com": {"has_3ds_24h": True}}
+    sel = ad.select_accounts_for_auto(rows, 150, 2, _dwin("aplus_no3ds@t.com", "c_3ds@t.com"), meta_map=meta)
+    order = [r["email"] for r in sel]
+    assert order[0] == "c_3ds@t.com"
+
+
 # ── Fase 3: advisor_boost — puro desempate dentro del tier ───────────────────
 def _adv_rows(*emails):
     import time as _t

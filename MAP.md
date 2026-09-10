@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 595 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5668 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 2751 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 2782 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `bet_advisor.py` | 471 | `betmexico.dashboard.bet_advisor` | _[completar]_ |
 | `bet_policy.py` | 221 | `—` | _[completar]_ |
@@ -284,6 +284,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `a792abc` | docs(next-session): /bet "sin cuentas elegibles" cerrado (508706d, deployado+smoke) |
 | `508706d` | fix(bet): JWT vivo prioriza, no excluye, en el planner de /bet |
 | `3f5b121` | docs: actualizar DEPLOY.md y NEXT-SESSION.md con SSH restaurado y Karen VPS |
 | `9101529` | docs(next-session): fixes deployados y verificados en KVM4-Karen |
@@ -295,7 +296,6 @@ prewarm.py (router)
 | `ea1ee77` | fix(logs): enlazar feed de logs de Ruthopia con KVM4-Karen :8002 y actualizar bridge |
 | `b91db43` | chore(infra): Fase 3 deployada a KVM4 + checkout de prod reconciliado |
 | `4fc99fa` | chore(infra): reconciliar checkout de prod KVM4 + protocolo de deploy git-only |
-| `ada87e4` | docs(next-session): merge Fase 0-3 a main (ab5732e) — siguiente = deploy KVM4 + smoke |
 <!-- GEN:end:recientes -->
 
 ---

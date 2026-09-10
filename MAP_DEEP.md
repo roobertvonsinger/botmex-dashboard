@@ -226,24 +226,24 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_normalize_pipe_to_3part` | def | L174–L176 |
 | `_get_married_card_owners` | def | L179–L221 |
 | `_has_card_deposit_24h` | def | L224–L240 |
-| `select_accounts_for_auto` | def | L252–L502 |
-| `_max_accounts_for_cards` | def | L513–L521 |
-| `_advisor_recent_history` | def | L525–L548 |
-| `_build_advisor_bundle` | def | L551–L645 |
-| `plan_auto_mission` | def | L648–L1217 |
-| `_fake_progress_pct` | def | L1264–L1295 |
-| `_iso` | def | L1299–L1300 |
-| `_m_load` | def | L1303–L1311 |
-| `_m_status` | def | L1314–L1316 |
-| `_m_update` | def | L1319–L1329 |
-| `_fetch_account` | def | L1332–L1339 |
-| `_is_account_dead` | def | L1342–L1356 |
-| `_is_account_rate_limited` | def | L1359–L1365 |
-| `_unlock` | def | L1368–L1377 |
-| `_pull_fresh_live_account` | def | L1380–L1514 |
-| `_broadcast_mission` | def | L1517–L1546 |
-| `_stop_pool` | def | L1549–L1556 |
-| `run_auto_mission` | def | L1560–L2751 |
+| `select_accounts_for_auto` | def | L252–L522 |
+| `_max_accounts_for_cards` | def | L533–L541 |
+| `_advisor_recent_history` | def | L545–L568 |
+| `_build_advisor_bundle` | def | L571–L665 |
+| `plan_auto_mission` | def | L668–L1248 |
+| `_fake_progress_pct` | def | L1295–L1326 |
+| `_iso` | def | L1330–L1331 |
+| `_m_load` | def | L1334–L1342 |
+| `_m_status` | def | L1345–L1347 |
+| `_m_update` | def | L1350–L1360 |
+| `_fetch_account` | def | L1363–L1370 |
+| `_is_account_dead` | def | L1373–L1387 |
+| `_is_account_rate_limited` | def | L1390–L1396 |
+| `_unlock` | def | L1399–L1408 |
+| `_pull_fresh_live_account` | def | L1411–L1545 |
+| `_broadcast_mission` | def | L1548–L1577 |
+| `_stop_pool` | def | L1580–L1587 |
+| `run_auto_mission` | def | L1591–L2782 |
 
 ### `autoexclusion.py`
 

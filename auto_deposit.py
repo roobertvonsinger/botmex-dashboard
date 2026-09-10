@@ -257,6 +257,7 @@ def select_accounts_for_auto(
     decline_map: Optional[Dict[str, int]] = None,
     meta_map: Optional[Dict[str, Dict[str, Any]]] = None,
     advisor_boost: Optional[Dict[str, int]] = None,
+    priority_emails: Optional[set] = None,
 ) -> List[Dict[str, Any]]:
     """Filtra + clasifica internamente (Top, Mid, Low) + limita cuentas candidatas al depósito auto.
 
@@ -431,44 +432,50 @@ def select_accounts_for_auto(
             tier_low.append(r)
 
     def sort_key(r):
+        # Recalibración D (Robert 2026-09-10). Orden de prioridad dentro del tier
+        # (menor = antes), lista B `5 3 1 2 4` + 3DS gana a grade + fails/cards graduados:
+        #   1. 3DS <24h   — ya comprobó lo que el grading intenta predecir (gana a grade)
+        #   2. JWT vivo   — sesión 🟢 = 0 captcha
+        #   3. fails ASC  — menos transacciones fallidas primero (GRADUADO, no binario)
+        #   4. cards ASC  — sin tarjetas guardadas primero; entre las que tienen, de menos a más (GRADUADO)
+        #   5. grade      — mejor rankeada primero (peso real, no desempate final)
+        #   6. actividad más antigua primero — "cuenta descansada" (criterio 5b)
         email = r.get("email")
         meta = meta_map.get(email) or {}
-        # -1. Hint del advisor LLM (Fase 3): boost alto → primero. Desempate puro
-        #     dentro del tier; el rango [-3,3] no puede saltar la separación de tiers
-        #     (que ya se aplicó arriba) ni un filtro de exclusión dura.
+        # Desempate del advisor LLM (Fase 3): boost alto → primero, dentro del tier.
+        # El rango [-3,3] no salta la separación de tiers ni una exclusión dura.
         adv_boost = -int(advisor_boost.get(email, 0) or 0)
-        # 0. Cuentas explícitamente en el pool primero
+        # Pool explícito antes que excepción RESERVADA_SA.
         pool_first = 0 if r.get("published_to_pool") else 1
-        # 1. Sesión activa 🟢 (0 captcha) SIEMPRE antes que cuentas sin sesión 🔑
-        jwt_first = 0 if r.get("_jwt_alive") else 1
-        # 2. 3DS reciente eleva prioridad
+        # 1. 3DS <24h gana a todo lo demás dentro del tier.
         has_3ds = 0 if meta.get("has_3ds_24h") else 1
-        # 2b. Penalizar cuentas con rechazos previos (cuentas vírgenes o sin fallas primero)
-        total_fails = meta.get("total_fails", 0)
-        has_fails = 1 if total_fails > 0 else 0
-        # 3. Cuentas ya intentadas (<60 min) al final
+        # 2. Sesión 🟢 viva = 0 captcha.
+        jwt_first = 0 if r.get("_jwt_alive") else 1
+        # 3. Fallas históricas GRADUADO: menos primero. Cap a 20 para que un outlier no domine el orden.
+        fails_rank = min(int(meta.get("total_fails") or 0), 20)
+        # 4. Tarjetas guardadas GRADUADO: 0 < 1 < 2 ... Cap a 10.
+        cards_rank = min(int(meta.get("cards_count") or 0), 10)
+        # 5. Grade = peso real (A+ → A → B → C).
+        grade_rank = _grade_rank(r.get("grade"))
+        # 6a. Anti-taladro: cuenta intentada <60 min al fondo de su tier.
         mins = meta.get("mins_since_last_attempt", 99999)
         recently_tried = 1 if mins < 60 else 0
-        # 4. 2+ tarjetas asociadas pierden prioridad (probabilidad de depósito baja)
-        cards_heavy = 1 if (meta.get("cards_count") or 0) >= 2 else 0
-        # 5. Afinidad de BIN exitoso previo
+        # 6b. Criterio 5b: actividad más reciente MÁS ANTIGUA primero. epoch 0
+        #     (sin historial nuestro) = máximamente descansada → primero.
+        act_epoch_asc = int(meta.get("last_activity_epoch") or 0)
+        # Desempates finales.
         has_bin_success = 0 if meta.get("approved_bin_pipes") else 1
-        # 6. Recencia de login/actividad: penalizar cuentas fósiles (>30d sin login/check = 1, recientes = 0)
-        act_epoch = int(meta.get("last_activity_epoch") or 0)
-        days_since_active = (now - act_epoch) / 86400.0 if act_epoch > 0 else 999.0
-        is_stale_fossil = 1 if days_since_active > 30 else 0
         return (
             adv_boost,
             pool_first,
-            jwt_first,
             has_3ds,
-            has_fails,
+            jwt_first,
+            fails_rank,
+            cards_rank,
+            grade_rank,
             recently_tried,
-            cards_heavy,
-            is_stale_fossil,
+            act_epoch_asc,
             has_bin_success,
-            -act_epoch,  # Más recientemente activa/logueada PRIMERO (ahorra captchas y evita cuentas muertas)
-            _grade_rank(r.get("grade")),
             -(float(r.get("grade_score") or 0)),
         )
 
@@ -494,6 +501,19 @@ def select_accounts_for_auto(
             remaining = [r for r in out if r not in stratified]
             remaining.sort(key=sort_key)
             stratified.extend(remaining[: count - len(stratified)])
+
+    # Fast-track de tarjeta casada (invariante 9): un dueño de tarjeta casada
+    # entre los pipes ofrecidos es un match garantizado — se prepende al plan
+    # (ya pasó todos los filtros duros, solo estaba fuera del corte por `count`).
+    if priority_emails:
+        pe = {str(e).strip().lower() for e in priority_emails}
+        strat_emails = {(r.get("email") or "").strip().lower() for r in stratified}
+        pull = [r for r in out
+                if (r.get("email") or "").strip().lower() in pe
+                and (r.get("email") or "").strip().lower() not in strat_emails]
+        if pull:
+            pull.sort(key=sort_key)
+            stratified = pull + stratified
 
     # _jwt_alive era flag interno de tiering — limpiarlo del dict entregado
     for r in stratified:
@@ -1057,6 +1077,16 @@ def plan_auto_mission(
         except sqlite3.OperationalError:
             bin_stats_map = {}
 
+        # Fast-track de tarjetas casadas: si un pipe ofrecido está casado en BD,
+        # su dueño es un match garantizado — se marca como prioritario para que
+        # la selección no lo deje fuera del corte por `count` (invariante 9).
+        _married_all = _get_married_card_owners(db_path)
+        _priority_emails = {
+            _married_all[_extract_card_number(p)]
+            for p in (card_pipes or [])
+            if _extract_card_number(p) in _married_all
+        }
+
         selected = select_accounts_for_auto(
             rows,
             amount,
@@ -1065,6 +1095,7 @@ def plan_auto_mission(
             decline_map=decline_map,
             meta_map=meta_map,
             advisor_boost=advisor_hint,
+            priority_emails=_priority_emails or None,
         )[:max_accounts]
 
         # Fase 3 refactor `/bet`: si el caller pide los inputs del advisor, se

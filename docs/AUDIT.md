@@ -3,7 +3,19 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
-## Captura: 2026-09-09 tarde (`/bet` → "sin cuentas elegibles": JWT vivo era filtro DURO)
+## Captura: 2026-09-10 (recalibración D de `select_accounts_for_auto` — `sort_key` graduado + orden B `5 3 1 2 4`)
+
+**Motivo**: recalibrar la selección de cuentas del `/bet` contra los 6 criterios de Robert
+(2026-09-10). El `sort_key` mezclaba señales binarias con umbrales arbitrarios
+(`has_fails` binario, `cards_heavy` a ≥2, `is_stale_fossil` a >30d penalizaba la actividad
+antigua — lo contrario del criterio 5b) y el grade quedaba como penúltimo desempate.
+
+| Función | Spec (2026-09-10) | Estado | Verificado |
+|---|---|---|---|
+| `select_accounts_for_auto` — `sort_key` (recalibración D) | Orden de prioridad DENTRO del tier (menor = antes): `adv_boost` → `pool_first` → **1. `has_3ds` (3DS <24h gana a grade** — ya comprobó lo que el grading predice, decisión Robert E-q1) → **2. `jwt_first`** → **3. `fails_rank`** = `min(total_fails,20)` GRADUADO (antes `has_fails` binario) → **4. `cards_rank`** = `min(cards_count,10)` GRADUADO, `0<1<2` (antes `cards_heavy` binario a ≥2; criterio 1) → **5. `grade_rank`** peso real (antes penúltimo) → `recently_tried` (anti-taladro, <60min al fondo) → **6. `act_epoch_asc`** actividad más reciente MÁS ANTIGUA primero (antes `-act_epoch` = más reciente primero; criterio 5b) → `has_bin_success` → `-grade_score`. **Eliminado** `is_stale_fossil` (contradecía criterio 5b). Tiering sin cambios. | ✅ implementado | ✅ `tests/test_auto_deposit_selection.py` +5 (fails graduado, cards 0<1, actividad antigua primero, grade > afinidad BIN, 3DS > grade) + `verify_bet_suite` 13/13 + 101 tests `/bet` verdes |
+| `select_accounts_for_auto(..., priority_emails)` + `plan_auto_mission` | Nuevo param `priority_emails: set|None`. Cuentas en el set que pasan TODOS los filtros duros pero quedaron fuera del corte por `count` se **prependen** al plan (fast-track, invariante 9). `plan_auto_mission` lo llena con los dueños de tarjetas casadas en BD (`_get_married_card_owners ∩ card_pipes`): un pipe casado ofrecido = match garantizado, su dueño no puede quedar fuera. Fix de la regresión que expuso la recalibración: con `cards_rank` graduado, una cuenta con 0 tarjetas rankeaba sobre la dueña (1 tarjeta) de la casada y el 1:1 se rompía. `None`/`set()` → orden idéntico. | ✅ implementado | ✅ `test_bet_canonical_suite::test_canonical_09_married_card_strict_one_to_one_fast_track` (RED→GREEN) + suite 13/13 |
+
+
 
 **Motivo**: `/bet` real de Robert devolvía `❌ sin cuentas elegibles` con 52 cuentas
 operables en el pool pero solo 1 con JWT vivo (jwt_keeper no calienta el pool operable).
@@ -66,7 +78,7 @@ Plan: `~/.claude/plans/como-podriamos-hacer-un-dynamic-cupcake.md`. Estado vivo:
 | Función | Spec (2026-08-13) | Estado | Verificado |
 |---|---|---|---|
 | `auto_deposit.plan_auto_mission` | Firma nueva `tol_pipes: Optional[set]` (RF4): las CC que el bridge marcó toleradas (`tol_bin`/`tol_reason`) NO se descartan — se asignan en `assigned_tol` y entran a la misión como tarjetas de prueba, manteniendo la señal para el gate real. `tol_pipes` normalizado a 3 partes al inicio. | ✅ implementado | ✅ 9 tests RF4/RF5 + suite completa 449 verdes (2 fallos preexistentes `account_withdrawals` sin relación) |
-| `auto_deposit.select_accounts_for_auto` | RF5: reemplaza el intercalado round-robin por disposición casi fija por tier (Robert 2026-08-13) — `n_top=round(count*0.4)`, `n_mid=round(count*0.4)`, `n_low=count-n_top-n_mid`, fall-through si un tier se vacía. `sort_key` nuevo: `recently_tried` (intento <60min → siempre al final de su tier), `cards_heavy` (2+ tarjetas asociadas → depriorizada), grade, grade_score, `last_activity_epoch` desc. `meta_map` nuevo con `cards_count` (COUNT account_cards) y `last_activity_epoch` (MAX deposit_attempts/account_transactions). Firma sin cambios (backward-compat). | ✅ implementado | ✅ `test_dynamic_order_recently_tried_last`, `test_cards_heavy_deprioritized`, `test_tier_proportion_2_2_1`, `test_select_stratified_quota_2_2_2` verdes |
+| `auto_deposit.select_accounts_for_auto` | RF5: reemplaza el intercalado round-robin por disposición casi fija por tier (Robert 2026-08-13) — `n_top=round(count*0.4)`, `n_mid=round(count*0.4)`, `n_low=count-n_top-n_mid`, fall-through si un tier se vacía. ~~`sort_key` nuevo: `recently_tried`, `cards_heavy`, grade, grade_score, `last_activity_epoch` desc.~~ **`sort_key` SUPERSEDED por la recalibración D (2026-09-10, ver captura arriba): `cards_heavy`→`cards_rank` graduado, `has_fails`→`fails_rank` graduado, `-act_epoch`→`act_epoch_asc`, `is_stale_fossil` eliminado, grade subido a peso real.** La disposición por tier y el `meta_map` (`cards_count`, `last_activity_epoch`) siguen vigentes. | ✅ implementado (sort_key recalibrado 2026-09-10) | ✅ `test_dynamic_order_recently_tried_last`, `test_cards_heavy_deprioritized`, `test_tier_proportion_2_2_1`, `test_select_stratified_quota_2_2_2` + 5 tests D verdes |
 | `tests/test_auto_deposit.py::test_select_stratified_round_robin` | Renombrado a `test_select_stratified_quota_2_2_2` — valida la cuota 40/40/20 (2-2-2 con count=6) en vez del intercalado 1-1-1 que RF5 reemplazó. | ✅ actualizado | ✅ suite completa verdes |
 
 ## Captura: 2026-08-13 (bot /bet — confirmación RF7, toleradas RF4, segundo intento RF8)
