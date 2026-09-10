@@ -241,9 +241,8 @@ def test_plan_operates_without_live_jwt(seed_db):
     (`where_extra`), y `/bet` dejó de armar plan cuando jwt_keeper se atrasa.
     Robert 2026-09-02: '/bet jamás debe no tener cuentas para operar'. JWT vivo
     PRIORIZA (jwt_order en el ORDER BY) pero NO excluye — el matchmaker toma
-    cuentas 🔑 (Login Full). El fallback tampoco debe rellenar con grade D."""
-    for i in range(3):
-        _add_account(seed_db, f"dead_grade{i}@t.com", grade="D", jwt_token=None)
+    cuentas 🔑 (Login Full). (Grade D tampoco excluye — Robert 2026-09-10 —
+    cubierto en test_auto_deposit_selection.py)."""
     _add_account(seed_db, "stale_jwt@t.com", jwt_token="x" * 40,
                  jwt_expires_at=int(time.time()) - 86400)
     _add_account(seed_db, "no_jwt@t.com", jwt_token=None)
@@ -253,7 +252,6 @@ def test_plan_operates_without_live_jwt(seed_db):
     assert plan["feasible"] is True
     assert "stale_jwt@t.com" in emails
     assert "no_jwt@t.com" in emails
-    assert not any(e.startswith("dead_grade") for e in emails)
 
 
 def test_plan_estimates_total(seed_db):

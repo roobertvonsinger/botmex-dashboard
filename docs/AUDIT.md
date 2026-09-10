@@ -3,6 +3,29 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-09-10b (grade D deja de ser descarte del `/bet` — el grading solo prioriza)
+
+**Motivo**: Robert (2026-09-10) — "el grading está deficiente; las D no son realmente D".
+Tras 3 rondas de resurrección (cuarentena/sin_reason/mass_sweep, ninguna recalcula grade)
+el pool operable colapsó a 12 sobre 178 LIVE porque 165 eran grade D heredada de la
+mass-kill de agosto y `account_refresh` nunca re-gradea D (roach motel). Regla nueva:
+**toda cuenta LIVE + pool + KYC entra al `/bet`**. El grade solo pesa en el ORDEN
+(A+/A priorizan vía `sort_key` y el `ORDER BY` del planner). Exclusiones reales que
+quedan: `published_to_pool=0` (depósito / retiro / manual), `balance_real >= $100`,
+`dead_reason`/`dead_at`, KYC≠1, 429/RATE_LIMITED, cooldowns, `a_plus_decline_streak>=2`.
+
+| Función | Spec (2026-09-10b) | Estado | Verificado |
+|---|---|---|---|
+| `select_accounts_for_auto` — filtro `0d` | **Eliminado** el `continue` por `grade == "D"`. Grade D ya no se descarta; entra a tier LOW y ordena por `grade_rank` (D=4, después de C). | ✅ implementado | ✅ `test_grade_d_live_pooled_account_is_selected`, `test_grade_d_excluded_only_by_pool_or_funds` |
+| `plan_auto_mission` — SQL primario + fallback | Quitado `AND COALESCE(grade,'') != 'D'` de ambas queries. El `ORDER BY (CASE grade A+→0 A→1 B→2 ELSE 3)` se conserva (prioridad, no filtro). | ✅ implementado | ✅ `test_plan_auto_mission_includes_grade_d` + `test_plan_operates_without_live_jwt` (revisado) |
+| `plan_auto_mission` — fast-track de casada (`married_pairs`) | `is_dead` ya no incluye `gr == "D"`: un dueño de tarjeta casada LIVE es match garantizado sin importar su letra. | ✅ implementado | ✅ `test_married_grade_d_owner_live_is_fast_tracked` |
+| `_pull_fresh_live_account` (rotación continua) | Quitado `AND COALESCE(grade,'') != 'D'` del pull de respaldo. | ✅ implementado | ✅ `test_pull_fresh_live_account_allows_grade_d` |
+| `run_auto_mission` — respaldo dinámico | Eliminado el gate `is_quality = grade != 'D'` en el loop de backup del matchmaking. | ✅ implementado | ✅ `verify_bet_suite` 13/13 (invariantes 5/6/8 sin cambio) |
+
+**Nota**: la mass-kill de agosto dejó ~137 LIVE en grade D estructural. `scripts/recalc_grades.py`
+(V10, lee `account_transactions`, cero logins) corrió en KVM4 el 2026-09-10: 45 re-gradeadas,
+pool operable 12→40. Pendiente automatizar (tarea Robert: saneador re-gradea + 1 D random por misión → **superada por esta regla**).
+
 ## Captura: 2026-09-10 (recalibración D de `select_accounts_for_auto` — `sort_key` graduado + orden B `5 3 1 2 4`)
 
 **Motivo**: recalibrar la selección de cuentas del `/bet` contra los 6 criterios de Robert

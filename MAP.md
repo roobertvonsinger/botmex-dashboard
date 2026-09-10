@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 595 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5668 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 2782 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 2781 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `bet_advisor.py` | 471 | `betmexico.dashboard.bet_advisor` | _[completar]_ |
 | `bet_policy.py` | 221 | `—` | _[completar]_ |
@@ -122,17 +122,20 @@ prewarm.py (router)
 | `jwt_keeper.py` | 391 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 246 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 922 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
-| `proxy_pool.py` | 389 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `proxy_pool.py` | 1091 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_validator.py` | 154 | `betmexico.renapo_validator` | _[completar]_ |
 | `saneador_daemon.py` | 275 | `saneador` | _[completar]_ |
+| `scripts/apply_sweep.py` | 76 | `—` | _[completar]_ |
 | `scripts/backfill_account_cards.py` | 123 | `—` | _[completar]_ |
 | `scripts/gen_map.py` | 484 | `—` | Regenerador de MAP.md + MAP_DEEP.md — AST + git log. Corre en pre-commit hook |
 | `scripts/kvm4_local_backup.py` | 75 | `—` | _[completar]_ |
+| `scripts/mass_sweep.py` | 366 | `—` | _[completar]_ |
 | `scripts/migrate_status_no_banco.py` | 80 | `—` | _[completar]_ |
 | `scripts/recalc_grades.py` | 136 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `scripts/reconcile_macro_fleet.py` | 142 | `macro_reconcile` | _[completar]_ |
 | `scripts/refresh_recent_fleet.py` | 124 | `fleet_refresh` | _[completar]_ |
 | `scripts/rescue_429.py` | 249 | `—` | _[completar]_ |
+| `scripts/restore_live.py` | 43 | `—` | _[completar]_ |
 | `scripts/session_balance_poller.py` | 469 | `balance_poller` | _[completar]_ |
 | `scripts/update_proxy001_list.py` | 35 | `—` | _[completar]_ |
 | `scripts/verify_all_accounts_active.py` | 140 | `verify_all_accounts` | _[completar]_ |
@@ -231,6 +234,7 @@ prewarm.py (router)
 | `BACKUPS_DIR` | `"/opt/kvm4/apps/betmexico/data/backups"` | `scripts/kvm4_local_backup.py` |
 | `LOG_FILE` | `"/opt/kvm4/apps/betmexico/data/logs/backup.log"` | `scripts/kvm4_local_backup.py` |
 | `RETENTION_COUNT` | `14` | `scripts/kvm4_local_backup.py` |
+| `REPORT` | `"/tmp/mass_sweep_report.json"` | `scripts/mass_sweep.py` |
 | `LOG_FILE` | `'/data/logs/reconcile_macro_fleet.log'` | `scripts/reconcile_macro_fleet.py` |
 | `DB_PATH` | `'/data/betmexico_accounts.db'` | `scripts/reconcile_macro_fleet.py` |
 | `LOG_FILE` | `'/data/logs/manual_refresh_fleet.log'` | `scripts/refresh_recent_fleet.py` |
@@ -284,6 +288,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `431da7d` | feat(rescue_429): cohorte sin_reason para las 85 DEAD sin razon |
 | `4260bd3` | docs(rescue_429): barrido cuarentena ejecutado — 51 resucitadas / 0 STILL_429 |
 | `5308113` | fix(rescue_429): _resurrect no recalcula grade (schema account_transactions sin txn_id) |
 | `c70fdd3` | fix(pool): eliminar update_429.py (mass-kill 429 sin re-verificar) + rescue_429.py |
@@ -295,7 +300,6 @@ prewarm.py (router)
 | `ac2de08` | docs(next-session): fixes pusheados, deploy bloqueado por SSH key faltante |
 | `04dd184` | docs(bitacora): cerrar bugs circuit-breaker-429 + fixture-jwt (pre-smoke) |
 | `df4ae4a` | test(bet): sembrar jwt_token en fixtures de test_plan_* (gate JWT de plan_auto_mission) |
-| `d6e69ad` | fix(bet): circuit breaker de 429 aborta la mision de verdad (outer loop chequea flag local) |
 <!-- GEN:end:recientes -->
 
 ---

@@ -32,6 +32,10 @@ def _make_db(tmp_path):
         published_to_pool INTEGER DEFAULT 0,
         locked_by INTEGER,
         cooldown_until INTEGER,
+        balance_real REAL,
+        withdrawal_ready INTEGER DEFAULT 0,
+        dead_reason TEXT,
+        dead_at TEXT,
         jwt_expires_at INTEGER DEFAULT 2147483647
     );
 
@@ -190,8 +194,9 @@ def test_accounts_with_real_funds_excluded(tmp_path):
     assert "empty_acc@test.com" in sel_emails
 
 
-def test_accounts_withdrawal_ready_or_grade_d_excluded(tmp_path):
-    """Cuentas con withdrawal_ready=1 con saldo activo (>= $10) o grado D quedan TOTALMENTE EXCLUIDAS."""
+def test_accounts_withdrawal_ready_with_balance_excluded_grade_d_is_not(tmp_path):
+    """withdrawal_ready=1 con saldo activo (>= $100) queda EXCLUIDA. Grade D por sí
+    solo ya NO excluye (Robert 2026-09-10: el grading está deficiente)."""
     rows = [
         {"id": 1, "email": "with_acc@test.com", "status": "LIVE", "published_to_pool": 1, "withdrawal_ready": 1, "balance_real": 250.0, "grade": "A", "kyc_verified": 1},
         {"id": 2, "email": "grade_d@test.com", "status": "LIVE", "published_to_pool": 1, "grade": "D", "kyc_verified": 1},
@@ -201,7 +206,7 @@ def test_accounts_withdrawal_ready_or_grade_d_excluded(tmp_path):
     sel = ad.select_accounts_for_auto(rows, 150, 5, win)
     sel_emails = [r["email"] for r in sel]
     assert "with_acc@test.com" not in sel_emails
-    assert "grade_d@test.com" not in sel_emails
+    assert "grade_d@test.com" in sel_emails
     assert "ok_acc@test.com" in sel_emails
 
 
@@ -450,4 +455,73 @@ def test_advisor_boost_cannot_pull_excluded_account():
         advisor_boost={"dead@t.com": 3},
     )
     assert [r["email"] for r in sel] == ["live@t.com"]
+
+
+# ── Recalibración grade-D (Robert 2026-09-10) ────────────────────────────────
+# "El grading está deficiente; las D no son realmente D. TODAS las cuentas LIVE
+#  entran al /bet. Solo quedan fuera las sacadas del pool (published_to_pool=0
+#  por depósito o manual), las de saldo >= $100, o las con dead_reason. Si sale
+#  un A+/A solito se prioriza, pero grade D NO es un descarte."
+
+def test_grade_d_live_pooled_account_is_selected(tmp_path):
+    rows = [
+        {"id": 1, "email": "d_ok@test.com", "status": "LIVE", "published_to_pool": 1, "grade": "D", "kyc_verified": 1},
+        {"id": 2, "email": "aplus@test.com", "status": "LIVE", "published_to_pool": 1, "grade": "A+", "kyc_verified": 1},
+    ]
+    win = {r["email"]: {"available": 5000.0} for r in rows}
+    sel_emails = [r["email"] for r in ad.select_accounts_for_auto(rows, 150, 5, win)]
+    assert "d_ok@test.com" in sel_emails
+    # prioridad preservada: A+ va antes que D dentro del mismo tier
+    assert sel_emails.index("aplus@test.com") < sel_emails.index("d_ok@test.com")
+
+
+def test_grade_d_excluded_only_by_pool_or_funds(tmp_path):
+    rows = [
+        {"id": 1, "email": "d_nopool@test.com", "status": "LIVE", "published_to_pool": 0, "grade": "D", "kyc_verified": 1},
+        {"id": 2, "email": "d_funded@test.com", "status": "LIVE", "published_to_pool": 1, "grade": "D", "kyc_verified": 1, "balance_real": 250.0},
+        {"id": 3, "email": "d_ok@test.com", "status": "LIVE", "published_to_pool": 1, "grade": "D", "kyc_verified": 1, "balance_real": 0.0},
+    ]
+    win = {r["email"]: {"available": 5000.0} for r in rows}
+    sel_emails = [r["email"] for r in ad.select_accounts_for_auto(rows, 150, 5, win)]
+    assert sel_emails == ["d_ok@test.com"]
+
+
+def test_plan_auto_mission_includes_grade_d(tmp_path):
+    db = _make_db(tmp_path)
+    con = sqlite3.connect(str(db))
+    con.execute("INSERT INTO accounts (email, status, grade, published_to_pool, kyc_verified) VALUES ('d1@t.com','LIVE','D',1,1)")
+    con.execute("INSERT INTO accounts (email, status, grade, published_to_pool, kyc_verified) VALUES ('a1@t.com','LIVE','A',1,1)")
+    con.commit(); con.close()
+    res = ad.plan_auto_mission(
+        db, card_pipes=["4111111111111111|12|28|123", "4222222222222222|12|28|123"],
+        amount=150, target_count=9,
+    )
+    emails = [a["email"] for a in res["accounts"]]
+    assert "d1@t.com" in emails
+
+
+def test_pull_fresh_live_account_allows_grade_d(tmp_path):
+    db = _make_db(tmp_path)
+    con = sqlite3.connect(str(db))
+    con.execute(
+        "INSERT INTO accounts (email, status, grade, published_to_pool, kyc_verified, jwt_expires_at) "
+        "VALUES ('donly@t.com','LIVE','D',1,1,9999999999)"
+    )
+    con.commit(); con.close()
+    got = ad._pull_fresh_live_account(db, already_checked=set(), married_owners={})
+    assert got is not None and got["email"] == "donly@t.com"
+
+
+def test_married_grade_d_owner_live_is_fast_tracked(tmp_path):
+    db = _make_db(tmp_path)
+    con = sqlite3.connect(str(db))
+    con.execute("INSERT INTO accounts (email, status, grade, published_to_pool, kyc_verified) VALUES ('mard@t.com','LIVE','D',1,1)")
+    con.commit(); con.close()
+    pipe = "4111111111111111|12|28|123"
+    res = ad.plan_auto_mission(
+        db, card_pipes=[pipe], amount=150, target_count=9,
+        married_pairs=[{"email": "mard@t.com", "card_pipe": pipe}],
+    )
+    emails = [a["email"] for a in res["accounts"]]
+    assert "mard@t.com" in emails
 

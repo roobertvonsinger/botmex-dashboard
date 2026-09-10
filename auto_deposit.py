@@ -319,9 +319,10 @@ def select_accounts_for_auto(
         if meta_acc.get("is_dead_blocked") or meta_acc.get("is_rate_limited"):
             continue
 
-        # 0d. Cuenta degradada (Grade D) -> jamás usar para auto_deposit / match
-        if (r.get("grade") or "").upper() == "D":
-            continue
+        # 0d. Grade D NO es descarte (Robert 2026-09-10): el grading está deficiente
+        # y muchas cuentas están mal rankeadas como D. Toda cuenta LIVE + pool + KYC
+        # entra al /bet; grade solo pesa en el ORDEN (A+/A priorizan, ver sort_key).
+        # Exclusiones reales: fuera de pool, saldo >= $100, dead_reason, KYC, 429.
 
         # 0e. Racha de declinaciones activa (a_plus_decline_streak >= 2) -> en reposo
         if (r.get("a_plus_decline_streak") or 0) >= 2:
@@ -755,10 +756,11 @@ def plan_auto_mission(
             if has_jwt_cols else ""
         )
 
-        # Cuentas primarias: publicadas al pool con grade != 'D' (sesión activa 🟢 primero)
+        # Cuentas primarias: TODAS las publicadas al pool (grade D incluido —
+        # Robert 2026-09-10: grade solo prioriza en el ORDER BY, no filtra).
         rows = [
             dict(r) for r in con.execute(
-                f"SELECT * FROM accounts WHERE status='LIVE' AND COALESCE(grade, '') != 'D' "
+                f"SELECT * FROM accounts WHERE status='LIVE' "
                 f"AND published_to_pool=1{where_extra} "
                 f"ORDER BY {jwt_order}"
                 f"  (CASE WHEN grade='A+' THEN 0 WHEN grade='A' THEN 1 WHEN grade='B' THEN 2 ELSE 3 END), "
@@ -775,7 +777,6 @@ def plan_auto_mission(
             seen_ids = {r["id"] for r in rows}
             fb_sql = (
                 f"SELECT * FROM accounts WHERE status='LIVE' AND published_to_pool=1 "
-                f"AND COALESCE(grade, '') != 'D' "
                 f"AND COALESCE(kyc_verified, 0)=1 "
                 f"AND (balance_real IS NULL OR balance_real < {MIN_WITHDRAWAL_AMOUNT}) "
                 f"{where_extra} "
@@ -1146,12 +1147,13 @@ def plan_auto_mission(
                 ).fetchone()
                 if row_acc:
                     st = (row_acc["status"] or "").upper()
-                    gr = (row_acc["grade"] or "").upper()
                     has_rl = con.execute(
                         "SELECT COUNT(*) as n FROM deposit_attempts WHERE account_email=? AND (UPPER(status) LIKE '%RATE%' OR rejection_reason LIKE '%429%' OR rejection_reason LIKE '%RATE%' OR UPPER(status) IN ('ACCOUNT_DEAD', 'BAN', 'RATE_LIMITED', 'RATE_LIMITED_PERMANENT'))",
                         (m_email,)
                     ).fetchone()["n"]
-                    is_dead = bool(row_acc["dead_reason"] or row_acc["dead_at"] or st != "LIVE" or gr == "D" or has_rl > 0)
+                    # grade D ya NO es "dead" (Robert 2026-09-10): un dueño de tarjeta
+                    # casada LIVE es match garantizado sin importar su letra.
+                    is_dead = bool(row_acc["dead_reason"] or row_acc["dead_at"] or st != "LIVE" or has_rl > 0)
                     if not is_dead:
                         accounts_out.append({
                             "id": row_acc["id"],
@@ -1461,7 +1463,6 @@ def _pull_fresh_live_account(
                 "SELECT * FROM accounts "
                 "WHERE status='LIVE' AND published_to_pool=1 "
                 "AND COALESCE(kyc_verified, 0)=1 "
-                "AND COALESCE(grade, '') != 'D' "
                 f"AND (balance_real IS NULL OR balance_real < {MIN_WITHDRAWAL_AMOUNT}) "
                 f"{where_extra} "
                 f"{dep_att_filter}"
@@ -2214,9 +2215,7 @@ async def run_auto_mission(
                                          if not is_kyc_ok or _is_account_dead(b_acc) or _is_account_dead(b_acct) or b_email in already_checked_emails:
                                              logger.info(f"➖ CUENTA DE RESPALDO SALTADA (kyc≠1 o dead) | {b_email}")
                                              continue
-                                         is_quality = (b_acc.get("grade") or b_acct.get("grade") or "").upper() != "D"
-                                         if not is_quality:
-                                             continue
+                                         # grade D NO descarta (Robert 2026-09-10): si está LIVE + KYC + pool, opera.
                                          b_cands = [p for p in [b_acc.get("card_pipe"), *card_pipes] if p]
                                          b_cands = [_normalize_pipe_to_3part(p) for p in b_cands]
                                          b_cands = list(dict.fromkeys(b_cands))

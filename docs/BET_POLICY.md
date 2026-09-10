@@ -173,6 +173,13 @@ Gate: `tests/test_bet_advisor.py` 27/27 · `verify_bet_suite` 13/13 · caracteri
   > es ahora `has_3ds → jwt_first → fails_rank(graduado) → cards_rank(graduado) →
   > grade_rank → recently_tried → act_epoch_asc → has_bin_success → -grade_score`
   > (3DS gana a grade; actividad más antigua primero). Detalle: `docs/AUDIT.md` captura 2026-09-10.
+  > **2026-09-10b: grade D dejó de ser exclusión dura.** El grading está deficiente
+  > (D heredada de la mass-kill de agosto, `account_refresh` nunca re-gradea D). Toda
+  > cuenta LIVE + pool + KYC entra al `/bet`; grade solo pesa en `grade_rank` (orden).
+  > Se quitó el `continue` por `grade=='D'` en `select_accounts_for_auto` y el
+  > `AND COALESCE(grade,'') != 'D'` de las 3 queries de `plan_auto_mission`/`_pull_fresh_live_account`
+  > + el gate `is_quality` del respaldo dinámico + `gr=='D'` del fast-track de casada.
+  > Exclusiones reales: `published_to_pool=0`, `balance_real>=$100`, `dead_reason`, KYC, 429.
 - **`plan_auto_mission(..., advisor_hint=None, _advisor_sink=None)`** — `advisor_hint`
   se pasa como `advisor_boost=`. Si el caller da `_advisor_sink` (list),
   `_build_advisor_bundle` arma `(bet_advisor.AdvisorInputs, ref2email)` **reusando

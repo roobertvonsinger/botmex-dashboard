@@ -226,24 +226,24 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_normalize_pipe_to_3part` | def | L174–L176 |
 | `_get_married_card_owners` | def | L179–L221 |
 | `_has_card_deposit_24h` | def | L224–L240 |
-| `select_accounts_for_auto` | def | L252–L522 |
-| `_max_accounts_for_cards` | def | L533–L541 |
-| `_advisor_recent_history` | def | L545–L568 |
-| `_build_advisor_bundle` | def | L571–L665 |
-| `plan_auto_mission` | def | L668–L1248 |
-| `_fake_progress_pct` | def | L1295–L1326 |
-| `_iso` | def | L1330–L1331 |
-| `_m_load` | def | L1334–L1342 |
-| `_m_status` | def | L1345–L1347 |
-| `_m_update` | def | L1350–L1360 |
-| `_fetch_account` | def | L1363–L1370 |
-| `_is_account_dead` | def | L1373–L1387 |
-| `_is_account_rate_limited` | def | L1390–L1396 |
-| `_unlock` | def | L1399–L1408 |
-| `_pull_fresh_live_account` | def | L1411–L1545 |
-| `_broadcast_mission` | def | L1548–L1577 |
-| `_stop_pool` | def | L1580–L1587 |
-| `run_auto_mission` | def | L1591–L2782 |
+| `select_accounts_for_auto` | def | L252–L523 |
+| `_max_accounts_for_cards` | def | L534–L542 |
+| `_advisor_recent_history` | def | L546–L569 |
+| `_build_advisor_bundle` | def | L572–L666 |
+| `plan_auto_mission` | def | L669–L1250 |
+| `_fake_progress_pct` | def | L1297–L1328 |
+| `_iso` | def | L1332–L1333 |
+| `_m_load` | def | L1336–L1344 |
+| `_m_status` | def | L1347–L1349 |
+| `_m_update` | def | L1352–L1362 |
+| `_fetch_account` | def | L1365–L1372 |
+| `_is_account_dead` | def | L1375–L1389 |
+| `_is_account_rate_limited` | def | L1392–L1398 |
+| `_unlock` | def | L1401–L1410 |
+| `_pull_fresh_live_account` | def | L1413–L1546 |
+| `_broadcast_mission` | def | L1549–L1578 |
+| `_stop_pool` | def | L1581–L1588 |
+| `run_auto_mission` | def | L1592–L2781 |
 
 ### `autoexclusion.py`
 
@@ -638,6 +638,12 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `audit_single_account` | def | L40–L175 |
 | `run_sanitizer_batch` | def | L177–L267 |
 
+### `scripts/apply_sweep.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `apply_report` | def | L5–L73 |
+
 ### `scripts/backfill_account_cards.py`
 
 | Símbolo | Tipo | Líneas |
@@ -718,6 +724,12 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_resurrect` | def | L133–L163 |
 | `_run` | def | L166–L203 |
 | `main` | def | L206–L245 |
+
+### `scripts/restore_live.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `restore` | def | L5–L40 |
 
 ### `scripts/session_balance_poller.py`
 
