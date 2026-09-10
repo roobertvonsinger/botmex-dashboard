@@ -13,8 +13,9 @@ CONTEXTO (docs/ERRORS.md):
 QUÉ HACE:
   Re-loguea (concurrency 1, gap configurable, max_login_retries=1) un lote de
   cuentas DEAD con dead_reason que menciona 429. Las que entran LIMPIO (LIVE + JWT)
-  se resucitan a status='LIVE', published_to_pool=1, dead_reason/dead_at NULL y se
-  les recalcula grade V10 (mismo path que saneador_daemon.audit_single_account).
+  se resucitan a status='LIVE', published_to_pool=1, dead_reason/dead_at NULL con
+  JWT + balances frescos (el grade lo recalcula account_refresh / saneador_daemon
+  en su propio ciclo — la cuenta conserva el grade previo mientras tanto).
   Las que siguen 429 / DEAD real se dejan intactas.
 
   Circuit breaker: N (default 3) STILL_429 consecutivos abortan el lote — a partir
@@ -110,8 +111,10 @@ def _pick(con, like: str, limit: int):
 
 
 def _resurrect(con, email: str, res) -> dict:
-    """Devuelve la cuenta al pool. Recalcula grade V10 con las txns frescas si
-    el LoginResult trae detalles (mismo criterio que saneador_daemon)."""
+    """Devuelve la cuenta al pool con JWT + balances frescos. NO recalcula grade:
+    eso es responsabilidad de account_refresh / saneador_daemon (loop propio) — la
+    cuenta conserva su grade previo hasta el siguiente ciclo. El grade viejo es una
+    aproximación válida y `select_accounts_for_auto` maneja cualquier grade."""
     details = getattr(res, "details", None) or {}
     wallet = details.get("wallet") if isinstance(details, dict) else None
     bal_real = bal_bonos = 0.0
@@ -123,38 +126,6 @@ def _resurrect(con, email: str, res) -> dict:
             elif w.get("accountType") == 2:
                 bal_bonos = amt
 
-    grade = score = None
-    try:
-        import sys
-        for p in ("/app", "/app/web"):
-            if p not in sys.path:
-                sys.path.insert(0, p)
-        from betmexico_payment_analyzer import score_payment_readiness
-        txns = (details.get("transactions") or {}).get("items") if isinstance(details, dict) else None
-        if txns is not None:
-            for t in txns:
-                con.execute(
-                    """INSERT OR IGNORE INTO account_transactions
-                       (account_email, txn_id, txn_date, txn_type, gateway, status, amount)
-                       VALUES (?,?,?,?,?,?,?)""",
-                    (email, str(t.get("id") or t.get("txn_id") or ""),
-                     str(t.get("date") or t.get("txn_date") or ""),
-                     int(t.get("type") or t.get("txn_type") or 1),
-                     int(t.get("gateway") or 1), int(t.get("status") or 0),
-                     float(t.get("amount") or 0.0)),
-                )
-            db_txns = con.execute(
-                "SELECT txn_date,status,txn_type,gateway,amount FROM account_transactions "
-                "WHERE LOWER(account_email)=LOWER(?) ORDER BY txn_date DESC", (email,)
-            ).fetchall()
-            sc = score_payment_readiness(
-                {"transactions": {"fetched": True, "items": [dict(x) for x in db_txns],
-                                  "total_rows": len(db_txns)}})
-            if sc:
-                grade, score = sc["grade"].upper(), sc["score"]
-    except Exception as e:  # recálculo best-effort
-        print(f"    (grade recalc skip {email}: {e})")
-
     now_epoch = int(time.time())
     con.execute(
         """UPDATE accounts SET
@@ -163,14 +134,13 @@ def _resurrect(con, email: str, res) -> dict:
                jwt_token=COALESCE(?, jwt_token),
                jwt_expires_at=?,
                balance_real=?, balance_bonos=?, balance_total=?,
-               grade=COALESCE(?, grade), grade_score=COALESCE(?, grade_score),
                last_checked_at=datetime('now')
            WHERE LOWER(email)=LOWER(?)""",
         (getattr(res, "jwt", None), now_epoch + 86400 * 7,
-         bal_real, bal_bonos, bal_real + bal_bonos, grade, score, email),
+         bal_real, bal_bonos, bal_real + bal_bonos, email),
     )
     con.commit()
-    return {"grade": grade, "score": score, "bal_real": bal_real}
+    return {"bal_real": bal_real, "grade_recalc": "deferred_to_account_refresh"}
 
 
 async def _run(sample, gap: float, breaker_threshold: int):
