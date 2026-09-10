@@ -21,9 +21,15 @@ QUÉ HACE:
   Circuit breaker: N (default 3) STILL_429 consecutivos abortan el lote — a partir
   de ahí cada intento es gasto de captcha puro.
 
+COHORTES:
+  cuarentena / bloqueo_ago / sep_429 / any429 — DEAD con 429 en dead_reason.
+  sin_reason — 85 DEAD sin dead_reason NI dead_at (path desconocido, no son 429).
+               $6,281 en balance, 33 grade A KYC=1 — la cohorte con dinero real.
+
 USO (dentro del contenedor betmexico-web):
   docker exec betmexico-web python3 /app/scripts/rescue_429.py --cohort cuarentena --limit 30 --gap 22          # dry-run
   docker exec betmexico-web python3 /app/scripts/rescue_429.py --cohort cuarentena --limit 30 --gap 22 --go     # ejecuta
+  docker exec betmexico-web python3 /app/scripts/rescue_429.py --cohort sin_reason --limit 90 --gap 22 --go     # barre las 85
 
 Salida: /tmp/rescue_429_report.json + resumen a stdout.
 """
@@ -40,13 +46,26 @@ import time
 
 DB_PATH = os.environ.get("BETMEX_DB", "/data/betmexico_accounts.db")
 
-# dead_reason LIKE por cohorte (ver forense docs/ERRORS.md / memoria 549)
+# Cohortes de cuentas DEAD a reconciliar (ver forense docs/ERRORS.md / memoria 549).
+# Valor = patrón para `dead_reason LIKE`; el sentinel None = `dead_reason IS NULL`.
 COHORTS = {
     "cuarentena": "RATE_LIMITED_PERMANENT (429 previo — enfriamiento en cuarent%",
     "bloqueo_ago": "RATE_LIMITED_PERMANENT (429 — BetMexico bloqueó la cuenta)",
     "sep_429": "RATE_LIMITED_PERMANENT (429)",
     "any429": "%429%",
+    # 85 cuentas DEAD sin dead_reason NI dead_at (path desconocido, no son 429).
+    # $6,281 en balance, 33 grade A KYC=1 — la cohorte con dinero real.
+    "sin_reason": None,
 }
+
+
+def cohort_where(cohort: str):
+    """(fragmento SQL, params) para el WHERE de la cohorte. `sin_reason` (sentinel
+    None) exige dead_reason IS NULL AND dead_at IS NULL — no matchea ningún LIKE."""
+    pat = COHORTS[cohort]
+    if pat is None:
+        return "dead_reason IS NULL AND dead_at IS NULL", ()
+    return "dead_reason LIKE ?", (pat,)
 
 
 # ─────────────────────────── lógica pura (testeada) ───────────────────────────
@@ -99,14 +118,15 @@ def _connect():
     return con
 
 
-def _pick(con, like: str, limit: int):
+def _pick(con, cohort: str, limit: int):
+    where_frag, where_params = cohort_where(cohort)
     return con.execute(
-        """SELECT email, password, grade, dead_at, balance_total
+        f"""SELECT email, password, grade, dead_at, balance_total
              FROM accounts
-            WHERE status='DEAD' AND dead_reason LIKE ?
+            WHERE status='DEAD' AND {where_frag}
               AND password IS NOT NULL AND password <> ''
             ORDER BY RANDOM() LIMIT ?""",
-        (like, limit),
+        (*where_params, limit),
     ).fetchall()
 
 
@@ -193,7 +213,7 @@ def main():
     args = ap.parse_args()
 
     con = _connect()
-    rows = _pick(con, COHORTS[args.cohort], args.limit)
+    rows = _pick(con, args.cohort, args.limit)
     con.close()
     sample = [{"cohort": args.cohort, "email": r["email"], "password": r["password"],
                "grade": r["grade"], "dead_at": r["dead_at"], "bal": r["balance_total"]}

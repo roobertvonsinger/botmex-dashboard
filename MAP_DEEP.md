@@ -709,14 +709,15 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `classify` | def | L54–L68 |
-| `decide_action` | def | L71–L73 |
-| `CircuitBreaker` | class | L76–L90 |
-| `_connect` | def | L95–L99 |
-| `_pick` | def | L102–L110 |
-| `_resurrect` | def | L113–L143 |
-| `_run` | def | L146–L183 |
-| `main` | def | L186–L225 |
+| `cohort_where` | def | L62–L68 |
+| `classify` | def | L73–L87 |
+| `decide_action` | def | L90–L92 |
+| `CircuitBreaker` | class | L95–L109 |
+| `_connect` | def | L114–L118 |
+| `_pick` | def | L121–L130 |
+| `_resurrect` | def | L133–L163 |
+| `_run` | def | L166–L203 |
+| `main` | def | L206–L245 |
 
 ### `scripts/session_balance_poller.py`
 

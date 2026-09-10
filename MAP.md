@@ -132,7 +132,7 @@ prewarm.py (router)
 | `scripts/recalc_grades.py` | 136 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `scripts/reconcile_macro_fleet.py` | 142 | `macro_reconcile` | _[completar]_ |
 | `scripts/refresh_recent_fleet.py` | 124 | `fleet_refresh` | _[completar]_ |
-| `scripts/rescue_429.py` | 229 | `—` | _[completar]_ |
+| `scripts/rescue_429.py` | 249 | `—` | _[completar]_ |
 | `scripts/session_balance_poller.py` | 469 | `balance_poller` | _[completar]_ |
 | `scripts/update_proxy001_list.py` | 35 | `—` | _[completar]_ |
 | `scripts/verify_all_accounts_active.py` | 140 | `verify_all_accounts` | _[completar]_ |
@@ -284,6 +284,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `4260bd3` | docs(rescue_429): barrido cuarentena ejecutado — 51 resucitadas / 0 STILL_429 |
 | `5308113` | fix(rescue_429): _resurrect no recalcula grade (schema account_transactions sin txn_id) |
 | `c70fdd3` | fix(pool): eliminar update_429.py (mass-kill 429 sin re-verificar) + rescue_429.py |
 | `f89c0d4` | feat(bet): recalibrar sort_key de select_accounts_for_auto (criterios Robert 2026-09-10) |
@@ -295,7 +296,6 @@ prewarm.py (router)
 | `04dd184` | docs(bitacora): cerrar bugs circuit-breaker-429 + fixture-jwt (pre-smoke) |
 | `df4ae4a` | test(bet): sembrar jwt_token en fixtures de test_plan_* (gate JWT de plan_auto_mission) |
 | `d6e69ad` | fix(bet): circuit breaker de 429 aborta la mision de verdad (outer loop chequea flag local) |
-| `5e8889b` | docs(plan): fix circuit breaker 429 + fixture JWT de test_plan_* (pre-smoke) |
 <!-- GEN:end:recientes -->
 
 ---

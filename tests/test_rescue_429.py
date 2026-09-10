@@ -76,3 +76,22 @@ def test_circuit_breaker_se_resetea_con_login_limpio():
     cb.record("STILL_429")
     cb.record("STILL_429")
     assert not cb.tripped
+
+
+def test_cohort_where_429_usa_like_con_param():
+    sql, params = rescue.cohort_where("cuarentena")
+    assert "dead_reason LIKE ?" in sql
+    assert params == (rescue.COHORTS["cuarentena"],)
+
+
+def test_cohort_where_sin_reason_es_is_null_sin_param():
+    # las 85 DEAD sin dead_reason NI dead_at — no matchean ningún LIKE
+    sql, params = rescue.cohort_where("sin_reason")
+    assert "LIKE" not in sql
+    assert "dead_reason IS NULL" in sql
+    assert "dead_at IS NULL" in sql
+    assert params == ()
+
+
+def test_cohort_sin_reason_registrada():
+    assert "sin_reason" in rescue.COHORTS
