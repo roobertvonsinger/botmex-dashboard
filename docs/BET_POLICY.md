@@ -328,6 +328,21 @@ Hallazgos documentados en los tests (comportamiento actual, no se toca en el ref
   `account_max_declines_per_run`, `card_max_declines`, `card_max_attempts`,
   `circuit_breaker_consecutive_429` — protegen invariantes 4/5/7/10.
 
+## Preguntas SA-only en el flujo `/bet` (Robert 2026-09-10)
+
+Ver `docs/BITACORA/2026-09-10_BET_PREGUNTAS_SA.md`. Resumen:
+
+- **Q1 (siempre, SA-only):** al pegar tarjetas, botones `bet_rw_on` / `bet_rw_off`.
+  "Sin check" → `precheck_card_liveness(skip_rw_liveness=True)`: omite **solo** el gate RW
+  de Ruthopia; casada/`RATE_LIMITED`/Luhn/rechazos-24h siguen. `/betf` intacto.
+- **Q2 (condicional, SA-only):** si una tarjeta está casada en BD, el prompt `💍` suma
+  `🔀 Ignorar Casamiento` → `plan_auto_mission(ignore_marriage_pans={PAN})`: la tarjeta va
+  al pool normal pero **veta su cuenta dueña** (invierte REGLA 2). El set viaja en el `plan`
+  y `run_auto_mission` lo respeta en todos los filtros de candidatas + recálculo dinámico.
+  `ignore_marriage_pans` vacío/None = **cero cambio** (invariante 9 intacta).
+- **No-SA:** sin preguntas — liveness siempre ON, casada → tiro directo silencioso a su
+  cuenta dueña, alto-rechazo → se incluye.
+
 ## Tests pre-existentes rotos (no bloquean el refactor)
 
 `tests/test_auto_deposit.py::test_plan_*` (8 tests) fallan en `main` desde antes: el

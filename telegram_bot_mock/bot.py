@@ -938,6 +938,10 @@ async def bet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ No autorizado.")
         return ConversationHandler.END
 
+    # Cada nueva corrida de /bet vuelve a preguntar Q1 (SA).
+    for _k in ("_bet_rw_answered", "_bet_pending_lines", "_bet_pending_auto_launch"):
+        context.user_data.pop(_k, None)
+
     msg_text = (update.message.text if update.message else "") or ""
     cards_text = ""
     is_fast_mode = msg_text.lower().startswith("/betf") or "fast" in msg_text.lower().split()[:2]
@@ -991,8 +995,15 @@ async def process_bet_input(
     override_text: Optional[str] = None,
     auto_launch: bool = False,
     is_fast_mode: bool = False,
+    skip_rw: bool = False,
+    _status_msg=None,
 ):
-    """Procesa las tarjetas ingresadas para /bet con validación de liveness concurrente."""
+    """Procesa las tarjetas ingresadas para /bet con validación de liveness concurrente.
+
+    `skip_rw` (Robert 2026-09-10, SA-only): omite el gate RW de Ruthopia en el
+    precheck (la revisión de tarjeta ya-en-BD y demás filtros siguen corriendo).
+    `_status_msg`: mensaje ya creado por el callback de la pregunta Q1 para editarlo.
+    """
     text = (override_text or (update.message.text if update.message else "") or "").strip()
     if text.startswith("/") and not any(char.isdigit() for char in text):
         if update.message:
@@ -1007,10 +1018,11 @@ async def process_bet_input(
     ]
     operator_id = update.effective_user.id
     is_sa = (operator_id == SUPERADMIN_ID)
+    _msg_tgt = update.message or (update.callback_query.message if update.callback_query else None)
 
     if not lines or (len(lines) > 4 and not is_sa):
-        if update.message:
-            await update.message.reply_text(
+        if _msg_tgt:
+            await _msg_tgt.reply_text(
                 "❌ Debes enviar entre 1 y 4 tarjetas por intento."
             )
         return WAIT_BET_CONFIRM
@@ -1031,14 +1043,43 @@ async def process_bet_input(
             f"❌ <b>Límite de {MAX_DAILY_STRIKES} strikes diarios alcanzado.</b>\n"
             f"<i>Espera a que se renueve tu cuota o contacta a soporte.</i>"
         )
-        if update.message:
-            await update.message.reply_text(fail_strike_msg, parse_mode="HTML")
+        if _msg_tgt:
+            await _msg_tgt.reply_text(fail_strike_msg, parse_mode="HTML")
         return ConversationHandler.END
 
-    status_msg = None
-    if update.message:
+    # ── Q1 (Robert 2026-09-10, SA-only): ¿con o sin check de liveness RW? ──
+    # Se pregunta UNA vez por corrida de /bet. /betf (fast) y los demás
+    # operadores nunca ven esto — corren siempre con check.
+    if (
+        operator_id == SUPERADMIN_ID
+        and not is_fast_mode
+        and not context.user_data.get("_bet_rw_answered")
+    ):
+        context.user_data["_bet_pending_lines"] = lines
+        context.user_data["_bet_pending_auto_launch"] = auto_launch
+        kb_q1 = InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("✅ Con check (RW Ruthopia)", callback_data="bet_rw_on")],
+                [InlineKeyboardButton("⚡ Sin check (omitir liveness)", callback_data="bet_rw_off")],
+                [InlineKeyboardButton("🛑 Cancelar", callback_data="cancel_bet")],
+            ]
+        )
+        q1_text = (
+            f"{HEADER}\n\n"
+            f"💳 <b>{len(lines)} tarjeta(s) recibida(s).</b>\n\n"
+            f"⚪ ¿Correr este <code>/bet</code> <b>con</b> o <b>sin</b> check de liveness "
+            f"(gate RW de Ruthopia)?\n"
+            f"<i>Sin check omite solo el liveness — la revisión de tarjeta ya-en-BD y "
+            f"los demás filtros siguen igual.</i>"
+        )
+        if _msg_tgt:
+            await _msg_tgt.reply_text(q1_text, parse_mode="HTML", reply_markup=kb_q1)
+        return WAIT_BET_CONFIRM
+
+    status_msg = _status_msg
+    if status_msg is None and _msg_tgt:
         try:
-            status_msg = await update.message.reply_text(
+            status_msg = await _msg_tgt.reply_text(
                 f"⏳ <b>Validando {len(lines)} tarjeta(s) en pasarela…</b>",
                 parse_mode="HTML",
             )
@@ -1055,7 +1096,7 @@ async def process_bet_input(
             results.append((True, "🟢 LIVE (Fast Mode · Pasaporte)", {"card_number": c_pan, "pipe_3parts": p3, "liveness_kind": "live"}))
     else:
         results = await asyncio.gather(
-            *[asyncio.to_thread(precheck_card_liveness, pipe, operator_id) for pipe in lines]
+            *[asyncio.to_thread(precheck_card_liveness, pipe, operator_id, skip_rw) for pipe in lines]
         )
 
     live_pipes = []
@@ -1127,25 +1168,34 @@ async def process_bet_input(
     context.user_data["pending_tol_pipes"] = tol_pipes
     context.user_data["pending_bet_pipes"] = valid_pipes
     context.user_data["pending_married_pairs"] = married_pairs
+    context.user_data["pending_married_pans"] = [
+        p["card_pipe"].split("|")[0].strip() for p in married_pairs
+    ]
 
-    # Regla de Oro (Robert 2026-09-02): Tarjetas casadas reconocidas
-    if married_pairs:
+    # Regla de Oro (Robert 2026-09-02): Tarjetas casadas reconocidas.
+    # Q2 (Robert 2026-09-10): el prompt es SA-only. Los demás operadores nunca
+    # eligen — la tarjeta casada se intenta en su cuenta ligada en silencio
+    # (tiro directo) y el resto del pool corre normal.
+    if married_pairs and is_sa:
         married_details = "\n".join([f"• <code>···{p['card_pipe'].split('|')[0][-4:]}</code> ➔ Cuenta: <code>{p['email']}</code>" for p in married_pairs])
         married_prompt = (
             f"{HEADER}\n\n"
             f"{summary_text}\n\n"
             f"💍 <b>TARJETA(S) CASADA(S) RECONOCIDA(S) (Regla de Oro 1:1):</b>\n"
             f"{married_details}\n\n"
-            f"<i>Estas tarjetas solo pueden intentarse en su cuenta ligada o ser excluidas.</i>\n"
+            f"<i>Puedes tirarlas a su cuenta ligada, ignorar el casamiento (pool "
+            f"normal sin su cuenta dueña) o excluirlas.</i>\n"
             f"¿Cómo deseas proceder?"
         )
         m_buttons = []
         if regular_pipes:
             m_buttons.append([InlineKeyboardButton(f"🚀 Lanzar Todo ({len(valid_pipes)} c/ Casadas)", callback_data="btn_bet_launch_all")])
             m_buttons.append([InlineKeyboardButton(f"🎯 Solo Casadas Directas ({len(married_pairs)})", callback_data="btn_bet_launch_married")])
+            m_buttons.append([InlineKeyboardButton(f"🔀 Ignorar Casamiento — pool sin su cuenta ({len(married_pairs)})", callback_data="btn_bet_launch_ignore_marr")])
             m_buttons.append([InlineKeyboardButton(f"⚡ Solo Pool Limpio ({len(regular_pipes)})", callback_data="btn_bet_launch_clean")])
         else:
             m_buttons.append([InlineKeyboardButton(f"🎯 Tiro Directo a Cuenta Casada ({len(married_pairs)})", callback_data="btn_bet_launch_married")])
+            m_buttons.append([InlineKeyboardButton(f"🔀 Ignorar Casamiento — pool sin su cuenta ({len(married_pairs)})", callback_data="btn_bet_launch_ignore_marr")])
         m_buttons.append([InlineKeyboardButton("🛑 Cancelar", callback_data="cancel_bet")])
         kb_married = InlineKeyboardMarkup(m_buttons)
 
@@ -1153,13 +1203,13 @@ async def process_bet_input(
             try:
                 await status_msg.edit_text(married_prompt, parse_mode="HTML", reply_markup=kb_married)
             except Exception:
-                if update.message:
-                    await update.message.reply_text(married_prompt, parse_mode="HTML", reply_markup=kb_married)
-        elif update.message:
-            await update.message.reply_text(married_prompt, parse_mode="HTML", reply_markup=kb_married)
+                if _msg_tgt:
+                    await _msg_tgt.reply_text(married_prompt, parse_mode="HTML", reply_markup=kb_married)
+        elif _msg_tgt:
+            await _msg_tgt.reply_text(married_prompt, parse_mode="HTML", reply_markup=kb_married)
         return WAIT_BET_CONFIRM
 
-    if high_decline_pipes:
+    if high_decline_pipes and is_sa:
         high_declined_tails = [f"···{p.split('|')[0][-4:]}" for p in high_decline_pipes]
         alert_text = (
             f"{HEADER}\n\n"
@@ -1603,16 +1653,44 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer()
 
     if query.data == "cancel_bet":
-        context.user_data.pop("pending_bet_pipes", None)
+        for _k in ("pending_bet_pipes", "_bet_rw_answered", "_bet_pending_lines", "_bet_pending_auto_launch"):
+            context.user_data.pop(_k, None)
         await query.edit_message_text("❌ Proceso /bet cancelado.")
         return ConversationHandler.END
 
-    if query.data in ("confirm_bet", "btn_bet_launch_all", "btn_bet_launch_clean", "btn_bet_launch_married"):
+    # ── Q1 (SA-only): respuesta con/sin check de liveness RW ──
+    if query.data in ("bet_rw_on", "bet_rw_off"):
+        lines = context.user_data.get("_bet_pending_lines", [])
+        auto_launch = bool(context.user_data.get("_bet_pending_auto_launch"))
+        context.user_data["_bet_rw_answered"] = True
+        skip_rw = (query.data == "bet_rw_off")
+        try:
+            status_msg = await query.edit_message_text(
+                f"⏳ <b>Validando {len(lines)} tarjeta(s)"
+                f"{' — SIN check de liveness' if skip_rw else ''}…</b>",
+                parse_mode="HTML",
+            )
+        except Exception:
+            status_msg = query.message
+        return await process_bet_input(
+            update, context,
+            override_text="\n".join(lines),
+            auto_launch=auto_launch,
+            skip_rw=skip_rw,
+            _status_msg=status_msg,
+        )
+
+    if query.data in ("confirm_bet", "btn_bet_launch_all", "btn_bet_launch_clean", "btn_bet_launch_married", "btn_bet_launch_ignore_marr"):
         try:
             married_pairs = []
+            ignore_marriage_pans = set()
             if query.data == "btn_bet_launch_married":
                 married_pairs = context.user_data.get("pending_married_pairs", [])
                 valid_pipes = [p["card_pipe"] for p in married_pairs]
+            elif query.data == "btn_bet_launch_ignore_marr":
+                # Casadas al pool normal (sin binding directo), vetando su cuenta dueña.
+                valid_pipes = context.user_data.get("pending_all_pipes") or context.user_data.get("pending_bet_pipes", [])
+                ignore_marriage_pans = set(context.user_data.get("pending_married_pans", []))
             elif query.data == "btn_bet_launch_clean":
                 valid_pipes = context.user_data.get("pending_clean_pipes", [])
             elif query.data == "btn_bet_launch_all":
@@ -1638,7 +1716,9 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
             tol_pipes = [p for p in context.user_data.get("pending_tol_pipes", []) if p in valid_pipes]
             # RF4: pasar tol_pipes al plan + married_pairs para tiro directo
-            plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count, tol_pipes=tol_pipes, married_pairs=married_pairs)
+            plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count,
+                                     tol_pipes=tol_pipes, married_pairs=married_pairs,
+                                     ignore_marriage_pans=ignore_marriage_pans)
             if not plan.get("feasible"):
                 await query.edit_message_text(
                     f"❌ No fue posible armar el plan: {plan.get('reason', 'desconocido')}"
@@ -2599,7 +2679,7 @@ def build_app():
             WAIT_BET_CONFIRM: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, process_bet_input),
                 CallbackQueryHandler(
-                    handle_bet_callback, pattern="^(confirm_bet|cancel_bet|btn_bet_launch_all|btn_bet_launch_clean|btn_bet_launch_married)$"
+                    handle_bet_callback, pattern="^(confirm_bet|cancel_bet|bet_rw_on|bet_rw_off|btn_bet_launch_all|btn_bet_launch_clean|btn_bet_launch_married|btn_bet_launch_ignore_marr)$"
                 ),
                 CallbackQueryHandler(
                     start_buttons_callback, pattern="^btn_start_bin_radar$"

@@ -63,6 +63,58 @@ def test_precheck_card_liveness_dead(monkeypatch):
     assert not ok and data["liveness_kind"] == "dead"
 
 
+class _NoMarriedDB:
+    """Contexto de BD que responde None a todo — aísla del betmexico_accounts.db local."""
+    def __init__(self, *a, **k):
+        pass
+    def __enter__(self):
+        class _Cur:
+            def execute(self, *a, **k):
+                class _R:
+                    def fetchone(self_inner):
+                        return None
+                    def fetchall(self_inner):
+                        return []
+                return _R()
+        return _Cur()
+    def __exit__(self, *a):
+        return False
+
+
+def test_precheck_skip_rw_bypasses_bridge(monkeypatch):
+    """`skip_rw_liveness=True` NO llama al gate rw de Ruthopia (bridge ni pasaporte DB)."""
+    import card_checker as cc
+    import deposits
+
+    def _boom(*a, **k):
+        raise AssertionError("el gate rw de Ruthopia no debe llamarse en modo sin-check")
+
+    monkeypatch.setattr(cc, "_get_app_db", _NoMarriedDB)
+    monkeypatch.setattr(deposits, "get_married_card_owner", lambda x: None)
+    monkeypatch.setattr(cc, "ruthopia_bridge_check", _boom)
+    monkeypatch.setattr(cc, "check_ruthopia_db_liveness", _boom)
+    ok, msg, data = cc.precheck_card_liveness("4111111111111111|1230|123", skip_rw_liveness=True)
+    assert ok is True
+    assert data["liveness_kind"] == "live"
+    assert data.get("rw_skipped") is True
+    assert "SIN CHECK" in msg
+
+
+def test_precheck_skip_rw_still_flags_married(monkeypatch):
+    """Sin check omite liveness pero la detección de tarjeta casada sigue viva."""
+    import card_checker as cc
+    import deposits
+
+    monkeypatch.setattr(deposits, "get_married_card_owner", lambda x: "owner@x.com")
+    monkeypatch.setattr(cc, "ruthopia_bridge_check", lambda *a, **k: (_ for _ in ()).throw(AssertionError("bridge")))
+    ok, msg, data = cc.precheck_card_liveness(
+        "4111111111111111|1230|123", operator_id=1341812706, skip_rw_liveness=True
+    )
+    assert ok is True
+    assert data["liveness_kind"] == "married"
+    assert data["married_account"] == "owner@x.com"
+
+
 def test_format_ruthopia_liveness_summary():
     items = [
         {"pipe": "4111111111111111|1230|123", "ok": True, "status_label": "🟢 LIVE"},

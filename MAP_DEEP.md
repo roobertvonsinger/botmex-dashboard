@@ -230,20 +230,20 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_max_accounts_for_cards` | def | L534–L542 |
 | `_advisor_recent_history` | def | L546–L569 |
 | `_build_advisor_bundle` | def | L572–L666 |
-| `plan_auto_mission` | def | L669–L1250 |
-| `_fake_progress_pct` | def | L1297–L1328 |
-| `_iso` | def | L1332–L1333 |
-| `_m_load` | def | L1336–L1344 |
-| `_m_status` | def | L1347–L1349 |
-| `_m_update` | def | L1352–L1362 |
-| `_fetch_account` | def | L1365–L1372 |
-| `_is_account_dead` | def | L1375–L1389 |
-| `_is_account_rate_limited` | def | L1392–L1398 |
-| `_unlock` | def | L1401–L1410 |
-| `_pull_fresh_live_account` | def | L1413–L1546 |
-| `_broadcast_mission` | def | L1549–L1578 |
-| `_stop_pool` | def | L1581–L1588 |
-| `run_auto_mission` | def | L1592–L2781 |
+| `plan_auto_mission` | def | L669–L1267 |
+| `_fake_progress_pct` | def | L1314–L1345 |
+| `_iso` | def | L1349–L1350 |
+| `_m_load` | def | L1353–L1361 |
+| `_m_status` | def | L1364–L1366 |
+| `_m_update` | def | L1369–L1379 |
+| `_fetch_account` | def | L1382–L1389 |
+| `_is_account_dead` | def | L1392–L1406 |
+| `_is_account_rate_limited` | def | L1409–L1415 |
+| `_unlock` | def | L1418–L1427 |
+| `_pull_fresh_live_account` | def | L1430–L1567 |
+| `_broadcast_mission` | def | L1570–L1599 |
+| `_stop_pool` | def | L1602–L1609 |
+| `run_auto_mission` | def | L1613–L2818 |
 
 ### `autoexclusion.py`
 
@@ -470,8 +470,8 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `perform_wabox_liveness_check` | def | L244–L370 |
 | `get_card_declines_24h` | def | L373–L418 |
 | `_get_app_db` | def | L421–L439 |
-| `precheck_card_liveness` | def | L442–L594 |
-| `format_ruthopia_liveness_summary` | def | L597–L640 |
+| `precheck_card_liveness` | def | L442–L609 |
+| `format_ruthopia_liveness_summary` | def | L612–L655 |
 
 ### `clabe_fetch.py`
 

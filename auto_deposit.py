@@ -675,6 +675,7 @@ def plan_auto_mission(
     tol_pipes: Optional[set] = None,
     married_pairs: Optional[List[Dict[str, str]]] = None,
     advisor_hint: Optional[Dict[str, int]] = None,
+    ignore_marriage_pans: Optional[set] = None,
     _advisor_sink: Optional[list] = None,
 ) -> Dict[str, Any]:
     """Plan de misión auto: cuentas elegibles + tarjeta asignada a cada una.
@@ -709,6 +710,14 @@ def plan_auto_mission(
         max_accounts = _max_accounts_for_cards(len(card_pipes or []), POLICY.max_accounts_hard_cap)
 
     tol_pipes = {_normalize_pipe_to_3part(p) for p in (tol_pipes or [])}
+
+    # "Ignorar casamiento" (Robert 2026-09-10, SA-only): PANs que el SA decidió
+    # tratar como NO enlazados. Entran al pool normal y se pueden asignar a
+    # cualquier cuenta elegible EXCEPTO su cuenta dueña.
+    ignore_pans = {
+        _extract_card_number(str(p)) or str(p).strip()
+        for p in (ignore_marriage_pans or [])
+    }
 
     con = sqlite3.connect(str(db_path))
     con.row_factory = sqlite3.Row
@@ -1086,6 +1095,7 @@ def plan_auto_mission(
             _married_all[_extract_card_number(p)]
             for p in (card_pipes or [])
             if _extract_card_number(p) in _married_all
+            and _extract_card_number(p) not in ignore_pans
         }
 
         selected = select_accounts_for_auto(
@@ -1139,7 +1149,7 @@ def plan_auto_mission(
                 if not m_email or not m_pipe:
                     continue
                 m_pan = _extract_card_number(m_pipe)
-                if m_pan in assigned_card_pans:
+                if m_pan in assigned_card_pans or m_pan in ignore_pans:
                     continue
                 row_acc = con.execute(
                     "SELECT id, email, grade, status, dead_reason, dead_at FROM accounts WHERE LOWER(email)=LOWER(?)",
@@ -1198,10 +1208,16 @@ def plan_auto_mission(
                     if cand_pan in assigned_card_pans:
                         continue
 
-                    # REGLA 2: Si la tarjeta ya pagó / casada con otra cuenta -> PROHIBIDA
+                    # REGLA 2: Si la tarjeta ya pagó / casada con otra cuenta -> PROHIBIDA.
+                    # Excepción "ignorar casamiento" (SA): se invierte — la tarjeta va
+                    # a cualquier cuenta MENOS su dueña.
                     married_to = married_owners.get(cand_pan)
-                    if married_to and married_to != email_lower:
-                        continue
+                    if married_to:
+                        if cand_pan in ignore_pans:
+                            if married_to == email_lower:
+                                continue
+                        elif married_to != email_lower:
+                            continue
 
                     # REGLA 3: Anti-Mezcla sobre saldo activo (Robert 2026-09-01)
                     # Si la cuenta tiene saldo >= $100 pesos Y fue fondeada en las últimas 24h,
@@ -1247,6 +1263,7 @@ def plan_auto_mission(
         "feasible": feasible,
         "reason": reason,
         "policy_digest": bet_policy.digest(POLICY),
+        "ignore_marriage_pans": sorted(ignore_pans),
     }
 
 
@@ -1415,6 +1432,7 @@ def _pull_fresh_live_account(
     already_checked: set,
     married_owners: dict,
     for_card: str = "",
+    blocked_owner_pans: Optional[dict] = None,
 ) -> Optional[Dict[str, Any]]:
     """Obtiene una cuenta fresca LIVE con KYC de la BD para rotación continua sin freezes."""
     import sqlite3
@@ -1509,6 +1527,9 @@ def _pull_fresh_live_account(
                 if cand_pan:
                     m_owner = married_owners.get(cand_pan)
                     if m_owner and m_owner != email_lower:
+                        continue
+                    # "ignorar casamiento": la tarjeta nunca vuelve a su cuenta dueña
+                    if blocked_owner_pans and blocked_owner_pans.get(cand_pan) == email_lower:
                         continue
 
                 if cand_bin and has_dep_att:
@@ -1790,6 +1811,26 @@ async def run_auto_mission(
             if married_card_owners:
                 logger.info(f"🛡️ Pre-cargadas {len(married_card_owners)} tarjetas casadas en BD")
 
+            # "Ignorar casamiento" (SA): estos PANs salen del mapa de casadas (van al
+            # pool normal) pero se registra su dueña en `_owner_block` para vetarla.
+            ignore_marr_pans = set((plan or {}).get("ignore_marriage_pans") or [])
+            _owner_block: Dict[str, str] = {}
+            for _p in ignore_marr_pans:
+                _o = married_card_owners.pop(_p, None)
+                if _o:
+                    _owner_block[_p] = _o
+            if _owner_block:
+                logger.info(f"🔀 {len(_owner_block)} tarjeta(s) con casamiento ignorado (pool sin su cuenta dueña)")
+
+            def _pipe_ok_for(p: str, planned: Optional[str], email_low: str) -> bool:
+                """True si el pipe puede usarse en esa cuenta (casadas 1:1 + veto de dueña)."""
+                if _is_card_retired(p):
+                    return False
+                pan = _extract_card_number(p)
+                if _owner_block.get(pan) == email_low:
+                    return False
+                return p == planned or married_card_owners.get(pan, email_low) == email_low
+
             # Inicializar estado de cuentas para el despachador Round-Robin
             accounts_state: List[Dict[str, Any]] = []
             for acc in accounts_list:
@@ -1806,10 +1847,7 @@ async def run_auto_mission(
                 cand = list(dict.fromkeys(cand))
                 email_lower = (email or "").strip().lower()
                 planned_pipe = _normalize_pipe_to_3part(acc.get("card_pipe")) if acc.get("card_pipe") else None
-                cand = [
-                    p for p in cand
-                    if not _is_card_retired(p) and (p == planned_pipe or married_card_owners.get(_extract_card_number(p), email_lower) == email_lower)
-                ]
+                cand = [p for p in cand if _pipe_ok_for(p, planned_pipe, email_lower)]
                 if not cand:
                     logger.info(f"⚠️ Sin tarjetas candidatas activas para {email}")
                     continue
@@ -1926,7 +1964,7 @@ async def run_auto_mission(
                         if not re_enqueued_3ds and len(accounts_state) < POLICY.max_accounts_hard_cap:
                             try:
                                 from app import DB_PATH
-                                fresh_acc = _pull_fresh_live_account(DB_PATH, already_checked_emails, married_card_owners, pipe)
+                                fresh_acc = _pull_fresh_live_account(DB_PATH, already_checked_emails, married_card_owners, pipe, blocked_owner_pans=_owner_block)
                                 if fresh_acc:
                                     already_checked_emails.add(fresh_acc["email"])
                                     accounts_state.append(fresh_acc)
@@ -2031,7 +2069,7 @@ async def run_auto_mission(
                         if not re_enqueued and len(accounts_state) < POLICY.max_accounts_hard_cap:
                             try:
                                 from app import DB_PATH
-                                fresh_acc = _pull_fresh_live_account(DB_PATH, already_checked_emails, married_card_owners, pipe)
+                                fresh_acc = _pull_fresh_live_account(DB_PATH, already_checked_emails, married_card_owners, pipe, blocked_owner_pans=_owner_block)
                                 if fresh_acc:
                                     already_checked_emails.add(fresh_acc["email"])
                                     accounts_state.append(fresh_acc)
@@ -2183,7 +2221,8 @@ async def run_auto_mission(
                                 _rc_sink = [] if _badv.enabled() else None
                                 backup_plan = plan_auto_mission(
                                     DB_PATH, active_cards, amount, target_count,
-                                    max_accounts=remaining, _advisor_sink=_rc_sink,
+                                    max_accounts=remaining, ignore_marriage_pans=ignore_marr_pans,
+                                    _advisor_sink=_rc_sink,
                                 )
                                 if _rc_sink:
                                     try:
@@ -2200,6 +2239,7 @@ async def run_auto_mission(
                                         _rc_boosted = plan_auto_mission(
                                             DB_PATH, active_cards, amount, target_count,
                                             max_accounts=remaining, advisor_hint=_rc_hint,
+                                            ignore_marriage_pans=ignore_marr_pans,
                                         )
                                         if _badv.plan_not_worse(backup_plan, _rc_boosted):
                                             backup_plan = _rc_boosted
@@ -2221,10 +2261,7 @@ async def run_auto_mission(
                                          b_cands = list(dict.fromkeys(b_cands))
                                          b_email_lower = (b_email or "").strip().lower()
                                          b_planned_pipe = _normalize_pipe_to_3part(b_acc.get("card_pipe")) if b_acc.get("card_pipe") else None
-                                         b_cands = [
-                                             p for p in b_cands
-                                             if not _is_card_retired(p) and (p == b_planned_pipe or married_card_owners.get(_extract_card_number(p), b_email_lower) == b_email_lower)
-                                         ]
+                                         b_cands = [p for p in b_cands if _pipe_ok_for(p, b_planned_pipe, b_email_lower)]
                                          if not b_cands:
                                              continue
                                          already_checked_emails.add(b_email)

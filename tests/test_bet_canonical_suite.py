@@ -362,6 +362,58 @@ def test_canonical_09_married_card_strict_one_to_one_fast_track(tmp_path):
     assert "owner@test.com" in plan_emails, "Tarjeta casada se vincula directamente a su dueña"
 
 
+def _seed_married_two_accounts(tmp_path, name):
+    db_file = tmp_path / name
+    con = sqlite3.connect(str(db_file))
+    con.executescript("""
+    CREATE TABLE accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT DEFAULT 'p',
+        status TEXT DEFAULT 'LIVE', grade TEXT DEFAULT 'A', kyc_verified INTEGER DEFAULT 1,
+        published_to_pool INTEGER DEFAULT 1, balance_real REAL DEFAULT 0.0, balance_total REAL DEFAULT 0.0,
+        locked_by INTEGER, cooldown_until INTEGER, jwt_expires_at INTEGER DEFAULT 2147483647
+    );
+    CREATE TABLE deposit_attempts (id INTEGER PRIMARY KEY, account_email TEXT, amount REAL, status TEXT, rejection_reason TEXT, card_pipe TEXT, created_at TEXT);
+    CREATE TABLE account_transactions (id INTEGER PRIMARY KEY, account_email TEXT, txn_date TEXT, amount REAL, status INTEGER, txn_type INTEGER, gateway INTEGER);
+    CREATE TABLE account_cards (id INTEGER PRIMARY KEY, account_email TEXT, number TEXT, status TEXT DEFAULT 'ACTIVE');
+    CREATE TABLE bin_stats (bin TEXT PRIMARY KEY, total_attempts INTEGER, approved_count INTEGER, approval_rate REAL);
+    """)
+    con.execute("INSERT INTO accounts (email) VALUES ('owner@test.com')")
+    con.execute("INSERT INTO accounts (email) VALUES ('stranger@test.com')")
+    con.execute("INSERT INTO account_cards (account_email, number) VALUES ('owner@test.com', '4555555555555555')")
+    con.commit()
+    con.close()
+    return db_file
+
+
+def test_canonical_09b_ignore_marriage_routes_to_non_owner(tmp_path):
+    """Extensión de la invariante 9 (SA-only, Robert 2026-09-10): al pasar
+    `ignore_marriage_pans`, la tarjeta casada se trata como NO enlazada y va al
+    pool normal — a CUALQUIER cuenta elegible MENOS su cuenta dueña."""
+    db_file = _seed_married_two_accounts(tmp_path, "test_ignore_marriage.db")
+    p_married = "4555555555555555|1228|999"
+
+    ign = ad.plan_auto_mission(db_file, [p_married], amount=150, target_count=1,
+                               ignore_marriage_pans={"4555555555555555"})
+    ign_emails = [a["email"] for a in ign.get("accounts", [])]
+    assert "owner@test.com" not in ign_emails, "Con casamiento ignorado, la dueña queda vetada"
+    assert "stranger@test.com" in ign_emails, "La tarjeta casada ya puede caer en un extraño"
+    s_entry = next(a for a in ign["accounts"] if a["email"] == "stranger@test.com")
+    assert s_entry["card_pipe"].startswith("4555555555555555")
+    assert ign["ignore_marriage_pans"] == ["4555555555555555"]
+
+
+def test_canonical_09c_ignore_marriage_empty_is_noop(tmp_path):
+    """`ignore_marriage_pans` vacío/None = invariante 9 intacta (cero cambio de conducta)."""
+    db_file = _seed_married_two_accounts(tmp_path, "test_ignore_marriage_noop.db")
+    p_married = "4555555555555555|1228|999"
+
+    base = ad.plan_auto_mission(db_file, [p_married], amount=150, target_count=1)
+    noop = ad.plan_auto_mission(db_file, [p_married], amount=150, target_count=1,
+                                ignore_marriage_pans=set())
+    assert [a["email"] for a in base["accounts"]] == [a["email"] for a in noop["accounts"]]
+    assert "owner@test.com" in [a["email"] for a in noop["accounts"]]
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 10. BLINDAJE CANÓNICO 429 RATE LIMIT (CERO PRIORIZACIÓN Y AISLAMIENTO TOTAL)
 # ─────────────────────────────────────────────────────────────────────────────

@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 595 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5668 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 2781 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 2818 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `bet_advisor.py` | 471 | `betmexico.dashboard.bet_advisor` | _[completar]_ |
 | `bet_policy.py` | 221 | `—` | _[completar]_ |
@@ -113,7 +113,7 @@ prewarm.py (router)
 | `betmexico_payment_analyzer.py` | 592 | `—` | _[completar]_ |
 | `betmexico_utils.py` | 1159 | `—` | _[completar]_ |
 | `bin_intelligence.py` | 701 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
-| `card_checker.py` | 640 | `betmexico.dashboard.card_checker` | _[completar]_ |
+| `card_checker.py` | 655 | `betmexico.dashboard.card_checker` | _[completar]_ |
 | `clabe_fetch.py` | 189 | `betmexico.dashboard.clabe_fetch` | _[completar]_ |
 | `conftest.py` | 222 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
@@ -288,6 +288,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `78d2233` | feat(bet): grade D deja de ser descarte — toda cuenta LIVE entra al /bet |
 | `431da7d` | feat(rescue_429): cohorte sin_reason para las 85 DEAD sin razon |
 | `4260bd3` | docs(rescue_429): barrido cuarentena ejecutado — 51 resucitadas / 0 STILL_429 |
 | `5308113` | fix(rescue_429): _resurrect no recalcula grade (schema account_transactions sin txn_id) |
@@ -299,7 +300,6 @@ prewarm.py (router)
 | `9101529` | docs(next-session): fixes deployados y verificados en KVM4-Karen |
 | `ac2de08` | docs(next-session): fixes pusheados, deploy bloqueado por SSH key faltante |
 | `04dd184` | docs(bitacora): cerrar bugs circuit-breaker-429 + fixture-jwt (pre-smoke) |
-| `df4ae4a` | test(bet): sembrar jwt_token en fixtures de test_plan_* (gate JWT de plan_auto_mission) |
 <!-- GEN:end:recientes -->
 
 ---

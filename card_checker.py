@@ -439,11 +439,16 @@ def _get_app_db(write=False):
         return DirectCtx()
 
 
-def precheck_card_liveness(card_pipe: str, operator_id: Optional[int] = None) -> Tuple[bool, str, Optional[Dict[str, str]]]:
+def precheck_card_liveness(card_pipe: str, operator_id: Optional[int] = None, skip_rw_liveness: bool = False) -> Tuple[bool, str, Optional[Dict[str, str]]]:
     """Realiza la verificación completa de liveness pre-depósito.
 
     Aplica sintaxis, Luhn, fecha, check de tarjetas asociadas y comprobación
     de pasaporte en Ruthopia DB / Ruthopia Gate.
+
+    `skip_rw_liveness` (Robert 2026-09-10): el SA pidió correr `/bet` "sin check".
+    Omite SOLO el gate rw de Ruthopia (pasaporte DB + bridge HTTP + tolerancias).
+    Sintaxis/Luhn/fecha, detección de tarjeta casada, RATE_LIMITED y la alerta de
+    rechazos 24h SIGUEN corriendo — la revisión contra la BD es independiente.
     """
     valid, parsed, reason = parse_and_validate_card_pipe(card_pipe)
     if not valid:
@@ -518,6 +523,16 @@ def precheck_card_liveness(card_pipe: str, operator_id: Optional[int] = None) ->
             ).fetchone()
             if account_status and "RATE_LIMITED" in (account_status["dead_reason"] or ""):
                 return False, "🔴 RATE_LIMITED - Cuenta bloqueada permanentemente", None
+
+    # SIN CHECK (Robert 2026-09-10): corte temprano ANTES del gate rw de Ruthopia.
+    # Ya pasaron sintaxis/Luhn/fecha + casada + RATE_LIMITED + rechazos 24h.
+    if skip_rw_liveness:
+        parsed["liveness_kind"] = "live"
+        parsed["is_live"] = True
+        parsed["rw_skipped"] = True
+        status_label = "⚪ SIN CHECK — liveness RW omitido"
+        parsed["liveness_label"] = status_label
+        return True, status_label, parsed
 
     # 0. Caché en memoria Utopía (TTL 30 min = 1800s) — Zero Overchecking inmediato
     if card_num in _UTOPIA_LIVENESS_CACHE:

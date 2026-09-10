@@ -24,7 +24,7 @@ def main():
 
     res = subprocess.run(cmd, cwd=str(root_dir))
     if res.returncode == 0:
-        print("\n✅ TODAS LAS 13 INVARIANTES CANÓNICAS DE /bet ESTÁN 100% OPERATIVAS Y VERIFICADAS.")
+        print("\n✅ TODAS LAS INVARIANTES CANÓNICAS DE /bet ESTÁN 100% OPERATIVAS Y VERIFICADAS.")
         sys.exit(0)
     else:
         print("\n❌ FALLO CRÍTICO: La suite canónica de /bet ha detectado una regresión operativa.")

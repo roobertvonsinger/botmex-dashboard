@@ -452,15 +452,15 @@ async def test_bet_input_zero_cards(seed_db):
 
 
 @pytest.mark.asyncio
-async def test_bet_input_five_cards(seed_db):
-    """Envío de 5 tarjetas en /bet."""
+async def test_bet_input_five_cards_non_sa_rejected(seed_db):
+    """Un operador normal con 5 tarjetas es rechazado (tope 1-4)."""
     update = MagicMock(spec=Update)
     user = MagicMock(spec=User)
-    user.id = SUPERADMIN_ID
+    user.id = 7847239854  # Luisito (colaborador, no SA)
     update.effective_user = user
+    update.callback_query = None
     update.message = AsyncMock(spec=Message)
-    pipes = "\n".join(["4532015112830366|12|28|123"] * 5)
-    update.message.text = pipes
+    update.message.text = "\n".join(["4532015112830366|12|28|123"] * 5)
 
     context = MagicMock()
     context.user_data = {}
@@ -468,6 +468,27 @@ async def test_bet_input_five_cards(seed_db):
     res = await process_bet_input(update, context)
     assert res == WAIT_BET_CONFIRM
     update.message.reply_text.assert_called_with("❌ Debes enviar entre 1 y 4 tarjetas por intento.")
+
+
+@pytest.mark.asyncio
+async def test_bet_input_five_cards_sa_allowed(seed_db):
+    """El SA no tiene tope de 4 — 5 tarjetas avanzan a la pregunta Q1."""
+    update = MagicMock(spec=Update)
+    user = MagicMock(spec=User)
+    user.id = SUPERADMIN_ID
+    update.effective_user = user
+    update.callback_query = None
+    update.message = AsyncMock(spec=Message)
+    update.message.text = "\n".join(["4532015112830366|12|28|123"] * 5)
+
+    context = MagicMock()
+    context.user_data = {}
+
+    res = await process_bet_input(update, context)
+    assert res == WAIT_BET_CONFIRM
+    args, kwargs = update.message.reply_text.call_args
+    flat = [b.callback_data for row in kwargs["reply_markup"].inline_keyboard for b in row]
+    assert "bet_rw_on" in flat
 
 
 @pytest.mark.asyncio
@@ -507,7 +528,8 @@ async def test_bet_card_invalid_or_cooldown(seed_db):
     update.message.text = "4000000000000002|12|28|123"
 
     context = MagicMock()
-    context.user_data = {}
+    # Q1 (con/sin check) ya respondida — este test cubre el flujo posterior.
+    context.user_data = {"_bet_rw_answered": True}
 
     res = await process_bet_input(update, context)
     assert res == ConversationHandler.END
@@ -539,7 +561,7 @@ async def test_bet_confirm_splits_live_tol(seed_db, monkeypatch):
         "41691600000000070|12|28|123"
     )
     context = MagicMock()
-    context.user_data = {}
+    context.user_data = {"_bet_rw_answered": True}
 
     res = await process_bet_input(update, context)
     assert res == WAIT_BET_CONFIRM
@@ -559,6 +581,83 @@ async def test_bet_confirm_splits_live_tol(seed_db, monkeypatch):
     flat = [b.callback_data for row in kb.inline_keyboard for b in row]
     assert "confirm_bet" in flat
     assert "cancel_bet" in flat
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Q1 (Robert 2026-09-10): pregunta SA-only con/sin check de liveness RW
+# ─────────────────────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_bet_q1_sa_gets_liveness_question(seed_db):
+    """El SA, al pegar tarjetas, primero recibe la pregunta con/sin check."""
+    update = MagicMock(spec=Update)
+    user = MagicMock(spec=User)
+    user.id = SUPERADMIN_ID
+    update.effective_user = user
+    update.callback_query = None
+    update.message = AsyncMock(spec=Message)
+    update.message.text = "4532015112830366|12|28|123"
+
+    context = MagicMock()
+    context.user_data = {}
+
+    res = await process_bet_input(update, context)
+    assert res == WAIT_BET_CONFIRM
+    args, kwargs = update.message.reply_text.call_args
+    flat = [b.callback_data for row in kwargs["reply_markup"].inline_keyboard for b in row]
+    assert "bet_rw_on" in flat and "bet_rw_off" in flat
+    assert context.user_data["_bet_pending_lines"] == ["4532015112830366|12|28|123"]
+
+
+@pytest.mark.asyncio
+async def test_bet_q1_non_sa_skips_question(seed_db, monkeypatch):
+    """Un operador normal NUNCA ve la pregunta — corre siempre con check."""
+    import card_checker
+    monkeypatch.setattr(card_checker, "ruthopia_bridge_check", lambda p: ("Approved", "ok"))
+
+    update = MagicMock(spec=Update)
+    user = MagicMock(spec=User)
+    user.id = 7847239854  # Luisito (colaborador)
+    update.effective_user = user
+    update.callback_query = None
+    update.message = AsyncMock(spec=Message)
+    update.message.text = "4532015112830366|12|28|123"
+
+    context = MagicMock()
+    context.user_data = {}
+
+    res = await process_bet_input(update, context)
+    # No hay pregunta Q1 — llega directo al paso de confirmación / plan
+    assert "_bet_pending_lines" not in context.user_data
+
+
+@pytest.mark.asyncio
+async def test_bet_q1_off_calls_precheck_skipping_rw(seed_db, monkeypatch):
+    """'Sin check' re-invoca el precheck con skip_rw=True (no toca el bridge RW)."""
+    import telegram_bot_mock.bot as mb
+
+    captured = {}
+
+    async def fake_process(update, context, **kw):
+        captured.update(kw)
+        return ConversationHandler.END
+
+    monkeypatch.setattr(mb, "process_bet_input", fake_process)
+
+    query = AsyncMock()
+    query.data = "bet_rw_off"
+    update = MagicMock(spec=Update)
+    user = MagicMock(spec=User)
+    user.id = SUPERADMIN_ID
+    update.effective_user = user
+    update.callback_query = query
+
+    context = MagicMock()
+    context.user_data = {"_bet_pending_lines": ["4532015112830366|12|28|123"], "_bet_pending_auto_launch": False}
+
+    await handle_bet_callback(update, context)
+    assert captured.get("skip_rw") is True
+    assert context.user_data.get("_bet_rw_answered") is True
 
 
 # ─────────────────────────────────────────────────────────────────────────────
