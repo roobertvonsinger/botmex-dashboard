@@ -23,10 +23,21 @@
   0 OTP-correo / 0 credenciales-mal en 36 intentos (la premisa "piden OTP al correo" es falsa). La cohorte **cuarentena** entró limpio **por el mismo proxy pool** que a otras les dio 429 en la misma corrida → el 429 es per-cuenta real de BetMexico, no quema del pool.
 - **Fix**:
   1. **`scripts/update_429.py` ELIMINADO** (`git rm`, + borrado de `/app/scripts/` en KVM4). Nunca recrear: cualquier reclasificación 429→DEAD debe re-verificar por-cuenta.
-  2. **`scripts/rescue_429.py`** (nuevo) — reconciliación tooled y con TDD: re-loguea cohortes 429 (concurrency 1, `max_login_retries=1`, gap configurable, circuit breaker de N STILL_429 consecutivos), resucita a `status='LIVE'` + `published_to_pool=1` + grade V10 recalculado SOLO las que entran limpio; deja intactas las que siguen 429 / DEAD real. `--go` para ejecutar, dry-run por defecto.
+  2. **`scripts/rescue_429.py`** (nuevo) — reconciliación tooled y con TDD: re-loguea cohortes 429 (concurrency 1, `max_login_retries=1`, gap configurable, circuit breaker de N STILL_429 consecutivos), resucita a `status='LIVE'` + `published_to_pool=1` + JWT/balances frescos SOLO las que entran limpio; deja intactas las que siguen 429 / DEAD real. **NO recalcula grade** — eso es del loop de `account_refresh`/`saneador_daemon`; la cuenta conserva su grade previo mientras tanto (`select_accounts_for_auto` maneja cualquier grade). Ver commit `5308113`: la versión inicial intentaba un INSERT en `account_transactions` con columna `txn_id` **inexistente** en el schema real (`['id','account_email','txn_date','amount','status','txn_type','gateway','checked_by','fetched_at','source','operator_id','card_id','attempt_id']`) — el `except Exception` lo tragaba y el recalc se saltaba en silencio. **Mismo bug latente en `saneador_daemon.py` (rama LIVE re-heal) — sin corregir aún.** `--go` para ejecutar, dry-run por defecto.
   3. `deposits._mark_rate_limited_dead` ya era correcto — `tests/test_pool_manage.py::test_mark_rate_limited_isolates_pool_not_dead` lo blinda (status='LIVE' preservado, pool=0).
 - **Verificación**: TDD RED→GREEN `tests/test_rescue_429.py` 9/9 (classify / decide_action / CircuitBreaker). `verify_bet_suite` 13/13. `py_compile` OK.
-- **Pendiente 🔵**: barrido de reconciliación de las 96 cuarentena con `rescue_429.py --go` (en curso) + re-testear `sep_429` en ~2 semanas (ventana de rate-limit activa). `bloqueo_ago` (388) se deja como está — 429 real confirmado.
+- **Barrido cuarentena ejecutado 2026-09-10** (`rescue_429.py --cohort cuarentena --limit 96 --gap 22 --breaker 3 --go`, `docker exec -d` en KVM4):
+  | verdict | n | acción |
+  |---|---|---|
+  | `LIVE_LIMPIO` | **51** | resucitadas → pool (JWT 7d, balance $0, grade previo) |
+  | `OTRO` (`LOGIN_FAILED "Login fallido tras reintentos"`, ~6s, no llega a captcha) | 44 | dejadas DEAD |
+  | `DEAD_REAL` (`LOGIN_DENIED` — `fernydifi@gmail.com`) | 1 | dejada DEAD |
+  | `STILL_429` | **0** | — |
+  - **Circuit breaker NO disparó** — cero 429 en 96 re-logins. La cohorte cuarentena **nunca** tuvo 429 real: el aislamiento fue 100% injustificado.
+  - **CapMonster**: $2.9474 → $2.8898 = **−$0.0576 por 96 logins reales** (≈$0.0006 c/u). Sin fuga, consumo proporcional.
+  - Resultado: `DEAD con '%429%'` 549 → **498**. cuarentena 96 → 45 DEAD.
+  - Los 44 `LOGIN_FAILED` (varias grade A): hipótesis = password rotado en BD desde el mass-kill (hace ~2 sem) o cuenta en estado que corta pre-captcha. **No re-testeado** (Robert: no drenar). Candidato a un segundo pase con credenciales frescas.
+- **Pendiente 🔵**: re-testear `sep_429` (65) en ~2 semanas (ventana rate-limit activa) · `bloqueo_ago` (388) se deja — 429 real confirmado · corregir el `txn_id` latente en `saneador_daemon.py` · decidir recurrence guard (opt-in slow re-test en saneador vs. dejar `rescue_429.py` manual).
 
 ## `/bet` → "sin cuentas elegibles" con el pool lleno: JWT vivo se volvió filtro DURO en el planner (2026-09-09, tarde)
 
