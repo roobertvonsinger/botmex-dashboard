@@ -705,6 +705,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `process_account` | def | L46–L97 |
 | `main` | def | L99–L121 |
 
+### `scripts/rescue_429.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `classify` | def | L53–L67 |
+| `decide_action` | def | L70–L72 |
+| `CircuitBreaker` | class | L75–L89 |
+| `_connect` | def | L94–L98 |
+| `_pick` | def | L101–L109 |
+| `_resurrect` | def | L112–L173 |
+| `_run` | def | L176–L213 |
+| `main` | def | L216–L255 |
+
 ### `scripts/session_balance_poller.py`
 
 | Símbolo | Tipo | Líneas |

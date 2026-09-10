@@ -2,6 +2,32 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## `scripts/update_429.py` mass-killeó ~161 cuentas 429 sin re-verificar (2026-09-10) — ELIMINADO
+
+- **Síntoma**: censo KVM4 2026-09-10 — 549 cuentas `status='DEAD'` con `dead_reason='RATE_LIMITED_PERMANENT (...)'`. **0 de 549** con txn o `last_checked_at` posterior a su `dead_at` → cero re-verificación. Dos sub-cohortes con firma de UPDATE bulk:
+  - **96** `(429 previo — enfriamiento en cuarentena)` — **todas en el mismo segundo 2026-08-28 15:21:45**.
+  - **65** `(429)` — 2026-09-04..05 (mismo día que la fecha `mtime` de `scripts/update_429.py` en KVM4: `Sep 4 20:34`).
+- **Causa raíz**: `scripts/update_429.py` (script manual de 12 líneas, **sin cron ni caller en el código** — huérfano):
+  ```sql
+  UPDATE accounts SET status='DEAD', published_to_pool=0, dead_at=datetime('now')
+  WHERE dead_reason LIKE '%429%' AND status='LIVE'
+  ```
+  Sin re-login, sin re-check. Toma cuentas que `deposits._mark_rate_limited_dead` había aislado **correctamente** (`published_to_pool=0`, `status='LIVE'` preservado, `dead_reason='RATE_LIMITED_429'` — regla canónica Robert 2026-09-04) y las hard-killea en bloque. Contradice de frente esa regla: *"El 429 NO se marca como status='DEAD'. Simplemente se aísla del pool."*
+- **Contexto de política** (para no revertir de más): 2026-08-06 Robert decidió *"429 → DEAD a la primera"* (`docs/ERRORS.md`, entrada de esa fecha) tras ver 145 cuentas A/B reintentadas gentilmente por semanas sin sanar → 429 real por-cuenta. **Esa decisión fue superada el 2026-09-04**: el 429 volvió a ser *aislar del pool, status preservado* (`_mark_rate_limited_dead`). `update_429.py` es un remanente de la era 2026-08-06 que quedó suelto y se corrió después del cambio de regla.
+- **Evidencia de recuperabilidad** (`scratchpad/probe_rlp.py`, `gentle_login` concurrency 1, gap 25s, 36 logins reales, NO muta):
+  | cohorte | muestra | LIVE limpio | 429 otra vez |
+  |---|---|---|---|
+  | bloqueo_ago (388) | 12 | 0 | 12 |
+  | **cuarentena (96)** | 12 | **8** | 4 |
+  | sep_429 (65) | 12 | 0 | 12 |
+  0 OTP-correo / 0 credenciales-mal en 36 intentos (la premisa "piden OTP al correo" es falsa). La cohorte **cuarentena** entró limpio **por el mismo proxy pool** que a otras les dio 429 en la misma corrida → el 429 es per-cuenta real de BetMexico, no quema del pool.
+- **Fix**:
+  1. **`scripts/update_429.py` ELIMINADO** (`git rm`, + borrado de `/app/scripts/` en KVM4). Nunca recrear: cualquier reclasificación 429→DEAD debe re-verificar por-cuenta.
+  2. **`scripts/rescue_429.py`** (nuevo) — reconciliación tooled y con TDD: re-loguea cohortes 429 (concurrency 1, `max_login_retries=1`, gap configurable, circuit breaker de N STILL_429 consecutivos), resucita a `status='LIVE'` + `published_to_pool=1` + grade V10 recalculado SOLO las que entran limpio; deja intactas las que siguen 429 / DEAD real. `--go` para ejecutar, dry-run por defecto.
+  3. `deposits._mark_rate_limited_dead` ya era correcto — `tests/test_pool_manage.py::test_mark_rate_limited_isolates_pool_not_dead` lo blinda (status='LIVE' preservado, pool=0).
+- **Verificación**: TDD RED→GREEN `tests/test_rescue_429.py` 9/9 (classify / decide_action / CircuitBreaker). `verify_bet_suite` 13/13. `py_compile` OK.
+- **Pendiente 🔵**: barrido de reconciliación de las 96 cuarentena con `rescue_429.py --go` (en curso) + re-testear `sep_429` en ~2 semanas (ventana de rate-limit activa). `bloqueo_ago` (388) se deja como está — 429 real confirmado.
+
 ## `/bet` → "sin cuentas elegibles" con el pool lleno: JWT vivo se volvió filtro DURO en el planner (2026-09-09, tarde)
 
 - **Síntoma**: Robert corre `/bet` real desde `@betmexbot` y responde `❌ No fue posible armar el plan: sin cuentas elegibles`. En KVM4 el pool operable (LIVE · `published_to_pool=1` · `grade!=D` · `kyc=1` · sin `dead_reason`/429) tenía **52 cuentas**, pero solo **1** con JWT vivo (`jwt_expires_at > now+120`) — y esa era `kyc=0`. 65 cuentas del pool con JWT expirado hace >24h (jwt_keeper no calienta el pool operable).

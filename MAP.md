@@ -132,8 +132,8 @@ prewarm.py (router)
 | `scripts/recalc_grades.py` | 136 | `—` | Utilería dev: recalcular grades de todas las cuentas desde BD |
 | `scripts/reconcile_macro_fleet.py` | 142 | `macro_reconcile` | _[completar]_ |
 | `scripts/refresh_recent_fleet.py` | 124 | `fleet_refresh` | _[completar]_ |
+| `scripts/rescue_429.py` | 259 | `—` | _[completar]_ |
 | `scripts/session_balance_poller.py` | 469 | `balance_poller` | _[completar]_ |
-| `scripts/update_429.py` | 11 | `—` | _[completar]_ |
 | `scripts/update_proxy001_list.py` | 35 | `—` | _[completar]_ |
 | `scripts/verify_all_accounts_active.py` | 140 | `verify_all_accounts` | _[completar]_ |
 | `shared/betmexico_payment_analyzer.py` | 592 | `—` | Algoritmo V10: clasifica pasarela/tarjeta A=sana/B=recuperando/C=lenta/D=quemada |
@@ -284,6 +284,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `f89c0d4` | feat(bet): recalibrar sort_key de select_accounts_for_auto (criterios Robert 2026-09-10) |
 | `a792abc` | docs(next-session): /bet "sin cuentas elegibles" cerrado (508706d, deployado+smoke) |
 | `508706d` | fix(bet): JWT vivo prioriza, no excluye, en el planner de /bet |
 | `3f5b121` | docs: actualizar DEPLOY.md y NEXT-SESSION.md con SSH restaurado y Karen VPS |
@@ -295,7 +296,6 @@ prewarm.py (router)
 | `5e8889b` | docs(plan): fix circuit breaker 429 + fixture JWT de test_plan_* (pre-smoke) |
 | `ea1ee77` | fix(logs): enlazar feed de logs de Ruthopia con KVM4-Karen :8002 y actualizar bridge |
 | `b91db43` | chore(infra): Fase 3 deployada a KVM4 + checkout de prod reconciliado |
-| `4fc99fa` | chore(infra): reconciliar checkout de prod KVM4 + protocolo de deploy git-only |
 <!-- GEN:end:recientes -->
 
 ---
