@@ -288,6 +288,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `1b70394` | feat(bet): preguntas SA-only — con/sin liveness check + ignorar casamiento |
 | `78d2233` | feat(bet): grade D deja de ser descarte — toda cuenta LIVE entra al /bet |
 | `431da7d` | feat(rescue_429): cohorte sin_reason para las 85 DEAD sin razon |
 | `4260bd3` | docs(rescue_429): barrido cuarentena ejecutado — 51 resucitadas / 0 STILL_429 |
@@ -299,7 +300,6 @@ prewarm.py (router)
 | `3f5b121` | docs: actualizar DEPLOY.md y NEXT-SESSION.md con SSH restaurado y Karen VPS |
 | `9101529` | docs(next-session): fixes deployados y verificados en KVM4-Karen |
 | `ac2de08` | docs(next-session): fixes pusheados, deploy bloqueado por SSH key faltante |
-| `04dd184` | docs(bitacora): cerrar bugs circuit-breaker-429 + fixture-jwt (pre-smoke) |
 <!-- GEN:end:recientes -->
 
 ---

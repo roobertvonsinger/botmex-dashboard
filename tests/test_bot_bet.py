@@ -36,7 +36,8 @@ def sa_client(seed_db, monkeypatch):
             matches TEXT,
             total_deposited REAL DEFAULT 0,
             total_approved INTEGER DEFAULT 0,
-            total_failed INTEGER DEFAULT 0
+            total_failed INTEGER DEFAULT 0,
+            policy_digest TEXT
         )
     """)
     con.execute("DELETE FROM account_cards")
@@ -93,7 +94,7 @@ def test_bot_bet_no_passwords_in_response(sa_client, monkeypatch):
     monkeypatch.setattr(card_checker, "ruthopia_bridge_check", lambda p: ("Approved", "Card Updated (Last4: 1111)"))
 
     import auto_deposit
-    def mock_plan(db_path, card_pipes, amount, target_count):
+    def mock_plan(db_path, card_pipes, amount, target_count, **kwargs):
         return {
             "feasible": True,
             "reason": "OK",
