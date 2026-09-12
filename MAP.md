@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 595 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5668 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 2818 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 2819 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `bet_advisor.py` | 471 | `betmexico.dashboard.bet_advisor` | _[completar]_ |
 | `bet_policy.py` | 221 | `—` | _[completar]_ |
@@ -118,7 +118,7 @@ prewarm.py (router)
 | `conftest.py` | 222 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
 | `db_registry.py` | 112 | `betmexico.dashboard.db` | _[completar]_ |
-| `deposits.py` | 3265 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 3273 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 391 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 246 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 922 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -288,6 +288,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `aaa2989` | fix(proxy): revertir exclusion — el agotado era dataimpulse, no proxy001 |
 | `47e2be4` | fix(proxy): excluir proxy001 (407 TRAFFIC_EXHAUSTED, banda agotada) |
 | `b0e91dd` | fix(bet): Q1 (con/sin check) deja de preguntar tras el primer batch |
 | `c2a91a3` | fix(tests): mock/fixture de test_bot_bet.py al día con el refactor advisor/bet_policy |
@@ -299,7 +300,6 @@ prewarm.py (router)
 | `c70fdd3` | fix(pool): eliminar update_429.py (mass-kill 429 sin re-verificar) + rescue_429.py |
 | `f89c0d4` | feat(bet): recalibrar sort_key de select_accounts_for_auto (criterios Robert 2026-09-10) |
 | `a792abc` | docs(next-session): /bet "sin cuentas elegibles" cerrado (508706d, deployado+smoke) |
-| `508706d` | fix(bet): JWT vivo prioriza, no excluye, en el planner de /bet |
 <!-- GEN:end:recientes -->
 
 ---

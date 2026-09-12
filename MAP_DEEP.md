@@ -243,7 +243,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_pull_fresh_live_account` | def | L1430–L1567 |
 | `_broadcast_mission` | def | L1570–L1599 |
 | `_stop_pool` | def | L1602–L1609 |
-| `run_auto_mission` | def | L1613–L2818 |
+| `run_auto_mission` | def | L1613–L2819 |
 
 ### `autoexclusion.py`
 
@@ -556,19 +556,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_refresh_account_after_deposit` | def | L1151–L1210 |
 | `_should_relogin_after_401` | def | L1213–L1217 |
 | `_acquire_session_and_begin` | def | L1220–L1514 |
-| `_run_deposit_with_phases` | def | L1517–L1866 |
-| `deposit_execute_stream` | def | L1870–L2087 |
-| `cap_status` | def | L2091–L2103 |
-| `_mm_is_real_decline` | def | L2143–L2149 |
-| `_mm_is_ambiguous_charge` | def | L2152–L2162 |
-| `classify_deposit_status` | def | L2165–L2196 |
-| `_mm_session_get` | def | L2239–L2261 |
-| `_mm_session_update` | def | L2264–L2273 |
-| `multi_stream` | def | L2277–L2832 |
-| `multi_cancel` | def | L2836–L2841 |
-| `scheduled_create` | def | L2854–L3227 |
-| `scheduled_list` | def | L3231–L3253 |
-| `scheduled_cancel` | def | L3257–L3265 |
+| `_run_deposit_with_phases` | def | L1517–L1874 |
+| `deposit_execute_stream` | def | L1878–L2095 |
+| `cap_status` | def | L2099–L2111 |
+| `_mm_is_real_decline` | def | L2151–L2157 |
+| `_mm_is_ambiguous_charge` | def | L2160–L2170 |
+| `classify_deposit_status` | def | L2173–L2204 |
+| `_mm_session_get` | def | L2247–L2269 |
+| `_mm_session_update` | def | L2272–L2281 |
+| `multi_stream` | def | L2285–L2840 |
+| `multi_cancel` | def | L2844–L2849 |
+| `scheduled_create` | def | L2862–L3235 |
+| `scheduled_list` | def | L3239–L3261 |
+| `scheduled_cancel` | def | L3265–L3273 |
 
 ### `jwt_keeper.py`
 

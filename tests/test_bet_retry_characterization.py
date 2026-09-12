@@ -131,7 +131,8 @@ def test_char_happy_path_single_account(H):
     assert probe_emails(H) == ["acc1@x.com"]
     assert sched_calls(H) == [{"email": "acc1@x.com", "amount": 150,
                                "session_jwt": "J", "session_proxy": "P",
-                               "persist_login_data": False}]
+                               "persist_login_data": False,
+                               "ignore_marriage_pans": set()}]
     assert statuses(H) == ["matching", "scheduling", "completed"]
     # único sleep: el piso anti-fuga de FASE 2 (random.uniform(45,60), fijado a 50)
     assert H.sleeps == pytest.approx([50.0], abs=1.0)

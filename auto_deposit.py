@@ -1701,6 +1701,7 @@ async def run_auto_mission(
                 session_jwt=sj,
                 session_proxy=sp,
                 persist_login_data=(sj is None),
+                ignore_marriage_pans=ignore_marr_pans,
             )
             total_real_processes += 1
             ok = bool(r.get("success"))

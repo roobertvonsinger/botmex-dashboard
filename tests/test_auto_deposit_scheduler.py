@@ -59,7 +59,7 @@ def _setup_ad_mocks(monkeypatch, harness: MockHarness):
         })
     monkeypatch.setattr(ad, "_fetch_account", mock_fetch)
 
-    async def mock_run_dep(email, pwd, num, exp, cvv, amt, user, pool, pb, session_jwt=None, session_proxy=None, persist_login_data=True):
+    async def mock_run_dep(email, pwd, num, exp, cvv, amt, user, pool, pb, session_jwt=None, session_proxy=None, persist_login_data=True, ignore_marriage_pans=None):
         pipe = f"{num}|{exp}|{cvv}"
         r = harness.make_attempt(email, pwd, pipe, amt, session_jwt, session_proxy)
         r.setdefault("result_code", "BANK_APPROVED" if r.get("success") else "BANK_REJECTED")

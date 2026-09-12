@@ -1529,11 +1529,18 @@ async def _run_deposit_with_phases(
     session_jwt: Optional[str] = None,
     session_proxy: Optional[str] = None,
     use_jwt_cache: bool = True,
+    ignore_marriage_pans: Optional[set] = None,
 ) -> dict:
     """Orquesta deposit emitiendo fases. Mismo shape que _run_deposit.
 
     NO escribe en BD. NO quema tarjetas. NO maneja marriage.
     Solo visibilidad — caller persiste resultado.
+
+    `ignore_marriage_pans`: PANs que el caller (auto_deposit, plan SA) ya
+    filtró para NO intentarse en su cuenta dueña — ver `_owner_block` en
+    auto_deposit.py. Ahí es donde se aplica el veto real; aquí solo se
+    salta el gate absoluto para permitir que la tarjeta toque banco en
+    la cuenta que el matchmaking ya decidió que es válida.
 
     Returns:
       {"success": bool, "result_code": str, "error": str|None, "duration_ms": int,
@@ -1542,8 +1549,9 @@ async def _run_deposit_with_phases(
     # Regla de Oro (Robert 2026-09-02):
     # UNA TARJETA QUE YA EXISTE EN UNA CUENTA, JAMÁS DEBE SER UTILIZADA POR OTRA CUENTA.
     # Al detectarse debe descartarse inmediatamente antes de tocar a BetMexico.
+    # Excepción: `ignore_marriage_pans` (SA) — el caller ya vetó la cuenta dueña.
     try:
-        married_owner = get_married_card_owner(cc_num)
+        married_owner = None if cc_num in (ignore_marriage_pans or ()) else get_married_card_owner(cc_num)
         if married_owner and married_owner.lower() != email.strip().lower():
             _msg = f"Regla de Oro: Tarjeta ya registrada o aprobada en {married_owner} — bloqueada para otras cuentas"
             logger.warning(f"🛑 [REGLA DE ORO] Tarjeta {cc_num[:6]}··· casada con {married_owner} — BLOQUEADA en {email}")
