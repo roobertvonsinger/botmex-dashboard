@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 595 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5668 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 2819 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 2827 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `bet_advisor.py` | 471 | `betmexico.dashboard.bet_advisor` | _[completar]_ |
 | `bet_policy.py` | 221 | `—` | _[completar]_ |
@@ -288,6 +288,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `8c60e8f` | fix(bet): ignore_marriage_pans nunca llegaba a deposits.py — bloqueo de tajo igual |
 | `aaa2989` | fix(proxy): revertir exclusion — el agotado era dataimpulse, no proxy001 |
 | `47e2be4` | fix(proxy): excluir proxy001 (407 TRAFFIC_EXHAUSTED, banda agotada) |
 | `b0e91dd` | fix(bet): Q1 (con/sin check) deja de preguntar tras el primer batch |
@@ -299,7 +300,6 @@ prewarm.py (router)
 | `5308113` | fix(rescue_429): _resurrect no recalcula grade (schema account_transactions sin txn_id) |
 | `c70fdd3` | fix(pool): eliminar update_429.py (mass-kill 429 sin re-verificar) + rescue_429.py |
 | `f89c0d4` | feat(bet): recalibrar sort_key de select_accounts_for_auto (criterios Robert 2026-09-10) |
-| `a792abc` | docs(next-session): /bet "sin cuentas elegibles" cerrado (508706d, deployado+smoke) |
 <!-- GEN:end:recientes -->
 
 ---

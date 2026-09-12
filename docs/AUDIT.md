@@ -3,6 +3,23 @@
 > Mantener vivo. Cada función con su spec + estado actual.
 > Leyenda: ✅ funcional · ⚠️ parcial · ❌ roto · 🔵 pendiente
 
+## Captura: 2026-09-12 (anti-taladro prioritario en `sort_key` + ventana 24h en exclusión de rate limit)
+
+**Motivo**: En misiones consecutivas del `/bet`, solo 36 de 178 cuentas LIVE eran seleccionadas
+mientras 142 quedaban sin tocar ("desfile repetitivo"). Causa raíz:
+1. `recently_tried` (<60min) estaba en la posición 7 de la tupla de `sort_key` (después de `fails_rank`).
+   Una cuenta con 5 fallas probada hace 1 minuto le ganaba a una cuenta con 6 fallas descansada 3 semanas (`5 < 6`).
+   Fix: `recently_tried` se mueve a la posición 3 (antes de `jwt_first` y `fails_rank`). Toda cuenta
+   intentada <60min va al fondo absoluto de su tier, forzando la rotación de toda la flota descansada.
+2. `deposit_attempts` en `plan_auto_mission` y `meta_map` excluía sin filtro de tiempo a cuentas con 429
+   histórico, bloqueando a 16 cuentas resucitadas a LIVE.
+   Fix: se acotó la exclusión a `(julianday('now') - julianday(created_at)) <= 1.0` (últimas 24h).
+
+| Función | Spec (2026-09-12) | Estado | Verificado |
+|---|---|---|---|
+| `select_accounts_for_auto` — `sort_key` | `recently_tried` sube a posición 3: `adv_boost → pool_first → has_3ds → recently_tried (<60min al fondo) → jwt_first → fails_rank → cards_rank → grade_rank → act_epoch_asc`. Cuentas descansadas rotan siempre antes que cuentas recién intentadas. | ✅ implementado | ✅ `test_anti_drill_recently_tried_beats_fails_count` + 29 tests selección + 15/15 invariantes |
+| `plan_auto_mission` + `meta_map` — ventana 429 | Exclusión por `deposit_attempts` acotada a `created_at` en últimas 24h. Cuentas con 429 viejo pero hoy `status='LIVE'` en `accounts` quedan habilitadas para rotación. | ✅ implementado | ✅ `test_plan_auto_mission_allows_recovered_429_older_than_24h` |
+
 ## Captura: 2026-09-10b (grade D deja de ser descarte del `/bet` — el grading solo prioriza)
 
 **Motivo**: Robert (2026-09-10) — "el grading está deficiente; las D no son realmente D".

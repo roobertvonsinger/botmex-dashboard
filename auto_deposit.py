@@ -450,6 +450,10 @@ def select_accounts_for_auto(
         pool_first = 0 if r.get("published_to_pool") else 1
         # 1. 3DS <24h gana a todo lo demás dentro del tier.
         has_3ds = 0 if meta.get("has_3ds_24h") else 1
+        # Anti-taladro real (RF5): cuenta intentada <60 min al fondo absoluto de su tier.
+        # Evita taladrar en bucle las mismas cuentas en misiones consecutivas.
+        mins = meta.get("mins_since_last_attempt", 99999)
+        recently_tried = 1 if mins < 60 else 0
         # 2. Sesión 🟢 viva = 0 captcha.
         jwt_first = 0 if r.get("_jwt_alive") else 1
         # 3. Fallas históricas GRADUADO: menos primero. Cap a 20 para que un outlier no domine el orden.
@@ -458,9 +462,6 @@ def select_accounts_for_auto(
         cards_rank = min(int(meta.get("cards_count") or 0), 10)
         # 5. Grade = peso real (A+ → A → B → C).
         grade_rank = _grade_rank(r.get("grade"))
-        # 6a. Anti-taladro: cuenta intentada <60 min al fondo de su tier.
-        mins = meta.get("mins_since_last_attempt", 99999)
-        recently_tried = 1 if mins < 60 else 0
         # 6b. Criterio 5b: actividad más reciente MÁS ANTIGUA primero. epoch 0
         #     (sin historial nuestro) = máximamente descansada → primero.
         act_epoch_asc = int(meta.get("last_activity_epoch") or 0)
@@ -470,11 +471,11 @@ def select_accounts_for_auto(
             adv_boost,
             pool_first,
             has_3ds,
+            recently_tried,
             jwt_first,
             fails_rank,
             cards_rank,
             grade_rank,
-            recently_tried,
             act_epoch_asc,
             has_bin_success,
             -(float(r.get("grade_score") or 0)),
@@ -743,10 +744,12 @@ def plan_auto_mission(
             where_extra += (
                 " AND LOWER(email) NOT IN ("
                 "   SELECT DISTINCT LOWER(account_email) FROM deposit_attempts "
-                "   WHERE UPPER(status) LIKE '%RATE%' "
+                "   WHERE (julianday('now') - julianday(created_at)) <= 1.0 AND ("
+                "      UPPER(status) LIKE '%RATE%' "
                 "      OR rejection_reason LIKE '%429%' "
                 "      OR rejection_reason LIKE '%RATE%' "
                 "      OR UPPER(status) IN ('ACCOUNT_DEAD', 'BAN', 'RATE_LIMITED', 'RATE_LIMITED_PERMANENT')"
+                "   )"
                 " )"
             )
         where_dead_reason = "OR (dead_reason IS NOT NULL AND dead_reason != '')" if has_dead else ""
@@ -908,22 +911,27 @@ def plan_auto_mission(
                 "WHERE LOWER(account_email)=LOWER(?) AND ("
                 "  rejection_reason LIKE '%DEAD%' "
                 "  OR rejection_reason LIKE '%UNAUTHORIZED%' "
-                "  OR rejection_reason LIKE '%RATE%' "
-                "  OR rejection_reason LIKE '%429%' "
-                "  OR UPPER(status) LIKE '%RATE%' "
-                "  OR UPPER(status) IN ('ACCOUNT_DEAD', 'BAN', 'RATE_LIMITED', 'RATE_LIMITED_PERMANENT')"
+                "  OR ("
+                "    (julianday('now') - julianday(created_at)) <= 1.0 AND ("
+                "      rejection_reason LIKE '%RATE%' "
+                "      OR rejection_reason LIKE '%429%' "
+                "      OR UPPER(status) LIKE '%RATE%' "
+                "      OR UPPER(status) IN ('ACCOUNT_DEAD', 'BAN', 'RATE_LIMITED', 'RATE_LIMITED_PERMANENT')"
+                "    )"
+                "  )"
                 ")",
                 (email,),
             ).fetchone()["n"]
 
             rate_limit_blocked = con.execute(
                 "SELECT COUNT(*) AS n FROM deposit_attempts "
-                "WHERE LOWER(account_email)=LOWER(?) AND ("
-                "  UPPER(status) LIKE '%RATE%' "
-                "  OR rejection_reason LIKE '%429%' "
-                "  OR rejection_reason LIKE '%RATE%' "
-                "  OR UPPER(status) IN ('ACCOUNT_DEAD', 'RATE_LIMITED', 'RATE_LIMITED_PERMANENT')"
-                ")",
+                "WHERE LOWER(account_email)=LOWER(?) "
+                "  AND (julianday('now') - julianday(created_at)) <= 1.0 AND ("
+                "    UPPER(status) LIKE '%RATE%' "
+                "    OR rejection_reason LIKE '%429%' "
+                "    OR rejection_reason LIKE '%RATE%' "
+                "    OR UPPER(status) IN ('ACCOUNT_DEAD', 'RATE_LIMITED', 'RATE_LIMITED_PERMANENT')"
+                "  )",
                 (email,),
             ).fetchone()["n"]
 

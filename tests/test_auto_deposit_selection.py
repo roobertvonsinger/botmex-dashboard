@@ -525,3 +525,34 @@ def test_married_grade_d_owner_live_is_fast_tracked(tmp_path):
     emails = [a["email"] for a in res["accounts"]]
     assert "mard@t.com" in emails
 
+
+def test_anti_drill_recently_tried_beats_fails_count():
+    """Anti-taladro real: cuenta intentada <60min va AL FONDO, incluso si tiene menos fallas que una descansada."""
+    rows = [_dk("tried_f2@t.com"), _dk("rested_f5@t.com")]
+    meta = {
+        "tried_f2@t.com": {"total_fails": 2, "mins_since_last_attempt": 5},
+        "rested_f5@t.com": {"total_fails": 5, "mins_since_last_attempt": 99999},
+    }
+    sel = ad.select_accounts_for_auto(rows, 150, 2, _dwin("tried_f2@t.com", "rested_f5@t.com"), meta_map=meta)
+    order = [r["email"] for r in sel]
+    assert order.index("rested_f5@t.com") < order.index("tried_f2@t.com")
+
+
+def test_plan_auto_mission_allows_recovered_429_older_than_24h(tmp_path):
+    """Cuentas con 429 histórico (>24h) pero hoy status=LIVE en accounts NO son bloqueadas permanentemente."""
+    db = _make_db(tmp_path)
+    con = sqlite3.connect(str(db))
+    con.execute("INSERT INTO accounts (email, status, grade, published_to_pool, kyc_verified) VALUES ('rec429@t.com','LIVE','D',1,1)")
+    # Intento 429 de hace 3 días
+    con.execute(
+        "INSERT INTO deposit_attempts (account_email, amount, status, rejection_reason, created_at) "
+        "VALUES ('rec429@t.com', 150, 'rate_limited', '429 Too Many Requests', datetime('now', '-3 days'))"
+    )
+    con.commit(); con.close()
+    res = ad.plan_auto_mission(
+        db, card_pipes=["4111111111111111|12|28|123"],
+        amount=150, target_count=1,
+    )
+    emails = [a["email"] for a in res["accounts"]]
+    assert "rec429@t.com" in emails
+

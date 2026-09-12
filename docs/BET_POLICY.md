@@ -169,10 +169,10 @@ Gate: `tests/test_bet_advisor.py` 27/27 · `verify_bet_suite` 13/13 · caracteri
   puede cambiar *qué* cuentas caen en `[:max_accounts]`, no solo su orden — por eso
   el caller aplica el guardarraíl `plan_not_worse` (ver abajo). `None`/`{}` → orden
   **idéntico** (test `test_advisor_boost_none_is_identity`).
-  > Recalibración D (2026-09-10): el resto del `sort_key` tras `adv_boost`/`pool_first`
-  > es ahora `has_3ds → jwt_first → fails_rank(graduado) → cards_rank(graduado) →
-  > grade_rank → recently_tried → act_epoch_asc → has_bin_success → -grade_score`
-  > (3DS gana a grade; actividad más antigua primero). Detalle: `docs/AUDIT.md` captura 2026-09-10.
+  > Recalibración (2026-09-12): el resto del `sort_key` tras `adv_boost`/`pool_first`
+  > es `has_3ds → recently_tried (<60min al fondo) → jwt_first → fails_rank(graduado) →
+  > cards_rank(graduado) → grade_rank → act_epoch_asc → has_bin_success → -grade_score`
+  > (anti-taladro real: cuentas descansadas rotan antes que cuentas recién probadas). Detalle: `docs/AUDIT.md`.
   > **2026-09-10b: grade D dejó de ser exclusión dura.** El grading está deficiente
   > (D heredada de la mass-kill de agosto, `account_refresh` nunca re-gradea D). Toda
   > cuenta LIVE + pool + KYC entra al `/bet`; grade solo pesa en `grade_rank` (orden).
