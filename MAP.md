@@ -122,7 +122,7 @@ prewarm.py (router)
 | `jwt_keeper.py` | 391 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 246 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 922 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
-| `proxy_pool.py` | 1091 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `proxy_pool.py` | 1092 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_validator.py` | 154 | `betmexico.renapo_validator` | _[completar]_ |
 | `saneador_daemon.py` | 275 | `saneador` | _[completar]_ |
 | `scripts/apply_sweep.py` | 76 | `—` | _[completar]_ |
@@ -288,6 +288,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b0e91dd` | fix(bet): Q1 (con/sin check) deja de preguntar tras el primer batch |
 | `c2a91a3` | fix(tests): mock/fixture de test_bot_bet.py al día con el refactor advisor/bet_policy |
 | `1b70394` | feat(bet): preguntas SA-only — con/sin liveness check + ignorar casamiento |
 | `78d2233` | feat(bet): grade D deja de ser descarte — toda cuenta LIVE entra al /bet |
@@ -299,7 +300,6 @@ prewarm.py (router)
 | `a792abc` | docs(next-session): /bet "sin cuentas elegibles" cerrado (508706d, deployado+smoke) |
 | `508706d` | fix(bet): JWT vivo prioriza, no excluye, en el planner de /bet |
 | `3f5b121` | docs: actualizar DEPLOY.md y NEXT-SESSION.md con SSH restaurado y Karen VPS |
-| `9101529` | docs(next-session): fixes deployados y verificados en KVM4-Karen |
 <!-- GEN:end:recientes -->
 
 ---
