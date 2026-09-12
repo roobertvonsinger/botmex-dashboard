@@ -531,7 +531,7 @@ async def test_bet_card_invalid_or_cooldown(seed_db):
     # Q1 (con/sin check) ya respondida — este test cubre el flujo posterior.
     context.user_data = {"_bet_rw_answered": True}
 
-    res = await process_bet_input(update, context)
+    res = await process_bet_input(update, context, override_text=update.message.text)
     assert res == ConversationHandler.END
     status_msg = update.message.reply_text.return_value
     args, kwargs = status_msg.edit_text.call_args if status_msg.edit_text.called else update.message.reply_text.call_args
@@ -563,7 +563,7 @@ async def test_bet_confirm_splits_live_tol(seed_db, monkeypatch):
     context = MagicMock()
     context.user_data = {"_bet_rw_answered": True}
 
-    res = await process_bet_input(update, context)
+    res = await process_bet_input(update, context, override_text=update.message.text)
     assert res == WAIT_BET_CONFIRM
 
     # Live + tol pasan a pending_bet_pipes; solo la tol queda en pending_tol_pipes
@@ -658,6 +658,31 @@ async def test_bet_q1_off_calls_precheck_skipping_rw(seed_db, monkeypatch):
     await handle_bet_callback(update, context)
     assert captured.get("skip_rw") is True
     assert context.user_data.get("_bet_rw_answered") is True
+
+
+@pytest.mark.asyncio
+async def test_bet_q1_asks_again_on_second_batch_same_conversation(seed_db):
+    """Regresión (Robert 2026-09-12): una 2a tanda de tarjetas en la misma
+    conversación (mensaje de texto crudo, sin volver a escribir /bet) debe
+    volver a preguntar Q1 — antes heredaba `_bet_rw_answered=True` del batch
+    anterior y la pregunta dejaba de aparecer."""
+    update = MagicMock(spec=Update)
+    user = MagicMock(spec=User)
+    user.id = SUPERADMIN_ID
+    update.effective_user = user
+    update.callback_query = None
+    update.message = AsyncMock(spec=Message)
+    update.message.text = "4532015112830366|12|28|123"
+
+    context = MagicMock()
+    # Simula que Q1 ya fue respondida en un batch anterior de esta misma conversación.
+    context.user_data = {"_bet_rw_answered": True}
+
+    res = await process_bet_input(update, context)
+    assert res == WAIT_BET_CONFIRM
+    args, kwargs = update.message.reply_text.call_args
+    flat = [b.callback_data for row in kwargs["reply_markup"].inline_keyboard for b in row]
+    assert "bet_rw_on" in flat and "bet_rw_off" in flat
 
 
 # ─────────────────────────────────────────────────────────────────────────────

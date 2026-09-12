@@ -1048,8 +1048,14 @@ async def process_bet_input(
         return ConversationHandler.END
 
     # ── Q1 (Robert 2026-09-10, SA-only): ¿con o sin check de liveness RW? ──
-    # Se pregunta UNA vez por corrida de /bet. /betf (fast) y los demás
-    # operadores nunca ven esto — corren siempre con check.
+    # Se pregunta por cada tanda NUEVA de tarjetas. `override_text is None` marca
+    # un mensaje de texto crudo del usuario (vía MessageHandler en WAIT_BET_CONFIRM),
+    # a diferencia del re-entry programático desde bet_rw_on/off (que sí manda
+    # override_text) — sin este reset, tandas siguientes en la misma conversación
+    # heredaban `_bet_rw_answered=True` y la pregunta dejaba de aparecer.
+    # /betf (fast) y los demás operadores nunca ven esto — corren siempre con check.
+    if override_text is None:
+        context.user_data.pop("_bet_rw_answered", None)
     if (
         operator_id == SUPERADMIN_ID
         and not is_fast_mode

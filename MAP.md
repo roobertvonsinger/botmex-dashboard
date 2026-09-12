@@ -288,6 +288,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c2a91a3` | fix(tests): mock/fixture de test_bot_bet.py al día con el refactor advisor/bet_policy |
 | `1b70394` | feat(bet): preguntas SA-only — con/sin liveness check + ignorar casamiento |
 | `78d2233` | feat(bet): grade D deja de ser descarte — toda cuenta LIVE entra al /bet |
 | `431da7d` | feat(rescue_429): cohorte sin_reason para las 85 DEAD sin razon |
@@ -299,7 +300,6 @@ prewarm.py (router)
 | `508706d` | fix(bet): JWT vivo prioriza, no excluye, en el planner de /bet |
 | `3f5b121` | docs: actualizar DEPLOY.md y NEXT-SESSION.md con SSH restaurado y Karen VPS |
 | `9101529` | docs(next-session): fixes deployados y verificados en KVM4-Karen |
-| `ac2de08` | docs(next-session): fixes pusheados, deploy bloqueado por SSH key faltante |
 <!-- GEN:end:recientes -->
 
 ---
