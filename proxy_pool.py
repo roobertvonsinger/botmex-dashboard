@@ -832,7 +832,7 @@ DATAIMPULSE_PROXIES: List[Dict[str, str]] = [
 #   responde (200, 3/3 IPs MX probadas) — confundir cual proveedor esta
 #   caido cuesta caro, probar cada uno AISLADO antes de excluir.
 #   Reactivar quitando "dataimpulse" cuando el proveedor recargue trafico.
-_EXCLUDED_PROXY_HOSTS: tuple = ("litport", "nodemaven", "dataimpulse")
+_EXCLUDED_PROXY_HOSTS: tuple = ("litport", "nodemaven")
 
 
 def _bot_proxies() -> List[Dict[str, str]]:

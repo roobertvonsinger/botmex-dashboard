@@ -1272,7 +1272,7 @@ async def _acquire_session_and_begin(
             # use_cache=True (Capa 1): el intento 0 prueba el JWT cacheado vigente
             # (0 captcha, 0 golpe a /login). Tras un re-login NO se reusa cache.
             login_res = await gentle_login(
-                email, password, max_login_retries=4, throttle=True,
+                email, password, max_login_retries=2, throttle=True,
                 pool=pool, sticky_session=forced,
                 use_cache=(use_jwt_cache and not _relogged),
             )

@@ -288,6 +288,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `3f27efc` | fix(bet): priorizar cuentas con 0 intentos o intento más antiguo en selección de cuentas |
 | `70d6036` | fix(bet): anti-taladro prioritario en sort_key y ventana 24h para rate_limited |
 | `8c60e8f` | fix(bet): ignore_marriage_pans nunca llegaba a deposits.py — bloqueo de tajo igual |
 | `aaa2989` | fix(proxy): revertir exclusion — el agotado era dataimpulse, no proxy001 |
@@ -299,7 +300,6 @@ prewarm.py (router)
 | `431da7d` | feat(rescue_429): cohorte sin_reason para las 85 DEAD sin razon |
 | `4260bd3` | docs(rescue_429): barrido cuarentena ejecutado — 51 resucitadas / 0 STILL_429 |
 | `5308113` | fix(rescue_429): _resurrect no recalcula grade (schema account_transactions sin txn_id) |
-| `c70fdd3` | fix(pool): eliminar update_429.py (mass-kill 429 sin re-verificar) + rescue_429.py |
 <!-- GEN:end:recientes -->
 
 ---

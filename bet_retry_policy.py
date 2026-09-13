@@ -158,6 +158,19 @@ def _is_session_stale(o: OutcomeView) -> bool:
     return "sesión rechazada" in low or "401" in low or "redirectlogin" in low
 
 
+def _is_login_failure(o: OutcomeView) -> bool:
+    """Fallo en autenticación previa al banco (captcha, credenciales, timeout de login).
+    NUNCA tocó el banco; la tarjeta está 100% virgen e intacta."""
+    code = (o.code or "").upper()
+    err = (o.error or "").lower()
+    return (
+        code in ("LOGIN_FAILED", "LOGIN_DENIED", "RETRY_CAPTCHA", "CAPTCHA_TIMEOUT", "LOGIN_RETRY_LATER")
+        or "captcha" in err
+        or "login falló" in err
+        or "fallo de login" in err
+    )
+
+
 def _sched_is_terminal(o: OutcomeView) -> bool:
     """FASE 2: `result_code` que corta las reps de ESTA cuenta (no de las demás).
     Réplica del OR de `auto_deposit.py` L2387-2398 vía la taxonomía única de `deposits`."""
@@ -206,7 +219,17 @@ def _decide_scheduled(
             d_failed=1,
         )
 
-    # ── 3. transitorio → RETRY_SAME / ABORT_ACCOUNT (sin broadcast) ─────────
+    # ── 3. fallo de login en rep → ABORT_ACCOUNT (anti-quema) ───────────────
+    if _is_login_failure(o):
+        return Action(
+            kind=ActionKind.ABORT_ACCOUNT,
+            reason=f"fallo de login ({o.code or o.error}) en rep — abortando cuenta para protegerla",
+            reset_session=False,
+            sched_abort_terminal=False,
+            d_failed=1,
+        )
+
+    # ── 4. transitorio → RETRY_SAME / ABORT_ACCOUNT (sin broadcast) ─────────
     # El reset de sesión stale se evalúa ANTES del tope de reintentos (L2429),
     # así que aplica también en la rama que abandona la cuenta.
     reset = m.session_jwt_present and _is_session_stale(o)
@@ -220,7 +243,7 @@ def _decide_scheduled(
         )
     return Action(
         kind=ActionKind.RETRY_SAME,
-        reason="transitorio (gateway/login/timeout/sesión) — reintentar la rep",
+        reason="transitorio (gateway/timeout/sesión) — reintentar la rep",
         wait_s=cfg.sched_retry_backoff_s,
         reset_session=reset,
         d_transient=1,
@@ -372,7 +395,23 @@ def decide_next_action(
             d_failed=1,
         )
 
-    # ── 7. transitorio (nuestro lado) → RETRY_SAME / GIVE_UP_PAIR ──────────
+    # ── 7. fallo de login (nuestro lado / captcha / cuenta) → GIVE_UP_PAIR (anti-quema) ──
+    # REGLA DE ORO ANTI-QUEMA (2026-09-13):
+    # Si el login falla, NUNCA disparar RETRY_SAME sobre la misma cuenta.
+    # Cada fallo cuenta contra el umbral de BetMexico. Se aparta la cuenta a descanso
+    # protector y se rescata la tarjeta intacta para el resto de la flota.
+    if _is_login_failure(o):
+        return Action(
+            kind=ActionKind.GIVE_UP_PAIR,
+            reason=f"fallo de login ({o.code or o.error or 'LOGIN_FAILED'}) — cuenta apartada, tarjeta preservada",
+            requeue_card=True,
+            rest_account=True,
+            clear_account_candidates=True,
+            wait_s=cfg.mm_cooldown_s,
+            d_failed=1,
+        )
+
+    # ── 8. transitorio (gateway 502/504 en begin_deposit) → RETRY_SAME / GIVE_UP_PAIR ──
     if (m.transient_count + 1) > cfg.match_transient_retries:
         return Action(
             kind=ActionKind.GIVE_UP_PAIR,
@@ -382,7 +421,7 @@ def decide_next_action(
         )
     return Action(
         kind=ActionKind.RETRY_SAME,
-        reason="transitorio (gateway/login/timeout) — reintentar el par",
+        reason="transitorio (gateway/timeout) — reintentar el par",
         wait_s=cfg.transient_backoff_s,
         d_transient=1,
     )

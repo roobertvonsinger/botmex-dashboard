@@ -1721,10 +1721,12 @@ async def handle_bet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             target_count = 9
 
             tol_pipes = [p for p in context.user_data.get("pending_tol_pipes", []) if p in valid_pipes]
-            # RF4: pasar tol_pipes al plan + married_pairs para tiro directo
+            # RF4: pasar tol_pipes al plan + married_pairs para tiro directo + is_sa para escalar sin límite de cuentas
+            is_sa_op = (operator_id == SUPERADMIN_ID)
             plan = plan_auto_mission(DB_PATH, valid_pipes, amount, target_count,
                                      tol_pipes=tol_pipes, married_pairs=married_pairs,
-                                     ignore_marriage_pans=ignore_marriage_pans)
+                                     ignore_marriage_pans=ignore_marriage_pans,
+                                     is_sa=is_sa_op)
             if not plan.get("feasible"):
                 await query.edit_message_text(
                     f"❌ No fue posible armar el plan: {plan.get('reason', 'desconocido')}"

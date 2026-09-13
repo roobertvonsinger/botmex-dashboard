@@ -192,12 +192,7 @@ async def gentle_login(
                         raw_result=res,
                     )
                 elif status == "BAN":
-                    if attempt < max(2, max_login_retries):
-                        logger.warning(f"[login] {email} 429 BAN en intento {attempt} — reintentando con proxy fresco para descartar falso rate-limit por IP")
-                        sticky_session = None
-                        await asyncio.sleep(1.5)
-                        continue
-                    logger.warning(f"[login] {email} 429 BAN confirmado cross-IP (rate-limit en BetMexico) → RATE_LIMITED")
+                    logger.warning(f"[login] {email} 429 BAN en BetMexico → RATE_LIMITED (sin reintentos para no quemar)")
                     return LoginResult(
                         ok=False,
                         code="RATE_LIMITED",

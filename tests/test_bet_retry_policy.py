@@ -369,9 +369,14 @@ def test_timeout_is_transient():
     assert a.kind is ActionKind.RETRY_SAME
 
 
-def test_login_failed_is_transient_not_dead():
+def test_login_failed_is_anti_burn_gives_up_pair_and_saves_card():
+    """Fallo de login (captcha/credenciales): NUNCA RETRY_SAME. La cuenta descansa y la tarjeta se preserva."""
     a = decide(_outcome(code="LOGIN_FAILED", error="captcha pool empty"))
-    assert a.kind is ActionKind.RETRY_SAME
+    assert a.kind is ActionKind.GIVE_UP_PAIR
+    assert a.requeue_card is True
+    assert a.rest_account is True
+    assert a.clear_account_candidates is True
+    assert a.d_failed == 1
 
 
 def test_unknown_code_is_transient():
@@ -512,9 +517,12 @@ def test_sched_transient_gives_up_after_cap_aborts_account_no_broadcast():
     assert a.d_failed == 1
 
 
-def test_sched_login_failed_is_transient_not_terminal():
+def test_sched_login_failed_is_anti_burn_aborts_account():
+    """Fallo de login en una rep programada: anti-quema, no reintentar la misma cuenta."""
     a = sdecide(_outcome(code="LOGIN_FAILED", error="captcha pool empty"))
-    assert a.kind is ActionKind.RETRY_SAME
+    assert a.kind is ActionKind.ABORT_ACCOUNT
+    assert a.sched_abort_terminal is False
+    assert a.d_failed == 1
 
 
 # ── reset de sesión stale ──────────────────────────────────────────────────
