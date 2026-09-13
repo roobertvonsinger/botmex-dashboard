@@ -258,6 +258,7 @@ def select_accounts_for_auto(
     meta_map: Optional[Dict[str, Dict[str, Any]]] = None,
     advisor_boost: Optional[Dict[str, int]] = None,
     priority_emails: Optional[set] = None,
+    resting_emails: Optional[set] = None,
 ) -> List[Dict[str, Any]]:
     """Filtra + clasifica internamente (Top, Mid, Low) + limita cuentas candidatas al depósito auto.
 
@@ -274,6 +275,7 @@ def select_accounts_for_auto(
       8. Cero IsUserInValidationProcess o DEAD reciente en meta_map
       9. Cero racha de declinaciones terminales (a_plus_decline_streak < 2)
       10. Cero proceso activo de retiro pendiente en la misma cuenta
+      11. Reposo de Misión 2x2: cuentas en resting_emails (2 misiones consecutivas sin fondear)
 
     Estratificación Inteligente Backend:
       - Tier TOP: 3DS reciente (<24h), Grade A+ con sesión activa 🟢 o alta afinidad de conversión.
@@ -290,6 +292,7 @@ def select_accounts_for_auto(
     sa = _sa_tokens()
     out: List[Dict[str, Any]] = []
     meta_map = meta_map or {}
+    resting_set = {str(e).strip().lower() for e in (resting_emails or set())}
     # Fase 3 refactor `/bet`: hint del operador LLM (`bet_advisor`). boost ∈ [-3,3]
     # por email; se prepende al `sort_key` como PURO DESEMPATE dentro del tier —
     # nunca altera exclusiones ni la asignación de tier. None / vacío → orden idéntico.
@@ -386,6 +389,10 @@ def select_accounts_for_auto(
 
         # 5. Errores de validación, Rate Limit o DEAD
         if meta.get("is_validation_blocked") or meta.get("is_dead_blocked") or meta.get("is_rate_limited"):
+            continue
+
+        # 6. Reposo de Misión 2x2 (Robert 2026-09-13): si fue intentada en 2 misiones sin fondear, reposa 2 misiones
+        if resting_set and (email or "").strip().lower() in resting_set:
             continue
 
         win = (window_map or {}).get(email) or {}
@@ -485,9 +492,27 @@ def select_accounts_for_auto(
     tier_mid.sort(key=sort_key)
     tier_low.sort(key=sort_key)
 
+    # Si hay cuentas en tier_top pero fueron intentadas recientemente (<60m) y existen
+    # otras cuentas descansadas en tiers inferiores, rotar las descansadas primero para
+    # romper el monopolio de repetición continua (Anti-taladro Global).
+    def _is_recently_tried(acct):
+        em = acct.get("email")
+        m = meta_map.get(em) or {}
+        return (m.get("mins_since_last_attempt", 99999) or 99999) < 60
+
     if count <= 3:
-        if tier_top and count >= 1:
-            combined = [tier_top[0]] + [r for r in (tier_top[1:] + tier_mid + tier_low) if r != tier_top[0]]
+        # Si tier_top[0] fue intentada <60 min y hay cuentas frescas en tier_mid o tier_low,
+        # poner las descansadas al frente
+        top_fresh = [r for r in tier_top if not _is_recently_tried(r)]
+        top_recent = [r for r in tier_top if _is_recently_tried(r)]
+        mid_fresh = [r for r in tier_mid if not _is_recently_tried(r)]
+        low_fresh = [r for r in tier_low if not _is_recently_tried(r)]
+
+        if top_fresh:
+            combined = top_fresh + [r for r in (tier_mid + tier_low + top_recent) if r not in top_fresh]
+            stratified = combined[:count]
+        elif mid_fresh or low_fresh:
+            combined = mid_fresh + low_fresh + tier_top + [r for r in (tier_mid + tier_low) if r not in mid_fresh and r not in low_fresh]
             stratified = combined[:count]
         else:
             stratified = (tier_top + tier_mid + tier_low)[:count]
@@ -498,7 +523,10 @@ def select_accounts_for_auto(
 
         stratified = []
         for tier, quota in ((tier_top, n_top), (tier_mid, n_mid), (tier_low, n_low)):
-            stratified.extend(tier[:quota])
+            # Dentro del tier, separar descansadas de intentadas <60 min
+            t_fresh = [r for r in tier if not _is_recently_tried(r)]
+            t_recent = [r for r in tier if _is_recently_tried(r)]
+            stratified.extend((t_fresh + t_recent)[:quota])
         if len(stratified) < count:
             remaining = [r for r in out if r not in stratified]
             remaining.sort(key=sort_key)
@@ -532,15 +560,113 @@ def select_accounts_for_auto(
 MAX_ACCOUNTS_HARD_CAP = bet_policy.DEFAULT.max_accounts_hard_cap
 
 
-def _max_accounts_for_cards(num_cards: int, hard_cap: int = MAX_ACCOUNTS_HARD_CAP) -> int:
+def _max_accounts_for_cards(num_cards: int, hard_cap: int = MAX_ACCOUNTS_HARD_CAP, is_sa: bool = False) -> int:
     """Robert 2026-07-28: 3 cuentas para la 1a tarjeta + 1 extra por tarjeta
     adicional — evita taladrar todo el pool para lograr el match, con rango
     suficiente cuando hay más tarjetas para probar.
 
-    Robert 2026-08-05: tope duro de `hard_cap` (default 10) — la fórmula de
-    3+1×extra es el estándar, pero NUNCA debe sumar más de `hard_cap` cuentas en
-    una sola corrida, sin importar cuántas tarjetas se den."""
-    return min(hard_cap, 3 + max(0, num_cards - 1))
+    Robert 2026-08-05: tope duro de `hard_cap` (default 10) para operadores estándar.
+    Robert 2026-09-13: Para SuperAdmin (is_sa=True), no se impone el techo de 10
+    cuentas para permitir lotes grandes con emparejamiento 1:1 y respaldo adecuado."""
+    calculated = 3 + max(0, num_cards - 1)
+    if is_sa:
+        return max(calculated, num_cards)
+    return min(hard_cap, calculated)
+
+
+def _get_resting_accounts(db_path) -> set:
+    """Regla de Reposo de Misión 2x2 (Robert 2026-09-13):
+    Si una cuenta fue intentada en 2 misiones consecutivas sin lograr ser fondeada
+    (cero aprobados), debe reposar por lo menos 2 misiones.
+    Inspecciona las últimas misiones en `auto_missions` y devuelve el conjunto de emails en reposo."""
+    import sqlite3
+    import json
+    con = sqlite3.connect(str(db_path))
+    con.row_factory = sqlite3.Row
+    resting: set = set()
+    try:
+        # Verificar existencia de la tabla auto_missions
+        has_table = bool(con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='auto_missions'").fetchone())
+        if not has_table:
+            return resting
+
+        cols = [c[1] for c in con.execute("PRAGMA table_info(auto_missions)").fetchall()]
+        if "matches" not in cols:
+            return resting
+
+        # Tomar las últimas 4 misiones completadas o terminadas para evaluar la ventana 2x2
+        recent_missions = con.execute(
+            "SELECT mission_id, accounts_selected, matches, status FROM auto_missions "
+            "ORDER BY id DESC LIMIT 4"
+        ).fetchall()
+
+        if len(recent_missions) < 2:
+            return resting
+
+        # Evaluar las últimas 2 misiones
+        m1, m2 = recent_missions[0], recent_missions[1]
+
+        def _get_attempted_and_funded(m_row):
+            funded_emails = set()
+            attempted_emails = set()
+            try:
+                matches_data = json.loads(m_row["matches"] or "[]")
+                for item in matches_data:
+                    em = (item.get("email") or "").strip().lower()
+                    if em:
+                        attempted_emails.add(em)
+            except Exception:
+                pass
+
+            # Consultar depósitos aprobados asociados al tiempo de la misión
+            # Si matches_data tiene cuentas pero ninguna tuvo APPROVED, se considera 0 fondeada
+            return attempted_emails, funded_emails
+
+        # Consultar cuentas con intentos fallidos y sin éxito en las últimas 2 misiones
+        # Vía deposit_attempts agrupado por mission_id si existe, o por historial reciente
+        has_dep_att = bool(con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='deposit_attempts'").fetchone())
+        if has_dep_att:
+            dep_cols = [c[1] for c in con.execute("PRAGMA table_info(deposit_attempts)").fetchall()]
+            has_mid = "mission_id" in dep_cols
+
+            m1_id = m1["mission_id"]
+            m2_id = m2["mission_id"]
+
+            if has_mid:
+                # Intentadas en m1
+                m1_att = {r[0].lower() for r in con.execute("SELECT DISTINCT LOWER(account_email) FROM deposit_attempts WHERE mission_id=?", (m1_id,)).fetchall() if r[0]}
+                m1_app = {r[0].lower() for r in con.execute("SELECT DISTINCT LOWER(account_email) FROM deposit_attempts WHERE mission_id=? AND UPPER(status)='APPROVED'", (m1_id,)).fetchall() if r[0]}
+                m2_att = {r[0].lower() for r in con.execute("SELECT DISTINCT LOWER(account_email) FROM deposit_attempts WHERE mission_id=?", (m2_id,)).fetchall() if r[0]}
+                m2_app = {r[0].lower() for r in con.execute("SELECT DISTINCT LOWER(account_email) FROM deposit_attempts WHERE mission_id=? AND UPPER(status)='APPROVED'", (m2_id,)).fetchall() if r[0]}
+            else:
+                # Si no hay mission_id en deposit_attempts, extraer de matches / accounts_selected
+                def _emails_from_m(m_row):
+                    ems = set()
+                    try:
+                        matches_data = json.loads(m_row["matches"] or "[]")
+                        for item in matches_data:
+                            em = (item.get("email") or "").strip().lower()
+                            if em:
+                                ems.add(em)
+                    except Exception:
+                        pass
+                    return ems
+
+                m1_att = _emails_from_m(m1)
+                m2_att = _emails_from_m(m2)
+                # Fondeadas en las últimas 24h
+                apps_recent = {r[0].lower() for r in con.execute("SELECT DISTINCT LOWER(account_email) FROM deposit_attempts WHERE UPPER(status)='APPROVED' AND created_at >= datetime('now', '-24 hours')").fetchall() if r[0]}
+                m1_app = m1_att.intersection(apps_recent)
+                m2_app = m2_att.intersection(apps_recent)
+
+            # Cuentas intentadas en ambas m1 y m2 sin haber sido fondeadas en ninguna
+            unfunded_both = (m1_att - m1_app).intersection(m2_att - m2_app)
+            resting.update(unfunded_both)
+    except Exception as ex:
+        logger.warning(f"[_get_resting_accounts] Error al calcular cuentas en reposo: {ex}")
+    finally:
+        con.close()
+    return resting
 
 
 # ── Fase 3 refactor `/bet` — puente hacia `bet_advisor` (operador LLM) ────────
@@ -678,6 +804,7 @@ def plan_auto_mission(
     advisor_hint: Optional[Dict[str, int]] = None,
     ignore_marriage_pans: Optional[set] = None,
     _advisor_sink: Optional[list] = None,
+    is_sa: bool = False,
 ) -> Dict[str, Any]:
     """Plan de misión auto: cuentas elegibles + tarjeta asignada a cada una.
 
@@ -696,7 +823,8 @@ def plan_auto_mission(
       ninguna del pool sirve para esa cuenta, la cuenta queda sin tarjeta
       (fuera del plan), no se sustituye por una married.
     - max_accounts: si no se pasa explícito, se escala con el número de
-      tarjetas pegadas (`_max_accounts_for_cards`).
+      tarjetas pegadas (`_max_accounts_for_cards`). Para SuperAdmin (is_sa=True),
+      se elimina el techo de 10 cuentas.
     - feasible = hay cuentas Y todas tienen tarjeta viable.
     """
     import sqlite3
@@ -708,7 +836,7 @@ def plan_auto_mission(
     POLICY = bet_policy.load_policy()
 
     if max_accounts is None:
-        max_accounts = _max_accounts_for_cards(len(card_pipes or []), POLICY.max_accounts_hard_cap)
+        max_accounts = _max_accounts_for_cards(len(card_pipes or []), POLICY.max_accounts_hard_cap, is_sa=is_sa)
 
     tol_pipes = {_normalize_pipe_to_3part(p) for p in (tol_pipes or [])}
 
@@ -770,12 +898,15 @@ def plan_auto_mission(
 
         # Cuentas primarias: TODAS las publicadas al pool (grade D incluido —
         # Robert 2026-09-10: grade solo prioriza en el ORDER BY, no filtra).
+        # Cuentas con 0 intentos o con intento más antiguo tienen oportunidad justa
+        # para que TODO el pool operable pase por bet y ninguna quede varada sin probar.
         rows = [
             dict(r) for r in con.execute(
                 f"SELECT * FROM accounts WHERE status='LIVE' "
                 f"AND published_to_pool=1{where_extra} "
                 f"ORDER BY {jwt_order}"
                 f"  (CASE WHEN grade='A+' THEN 0 WHEN grade='A' THEN 1 WHEN grade='B' THEN 2 ELSE 3 END), "
+                f"  (SELECT COUNT(*) FROM deposit_attempts WHERE account_email COLLATE NOCASE=accounts.email COLLATE NOCASE) ASC, "
                 f"  {order_lca}"
             ).fetchall()
         ]
@@ -794,6 +925,7 @@ def plan_auto_mission(
                 f"{where_extra} "
                 f"ORDER BY {jwt_order}"
                 f"  (CASE WHEN grade='A+' THEN 0 WHEN grade='A' THEN 1 WHEN grade='B' THEN 2 ELSE 3 END), "
+                f"  (SELECT COUNT(*) FROM deposit_attempts WHERE account_email COLLATE NOCASE=accounts.email COLLATE NOCASE) ASC, "
                 f"  {order_lca} LIMIT ?"
             )
             try:
@@ -1106,6 +1238,9 @@ def plan_auto_mission(
             and _extract_card_number(p) not in ignore_pans
         }
 
+        # Inyectar cuentas en reposo de misión 2x2 (Robert 2026-09-13)
+        _resting_emails = _get_resting_accounts(db_path)
+
         selected = select_accounts_for_auto(
             rows,
             amount,
@@ -1115,6 +1250,7 @@ def plan_auto_mission(
             meta_map=meta_map,
             advisor_boost=advisor_hint,
             priority_emails=_priority_emails or None,
+            resting_emails=_resting_emails or None,
         )[:max_accounts]
 
         # Fase 3 refactor `/bet`: si el caller pide los inputs del advisor, se
@@ -1441,12 +1577,14 @@ def _pull_fresh_live_account(
     married_owners: dict,
     for_card: str = "",
     blocked_owner_pans: Optional[dict] = None,
+    resting_emails: Optional[set] = None,
 ) -> Optional[Dict[str, Any]]:
     """Obtiene una cuenta fresca LIVE con KYC de la BD para rotación continua sin freezes."""
     import sqlite3
     if not db_path:
         return None
     try:
+        resting_set = {str(e).strip().lower() for e in (resting_emails or set())}
         con = sqlite3.connect(str(db_path))
         con.row_factory = sqlite3.Row
         try:
@@ -1507,6 +1645,9 @@ def _pull_fresh_live_account(
                 email_lower = email.lower()
                 aid = r_dict.get("id")
                 if not email or email in already_checked or email_lower in already_checked:
+                    continue
+
+                if resting_set and email_lower in resting_set:
                     continue
 
                 if has_dep_att:
@@ -2112,6 +2253,16 @@ async def run_auto_mission(
                 if action.kind is AK.GIVE_UP_PAIR:
                     failed += 1
                     tgt["cooldown_until"] = _get_now() + action.wait_s
+                    if getattr(action, "clear_account_candidates", False) or getattr(action, "rest_account", False):
+                        tgt["done"] = True
+                        tgt["candidates"] = []
+                        if tgt["locked"] and not tgt["matched"]:
+                            _unlock(account_id)
+                            locked_ids.discard(account_id)
+                    if getattr(action, "requeue_card", False):
+                        for other in accounts_state:
+                            if not other["done"] and other["id"] != account_id and pipe not in other["candidates"] and not _is_card_retired(pipe):
+                                other["candidates"].append(pipe)
                     return "break"
 
                 # RETRY_SAME — el shell hace el backoff y el `continue`

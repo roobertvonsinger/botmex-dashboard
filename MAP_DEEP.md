@@ -226,24 +226,25 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_normalize_pipe_to_3part` | def | L174–L176 |
 | `_get_married_card_owners` | def | L179–L221 |
 | `_has_card_deposit_24h` | def | L224–L240 |
-| `select_accounts_for_auto` | def | L252–L524 |
-| `_max_accounts_for_cards` | def | L535–L543 |
-| `_advisor_recent_history` | def | L547–L570 |
-| `_build_advisor_bundle` | def | L573–L667 |
-| `plan_auto_mission` | def | L670–L1275 |
-| `_fake_progress_pct` | def | L1322–L1353 |
-| `_iso` | def | L1357–L1358 |
-| `_m_load` | def | L1361–L1369 |
-| `_m_status` | def | L1372–L1374 |
-| `_m_update` | def | L1377–L1387 |
-| `_fetch_account` | def | L1390–L1397 |
-| `_is_account_dead` | def | L1400–L1414 |
-| `_is_account_rate_limited` | def | L1417–L1423 |
-| `_unlock` | def | L1426–L1435 |
-| `_pull_fresh_live_account` | def | L1438–L1575 |
-| `_broadcast_mission` | def | L1578–L1607 |
-| `_stop_pool` | def | L1610–L1617 |
-| `run_auto_mission` | def | L1621–L2827 |
+| `select_accounts_for_auto` | def | L252–L552 |
+| `_max_accounts_for_cards` | def | L563–L574 |
+| `_get_resting_accounts` | def | L577–L669 |
+| `_advisor_recent_history` | def | L673–L696 |
+| `_build_advisor_bundle` | def | L699–L793 |
+| `plan_auto_mission` | def | L796–L1411 |
+| `_fake_progress_pct` | def | L1458–L1489 |
+| `_iso` | def | L1493–L1494 |
+| `_m_load` | def | L1497–L1505 |
+| `_m_status` | def | L1508–L1510 |
+| `_m_update` | def | L1513–L1523 |
+| `_fetch_account` | def | L1526–L1533 |
+| `_is_account_dead` | def | L1536–L1550 |
+| `_is_account_rate_limited` | def | L1553–L1559 |
+| `_unlock` | def | L1562–L1571 |
+| `_pull_fresh_live_account` | def | L1574–L1716 |
+| `_broadcast_mission` | def | L1719–L1748 |
+| `_stop_pool` | def | L1751–L1758 |
+| `run_auto_mission` | def | L1762–L2978 |
 
 ### `autoexclusion.py`
 
@@ -304,9 +305,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_is_dead_family` | def | L135–L143 |
 | `_is_card_locked` | def | L146–L152 |
 | `_is_session_stale` | def | L155–L158 |
-| `_sched_is_terminal` | def | L161–L170 |
-| `_decide_scheduled` | def | L173–L227 |
-| `decide_next_action` | def | L230–L388 |
+| `_is_login_failure` | def | L161–L171 |
+| `_sched_is_terminal` | def | L174–L183 |
+| `_decide_scheduled` | def | L186–L250 |
+| `decide_next_action` | def | L253–L427 |
 
 ### `betmexico_config.py`
 
@@ -593,7 +595,7 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `LoginResult` | class | L28–L42 |
 | `StickySessionManager` | class | L45–L56 |
 | `_classify_dead` | def | L59–L70 |
-| `gentle_login` | def | L73–L246 |
+| `gentle_login` | def | L73–L241 |
 
 ### `prewarm.py`
 
