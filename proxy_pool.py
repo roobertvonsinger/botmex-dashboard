@@ -826,13 +826,12 @@ DATAIMPULSE_PROXIES: List[Dict[str, str]] = [
 # - nodemaven: degradado 504/407 (commit b3d0361, 2026-08-13). El bot del
 #   monorepo aún lo lista en ADMIN_PROXIES, pero el dashboard NO debe usarlo —
 #   la exclusión aplica al pool combinado (bot + extras).
-# - dataimpulse: 407 TRAFFIC_EXHAUSTED (banda del plan agotada, 2026-09-12).
-#   Verificado con curl directo a gw.dataimpulse.com:823 -> 407 en los 2
-#   formatos de puerto (rotativo 823 y sticky 10000-10500). proxy001 SI
-#   responde (200, 3/3 IPs MX probadas) — confundir cual proveedor esta
-#   caido cuesta caro, probar cada uno AISLADO antes de excluir.
-#   Reactivar quitando "dataimpulse" cuando el proveedor recargue trafico.
-_EXCLUDED_PROXY_HOSTS: tuple = ("litport", "nodemaven")
+# - dataimpulse: 407 TRAFFIC_EXHAUSTED (banda del plan agotada). Re-verificado
+#   con curl directo a gw.dataimpulse.com:823 el 2026-09-13 20:47 UTC -> sigue
+#   407 (rotativo 823). NO quitar de esta lista sin un curl directo que
+#   confirme 200 primero — la vez pasada se quitó sin verificar y volvió a
+#   tronar /bet en vivo (Robert 2026-09-13).
+_EXCLUDED_PROXY_HOSTS: tuple = ("litport", "nodemaven", "dataimpulse")
 
 
 def _bot_proxies() -> List[Dict[str, str]]:

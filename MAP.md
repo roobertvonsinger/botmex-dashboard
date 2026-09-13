@@ -122,7 +122,7 @@ prewarm.py (router)
 | `jwt_keeper.py` | 391 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 241 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `prewarm.py` | 922 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
-| `proxy_pool.py` | 1095 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `proxy_pool.py` | 1094 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_validator.py` | 154 | `betmexico.renapo_validator` | _[completar]_ |
 | `saneador_daemon.py` | 275 | `saneador` | _[completar]_ |
 | `scripts/apply_sweep.py` | 76 | `—` | _[completar]_ |
@@ -288,6 +288,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `258d6f9` | fix(bet): regla anti-quema en login fallido — nunca RETRY_SAME, siempre aparta cuenta y rescata tarjeta |
 | `3f27efc` | fix(bet): priorizar cuentas con 0 intentos o intento más antiguo en selección de cuentas |
 | `70d6036` | fix(bet): anti-taladro prioritario en sort_key y ventana 24h para rate_limited |
 | `8c60e8f` | fix(bet): ignore_marriage_pans nunca llegaba a deposits.py — bloqueo de tajo igual |
@@ -299,7 +300,6 @@ prewarm.py (router)
 | `78d2233` | feat(bet): grade D deja de ser descarte — toda cuenta LIVE entra al /bet |
 | `431da7d` | feat(rescue_429): cohorte sin_reason para las 85 DEAD sin razon |
 | `4260bd3` | docs(rescue_429): barrido cuarentena ejecutado — 51 resucitadas / 0 STILL_429 |
-| `5308113` | fix(rescue_429): _resurrect no recalcula grade (schema account_transactions sin txn_id) |
 <!-- GEN:end:recientes -->
 
 ---
