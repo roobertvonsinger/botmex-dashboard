@@ -138,6 +138,8 @@ _active_operator_missions: Dict[int, Dict[str, Any]] = {}
 _active_operator_withdrawals: Dict[int, Dict[str, Any]] = {}
 # operator_id -> info de ficha SPEI pendiente de pago
 _pending_spei_fundings: Dict[int, Dict[str, Any]] = {}
+# operator_id -> tarea asyncio activa de check PlayDoit
+_active_playdoit_tasks: Dict[int, asyncio.Task] = {}
 
 
 def resolve_mission_confirm_gate(mission_id: str, decision: bool) -> bool:
@@ -571,6 +573,9 @@ async def cancel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _active_operator_missions.pop(user_id, None)
     _active_operator_withdrawals.pop(user_id, None)
     _pending_spei_fundings.pop(user_id, None)
+    pd_task = _active_playdoit_tasks.pop(user_id, None)
+    if pd_task and not pd_task.done():
+        pd_task.cancel()
     context.user_data.clear()
 
     nickname = get_user_nickname(user_id, update.effective_user.first_name)
@@ -1010,14 +1015,21 @@ async def process_check_playdoit_input(update: Update, context: ContextTypes.DEF
 
     existing_in_db = 0
     try:
+        from playdoit_db import init_playdoit_table
+        init_playdoit_table()
         from db_registry import db
         with db(write=False) as c:
-            placeholders = ",".join(["?"] * len(valid_combos))
-            existing_rows = c.execute(
-                f"SELECT email FROM playdoit_accounts WHERE email IN ({placeholders})",
-                [v["email"] for v in valid_combos],
-            ).fetchall()
-            existing_in_db = len(existing_rows)
+            all_emails = [v["email"] for v in valid_combos]
+            chunk_size = 500
+            for i in range(0, len(all_emails), chunk_size):
+                chunk = all_emails[i : i + chunk_size]
+                placeholders = ",".join(["?"] * len(chunk))
+                rows = c.execute(
+                    f"SELECT COUNT(*) FROM playdoit_accounts WHERE email IN ({placeholders})",
+                    chunk,
+                ).fetchone()
+                if rows:
+                    existing_in_db += rows[0]
     except Exception:
         pass
 
@@ -1065,14 +1077,20 @@ async def handle_check_playdoit_callback(update: Update, context: ContextTypes.D
             parse_mode="HTML",
         )
 
-        asyncio.create_task(
+        user_id = update.effective_user.id
+        old_task = _active_playdoit_tasks.pop(user_id, None)
+        if old_task and not old_task.done():
+            old_task.cancel()
+
+        task = asyncio.create_task(
             _run_check_playdoit_task(
                 query.message.chat_id,
                 context.bot,
                 valid_combos,
-                update.effective_user.id,
+                user_id,
             )
         )
+        _active_playdoit_tasks[user_id] = task
         return ConversationHandler.END
 
 
@@ -1144,9 +1162,14 @@ async def _run_check_playdoit_task(
             f"🌐 <i>Consulta detalles completos en el dashboard web ({DASHBOARD_URL}).</i>"
         )
         await bot.send_message(chat_id=chat_id, text=final_text, parse_mode="HTML")
+    except asyncio.CancelledError:
+        logger.info(f"[check_playdoit] Tarea cancelada por operador {operator_id}")
+        await bot.send_message(chat_id=chat_id, text="🛑 <b>Verificación de PlayDoit cancelada por el operador.</b>", parse_mode="HTML")
     except Exception as ex:
         logger.error(f"[check_playdoit] Error inesperado en _run_check_playdoit_task: {ex}", exc_info=True)
         await bot.send_message(chat_id=chat_id, text=f"❌ Error durante el check PlayDoit: {ex}")
+    finally:
+        _active_playdoit_tasks.pop(operator_id, None)
 
 
 # ─────────────────────────────────────────────────────────────────────

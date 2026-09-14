@@ -600,7 +600,7 @@ async function fetchAccounts() {
     const r = await fetch(url);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
-    return data.map(d => ({ ...d, platform: 'playdoit' }));
+    return data.map(d => ({ ...d, id: 'pd_' + d.id, playdoit_id: d.id, platform: 'playdoit' }));
   }
 
   // 2. Fetch BetMexico:
@@ -629,7 +629,7 @@ async function fetchAccounts() {
       const pr = await fetch(pUrl);
       if (pr.ok) {
         const pData = await pr.json();
-        const pMapped = pData.map(d => ({ ...d, platform: 'playdoit' }));
+        const pMapped = pData.map(d => ({ ...d, id: 'pd_' + d.id, playdoit_id: d.id, platform: 'playdoit' }));
         return [...bmxData, ...pMapped];
       }
     } catch (_) {}
@@ -677,8 +677,9 @@ function renderTable() {
     const ariaSort = on ? (_sortDir === 1 ? 'ascending' : 'descending') : 'none';
     return `<th class="th-sort${on ? ' sort-on' : ''} ${cls}" data-sort="${col}" tabindex="0" role="columnheader button" aria-sort="${ariaSort}" title="Ordenar por ${label}">${label}${ic}</th>`;
   };
-  const allVisibleSelected = visible.length > 0 && visible.every(r => selectedIds.has(r.id));
-  const someVisibleSelected = visible.some(r => selectedIds.has(r.id));
+  const selectableVisible = visible.filter(r => r.platform !== 'playdoit');
+  const allVisibleSelected = selectableVisible.length > 0 && selectableVisible.every(r => selectedIds.has(r.id));
+  const someVisibleSelected = selectableVisible.some(r => selectedIds.has(r.id));
   const masterCheckHtml = `<button type="button" class="btn-sel-master ${allVisibleSelected ? 'on' : (someVisibleSelected ? 'partial' : '')}" id="btnMasterSelect" title="${allVisibleSelected ? 'Deseleccionar visibles (Esc)' : 'Seleccionar todas las cuentas visibles en esta página'}">${allVisibleSelected ? '☑' : (someVisibleSelected ? '⊟' : '☐')}</button>`;
 
   const cols = state.view === 'simple'
@@ -703,7 +704,7 @@ function renderTable() {
   thead.querySelector('#btnMasterSelect')?.addEventListener('click', ev => {
     ev.stopPropagation();
     const paged = getPaged();
-    const visibleRows = paged.rows;
+    const visibleRows = paged.rows.filter(r => r.platform !== 'playdoit');
     const allSelected = visibleRows.length > 0 && visibleRows.every(r => selectedIds.has(r.id));
     if (allSelected) {
       visibleRows.forEach(r => selectedIds.delete(r.id));
@@ -778,34 +779,37 @@ function renderTable() {
         : `<span class="jwt-chip jwt-expired" role="img" aria-label="Sesión expirada, el próximo uso requiere resolver captcha" title="Sesión expirada — el próximo uso requiere resolver captcha">🔑</span>`;
     }
     const isSA = state.user?.role === 'superadmin';
+    const isPlaydoit = r.platform === 'playdoit';
     const trTitle = isSA ? `Grade ${esc(r.grade) || '?'}` : '';
     // Iconos de fila: 💳 (tarjetas), 📝 (notas), siempre + (quick add), 📌 (marcador) + botón Detalles
     const hasCards = (r.cards_count || 0) > 0;
     const hasNotes = (r.notes_count || 0) > 0;
     const isMarked = markedSet.has(r.email);
-    // Iconos en 3 columnas separadas — orden Robert: Nota | tarjetas | pin
-    // (alineadas a la derecha; tarjetas/pin quedan vacíos si no aplican).
-    const cellNota =
+    // Iconos en 3 columnas separadas — solo para cuentas BetMexico
+    const cellNota = isPlaydoit ? '' : (
       `<button class="row-ic ic-add" data-id="${r.id}" data-email="${esc(r.email)}" title="Añadir nota rápida">+ Nota</button>` +
-      (hasNotes ? `<button class="row-ic ic-notes" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.notes_count} nota${r.notes_count>1?'s':''}">📝<sup>${r.notes_count}</sup></button>` : '');
+      (hasNotes ? `<button class="row-ic ic-notes" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.notes_count} nota${r.notes_count>1?'s':''}">📝<sup>${r.notes_count}</sup></button>` : '')
+    );
     const isPoolOn = r.published_to_pool === 1 || r.published_to_pool === '1' || r.published_to_pool === true;
-    const poolSwitchBtn = `<button type="button" class="pool-switch ${isPoolOn ? 'on' : 'off'}" data-pool-email="${esc(r.email)}" data-pool-val="${isPoolOn ? '1' : '0'}" title="${isPoolOn ? '🟢 En Pool (/bet activo) — Click para pasar a Privada' : '🔒 Privada (Fuera de /bet) — Click para meter al Pool'}">${isPoolOn ? '🟢 POOL' : '🔒 PRIVADA'}</button>`;
+    const poolSwitchBtn = isPlaydoit ? '' : `<button type="button" class="pool-switch ${isPoolOn ? 'on' : 'off'}" data-pool-email="${esc(r.email)}" data-pool-val="${isPoolOn ? '1' : '0'}" title="${isPoolOn ? '🟢 En Pool (/bet activo) — Click para pasar a Privada' : '🔒 Privada (Fuera de /bet) — Click para meter al Pool'}">${isPoolOn ? '🟢 POOL' : '🔒 PRIVADA'}</button>`;
 
-    const cellCards = hasCards
+    const cellCards = (!isPlaydoit && hasCards)
       ? `<button class="row-ic ic-cards card-count-badge" data-id="${r.id}" data-email="${esc(r.email)}" title="${r.cards_count} tarjeta${r.cards_count>1?'s':''} vinculada${r.cards_count>1?'s':''}">💳 ${r.cards_count}</button>`
       : '';
-    const cellPin = `<button class="row-ic ic-mark${isMarked?' on':''}" data-mark-email="${esc(r.email)}" title="${isMarked?'Quitar marca':'Fijar para después'}">📌</button>`;
+    const cellPin = isPlaydoit ? '' : `<button class="row-ic ic-mark${isMarked?' on':''}" data-mark-email="${esc(r.email)}" title="${isMarked?'Quitar marca':'Fijar para después'}">📌</button>`;
 
     // Detalle (acordeón) ahora se abre/cierra con CLICK DERECHO en la fila (P7).
     // Se eliminó la columna "Detalles"; los iconos 💳/📝 también abren el detalle.
 
-    // Botón ↻ por fila — actualiza SOLO esta cuenta al instante
-    const refreshOneBtn = `<button class="row-refresh-one" data-id="${r.id}" title="Actualizar SOLO esta cuenta (login fresh + fetch live)">↻</button>`;
-    const cellAcciones = `<td class="ic-col acciones-col">${cellNota}${cellCards}${cellPin}</td>`;
+    // Botón ↻ por fila — actualiza SOLO esta cuenta al instante (exclusivo BetMexico)
+    const refreshOneBtn = isPlaydoit ? '' : `<button class="row-refresh-one" data-id="${r.id}" title="Actualizar SOLO esta cuenta (login fresh + fetch live)">↻</button>`;
+    const cellAcciones = isPlaydoit ? `<td class="ic-col acciones-col"></td>` : `<td class="ic-col acciones-col">${cellNota}${cellCards}${cellPin}</td>`;
     const isSel = selectedIds.has(r.id);
-    const selCellHtml = `<td class="sel-cell" data-id="${r.id}" title="Click para seleccionar"><span class="row-checkbox ${isSel ? 'on' : ''}">${isSel ? '☑' : '☐'}</span></td>`;
+    const selCellHtml = isPlaydoit
+      ? `<td class="sel-cell" title="PlayDoit (consulta)"><span class="row-checkbox" style="opacity:0.3;">—</span></td>`
+      : `<td class="sel-cell" data-id="${r.id}" title="Click para seleccionar"><span class="row-checkbox ${isSel ? 'on' : ''}">${isSel ? '☑' : '☐'}</span></td>`;
       if (state.view === 'simple') {
-        return `<tr class="${trClasses}" data-id="${r.id}"${selDrag} title="${trTitle || ''}">
+        return `<tr class="${trClasses}" data-id="${r.id}" data-platform="${esc(r.platform || 'betmexico')}"${selDrag} title="${trTitle || ''}">
           <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
           ${selCellHtml}
           <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
@@ -814,7 +818,7 @@ function renderTable() {
           ${cellAcciones}
         </tr>`;
       }
-      return `<tr class="${trClasses}" data-id="${r.id}"${selDrag} title="${trTitle || ''}">
+      return `<tr class="${trClasses}" data-id="${r.id}" data-platform="${esc(r.platform || 'betmexico')}"${selDrag} title="${trTitle || ''}">
         <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
         ${selCellHtml}
         <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
@@ -4271,6 +4275,10 @@ $('#accTable')?.addEventListener('click', e => {
   //   · Shift+Click     → selecciona el rango desde la última fila clickeada (orden visible, también sobre el combo)
   const tr = e.target.closest('tr[data-id]');
   if (tr && tr.dataset.id) {
+    if (tr.dataset.platform === 'playdoit') {
+      // Cuentas PlayDoit: exclusivas de consulta, no abren La Pantalla (/bet BetMexico)
+      return;
+    }
     const id = parseInt(tr.dataset.id);
     const isSelCell = !!e.target.closest('.sel-cell');
     if (e.shiftKey) {
@@ -4304,7 +4312,7 @@ $('#accTable')?.addEventListener('click', e => {
 
 // Botón de selección rápida de visibles en la cabecera
 $('#btnSelectVisibleTop')?.addEventListener('click', () => {
-  const visibleRows = getPaged().rows;
+  const visibleRows = getPaged().rows.filter(r => r.platform !== 'playdoit');
   const allSelected = visibleRows.length > 0 && visibleRows.every(r => selectedIds.has(r.id));
   if (allSelected) {
     visibleRows.forEach(r => selectedIds.delete(r.id));
@@ -4325,11 +4333,17 @@ function _selectRange(id) {
   if (idxTo < 0) return;
   const anchor = _lastClickedId != null ? visible.findIndex(r => r.id === _lastClickedId) : -1;
   if (anchor < 0) {
-    selectedIds.add(id);
-    _lastClickedId = id;
+    if (visible[idxTo]?.platform !== 'playdoit') {
+      selectedIds.add(id);
+      _lastClickedId = id;
+    }
   } else {
     const [lo, hi] = anchor < idxTo ? [anchor, idxTo] : [idxTo, anchor];
-    for (let i = lo; i <= hi; i++) selectedIds.add(visible[i].id);
+    for (let i = lo; i <= hi; i++) {
+      if (visible[i]?.platform !== 'playdoit') {
+        selectedIds.add(visible[i].id);
+      }
+    }
   }
   // Reflejar el resaltado en las filas presentes en el DOM.
   document.querySelectorAll('#accTable tbody tr[data-id]').forEach(tr => {
@@ -4777,6 +4791,7 @@ document.addEventListener('keydown', e => {
   function rowsInBand(top, bottom) {
     const hits = new Set();
     document.querySelectorAll('#accTable tbody tr[data-id]').forEach(tr => {
+      if (tr.dataset.platform === 'playdoit') return; // Cuentas PlayDoit no seleccionables
       const b = tr.getBoundingClientRect();
       if (b.bottom < top || b.top > bottom) return;   // sin solape vertical → fuera
       hits.add(parseInt(tr.dataset.id));

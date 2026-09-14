@@ -212,3 +212,35 @@ def test_app_playdoit_endpoints(client, seed_db):
     assert "total_accounts" in stats
     assert "live_accounts" in stats
     assert "dead_accounts" in stats
+
+
+def test_playdoit_auto_init_table_on_upsert(seed_db):
+    """Verifica que upsert_playdoit_account auto-inicializa la tabla si no existía."""
+    # Insertar directamente sin llamar a init_playdoit_table()
+    acc_id = playdoit_db.upsert_playdoit_account({
+        "email": "autoinit@playdoit.mx",
+        "password": "secret_pass",
+        "balance_total": 750.0,
+    })
+    assert acc_id > 0
+    accounts = playdoit_db.list_playdoit_accounts()
+    assert any(a["email"] == "autoinit@playdoit.mx" for a in accounts)
+
+
+@pytest.mark.asyncio
+async def test_playdoit_5xx_raises_proxy_error_for_rotation():
+    """Verifica que HTTP >= 500 levante httpx.ProxyError para que proxy_pool rote."""
+    client = playdoit_api.PlaydoitClient()
+    mock_login_resp = MagicMock(spec=httpx.Response)
+    mock_login_resp.status_code = 502
+
+    mock_http_client = AsyncMock()
+    mock_http_client.get = AsyncMock(return_value=MagicMock(status_code=200))
+    mock_http_client.post = AsyncMock(return_value=mock_login_resp)
+    mock_http_client.__aenter__.return_value = mock_http_client
+    mock_http_client.__aexit__.return_value = None
+
+    with patch.object(client, "_create_client", return_value=mock_http_client):
+        with pytest.raises(httpx.ProxyError):
+            await client.check_credentials_and_fetch("err502@playdoit.mx", "pass")
+

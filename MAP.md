@@ -121,8 +121,8 @@ prewarm.py (router)
 | `deposits.py` | 3273 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 391 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 241 | `betmexico.dashboard.login_orch` | _[completar]_ |
-| `playdoit_api.py` | 277 | `playdoit_api` | _[completar]_ |
-| `playdoit_db.py` | 194 | `playdoit_db` | _[completar]_ |
+| `playdoit_api.py` | 298 | `playdoit_api` | _[completar]_ |
+| `playdoit_db.py` | 205 | `playdoit_db` | _[completar]_ |
 | `prewarm.py` | 922 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 1094 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_validator.py` | 154 | `betmexico.renapo_validator` | _[completar]_ |
@@ -291,6 +291,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `b9eabd1` | feat(playdoit): integracion PlayDoit - API async, tabla aislada DB, /check_playdoit y visualizacion dashboard |
 | `567a4c9` | fix(proxy): re-excluir dataimpulse — sigue 407 TRAFFIC_EXHAUSTED, no recargó |
 | `258d6f9` | fix(bet): regla anti-quema en login fallido — nunca RETRY_SAME, siempre aparta cuenta y rescata tarjeta |
 | `3f27efc` | fix(bet): priorizar cuentas con 0 intentos o intento más antiguo en selección de cuentas |
@@ -302,7 +303,6 @@ prewarm.py (router)
 | `c2a91a3` | fix(tests): mock/fixture de test_bot_bet.py al día con el refactor advisor/bet_policy |
 | `1b70394` | feat(bet): preguntas SA-only — con/sin liveness check + ignorar casamiento |
 | `78d2233` | feat(bet): grade D deja de ser descarte — toda cuenta LIVE entra al /bet |
-| `431da7d` | feat(rescue_429): cohorte sin_reason para las 85 DEAD sin razon |
 <!-- GEN:end:recientes -->
 
 ---
