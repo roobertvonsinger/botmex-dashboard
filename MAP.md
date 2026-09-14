@@ -291,6 +291,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `10d3ef2` | fix(playdoit): usar requests.Session en playdoit_api para bypass de Cloudflare WAF |
 | `7044ad1` | docs(session): actualizar NEXT-SESSION con cierre de integracion PlayDoit y deploy KVM4 |
 | `2117452` | feat(playdoit): blindaje y cierre Smartreview de integracion PlayDoit |
 | `b9eabd1` | feat(playdoit): integracion PlayDoit - API async, tabla aislada DB, /check_playdoit y visualizacion dashboard |
@@ -302,7 +303,6 @@ prewarm.py (router)
 | `aaa2989` | fix(proxy): revertir exclusion — el agotado era dataimpulse, no proxy001 |
 | `47e2be4` | fix(proxy): excluir proxy001 (407 TRAFFIC_EXHAUSTED, banda agotada) |
 | `b0e91dd` | fix(bet): Q1 (con/sin check) deja de preguntar tras el primer batch |
-| `c2a91a3` | fix(tests): mock/fixture de test_bot_bet.py al día con el refactor advisor/bet_policy |
 <!-- GEN:end:recientes -->
 
 ---

@@ -7,18 +7,22 @@
 
 ## ▶ ARRANQUE INMEDIATO (2026-09-14) — Integración PlayDoit DEPLOYADA Y BLINDADA
 
-**✅ INTEGRACIÓN PLAYDOIT COMPLETADA, BLINDADA Y DESPLEGADA (`2117452`):**
+**✅ INTEGRACIÓN PLAYDOIT COMPLETADA, BLINDADA Y DESPLEGADA (`2117452` / `10d3ef2`):**
 - **Alcance cumplido**: Login async, polling de balance/player/methods/docs, persistencia en tabla aislada `playdoit_accounts`, visualización en dashboard web (filtro rojo y badge `[PLAYDOIT]`), y comando de Telegram `/check_playdoit` (batch asíncrono con progreso en vivo).
+- **Bypass Cloudflare WAF (`10d3ef2`)**:
+  - `playdoit_api.py` migrado de `httpx.AsyncClient` a `requests.Session` ejecutado via `asyncio.to_thread` con headers exactos de navegador (`X-Requested-With`, `Sec-Ch-Ua`, etc.).
+  - Error 403 resuelto en warmup y login: verificado en vivo en KVM4 contra proxy residencial (`UserNotFoundException` con HTTP 200 OK).
 - **Smartreview Doble Verde**:
   - Auditor Técnico: `APROBADO` (0 discrepancias, defaults canónicos `"Sin dato"`, chunking 500 SQLite, failover de proxies con `httpx.ProxyError`).
   - Red Team: `RESISTENTE` (IDs frontend namespaciados `pd_` para eliminar colisión con `accounts.id`, exclusión total de La Pantalla, auto-depósitos y selección masiva de BetMexico).
 - **Deploy en KVM4-Karen**:
-  - `betmexico-web` y `betmexico-mock-bot` reiniciados limpiamente tras git reset.
+  - `betmexico-web` y `betmexico-mock-bot` reiniciados limpiamente tras git reset a `10d3ef2`.
   - `/api/health/ping` respondiendo `{"accounts": 948, "ok": true}` sin tracebacks.
+  - Test en vivo en `betmexico-mock-bot`: `check_playdoit_with_failover` exitoso con proxy residencial.
 - **Invariantes `/bet`**: Suite canónica `verify_bet_suite.py` 15/15 verde (100% intacta).
 
 **Siguiente:**
-1. Smoke test de Robert en Telegram: probar `/check_playdoit` enviando combos de prueba (texto o archivo .txt).
+1. Smoke test de Robert en Telegram: re-probar `/check_playdoit` adjuntando el archivo `.txt` de combos o por mensaje.
 2. Inspección visual en el dashboard web (`/dashboard`): verificar selector "🔴 PlayDoit" y renderizado de saldos.
 
 ---
