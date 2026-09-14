@@ -605,9 +605,9 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 |---------|------|--------|
 | `PlaydoitCheckResult` | class | L32–L68 |
 | `_get_browser_headers` | def | L71–L94 |
-| `PlaydoitClient` | class | L97–L263 |
-| `check_playdoit_account` | def | L266–L271 |
-| `check_playdoit_with_failover` | def | L274–L300 |
+| `PlaydoitClient` | class | L97–L269 |
+| `check_playdoit_account` | def | L272–L277 |
+| `check_playdoit_with_failover` | def | L280–L306 |
 
 ### `playdoit_db.py`
 

@@ -121,7 +121,7 @@ prewarm.py (router)
 | `deposits.py` | 3273 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 391 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 241 | `betmexico.dashboard.login_orch` | _[completar]_ |
-| `playdoit_api.py` | 301 | `playdoit_api` | _[completar]_ |
+| `playdoit_api.py` | 307 | `playdoit_api` | _[completar]_ |
 | `playdoit_db.py` | 205 | `playdoit_db` | _[completar]_ |
 | `prewarm.py` | 922 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 1094 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
@@ -291,6 +291,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `ab9aad0` | docs(session): documentar bypass Cloudflare WAF y deploy 10d3ef2 en KVM4 |
 | `10d3ef2` | fix(playdoit): usar requests.Session en playdoit_api para bypass de Cloudflare WAF |
 | `7044ad1` | docs(session): actualizar NEXT-SESSION con cierre de integracion PlayDoit y deploy KVM4 |
 | `2117452` | feat(playdoit): blindaje y cierre Smartreview de integracion PlayDoit |
@@ -302,7 +303,6 @@ prewarm.py (router)
 | `8c60e8f` | fix(bet): ignore_marriage_pans nunca llegaba a deposits.py — bloqueo de tajo igual |
 | `aaa2989` | fix(proxy): revertir exclusion — el agotado era dataimpulse, no proxy001 |
 | `47e2be4` | fix(proxy): excluir proxy001 (407 TRAFFIC_EXHAUSTED, banda agotada) |
-| `b0e91dd` | fix(bet): Q1 (con/sin check) deja de preguntar tras el primer batch |
 <!-- GEN:end:recientes -->
 
 ---

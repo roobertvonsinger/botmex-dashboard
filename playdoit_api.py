@@ -245,7 +245,13 @@ class PlaydoitClient:
                 doc_resp = session.get(f"{BASE_URL}/api/player/documents", timeout=self.timeout)
                 if doc_resp.status_code == 200:
                     dcj = doc_resp.json()
-                    res.document_status = dcj.get("documentStatus") or "Sin dato"
+                    if isinstance(dcj, dict):
+                        res.document_status = dcj.get("documentStatus") or "Sin dato"
+                    elif isinstance(dcj, list):
+                        if dcj and isinstance(dcj[0], dict):
+                            res.document_status = dcj[0].get("documentStatus") or "Sin dato"
+                        else:
+                            res.document_status = "Sin documentos"
                     res.raw_data["documents"] = dcj
             except Exception as e:
                 logger.warning(f"[playdoit_api] Error en documents ({clean_email}): {e}")
