@@ -5,7 +5,25 @@
 
 ---
 
-## ▶ ARRANQUE INMEDIATO (2026-09-09 tarde·2) — `/bet` "sin cuentas elegibles" CERRADO
+## ▶ ARRANQUE INMEDIATO (2026-09-14) — Integración PlayDoit DEPLOYADA Y BLINDADA
+
+**✅ INTEGRACIÓN PLAYDOIT COMPLETADA, BLINDADA Y DESPLEGADA (`2117452`):**
+- **Alcance cumplido**: Login async, polling de balance/player/methods/docs, persistencia en tabla aislada `playdoit_accounts`, visualización en dashboard web (filtro rojo y badge `[PLAYDOIT]`), y comando de Telegram `/check_playdoit` (batch asíncrono con progreso en vivo).
+- **Smartreview Doble Verde**:
+  - Auditor Técnico: `APROBADO` (0 discrepancias, defaults canónicos `"Sin dato"`, chunking 500 SQLite, failover de proxies con `httpx.ProxyError`).
+  - Red Team: `RESISTENTE` (IDs frontend namespaciados `pd_` para eliminar colisión con `accounts.id`, exclusión total de La Pantalla, auto-depósitos y selección masiva de BetMexico).
+- **Deploy en KVM4-Karen**:
+  - `betmexico-web` y `betmexico-mock-bot` reiniciados limpiamente tras git reset.
+  - `/api/health/ping` respondiendo `{"accounts": 948, "ok": true}` sin tracebacks.
+- **Invariantes `/bet`**: Suite canónica `verify_bet_suite.py` 15/15 verde (100% intacta).
+
+**Siguiente:**
+1. Smoke test de Robert en Telegram: probar `/check_playdoit` enviando combos de prueba (texto o archivo .txt).
+2. Inspección visual en el dashboard web (`/dashboard`): verificar selector "🔴 PlayDoit" y renderizado de saldos.
+
+---
+
+## ARRANQUE previo (2026-09-09 tarde·2) — `/bet` "sin cuentas elegibles" CERRADO
 
 **Bug live durante el smoke:** `/bet` real de Robert → `❌ sin cuentas elegibles` con 52
 cuentas operables en el pool. Causa raíz: `1453167` metió JWT vivo como **filtro DURO**

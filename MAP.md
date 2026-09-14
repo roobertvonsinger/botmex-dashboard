@@ -291,6 +291,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `2117452` | feat(playdoit): blindaje y cierre Smartreview de integracion PlayDoit |
 | `b9eabd1` | feat(playdoit): integracion PlayDoit - API async, tabla aislada DB, /check_playdoit y visualizacion dashboard |
 | `567a4c9` | fix(proxy): re-excluir dataimpulse — sigue 407 TRAFFIC_EXHAUSTED, no recargó |
 | `258d6f9` | fix(bet): regla anti-quema en login fallido — nunca RETRY_SAME, siempre aparta cuenta y rescata tarjeta |
@@ -302,7 +303,6 @@ prewarm.py (router)
 | `b0e91dd` | fix(bet): Q1 (con/sin check) deja de preguntar tras el primer batch |
 | `c2a91a3` | fix(tests): mock/fixture de test_bot_bet.py al día con el refactor advisor/bet_policy |
 | `1b70394` | feat(bet): preguntas SA-only — con/sin liveness check + ignorar casamiento |
-| `78d2233` | feat(bet): grade D deja de ser descarte — toda cuenta LIVE entra al /bet |
 <!-- GEN:end:recientes -->
 
 ---
