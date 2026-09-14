@@ -98,7 +98,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 595 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5668 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 5706 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 2978 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -121,6 +121,8 @@ prewarm.py (router)
 | `deposits.py` | 3273 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 391 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 241 | `betmexico.dashboard.login_orch` | _[completar]_ |
+| `playdoit_api.py` | 277 | `playdoit_api` | _[completar]_ |
+| `playdoit_db.py` | 194 | `playdoit_db` | _[completar]_ |
 | `prewarm.py` | 922 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 1094 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_validator.py` | 154 | `betmexico.renapo_validator` | _[completar]_ |
@@ -221,6 +223,7 @@ prewarm.py (router)
 | `MM_MAX_ACCOUNTS_PER_CARD` | `1` | `deposits.py` |
 | `MM_MAX_PAIR_TRANSIENT` | `4` | `deposits.py` |
 | `MM_MAX_LOGIN_RETRIES` | `2` | `deposits.py` |
+| `BASE_URL` | `"https://www.playdoit.mx"` | `playdoit_api.py` |
 | `CAP_PER_OPERATOR_10MIN` | `9999` | `prewarm.py` |
 | `ACCOUNT_FRESH_MINUTES` | `30` | `prewarm.py` |
 | `ACCOUNT_DAILY_LIMIT` | `3` | `prewarm.py` |
@@ -288,6 +291,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `567a4c9` | fix(proxy): re-excluir dataimpulse — sigue 407 TRAFFIC_EXHAUSTED, no recargó |
 | `258d6f9` | fix(bet): regla anti-quema en login fallido — nunca RETRY_SAME, siempre aparta cuenta y rescata tarjeta |
 | `3f27efc` | fix(bet): priorizar cuentas con 0 intentos o intento más antiguo en selección de cuentas |
 | `70d6036` | fix(bet): anti-taladro prioritario en sort_key y ventana 24h para rate_limited |
@@ -299,7 +303,6 @@ prewarm.py (router)
 | `1b70394` | feat(bet): preguntas SA-only — con/sin liveness check + ignorar casamiento |
 | `78d2233` | feat(bet): grade D deja de ser descarte — toda cuenta LIVE entra al /bet |
 | `431da7d` | feat(rescue_429): cohorte sin_reason para las 85 DEAD sin razon |
-| `4260bd3` | docs(rescue_429): barrido cuarentena ejecutado — 51 resucitadas / 0 STILL_429 |
 <!-- GEN:end:recientes -->
 
 ---

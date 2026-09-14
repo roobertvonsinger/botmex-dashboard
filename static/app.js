@@ -24,6 +24,7 @@ const state = {
   section: 'accounts',
   status: 'LIVE',
   grade: '',
+  casino: '', // '' (Todos) | 'betmexico' | 'playdoit'
   view: 'detail',   // vista única (Robert mató el toggle Simple/Detallada)
   rows: [],
   user: null,
@@ -588,11 +589,23 @@ async function loadMe() {
 
 // ─── data fetchers ───
 async function fetchAccounts() {
+  const casino = state.casino || '';
+
+  // 1. Si se filtra expresamente por PlayDoit:
+  if (casino === 'playdoit') {
+    const url = new URL('/api/playdoit/accounts', location.origin);
+    url.searchParams.set('status', state.status);
+    if (searchQuery) url.searchParams.set('q', searchQuery);
+    url.searchParams.set('limit', String(ACCOUNTS_FETCH_LIMIT));
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    return data.map(d => ({ ...d, platform: 'playdoit' }));
+  }
+
+  // 2. Fetch BetMexico:
   const url = new URL('/api/accounts', location.origin);
   if (searchQuery) {
-    // Búsqueda DOMINANTE: corre sobre TODOS los registros, ignorando los filtros
-    // (status/grade/con-tarjeta). Robert: "la búsqueda nunca debe entorpecerse
-    // ni por el filtro ni por la vista". Filtros propios de búsqueda = después.
     url.searchParams.set('status', 'all');
     url.searchParams.set('q', searchQuery);
   } else {
@@ -603,7 +616,25 @@ async function fetchAccounts() {
   url.searchParams.set('limit', String(ACCOUNTS_FETCH_LIMIT));
   const r = await fetch(url);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.json();
+  let bmxData = await r.json();
+  bmxData = bmxData.map(d => ({ ...d, platform: d.platform || 'betmexico' }));
+
+  // 3. Si casino es '' (Todos): combinar BetMexico + PlayDoit
+  if (!casino) {
+    try {
+      const pUrl = new URL('/api/playdoit/accounts', location.origin);
+      pUrl.searchParams.set('status', state.status);
+      if (searchQuery) pUrl.searchParams.set('q', searchQuery);
+      pUrl.searchParams.set('limit', String(ACCOUNTS_FETCH_LIMIT));
+      const pr = await fetch(pUrl);
+      if (pr.ok) {
+        const pData = await pr.json();
+        const pMapped = pData.map(d => ({ ...d, platform: 'playdoit' }));
+        return [...bmxData, ...pMapped];
+      }
+    } catch (_) {}
+  }
+  return bmxData;
 }
 async function fetchStats() {
   const r = await fetch('/api/stats');
@@ -720,7 +751,11 @@ function renderTable() {
     // igual que row-sel. El toggle instantáneo al abrir/cerrar vive en pantalla.js.
     const pantallaSrcClass = (window.Pantalla && window.Pantalla.currentId === r.id) ? 'pantalla-source' : '';
     const isNewCls = r.is_new ? 'row-is-new' : '';
-    const trClasses = `r-grade-${g} ${lockedCls} ${selCls} ${opClass} ${trasClass} ${coolingClass} ${pantallaSrcClass} ${isNewCls}`.trim();
+    const platformCls = r.platform === 'playdoit' ? 'row-platform-playdoit' : '';
+    const trClasses = `r-grade-${g} ${lockedCls} ${selCls} ${opClass} ${trasClass} ${coolingClass} ${pantallaSrcClass} ${isNewCls} ${platformCls}`.trim();
+    const platformBadge = r.platform === 'playdoit'
+      ? `<span class="badge-playdoit" title="Cuenta de PlayDoit">🔴 PLAYDOIT</span>`
+      : '';
     const lockChip = r.locked_by
       ? `<span class="lock-chip op-${esc(opCol)} ${until?.expired ? 'expired' : ''}" title="Lockeada por ${esc(r.locked_by)}${until ? ` · ${until.expired ? 'vencido' : `vence en ${until.text}`}` : ''}">🔒 ${esc(r.locked_by)}${until && !until.expired ? ` <span class="lock-chip-time dim">${until.text}</span>` : ''}</span>`
       : '';
@@ -769,25 +804,25 @@ function renderTable() {
     const cellAcciones = `<td class="ic-col acciones-col">${cellNota}${cellCards}${cellPin}</td>`;
     const isSel = selectedIds.has(r.id);
     const selCellHtml = `<td class="sel-cell" data-id="${r.id}" title="Click para seleccionar"><span class="row-checkbox ${isSel ? 'on' : ''}">${isSel ? '☑' : '☐'}</span></td>`;
-    if (state.view === 'simple') {
+      if (state.view === 'simple') {
+        return `<tr class="${trClasses}" data-id="${r.id}"${selDrag} title="${trTitle || ''}">
+          <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
+          ${selCellHtml}
+          <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
+          <td class="combo" title="Click: ver detalle · Ctrl/Shift+Click: seleccionar">${platformBadge}${jwtBadge}${newBadge}${poolSwitchBtn}<b class="combo-txt d-copy" data-copy="${esc(combo)}" title="Click: copiar combo">${esc(combo)}</b>${lockChip}</td>
+          <td class="dep" title="Último depósito hecho">${dep}</td>
+          ${cellAcciones}
+        </tr>`;
+      }
       return `<tr class="${trClasses}" data-id="${r.id}"${selDrag} title="${trTitle || ''}">
         <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
         ${selCellHtml}
         <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-        <td class="combo" title="Click: ver detalle · Ctrl/Shift+Click: seleccionar">${jwtBadge}${newBadge}${poolSwitchBtn}<b class="combo-txt d-copy" data-copy="${esc(combo)}" title="Click: copiar combo">${esc(combo)}</b>${lockChip}</td>
+        <td class="combo" title="Click: ver detalle · Ctrl/Shift+Click: seleccionar">${platformBadge}${jwtBadge}${newBadge}${poolSwitchBtn}<b class="combo-txt d-copy" data-copy="${esc(combo)}" title="Click: copiar combo">${esc(combo)}</b></td>
         <td class="dep" title="Último depósito hecho">${dep}</td>
+        <td class="dep dim check-cell" title="Última actualización real · total de checks">${fmtAgo(r.last_updated_at || r.last_checked_at)}<span class="check-cnt">· ${r.check_count || 0}</span></td>
         ${cellAcciones}
       </tr>`;
-    }
-    return `<tr class="${trClasses}" data-id="${r.id}"${selDrag} title="${trTitle || ''}">
-      <td class="grade-bar-cell" title="Grade ${esc(r.grade) || '?'}"></td>
-      ${selCellHtml}
-      <td class="num" title="Saldo total disponible"><span class="balance ${balanceCls(r.balance_total)}">${fmtMoney(r.balance_total)}</span>${refreshOneBtn}</td>
-      <td class="combo" title="Click: ver detalle · Ctrl/Shift+Click: seleccionar">${jwtBadge}${newBadge}${poolSwitchBtn}<b class="combo-txt d-copy" data-copy="${esc(combo)}" title="Click: copiar combo">${esc(combo)}</b></td>
-      <td class="dep" title="Último depósito hecho">${dep}</td>
-      <td class="dep dim check-cell" title="Última actualización real · total de checks">${fmtAgo(r.last_updated_at || r.last_checked_at)}<span class="check-cnt">· ${r.check_count || 0}</span></td>
-      ${cellAcciones}
-    </tr>`;
   }).join('');
 
   t.querySelector('tbody').innerHTML = rowsHtml || `<tr><td colspan="${colspan}" class="loading">Sin cuentas</td></tr>`;
@@ -3040,6 +3075,7 @@ $('#btnRefreshVisible')?.addEventListener('click', () => refreshVisible());
 function _isFiltersDefault() {
   return state.status === 'LIVE'
       && state.grade === ''
+      && !state.casino
       && !searchQuery
       && !state.filterInUse
       && state.filterJwt === ''
@@ -3060,6 +3096,7 @@ $('#btnResetFilters')?.addEventListener('click', () => {
   // Reset de filtros (no toca selección)
   state.status = 'LIVE';
   state.grade = '';
+  state.casino = '';
   searchQuery = '';
   state.filterInUse = false;
   state.filterJwt = '';
@@ -3070,6 +3107,7 @@ $('#btnResetFilters')?.addEventListener('click', () => {
   _sortDir = -1;
   // UI segments back to default
   document.querySelectorAll('.seg[data-seg="status"] button').forEach(b => b.classList.toggle('on', b.dataset.v === 'LIVE'));
+  document.querySelectorAll('.seg[data-seg="casino"] button').forEach(b => b.classList.toggle('on', b.dataset.v === ''));
   document.querySelectorAll('.seg[data-seg="pool"] button').forEach(b => b.classList.toggle('on', b.dataset.v === ''));
   document.querySelectorAll('.seg[data-seg="grade"] button').forEach(b => b.classList.toggle('on', b.dataset.v === ''));
   document.querySelectorAll('.seg[data-seg="jwt"] button').forEach(b => b.classList.toggle('on', b.dataset.v === ''));

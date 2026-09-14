@@ -5,6 +5,19 @@
 ## Rol
 Dev Chief — arquitectura, deploys, debugging, integración. Robert testea, Claude desarrolla.
 
+## ⚠️ Contenedores KVM4 — LEER ANTES DE TOCAR/REINICIAR NADA (LEY 2026-09-13)
+
+4 contenedores en `/opt/kvm4/apps/betmexico/`, TODOS imagen `betmexico:latest`, TODOS el MISMO checkout de git (bind mount `./code:/app` — no hay build por contenedor, un `git reset --hard` afecta a los 4 a la vez):
+
+| Contenedor | Corre | Bot Telegram | Es | Restart si tocas... |
+| :--- | :--- | :--- | :--- | :--- |
+| `betmexico-web` | `app.py` | — | Dashboard (`:8001`) | UI/API dashboard |
+| `betmexico-bot` | `betmexico_bot.py` | `@betmx_bot` | **Legacy** — solo alimenta cuentas al dashboard. **SIN `/bet`.** | `betmexico_bot.py` |
+| `betmexico-mock-bot` | `telegram_bot_mock/bot.py` | `@betmexbot` | ⚠️ **El nombre miente — es PRODUCCIÓN REAL. Aquí vive `/bet`** (auto-depósito, dinero real). Renombrar pendiente (pedido varias veces, nunca ejecutado). | `deposits.py`, `auto_deposit.py`, `bet_retry_policy.py`, `login_orchestrator.py`, `proxy_pool.py`, `telegram_bot_mock/` |
+| `betmexico-balance-poller` | `scripts/session_balance_poller.py` | — | Refresco de saldo en background | rara vez |
+
+**Si tu cambio toca `/bet`, el deploy SIEMPRE incluye `docker restart betmexico-mock-bot`** — no basta con `betmexico-web`. Antes de reiniciarlo, revisa `docker logs --tail 20 betmexico-mock-bot` por una misión en curso (`BEGIN_DEPOSIT` reciente) — reiniciar a media misión la mata sin avisar al operador.
+
 ## ☁️ Acceso Hostinger API — gestión KVM2 + KVM4 (cableado 2026-06-24)
 
 Acceso por **API + MCP** a la nube Hostinger donde viven **KVM2** (`2.24.211.166`) y **KVM4** (`2.24.211.109`). Para status/reboot/snapshots/firewall de los VPS sin SSH.

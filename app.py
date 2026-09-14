@@ -494,6 +494,12 @@ def _migrate():
     except sqlite3.OperationalError:
         pass
 
+    try:
+        from playdoit_db import init_playdoit_table
+        init_playdoit_table()
+    except Exception as ex_pdi:
+        logger.warning(f"[migrate] init_playdoit_table error: {ex_pdi}")
+
     _backfill_grades_v10_m7()
 
 
@@ -1292,6 +1298,38 @@ def list_accounts(
         # Cualquier otro OperationalError (p.ej. "no such table: accounts") es una
         # BD rota, no "cero cuentas" — no tragar en silencio (vacío != roto).
         raise HTTPException(500, f"DB: {e}")
+
+
+# ─── PlayDoit Casino Endpoints ──────────────────────────────────────────────────
+
+@app.get("/api/playdoit/accounts")
+def api_list_playdoit_accounts(
+    status: Optional[str] = Query("LIVE"),
+    q: Optional[str] = None,
+    limit: int = Query(500, le=2000),
+    user: dict = Depends(require_session),
+):
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Acceso acotado: endpoints de lectura de cuentas solo para SuperAdmin")
+    try:
+        from playdoit_db import list_playdoit_accounts
+        st = None if status == "all" else status
+        return list_playdoit_accounts(status=st, q=q, limit=limit)
+    except Exception as e:
+        logger.error(f"Error list_playdoit_accounts: {e}")
+        raise HTTPException(500, f"Error listando cuentas PlayDoit: {e}")
+
+
+@app.get("/api/playdoit/stats")
+def api_get_playdoit_stats(user: dict = Depends(require_session)):
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Acceso acotado: endpoints de lectura de cuentas solo para SuperAdmin")
+    try:
+        from playdoit_db import get_playdoit_stats
+        return get_playdoit_stats()
+    except Exception as e:
+        logger.error(f"Error get_playdoit_stats: {e}")
+        raise HTTPException(500, f"Error obteniendo estadísticas PlayDoit: {e}")
 
 
 # ─── Asignaciones / Liberador ──────────────────────────────────────────────────
