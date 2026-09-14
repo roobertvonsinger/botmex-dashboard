@@ -291,6 +291,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `2fc6f0c` | fix(playdoit): parsear documentStatus cuando retorna lista y sumarizar progreso en logs |
 | `ab9aad0` | docs(session): documentar bypass Cloudflare WAF y deploy 10d3ef2 en KVM4 |
 | `10d3ef2` | fix(playdoit): usar requests.Session en playdoit_api para bypass de Cloudflare WAF |
 | `7044ad1` | docs(session): actualizar NEXT-SESSION con cierre de integracion PlayDoit y deploy KVM4 |
@@ -302,7 +303,6 @@ prewarm.py (router)
 | `70d6036` | fix(bet): anti-taladro prioritario en sort_key y ventana 24h para rate_limited |
 | `8c60e8f` | fix(bet): ignore_marriage_pans nunca llegaba a deposits.py — bloqueo de tajo igual |
 | `aaa2989` | fix(proxy): revertir exclusion — el agotado era dataimpulse, no proxy001 |
-| `47e2be4` | fix(proxy): excluir proxy001 (407 TRAFFIC_EXHAUSTED, banda agotada) |
 <!-- GEN:end:recientes -->
 
 ---

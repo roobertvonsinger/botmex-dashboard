@@ -1161,10 +1161,12 @@ async def _run_check_playdoit_task(
 
         hits_section = ""
         if hits_list:
-            hits_lines = [
-                f"• <code>{h.email}:{h.password}</code> | ${h.balance_total:,.2f} | {h.fullname}"
-                for h in hits_list[:25]
-            ]
+            hits_lines = []
+            for h in hits_list[:25]:
+                if getattr(h, "balance_total", 0.0) >= 100.0:
+                    hits_lines.append(f"💰 <code>{h.email}:{h.password}</code> | <b>${h.balance_total:,.2f}</b>")
+                else:
+                    hits_lines.append(f"• <code>{h.email}:{h.password}</code> | ${h.balance_total:,.2f}")
             hits_section = "\n\n🎯 <b>HITS ENCONTRADOS:</b>\n" + "\n".join(hits_lines)
             if len(hits_list) > 25:
                 hits_section += f"\n<i>...y {len(hits_list) - 25} hits más registrados en BD.</i>"
@@ -1176,8 +1178,7 @@ async def _run_check_playdoit_task(
             f"• <b>Cuentas Muertas (DEAD):</b> {dead_count}\n"
             f"• <b>Errores de Red / Proxy:</b> {errors_count}\n"
             f"• <b>Saldo Total Encontrado:</b> <b>${total_balance_found:,.2f} MXN</b>"
-            f"{hits_section}\n\n"
-            f"🌐 <i>Consulta detalles completos en el dashboard web ({DASHBOARD_URL}).</i>"
+            f"{hits_section}"
         )
         logger.info(
             f"[check_playdoit] RESUMEN: {total} procesados | {hits_count} HITS (${total_balance_found:,.2f}) | {dead_count} DEAD | {errors_count} ERRORS"
