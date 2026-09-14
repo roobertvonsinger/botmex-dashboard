@@ -7,8 +7,11 @@
 
 ## ▶ ARRANQUE INMEDIATO (2026-09-14) — Integración PlayDoit DEPLOYADA Y BLINDADA
 
-**✅ INTEGRACIÓN PLAYDOIT COMPLETADA, BLINDADA Y DESPLEGADA (`2117452` / `10d3ef2`):**
+**✅ INTEGRACIÓN PLAYDOIT COMPLETADA, BLINDADA Y DESPLEGADA (`2117452` / `10d3ef2` / `72a39e5`):**
 - **Alcance cumplido**: Login async, polling de balance/player/methods/docs, persistencia en tabla aislada `playdoit_accounts`, visualización en dashboard web (filtro rojo y badge `[PLAYDOIT]`), y comando de Telegram `/check_playdoit` (batch asíncrono con progreso en vivo).
+- **Ajustes de layout y logs (`2fc6f0c` / `72a39e5`)**:
+  - Eliminado spam de logs individuales; logging de progreso cada 25 combos y resumen final.
+  - Formato final de Telegram: lista de hits limpia `combo | $saldo`, sin nombre, sin pie de página web, y con diferenciador visual `💰` + saldo resaltado para cuentas con saldo ≥ $100.
 - **Bypass Cloudflare WAF (`10d3ef2`)**:
   - `playdoit_api.py` migrado de `httpx.AsyncClient` a `requests.Session` ejecutado via `asyncio.to_thread` con headers exactos de navegador (`X-Requested-With`, `Sec-Ch-Ua`, etc.).
   - Error 403 resuelto en warmup y login: verificado en vivo en KVM4 contra proxy residencial (`UserNotFoundException` con HTTP 200 OK).

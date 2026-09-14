@@ -291,6 +291,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `72a39e5` | fix(telegram): ajustar layout hits playdoit sin nombre y con badge saldo > |
 | `2fc6f0c` | fix(playdoit): parsear documentStatus cuando retorna lista y sumarizar progreso en logs |
 | `ab9aad0` | docs(session): documentar bypass Cloudflare WAF y deploy 10d3ef2 en KVM4 |
 | `10d3ef2` | fix(playdoit): usar requests.Session en playdoit_api para bypass de Cloudflare WAF |
@@ -302,7 +303,6 @@ prewarm.py (router)
 | `3f27efc` | fix(bet): priorizar cuentas con 0 intentos o intento más antiguo en selección de cuentas |
 | `70d6036` | fix(bet): anti-taladro prioritario en sort_key y ventana 24h para rate_limited |
 | `8c60e8f` | fix(bet): ignore_marriage_pans nunca llegaba a deposits.py — bloqueo de tajo igual |
-| `aaa2989` | fix(proxy): revertir exclusion — el agotado era dataimpulse, no proxy001 |
 <!-- GEN:end:recientes -->
 
 ---
