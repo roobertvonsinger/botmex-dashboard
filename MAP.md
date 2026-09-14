@@ -291,6 +291,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `d364ebb` | docs: actualizar NEXT-SESSION con modo stream y nuevo layout de hits playdoit |
 | `571196a` | feat(telegram): streaming de hits playdoit en tiempo real y layout con saldo al frente |
 | `feea7c5` | docs: registrar ajuste de layout de hits playdoit en NEXT-SESSION |
 | `72a39e5` | fix(telegram): ajustar layout hits playdoit sin nombre y con badge saldo > |
@@ -302,7 +303,6 @@ prewarm.py (router)
 | `b9eabd1` | feat(playdoit): integracion PlayDoit - API async, tabla aislada DB, /check_playdoit y visualizacion dashboard |
 | `567a4c9` | fix(proxy): re-excluir dataimpulse — sigue 407 TRAFFIC_EXHAUSTED, no recargó |
 | `258d6f9` | fix(bet): regla anti-quema en login fallido — nunca RETRY_SAME, siempre aparta cuenta y rescata tarjeta |
-| `3f27efc` | fix(bet): priorizar cuentas con 0 intentos o intento más antiguo en selección de cuentas |
 <!-- GEN:end:recientes -->
 
 ---

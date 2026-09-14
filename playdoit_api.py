@@ -97,7 +97,7 @@ def _get_browser_headers(ua: str) -> Dict[str, str]:
 class PlaydoitClient:
     """Cliente para interactuar con PlayDoit usando requests.Session con bypass de Cloudflare WAF."""
 
-    def __init__(self, proxy: Optional[str] = None, timeout: float = 20.0):
+    def __init__(self, proxy: Optional[str] = None, timeout: Any = (4.0, 8.0)):
         self.proxy = proxy
         self.timeout = timeout
         self.ua = random.choice(USER_AGENTS)
@@ -270,28 +270,28 @@ class PlaydoitClient:
 
 
 async def check_playdoit_account(
-    email: str, password: str, proxy: Optional[str] = None
+    email: str, password: str, proxy: Optional[str] = None, timeout: Any = (4.0, 8.0)
 ) -> PlaydoitCheckResult:
     """Ejecuta un check individual sobre PlayDoit."""
-    client = PlaydoitClient(proxy=proxy)
+    client = PlaydoitClient(proxy=proxy, timeout=timeout)
     return await client.check_credentials_and_fetch(email, password)
 
 
 async def check_playdoit_with_failover(
-    email: str, password: str
+    email: str, password: str, timeout: Any = (4.0, 8.0)
 ) -> Tuple[PlaydoitCheckResult, Optional[str]]:
     """
     Ejecuta el check de PlayDoit rotando proxies en caso de fallo de red/proxy.
     Retorna (resultado, proxy_utilizado).
     """
     async def _runner(proxy: Optional[str] = None) -> PlaydoitCheckResult:
-        return await check_playdoit_account(email, password, proxy=proxy)
+        return await check_playdoit_account(email, password, proxy=proxy, timeout=timeout)
 
     try:
         result, used_proxy = await call_with_proxy_failover(
             _runner,
             proxy_kwarg="proxy",
-            max_attempts=4,
+            max_attempts=3,
         )
         return result, used_proxy
     except Exception as exc:

@@ -924,13 +924,13 @@ def test_build_app_handlers_order():
     from telegram.ext import ConversationHandler, MessageHandler
     app = mock_bot.build_app()
     handlers_group_0 = app.handlers.get(0, [])
-    
+
     conv_indices = [i for i, h in enumerate(handlers_group_0) if isinstance(h, ConversationHandler)]
     msg_text_indices = [
         i for i, h in enumerate(handlers_group_0)
         if isinstance(h, MessageHandler) and not isinstance(h, ConversationHandler)
     ]
-    
+
     assert len(conv_indices) >= 3, "Deben estar registrados check, adduser y bet handlers"
     last_conv_idx = max(conv_indices)
     for msg_idx in msg_text_indices:
@@ -938,4 +938,59 @@ def test_build_app_handlers_order():
             f"El MessageHandler en el índice {msg_idx} debe registrarse después "
             f"del último ConversationHandler (índice {last_conv_idx}) para no interceptar inputs de texto"
         )
+
+
+def test_start_menu_includes_playdoit_button():
+    """Valida que el menú de /start incluya el botón de Check PlayDoit."""
+    msg, kb = mock_bot._start_menu_msg(SUPERADMIN_ID, "robertvs")
+    flat = _flat_callback_data(kb)
+    assert "btn_start_check_playdoit" in flat
+
+
+def test_playdoit_hit_line_format_money_bag_after_amount():
+    """Valida que el layout de hit coloque la bolsita de dinero 💰 después del monto si saldo >= 100."""
+    # 1. Saldo >= 100 (bolsita 💰 después del monto)
+    hit_high = {
+        "balance_total": 205.20,
+        "email": "rich@playdoit.mx",
+        "password": "secret",
+    }
+    line_high = mock_bot._format_playdoit_hit_line(hit_high)
+    assert line_high == "• <b>$205.20</b> 💰 | <code>rich@playdoit.mx:secret</code>"
+
+    # 2. Saldo menor a 100 (sin bolsita)
+    hit_low = {
+        "balance_total": 45.50,
+        "email": "low@playdoit.mx",
+        "password": "secret",
+    }
+    line_low = mock_bot._format_playdoit_hit_line(hit_low)
+    assert line_low == "• <b>$45.50</b> | <code>low@playdoit.mx:secret</code>"
+
+    # 3. Saldo 0.00
+    hit_zero = {
+        "balance_total": 0.0,
+        "email": "zero@playdoit.mx",
+        "password": "secret",
+    }
+    line_zero = mock_bot._format_playdoit_hit_line(hit_zero)
+    assert line_zero == "• $0.00 | <code>zero@playdoit.mx:secret</code>"
+
+
+@pytest.mark.asyncio
+async def test_btn_start_check_playdoit_callback():
+    """Valida que tocar el botón btn_start_check_playdoit muestre el prompt de PlayDoit."""
+    query = AsyncMock()
+    query.data = "btn_start_check_playdoit"
+    query.message.photo = None
+    update = MagicMock(spec=Update)
+    update.callback_query = query
+    context = MagicMock()
+
+    res = await mock_bot.start_buttons_callback(update, context)
+    assert res == mock_bot.WAIT_CHECK_PLAYDOIT_CONFIRM
+    query.edit_message_text.assert_called_once()
+    called_text = query.edit_message_text.call_args.kwargs.get("text") or query.edit_message_text.call_args[0][0]
+    assert "PlayDoit" in called_text
+
 
