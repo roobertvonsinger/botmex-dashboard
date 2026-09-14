@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
 import httpx
+import requests
 
 import playdoit_db
 import playdoit_api
@@ -128,15 +129,15 @@ def test_playdoit_api_result_dataclass():
 async def test_playdoit_client_mock():
     client = playdoit_api.PlaydoitClient()
 
-    mock_login_resp = MagicMock(spec=httpx.Response)
+    mock_login_resp = MagicMock(spec=requests.Response)
     mock_login_resp.status_code = 200
     mock_login_resp.json.return_value = {"success": True, "message": "OK"}
 
-    mock_bal_resp = MagicMock(spec=httpx.Response)
+    mock_bal_resp = MagicMock(spec=requests.Response)
     mock_bal_resp.status_code = 200
     mock_bal_resp.json.return_value = {"cash": 150.0, "promo": 20.0, "balance": 170.0}
 
-    mock_player_resp = MagicMock(spec=httpx.Response)
+    mock_player_resp = MagicMock(spec=requests.Response)
     mock_player_resp.status_code = 200
     mock_player_resp.json.return_value = {
         "firstName": "Ana",
@@ -145,7 +146,7 @@ async def test_playdoit_client_mock():
         "nationalIdNumber": "LOAN950515",
     }
 
-    mock_methods_resp = MagicMock(spec=httpx.Response)
+    mock_methods_resp = MagicMock(spec=requests.Response)
     mock_methods_resp.status_code = 200
     mock_methods_resp.json.return_value = {
         "totalDeposits": 1000.0,
@@ -153,29 +154,27 @@ async def test_playdoit_client_mock():
         "totalDepositCount": 5,
     }
 
-    mock_details_resp = MagicMock(spec=httpx.Response)
+    mock_details_resp = MagicMock(spec=requests.Response)
     mock_details_resp.status_code = 200
     mock_details_resp.json.return_value = []
 
-    mock_docs_resp = MagicMock(spec=httpx.Response)
+    mock_docs_resp = MagicMock(spec=requests.Response)
     mock_docs_resp.status_code = 200
     mock_docs_resp.json.return_value = {"documentStatus": "VERIFIED"}
 
-    # Mock del httpx.AsyncClient interno
-    mock_http_client = AsyncMock()
-    mock_http_client.get = AsyncMock(side_effect=[
+    # Mock del requests.Session interno
+    mock_session = MagicMock(spec=requests.Session)
+    mock_session.get.side_effect = [
         MagicMock(status_code=200), # Warmup
         mock_bal_resp,              # Balance
         mock_player_resp,           # Player
         mock_methods_resp,          # Methods
         mock_details_resp,          # Details
         mock_docs_resp,             # Docs
-    ])
-    mock_http_client.post = AsyncMock(return_value=mock_login_resp)
-    mock_http_client.__aenter__.return_value = mock_http_client
-    mock_http_client.__aexit__.return_value = None
+    ]
+    mock_session.post.return_value = mock_login_resp
 
-    with patch.object(client, "_create_client", return_value=mock_http_client):
+    with patch.object(client, "_create_session", return_value=mock_session):
         res = await client.check_credentials_and_fetch("ana@playdoit.mx", "pass123")
         assert res.ok is True
         assert res.balance_cash == 150.0
@@ -231,16 +230,14 @@ def test_playdoit_auto_init_table_on_upsert(seed_db):
 async def test_playdoit_5xx_raises_proxy_error_for_rotation():
     """Verifica que HTTP >= 500 levante httpx.ProxyError para que proxy_pool rote."""
     client = playdoit_api.PlaydoitClient()
-    mock_login_resp = MagicMock(spec=httpx.Response)
+    mock_login_resp = MagicMock(spec=requests.Response)
     mock_login_resp.status_code = 502
 
-    mock_http_client = AsyncMock()
-    mock_http_client.get = AsyncMock(return_value=MagicMock(status_code=200))
-    mock_http_client.post = AsyncMock(return_value=mock_login_resp)
-    mock_http_client.__aenter__.return_value = mock_http_client
-    mock_http_client.__aexit__.return_value = None
+    mock_session = MagicMock(spec=requests.Session)
+    mock_session.get.return_value = MagicMock(status_code=200)
+    mock_session.post.return_value = mock_login_resp
 
-    with patch.object(client, "_create_client", return_value=mock_http_client):
+    with patch.object(client, "_create_session", return_value=mock_session):
         with pytest.raises(httpx.ProxyError):
             await client.check_credentials_and_fetch("err502@playdoit.mx", "pass")
 

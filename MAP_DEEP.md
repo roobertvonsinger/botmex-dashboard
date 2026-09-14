@@ -603,11 +603,11 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `PlaydoitCheckResult` | class | L31–L67 |
-| `_get_browser_headers` | def | L70–L85 |
-| `PlaydoitClient` | class | L88–L260 |
-| `check_playdoit_account` | def | L263–L268 |
-| `check_playdoit_with_failover` | def | L271–L297 |
+| `PlaydoitCheckResult` | class | L32–L68 |
+| `_get_browser_headers` | def | L71–L94 |
+| `PlaydoitClient` | class | L97–L263 |
+| `check_playdoit_account` | def | L266–L271 |
+| `check_playdoit_with_failover` | def | L274–L300 |
 
 ### `playdoit_db.py`
 
