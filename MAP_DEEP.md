@@ -593,11 +593,12 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `StickySession` | class | L17–L24 |
-| `LoginResult` | class | L28–L42 |
-| `StickySessionManager` | class | L45–L56 |
-| `_classify_dead` | def | L59–L70 |
-| `gentle_login` | def | L73–L241 |
+| `_capmonster_available` | def | L24–L49 |
+| `StickySession` | class | L53–L60 |
+| `LoginResult` | class | L64–L78 |
+| `StickySessionManager` | class | L81–L92 |
+| `_classify_dead` | def | L95–L106 |
+| `gentle_login` | def | L109–L288 |
 
 ### `playdoit_api.py`
 

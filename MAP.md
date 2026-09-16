@@ -120,7 +120,7 @@ prewarm.py (router)
 | `db_registry.py` | 112 | `betmexico.dashboard.db` | _[completar]_ |
 | `deposits.py` | 3274 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 391 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
-| `login_orchestrator.py` | 241 | `betmexico.dashboard.login_orch` | _[completar]_ |
+| `login_orchestrator.py` | 288 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `playdoit_api.py` | 307 | `playdoit_api` | _[completar]_ |
 | `playdoit_db.py` | 205 | `playdoit_db` | _[completar]_ |
 | `prewarm.py` | 922 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
@@ -291,6 +291,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `c2ac134` | fix(security): eliminar tokens de telegram hardcodeados y obligar lectura desde .env |
 | `82fcb10` | docs: actualizar NEXT-SESSION con boton playdoit, anti-hang y deploy a KVM4 |
 | `4cf2f0b` | feat(telegram): boton /start playdoit, anti-hang timeouts y ajuste layout hits |
 | `d364ebb` | docs: actualizar NEXT-SESSION con modo stream y nuevo layout de hits playdoit |
@@ -302,7 +303,6 @@ prewarm.py (router)
 | `10d3ef2` | fix(playdoit): usar requests.Session en playdoit_api para bypass de Cloudflare WAF |
 | `7044ad1` | docs(session): actualizar NEXT-SESSION con cierre de integracion PlayDoit y deploy KVM4 |
 | `2117452` | feat(playdoit): blindaje y cierre Smartreview de integracion PlayDoit |
-| `b9eabd1` | feat(playdoit): integracion PlayDoit - API async, tabla aislada DB, /check_playdoit y visualizacion dashboard |
 <!-- GEN:end:recientes -->
 
 ---

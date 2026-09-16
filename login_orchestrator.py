@@ -12,6 +12,42 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("betmexico.dashboard.login_orch")
 
+# ── Health-gate de CapMonster ────────────────────────────────────────────────
+# Si CapMonster está caído/baneado, cada login real (sin JWT cache) se queda
+# ~35s x N reintentos esperando un token que nunca llega — con cientos de
+# cuentas eso satura proxies/CPU/logs sin ningún avance (Robert 2026-09-16,
+# ver docs/ERRORS.md). Cache corta evita golpear getBalance en cada login.
+_CAPMONSTER_HEALTH_TTL_SEC = 60.0
+_capmonster_health_cache: Dict[str, Any] = {"ts": 0.0, "ok": True}
+
+
+async def _capmonster_available() -> bool:
+    now = time.time()
+    if now - _capmonster_health_cache["ts"] < _CAPMONSTER_HEALTH_TTL_SEC:
+        return _capmonster_health_cache["ok"]
+    import os
+    import httpx
+    key = os.environ.get("BMX_CAPMONSTER_KEY") or os.environ.get("CAPMONSTER_KEY", "")
+    ok = False
+    if key:
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                r = await client.post(
+                    "https://api.capmonster.cloud/getBalance",
+                    json={"clientKey": key},
+                )
+                ok = r.json().get("errorId") == 0
+        except Exception as e:
+            logger.debug(f"[capmonster_health] no disponible: {e}")
+    was_ok = _capmonster_health_cache["ok"]
+    _capmonster_health_cache["ts"] = now
+    _capmonster_health_cache["ok"] = ok
+    if not ok and was_ok:
+        logger.warning("[CAPTCHA_DOWN] CapMonster no responde — logins nuevos (sin JWT cache) se pausan")
+    elif ok and not was_ok:
+        logger.info("[CAPTCHA_DOWN] CapMonster respondió de nuevo — logins nuevos reanudados")
+    return ok
+
 
 @dataclass
 class StickySession:
@@ -126,6 +162,17 @@ async def gentle_login(
             logger.debug(f"[login] {email} cache check: {e}")
 
     # 2. Login real vía CaptchaHub (hasta 2 intentos en caso de 406)
+    # Gate de salud: si CapMonster está caído, fail-fast en vez de quemar
+    # ~35s x N reintentos contra un proveedor que no va a responder.
+    if not await _capmonster_available():
+        return LoginResult(
+            ok=False,
+            code="CAPTCHA_DOWN",
+            account_dead=False,
+            error="CapMonster no disponible — login pausado (requiere captcha)",
+            attempts=0,
+        )
+
     last_error = None
     last_res = None
     for attempt in range(1, max(2, max_login_retries + 1)):

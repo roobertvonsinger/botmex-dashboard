@@ -2,6 +2,21 @@
 
 > Bitácora viva. Agregar entry cada vez que un error nuevo aparezca.
 
+## CapMonster baneó la IP de Karen VPS (2.25.98.162) — login/captcha caído desde 2026-09-15 04:38 — MITIGADO con fail-fast
+
+- **Síntoma**: `kvm4-captcha-hub` tirando `httpx.ConnectError: [Errno 111] Connection refused` en cada `/solve` (2583 líneas en el buffer de 27 min de `docker logs`). En `telegram_mock_bot.log`: último `[CAPTCHA_HUB] Token obtenido` a las **2026-09-15 04:38:35**; desde **04:44:49** solo `[POOL] Timeout (30.0s) resolviendo captcha bajo demanda`, sostenido hasta hoy (2026-09-16).
+- **Diagnóstico** (BANDERA — medido, no asumido):
+  - `curl`/`httpx` desde dentro del contenedor y desde el host Karen a `api.capmonster.cloud:443` → **Connection refused** en las 3 IPs del DNS round-robin (`135.181.20.42`, `135.181.20.38`, `65.108.229.30`).
+  - `traceroute -T -p 443` llega hasta el hop del servidor destino (hop 11, `static.30.229.108.65.clients.your-server.de`) → el paquete SÍ llega, el rechazo es activo del lado de CapMonster (RST inmediato), no un firewall intermedio ni problema del VPS.
+  - Mismo `curl` desde una IP distinta (máquina local de Robert, fuera de Karen) → conecta normal, `403` con `errorId`/`errorCode` de aplicación (`ERROR_KEY_DOES_NOT_EXIST` con key de prueba). Confirma que el servicio de CapMonster está arriba globalmente — el bloqueo es específico de la IP `2.25.98.162`.
+  - Volumen previo al corte: ~11-12 tokens/min sostenido 24/7 por días (conteo por minuto sin picos) → corte abrupto, no gradual.
+  - **Conclusión verificada**: ban de IP del lado de CapMonster sobre `2.25.98.162`. **Hipótesis** (no verificable sin soporte de CapMonster): volumen sostenido de reCAPTCHA v2 contra un único dominio (`betmexico.mx`) desde una sola IP de datacenter (Hetzner) — patrón que los proveedores de captcha-solving suelen banear para protegerse de que Google les revoque el servicio a ELLOS.
+- **Impacto sin mitigar**: `gentle_login` sin JWT cache vigente intenta login real → `pool.get_token()` cuelga hasta timeout (~30s) × `max_login_retries` (2-5 según caller) → **jwt_keeper** (`use_cache=False` siempre) fallaba el 100% de su lote cada ciclo, quemando minutos por cuenta sin ningún avance; **prewarm**/**deposits** sin JWT vigente también tardaban 35-70s en fallar por cuenta.
+- **Fix — gate de salud centralizado en `login_orchestrator.gentle_login`** (`_capmonster_available()`, cache 60s vía `getBalance`): si CapMonster no responde, el login real retorna de inmediato `code="CAPTCHA_DOWN"` (attempts=0) **sin tocar el pool ni esperar timeout**. Al vivir dentro de `gentle_login`, cubre automáticamente a TODOS los callers (jwt_keeper, prewarm, deposits single/multi/scheduled, mass_sweep, telegram bot) sin tocarlos uno por uno. Cuentas con JWT vigente siguen operando normal (fast-path de cache en `gentle_login` sale ANTES de este gate, nunca lo toca). `CAPTCHA_DOWN` no está en `MM_DEAD_RC`/`SCHED_TERMINAL_RC` ni dispara `account_dead` en ningún caller → se trata como fallo transitorio (reintento futuro), nunca mata ni aísla cuentas.
+- **Efecto práctico**: auto-refresh (`account_refresh.py`, ya no usaba captcha) intacto. Depósitos/retiros/prewarm/jwt_keeper: solo operan cuentas con JWT guardado vigente; todo lo que requeriría login nuevo (captcha) falla rápido (~5s del healthcheck cacheado) en vez de spamear timeouts de 30-70s.
+- **Reversión**: automática — en cuanto `getBalance` vuelva a responder `errorId:0`, el cache de 60s se refresca solo y los logins nuevos se reanudan sin deploy (log `[CAPTCHA_DOWN] CapMonster respondió de nuevo`).
+- **Pendiente 🔵**: contactar soporte de CapMonster para confirmar causa exacta del ban y pedir whitelist de `2.25.98.162` (o rotar a una IP/VPS limpia si no responden). Evaluar cap de tasa propio (< umbral que gatilló el ban) antes de reactivar a volumen completo.
+
 ## `scripts/update_429.py` mass-killeó ~161 cuentas 429 sin re-verificar (2026-09-10) — ELIMINADO
 
 - **Síntoma**: censo KVM4 2026-09-10 — 549 cuentas `status='DEAD'` con `dead_reason='RATE_LIMITED_PERMANENT (...)'`. **0 de 549** con txn o `last_checked_at` posterior a su `dead_at` → cero re-verificación. Dos sub-cohortes con firma de UPDATE bulk:
