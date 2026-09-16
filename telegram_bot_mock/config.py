@@ -82,8 +82,17 @@ def get_user_nickname(user_id: int, fallback_name: str = "") -> str:
             return u.get("display", fallback_name)
     return fallback_name or f"Operador_{user_id}"
 
-# Token para el bot mock
-MOCK_BOT_TOKEN = os.getenv("BMX_MOCK_BOT_TOKEN", "8823043859:AAEWnv2aVYopE7qsNVACA24sW_Tei7o1nnI")
+# Cargar .env si existe (entorno local o testing)
+try:
+    from dotenv import load_dotenv
+    _env_file = DASHBOARD_DIR / ".env"
+    if _env_file.exists():
+        load_dotenv(_env_file)
+except ImportError:
+    pass
+
+# Token para el bot mock (obligatorio en .env / entorno para prevenir leaks)
+MOCK_BOT_TOKEN = os.getenv("BMX_MOCK_BOT_TOKEN", "mock_token_for_tests" if any("pytest" in mod for mod in sys.modules) else "")
 DASHBOARD_URL = os.getenv("BMX_DASHBOARD_URL", "https://botmexico.net")
 
 # Usuarios autorizados (coincide con auth.py del dashboard y betmexico_config)

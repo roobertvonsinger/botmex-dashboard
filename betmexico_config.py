@@ -45,7 +45,7 @@ def now_mx() -> datetime:
 # TELEGRAM TOKEN
 # ─────────────────────────────────────────────────────────────────────
 
-TELEGRAM_BOT_TOKEN = os.getenv("BMX_BOT_TOKEN", "8516175452:AAGz_PCh9Oq3D9l5DZtCzgdU5ObAJH-b1Gs")
+TELEGRAM_BOT_TOKEN = os.getenv("BMX_BOT_TOKEN", "")
 
 # ─────────────────────────────────────────────────────────────────────
 # ROLES Y USUARIOS

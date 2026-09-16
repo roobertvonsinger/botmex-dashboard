@@ -100,7 +100,7 @@ prewarm.py (router)
 | `account_refresh.py` | 595 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
 | `app.py` | 5706 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
-| `auto_deposit.py` | 2978 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
+| `auto_deposit.py` | 2970 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
 | `bet_advisor.py` | 471 | `betmexico.dashboard.bet_advisor` | _[completar]_ |
 | `bet_policy.py` | 221 | `—` | _[completar]_ |
@@ -118,7 +118,7 @@ prewarm.py (router)
 | `conftest.py` | 222 | `—` | Fixtures pytest (BD en memoria, cliente test, sesión de prueba) |
 | `curp_utils.py` | 267 | `—` | _[completar]_ |
 | `db_registry.py` | 112 | `betmexico.dashboard.db` | _[completar]_ |
-| `deposits.py` | 3273 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
+| `deposits.py` | 3274 | `betmexico.dashboard.deposits` | Motor de depósitos: `_run_deposit`, captcha pool, retry-con-failover, caps duros |
 | `jwt_keeper.py` | 391 | `betmexico.dashboard.jwt_keeper` | Mantiene JWT de sesión vivos (7d): re-loguea espaciado las cuentas por expirar para bajar el 429. Bg-loop horario `app._jwt_keepalive_loop`. Config `JWT_KEEPER_*` |
 | `login_orchestrator.py` | 241 | `betmexico.dashboard.login_orch` | _[completar]_ |
 | `playdoit_api.py` | 307 | `playdoit_api` | _[completar]_ |
@@ -276,7 +276,7 @@ prewarm.py (router)
 | Variable | Default | Definida en |
 |----------|---------|-------------|
 | `BETMEX_DB` | `os.getenv("DB_PATH", "/data/betmexico_accounts.db" if (os.name != "nt" and Path("/data/betmexico_accounts.db"` | `betmexico_db.py` |
-| `BMX_BOT_TOKEN` | `"8516175452:AAGz_PCh9Oq3D9l5DZtCzgdU5ObAJH-b1Gs"` | `betmexico_config.py` |
+| `BMX_BOT_TOKEN` | `""` | `betmexico_config.py` |
 | `BMX_CAPMONSTER_KEY` | `""` | `betmexico_login_api.py` |
 | `BMX_CAPSOLVER_KEY` | `""` | `betmexico_login_api.py` |
 | `BMX_RECAPTCHA_SITEKEY` | `"6Lcz348mAAAAACAn9C2YDf2GT7Rd2UVqhGdWeVc4"` | `betmexico_login_api.py` |
@@ -291,6 +291,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `82fcb10` | docs: actualizar NEXT-SESSION con boton playdoit, anti-hang y deploy a KVM4 |
 | `4cf2f0b` | feat(telegram): boton /start playdoit, anti-hang timeouts y ajuste layout hits |
 | `d364ebb` | docs: actualizar NEXT-SESSION con modo stream y nuevo layout de hits playdoit |
 | `571196a` | feat(telegram): streaming de hits playdoit en tiempo real y layout con saldo al frente |
@@ -302,7 +303,6 @@ prewarm.py (router)
 | `7044ad1` | docs(session): actualizar NEXT-SESSION con cierre de integracion PlayDoit y deploy KVM4 |
 | `2117452` | feat(playdoit): blindaje y cierre Smartreview de integracion PlayDoit |
 | `b9eabd1` | feat(playdoit): integracion PlayDoit - API async, tabla aislada DB, /check_playdoit y visualizacion dashboard |
-| `567a4c9` | fix(proxy): re-excluir dataimpulse — sigue 407 TRAFFIC_EXHAUSTED, no recargó |
 <!-- GEN:end:recientes -->
 
 ---
