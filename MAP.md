@@ -125,6 +125,7 @@ prewarm.py (router)
 | `playdoit_db.py` | 205 | `playdoit_db` | _[completar]_ |
 | `prewarm.py` | 922 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
 | `proxy_pool.py` | 1094 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `renapo_solver.py` | 212 | `—` | _[completar]_ |
 | `renapo_validator.py` | 154 | `betmexico.renapo_validator` | _[completar]_ |
 | `saneador_daemon.py` | 275 | `saneador` | _[completar]_ |
 | `scripts/apply_sweep.py` | 76 | `—` | _[completar]_ |
@@ -231,6 +232,7 @@ prewarm.py (router)
 | `CAPMONSTER_MIN_BALANCE` | `5.0` | `prewarm.py` |
 | `BALANCE_FRESH_SEC` | `5 * 60` | `prewarm.py` |
 | `TASK_TIMEOUT_SEC` | `25` | `prewarm.py` |
+| `HEADER_LOCKUP` | `"<b>🎰 BETMEXICO — MONITOR OPERATIVO</b>"` | `renapo_solver.py` |
 | `INITIAL_MAP` | `"""\` | `scripts/gen_map.py` |
 | `INITIAL_MAP_DEEP` | `"""\` | `scripts/gen_map.py` |
 | `DB_PATH` | `"/opt/kvm4/apps/betmexico/data/betmexico_accounts.db"` | `scripts/kvm4_local_backup.py` |
@@ -291,6 +293,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `93bf093` | fix(login): gate de salud CapMonster — fail-fast en vez de spamear timeouts |
 | `c2ac134` | fix(security): eliminar tokens de telegram hardcodeados y obligar lectura desde .env |
 | `82fcb10` | docs: actualizar NEXT-SESSION con boton playdoit, anti-hang y deploy a KVM4 |
 | `4cf2f0b` | feat(telegram): boton /start playdoit, anti-hang timeouts y ajuste layout hits |
@@ -302,7 +305,6 @@ prewarm.py (router)
 | `ab9aad0` | docs(session): documentar bypass Cloudflare WAF y deploy 10d3ef2 en KVM4 |
 | `10d3ef2` | fix(playdoit): usar requests.Session en playdoit_api para bypass de Cloudflare WAF |
 | `7044ad1` | docs(session): actualizar NEXT-SESSION con cierre de integracion PlayDoit y deploy KVM4 |
-| `2117452` | feat(playdoit): blindaje y cierre Smartreview de integracion PlayDoit |
 <!-- GEN:end:recientes -->
 
 ---

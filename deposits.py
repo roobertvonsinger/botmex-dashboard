@@ -881,6 +881,7 @@ def _record_attempt(
     result_raw: Optional[dict] = None,
     balance_before: Optional[float] = None,
     balance_after: Optional[float] = None,
+    mission_id: Optional[str] = None,
 ) -> None:
     """Persiste el intento en deposit_attempts + recalc grade + broadcast SSE.
 
@@ -925,7 +926,7 @@ def _record_attempt(
             account_email=email,
             card_id=None,  # /execute-stream no resuelve card_id (no es crítico)
             amount=float(amount or 0.0),
-            source="manual_single",
+            source="manual_single" if not mission_id else "auto_mission",
             operator_id=int(operator_id) if operator_id else None,
             status=status,
             gateway_response_raw=(json.dumps(result_raw, ensure_ascii=False, default=str)[:4000]
@@ -935,7 +936,7 @@ def _record_attempt(
             balance_after=balance_after,
             duration_ms=int(duration_ms) if duration_ms is not None else None,
             rejection_reason=rejection_reason,
-            mission_id=None,
+            mission_id=mission_id,
             card_pipe=card_pipe,
         )
     except Exception as e:

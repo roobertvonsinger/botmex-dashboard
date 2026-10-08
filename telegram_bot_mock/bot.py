@@ -89,6 +89,11 @@ from bin_intelligence import (
     fetch_operator_personal_stats,
     format_telegram_operator_stats,
 )
+from renapo_solver import (
+    parse_curp_command_input,
+    resolve_curp_deterministic,
+    format_curp_response,
+)
 
 # Frases de saludo directas del operador
 POC_GREETINGS = [
@@ -638,6 +643,61 @@ async def cancel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=home_kb,
     )
     return ConversationHandler.END
+
+
+# ─────────────────────────────────────────────────────────────────────
+# FLUJO /CURP (Consulta y Validación Oficial RENAPO)
+# ─────────────────────────────────────────────────────────────────────
+
+async def curp_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Comando /curp — Consulta y resolución oficial de CURP."""
+    user_id = update.effective_user.id
+    if not is_authorized(user_id):
+        logger.warning(f"[Bot Auth] Usuario no autorizado intentó usar /curp: {user_id}")
+        await update.message.reply_text("⛔ Acceso denegado.")
+        return
+
+    raw_args = " ".join(context.args) if context.args else ""
+    if not raw_args:
+        help_msg = (
+            f"{HEADER}\n\n"
+            f"🪪 <b>Consultor de CURP Oficial (RENAPO)</b>\n\n"
+            f"<b>Uso:</b>\n"
+            f"<code>/curp NOMBRE COMPLETO|FECHA|ESTADO</code>\n\n"
+            f"<b>Ejemplos:</b>\n"
+            f"• <code>/curp JOSE JUAN MARTINEZ DOMINGUEZ|200381|NL</code>\n"
+            f"• <code>/curp MARIA TERESA LOZANO LOPEZ|200381|DF</code>\n"
+            f"• <code>/curp CARLOS HERNANDEZ PEREZ|1990-05-15|JAL</code>\n\n"
+            f"<i>Formatos de fecha aceptados: DDMMAA (200381), DDMMAAAA o YYYY-MM-DD.</i>"
+        )
+        await update.message.reply_text(help_msg, parse_mode="HTML")
+        return
+
+    data = parse_curp_command_input(raw_args)
+    if not data:
+        await update.message.reply_text(
+            f"{HEADER}\n\n"
+            "⚠️ <b>Formato de entrada no reconocido.</b>\n\n"
+            "Usa la sintaxis separada por barra:\n"
+            "<code>/curp NOMBRE COMPLETO|FECHA|ESTADO</code>\n\n"
+            "Ejemplo:\n"
+            "<code>/curp MARIA TERESA LOZANO LOPEZ|200381|DF</code>",
+            parse_mode="HTML",
+        )
+        return
+
+    curp = resolve_curp_deterministic(data)
+    if not curp:
+        await update.message.reply_text(
+            f"{HEADER}\n\n"
+            "❌ <b>Error al calcular el CURP.</b>\n"
+            "Verifica que el nombre completo tenga apellidos y la fecha sea válida.",
+            parse_mode="HTML",
+        )
+        return
+
+    reply_text = format_curp_response(data, curp)
+    await update.message.reply_text(reply_text, parse_mode="HTML")
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -2988,6 +3048,7 @@ async def setup_bot_commands(application):
     commands = [
         BotCommand("start", "🚀 Menú principal"),
         BotCommand("help", "📖 Manual operativo"),
+        BotCommand("curp", "🪪 Consultar CURP"),
         BotCommand("check", "🔍 Check BetMexico"),
         BotCommand("check_playdoit", "🔴 Check PlayDoit"),
         BotCommand("cancel", "🛑 Cancelar proceso"),
@@ -3063,6 +3124,7 @@ def build_app():
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("botmex", botmex_cmd))
     app.add_handler(CommandHandler("cancel", cancel_cmd))
+    app.add_handler(CommandHandler("curp", curp_cmd))
 
     # Handler callback para botones standalone del /start (help, cancel, radar, stats, active_process)
     app.add_handler(

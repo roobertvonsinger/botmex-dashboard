@@ -38,7 +38,7 @@ class BetPolicyConfig:
     misión — un cambio del tuner a mitad de vuelo nunca afecta una misión viva."""
 
     # ── montos / reintentos ──────────────────────────────────────────────────
-    probe_amount: float = 10.0            # D1: probe de matchmaking (dinero real)
+    probe_amount: float = 100.0           # D1: probe de matchmaking (dinero real) — temp $100 por Robert
     match_transient_retries: int = 4      # reintentos por PAR ante fallo transitorio (nuestro lado)
     transient_backoff_s: int = 25         # espera entre reintentos transitorios (enfría IP en 406)
 
@@ -77,7 +77,7 @@ _LOCKED_FIELDS = frozenset({
 # lo verifica `tests/test_bet_policy.py`). Un override fuera de rango se descarta y
 # ese campo cae al default. `(lo, hi)` inclusivo.
 _SANE_BOUNDS: dict[str, tuple[float, float]] = {
-    "probe_amount": (5.0, 50.0),
+    "probe_amount": (5.0, 200.0),
     "match_transient_retries": (1, 12),
     "transient_backoff_s": (5, 180),
     "sched_max_transient_retries": (1, 12),

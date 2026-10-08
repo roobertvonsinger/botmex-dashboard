@@ -139,7 +139,7 @@ def test_char_happy_path_single_account(H):
     assert H.locked == [1]
     assert H.unlocked == [1]       # cierre libera todos los locks (finally)
     final = H.updates[-1]
-    assert final["total_approved"] == 2 and final["total_deposited"] == 10 + 150
+    assert final["total_approved"] == 2 and final["total_deposited"] == ad.PROBE_AMOUNT + 150
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -308,7 +308,7 @@ def test_char_scheduled_nine_reps_exact_sleep_and_totals(H):
     assert approved_series == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10]
     final = H.updates[-1]
     assert final["status"] == "completed"
-    assert final["total_deposited"] == 10 + 9 * 150
+    assert final["total_deposited"] == ad.PROBE_AMOUNT + 9 * 150
 
 
 # ─────────────────────────────────────────────────────────────────────────────

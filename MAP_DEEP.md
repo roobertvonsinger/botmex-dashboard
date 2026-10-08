@@ -647,6 +647,16 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `prewarm_status` | def | L706–L721 |
 | `prewarm_refresh_stream` | def | L727–L922 |
 
+### `renapo_solver.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `parse_date_flexible` | def | L28–L81 |
+| `parse_state_code` | def | L84–L111 |
+| `parse_curp_command_input` | def | L114–L163 |
+| `format_curp_response` | def | L166–L194 |
+| `resolve_curp_deterministic` | def | L197–L212 |
+
 ### `renapo_validator.py`
 
 | Símbolo | Tipo | Líneas |

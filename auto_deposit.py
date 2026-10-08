@@ -479,8 +479,8 @@ def select_accounts_for_auto(
             pool_first,
             has_3ds,
             recently_tried,
-            jwt_first,
             fails_rank,
+            jwt_first,
             cards_rank,
             grade_rank,
             act_epoch_asc,
@@ -594,74 +594,62 @@ def _get_resting_accounts(db_path) -> set:
         if "matches" not in cols:
             return resting
 
-        # Tomar las últimas 4 misiones completadas o terminadas para evaluar la ventana 2x2
+        # Tomar las últimas 4 misiones para evaluar la ventana rodante 2x2
         recent_missions = con.execute(
-            "SELECT mission_id, accounts_selected, matches, status FROM auto_missions "
+            "SELECT mission_id, created_at, accounts_selected, matches, status FROM auto_missions "
             "ORDER BY id DESC LIMIT 4"
         ).fetchall()
 
         if len(recent_missions) < 2:
             return resting
 
-        # Evaluar las últimas 2 misiones
-        m1, m2 = recent_missions[0], recent_missions[1]
+        def _get_m_stats(m_row):
+            mid = m_row["mission_id"]
+            # 1. Consultar vía mission_id en deposit_attempts
+            att = {r[0].lower() for r in con.execute(
+                "SELECT DISTINCT LOWER(account_email) FROM deposit_attempts WHERE mission_id=?", (mid,)
+            ).fetchall() if r[0]}
+            funded = {r[0].lower() for r in con.execute(
+                "SELECT DISTINCT LOWER(account_email) FROM deposit_attempts WHERE mission_id=? AND UPPER(status)='APPROVED'", (mid,)
+            ).fetchall() if r[0]}
 
-        def _get_attempted_and_funded(m_row):
-            funded_emails = set()
-            attempted_emails = set()
-            try:
-                matches_data = json.loads(m_row["matches"] or "[]")
-                for item in matches_data:
-                    em = (item.get("email") or "").strip().lower()
-                    if em:
-                        attempted_emails.add(em)
-            except Exception:
-                pass
+            # 2. Fallback para misiones históricas sin mission_id persistido en deposit_attempts
+            if not att:
+                try:
+                    matches_data = json.loads(m_row["matches"] or "[]")
+                    for item in matches_data:
+                        em = (item.get("email") or "").strip().lower()
+                        if em:
+                            att.add(em)
+                except Exception:
+                    pass
+                c_at = m_row["created_at"]
+                if att and c_at:
+                    app_q = con.execute(
+                        "SELECT DISTINCT LOWER(account_email) FROM deposit_attempts "
+                        "WHERE UPPER(status)='APPROVED' AND LOWER(account_email) IN ({}) "
+                        "AND abs(julianday(created_at) - julianday(?)) <= (30.0 / 1440.0)".format(
+                            ",".join("?" * len(att))
+                        ),
+                        (*att, c_at)
+                    ).fetchall()
+                    funded = {r[0].lower() for r in app_q if r[0]}
 
-            # Consultar depósitos aprobados asociados al tiempo de la misión
-            # Si matches_data tiene cuentas pero ninguna tuvo APPROVED, se considera 0 fondeada
-            return attempted_emails, funded_emails
+            unfunded = att - funded
+            return att, funded, unfunded
 
-        # Consultar cuentas con intentos fallidos y sin éxito en las últimas 2 misiones
-        # Vía deposit_attempts agrupado por mission_id si existe, o por historial reciente
-        has_dep_att = bool(con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='deposit_attempts'").fetchone())
-        if has_dep_att:
-            dep_cols = [c[1] for c in con.execute("PRAGMA table_info(deposit_attempts)").fetchall()]
-            has_mid = "mission_id" in dep_cols
+        m_stats = [_get_m_stats(m) for m in recent_missions]
 
-            m1_id = m1["mission_id"]
-            m2_id = m2["mission_id"]
+        # Regla 1: Intentada y no fondeada en ambas m1 y m2 -> reposa (1a misión de reposo)
+        if len(m_stats) >= 2:
+            unfunded_m1_m2 = m_stats[0][2].intersection(m_stats[1][2])
+            resting.update(unfunded_m1_m2)
 
-            if has_mid:
-                # Intentadas en m1
-                m1_att = {r[0].lower() for r in con.execute("SELECT DISTINCT LOWER(account_email) FROM deposit_attempts WHERE mission_id=?", (m1_id,)).fetchall() if r[0]}
-                m1_app = {r[0].lower() for r in con.execute("SELECT DISTINCT LOWER(account_email) FROM deposit_attempts WHERE mission_id=? AND UPPER(status)='APPROVED'", (m1_id,)).fetchall() if r[0]}
-                m2_att = {r[0].lower() for r in con.execute("SELECT DISTINCT LOWER(account_email) FROM deposit_attempts WHERE mission_id=?", (m2_id,)).fetchall() if r[0]}
-                m2_app = {r[0].lower() for r in con.execute("SELECT DISTINCT LOWER(account_email) FROM deposit_attempts WHERE mission_id=? AND UPPER(status)='APPROVED'", (m2_id,)).fetchall() if r[0]}
-            else:
-                # Si no hay mission_id en deposit_attempts, extraer de matches / accounts_selected
-                def _emails_from_m(m_row):
-                    ems = set()
-                    try:
-                        matches_data = json.loads(m_row["matches"] or "[]")
-                        for item in matches_data:
-                            em = (item.get("email") or "").strip().lower()
-                            if em:
-                                ems.add(em)
-                    except Exception:
-                        pass
-                    return ems
-
-                m1_att = _emails_from_m(m1)
-                m2_att = _emails_from_m(m2)
-                # Fondeadas en las últimas 24h
-                apps_recent = {r[0].lower() for r in con.execute("SELECT DISTINCT LOWER(account_email) FROM deposit_attempts WHERE UPPER(status)='APPROVED' AND created_at >= datetime('now', '-24 hours')").fetchall() if r[0]}
-                m1_app = m1_att.intersection(apps_recent)
-                m2_app = m2_att.intersection(apps_recent)
-
-            # Cuentas intentadas en ambas m1 y m2 sin haber sido fondeadas en ninguna
-            unfunded_both = (m1_att - m1_app).intersection(m2_att - m2_app)
-            resting.update(unfunded_both)
+        # Regla 2: Intentada y no fondeada en m2 y m3, y reposó en m1 (no intentada en m1) -> reposa (2a misión de reposo)
+        if len(m_stats) >= 3:
+            unfunded_m2_m3 = m_stats[1][2].intersection(m_stats[2][2])
+            resting_m2_m3 = unfunded_m2_m3 - m_stats[0][0]
+            resting.update(resting_m2_m3)
     except Exception as ex:
         logger.warning(f"[_get_resting_accounts] Error al calcular cuentas en reposo: {ex}")
     finally:
@@ -904,9 +892,10 @@ def plan_auto_mission(
             dict(r) for r in con.execute(
                 f"SELECT * FROM accounts WHERE status='LIVE' "
                 f"AND published_to_pool=1{where_extra} "
-                f"ORDER BY {jwt_order}"
-                f"  (CASE WHEN grade='A+' THEN 0 WHEN grade='A' THEN 1 WHEN grade='B' THEN 2 ELSE 3 END), "
+                f"ORDER BY "
                 f"  (SELECT COUNT(*) FROM deposit_attempts WHERE account_email COLLATE NOCASE=accounts.email COLLATE NOCASE) ASC, "
+                f"  {jwt_order}"
+                f"  (CASE WHEN grade='A+' THEN 0 WHEN grade='A' THEN 1 WHEN grade='B' THEN 2 ELSE 3 END), "
                 f"  {order_lca}"
             ).fetchall()
         ]
@@ -923,9 +912,10 @@ def plan_auto_mission(
                 f"AND COALESCE(kyc_verified, 0)=1 "
                 f"AND (balance_real IS NULL OR balance_real < {MIN_WITHDRAWAL_AMOUNT}) "
                 f"{where_extra} "
-                f"ORDER BY {jwt_order}"
-                f"  (CASE WHEN grade='A+' THEN 0 WHEN grade='A' THEN 1 WHEN grade='B' THEN 2 ELSE 3 END), "
+                f"ORDER BY "
                 f"  (SELECT COUNT(*) FROM deposit_attempts WHERE account_email COLLATE NOCASE=accounts.email COLLATE NOCASE) ASC, "
+                f"  {jwt_order}"
+                f"  (CASE WHEN grade='A+' THEN 0 WHEN grade='A' THEN 1 WHEN grade='B' THEN 2 ELSE 3 END), "
                 f"  {order_lca} LIMIT ?"
             )
             try:
@@ -1635,6 +1625,7 @@ def _pull_fresh_live_account(
                 f"   WHERE status='DEAD' {where_dead_reason_pull}"
                 ") "
                 "ORDER BY "
+                "  (SELECT COUNT(*) FROM deposit_attempts WHERE account_email COLLATE NOCASE=accounts.email COLLATE NOCASE) ASC, "
                 "  (CASE WHEN grade='A+' THEN 0 WHEN grade='A' THEN 1 WHEN grade='B' THEN 2 ELSE 3 END), "
                 f"  {order_lca_pull} LIMIT 25"
             )
@@ -1899,6 +1890,7 @@ async def run_auto_mission(
                 duration,
                 operator_id,
                 card_pipe=pipe,
+                mission_id=mission_id,
             )
             return r, ok, code
 
@@ -2107,7 +2099,7 @@ async def run_auto_mission(
                         )
                         re_enqueued_3ds = False
                         for other in accounts_state:
-                            if not other["done"] and other["id"] not in card_tried_accounts[k] and pipe not in other["candidates"] and not _is_card_retired(pipe):
+                            if not other["done"] and other.get("declines", 0) == 0 and other["id"] not in card_tried_accounts[k] and pipe not in other["candidates"] and not _is_card_retired(pipe):
                                 other["candidates"].append(pipe)
                                 re_enqueued_3ds = True
                                 break
@@ -2212,7 +2204,7 @@ async def run_auto_mission(
                         )
                         re_enqueued = False
                         for other in accounts_state:
-                            if not other["done"] and other["id"] not in card_tried_accounts[k] and pipe not in other["candidates"] and not _is_card_retired(pipe):
+                            if not other["done"] and other.get("declines", 0) == 0 and other["id"] not in card_tried_accounts[k] and pipe not in other["candidates"] and not _is_card_retired(pipe):
                                 other["candidates"].append(pipe)
                                 re_enqueued = True
                                 break
