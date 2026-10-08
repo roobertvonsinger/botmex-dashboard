@@ -788,6 +788,34 @@ async def _no_cache_static_assets(request, call_next):
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
     return response
+
+
+@app.middleware("http")
+async def _botmex_subpath_middleware(request: Request, call_next):
+    """Soporte para subrutas /botmex y /betmexico tras reverse proxy Ingress.
+    1. Re-enruta requests con prefijo /botmex o /betmexico al path interno real.
+    2. Reescribe headers Location en redirects para preservar el prefijo /botmex.
+    """
+    path = request.url.path
+    matched_prefix = None
+    for prefix in ("/botmex", "/betmexico"):
+        if path == prefix or path.startswith(f"{prefix}/"):
+            matched_prefix = prefix
+            new_path = path[len(prefix):] or "/"
+            request.scope["path"] = new_path
+            break
+
+    response = await call_next(request)
+
+    # Reescribir Location en redirects si es relativo a la raiz
+    location = response.headers.get("location")
+    if location and location.startswith("/"):
+        if not (location.startswith("/botmex") or location.startswith("/betmexico")):
+            response.headers["location"] = f"/botmex{location}"
+
+    return response
+
+
 app.include_router(_prewarm_router)
 app.include_router(_deposits_router)
 

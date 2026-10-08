@@ -98,7 +98,7 @@ prewarm.py (router)
 | Módulo | L# | Logger | Propósito |
 |--------|----|---------|-----------| 
 | `account_refresh.py` | 595 | `betmexico.dashboard.account_refresh` | Refresca balance/movimientos de cuentas con JWT VIGENTE (sin login, sin captcha) — bg-loop cada 5min (`ACCOUNT_REFRESH_INTERVAL_SEC=300`). Cuentas "hot" (balance>$50, autolock activo, retiro pendiente) se priorizan y bypassean grade/pool/lock |
-| `app.py` | 5706 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
+| `app.py` | 5734 | `betmexico.dashboard.account_refresh` | App Flask principal: config, BD SQLite, rutas base, bus SSE, KPIs/admin, watchdog init |
 | `auth.py` | 287 | `—` | Core de autenticación: sesiones, hashing de passwords, decorador `require_session` |
 | `auto_deposit.py` | 2970 | `betmexico.dashboard.auto_deposit` | _[completar]_ |
 | `autoexclusion.py` | 177 | `betmexico.dashboard.autoexclusion` | _[completar]_ |
@@ -294,6 +294,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `36b1ce1` | feat(proxy): reactivar DataImpulse 501 proxies residencial MX con nuevas credenciales |
 | `e0211cf` | feat(bot): /curp resolver renapo y actualizacion test characterization |
 | `93bf093` | fix(login): gate de salud CapMonster — fail-fast en vez de spamear timeouts |
 | `c2ac134` | fix(security): eliminar tokens de telegram hardcodeados y obligar lectura desde .env |
@@ -305,7 +306,6 @@ prewarm.py (router)
 | `72a39e5` | fix(telegram): ajustar layout hits playdoit sin nombre y con badge saldo > |
 | `2fc6f0c` | fix(playdoit): parsear documentStatus cuando retorna lista y sumarizar progreso en logs |
 | `ab9aad0` | docs(session): documentar bypass Cloudflare WAF y deploy 10d3ef2 en KVM4 |
-| `10d3ef2` | fix(playdoit): usar requests.Session en playdoit_api para bypass de Cloudflare WAF |
 <!-- GEN:end:recientes -->
 
 ---
