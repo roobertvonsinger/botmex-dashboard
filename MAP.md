@@ -106,7 +106,7 @@ prewarm.py (router)
 | `bet_policy.py` | 221 | `—` | _[completar]_ |
 | `bet_retry_policy.py` | 427 | `—` | _[completar]_ |
 | `betmexico_bot.py` | 528 | `—` | _[completar]_ |
-| `betmexico_config.py` | 185 | `betmexico` | _[completar]_ |
+| `betmexico_config.py` | 186 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2959 | `—` | _[completar]_ |
 | `betmexico_deposit.py` | 958 | `—` | _[completar]_ |
 | `betmexico_login_api.py` | 1197 | `httpx` | _[completar]_ |
@@ -125,7 +125,7 @@ prewarm.py (router)
 | `playdoit_api.py` | 307 | `playdoit_api` | _[completar]_ |
 | `playdoit_db.py` | 205 | `playdoit_db` | _[completar]_ |
 | `prewarm.py` | 922 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
-| `proxy_pool.py` | 1090 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `proxy_pool.py` | 1091 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_solver.py` | 212 | `—` | _[completar]_ |
 | `renapo_validator.py` | 154 | `betmexico.renapo_validator` | _[completar]_ |
 | `saneador_daemon.py` | 275 | `saneador` | _[completar]_ |
@@ -295,6 +295,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `203b89c` | fix(captcha): wire make_pool and ApiChecker to CapMonster Cloud directly, purge dead KVM4 IP |
 | `141dc5c` | feat(routing): soporte canonico para subruta /botmex con middleware de prefijo y redirects relativos |
 | `36b1ce1` | feat(proxy): reactivar DataImpulse 501 proxies residencial MX con nuevas credenciales |
 | `e0211cf` | feat(bot): /curp resolver renapo y actualizacion test characterization |
@@ -306,7 +307,6 @@ prewarm.py (router)
 | `571196a` | feat(telegram): streaming de hits playdoit en tiempo real y layout con saldo al frente |
 | `feea7c5` | docs: registrar ajuste de layout de hits playdoit en NEXT-SESSION |
 | `72a39e5` | fix(telegram): ajustar layout hits playdoit sin nombre y con badge saldo > |
-| `2fc6f0c` | fix(playdoit): parsear documentStatus cuando retorna lista y sumarizar progreso en logs |
 <!-- GEN:end:recientes -->
 
 ---

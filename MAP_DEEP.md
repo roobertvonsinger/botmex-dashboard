@@ -336,10 +336,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `is_subadmin` | def | L80–L82 |
 | `is_any_admin` | def | L85–L87 |
 | `is_authorized` | def | L90–L91 |
-| `get_admin_proxy` | def | L148–L150 |
-| `parse_user_proxy` | def | L153–L164 |
-| `get_user_proxy` | def | L167–L180 |
-| `_get_solver_for_user` | def | L183–L185 |
+| `get_admin_proxy` | def | L149–L151 |
+| `parse_user_proxy` | def | L154–L165 |
+| `get_user_proxy` | def | L168–L181 |
+| `_get_solver_for_user` | def | L184–L186 |
 
 ### `betmexico_db.py`
 
@@ -665,17 +665,17 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `_bot_proxies` | def | L833–L839 |
-| `all_proxies` | def | L842–L865 |
-| `_to_url` | def | L868–L878 |
-| `get_admin_proxy` | def | L881–L886 |
-| `build_admin_proxy_url` | def | L889–L892 |
-| `shuffled_proxy_urls` | def | L895–L903 |
-| `_retry_exceptions` | def | L911–L937 |
-| `_proxy_host` | def | L940–L944 |
-| `call_with_proxy_failover` | def | L947–L1043 |
-| `_looks_like_proxy_failure_result` | def | L1052–L1071 |
-| `_looks_like_captcha_failure_result` | def | L1074–L1089 |
+| `_bot_proxies` | def | L834–L840 |
+| `all_proxies` | def | L843–L866 |
+| `_to_url` | def | L869–L879 |
+| `get_admin_proxy` | def | L882–L887 |
+| `build_admin_proxy_url` | def | L890–L893 |
+| `shuffled_proxy_urls` | def | L896–L904 |
+| `_retry_exceptions` | def | L912–L938 |
+| `_proxy_host` | def | L941–L945 |
+| `call_with_proxy_failover` | def | L948–L1044 |
+| `_looks_like_proxy_failure_result` | def | L1053–L1072 |
+| `_looks_like_captcha_failure_result` | def | L1075–L1090 |
 
 ### `renapo_solver.py`
 
