@@ -1,4 +1,4 @@
-﻿"""Pool de proxies admin local del dashboard + failover real.
+"""Pool de proxies admin local del dashboard + failover real.
 
 Combina los proxies del bot (`betmexico_config.ADMIN_PROXIES`) con extras
 definidos acÃ¡. Permite agregar/quitar proxies sin tocar el monorepo del bot â€”
@@ -801,8 +801,8 @@ PROXY001_PROXIES: List[Dict[str, str]] = [
 
 
 _DATAIMPULSE_HOST = "gw.dataimpulse.com"
-_DATAIMPULSE_USER = "506e02a6444effce62de__cr.mx"
-_DATAIMPULSE_PASS = "59bd44415b7b9c7c"
+_DATAIMPULSE_USER = "3d7652c3743edba62771__cr.mx"
+_DATAIMPULSE_PASS = "6f87d951d352bd3f"
 _DATAIMPULSE_PORT = 823
 
 # Puerto 823 rotativo directo + rango sticky 10000-10500 (500 puertos)
@@ -826,12 +826,8 @@ DATAIMPULSE_PROXIES: List[Dict[str, str]] = [
 # - nodemaven: degradado 504/407 (commit b3d0361, 2026-08-13). El bot del
 #   monorepo aún lo lista en ADMIN_PROXIES, pero el dashboard NO debe usarlo —
 #   la exclusión aplica al pool combinado (bot + extras).
-# - dataimpulse: 407 TRAFFIC_EXHAUSTED (banda del plan agotada). Re-verificado
-#   con curl directo a gw.dataimpulse.com:823 el 2026-09-13 20:47 UTC -> sigue
-#   407 (rotativo 823). NO quitar de esta lista sin un curl directo que
-#   confirme 200 primero — la vez pasada se quitó sin verificar y volvió a
-#   tronar /bet en vivo (Robert 2026-09-13).
-_EXCLUDED_PROXY_HOSTS: tuple = ("litport", "nodemaven", "dataimpulse")
+# - dataimpulse: REACTIVADO (2026-10-08) con nuevo plan residencial MX verificado 200 OK.
+_EXCLUDED_PROXY_HOSTS: tuple = ("litport", "nodemaven")
 
 
 def _bot_proxies() -> List[Dict[str, str]]:

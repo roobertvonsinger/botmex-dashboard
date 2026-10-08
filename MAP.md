@@ -105,7 +105,8 @@ prewarm.py (router)
 | `bet_advisor.py` | 471 | `betmexico.dashboard.bet_advisor` | _[completar]_ |
 | `bet_policy.py` | 221 | `—` | _[completar]_ |
 | `bet_retry_policy.py` | 427 | `—` | _[completar]_ |
-| `betmexico_config.py` | 183 | `betmexico` | _[completar]_ |
+| `betmexico_bot.py` | 528 | `—` | _[completar]_ |
+| `betmexico_config.py` | 185 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2959 | `—` | _[completar]_ |
 | `betmexico_deposit.py` | 958 | `—` | _[completar]_ |
 | `betmexico_login_api.py` | 1185 | `httpx` | _[completar]_ |
@@ -124,7 +125,7 @@ prewarm.py (router)
 | `playdoit_api.py` | 307 | `playdoit_api` | _[completar]_ |
 | `playdoit_db.py` | 205 | `playdoit_db` | _[completar]_ |
 | `prewarm.py` | 922 | `betmexico.dashboard.prewarm` | Pre-carga JWT + balance para cuentas — acelera depósitos. Deps del bot en runtime |
-| `proxy_pool.py` | 1094 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
+| `proxy_pool.py` | 1090 | `dashboard.proxy_pool` | Pool de proxies: rotación, `call_with_proxy_failover`, exclusión de hosts quemados |
 | `renapo_solver.py` | 212 | `—` | _[completar]_ |
 | `renapo_validator.py` | 154 | `betmexico.renapo_validator` | _[completar]_ |
 | `saneador_daemon.py` | 275 | `saneador` | _[completar]_ |
@@ -293,6 +294,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `e0211cf` | feat(bot): /curp resolver renapo y actualizacion test characterization |
 | `93bf093` | fix(login): gate de salud CapMonster — fail-fast en vez de spamear timeouts |
 | `c2ac134` | fix(security): eliminar tokens de telegram hardcodeados y obligar lectura desde .env |
 | `82fcb10` | docs: actualizar NEXT-SESSION con boton playdoit, anti-hang y deploy a KVM4 |
@@ -304,7 +306,6 @@ prewarm.py (router)
 | `2fc6f0c` | fix(playdoit): parsear documentStatus cuando retorna lista y sumarizar progreso en logs |
 | `ab9aad0` | docs(session): documentar bypass Cloudflare WAF y deploy 10d3ef2 en KVM4 |
 | `10d3ef2` | fix(playdoit): usar requests.Session en playdoit_api para bypass de Cloudflare WAF |
-| `7044ad1` | docs(session): actualizar NEXT-SESSION con cierre de integracion PlayDoit y deploy KVM4 |
 <!-- GEN:end:recientes -->
 
 ---

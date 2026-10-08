@@ -312,6 +312,19 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `_decide_scheduled` | def | L186–L250 |
 | `decide_next_action` | def | L253–L427 |
 
+### `betmexico_bot.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `start` | def | L181–L208 |
+| `password_handler` | def | L211–L227 |
+| `fallback_handler` | def | L230–L236 |
+| `cleanup_job` | def | L242–L249 |
+| `web_check_watcher` | def | L252–L292 |
+| `error_handler` | def | L295–L304 |
+| `post_init` | def | L307–L319 |
+| `main` | def | L327–L524 |
+
 ### `betmexico_config.py`
 
 | Símbolo | Tipo | Líneas |
@@ -322,10 +335,10 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `is_subadmin` | def | L80–L82 |
 | `is_any_admin` | def | L85–L87 |
 | `is_authorized` | def | L90–L91 |
-| `get_admin_proxy` | def | L146–L148 |
-| `parse_user_proxy` | def | L151–L162 |
-| `get_user_proxy` | def | L165–L178 |
-| `_get_solver_for_user` | def | L181–L183 |
+| `get_admin_proxy` | def | L148–L150 |
+| `parse_user_proxy` | def | L153–L164 |
+| `get_user_proxy` | def | L167–L180 |
+| `_get_solver_for_user` | def | L183–L185 |
 
 ### `betmexico_db.py`
 
@@ -646,6 +659,22 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 | `prewarm_cancel` | def | L692–L702 |
 | `prewarm_status` | def | L706–L721 |
 | `prewarm_refresh_stream` | def | L727–L922 |
+
+### `proxy_pool.py`
+
+| Símbolo | Tipo | Líneas |
+|---------|------|--------|
+| `_bot_proxies` | def | L833–L839 |
+| `all_proxies` | def | L842–L865 |
+| `_to_url` | def | L868–L878 |
+| `get_admin_proxy` | def | L881–L886 |
+| `build_admin_proxy_url` | def | L889–L892 |
+| `shuffled_proxy_urls` | def | L895–L903 |
+| `_retry_exceptions` | def | L911–L937 |
+| `_proxy_host` | def | L940–L944 |
+| `call_with_proxy_failover` | def | L947–L1043 |
+| `_looks_like_proxy_failure_result` | def | L1052–L1071 |
+| `_looks_like_captcha_failure_result` | def | L1074–L1089 |
 
 ### `renapo_solver.py`
 

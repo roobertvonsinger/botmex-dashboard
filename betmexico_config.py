@@ -137,7 +137,9 @@ LOGO = "┏ ◍ B🤖T ━┓\n  chk\n\n"
 # ─────────────────────────────────────────────────────────────────────
 
 ADMIN_PROXIES = [
-    # Litport (Premium MX) — ACTIVE
+    # DataImpulse (Residencial MX) — ACTIVE (2026-10-08)
+    {"server": "gw.dataimpulse.com:823", "username": "3d7652c3743edba62771__cr.mx", "password": "6f87d951d352bd3f"},
+    # Litport (Premium MX)
     {"server": "hub-us-7.litport.net:1337", "username": "bmxutop", "password": "49O3mC6hl4"},
     # DataBay EXHAUSTED — descomentar cuando tengas crédito nuevo
 ]
