@@ -15,7 +15,7 @@ import asyncio
 import logging
 import random
 import time
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -104,7 +104,6 @@ class CaptchaHubSolverFast:
             self.base_url,
             "http://captcha-hub:8889",
             "http://127.0.0.1:8889",
-            "http://2.25.98.162:8889",
         ]
         for url in urls_to_try:
             if not url:
@@ -425,14 +424,27 @@ class BetmexicoApiChecker:
     Misma interfaz que BetmexicoLoginTester para drop-in replacement.
     """
 
-    def __init__(self, headless: bool = True, proxy: Optional[dict] = None, client: Optional[httpx.AsyncClient] = None):
+    def __init__(self, headless: bool = True, proxy: Optional[dict] = None, client: Optional[httpx.AsyncClient] = None, solver: Optional[Any] = None):
         self.headless = headless  # Compatibilidad con BetmexicoLoginTester
         self.proxy = proxy  # {"server": "host:port", "username": "...", "password": "..."}
         self.user_agent = random.choice(USER_AGENTS)
         # Prioridad de solvers:
-        # 1. KVM4 Central Captcha Hub (:8889) con cache y multi-provider
-        # 2. CapSolver / CapMonster directos como fallback
-        self.captcha_solver = CaptchaHubSolverFast()
+        # 1. Solver explícito pasado como argumento
+        # 2. CapMonster Cloud directo si hay key en env (BMX_CAPMONSTER_KEY / CAPMONSTER_KEY)
+        # 3. CaptchaHub si hay CAPTCHA_HUB_URL configurado explícitamente
+        # 4. CapSolver / AntiCaptcha si hay key
+        cap_key = os.getenv("BMX_CAPMONSTER_KEY") or os.getenv("CAPMONSTER_KEY") or CAPMONSTER_API_KEY
+        hub_url = os.getenv("CAPTCHA_HUB_URL")
+        if solver is not None:
+            self.captcha_solver = solver
+        elif cap_key:
+            self.captcha_solver = CapMonsterSolverFast(cap_key)
+        elif hub_url:
+            self.captcha_solver = CaptchaHubSolverFast(hub_url)
+        elif CAPSOLVER_API_KEY:
+            self.captcha_solver = AntiCaptchaSolverFast(CAPSOLVER_API_KEY)
+        else:
+            self.captcha_solver = CapMonsterSolverFast(cap_key or "")
         self._client = client
         self._external_client = client is not None
 

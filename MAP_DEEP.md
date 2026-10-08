@@ -384,21 +384,21 @@ Busca el nombre de la función con Ctrl+F y obtén el rango de líneas exacto.
 |---------|------|--------|
 | `now_mx` | def | L24–L26 |
 | `_decode_jwt_payload` | def | L34–L42 |
-| `CaptchaHubSolverFast` | class | L88–L130 |
-| `AntiCaptchaSolverFast` | class | L133–L239 |
-| `TwoCaptchaSolverFast` | class | L242–L331 |
-| `create_solver` | def | L334–L340 |
-| `CapMonsterSolverFast` | class | L347–L415 |
-| `BetmexicoApiChecker` | class | L418–L978 |
-| `CaptchaTokenPool` | class | L984–L1185 |
+| `CaptchaHubSolverFast` | class | L88–L129 |
+| `AntiCaptchaSolverFast` | class | L132–L238 |
+| `TwoCaptchaSolverFast` | class | L241–L330 |
+| `create_solver` | def | L333–L339 |
+| `CapMonsterSolverFast` | class | L346–L414 |
+| `BetmexicoApiChecker` | class | L417–L990 |
+| `CaptchaTokenPool` | class | L996–L1197 |
 
 ### `betmexico_login_service.py`
 
 | Símbolo | Tipo | Líneas |
 |---------|------|--------|
-| `make_pool` | def | L33–L53 |
-| `_persist_jwt_cache` | def | L56–L70 |
-| `get_jwt` | def | L73–L144 |
+| `make_pool` | def | L33–L59 |
+| `_persist_jwt_cache` | def | L62–L76 |
+| `get_jwt` | def | L79–L150 |
 
 ### `betmexico_payment_analyzer.py`
 

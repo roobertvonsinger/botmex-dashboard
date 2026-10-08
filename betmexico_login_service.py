@@ -31,17 +31,23 @@ _JWT_CACHE_MARGIN_SEC = 60  # margen de 1 min para evitar usar JWT a punto de ex
 
 
 def make_pool(solver_or_key=None, size: int = 12, workers: int = 10) -> CaptchaTokenPool:
-    """Crea un CaptchaTokenPool estándar para BetMexico usando CaptchaHub."""
-    from betmexico_login_api import CaptchaHubSolverFast, AntiCaptchaSolverFast
-    if solver_or_key is None or solver_or_key == "":
-        solver = CaptchaHubSolverFast()
-    elif isinstance(solver_or_key, str):
+    """Crea un CaptchaTokenPool estándar para BetMexico usando CapMonster o fallback."""
+    from betmexico_login_api import CapMonsterSolverFast, CaptchaHubSolverFast, AntiCaptchaSolverFast
+    import os
+    if not solver_or_key:
+        solver_or_key = os.getenv("BMX_CAPMONSTER_KEY") or os.getenv("CAPMONSTER_KEY") or os.getenv("BMX_CAPSOLVER_KEY")
+
+    if isinstance(solver_or_key, str):
         if solver_or_key.startswith("http"):
             solver = CaptchaHubSolverFast(solver_or_key)
         elif solver_or_key.startswith("CAP-"):
             solver = AntiCaptchaSolverFast(solver_or_key)
+        elif solver_or_key:
+            solver = CapMonsterSolverFast(solver_or_key)
         else:
-            solver = CaptchaHubSolverFast()
+            solver = CapMonsterSolverFast(os.getenv("BMX_CAPMONSTER_KEY", ""))
+    elif solver_or_key is None:
+        solver = CapMonsterSolverFast(os.getenv("BMX_CAPMONSTER_KEY", ""))
     else:
         solver = solver_or_key
     return CaptchaTokenPool(

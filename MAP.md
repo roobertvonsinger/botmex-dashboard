@@ -109,8 +109,8 @@ prewarm.py (router)
 | `betmexico_config.py` | 185 | `betmexico` | _[completar]_ |
 | `betmexico_db.py` | 2959 | `—` | _[completar]_ |
 | `betmexico_deposit.py` | 958 | `—` | _[completar]_ |
-| `betmexico_login_api.py` | 1185 | `httpx` | _[completar]_ |
-| `betmexico_login_service.py` | 144 | `betmexico.login_service` | _[completar]_ |
+| `betmexico_login_api.py` | 1197 | `httpx` | _[completar]_ |
+| `betmexico_login_service.py` | 150 | `betmexico.login_service` | _[completar]_ |
 | `betmexico_payment_analyzer.py` | 592 | `—` | _[completar]_ |
 | `betmexico_utils.py` | 1159 | `—` | _[completar]_ |
 | `bin_intelligence.py` | 701 | `betmexico.dashboard.bin_intelligence` | _[completar]_ |
@@ -284,6 +284,7 @@ prewarm.py (router)
 | `BMX_CAPSOLVER_KEY` | `""` | `betmexico_login_api.py` |
 | `BMX_RECAPTCHA_SITEKEY` | `"6Lcz348mAAAAACAn9C2YDf2GT7Rd2UVqhGdWeVc4"` | `betmexico_login_api.py` |
 | `BMX_WEB_URL` | `"https://botmexico.com.mx"` | `betmexico_utils.py` |
+| `CAPMONSTER_KEY` | `—` | `betmexico_login_api.py` |
 | `CAPTCHA_HUB_URL` | `"http://captcha-hub:8889"` | `betmexico_login_api.py` |
 <!-- GEN:end:env -->
 
@@ -294,6 +295,7 @@ prewarm.py (router)
 <!-- GEN:start:recientes -->
 | Hash | Mensaje |
 |------|---------|
+| `141dc5c` | feat(routing): soporte canonico para subruta /botmex con middleware de prefijo y redirects relativos |
 | `36b1ce1` | feat(proxy): reactivar DataImpulse 501 proxies residencial MX con nuevas credenciales |
 | `e0211cf` | feat(bot): /curp resolver renapo y actualizacion test characterization |
 | `93bf093` | fix(login): gate de salud CapMonster — fail-fast en vez de spamear timeouts |
@@ -305,7 +307,6 @@ prewarm.py (router)
 | `feea7c5` | docs: registrar ajuste de layout de hits playdoit en NEXT-SESSION |
 | `72a39e5` | fix(telegram): ajustar layout hits playdoit sin nombre y con badge saldo > |
 | `2fc6f0c` | fix(playdoit): parsear documentStatus cuando retorna lista y sumarizar progreso en logs |
-| `ab9aad0` | docs(session): documentar bypass Cloudflare WAF y deploy 10d3ef2 en KVM4 |
 <!-- GEN:end:recientes -->
 
 ---
